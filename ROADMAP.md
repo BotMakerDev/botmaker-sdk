@@ -8,6 +8,16 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-11 — Fix `steam://` launch opening a blank browser page
+
+**Done**
+- `UriLauncher.open` no longer routes custom protocol schemes through `Desktop.browse`. On Windows
+  `Desktop.browse("steam://…")` handed the URI to the default *browser* (blank page) instead of Steam. Now
+  only `http`/`https`/`file` URLs use `Desktop.browse`; everything else goes straight to the OS protocol
+  handler. The Windows native opener switched from `rundll32 url.dll,FileProtocolHandler` to `explorer.exe`
+  (ShellExecute — the reliable way to invoke a registered protocol handler). `Game.launchSteam`'s CLI
+  fallback is unchanged.
+
 ## 2026-07-10 — Compare API trim, click Any/All Compare, Game running-detection, per-template resolution
 
 **Done**

@@ -22,8 +22,16 @@ public final class UriLauncher {
     /** Opens {@code uri} with the OS handler. Returns {@code true} if a launcher was invoked. */
     public static boolean open(String uri) {
         if (uri == null || uri.isBlank()) return false;
-        if (tryDesktop(uri)) return true;
+        // Custom protocol schemes (steam://, discord://, …) must go to the OS protocol handler. On Windows
+        // Desktop.browse hands them to the default *browser*, which shows a blank page instead of launching
+        // Steam — so only use Desktop.browse for real web/file URLs and route everything else natively.
+        if (isWebOrFileScheme(uri) && tryDesktop(uri)) return true;
         return tryNativeOpener(uri);
+    }
+
+    private static boolean isWebOrFileScheme(String uri) {
+        String lower = uri.toLowerCase();
+        return lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("file:");
     }
 
     private static boolean tryDesktop(String uri) {
@@ -42,7 +50,9 @@ public final class UriLauncher {
         String os = System.getProperty("os.name", "").toLowerCase();
         List<String> command;
         if (os.contains("win")) {
-            command = List.of("rundll32", "url.dll,FileProtocolHandler", uri);
+            // explorer.exe routes the URI through ShellExecute, which honours registered protocol handlers
+            // (steam://, etc.) — the most reliable way to hand a custom scheme to its app on Windows.
+            command = List.of("explorer.exe", uri);
         } else if (os.contains("mac")) {
             command = List.of("open", uri);
         } else {
