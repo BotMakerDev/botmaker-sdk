@@ -443,6 +443,140 @@ public class ImageFinder {
         return result.isFound();
     }
 
+    // --- findAnyCompare: the FIRST good template (in order) that beats every bad template ---
+
+    /**
+     * Return the first {@code good} template (in priority order) whose best match beats every
+     * {@code bad} template at its location by the default margin. Unlike {@link #findCompare} (which
+     * returns the single highest-scoring good), this stops at the first good that wins — the compare
+     * analogue of {@link #findAny}.
+     * <p>
+     * The match result is stored in {@link VisionContext}.
+     *
+     * @param good the group of good templates to search for, in priority order
+     * @param bad  the group of bad templates that must NOT out-score the good template
+     * @return true if a good template was found and beats all bad templates, false otherwise
+     */
+    public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
+        return findAnyCompare(good, bad, Source.current(), ClickConfig.DEFAULT_COMPARE_MARGIN);
+    }
+
+    /**
+     * Return the first {@code good} template (in priority order) whose best match beats every
+     * {@code bad} template at its location by the specified margin.
+     * <p>
+     * The match result is stored in {@link VisionContext}.
+     *
+     * @param good   the group of good templates to search for, in priority order
+     * @param bad    the group of bad templates that must NOT out-score the good template
+     * @param margin the minimum score difference required for a match
+     * @return true if a good template was found and beats all bad templates, false otherwise
+     */
+    public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
+        return findAnyCompare(good, bad, Source.current(), margin);
+    }
+
+    /**
+     * Return the first {@code good} template (in priority order) whose best match beats every
+     * {@code bad} template at its location by the default margin, searched within {@code source}.
+     * <p>
+     * The match result is stored in {@link VisionContext}.
+     *
+     * @param good   the group of good templates to search for, in priority order
+     * @param bad    the group of bad templates that must NOT out-score the good template
+     * @param source the capture source to search within
+     * @return true if a good template was found and beats all bad templates, false otherwise
+     */
+    public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
+        return findAnyCompare(good, bad, source, ClickConfig.DEFAULT_COMPARE_MARGIN);
+    }
+
+    /**
+     * Return the first {@code good} template (in priority order) whose best match beats every
+     * {@code bad} template at its location by the specified margin, searched within {@code source}.
+     * <p>
+     * The match result is stored in {@link VisionContext}.
+     *
+     * @param good   the group of good templates to search for, in priority order
+     * @param bad    the group of bad templates that must NOT out-score the good template
+     * @param source the capture source to search within
+     * @param margin the minimum score difference required for a match
+     * @return true if a good template was found and beats all bad templates, false otherwise
+     */
+    public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
+                                         double margin) {
+        MatchResult result = compareAny(good.templates(), bad.templates(), source,
+                ClickConfig.DEFAULT_CONFIDENCE, margin);
+        VisionContext.setLastMatch(result);
+        return result.isFound();
+    }
+
+    // --- findAllCompare: EVERY good match (across every good template) that beats all bad templates ---
+
+    /**
+     * Find every location of every {@code good} template that beats all {@code bad} templates there by
+     * the default margin — the compare analogue of {@link #findAll}.
+     * <p>
+     * The list of matches is stored in {@link VisionContext} ({@link VisionContext#getLastMatchList()}).
+     *
+     * @param good the group of good templates to search for
+     * @param bad  the group of bad templates that must NOT out-score a good match
+     * @return the number of winning good matches found
+     */
+    public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
+        return findAllCompare(good, bad, Source.current(), ClickConfig.DEFAULT_COMPARE_MARGIN);
+    }
+
+    /**
+     * Find every location of every {@code good} template that beats all {@code bad} templates there by
+     * the specified margin.
+     * <p>
+     * The list of matches is stored in {@link VisionContext} ({@link VisionContext#getLastMatchList()}).
+     *
+     * @param good   the group of good templates to search for
+     * @param bad    the group of bad templates that must NOT out-score a good match
+     * @param margin the minimum score difference required for a match
+     * @return the number of winning good matches found
+     */
+    public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
+        return findAllCompare(good, bad, Source.current(), margin);
+    }
+
+    /**
+     * Find every location of every {@code good} template that beats all {@code bad} templates there by
+     * the default margin, searched within {@code source}.
+     * <p>
+     * The list of matches is stored in {@link VisionContext} ({@link VisionContext#getLastMatchList()}).
+     *
+     * @param good   the group of good templates to search for
+     * @param bad    the group of bad templates that must NOT out-score a good match
+     * @param source the capture source to search within
+     * @return the number of winning good matches found
+     */
+    public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
+        return findAllCompare(good, bad, source, ClickConfig.DEFAULT_COMPARE_MARGIN);
+    }
+
+    /**
+     * Find every location of every {@code good} template that beats all {@code bad} templates there by
+     * the specified margin, searched within {@code source}.
+     * <p>
+     * The list of matches is stored in {@link VisionContext} ({@link VisionContext#getLastMatchList()}).
+     *
+     * @param good   the group of good templates to search for
+     * @param bad    the group of bad templates that must NOT out-score a good match
+     * @param source the capture source to search within
+     * @param margin the minimum score difference required for a match
+     * @return the number of winning good matches found
+     */
+    public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
+                                     double margin) {
+        List<MatchResult> results = compareAll(good.templates(), bad.templates(), source,
+                ClickConfig.DEFAULT_CONFIDENCE, margin);
+        VisionContext.setLastMatchList(results);
+        return results.size();
+    }
+
     /**
      * Single-capture compare: find each good template's best match, keep the highest-scoring good
      * whose location out-scores every bad template (re-scored on the same frame) by {@code margin}.
@@ -469,16 +603,7 @@ public class ImageFinder {
                 if (gm == null) {
                     continue;
                 }
-                boolean wins = true;
-                for (ImageTemplate bad : bads) {
-                    double badScore = OpencvManager.scoreAround(
-                            bad.getMat(), background, false, gm.x(), gm.y(), COMPARE_PAD);
-                    if (badScore >= gm.score() - margin) {
-                        wins = false;
-                        break;
-                    }
-                }
-                if (wins && (!best.isFound() || gm.score() > best.getConfidence())) {
+                if (beatsAllBads(gm, bads, background, margin) && (!best.isFound() || gm.score() > best.getConfidence())) {
                     best = new MatchResult(
                             new Point(gm.x() + offsetX, gm.y() + offsetY),
                             gm.width(), gm.height(), gm.score(), good.getId());
@@ -497,6 +622,112 @@ public class ImageFinder {
                 background.release();
             }
         }
+    }
+
+    /**
+     * Single-capture compare, first-wins: return the first good template (in order) whose best match
+     * out-scores every bad template (re-scored on the same frame) by {@code margin}. Internal — callers
+     * update VisionContext.
+     */
+    private static MatchResult compareAny(List<ImageTemplate> goods, List<ImageTemplate> bads,
+                                          CaptureSource source, double confidence, double margin) {
+        Mat background = null;
+        try {
+            BufferedImage screenshot = source.capture();
+            if (screenshot == null) {
+                return MatchResult.notFound();
+            }
+            background = OpencvManager.bufferedImageToMat(screenshot);
+
+            Point origin = source.origin();
+            int offsetX = (int) origin.x;
+            int offsetY = (int) origin.y;
+
+            for (ImageTemplate good : goods) {
+                RawMatch gm = OpencvManager.findBestMatch(good.getMat(), background, false, confidence,
+                        good.captureResolution());
+                if (gm == null) {
+                    continue;
+                }
+                if (beatsAllBads(gm, bads, background, margin)) {
+                    MatchResult result = new MatchResult(
+                            new Point(gm.x() + offsetX, gm.y() + offsetY),
+                            gm.width(), gm.height(), gm.score(), good.getId());
+                    emitMatch(source, result);
+                    return result;
+                }
+            }
+            emitMatch(source, MatchResult.notFound());
+            return MatchResult.notFound();
+        } catch (Exception e) {
+            if (ClickConfig.DEBUG_MODE) {
+                System.err.println("Error in compareAny: " + e.getMessage());
+                e.printStackTrace();
+            }
+            return MatchResult.notFound();
+        } finally {
+            if (background != null) {
+                background.release();
+            }
+        }
+    }
+
+    /**
+     * Single-capture compare, every-location: for every good template, keep each match location that
+     * out-scores every bad template (re-scored on the same frame) by {@code margin}. Internal — callers
+     * update VisionContext.
+     */
+    private static List<MatchResult> compareAll(List<ImageTemplate> goods, List<ImageTemplate> bads,
+                                                CaptureSource source, double confidence, double margin) {
+        Mat background = null;
+        try {
+            BufferedImage screenshot = source.capture();
+            if (screenshot == null) {
+                return new ArrayList<>();
+            }
+            background = OpencvManager.bufferedImageToMat(screenshot);
+
+            Point origin = source.origin();
+            int offsetX = (int) origin.x;
+            int offsetY = (int) origin.y;
+
+            List<MatchResult> results = new ArrayList<>();
+            for (ImageTemplate good : goods) {
+                List<RawMatch> matches = OpencvManager.findMultipleMatches(good.getMat(), background, false,
+                        confidence, good.captureResolution());
+                for (RawMatch gm : matches) {
+                    if (beatsAllBads(gm, bads, background, margin)) {
+                        results.add(new MatchResult(
+                                new Point(gm.x() + offsetX, gm.y() + offsetY),
+                                gm.width(), gm.height(), gm.score(), good.getId()));
+                    }
+                }
+            }
+            emitMatches(source, results);
+            return results;
+        } catch (Exception e) {
+            if (ClickConfig.DEBUG_MODE) {
+                System.err.println("Error in compareAll: " + e.getMessage());
+                e.printStackTrace();
+            }
+            return new ArrayList<>();
+        } finally {
+            if (background != null) {
+                background.release();
+            }
+        }
+    }
+
+    /** Whether {@code good}'s match location out-scores every bad template (re-scored there) by {@code margin}. */
+    private static boolean beatsAllBads(RawMatch good, List<ImageTemplate> bads, Mat background, double margin) {
+        for (ImageTemplate bad : bads) {
+            double badScore = OpencvManager.scoreAround(
+                    bad.getMat(), background, false, good.x(), good.y(), COMPARE_PAD);
+            if (badScore >= good.score() - margin) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // --- findAll (every location above the threshold) ---

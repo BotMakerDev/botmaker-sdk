@@ -8,6 +8,28 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-11 — Game window-detection takes `CaptureSource`; add `ImageFinder.findAnyCompare`/`findAllCompare`
+
+**Done**
+- **`Game` window-detection now uses `CaptureSource`, not a bare window-title `String`** (so the Studio
+  offers the visual capture-source picker instead of a free-text field, matching the vision API):
+  `isRunning(CaptureSource)`, `waitForLaunch(CaptureSource, long)`,
+  `launchIfNotRunning(String executablePath, CaptureSource, String... args)`,
+  `launchSteamIfNotRunning(String appId, CaptureSource)`,
+  `launchAndWait(String executablePath, CaptureSource, long timeout, String... args)`. The executable path
+  and Steam appId are now the **first** parameter. Still window-based (no process detection yet).
+- **Capture-layer presence**: new `CaptureSource.isPresent()` (default `true`; desktop/monitor are always
+  present). New lazy `NamedWindow` source — `CaptureSource.window(title)` now returns it instead of eagerly
+  resolving + falling back to `desktop()`. It re-resolves `Window.find(title)` on every use, so a
+  window source survives the window not existing yet (before launch) and reports `isPresent()` correctly;
+  `Game`'s detection delegates to it. Also makes ordinary vision matching more robust (re-binds a moved/
+  reopened window per frame). `GameRunningTest` updated to drive `CaptureSource.window(...)`.
+- **New compare finders** on `ImageFinder`: `findAnyCompare(good, bad[, source][, margin])` → `boolean`
+  (first good template, in order, that beats every bad by the margin) and
+  `findAllCompare(...)` → `int` (every winning good location; stored in `VisionContext` last-match-list).
+  Mirror the existing `findCompare` overload set; new private `compareAny`/`compareAll` + shared
+  `beatsAllBads` helper (which `compare` was refactored to reuse). `ImageClicker.clickCompare*` untouched.
+
 ## 2026-07-11 — Stamp the jar manifest with a build identifier
 
 **Done**

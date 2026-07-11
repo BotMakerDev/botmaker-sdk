@@ -1,9 +1,8 @@
 package com.botmaker.sdk.api.launch;
 
+import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.interaction.Wait;
 import com.botmaker.sdk.internal.launch.UriLauncher;
-import com.botmaker.shared.capture.GenericWindow;
-import com.botmaker.shared.capture.NativeControllerFactory;
 
 /**
  * Launches a game so a bot can automate it.
@@ -79,48 +78,37 @@ public class Game {
         launchSteam(Integer.toString(appId));
     }
 
-    // --- Running-detection & wait (window-title based) ---
+    // --- Running-detection & wait (window-based, via CaptureSource) ---
 
     /**
-     * Whether a window whose title contains {@code windowTitle} (case-insensitive) is currently open.
-     * A cheap way to tell if a game is already running before deciding to launch it.
+     * Whether the game's window is currently open. Pass the same {@link CaptureSource} the bot targets —
+     * typically {@code CaptureSource.window("Game Title")} — and this reports whether that window exists
+     * right now. A cheap way to tell if a game is already running before deciding to launch it.
      *
-     * @param windowTitle a substring of the game window's title (e.g. {@code "Notepad"})
-     * @return true if any open window's title contains {@code windowTitle}
-     * @throws IllegalArgumentException if {@code windowTitle} is null/blank
+     * @param source the capture source identifying the game (usually a {@code CaptureSource.window(...)})
+     * @return true if the source's window is currently present
+     * @throws IllegalArgumentException if {@code source} is null
      */
-    public static boolean isRunning(String windowTitle) {
-        if (windowTitle == null || windowTitle.isBlank()) {
-            throw new IllegalArgumentException("windowTitle must not be empty");
+    public static boolean isRunning(CaptureSource source) {
+        if (source == null) {
+            throw new IllegalArgumentException("source must not be null");
         }
-        String needle = windowTitle.trim().toLowerCase();
-        try {
-            for (GenericWindow win : NativeControllerFactory.get().getAllWindows()) {
-                String title = win.getTitle();
-                if (title != null && title.toLowerCase().contains(needle)) {
-                    return true;
-                }
-            }
-        } catch (RuntimeException e) {
-            // Native enumeration failed (e.g. unsupported platform) — treat as "not detected".
-            return false;
-        }
-        return false;
+        return source.isPresent();
     }
 
     /**
-     * Blocks until a window matching {@code windowTitle} appears, or {@code timeoutMillis} elapses.
-     * Poll interval is ~250ms. Use after {@link #launch} to wait for a game to finish starting up.
+     * Blocks until {@code source}'s window appears, or {@code timeoutMillis} elapses. Poll interval is
+     * ~250ms. Use after {@link #launch} to wait for a game to finish starting up.
      *
-     * @param windowTitle  a substring of the game window's title
+     * @param source        the capture source identifying the game window
      * @param timeoutMillis the maximum time to wait, in milliseconds
      * @return true if the window appeared within the timeout, false if it timed out
-     * @throws IllegalArgumentException if {@code windowTitle} is null/blank
+     * @throws IllegalArgumentException if {@code source} is null
      */
-    public static boolean waitForLaunch(String windowTitle, long timeoutMillis) {
+    public static boolean waitForLaunch(CaptureSource source, long timeoutMillis) {
         long deadline = System.currentTimeMillis() + Math.max(0, timeoutMillis);
         while (true) {
-            if (isRunning(windowTitle)) {
+            if (isRunning(source)) {
                 return true;
             }
             if (System.currentTimeMillis() >= deadline) {
@@ -131,16 +119,16 @@ public class Game {
     }
 
     /**
-     * Launches {@code executablePath} only if no window matching {@code windowTitle} is already open —
-     * avoids spawning a duplicate instance of an already-running game.
+     * Launches {@code executablePath} only if {@code source}'s window is not already open — avoids
+     * spawning a duplicate instance of an already-running game.
      *
-     * @param windowTitle    a substring of the game window's title used to detect an existing instance
      * @param executablePath path to the program to run (see {@link #launch})
+     * @param source         the capture source used to detect an existing instance
      * @param args           optional command-line arguments
      * @return true if the game was launched, false if it was already running
      */
-    public static boolean launchIfNotRunning(String windowTitle, String executablePath, String... args) {
-        if (isRunning(windowTitle)) {
+    public static boolean launchIfNotRunning(String executablePath, CaptureSource source, String... args) {
+        if (isRunning(source)) {
             return false;
         }
         launch(executablePath, args);
@@ -148,14 +136,14 @@ public class Game {
     }
 
     /**
-     * Launches a Steam game by appId only if no window matching {@code windowTitle} is already open.
+     * Launches a Steam game by appId only if {@code source}'s window is not already open.
      *
-     * @param windowTitle a substring of the game window's title used to detect an existing instance
-     * @param appId       the Steam application id (see {@link #launchSteam(String)})
+     * @param appId  the Steam application id (see {@link #launchSteam(String)})
+     * @param source the capture source used to detect an existing instance
      * @return true if the game was launched, false if it was already running
      */
-    public static boolean launchSteamIfNotRunning(String windowTitle, String appId) {
-        if (isRunning(windowTitle)) {
+    public static boolean launchSteamIfNotRunning(String appId, CaptureSource source) {
+        if (isRunning(source)) {
             return false;
         }
         launchSteam(appId);
@@ -163,18 +151,18 @@ public class Game {
     }
 
     /**
-     * Launches {@code executablePath} (unless already running) and then blocks until its window appears
-     * or {@code timeoutMillis} elapses.
+     * Launches {@code executablePath} (unless already running) and then blocks until {@code source}'s
+     * window appears or {@code timeoutMillis} elapses.
      *
-     * @param windowTitle    a substring of the game window's title
-     * @param timeoutMillis  the maximum time to wait for the window, in milliseconds
      * @param executablePath path to the program to run
+     * @param source         the capture source identifying the game window
+     * @param timeoutMillis  the maximum time to wait for the window, in milliseconds
      * @param args           optional command-line arguments
      * @return true if the game's window was present within the timeout, false if it timed out
      */
-    public static boolean launchAndWait(String windowTitle, long timeoutMillis, String executablePath,
+    public static boolean launchAndWait(String executablePath, CaptureSource source, long timeoutMillis,
                                         String... args) {
-        launchIfNotRunning(windowTitle, executablePath, args);
-        return waitForLaunch(windowTitle, timeoutMillis);
+        launchIfNotRunning(executablePath, source, args);
+        return waitForLaunch(source, timeoutMillis);
     }
 }

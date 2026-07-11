@@ -30,6 +30,16 @@ public interface CaptureSource {
      */
     Point origin();
 
+    /**
+     * Whether this source currently exists / can be captured. The whole {@link #desktop()} and a
+     * {@link #monitor(int) monitor} are always present, so this defaults to {@code true}; a window
+     * source ({@link #window(String)}) overrides it to report whether a matching window is open right
+     * now. Used by {@link com.botmaker.sdk.api.launch.Game} to tell if a game is already running.
+     */
+    default boolean isPresent() {
+        return true;
+    }
+
     // --- The three canonical sources ---
 
     /** The whole virtual desktop (all monitors). The ultimate fallback source for every matcher. */
@@ -46,12 +56,14 @@ public interface CaptureSource {
     }
 
     /**
-     * The first window whose title contains {@code titleSubstring} (case-insensitive) as a capture source,
-     * or the whole {@link #desktop()} if none matches. A convenience so a capture-source slot can target a
-     * window by title in one call without unwrapping the {@link Window#find(String)} {@code Optional}.
+     * A capture source that targets the first window whose title contains {@code titleSubstring}
+     * (case-insensitive). The window is resolved <em>lazily on every use</em>, so the source survives
+     * the window not existing yet (e.g. before the game launches) and re-binds if the window moves or
+     * reopens: {@link #capture()} returns {@code null} while it is absent, and {@link #isPresent()}
+     * reports whether it is currently open.
      */
     static CaptureSource window(String titleSubstring) {
-        return Window.find(titleSubstring).map(w -> (CaptureSource) w).orElseGet(CaptureSource::desktop);
+        return new NamedWindow(titleSubstring);
     }
 
     // --- Region: a Rect that belongs to THIS source ---

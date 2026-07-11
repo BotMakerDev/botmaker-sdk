@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.launch;
 
+import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -14,8 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests {@link Game}'s window-title-based running detection against a fake {@link NativeController} injected
- * via {@link NativeControllerFactory#setForTesting}, so nothing real is launched or enumerated.
+ * Tests {@link Game}'s window-based running detection (via {@link CaptureSource#window}) against a fake
+ * {@link NativeController} injected via {@link NativeControllerFactory#setForTesting}, so nothing real is
+ * launched or enumerated.
  */
 class GameRunningTest {
 
@@ -31,34 +33,34 @@ class GameRunningTest {
     @Test
     void isRunningMatchesTitleSubstringCaseInsensitively() {
         NativeControllerFactory.setForTesting(new FakeController(List.of(window("My Cool Game — Level 1"))));
-        assertTrue(Game.isRunning("cool game"));
-        assertTrue(Game.isRunning("Level 1"));
-        assertFalse(Game.isRunning("Some Other App"));
+        assertTrue(Game.isRunning(CaptureSource.window("cool game")));
+        assertTrue(Game.isRunning(CaptureSource.window("Level 1")));
+        assertFalse(Game.isRunning(CaptureSource.window("Some Other App")));
     }
 
     @Test
     void isRunningFalseWhenNoWindows() {
         NativeControllerFactory.setForTesting(new FakeController(List.of()));
-        assertFalse(Game.isRunning("anything"));
+        assertFalse(Game.isRunning(CaptureSource.window("anything")));
     }
 
     @Test
     void waitForLaunchReturnsFalseOnTimeoutWhenAbsent() {
         NativeControllerFactory.setForTesting(new FakeController(List.of(window("Unrelated"))));
-        assertFalse(Game.waitForLaunch("MissingGame", 200));
+        assertFalse(Game.waitForLaunch(CaptureSource.window("MissingGame"), 200));
     }
 
     @Test
     void waitForLaunchReturnsTrueImmediatelyWhenPresent() {
         NativeControllerFactory.setForTesting(new FakeController(List.of(window("Present Game"))));
-        assertTrue(Game.waitForLaunch("Present Game", 200));
+        assertTrue(Game.waitForLaunch(CaptureSource.window("Present Game"), 200));
     }
 
     @Test
     void launchIfNotRunningSkipsWhenAlreadyRunning() {
         NativeControllerFactory.setForTesting(new FakeController(List.of(window("Already Here"))));
         // Returns false (not launched) without ever touching the executable path, so a bogus path is fine.
-        assertFalse(Game.launchIfNotRunning("Already Here", "/nonexistent/should-not-run"));
+        assertFalse(Game.launchIfNotRunning("/nonexistent/should-not-run", CaptureSource.window("Already Here")));
     }
 
     /** Minimal {@link NativeController} that only answers {@code getAllWindows}; everything else is a no-op. */
