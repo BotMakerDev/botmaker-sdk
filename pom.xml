@@ -12,6 +12,9 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Stamped into the jar manifest (Build-Time) so a bot/editor can tell which SDK build it loaded;
+             crucial for local dev where every rebuild reuses the same 0.0.0-SNAPSHOT jar file name. -->
+        <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
         <!-- botmaker-shared version. Committed value is ALWAYS 0.0.0-SNAPSHOT: it resolves the sibling
              module in the umbrella reactor / dev-install. The real released shared tag is injected only at
              build time by CI (jitpack.yml) via -Dbotmaker.shared.version=<tag> — never committed here, so a
@@ -111,6 +114,26 @@
                          SDK jar via ClassGraph to label call arguments (e.g. findCompare(good, bad))
                          instead of arg0/arg1. -->
                     <parameters>true</parameters>
+                </configuration>
+            </plugin>
+
+            <!-- Jar Plugin: stamp the manifest with Implementation-* (pom version/vendor) and a Build-Time
+                 so a running bot / Studio's editor can report exactly which SDK build was loaded. The pom
+                 version is cosmetic (0.0.0-SNAPSHOT for local dev; JitPack overrides it with the tag), so
+                 Build-Time is the signal that distinguishes local rebuilds sharing one jar file name. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                        <manifestEntries>
+                            <Build-Time>${maven.build.timestamp}</Build-Time>
+                        </manifestEntries>
+                    </archive>
                 </configuration>
             </plugin>
 

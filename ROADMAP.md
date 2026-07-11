@@ -8,6 +8,16 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-11 — Stamp the jar manifest with a build identifier
+
+**Done**
+- `pom.xml` now runs `maven-jar-plugin` with `addDefaultImplementationEntries` + a `Build-Time`
+  manifest entry (`${maven.build.timestamp}`, ISO-8601). The pom `version` is cosmetic (`0.0.0-SNAPSHOT`
+  locally; JitPack overrides it with the tag), so `Build-Time` is the signal that distinguishes local
+  rebuilds that all reuse the same `botmaker-sdk-0.0.0-SNAPSHOT.jar` file name. Studio reads it at project
+  open to report which SDK build the editor indexed — closes the "no way to tell which SDK a bot loaded" gap
+  behind the stale-editor-cache bug fixed in the Studio ROADMAP (same date).
+
 ## 2026-07-11 — Fix `steam://` launch opening a blank browser page
 
 **Done**
