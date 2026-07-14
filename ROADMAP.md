@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-14 — Transparent-background templates: alpha-as-mask matching
+
+**Done**
+- **`ImageTemplate.getMat()` loads with `Imgcodecs.IMREAD_UNCHANGED`** so a transparent PNG keeps its alpha
+  channel (4-channel BGRA); opaque PNGs still load as 3-channel BGR.
+- **`OpencvManager` uses the alpha channel as a match mask.** New `extractAlphaMask` + `runMatch` helpers:
+  when a template carries alpha, transparent pixels are ignored via `TM_CCORR_NORMED` with a mask (the
+  reliably mask-supporting normed method); opaque templates keep `TM_CCOEFF_NORMED`. Threaded through
+  `matchScaled`, `findMultipleMatches`, and `scoreAround`. This makes Studio's new "Capture object"
+  (transparent-background) templates actually match regardless of the scene behind the object.
+  Note: masked scores use CCORR_NORMED, so the 0.8 default threshold reads slightly differently for
+  transparent templates. New `MaskedMatchTest` covers the path.
+
+---
+
 ## 2026-07-11 — Game window-detection takes `CaptureSource`; add `ImageFinder.findAnyCompare`/`findAllCompare`
 
 **Done**

@@ -13,6 +13,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.opencv.imgproc.Imgproc.TM_CCOEFF_NORMED;
+import static org.opencv.imgproc.Imgproc.TM_CCORR_NORMED;
 import static org.opencv.imgproc.Imgproc.matchTemplate;
 
 /**
@@ -53,6 +54,41 @@ public final class OpencvManager {
         } else {
             if (isGray(mat))      Imgproc.cvtColor(mat, mat, Imgproc.COLOR_GRAY2RGB);
             else if (isRGBA(mat)) Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGBA2RGB);
+        }
+    }
+
+    /**
+     * The alpha channel of a 4-channel (BGRA) template as a single-channel 8U mask (transparent pixels = 0),
+     * or {@code null} when {@code mat} has no alpha. Must be called <em>before</em> {@link #normalise} flattens
+     * the template. The caller owns and releases the returned Mat.
+     */
+    private static Mat extractAlphaMask(Mat mat) {
+        if (!isRGBA(mat)) return null;
+        java.util.List<Mat> channels = new ArrayList<>();
+        Core.split(mat, channels);
+        Mat alpha = channels.get(3);           // keep alpha as the mask
+        for (int i = 0; i < 3; i++) channels.get(i).release();
+        return alpha;
+    }
+
+    /**
+     * Runs {@code matchTemplate} into {@code result}, normalising {@code localTemplate} in place first. When the
+     * template carries an alpha channel (a transparent-background template), its alpha is used as a
+     * <b>mask</b> with {@code TM_CCORR_NORMED} (the reliably mask-supporting normed method) so transparent
+     * pixels are ignored; opaque templates use the standard {@code TM_CCOEFF_NORMED}. {@code localBackground}
+     * must already be normalised to the same channel space.
+     */
+    private static void runMatch(Mat localBackground, Mat localTemplate, Mat result, boolean grayscale) {
+        Mat mask = extractAlphaMask(localTemplate);
+        try {
+            normalise(localTemplate, grayscale);
+            if (mask != null) {
+                matchTemplate(localBackground, localTemplate, result, TM_CCORR_NORMED, mask);
+            } else {
+                matchTemplate(localBackground, localTemplate, result, TM_CCOEFF_NORMED);
+            }
+        } finally {
+            if (mask != null) mask.release();
         }
     }
 
@@ -134,14 +170,13 @@ public final class OpencvManager {
         Mat localBackground = background.clone();
         Mat resultMat = new Mat();
         try {
-            normalise(localTemplate, grayscale);
             normalise(localBackground, grayscale);
 
             if (localBackground.width() < localTemplate.width() || localBackground.height() < localTemplate.height()) {
                 return null;
             }
 
-            matchTemplate(localBackground, localTemplate, resultMat, TM_CCOEFF_NORMED);
+            runMatch(localBackground, localTemplate, resultMat, grayscale);
             Core.MinMaxLocResult mmr = Core.minMaxLoc(resultMat);
             Point loc = mmr.maxLoc;
             return new RawMatch((int) loc.x, (int) loc.y, localTemplate.cols(), localTemplate.rows(), mmr.maxVal);
@@ -181,10 +216,9 @@ public final class OpencvManager {
         Mat window = null;
         Mat resultMat = new Mat();
         try {
-            normalise(localTemplate, grayscale);
             normalise(localBackground, grayscale);
 
-            int tw = localTemplate.cols();
+            int tw = localTemplate.cols();      // channel count doesn't affect dimensions
             int th = localTemplate.rows();
             int x0 = Math.max(0, x - pad);
             int y0 = Math.max(0, y - pad);
@@ -195,7 +229,7 @@ public final class OpencvManager {
             }
 
             window = localBackground.submat(new org.opencv.core.Rect(x0, y0, x1 - x0, y1 - y0));
-            matchTemplate(window, localTemplate, resultMat, TM_CCOEFF_NORMED);
+            runMatch(window, localTemplate, resultMat, grayscale);
             return Core.minMaxLoc(resultMat).maxVal;
         } finally {
             localTemplate.release();
@@ -252,13 +286,12 @@ public final class OpencvManager {
         }
         Mat resultMat = new Mat();
         try {
-            normalise(localTemplate, grayscale);
             normalise(localBackground, grayscale);
-
-            matchTemplate(localBackground, localTemplate, resultMat, TM_CCOEFF_NORMED);
 
             int w = localTemplate.cols();
             int h = localTemplate.rows();
+            runMatch(localBackground, localTemplate, resultMat, grayscale);
+
             List<RawMatch> candidates = new ArrayList<>();
             for (int y = 0; y < resultMat.rows(); y++) {
                 for (int x = 0; x < resultMat.cols(); x++) {

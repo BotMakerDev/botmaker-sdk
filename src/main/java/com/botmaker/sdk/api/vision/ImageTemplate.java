@@ -85,7 +85,9 @@ public class ImageTemplate implements AutoCloseable {
     public Mat getMat() {
         if (mat == null || mat.empty()) {
             String absPath = new File(filePath).getAbsolutePath();
-            mat = Imgcodecs.imread(absPath);
+            // IMREAD_UNCHANGED keeps a transparent PNG's alpha channel (4-channel BGRA) so the matcher can
+            // use it as a mask (ignoring transparent pixels); opaque PNGs still load as 3-channel BGR.
+            mat = Imgcodecs.imread(absPath, Imgcodecs.IMREAD_UNCHANGED);
             if (mat.empty()) {
                 throw new RuntimeException("Failed to load image template. Path: " + absPath);
             }
