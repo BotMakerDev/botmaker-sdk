@@ -40,8 +40,10 @@ public class ClickConfig {
     public static double DEFAULT_COMPARE_MARGIN = 0.05;
 
     /**
-     * Maximum number of retry attempts before giving up.
-     * Used by retry-based methods.
+     * How many consecutive no-progress checks the {@link com.botmaker.sdk.api.bot.Watchdog} tolerates
+     * before it throws {@link com.botmaker.sdk.api.bot.BotStuckException} at the next
+     * {@code Watchdog.checkpoint()} — i.e. how long a frozen screen or a repeated no-op click is allowed
+     * to run before the bot is considered stuck and restarted.
      */
     public static int MAX_RETRY_ATTEMPTS = 20;
 

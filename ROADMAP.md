@@ -8,6 +8,28 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-14 — Bot lifecycle: supervisor + watchdog + Activity (new `api.bot`)
+
+**Done**
+- **New package `com.botmaker.sdk.api.bot`** with the runtime primitives a game bot needs:
+  - **`BotStuckException`** (first custom exception in `api.*`) — unchecked; thrown by the watchdog, caught
+    by the supervisor.
+  - **`Watchdog`** — stuck detector. Piggybacks on existing `api.observe` match telemetry: while enabled it
+    installs a `BotObserver` that counts consecutive identical match *signatures* (`templateId + coarse
+    location`, or `"miss"`). The observer only counts (never throws — `ImageFinder.findInternal` swallows
+    `Exception`); the throw is deterministic at `checkpoint()` once `repeats >= ClickConfig.MAX_RETRY_ATTEMPTS`.
+    `progress()`/`reset()` clear the per-thread counter.
+  - **`Bot.supervise(body, recovery)`** / `supervise(body, goHome, startGame)` — the outer restart loop:
+    runs `body` forever, catches `BotStuckException`/`RuntimeException`, resets the watchdog, runs recovery.
+  - **`Activity`** — abstract base a bot author subclasses per game task: `isEnabled()`/`run()` abstract,
+    `before()`/`after()`/`onStuck()` overridable no-ops, `final execute()` orchestrates them. Studio
+    generates one subclass per activity and a registry of instances.
+- **`ClickConfig.MAX_RETRY_ATTEMPTS`** is now genuinely live (the watchdog's threshold); javadoc updated.
+- Tests: `api/bot/WatchdogTest` (counter → checkpoint throws / resets) and `api/bot/BotTest` (supervisor
+  recovery ordering) — standalone, no OpenCV/screen.
+- Studio mirror: added `Bot`, `Watchdog` to `palette/SdkApi.FACADE_CLASSES` (`Activity` is a base class, not
+  a static facade, so it's intentionally not listed).
+
 ## 2026-07-14 — Transparent-background templates: alpha-as-mask matching
 
 **Done**
