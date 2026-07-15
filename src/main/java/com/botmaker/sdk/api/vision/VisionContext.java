@@ -33,6 +33,8 @@ public final class VisionContext {
 
     private static final ThreadLocal<MatchResult> lastMatch = new ThreadLocal<>();
     private static final ThreadLocal<List<MatchResult>> lastMatchList = new ThreadLocal<>();
+    private static final ThreadLocal<ColorMatch> lastColorMatch = new ThreadLocal<>();
+    private static final ThreadLocal<List<ColorMatch>> lastColorMatchList = new ThreadLocal<>();
 
     private VisionContext() {}
 
@@ -117,5 +119,72 @@ public final class VisionContext {
         } else {
             lastMatch.set(MatchResult.notFound());
         }
+    }
+
+    // --- colour (Pixel) ---------------------------------------------------
+    //
+    // Colour results are tracked separately from template results: a bot commonly interleaves the two
+    // (find a button by template, check its colour), and sharing one slot would let each clobber the other.
+
+    /**
+     * Returns the most recent colour match for the current thread, or {@link ColorMatch#notFound()} if no
+     * {@link Pixel} operation has been performed yet on this thread.
+     *
+     * @return the last colour match, never null
+     */
+    public static ColorMatch getLastColorMatch() {
+        ColorMatch result = lastColorMatch.get();
+        return result != null ? result : ColorMatch.notFound();
+    }
+
+    /**
+     * Returns the most recent list of colour matches for the current thread (from
+     * {@link Pixel#findAll}), or an empty list if none has been performed yet.
+     *
+     * @return the last colour match list, never null
+     */
+    public static List<ColorMatch> getLastColorMatchList() {
+        List<ColorMatch> result = lastColorMatchList.get();
+        return result != null ? result : new ArrayList<>();
+    }
+
+    /**
+     * Returns whether the last colour search for the current thread found something.
+     * Equivalent to {@code getLastColorMatch().isFound()}.
+     */
+    public static boolean lastColorMatchFound() {
+        return getLastColorMatch().isFound();
+    }
+
+    /** Clears the last colour match and colour match list for the current thread. */
+    public static void clearLastColorMatch() {
+        lastColorMatch.remove();
+        lastColorMatchList.remove();
+    }
+
+    /**
+     * Invokes {@code action} with the last colour match if one was found. Does nothing otherwise.
+     *
+     * @return true if a match existed and the action was invoked
+     */
+    public static boolean ifLastColorMatch(java.util.function.Consumer<ColorMatch> action) {
+        ColorMatch result = getLastColorMatch();
+        if (result.isFound()) {
+            action.accept(result);
+            return true;
+        }
+        return false;
+    }
+
+    /** Internal: updates the last colour match for the current thread. */
+    static void setLastColorMatch(ColorMatch result) {
+        lastColorMatch.set(result);
+        lastColorMatchList.remove();
+    }
+
+    /** Internal: updates the last colour match list for the current thread. */
+    static void setLastColorMatchList(List<ColorMatch> results) {
+        lastColorMatchList.set(results);
+        lastColorMatch.set(results.isEmpty() ? ColorMatch.notFound() : results.get(0));
     }
 }

@@ -8,6 +8,32 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-15 — Pixel colour detection (new `Pixel` facade)
+
+**Done**
+- **`api/vision/Pixel`** — the colour counterpart to `ImageFinder`, following the same conventions
+  (`CaptureSource` per call, region-as-`source.region(...)`, absolute coords via `source.origin()`, results
+  parked in `VisionContext`, no-source overloads use `Source.current()`). Surface: `colorAt`, `matchesAt`,
+  `distance`, `find`, `findAll`, `findInRange`, `coverage`, `waitFor`, `waitForGone`.
+- **Two precisions are separate knobs, deliberately.** `tolerance` is *colour* precision only — a **CIELAB
+  ΔE76** distance (constants `EXACT`/`TIGHT`/`DEFAULT_TOLERANCE`/`LOOSE` = 0/5/12/25). *Location* precision is
+  the searched region plus `minPixels`, the smallest connected blob that counts (kills stray anti-aliased
+  pixels). Coupling the two into one knob is what makes Studio's old magic wand unusable; don't repeat it.
+- **`api/vision/ColorMatch`** — mirrors `MatchResult` (package-private ctors, `notFound()` sentinel, null
+  accessors when not found). Exposes `getCenter()` as the **centroid**, not the bbox centre — an L-shaped
+  blob's bbox centre can lie outside the blob.
+- **`internal/opencv/ColorMatcher`** + **`RawColorMatch`** (OpenCV-free, crosses internal/api like `RawMatch`).
+  Pipeline: BGR → **float** Lab → per-pixel ΔE → threshold → `connectedComponentsWithStats` → `minPixels`
+  filter → largest-first. The float conversion matters: converting an 8-bit image via `COLOR_BGR2Lab` gives L
+  rescaled to 0..255 and a/b offset by 128, so the distances would not be ΔE.
+- **`VisionContext`** gains `getLastColorMatch` / `getLastColorMatchList` / `lastColorMatchFound` /
+  `clearLastColorMatch` / `ifLastColorMatch`. Colour results use their own thread-locals rather than sharing
+  the template slots — bots interleave the two and would otherwise clobber each other.
+- Studio: `SdkApi.FACADE_CLASSES` gains `Pixel` (a new *facade* needs registering; new *methods* on an
+  existing facade do not — ClassGraph discovers those at runtime).
+
+---
+
 ## 2026-07-14 — Bot lifecycle: supervisor + watchdog + Activity (new `api.bot`)
 
 **Done**
