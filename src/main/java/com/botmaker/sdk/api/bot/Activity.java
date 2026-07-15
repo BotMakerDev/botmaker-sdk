@@ -13,6 +13,15 @@ public abstract class Activity {
 
     private final String name;
 
+    /**
+     * Names this activity after its own class — {@code class Mining extends Activity} is called "Mining". This
+     * is what the Studio-generated subclasses use, so they need no constructor at all.
+     */
+    protected Activity() {
+        this.name = getClass().getSimpleName();
+    }
+
+    /** Names this activity explicitly, for a name that shouldn't track the class name. */
     protected Activity(String name) {
         this.name = name;
     }

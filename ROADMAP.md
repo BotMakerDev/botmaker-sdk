@@ -8,6 +8,20 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-15 — `Activity` names itself (no-arg constructor)
+
+**Done**
+- **`api/bot/Activity` gained `protected Activity()`**, defaulting `name` to `getClass().getSimpleName()`.
+  Additive — `Activity(String)` stays for a name that shouldn't track the class name, and `name` stays final.
+- **Why:** the only constructor was `Activity(String name)`, so every Studio-generated activity subclass had to
+  carry a `public Mining() { super("Mining"); }` that restated the class name and asked the bot author for
+  nothing. The Studio now generates a stub with `run()` and `isEnabled()` and no constructor at all; the
+  generated `ActivityRegistry`'s `new Mining()` binds this inherited ctor.
+- **Release note:** generated bots pinned to a *released* SDK can't use the constructor-less stub until this
+  ships. Local `0.0.0-SNAPSHOT` dev runs pick it up immediately. Cut with `../release.sh` when ready.
+
+---
+
 ## 2026-07-15 — Pixel colour detection (new `Pixel` facade)
 
 **Done**
