@@ -42,6 +42,9 @@ public class Game {
             }
         }
         try {
+            // Log the command before running it: a launch that "does nothing" is otherwise invisible, since a
+            // detached process gives no feedback. This line makes the attempt show up in the Studio console.
+            System.out.println("[Game] launch: " + String.join(" ", command));
             new ProcessBuilder(command).start();
         } catch (Exception e) {
             throw new RuntimeException("Failed to launch '" + executablePath + "': " + e.getMessage(), e);
@@ -61,10 +64,16 @@ public class Game {
             throw new IllegalArgumentException("appId must not be empty");
         }
         String id = appId.trim();
-        if (UriLauncher.open("steam://rungameid/" + id)) {
+        String uri = "steam://rungameid/" + id;
+        // Log before invoking: if Steam doesn't come up, the console still shows the URI/CLI we tried, so a
+        // silent failure (e.g. no registered steam:// handler) is diagnosable instead of "nothing happened".
+        System.out.println("[Game] launchSteam " + id + " → " + uri);
+        if (UriLauncher.open(uri)) {
+            System.out.println("[Game] launchSteam: opener invoked for " + uri);
             return;
         }
         // Fallback: the Steam CLI (requires `steam` on PATH).
+        System.out.println("[Game] launchSteam: opener declined " + uri + ", falling back to `steam -applaunch " + id + "`");
         try {
             new ProcessBuilder("steam", "-applaunch", id).start();
         } catch (Exception e) {
@@ -164,5 +173,68 @@ public class Game {
                                         String... args) {
         launchIfNotRunning(executablePath, source, args);
         return waitForLaunch(source, timeoutMillis);
+    }
+
+    // --- Process control (by executable name) ---
+
+    /**
+     * Force-terminates every process whose executable matches {@code processName} — the "close the game"
+     * half of a restart routine. Best-effort and cross-platform: Windows {@code taskkill /F /IM <name>},
+     * Linux/macOS {@code pkill -f <name>}. Never throws when there is simply no such process (that is a
+     * success for a kill); a genuinely un-runnable killer command is logged, not raised, so a restart loop
+     * keeps going.
+     *
+     * @param processName the executable name, e.g. {@code "Firestone.exe"} (Windows) or {@code "firestone"}
+     * @throws IllegalArgumentException if {@code processName} is null/blank
+     */
+    public static void kill(String processName) {
+        if (processName == null || processName.isBlank()) {
+            throw new IllegalArgumentException("processName must not be empty");
+        }
+        String name = processName.trim();
+        String[] command = isWindows()
+                ? new String[]{"taskkill", "/F", "/IM", name}
+                : new String[]{"pkill", "-f", name};
+        System.out.println("[Game] kill " + name + " → " + String.join(" ", command));
+        try {
+            int code = new ProcessBuilder(command).inheritIO().start().waitFor();
+            // taskkill=128 / pkill=1 both mean "no matching process" — expected, not a failure.
+            System.out.println("[Game] kill " + name + ": exit " + code
+                    + (code == 0 ? " (terminated)" : " (nothing to kill / already gone)"));
+        } catch (Exception e) {
+            System.out.println("[Game] kill " + name + " failed to invoke: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Whether any process whose executable matches {@code processName} is currently running — the name-based
+     * counterpart to {@link #isRunning(CaptureSource)}. Uses {@code tasklist} on Windows, {@code pgrep -f}
+     * elsewhere. Returns {@code false} (rather than throwing) if the check itself cannot run.
+     *
+     * @param processName the executable name to look for
+     * @throws IllegalArgumentException if {@code processName} is null/blank
+     */
+    public static boolean isRunning(String processName) {
+        if (processName == null || processName.isBlank()) {
+            throw new IllegalArgumentException("processName must not be empty");
+        }
+        String name = processName.trim();
+        try {
+            if (isWindows()) {
+                Process p = new ProcessBuilder("tasklist", "/FI", "IMAGENAME eq " + name).start();
+                String out = new String(p.getInputStream().readAllBytes());
+                p.waitFor();
+                return out.toLowerCase().contains(name.toLowerCase());
+            }
+            // pgrep exits 0 when at least one process matches, 1 when none do.
+            return new ProcessBuilder("pgrep", "-f", name).start().waitFor() == 0;
+        } catch (Exception e) {
+            System.out.println("[Game] isRunning(" + name + ") check failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase().contains("win");
     }
 }

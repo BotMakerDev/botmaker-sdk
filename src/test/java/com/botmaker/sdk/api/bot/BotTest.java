@@ -45,15 +45,70 @@ class BotTest {
     }
 
     @Test
-    void superviseRunsGoHomeThenStartGameInThatOrder() {
+    void superviseRunsStartGameThenGoHomeOnceAtColdStartBeforeTheLoop() {
+        // The reported bug: Startup never ran on a normal launch. Cold start now runs startGame then goHome,
+        // once, before the first body pass — so "launch the game in Startup" actually fires.
         StringBuilder order = new StringBuilder();
         assertThrows(StopLoop.class, () -> Bot.supervise(
-                () -> { throw new BotStuckException("stuck"); },
-                () -> order.append("H"),          // goHome
-                () -> {                             // startGame
+                () -> { order.append("B"); throw new StopLoop(); },   // body: end the loop on the first pass
+                () -> order.append("H"),                              // goHome
+                () -> order.append("S")));                            // startGame
+        assertEquals("SHB", order.toString(),
+                "cold start = startGame then goHome, once, before the first body pass");
+    }
+
+    @Test
+    void superviseRecoversWithGoHomeThenStartGameAfterColdStart() {
+        // Mid-run recovery keeps its original order (goHome then startGame), distinct from cold start.
+        StringBuilder order = new StringBuilder();
+        AtomicInteger starts = new AtomicInteger();
+        assertThrows(StopLoop.class, () -> Bot.supervise(
+                () -> { order.append("B"); throw new BotStuckException("stuck"); },
+                () -> order.append("H"),                              // goHome
+                () -> {                                               // startGame
                     order.append("S");
-                    throw new StopLoop();
+                    if (starts.incrementAndGet() >= 2) throw new StopLoop();  // stop on the recovery restart
                 }));
-        assertEquals("HS", order.toString());
+        // cold start S,H → body B (stuck) → recovery H,S(2nd → StopLoop)
+        assertEquals("SHBHS", order.toString());
+    }
+
+    @Test
+    void stopBreaksTheLoopAndSuperviseReturnsWithoutRecovering() {
+        // Bot.stop() is the clean exit: supervise returns normally (no StopLoop needed) and never recovers.
+        AtomicInteger body = new AtomicInteger();
+        AtomicInteger recovery = new AtomicInteger();
+        Bot.supervise(
+                () -> { if (body.incrementAndGet() >= 3) Bot.stop(); },
+                recovery::incrementAndGet);
+        assertEquals(3, body.get(), "body runs until it calls stop()");
+        assertEquals(0, recovery.get(), "stop() is a clean exit, not a crash — recovery must not run");
+    }
+
+    @Test
+    void stopDuringColdStartEndsTheBotBeforeTheLoopRuns() {
+        AtomicInteger body = new AtomicInteger();
+        AtomicInteger recovery = new AtomicInteger();
+        Bot.supervise(
+                body::incrementAndGet,                 // body: must never run
+                recovery::incrementAndGet,             // goHome (recovery half)
+                Bot::stop);                            // startGame stops during cold start
+        assertEquals(0, body.get(), "a stop() during cold start ends the bot before the first body pass");
+        assertEquals(0, recovery.get(), "and does not route through recovery");
+    }
+
+    @Test
+    void aFailedColdStartRoutesThroughRecoveryInsteadOfAborting() {
+        StringBuilder order = new StringBuilder();
+        AtomicInteger starts = new AtomicInteger();
+        assertThrows(StopLoop.class, () -> Bot.supervise(
+                () -> { order.append("B"); throw new StopLoop(); },   // body ends the loop
+                () -> order.append("H"),                              // goHome
+                () -> {                                               // startGame
+                    order.append("S");
+                    if (starts.incrementAndGet() == 1) throw new IllegalStateException("cold start boom");
+                }));
+        // cold start S (throws) → recovery H,S → loop body B (StopLoop)
+        assertEquals("SHSB", order.toString());
     }
 }

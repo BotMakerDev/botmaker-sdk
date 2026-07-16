@@ -8,6 +8,65 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-16 — `Game.kill` + name-based `Activity` control
+
+**Done**
+- **`Game.kill(name)` / `Game.isRunning(name)`** — cross-platform process control by executable name
+  (Windows `taskkill`/`tasklist`, Linux/mac `pkill`/`pgrep`), best-effort and never throwing on "no such
+  process". **Why:** the Firestone restart routine does `Process, Close, Firestone.exe` → relaunch, which the
+  launch-only `Game` couldn't reproduce. Complements the existing window-based `isRunning(CaptureSource)`.
+- **`Activity` self-registers by name; static `Activity.disable(name)`/`enable(name)`/`setEnabled(name,bool)`.**
+  The constructor registers `this` in a static name→instance map, so any code can toggle an activity by name
+  without a reference (one activity disabling another, or `GoHome`/`Startup` toggling one). Unknown name →
+  stderr warning + no-op (never crashes a running bot). Instance `active()/setEnabled/enable/disable` unchanged.
+  Package-private `clearRegistry()` for test isolation. **Why:** the Studio "disable this activity" self-call
+  only worked inside an Activity and only self-targeted; the block now emits `Activity.disable("Name")` with a
+  picker (see `../botmaker-studio/ROADMAP.md`).
+- Tests: `GameTest` (kill/isRunning validation + no-throw on a bogus name); `ActivityTest` (static
+  disable/enable by name toggles only that activity; unknown name warns + no-ops).
+
+## 2026-07-16 — `Bot.stop()`: let the bot end cleanly
+
+**Done**
+- **New `Bot.stop()` ends the bot** — throws a **private nested** `BotStoppedException` (extends
+  `RuntimeException`) which both `supervise` overloads catch *before* the `BotStuckException`/`RuntimeException`
+  catches, log `[Bot] Stopped by request.` and **return** (not recover). The 3-arg cold-start try also honours
+  it (a `stop()` during Startup/GoHome ends the bot before the loop). **Why:** `supervise`'s `while (true)` had
+  no exit — once a bot disabled every activity, the loop spun forever with nothing to do ("the bot can't end").
+  Exception (not a boolean body return) so `stop()` unwinds cleanly from arbitrarily deep in an activity's
+  `run()`; nested-private so the only public surface is `Bot.stop()` (users never see/throw the exception),
+  mirroring how `BotStuckException` is caught internally. `Activity.execute()` only catches `BotStuckException`,
+  so the stop propagates through it untouched.
+- Studio pairs this with an auto-`Bot.stop()` in the generated `GameLoop` (registry non-empty + no active
+  activity) and a "Stop This Bot" palette block — see `../botmaker-studio/ROADMAP.md`.
+- Tests: `BotTest` — `stop()` breaks the loop and `supervise` returns without recovering; a `stop()` during
+  cold start ends the bot before the first body pass.
+
+## 2026-07-16 — Cold-start launch sequence + runtime activity enable/disable + launch diagnostics
+
+**Done**
+- **`Bot.supervise(body, goHome, startGame)` now runs the start-up sequence once at launch** — `startGame()`
+  then `goHome()` — *before* the first loop pass, reusing one shared `recovery` runnable. A cold-start failure
+  routes through that same recovery instead of aborting the bot. **Why:** the 3-arg supervisor only ran
+  GoHome/Startup *after* the loop threw, so "launch the game in Startup" never fired on a normal run (the
+  reported bug: prints in Startup were silent while the activity `run()` printed fine). The 2-arg
+  `supervise(body, recovery)` is unchanged.
+- **`Activity` gained a runtime enable override** — nullable `enabledOverride` plus `setEnabled(boolean)`,
+  `enable()`, `disable()`, and `active()` (the *effective* state: override if set, else the configured
+  `isEnabled()`). The macro loop should consult `active()`, so a mid-run `disable()` actually stops the
+  activity next pass (the reported "can't turn an activity off → GameLoop runs forever"). `isEnabled()`'s
+  javadoc reworded to "configured default"; it stays the `Activities.<FLAG>` wiring.
+- **`Game.launch`/`launchSteam` now log the exact command/URI they invoke** (`[Game] launch: …`,
+  `[Game] launchSteam <id> → <uri>` + opener result) so a silent "nothing happened" launch becomes
+  diagnosable in the Studio console. Behavior is otherwise identical.
+- Tests: `BotTest` now asserts cold-start order (SHB / SHBHS / SHSB); new `ActivityTest` covers
+  `active()`/`setEnabled`/`enable`/`disable`.
+- **Release note:** generated bots pinned to a *released* SDK don't get cold-start or `active()` until this
+  ships; the Studio GameLoop template emits `activity.active()`, which needs this SDK. Local
+  `0.0.0-SNAPSHOT` dev runs pick it up immediately. Cut with `../release.sh` (shared unchanged → sdk → studio).
+
+---
+
 ## 2026-07-15 — `Activity` names itself (no-arg constructor)
 
 **Done**
