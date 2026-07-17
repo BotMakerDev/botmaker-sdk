@@ -8,6 +8,39 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-18 — `Text` OCR facade (`api.vision.Text`)
+
+**Done**
+- **New `api.vision.Text` facade — on-screen text recognition, shaped exactly like `Pixel`.** Per-call
+  `CaptureSource`, region via `source.region(...)`, results in **absolute** screen coords, parked in
+  `VisionContext`, no-source overloads use `Source.current()`. The heavy lifting lives in
+  `botmaker-shared`'s new `com.botmaker.shared.ocr.OcrEngine` (OpenCV preprocessing + Tesseract), so Studio
+  can reuse OCR later without depending on the SDK. Surface:
+  - `read(source[, opts])` — all recognized text as one string.
+  - `find(needle, source)` (case-insensitive substring), `findExact`, `findMatching` (regex) — booleans that
+    store the hit in `VisionContext.getLastTextMatch()`.
+  - `findAll(needle, source)` / `readAll(source)` — counts, list in `VisionContext.getLastTextMatchList()`.
+  - `waitFor` / `waitForGone` — poll loops identical to `Pixel`'s. Every call accepts an `OcrOptions` overload
+    (languages, PSM, upscale, binarize, char whitelist). Default options read whole **lines** so multi-word
+    phrases (`"Game Over"`) match by substring.
+- **`api.vision.TextMatch`** — result type mirroring `ColorMatch`/`MatchResult` (package-private ctor,
+  `notFound()` sentinel, `null` accessors when not found): `getText`, `getBounds` (absolute `Rect`),
+  `getCenter`, `getConfidence`.
+- **`api.vision.VisionContext`** — added a **separate** thread-local text slot (`lastTextMatch` /
+  `lastTextMatchList` + getters/`ifLastTextMatch`/`clearLastTextMatch`), not shared with the template or
+  colour slots, since bots interleave all three.
+- **Bridge** maps shared `TextResult` (source-local box) → `TextMatch` (absolute via `source.origin()`),
+  exactly like `Pixel.map(...)`. A genuine native-load failure surfaces as an `Error` (not caught), matching
+  the rest of the vision layer.
+- **Tests** — `TextTest` drives `Text` against a fixed-origin `CaptureSource` stub (rendered text) and
+  asserts recognition, `VisionContext` storage, and absolute-coordinate mapping.
+
+**Deferred / next**
+- **Studio palette** — register `Text` in `palette/SdkApi.FACADE_CLASSES` and add palette blocks (a new
+  facade needs registering; its methods are then auto-discovered). Not started.
+
+---
+
 ## 2026-07-16 — `Game.kill` + name-based `Activity` control
 
 **Done**

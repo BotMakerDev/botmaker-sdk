@@ -35,6 +35,8 @@ public final class VisionContext {
     private static final ThreadLocal<List<MatchResult>> lastMatchList = new ThreadLocal<>();
     private static final ThreadLocal<ColorMatch> lastColorMatch = new ThreadLocal<>();
     private static final ThreadLocal<List<ColorMatch>> lastColorMatchList = new ThreadLocal<>();
+    private static final ThreadLocal<TextMatch> lastTextMatch = new ThreadLocal<>();
+    private static final ThreadLocal<List<TextMatch>> lastTextMatchList = new ThreadLocal<>();
 
     private VisionContext() {}
 
@@ -186,5 +188,73 @@ public final class VisionContext {
     static void setLastColorMatchList(List<ColorMatch> results) {
         lastColorMatchList.set(results);
         lastColorMatch.set(results.isEmpty() ? ColorMatch.notFound() : results.get(0));
+    }
+
+    // --- text (Text / OCR) ------------------------------------------------
+    //
+    // Text results are tracked in their own slot, separate from template and colour, for the same reason:
+    // a bot commonly interleaves all three (find a button by template, check its colour, read its label),
+    // and sharing a slot would let each clobber the others.
+
+    /**
+     * Returns the most recent text match for the current thread, or {@link TextMatch#notFound()} if no
+     * {@link Text} operation has been performed yet on this thread.
+     *
+     * @return the last text match, never null
+     */
+    public static TextMatch getLastTextMatch() {
+        TextMatch result = lastTextMatch.get();
+        return result != null ? result : TextMatch.notFound();
+    }
+
+    /**
+     * Returns the most recent list of text matches for the current thread (from {@link Text#findAll}),
+     * or an empty list if none has been performed yet.
+     *
+     * @return the last text match list, never null
+     */
+    public static List<TextMatch> getLastTextMatchList() {
+        List<TextMatch> result = lastTextMatchList.get();
+        return result != null ? result : new ArrayList<>();
+    }
+
+    /**
+     * Returns whether the last text search for the current thread found something.
+     * Equivalent to {@code getLastTextMatch().isFound()}.
+     */
+    public static boolean lastTextMatchFound() {
+        return getLastTextMatch().isFound();
+    }
+
+    /** Clears the last text match and text match list for the current thread. */
+    public static void clearLastTextMatch() {
+        lastTextMatch.remove();
+        lastTextMatchList.remove();
+    }
+
+    /**
+     * Invokes {@code action} with the last text match if one was found. Does nothing otherwise.
+     *
+     * @return true if a match existed and the action was invoked
+     */
+    public static boolean ifLastTextMatch(java.util.function.Consumer<TextMatch> action) {
+        TextMatch result = getLastTextMatch();
+        if (result.isFound()) {
+            action.accept(result);
+            return true;
+        }
+        return false;
+    }
+
+    /** Internal: updates the last text match for the current thread. */
+    static void setLastTextMatch(TextMatch result) {
+        lastTextMatch.set(result);
+        lastTextMatchList.remove();
+    }
+
+    /** Internal: updates the last text match list for the current thread. */
+    static void setLastTextMatchList(List<TextMatch> results) {
+        lastTextMatchList.set(results);
+        lastTextMatch.set(results.isEmpty() ? TextMatch.notFound() : results.get(0));
     }
 }
