@@ -7,15 +7,16 @@ import com.botmaker.sdk.internal.launch.UriLauncher;
 /**
  * Launches a game so a bot can automate it.
  *
- * <p>Two entry points, both exposed as visual blocks:
+ * <p>Three entry points, all exposed as visual blocks:
  * <ul>
  *   <li>{@link #launch(String, String...)} — run any executable/command directly.</li>
  *   <li>{@link #launchSteam(String)} — hand a Steam appId to the local Steam client.</li>
+ *   <li>{@link #launchEpic(String)} — hand an Epic app name to the local Epic Games Launcher.</li>
  * </ul>
  *
- * <p>Launching a Steam game requires the Steam client to be installed and signed in (the client owns that
- * session; this SDK never touches Steam credentials). If Steam is not running, invoking the launch starts it
- * and Steam prompts the user to sign in through its own UI.
+ * <p>Launching a store game requires that store's client (Steam / Epic Games Launcher) to be installed and
+ * signed in — the client owns that session; this SDK never touches store credentials. If the client is not
+ * running, invoking the launch starts it and it prompts the user to sign in through its own UI.
  */
 public class Game {
 
@@ -85,6 +86,51 @@ public class Game {
     /** Convenience overload accepting a numeric appId. */
     public static void launchSteam(int appId) {
         launchSteam(Integer.toString(appId));
+    }
+
+    /**
+     * Launches an Epic Games game by its <em>app name</em> — the {@code AppName} launch token from the Epic
+     * Games Launcher's local manifest (Studio's game picker fills this in for you), not the store-page title.
+     * Opens the {@code com.epicgames.launcher://apps/<appName>?action=launch} protocol URL, which the
+     * installed Epic Games Launcher handles.
+     *
+     * <p>Unlike Steam there is no supported command-line fallback, so this relies on the {@code
+     * com.epicgames.launcher://} protocol handler that the launcher registers on install.
+     *
+     * @param appName the Epic application name / launch token, e.g. {@code "Fortnite"}
+     * @throws IllegalArgumentException if {@code appName} is null/blank
+     * @throws RuntimeException         if the Epic protocol URL could not be invoked (launcher not installed?)
+     */
+    public static void launchEpic(String appName) {
+        if (appName == null || appName.isBlank()) {
+            throw new IllegalArgumentException("appName must not be empty");
+        }
+        String id = appName.trim();
+        String uri = "com.epicgames.launcher://apps/" + id + "?action=launch&silent=true";
+        // Log before invoking: if the launcher doesn't come up, the console still shows the URI we tried, so a
+        // silent failure (e.g. no registered com.epicgames.launcher:// handler) is diagnosable.
+        System.out.println("[Game] launchEpic " + id + " → " + uri);
+        if (UriLauncher.open(uri)) {
+            System.out.println("[Game] launchEpic: opener invoked for " + uri);
+            return;
+        }
+        throw new RuntimeException("Failed to launch Epic game '" + id
+                + "'. Is the Epic Games Launcher installed?");
+    }
+
+    /**
+     * Launches an Epic game by app name only if {@code source}'s window is not already open.
+     *
+     * @param appName the Epic application name (see {@link #launchEpic(String)})
+     * @param source  the capture source used to detect an existing instance
+     * @return true if the game was launched, false if it was already running
+     */
+    public static boolean launchEpicIfNotRunning(String appName, CaptureSource source) {
+        if (isRunning(source)) {
+            return false;
+        }
+        launchEpic(appName);
+        return true;
     }
 
     // --- Running-detection & wait (window-based, via CaptureSource) ---

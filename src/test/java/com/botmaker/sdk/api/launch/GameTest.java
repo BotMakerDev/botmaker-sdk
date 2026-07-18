@@ -28,6 +28,13 @@ class GameTest {
     }
 
     @Test
+    void launchEpicRejectsEmptyAppId() {
+        assertThrows(IllegalArgumentException.class, () -> Game.launchEpic(null));
+        assertThrows(IllegalArgumentException.class, () -> Game.launchEpic(""));
+        assertThrows(IllegalArgumentException.class, () -> Game.launchEpic("   "));
+    }
+
+    @Test
     void killAndIsRunningRejectEmptyName() {
         assertThrows(IllegalArgumentException.class, () -> Game.kill(null));
         assertThrows(IllegalArgumentException.class, () -> Game.kill("  "));

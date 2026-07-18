@@ -8,6 +8,19 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-18 — Epic Games launch (`Game.launchEpic`)
+
+**Done**
+- **`Game.launchEpic(String appName)` + `launchEpicIfNotRunning(appName, source)`** — mirror the Steam pair.
+  Opens `com.epicgames.launcher://apps/<appName>?action=launch&silent=true` through the scheme-agnostic
+  `UriLauncher` (no `UriLauncher` change needed). `appName` is the Epic manifest `AppName` launch token
+  (Studio's game picker fills it in), not the store title. Unlike Steam there's no CLI fallback, so a genuine
+  failure (launcher not installed / no protocol handler) throws. Empty-input validation mirrors `launchSteam`;
+  `GameTest.launchEpicRejectsEmptyAppId` pins it.
+
+**Deferred / next**
+- GOG / other stores follow the same shape when wanted (new `launch<Store>` + a `GameLibraryProvider` in Studio).
+
 ## 2026-07-18 — `Text` OCR facade (`api.vision.Text`)
 
 **Done**
