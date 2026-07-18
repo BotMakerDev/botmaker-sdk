@@ -40,6 +40,19 @@ public interface CaptureSource {
         return true;
     }
 
+    /**
+     * Sends a primary click at absolute point {@code p} — the location a matcher produced on <em>this</em>
+     * source. The default is a real desktop click ({@link com.botmaker.sdk.api.interaction.Mouse#click(Point)}),
+     * which is correct for the on-screen sources (desktop / monitor / window). A source whose pixels are
+     * <em>not</em> on the desktop — an emulator captured over ADB — overrides this to inject the click through
+     * its own channel (e.g. {@code adb input tap}); because such a source reports {@link #origin()} as
+     * {@code (0,0)}, {@code p} is already a coordinate in that source's own pixel space. This is the single
+     * seam that lets the whole vision→click pipeline target an emulator without any matcher change.
+     */
+    default void click(Point p) {
+        com.botmaker.sdk.api.interaction.Mouse.click(p);
+    }
+
     // --- The three canonical sources ---
 
     /** The whole virtual desktop (all monitors). The ultimate fallback source for every matcher. */
@@ -94,6 +107,12 @@ public interface CaptureSource {
             public Point origin() {
                 Point o = parent.origin();
                 return new Point(o.x + Math.max(0, sub.x), o.y + Math.max(0, sub.y));
+            }
+
+            @Override
+            public void click(Point p) {
+                // Route the click to the underlying surface so a region of an emulator still taps via ADB.
+                parent.click(p);
             }
 
             @Override

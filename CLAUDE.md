@@ -88,8 +88,10 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   - `api.BotMaker` — console IO. `readX()` prints a SOH-wrapped `BM-INPUT:<type>` marker to stdout
     before blocking on stdin; Studio detects/strips it to show a modal input prompt. Changing that
     marker on one side without the other breaks input prompts.
-- **`com.botmaker.sdk.internal.*`** is plumbing, free to rework: `opencv`, `capture`, `emulator`,
-  `inspector`, `interaction`.
+- **`com.botmaker.sdk.internal.*`** is plumbing, free to rework: `opencv`, `capture`, `observe`,
+  `launch`. (The old `inspector` / `interaction` packages and the `ddmlib` dependency were removed for the
+  Phase-3 emulator rewrite; there is no SDK `internal/emulator` — the ADB transport + discovery live in
+  **shared** now, see below.)
 
 ### OpenCV / native loading
 
@@ -139,7 +141,15 @@ skips the restore when `WAYLAND_DISPLAY` is set, leaving the cursor on the targe
 "click without disturbing the cursor" path is the xdg-desktop-portal **RemoteDesktop** (libei/
 PipeWire) interface — deferred; see `ROADMAP.md`.
 
-## Out of scope (for now)
+## Android emulator (`api.emulator`)
 
-ADB / emulator control (`internal/emulator/*`, the `ddmlib` dependency) is present but not a current
-focus.
+The emulator **capability** — the dadb transport (`AdbDevice`) and product discovery (`Platforms`,
+`BlueStacks`/`LdPlayer`, `WindowsRegistry`, `EmulatorInstance`) — lives in **shared**
+(`com.botmaker.shared.emulator`), because both the SDK (connect at runtime) and Studio (list instances in the
+picker) need it, and so a future Studio capture-picker can preview an emulator screen. dadb therefore comes in
+transitively via shared — it is **not** a direct SDK dependency.
+
+The SDK owns only the bot-facing facade `api.emulator`: **`Emulator implements CaptureSource`** (wraps a shared
+`AdbDevice`; `origin()` is `(0,0)` so a match's coords are already emulator pixels and the whole vision/click
+stack works unchanged; `click(Point)` → `adb input tap`) and **`Emulators`** (static discovery over shared's
+`Platforms`: `list`/`first`/`named`/`connect`, plus `use()`/`use(String)` connect-and-set-`Source` shorthands).

@@ -3,7 +3,6 @@ package com.botmaker.sdk.api.vision;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.api.interaction.Mouse;
 import com.botmaker.sdk.api.interaction.Wait;
 import com.botmaker.sdk.api.observe.Bots;
 import com.botmaker.sdk.api.observe.ClickEvent;
@@ -99,7 +98,7 @@ public class ImageClicker {
     public static boolean click(ImageTemplate template, CaptureSource source, double confidence, int delayMs) {
         MatchResult result = ImageFinder.findInternal(template, source, confidence);
         VisionContext.setLastMatch(result);
-        return clickResult(result, delayMs > 0 ? delayMs : ClickConfig.DEFAULT_FOUND_DELAY);
+        return clickResult(source, result, delayMs > 0 ? delayMs : ClickConfig.DEFAULT_FOUND_DELAY);
     }
 
     // --- clickAny (first template, in order, that clears the threshold) ---
@@ -237,7 +236,8 @@ public class ImageClicker {
      * @return true if the template was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplate template) {
-        return clickResult(ImageFinder.findInternal(template, Source.current(), ClickConfig.DEFAULT_CONFIDENCE));
+        CaptureSource source = Source.current();
+        return clickResult(source, ImageFinder.findInternal(template, source, ClickConfig.DEFAULT_CONFIDENCE));
     }
 
     /**
@@ -251,7 +251,8 @@ public class ImageClicker {
      * @return true if the template was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplate template, double confidence) {
-        return clickResult(ImageFinder.findInternal(template, Source.current(), confidence));
+        CaptureSource source = Source.current();
+        return clickResult(source, ImageFinder.findInternal(template, source, confidence));
     }
 
     /**
@@ -265,7 +266,7 @@ public class ImageClicker {
      * @return true if the template was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplate template, CaptureSource source) {
-        return clickResult(ImageFinder.findInternal(template, source, ClickConfig.DEFAULT_CONFIDENCE));
+        return clickResult(source, ImageFinder.findInternal(template, source, ClickConfig.DEFAULT_CONFIDENCE));
     }
 
     /**
@@ -280,7 +281,7 @@ public class ImageClicker {
      * @return true if the template was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplate template, CaptureSource source, double confidence) {
-        return clickResult(ImageFinder.findInternal(template, source, confidence));
+        return clickResult(source, ImageFinder.findInternal(template, source, confidence));
     }
 
     // --- clickBest over an ImageTemplateGroup ---
@@ -296,9 +297,10 @@ public class ImageClicker {
      * @return true if any template in the group was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplateGroup group) {
-        MatchResult result = findBestInternal(group, Source.current(), ClickConfig.DEFAULT_CONFIDENCE);
+        CaptureSource source = Source.current();
+        MatchResult result = findBestInternal(group, source, ClickConfig.DEFAULT_CONFIDENCE);
         VisionContext.setLastMatch(result);
-        return clickResult(result);
+        return clickResult(source, result);
     }
 
     /**
@@ -312,9 +314,10 @@ public class ImageClicker {
      * @return true if any template in the group was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplateGroup group, double confidence) {
-        MatchResult result = findBestInternal(group, Source.current(), confidence);
+        CaptureSource source = Source.current();
+        MatchResult result = findBestInternal(group, source, confidence);
         VisionContext.setLastMatch(result);
-        return clickResult(result);
+        return clickResult(source, result);
     }
 
     /**
@@ -330,7 +333,7 @@ public class ImageClicker {
     public static boolean clickBest(ImageTemplateGroup group, CaptureSource source) {
         MatchResult result = findBestInternal(group, source, ClickConfig.DEFAULT_CONFIDENCE);
         VisionContext.setLastMatch(result);
-        return clickResult(result);
+        return clickResult(source, result);
     }
 
     /**
@@ -347,7 +350,7 @@ public class ImageClicker {
     public static boolean clickBest(ImageTemplateGroup group, CaptureSource source, double confidence) {
         MatchResult result = findBestInternal(group, source, confidence);
         VisionContext.setLastMatch(result);
-        return clickResult(result);
+        return clickResult(source, result);
     }
 
     // --- clickCompare over ImageTemplateGroup ---
@@ -364,10 +367,11 @@ public class ImageClicker {
      * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
      */
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
-        MatchResult result = compareInternal(good.templates(), bad.templates(), Source.current(),
+        CaptureSource source = Source.current();
+        MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 ClickConfig.DEFAULT_CONFIDENCE, ClickConfig.DEFAULT_COMPARE_MARGIN);
         VisionContext.setLastMatch(result);
-        return clickResult(result);
+        return clickResult(source, result);
     }
 
     /**
@@ -383,10 +387,11 @@ public class ImageClicker {
      * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
      */
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
-        MatchResult result = compareInternal(good.templates(), bad.templates(), Source.current(),
+        CaptureSource source = Source.current();
+        MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 ClickConfig.DEFAULT_CONFIDENCE, margin);
         VisionContext.setLastMatch(result);
-        return clickResult(result);
+        return clickResult(source, result);
     }
 
     /**
@@ -405,7 +410,7 @@ public class ImageClicker {
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 ClickConfig.DEFAULT_CONFIDENCE, ClickConfig.DEFAULT_COMPARE_MARGIN);
         VisionContext.setLastMatch(result);
-        return clickResult(result);
+        return clickResult(source, result);
     }
 
     /**
@@ -426,7 +431,7 @@ public class ImageClicker {
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 ClickConfig.DEFAULT_CONFIDENCE, margin);
         VisionContext.setLastMatch(result);
-        return clickResult(result);
+        return clickResult(source, result);
     }
 
     // --- clickAnyCompare (click the FIRST good, in group order, that beats the bad set) ---
@@ -476,7 +481,7 @@ public class ImageClicker {
         MatchResult result = compareAnyInternal(good.templates(), bad.templates(), source,
                 ClickConfig.DEFAULT_CONFIDENCE, margin);
         VisionContext.setLastMatch(result);
-        return clickResult(result);
+        return clickResult(source, result);
     }
 
     // --- clickAllCompare (click EVERY good location that beats the bad set) ---
@@ -525,7 +530,7 @@ public class ImageClicker {
         VisionContext.setLastMatchList(winners);
         for (MatchResult match : winners) {
             Point clickPoint = ClickConfig.RANDOMIZE_CLICKS ? match.getRandomClickPoint() : match.getCenter();
-            Mouse.click(clickPoint);
+            source.click(clickPoint);
             emitClick(clickPoint);
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
         }
@@ -594,7 +599,7 @@ public class ImageClicker {
         VisionContext.setLastMatchList(matches);
         for (MatchResult match : matches) {
             Point clickPoint = ClickConfig.RANDOMIZE_CLICKS ? match.getRandomClickPoint() : match.getCenter();
-            Mouse.click(clickPoint);
+            source.click(clickPoint);
             emitClick(clickPoint);
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
         }
@@ -666,7 +671,7 @@ public class ImageClicker {
         VisionContext.setLastMatchList(all);
         for (MatchResult match : all) {
             Point clickPoint = ClickConfig.RANDOMIZE_CLICKS ? match.getRandomClickPoint() : match.getCenter();
-            Mouse.click(clickPoint);
+            source.click(clickPoint);
             emitClick(clickPoint);
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
         }
@@ -830,26 +835,30 @@ public class ImageClicker {
     }
 
     /**
-     * Click a match already located (used by clickBest/clickCompare).
+     * Click a match already located (used by clickBest/clickCompare). The click is dispatched through
+     * {@code source} so an emulator source taps via ADB instead of the desktop.
      *
+     * @param source the source the match was located on
      * @param result the match result to click
      * @return true if the click was successful, false otherwise
      */
-    private static boolean clickResult(MatchResult result) {
-        return clickResult(result, ClickConfig.DEFAULT_FOUND_DELAY);
+    private static boolean clickResult(CaptureSource source, MatchResult result) {
+        return clickResult(source, result, ClickConfig.DEFAULT_FOUND_DELAY);
     }
 
     /**
-     * Click a located match, waiting {@code delayMs} afterwards (the shared click body).
+     * Click a located match, waiting {@code delayMs} afterwards (the shared click body). The click is
+     * dispatched through {@code source} (see {@link CaptureSource#click(Point)}).
      *
+     * @param source  the source the match was located on
      * @param result  the match result to click
      * @param delayMs the delay in milliseconds after the click
      * @return true if the click was successful, false otherwise
      */
-    private static boolean clickResult(MatchResult result, int delayMs) {
+    private static boolean clickResult(CaptureSource source, MatchResult result, int delayMs) {
         if (result.isFound()) {
             Point clickPoint = ClickConfig.RANDOMIZE_CLICKS ? result.getRandomClickPoint() : result.getCenter();
-            Mouse.click(clickPoint);
+            source.click(clickPoint);
             emitClick(clickPoint);
             Wait.milliseconds(delayMs);
 

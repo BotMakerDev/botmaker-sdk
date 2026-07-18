@@ -30,11 +30,6 @@
             <id>jitpack.io</id>
             <url>https://jitpack.io</url>
         </repository>
-        <!-- Google's Maven repo hosts com.android.tools.ddms:ddmlib -->
-        <repository>
-            <id>google</id>
-            <url>https://dl.google.com/dl/android/maven2/</url>
-        </repository>
     </repositories>
 
     <dependencies>
@@ -66,19 +61,16 @@
             <version>5.14.0</version>
         </dependency>
 
-        <!-- Android DDMLIB (adb / emulator control) -->
-        <dependency>
-            <groupId>com.android.tools.ddms</groupId>
-            <artifactId>ddmlib</artifactId>
-            <version>31.2.0</version>
-        </dependency>
-
         <!-- Jackson Databind (config serialization) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>2.17.0</version>
         </dependency>
+
+        <!-- The Android-emulator transport (dadb) lives in botmaker-shared now, so it arrives transitively
+             via the shared dependency above — the SDK's api.emulator facade compiles against
+             com.botmaker.shared.emulator.{AdbDevice, Platforms, EmulatorInstance}. -->
 
         <!-- Test Dependencies -->
         <dependency>

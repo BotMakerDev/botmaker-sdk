@@ -8,6 +8,66 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-18 — Emulator capability hoisted to shared; SDK keeps only the `api.emulator` facade
+
+**Done** (Phase 3 refactor — supersedes the Slice A layout below)
+- **Moved the whole emulator capability to `botmaker-shared` (`com.botmaker.shared.emulator`):** the dadb
+  transport `AdbDevice` **and** discovery (`Platforms`, `EmulatorPlatform`, `BlueStacks`/`LdPlayer`/scaffolds,
+  `WindowsRegistry`, `EmulatorInstance`). Reason: discovery is needed by both the SDK (connect) and Studio (list
+  instances in the picker), so it can't be SDK-only; moving the transport too lets a future Studio capture-picker
+  preview the emulator screen. `dev.mobile:dadb` moved to shared's pom and was **removed from the SDK pom** — the
+  SDK now gets it transitively. The SDK's `internal/emulator` package no longer exists.
+- **SDK keeps only `api.emulator`** (`Emulator`/`Emulators`), repointed to import `com.botmaker.shared.emulator.*`.
+  `Emulator` still `implements CaptureSource` (the SDK-only type that anchors it here). Added `Emulators.use()` /
+  `use(String)` — connect-and-`Source.set` shorthands (the one-block "use emulator as source" flow Studio inserts).
+- **The click-routing seam stays in the SDK** (it's an `api.capture`/`api.vision` change): `CaptureSource` has
+  `default void click(Point)` (region delegates to parent) and `ImageClicker` routes clicks through `source.click`
+  so an emulator overrides to `adb input tap`. Guarded by `ImageClickerRoutingTest` (stays in the SDK). The
+  discovery parser tests moved to shared.
+
+**Deferred / next**
+- Live smoke test on real BlueStacks/LDPlayer (screencap decode, `input tap`, per-instance ADB-port discovery) —
+  can't run without an emulator installed.
+
+---
+
+## 2026-07-18 — Android emulator, Slice A: dadb transport + `Emulator` capture source
+
+> Superseded by the entry above: the `internal/emulator/*` classes named here (`AdbDevice`, `Platforms`,
+> `BlueStacks`/`LdPlayer`, `WindowsRegistry`) now live in `com.botmaker.shared.emulator`. Kept for history.
+
+**Done** (Phase 3, Slice A — SDK side; Studio picker is Slice B, deferred)
+- **Cleared the old ADB stack** — deleted `internal/emulator/*` (ddmlib-based), `internal/inspector/RegistryInspector`,
+  `internal/interaction/*`, and the `com.android.tools.ddms:ddmlib` dependency + its Google Maven repo. Rebuilt from scratch.
+- **Transport = dadb** (`dev.mobile:dadb:1.2.9`, pure-JVM ADB — no `adb.exe`/server to ship). Pulls kotlin-stdlib
+  transitively into generated bots — accepted cost of shipping no adb binary. dadb owns the RSA auth key
+  (`~/.android/adbkey`), so there's no key lifecycle to manage here. Note: the Kotlin package is `dadb.*`, not the
+  `dev.mobile` groupId.
+- **`internal/emulator/AdbDevice`** — one live connection: `screencap()` (binary-safe via `exec:screencap -p`, decoded
+  with ImageIO), `tap`/`swipe`/`key`/`text`/`startApp`/`getProp`/`shell`, `isConnected`.
+- **Discovery** — `EmulatorPlatform` interface + `EmulatorInstance` record; `BlueStacksPlatform` (parses
+  `bluestacks.conf` `bst.instance.<n>.status.adb_port`) and `LdPlayerPlatform` (parses `leidian<i>.config`; ADB port
+  = 5555 + 2·i) discover for real; MEmu/MuMu/Gameloop scaffolded (return empty). `WindowsRegistry` (`reg query`)
+  replaces the deleted BlueStacks-specific inspector. `Platforms.discoverAll()` aggregates. Windows-first; empty
+  elsewhere; never throws. Parsers are pure + unit-tested.
+- **`api.emulator.Emulator implements CaptureSource`** — the crux: `origin()` is `(0,0)` so a match's coords are
+  already emulator pixels, and `capture()` = `screencap`, so `ImageFinder`/`Pixel`/`Text` work on it unchanged.
+  Plus native verbs (`tap`/`swipe`/`back`/`home`/`text`/`key`/`startApp`), `use()` = `Source.set(this)`.
+  `api.emulator.Emulators` = static discovery (`list`/`first`/`named`/`connect`).
+- **Click-routing seam** — `CaptureSource.click(Point)` (default `Mouse.click`; `region(...)` delegates to parent);
+  `ImageClicker` now dispatches every click through `source.click(...)` instead of `Mouse.click(...)`, so an emulator
+  source taps via ADB. `ImageClickerRoutingTest` pins it (real OpenCV match → click recorded on the source, incl.
+  region delegation). SDK suite green (90 tests).
+
+**Deferred / next**
+- **Slice B (Studio):** register `Emulators` facade in `palette/SdkApi`, add a `CONNECT_EMULATOR` block, a Studio-side
+  `EmulatorInstanceScanner` (reads the same BlueStacks/LDPlayer configs), and an `EmulatorArgPicker` + `PickerContext`
+  /`PickerRegistry` wiring — mirrors the Steam/Epic game picker.
+- **Live smoke test** on real BlueStacks/LDPlayer (couldn't run here — no emulator installed): verify `screencap`
+  decode, `input tap`, and per-instance ADB port discovery. BlueStacks needs ADB enabled in its settings.
+- **Native-window capture backend** behind the same `CaptureSource` as a throughput optimization (a full-frame PNG
+  per `screencap` is the ceiling). MEmu/MuMu/Gameloop discovery parsers.
+
 ## 2026-07-18 — Epic Games launch (`Game.launchEpic`)
 
 **Done**
