@@ -1,6 +1,8 @@
 package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.Debug;
 
+import java.util.function.Consumer;
+
 /**
  * Bot lifecycle supervisor: the outermost loop that keeps a bot running through crashes and stuck states.
  *
@@ -10,9 +12,11 @@ import com.botmaker.sdk.api.Debug;
  * back to a known-good state before restarting. This is the "restart the bot on failure" machinery a game
  * bot needs; the body, the recovery hooks and the per-activity logic stay in editable user code.
  *
- * <p>The 3-arg {@link #supervise(Runnable, Runnable, Runnable)} also runs your start-up sequence <em>once</em>
- * before the first loop pass — {@code startGame()} then {@code goHome()} — so a fresh launch actually opens
- * the game and reaches a known screen instead of assuming it is already running.
+ * <p>The 3-arg {@link #supervise(Runnable, Runnable, Consumer)} also runs your start-up sequence <em>once</em>
+ * before the first loop pass — {@code startGame(COLD)} then {@code goHome()} — so a fresh launch actually opens
+ * the game and reaches a known screen instead of assuming it is already running. The start-up step is handed a
+ * {@link StartMode} so it can tell a first {@code COLD} launch (don't relaunch an already-open game) from a
+ * {@code RESTART} recovery (shut a frozen game down first).
  *
  * <p>The bot ends when {@link #stop()} is called — from an activity that is done, or automatically by the
  * generated loop once every activity is disabled. {@code stop()} unwinds the supervise loop cleanly and
@@ -55,9 +59,10 @@ public final class Bot {
      *
      * @param body      the bot's main work
      * @param goHome    navigate from wherever the bot is back to a safe/home screen
-     * @param startGame (re)launch or restart the game from the home screen
+     * @param startGame (re)launch the game; receives {@link StartMode#COLD} on the one-time cold start and
+     *                  {@link StartMode#RESTART} on every recovery restart
      */
-    public static void start(Runnable body, Runnable goHome, Runnable startGame) {
+    public static void start(Runnable body, Runnable goHome, Consumer<StartMode> startGame) {
         supervise(body, goHome, startGame);
     }
 
@@ -96,28 +101,30 @@ public final class Bot {
      * Convenience supervisor whose recovery is "get back home, then (re)start the game", and which also runs a
      * one-time start-up before the loop.
      *
-     * <p><b>Cold start (once, before the first pass):</b> {@code startGame} then {@code goHome} — launch the
-     * game, then navigate to a known-good screen. Without this the loop began against whatever was on screen,
-     * so "launch the game in Startup" never fired on a normal run (Startup only ran during recovery).
+     * <p><b>Cold start (once, before the first pass):</b> {@code startGame(COLD)} then {@code goHome} — launch
+     * the game (only if it isn't already open), then navigate to a known-good screen. Without this the loop
+     * began against whatever was on screen, so "launch the game in Startup" never fired on a normal run (Startup
+     * only ran during recovery).
      *
-     * <p><b>Recovery (on every crash/stuck):</b> {@code goHome} then {@code startGame} — get back home, then
-     * (re)start the game. A failure <em>during</em> cold start routes through this same recovery rather than
-     * aborting the bot.
+     * <p><b>Recovery (on every crash/stuck):</b> {@code goHome} then {@code startGame(RESTART)} — get back
+     * home, then restart the game (shutting a frozen one down first). A failure <em>during</em> cold start
+     * routes through this same recovery rather than aborting the bot.
      *
      * @param body      the bot's main work
      * @param goHome    navigate from wherever the bot is back to a safe/home screen
-     * @param startGame (re)launch or restart the game from the home screen
+     * @param startGame (re)launch the game; gets {@link StartMode#COLD} at cold start, {@link StartMode#RESTART}
+     *                  on recovery
      */
-    static void supervise(Runnable body, Runnable goHome, Runnable startGame) {
+    static void supervise(Runnable body, Runnable goHome, Consumer<StartMode> startGame) {
         Runnable recovery = () -> {
             goHome.run();
-            startGame.run();
+            startGame.accept(StartMode.RESTART);
         };
         Watchdog.enable();
         // Cold start: open the game and reach a known screen once, before the loop. A failure here recovers
         // exactly as a mid-run failure would, so a bad first launch still self-heals instead of exiting.
         try {
-            startGame.run();
+            startGame.accept(StartMode.COLD);
             goHome.run();
         } catch (BotStoppedException e) {
             Debug.log("[Bot] Stopped by request during start-up.");

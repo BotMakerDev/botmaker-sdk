@@ -30,6 +30,16 @@ public sealed interface LaunchTarget {
     /** Brings the target up (launches the game/app). Best-effort — logs rather than throwing on failure. */
     void start();
 
+    /**
+     * Brings the target up only if it isn't already running — the cold-start path, so a game the user already
+     * opened by hand isn't relaunched. Defaults to {@link #start()} (for targets where re-launching an already
+     * running game is a harmless focus, e.g. Steam/Epic); variants that can cheaply detect "already running"
+     * override this to skip.
+     */
+    default void startIfNotRunning() {
+        start();
+    }
+
     /** Restarts the target from a clean state. Defaults to {@link #start()}; only some variants can force-stop. */
     default void restart() {
         start();
@@ -109,8 +119,38 @@ public sealed interface LaunchTarget {
         }
 
         @Override
+        public void startIfNotRunning() {
+            String name = processName(path);
+            if (name != null && Game.isRunning(name)) {
+                Debug.log("[Target] exe '" + name + "' already running — skipping cold launch");
+                return;
+            }
+            start();
+        }
+
+        @Override
+        public void restart() {
+            // A frozen exe won't exit on its own: force-stop it by process name, then relaunch.
+            String name = processName(path);
+            if (name != null) {
+                Game.kill(name);
+            }
+            start();
+        }
+
+        @Override
         public String spec() {
             return "exe:" + path;
+        }
+
+        /** The executable's file name (the process/image name {@link Game#kill}/{@link Game#isRunning} match). */
+        private static String processName(String path) {
+            if (path == null || path.isBlank()) {
+                return null;
+            }
+            int slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+            String name = (slash >= 0 && slash < path.length() - 1) ? path.substring(slash + 1) : path;
+            return name.isBlank() ? null : name;
         }
     }
 

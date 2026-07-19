@@ -49,12 +49,14 @@ class BotTest {
         // The reported bug: Startup never ran on a normal launch. Cold start now runs startGame then goHome,
         // once, before the first body pass — so "launch the game in Startup" actually fires.
         StringBuilder order = new StringBuilder();
+        java.util.List<StartMode> modes = new java.util.ArrayList<>();
         assertThrows(StopLoop.class, () -> Bot.supervise(
                 () -> { order.append("B"); throw new StopLoop(); },   // body: end the loop on the first pass
                 () -> order.append("H"),                              // goHome
-                () -> order.append("S")));                            // startGame
+                mode -> { modes.add(mode); order.append("S"); }));    // startGame
         assertEquals("SHB", order.toString(),
                 "cold start = startGame then goHome, once, before the first body pass");
+        assertEquals(java.util.List.of(StartMode.COLD), modes, "cold start hands startGame COLD");
     }
 
     @Test
@@ -62,15 +64,19 @@ class BotTest {
         // Mid-run recovery keeps its original order (goHome then startGame), distinct from cold start.
         StringBuilder order = new StringBuilder();
         AtomicInteger starts = new AtomicInteger();
+        java.util.List<StartMode> modes = new java.util.ArrayList<>();
         assertThrows(StopLoop.class, () -> Bot.supervise(
                 () -> { order.append("B"); throw new BotStuckException("stuck"); },
                 () -> order.append("H"),                              // goHome
-                () -> {                                               // startGame
+                mode -> {                                             // startGame
+                    modes.add(mode);
                     order.append("S");
                     if (starts.incrementAndGet() >= 2) throw new StopLoop();  // stop on the recovery restart
                 }));
         // cold start S,H → body B (stuck) → recovery H,S(2nd → StopLoop)
         assertEquals("SHBHS", order.toString());
+        assertEquals(java.util.List.of(StartMode.COLD, StartMode.RESTART), modes,
+                "cold start is COLD; the recovery restart is RESTART");
     }
 
     @Test
@@ -92,7 +98,7 @@ class BotTest {
         Bot.supervise(
                 body::incrementAndGet,                 // body: must never run
                 recovery::incrementAndGet,             // goHome (recovery half)
-                Bot::stop);                            // startGame stops during cold start
+                mode -> Bot.stop());                   // startGame stops during cold start
         assertEquals(0, body.get(), "a stop() during cold start ends the bot before the first body pass");
         assertEquals(0, recovery.get(), "and does not route through recovery");
     }
@@ -104,7 +110,7 @@ class BotTest {
         assertThrows(StopLoop.class, () -> Bot.supervise(
                 () -> { order.append("B"); throw new StopLoop(); },   // body ends the loop
                 () -> order.append("H"),                              // goHome
-                () -> {                                               // startGame
+                mode -> {                                             // startGame
                     order.append("S");
                     if (starts.incrementAndGet() == 1) throw new IllegalStateException("cold start boom");
                 }));

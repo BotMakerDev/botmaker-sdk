@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-20 — Start-vs-restart-aware startup (`StartMode`)
+
+**Done**
+- **New `api.bot.StartMode { COLD, RESTART }`** and the supervisor now hands the start-up step which one it is.
+  `Bot.start`/`supervise`'s `startGame` param changed from `Runnable` to `Consumer<StartMode>`: cold start calls
+  `startGame(COLD)` then `goHome`; recovery calls `goHome` then `startGame(RESTART)`. (API break — allowed;
+  lands with the matching Studio `Startup` template.)
+- **`Target.startIfNotRunning()`** (cold path) + `LaunchTarget.startIfNotRunning()` default. **`Exe`** overrides
+  it to skip launch when its process is already running (`Game.isRunning(name)`), and overrides `restart()` to
+  force-stop by process name (`Game.kill`) then relaunch — the "shut a frozen game down before restarting" case.
+  Steam/Epic keep the idempotent-relaunch default; `EmulatorApp.restart()` already stop-then-starts the app.
+- Wired `Game.kill` / `Game.isRunning(String)` / the skip-if-running primitives that existed but were unused.
+
+---
+
 ## 2026-07-19 — Unified debug output switch (`api.Debug`)
 
 **Done**

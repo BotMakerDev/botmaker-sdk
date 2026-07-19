@@ -65,6 +65,20 @@ public final class Target {
         t.start();
     }
 
+    /**
+     * Brings the current target up only if it isn't already running — the cold-start path. Avoids relaunching a
+     * game the user already opened by hand on a first run (see {@link LaunchTarget#startIfNotRunning()}). No-op
+     * when no target is configured.
+     */
+    public static void startIfNotRunning() {
+        LaunchTarget t = current();
+        if (t == null) {
+            Debug.log("[Target] startIfNotRunning: no launch target configured — nothing to launch");
+            return;
+        }
+        t.startIfNotRunning();
+    }
+
     /** Restarts the current target from a clean state (see {@link LaunchTarget#restart()}). No-op when none. */
     public static void restart() {
         LaunchTarget t = current();
