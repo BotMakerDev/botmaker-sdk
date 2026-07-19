@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.vision;
+import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -146,7 +147,7 @@ public class ImageFinder {
             return MatchResult.notFound();
 
         } catch (Exception e) {
-            if (ClickConfig.DEBUG_MODE) {
+            if (Debug.isEnabled()) {
                 System.err.println("Error finding template: " + e.getMessage());
                 e.printStackTrace();
             }
@@ -612,7 +613,7 @@ public class ImageFinder {
             emitMatch(source, best);
             return best;
         } catch (Exception e) {
-            if (ClickConfig.DEBUG_MODE) {
+            if (Debug.isEnabled()) {
                 System.err.println("Error in compare: " + e.getMessage());
                 e.printStackTrace();
             }
@@ -660,7 +661,7 @@ public class ImageFinder {
             emitMatch(source, MatchResult.notFound());
             return MatchResult.notFound();
         } catch (Exception e) {
-            if (ClickConfig.DEBUG_MODE) {
+            if (Debug.isEnabled()) {
                 System.err.println("Error in compareAny: " + e.getMessage());
                 e.printStackTrace();
             }
@@ -706,7 +707,7 @@ public class ImageFinder {
             emitMatches(source, results);
             return results;
         } catch (Exception e) {
-            if (ClickConfig.DEBUG_MODE) {
+            if (Debug.isEnabled()) {
                 System.err.println("Error in compareAll: " + e.getMessage());
                 e.printStackTrace();
             }
@@ -823,7 +824,7 @@ public class ImageFinder {
             return results;
 
         } catch (Exception e) {
-            if (ClickConfig.DEBUG_MODE) {
+            if (Debug.isEnabled()) {
                 System.err.println("Error in findAll: " + e.getMessage());
                 e.printStackTrace();
             }

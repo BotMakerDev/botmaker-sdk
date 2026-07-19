@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.launch;
+import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.emulator.Emulator;
 import com.botmaker.sdk.api.emulator.EmulatorRef;
@@ -152,12 +153,12 @@ public sealed interface LaunchTarget {
                     .filter(ref -> instance.equals(ref.name()))
                     .findFirst();
             if (match.isEmpty()) {
-                System.out.println("[Target] emu-app: no emulator instance named '" + instance + "'");
+                Debug.log("[Target] emu-app: no emulator instance named '" + instance + "'");
                 return;
             }
             EmulatorRef ref = match.get();
             if (!awaitRunning(ref)) {
-                System.out.println("[Target] emu-app: instance '" + instance + "' did not come up");
+                Debug.log("[Target] emu-app: instance '" + instance + "' did not come up");
                 return;
             }
             Emulator emu = null;
@@ -165,7 +166,7 @@ public sealed interface LaunchTarget {
                 emu = ref.connect();
                 action.accept(emu);
             } catch (Exception e) {
-                System.out.println("[Target] emu-app: " + instance + " failed: " + e.getMessage());
+                Debug.log("[Target] emu-app: " + instance + " failed: " + e.getMessage());
             } finally {
                 if (emu != null) {
                     emu.disconnect();
@@ -178,7 +179,7 @@ public sealed interface LaunchTarget {
             if (ref.running()) {
                 return true;
             }
-            System.out.println("[Target] emu-app: launching emulator instance '" + instance + "'");
+            Debug.log("[Target] emu-app: launching emulator instance '" + instance + "'");
             ref.launch();
             long deadline = System.currentTimeMillis() + BOOT_TIMEOUT_MS;
             while (System.currentTimeMillis() < deadline) {

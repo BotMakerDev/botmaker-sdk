@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.vision;
+import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
@@ -254,7 +255,7 @@ public class Pixel {
             List<RawColorMatch> raw = ColorMatcher.findClusters(img, target, tolerance, minPixels);
             return map(raw, source, img, target);
         } catch (Exception e) {
-            if (ClickConfig.DEBUG_MODE) {
+            if (Debug.isEnabled()) {
                 System.err.println("Error finding colour: " + e.getMessage());
                 e.printStackTrace();
             }

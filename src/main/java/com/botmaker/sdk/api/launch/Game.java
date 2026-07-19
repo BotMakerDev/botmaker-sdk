@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.launch;
+import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.interaction.Wait;
@@ -45,7 +46,7 @@ public class Game {
         try {
             // Log the command before running it: a launch that "does nothing" is otherwise invisible, since a
             // detached process gives no feedback. This line makes the attempt show up in the Studio console.
-            System.out.println("[Game] launch: " + String.join(" ", command));
+            Debug.log("[Game] launch: " + String.join(" ", command));
             new ProcessBuilder(command).start();
         } catch (Exception e) {
             throw new RuntimeException("Failed to launch '" + executablePath + "': " + e.getMessage(), e);
@@ -68,13 +69,13 @@ public class Game {
         String uri = "steam://rungameid/" + id;
         // Log before invoking: if Steam doesn't come up, the console still shows the URI/CLI we tried, so a
         // silent failure (e.g. no registered steam:// handler) is diagnosable instead of "nothing happened".
-        System.out.println("[Game] launchSteam " + id + " → " + uri);
+        Debug.log("[Game] launchSteam " + id + " → " + uri);
         if (UriLauncher.open(uri)) {
-            System.out.println("[Game] launchSteam: opener invoked for " + uri);
+            Debug.log("[Game] launchSteam: opener invoked for " + uri);
             return;
         }
         // Fallback: the Steam CLI (requires `steam` on PATH).
-        System.out.println("[Game] launchSteam: opener declined " + uri + ", falling back to `steam -applaunch " + id + "`");
+        Debug.log("[Game] launchSteam: opener declined " + uri + ", falling back to `steam -applaunch " + id + "`");
         try {
             new ProcessBuilder("steam", "-applaunch", id).start();
         } catch (Exception e) {
@@ -109,9 +110,9 @@ public class Game {
         String uri = "com.epicgames.launcher://apps/" + id + "?action=launch&silent=true";
         // Log before invoking: if the launcher doesn't come up, the console still shows the URI we tried, so a
         // silent failure (e.g. no registered com.epicgames.launcher:// handler) is diagnosable.
-        System.out.println("[Game] launchEpic " + id + " → " + uri);
+        Debug.log("[Game] launchEpic " + id + " → " + uri);
         if (UriLauncher.open(uri)) {
-            System.out.println("[Game] launchEpic: opener invoked for " + uri);
+            Debug.log("[Game] launchEpic: opener invoked for " + uri);
             return;
         }
         throw new RuntimeException("Failed to launch Epic game '" + id
@@ -241,14 +242,14 @@ public class Game {
         String[] command = isWindows()
                 ? new String[]{"taskkill", "/F", "/IM", name}
                 : new String[]{"pkill", "-f", name};
-        System.out.println("[Game] kill " + name + " → " + String.join(" ", command));
+        Debug.log("[Game] kill " + name + " → " + String.join(" ", command));
         try {
             int code = new ProcessBuilder(command).inheritIO().start().waitFor();
             // taskkill=128 / pkill=1 both mean "no matching process" — expected, not a failure.
-            System.out.println("[Game] kill " + name + ": exit " + code
+            Debug.log("[Game] kill " + name + ": exit " + code
                     + (code == 0 ? " (terminated)" : " (nothing to kill / already gone)"));
         } catch (Exception e) {
-            System.out.println("[Game] kill " + name + " failed to invoke: " + e.getMessage());
+            Debug.log("[Game] kill " + name + " failed to invoke: " + e.getMessage());
         }
     }
 
@@ -275,7 +276,7 @@ public class Game {
             // pgrep exits 0 when at least one process matches, 1 when none do.
             return new ProcessBuilder("pgrep", "-f", name).start().waitFor() == 0;
         } catch (Exception e) {
-            System.out.println("[Game] isRunning(" + name + ") check failed: " + e.getMessage());
+            Debug.log("[Game] isRunning(" + name + ") check failed: " + e.getMessage());
             return false;
         }
     }

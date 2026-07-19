@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.Debug;
+
 /**
  * Global configuration for click behavior and delays.
  * Mimics your templateFound delay logic from C++.
@@ -47,11 +49,6 @@ public class ClickConfig {
      */
     public static int MAX_RETRY_ATTEMPTS = 20;
 
-    /**
-     * Whether to print debug information during matching.
-     */
-    public static boolean DEBUG_MODE = false;
-
     // Configuration methods
 
     public static void setFoundDelay(int milliseconds) {
@@ -86,12 +83,18 @@ public class ClickConfig {
         MAX_RETRY_ATTEMPTS = attempts;
     }
 
+    /**
+     * Toggles the SDK's global debug output. Kept here for discoverability alongside the other tuning knobs,
+     * but it is a thin delegate to the single global switch {@link Debug} — vision, lifecycle, and launch
+     * traces all share one flag now.
+     */
     public static void enableDebugMode(boolean enable) {
-        DEBUG_MODE = enable;
+        Debug.set(enable);
     }
 
     /**
-     * Resets all settings to their defaults.
+     * Resets the click/vision tuning to its defaults. Does not touch the global {@link Debug} switch — that has
+     * its own lifecycle (project default + runtime toggle).
      */
     public static void resetToDefaults() {
         DEFAULT_FOUND_DELAY = 500;
@@ -100,6 +103,5 @@ public class ClickConfig {
         DEFAULT_CONFIDENCE = 0.8;
         DEFAULT_COMPARE_MARGIN = 0.05;
         MAX_RETRY_ATTEMPTS = 20;
-        DEBUG_MODE = false;
     }
 }

@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.vision;
+import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
@@ -271,7 +272,7 @@ public final class Text {
             }
             return out;
         } catch (Exception e) {
-            if (ClickConfig.DEBUG_MODE) {
+            if (Debug.isEnabled()) {
                 System.err.println("Error reading text: " + e.getMessage());
                 e.printStackTrace();
             }

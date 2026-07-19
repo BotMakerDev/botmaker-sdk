@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.launch;
+import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 
@@ -58,7 +59,7 @@ public final class Target {
     public static void start() {
         LaunchTarget t = current();
         if (t == null) {
-            System.out.println("[Target] start: no launch target configured — nothing to launch");
+            Debug.log("[Target] start: no launch target configured — nothing to launch");
             return;
         }
         t.start();

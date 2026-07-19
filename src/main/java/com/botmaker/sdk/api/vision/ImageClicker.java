@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.vision;
+import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -534,7 +535,7 @@ public class ImageClicker {
             emitClick(clickPoint);
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
         }
-        if (ClickConfig.DEBUG_MODE && !winners.isEmpty()) {
+        if (Debug.isEnabled() && !winners.isEmpty()) {
             System.out.println("Clicked " + winners.size() + " compare-winning locations");
         }
         return winners.size();
@@ -603,7 +604,7 @@ public class ImageClicker {
             emitClick(clickPoint);
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
         }
-        if (ClickConfig.DEBUG_MODE && !matches.isEmpty()) {
+        if (Debug.isEnabled() && !matches.isEmpty()) {
             System.out.println("Clicked " + matches.size() + " instances of " + template.getId());
         }
         return matches.size();
@@ -675,7 +676,7 @@ public class ImageClicker {
             emitClick(clickPoint);
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
         }
-        if (ClickConfig.DEBUG_MODE && !all.isEmpty()) {
+        if (Debug.isEnabled() && !all.isEmpty()) {
             System.out.println("Clicked " + all.size() + " instances across the group");
         }
         return all.size();
@@ -862,14 +863,14 @@ public class ImageClicker {
             emitClick(clickPoint);
             Wait.milliseconds(delayMs);
 
-            if (ClickConfig.DEBUG_MODE) {
+            if (Debug.isEnabled()) {
                 System.out.println("Clicked " + result.getTemplateId() + " at " + clickPoint +
                         " (confidence: " + String.format("%.3f", result.getConfidence()) + ")");
             }
             return true;
         }
         Wait.milliseconds(ClickConfig.DEFAULT_NOT_FOUND_DELAY);
-        if (ClickConfig.DEBUG_MODE) {
+        if (Debug.isEnabled()) {
             System.out.println("Template not found");
         }
         return false;

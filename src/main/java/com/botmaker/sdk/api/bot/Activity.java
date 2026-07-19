@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.bot;
+import com.botmaker.sdk.api.Debug;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -74,7 +75,7 @@ public abstract class Activity {
     public static void setEnabled(String name, boolean enabled) {
         Activity activity = REGISTRY.get(name);
         if (activity == null) {
-            System.err.println("[Activity] setEnabled: no activity named '" + name + "' — known: "
+            Debug.error("[Activity] setEnabled: no activity named '" + name + "' — known: "
                     + REGISTRY.keySet() + ". Ignoring.");
             return;
         }

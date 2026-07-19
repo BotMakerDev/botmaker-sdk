@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.bot;
+import com.botmaker.sdk.api.Debug;
 
 /**
  * Bot lifecycle supervisor: the outermost loop that keeps a bot running through crashes and stuck states.
@@ -77,14 +78,14 @@ public final class Bot {
             try {
                 body.run();
             } catch (BotStoppedException e) {
-                System.out.println("[Bot] Stopped by request.");
+                Debug.log("[Bot] Stopped by request.");
                 return;
             } catch (BotStuckException e) {
-                System.err.println("[Bot] Stuck: " + e.getMessage() + " — recovering.");
+                Debug.error("[Bot] Stuck: " + e.getMessage() + " — recovering.");
                 Watchdog.reset();
                 recovery.run();
             } catch (RuntimeException e) {
-                System.err.println("[Bot] Crashed: " + e + " — recovering.");
+                Debug.error("[Bot] Crashed: " + e + " — recovering.");
                 Watchdog.reset();
                 recovery.run();
             }
@@ -119,14 +120,14 @@ public final class Bot {
             startGame.run();
             goHome.run();
         } catch (BotStoppedException e) {
-            System.out.println("[Bot] Stopped by request during start-up.");
+            Debug.log("[Bot] Stopped by request during start-up.");
             return;
         } catch (BotStuckException e) {
-            System.err.println("[Bot] Stuck during start-up: " + e.getMessage() + " — recovering.");
+            Debug.error("[Bot] Stuck during start-up: " + e.getMessage() + " — recovering.");
             Watchdog.reset();
             recovery.run();
         } catch (RuntimeException e) {
-            System.err.println("[Bot] Crashed during start-up: " + e + " — recovering.");
+            Debug.error("[Bot] Crashed during start-up: " + e + " — recovering.");
             Watchdog.reset();
             recovery.run();
         }

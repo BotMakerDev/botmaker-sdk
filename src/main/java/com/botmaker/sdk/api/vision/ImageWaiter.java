@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.vision;
+import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -87,7 +88,7 @@ public class ImageWaiter {
             MatchResult result = ImageFinder.findInternal(template, source, confidence);
             VisionContext.setLastMatch(result);
             if (result.isFound()) {
-                if (ClickConfig.DEBUG_MODE) {
+                if (Debug.isEnabled()) {
                     long elapsed = System.currentTimeMillis() - startTime;
                     System.out.println("Found " + template.getId() + " after " + elapsed + "ms");
                 }
@@ -96,7 +97,7 @@ public class ImageWaiter {
             Wait.milliseconds(100);
         }
 
-        if (ClickConfig.DEBUG_MODE) {
+        if (Debug.isEnabled()) {
             System.out.println("Timeout waiting for " + template.getId());
         }
         VisionContext.setLastMatch(MatchResult.notFound());
@@ -174,7 +175,7 @@ public class ImageWaiter {
             MatchResult result = ImageFinder.findInternal(template, source, confidence);
             VisionContext.setLastMatch(result);
             if (!result.isFound()) {
-                if (ClickConfig.DEBUG_MODE) {
+                if (Debug.isEnabled()) {
                     long elapsed = System.currentTimeMillis() - startTime;
                     System.out.println(template.getId() + " disappeared after " + elapsed + "ms");
                 }
@@ -183,7 +184,7 @@ public class ImageWaiter {
             Wait.milliseconds(100);
         }
 
-        if (ClickConfig.DEBUG_MODE) {
+        if (Debug.isEnabled()) {
             System.out.println("Timeout: " + template.getId() + " still visible");
         }
         // Set last match to notFound since we timed out waiting for it to disappear
@@ -261,7 +262,7 @@ public class ImageWaiter {
             Point clickPoint = ClickConfig.RANDOMIZE_CLICKS ? result.getRandomClickPoint() : result.getCenter();
             Mouse.click(clickPoint);
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
-            if (ClickConfig.DEBUG_MODE) {
+            if (Debug.isEnabled()) {
                 System.out.println("Found and clicked " + template.getId());
             }
             return true;

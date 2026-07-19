@@ -22,6 +22,8 @@ import java.util.Properties;
  *   <li>{@code launch.target} — what the bot launches:
  *       {@code steam:<appId>} | {@code epic:<appName>} | {@code exe:<path>} | {@code emu-app:<pkg>@<instance>}
  *       (parsed by {@code api.launch.LaunchTarget}, read raw here)</li>
+ *   <li>{@code debug} — {@code true}/{@code false} (default on): the initial state of the global
+ *       {@code api.Debug} output switch</li>
  * </ul>
  */
 public final class ProjectDefaults {
@@ -87,6 +89,24 @@ public final class ProjectDefaults {
     public static String launchTarget() {
         String spec = props().getProperty("launch.target");
         return (spec == null || spec.isBlank()) ? null : spec.trim();
+    }
+
+    /**
+     * The configured debug-output default: {@code TRUE}/{@code FALSE} for an explicit {@code debug} key
+     * ({@code true}/{@code 1}/{@code yes}/{@code on} → on; {@code false}/{@code 0}/{@code no}/{@code off} → off),
+     * or {@code null} when the key is absent/unparseable so {@link com.botmaker.sdk.api.Debug} keeps its
+     * default (on).
+     */
+    public static Boolean debug() {
+        String spec = props().getProperty("debug");
+        if (spec == null || spec.isBlank()) {
+            return null;
+        }
+        return switch (spec.trim().toLowerCase()) {
+            case "true", "1", "yes", "on" -> Boolean.TRUE;
+            case "false", "0", "no", "off" -> Boolean.FALSE;
+            default -> null;
+        };
     }
 
     /**

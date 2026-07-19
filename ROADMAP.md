@@ -8,6 +8,20 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-19 — Unified debug output switch (`api.Debug`)
+
+**Done**
+- **New `api.Debug` facade** — one global switch governing *all* SDK diagnostic printing. `isEnabled()` /
+  `enable()` / `disable()` / `set(boolean)` plus `log(String)` / `error(String)` helpers that print only when on.
+  **Default on**, seeded once from the project's `debug` key (see below); overridable at runtime.
+- **Unified the two prior debug paths onto it.** The formerly *unconditional* lifecycle/launch traces
+  (`[Bot]` / `[Game]` / `[Target]` / `[Activity]` in `Bot`/`Activity`/`Target`/`LaunchTarget`/`Game`) now route
+  through `Debug.log`/`Debug.error`, and the vision traces (find/click/wait/pixel/text) now consult
+  `Debug.isEnabled()` instead of the separate `ClickConfig.DEBUG_MODE`. **`ClickConfig.DEBUG_MODE` field
+  removed**; `ClickConfig.enableDebugMode(boolean)` kept as a thin delegate to `Debug.set(...)`.
+- **`ProjectDefaults.debug()`** parses the optional `debug` key (`true/1/yes/on` ↔ `false/0/no/off`) →
+  `Boolean` (null when absent/unparseable so `Debug` keeps its default-on).
+
 ## 2026-07-19 — `Text.findFuzzy` (edit-distance OCR matching)
 
 **Done**
