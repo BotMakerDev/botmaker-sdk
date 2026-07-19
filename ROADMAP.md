@@ -8,6 +8,18 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-19 — `Bot.start` is the single public entry point
+
+**Done**
+- **`Bot.start(body, recovery)` / `Bot.start(body, goHome, startGame)`** added as the only public way to run a
+  bot; both delegate to the existing loop. **`Bot.supervise(...)` is now package-private** — it stays the
+  internal machinery but is no longer part of the public palette (Studio surfaces only `public` facade methods
+  as blocks, so `supervise` disappears from the menus). Generated game-bot `main` now calls
+  `Bot.start(GameLoop::run, GoHome::run, Startup::run)`. `BotTest` stays in-package so it still drives
+  `supervise` directly.
+
+---
+
 ## 2026-07-19 — Launch target holder + emulator capture source (Phase 3)
 
 **Done**

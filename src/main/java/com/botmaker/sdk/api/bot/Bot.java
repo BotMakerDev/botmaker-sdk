@@ -37,14 +37,41 @@ public final class Bot {
     }
 
     /**
-     * Run {@code body} forever, recovering with {@code recovery} whenever it throws. Enables the
-     * {@link Watchdog} so stuck states surface as {@link BotStuckException}. Does not return under normal
-     * operation.
+     * Starts the bot: the single public entry point. Runs {@code body} forever, recovering with
+     * {@code recovery} whenever it throws. Delegates to the internal supervise loop.
      *
      * @param body     the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param recovery run after a crash/stuck to restore a known-good state before the next attempt
      */
-    public static void supervise(Runnable body, Runnable recovery) {
+    public static void start(Runnable body, Runnable recovery) {
+        supervise(body, recovery);
+    }
+
+    /**
+     * Starts the bot with the "get home, then (re)start the game" recovery and a one-time cold start
+     * before the loop — the shape a generated game bot uses. The single public entry point; delegates to
+     * the internal supervise loop.
+     *
+     * @param body      the bot's main work
+     * @param goHome    navigate from wherever the bot is back to a safe/home screen
+     * @param startGame (re)launch or restart the game from the home screen
+     */
+    public static void start(Runnable body, Runnable goHome, Runnable startGame) {
+        supervise(body, goHome, startGame);
+    }
+
+    /**
+     * Run {@code body} forever, recovering with {@code recovery} whenever it throws. Enables the
+     * {@link Watchdog} so stuck states surface as {@link BotStuckException}. Does not return under normal
+     * operation.
+     *
+     * <p>Package-private: bots call {@link #start} — {@code supervise} is the internal loop, not part of
+     * the public palette (Studio only surfaces {@code public} facade methods as blocks).
+     *
+     * @param body     the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
+     * @param recovery run after a crash/stuck to restore a known-good state before the next attempt
+     */
+    static void supervise(Runnable body, Runnable recovery) {
         Watchdog.enable();
         while (true) {
             try {
@@ -80,7 +107,7 @@ public final class Bot {
      * @param goHome    navigate from wherever the bot is back to a safe/home screen
      * @param startGame (re)launch or restart the game from the home screen
      */
-    public static void supervise(Runnable body, Runnable goHome, Runnable startGame) {
+    static void supervise(Runnable body, Runnable goHome, Runnable startGame) {
         Runnable recovery = () -> {
             goHome.run();
             startGame.run();
