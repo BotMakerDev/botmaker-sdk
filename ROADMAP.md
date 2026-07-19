@@ -8,6 +8,17 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-19 — `Text.findFuzzy` (edit-distance OCR matching)
+
+**Done**
+- **`Text.findFuzzy(needle[, maxDistance], source[, opts])`** (+ current-source overload) — approximate,
+  case-insensitive text search tolerant of OCR noise (`l↔1`, `O↔0`, a dropped letter). Slides the needle across
+  each recognized line and accepts a window within `maxDistance` Levenshtein edits (`DEFAULT_FUZZY_DISTANCE = 2`);
+  exact substring is a distance-0 fast path. Fills `VisionContext.getLastTextMatch()` like the other finders.
+  Complements the existing `find` (substring) / `findExact` / `findMatching` (regex).
+
+---
+
 ## 2026-07-19 — `Bot.start` is the single public entry point
 
 **Done**

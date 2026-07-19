@@ -132,6 +132,40 @@ public final class Text {
     }
 
     // ---------------------------------------------------------------------
+    // findFuzzy — approximate match, tolerant of OCR noise (edit distance)
+    // ---------------------------------------------------------------------
+
+    /** Default edit-distance tolerance for {@link #findFuzzy}: 2 characters (e.g. {@code "P1ay"} ≈ {@code "Play"}). */
+    public static final int DEFAULT_FUZZY_DISTANCE = 2;
+
+    /**
+     * Whether {@code needle} appears within {@code source} <em>approximately</em> — case-insensitive, tolerating
+     * up to {@link #DEFAULT_FUZZY_DISTANCE} character edits (insertions/deletions/substitutions). Forgives the
+     * usual OCR misreads ({@code l↔1}, {@code O↔0}, a dropped letter) that make {@link #find}'s exact substring
+     * miss. The matching line is stored in {@link VisionContext#getLastTextMatch()}.
+     */
+    public static boolean findFuzzy(String needle, CaptureSource source) {
+        return findFuzzy(needle, DEFAULT_FUZZY_DISTANCE, source, DEFAULT_OPTIONS);
+    }
+
+    /** {@link #findFuzzy(String, CaptureSource)} against the current source. */
+    public static boolean findFuzzy(String needle) {
+        return findFuzzy(needle, DEFAULT_FUZZY_DISTANCE, Source.current(), DEFAULT_OPTIONS);
+    }
+
+    /** {@link #findFuzzy(String, CaptureSource)} with an explicit {@code maxDistance} edit tolerance. */
+    public static boolean findFuzzy(String needle, int maxDistance, CaptureSource source) {
+        return findFuzzy(needle, maxDistance, source, DEFAULT_OPTIONS);
+    }
+
+    /** {@link #findFuzzy(String, int, CaptureSource)} using {@code opts}. */
+    public static boolean findFuzzy(String needle, int maxDistance, CaptureSource source, OcrOptions opts) {
+        TextMatch hit = firstMatching(recognize(source, opts), m -> fuzzyContains(m.getText(), needle, maxDistance));
+        VisionContext.setLastTextMatch(hit);
+        return hit.isFound();
+    }
+
+    // ---------------------------------------------------------------------
     // findAll — every place this text appears
     // ---------------------------------------------------------------------
 
@@ -255,6 +289,53 @@ public final class Text {
     private static boolean containsIgnoreCase(String haystack, String needle) {
         if (haystack == null || needle == null) return false;
         return haystack.toLowerCase().contains(needle.toLowerCase());
+    }
+
+    /**
+     * Whether {@code line} approximately contains {@code needle} within {@code maxDistance} edits
+     * (case-insensitive). Exact substring is an early yes (distance 0); otherwise the needle is slid across the
+     * line one window at a time (window = the needle's length ± {@code maxDistance}) and the best
+     * {@link #levenshtein} distance is compared to the budget — so a short needle can match inside a longer
+     * noisy line without the line's extra length counting against it.
+     */
+    private static boolean fuzzyContains(String line, String needle, int maxDistance) {
+        if (line == null || needle == null) return false;
+        if (maxDistance < 0) maxDistance = 0;
+        String hay = line.toLowerCase();
+        String pat = needle.toLowerCase();
+        if (pat.isEmpty()) return true;
+        if (hay.contains(pat)) return true;                       // distance 0 fast path
+        if (hay.length() < pat.length() - maxDistance) return false;
+        int min = Math.max(1, pat.length() - maxDistance);
+        int max = pat.length() + maxDistance;
+        for (int start = 0; start < hay.length(); start++) {
+            int limit = Math.min(hay.length(), start + max);
+            for (int end = start + min; end <= limit; end++) {
+                if (levenshtein(hay.substring(start, end), pat) <= maxDistance) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Classic iterative two-row Levenshtein edit distance between {@code a} and {@code b}. */
+    private static int levenshtein(String a, String b) {
+        int n = a.length();
+        int m = b.length();
+        if (n == 0) return m;
+        if (m == 0) return n;
+        int[] prev = new int[m + 1];
+        int[] curr = new int[m + 1];
+        for (int j = 0; j <= m; j++) prev[j] = j;
+        for (int i = 1; i <= n; i++) {
+            curr[0] = i;
+            char ca = a.charAt(i - 1);
+            for (int j = 1; j <= m; j++) {
+                int cost = (ca == b.charAt(j - 1)) ? 0 : 1;
+                curr[j] = Math.min(Math.min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] tmp = prev; prev = curr; curr = tmp;
+        }
+        return prev[m];
     }
 
     /** Sleeps the poll interval; returns true if interrupted (caller should abort the wait). */
