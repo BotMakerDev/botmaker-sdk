@@ -8,6 +8,60 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-19 — Launch target holder + emulator capture source (Phase 3)
+
+**Done**
+- **New `api.launch.Target`** — the ambient launch-side counterpart to `api.capture.Source`. `current()` lazily
+  initialises from the project default (`ProjectDefaults.launchTarget()`), `set(String|LaunchTarget)` overrides,
+  `start()`/`restart()` launch it. `null` target = no-op (a game-bot that hasn't picked a game yet just doesn't
+  launch anything). The generated game-bot `Startup.run()` is now simply `Target.start()`.
+- **New sealed `api.launch.LaunchTarget`** with variants `Steam`/`Epic`/`Exe`/`EmulatorApp`, each knowing how to
+  `start()` (delegating to `Game`/`Emulators`) and round-trip to a `spec()` string. Parsed from the
+  `launch.target` project key: `steam:<id>` | `epic:<name>` | `exe:<path>` | `emu-app:<pkg>@<instance>`
+  (exe keeps its Windows drive colon; emu-app splits on the last `@`). `EmulatorApp.start()` ensures the named
+  instance is running (launch + poll up to 120s), connects, starts the app, disconnects; `restart()` force-stops
+  first. Pure parsing is unit-tested (`LaunchTargetTest`).
+- **New `api.emulator.EmulatorSource implements CaptureSource`** — resolves an emulator **by instance name**,
+  connecting lazily and dispatching a one-time launch if the instance is down (non-blocking: `capture()` returns
+  null until it boots, then connects). This is the auto-launch-on-set capture source deferred from Phase 2.
+- **`ProjectDefaults`** gained `launchTarget()` (raw `launch.target` spec) and `capture.source = emulator:<name>`
+  support (→ `EmulatorSource`). **`Emulator.stopApp(pkg)`** added (`am force-stop`) for `EmulatorApp.restart()`.
+
+**Deferred / next**
+- The Studio game/emulator picker writing `launch.target` (+ the full emulator picker dialog) is Phase 4.
+
+## 2026-07-19 — Emulator facade: launch/stop, all-instances, app queries (Phase 2)
+
+**Done**
+- **`Emulators.listAll()`** returns every *configured* instance (running or not) as new lightweight
+  **`EmulatorRef`** DTOs (name/platform/endpoint, no ADB connection). `EmulatorRef` exposes `running()` (cheap
+  TCP probe of the ADB port), `launch()`/`stop()` (host console tool via shared `EmulatorLauncher`), and
+  `connect()` → live `Emulator`. This is the "show every instance I could pick without pre-launching" list the
+  Studio picker (Phase 4) and the target holder (Phase 3) build on. `list()`/`first()`/`named()` stay the
+  running-only connectors.
+- **`Emulators.launch(name)` / `stop(name)`** start/stop a configured instance by name without connecting.
+- **`Emulators.connect(host,port)` no longer stamps `"adb"`** — it recovers the real product identity when the
+  endpoint matches a discovered instance, else labels it `"custom"` (with no launch/stop commands).
+- **`Emulator` now carries its `EmulatorInstance`** (instead of loose name/platformId) and gained
+  `installedApps()`, `isInstalled(pkg)`, `currentApp()`, `reboot()` (guest `adb reboot`), and `stop()` (host
+  console tool, falling back to powering off the guest). Its ctor is `(AdbDevice, EmulatorInstance)`.
+
+**Deferred / next**
+- Auto-launch-on-set (resolve an emulator CaptureSource by name, launching + waiting if stopped) lands with
+  the Phase 3 current-target holder.
+
+## 2026-07-19 — Fix Epic Games launch opening the Documents folder
+
+**Done**
+- `UriLauncher.tryNativeOpener` (Windows) switched from `explorer.exe <uri>` back to
+  `rundll32 url.dll,FileProtocolHandler <uri>`. `explorer.exe` treats a custom scheme carrying a query
+  string — `com.epicgames.launcher://apps/<AppName>?action=launch&silent=true` — as a filesystem target,
+  fails to resolve it, and silently opens a default Explorer window (the user's Documents) instead of the
+  game. `rundll32`/ShellExecute takes the full URI as a single argument (no shell, so the `&` isn't split)
+  and routes it to the registered protocol handler. Steam (`steam://rungameid/N`, no query string) worked
+  either way and still does. The blank-browser bug the `explorer.exe` switch originally targeted was actually
+  `Desktop.browse` (already gated to http/https/file only), so this is a safe revert of that one line.
+
 ## 2026-07-18 — Emulator capability hoisted to shared; SDK keeps only the `api.emulator` facade
 
 **Done** (Phase 3 refactor — supersedes the Slice A layout below)

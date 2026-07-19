@@ -16,8 +16,12 @@ import java.util.Properties;
  *
  * <p>Recognised keys:
  * <ul>
- *   <li>{@code capture.source} — {@code desktop} | {@code monitor:<index>} | {@code window:<titleSubstring>}</li>
+ *   <li>{@code capture.source} — {@code desktop} | {@code monitor:<index>} | {@code window:<titleSubstring>}
+ *       | {@code emulator:<instanceName>}</li>
  *   <li>{@code capture.width} / {@code capture.height} — the resolution templates were authored at</li>
+ *   <li>{@code launch.target} — what the bot launches:
+ *       {@code steam:<appId>} | {@code epic:<appName>} | {@code exe:<path>} | {@code emu-app:<pkg>@<instance>}
+ *       (parsed by {@code api.launch.LaunchTarget}, read raw here)</li>
  * </ul>
  */
 public final class ProjectDefaults {
@@ -66,10 +70,23 @@ public final class ProjectDefaults {
             if (spec.regionMatches(true, 0, "window:", 0, 7)) {
                 return CaptureSource.window(spec.substring(7).trim());
             }
+            if (spec.regionMatches(true, 0, "emulator:", 0, 9)) {
+                return new com.botmaker.sdk.api.emulator.EmulatorSource(spec.substring(9).trim());
+            }
         } catch (RuntimeException ignored) {
             // unparseable — fall through to null
         }
         return null;
+    }
+
+    /**
+     * The raw {@code launch.target} spec, or {@code null} when unset — {@code api.launch.Target} parses it via
+     * {@code api.launch.LaunchTarget}. Kept as a raw string here so this internal config reader stays free of the
+     * launch facade.
+     */
+    public static String launchTarget() {
+        String spec = props().getProperty("launch.target");
+        return (spec == null || spec.isBlank()) ? null : spec.trim();
     }
 
     /**

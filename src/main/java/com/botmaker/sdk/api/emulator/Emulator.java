@@ -4,6 +4,10 @@ import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.emulator.AdbDevice;
+import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.EmulatorLauncher;
+
+import java.util.List;
 
 /**
  * A connected Android emulator, exposed as a {@link CaptureSource} so the whole vision stack
@@ -30,13 +34,11 @@ public final class Emulator implements CaptureSource {
     private static final int KEYCODE_BACK = 4;
 
     private final AdbDevice device;
-    private final String name;
-    private final String platformId;
+    private final EmulatorInstance instance;
 
-    Emulator(AdbDevice device, String name, String platformId) {
+    Emulator(AdbDevice device, EmulatorInstance instance) {
         this.device = device;
-        this.name = name;
-        this.platformId = platformId;
+        this.instance = instance;
     }
 
     // --- CaptureSource: makes the emulator a first-class vision target ---
@@ -103,6 +105,53 @@ public final class Emulator implements CaptureSource {
         device.startApp(packageName);
     }
 
+    /** Force-stops an app by package name ({@code am force-stop}) — the "close it" half of a restart. */
+    public void stopApp(String packageName) {
+        if (packageName == null || packageName.isBlank()) {
+            return;
+        }
+        device.shell("am force-stop " + packageName.trim());
+    }
+
+    // --- App / lifecycle queries ---
+
+    /** The third-party (user-installed) packages on the emulator — the games/apps a bot targets. */
+    public List<String> installedApps() {
+        return device.installedApps();
+    }
+
+    /** Whether {@code packageName} is installed on the emulator. */
+    public boolean isInstalled(String packageName) {
+        return device.isInstalled(packageName);
+    }
+
+    /** The package name of the app currently in the foreground, or {@code ""} if none/unknown. */
+    public String currentApp() {
+        return device.currentApp();
+    }
+
+    /** Reboots the Android guest ({@code adb reboot}); the ADB connection drops until it comes back up. */
+    public void reboot() {
+        device.shell("reboot");
+    }
+
+    /**
+     * Stops the whole emulator from the host — the counterpart to {@link Emulators#launch(String)}. Uses the
+     * product's console tool when discovery found one (e.g. {@code ldconsole quit}); otherwise best-effort
+     * powers off the Android guest. Returns whether a stop was dispatched. After this the connection is dead.
+     */
+    public boolean stop() {
+        if (instance.canStop() && EmulatorLauncher.stop(instance)) {
+            return true;
+        }
+        try {
+            device.shell("reboot -p"); // power off the guest when there's no host stop command
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /** Sets this emulator as the bot's ambient {@link Source} — shorthand for {@code Source.set(this)}. */
     public void use() {
         Source.set(this);
@@ -110,12 +159,12 @@ public final class Emulator implements CaptureSource {
 
     /** The instance name (as shown in the emulator's multi-instance manager). */
     public String name() {
-        return name;
+        return instance.name();
     }
 
     /** The product key this instance belongs to, e.g. {@code "bluestacks"}. */
     public String platform() {
-        return platformId;
+        return instance.platformId();
     }
 
     /** Closes the underlying ADB connection. After this the emulator can no longer be captured or tapped. */
@@ -125,6 +174,6 @@ public final class Emulator implements CaptureSource {
 
     @Override
     public String toString() {
-        return "Emulator[" + platformId + ":" + name + " @ " + device.endpoint() + "]";
+        return "Emulator[" + instance.platformId() + ":" + instance.name() + " @ " + device.endpoint() + "]";
     }
 }

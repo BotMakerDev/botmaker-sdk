@@ -2,10 +2,12 @@ package com.botmaker.sdk.api.emulator;
 
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.EmulatorLauncher;
 import com.botmaker.shared.emulator.Platforms;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Finds and connects to Android emulators — the entry point to the emulator stack. Discovery reads the
@@ -33,6 +35,39 @@ public final class Emulators {
             tryConnect(instance).ifPresent(running::add);
         }
         return running;
+    }
+
+    /**
+     * Every configured emulator instance across every installed product — running <em>or not</em> — as
+     * lightweight {@link EmulatorRef}s that carry name/platform/endpoint without opening an ADB connection.
+     * This is the "show me every instance I could pick" list (a picker/target chooser); call
+     * {@link EmulatorRef#running()} for liveness and {@link EmulatorRef#connect()} to go live. Never throws;
+     * empty when nothing is installed.
+     */
+    public static List<EmulatorRef> listAll() {
+        List<EmulatorRef> all = new ArrayList<>();
+        for (EmulatorInstance instance : Platforms.discoverAll()) {
+            all.add(new EmulatorRef(instance));
+        }
+        return all;
+    }
+
+    /**
+     * Starts the configured instance named {@code name} via its product's console tool (no connection needed
+     * — the instance can be stopped). Returns whether a launch was dispatched; {@code false} if there's no such
+     * instance or the product exposes no launch command. Poll {@link EmulatorRef#running()} / retry
+     * {@link #named(String)} for readiness afterwards.
+     */
+    public static boolean launch(String name) {
+        return findInstance(name).map(EmulatorLauncher::launch).orElse(false);
+    }
+
+    /**
+     * Stops the configured instance named {@code name} via its product's console tool. Returns whether a stop
+     * was dispatched; {@code false} if there's no such instance or the product exposes no stop command.
+     */
+    public static boolean stop(String name) {
+        return findInstance(name).map(EmulatorLauncher::stop).orElse(false);
     }
 
     /**
@@ -110,16 +145,44 @@ public final class Emulators {
      * @throws RuntimeException if the connection can't be established
      */
     public static Emulator connect(String host, int port) {
-        return new Emulator(AdbDevice.connect(host, port), host + ":" + port, "adb");
+        // Recover the real product identity when this endpoint matches a discovered instance; otherwise stamp a
+        // generic "custom" descriptor (no launch/stop commands) rather than mislabeling it a specific product.
+        EmulatorInstance instance = findInstanceByEndpoint(host, port)
+                .orElseGet(() -> new EmulatorInstance("custom", host + ":" + port, host, port));
+        return new Emulator(AdbDevice.connect(host, port), instance);
     }
 
-    private static java.util.Optional<Emulator> tryConnect(EmulatorInstance instance) {
+    private static Optional<Emulator> tryConnect(EmulatorInstance instance) {
         try {
             AdbDevice device = AdbDevice.connect(instance.host(), instance.adbPort());
-            return java.util.Optional.of(new Emulator(device, instance.name(), instance.platformId()));
+            return Optional.of(new Emulator(device, instance));
         } catch (Exception e) {
             // instance configured but not running / ADB port closed — skip it
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
+    }
+
+    /** The first discovered instance whose name matches {@code name} (trimmed), or empty. */
+    private static Optional<EmulatorInstance> findInstance(String name) {
+        if (name == null || name.isBlank()) {
+            return Optional.empty();
+        }
+        String needle = name.trim();
+        for (EmulatorInstance instance : Platforms.discoverAll()) {
+            if (needle.equals(instance.name())) {
+                return Optional.of(instance);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** The first discovered instance whose ADB endpoint matches {@code host:port}, or empty. */
+    private static Optional<EmulatorInstance> findInstanceByEndpoint(String host, int port) {
+        for (EmulatorInstance instance : Platforms.discoverAll()) {
+            if (instance.adbPort() == port && instance.host().equals(host)) {
+                return Optional.of(instance);
+            }
+        }
+        return Optional.empty();
     }
 }
