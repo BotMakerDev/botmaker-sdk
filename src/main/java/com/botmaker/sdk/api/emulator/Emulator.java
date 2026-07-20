@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
+import com.botmaker.shared.emulator.PlatformId;
 
 import java.util.List;
 
@@ -162,8 +163,8 @@ public final class Emulator implements CaptureSource {
         return instance.name();
     }
 
-    /** The product key this instance belongs to, e.g. {@code "bluestacks"}. */
-    public String platform() {
+    /** Which emulator product this instance belongs to. */
+    public PlatformId platform() {
         return instance.platformId();
     }
 
@@ -174,6 +175,6 @@ public final class Emulator implements CaptureSource {
 
     @Override
     public String toString() {
-        return "Emulator[" + instance.platformId() + ":" + instance.name() + " @ " + device.endpoint() + "]";
+        return "Emulator[" + instance.platformId().id() + ":" + instance.name() + " @ " + device.endpoint() + "]";
     }
 }

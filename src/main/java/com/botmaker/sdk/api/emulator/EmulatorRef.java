@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.emulator;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
+import com.botmaker.shared.emulator.PlatformId;
 
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -27,8 +28,8 @@ public final class EmulatorRef {
         return instance.name();
     }
 
-    /** The product key this instance belongs to, e.g. {@code "bluestacks"}. */
-    public String platform() {
+    /** Which emulator product this instance belongs to. */
+    public PlatformId platform() {
         return instance.platformId();
     }
 
@@ -76,6 +77,6 @@ public final class EmulatorRef {
 
     @Override
     public String toString() {
-        return "EmulatorRef[" + instance.platformId() + ":" + instance.name() + " @ " + instance.endpoint() + "]";
+        return "EmulatorRef[" + instance.platformId().id() + ":" + instance.name() + " @ " + instance.endpoint() + "]";
     }
 }

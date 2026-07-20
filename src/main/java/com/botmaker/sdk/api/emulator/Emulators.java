@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.emulator;
 
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.EmulatorLauncher;
 import com.botmaker.shared.emulator.Platforms;
 
@@ -145,10 +146,10 @@ public final class Emulators {
      * @throws RuntimeException if the connection can't be established
      */
     public static Emulator connect(String host, int port) {
-        // Recover the real product identity when this endpoint matches a discovered instance; otherwise stamp a
-        // generic "custom" descriptor (no launch/stop commands) rather than mislabeling it a specific product.
+        // Recover the real product identity when this endpoint matches a discovered instance; otherwise stamp
+        // an UNKNOWN descriptor (no launch/stop commands) rather than mislabeling it a specific product.
         EmulatorInstance instance = findInstanceByEndpoint(host, port)
-                .orElseGet(() -> new EmulatorInstance("custom", host + ":" + port, host, port));
+                .orElseGet(() -> new EmulatorInstance(PlatformId.UNKNOWN, host + ":" + port, host, port));
         return new Emulator(AdbDevice.connect(host, port), instance);
     }
 

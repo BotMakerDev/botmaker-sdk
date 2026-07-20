@@ -8,6 +8,16 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-20 — `Emulator.platform()` returns `PlatformId`
+
+**Done**
+
+- Followed shared's `String platformId` → `PlatformId` enum change. `Emulator.platform()` and
+  `EmulatorRef.platform()` now return the enum (callers wanting the old string use `.id()`, or
+  `.displayName()` for UI); `toString()` still prints the wire id.
+- `Emulators.connect(host, port)` stamped a hand-rolled sixth id, `"custom"`, when an endpoint matched no
+  discovered instance — it now uses `PlatformId.UNKNOWN`, which is exactly what that constant is for.
+
 ## 2026-07-20 — Start-vs-restart-aware startup (`StartMode`)
 
 **Done**
