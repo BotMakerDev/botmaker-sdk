@@ -9,9 +9,23 @@ import java.util.Map;
  * this once per activity (BotMaker Studio generates the subclass when you add an activity), overriding
  * {@link #isEnabled()} (usually {@code return Activities.MY_FLAG;}) and {@link #run()} (how to do it).
  *
- * <p>The macro loop iterates the enabled activities and calls {@link #execute()}, which wraps {@link #run()}
- * with the overridable {@link #before()}/{@link #after()} hooks and routes a {@link BotStuckException}
- * through {@link #onStuck(BotStuckException)} before rethrowing it to the supervisor.
+ * <p>The generated flow driver calls {@link #execute()}, which wraps {@link #run()} with the overridable
+ * {@link #before()}/{@link #after()} hooks and routes a {@link BotStuckException} through
+ * {@link #onStuck(BotStuckException)} before rethrowing it to the supervisor.
+ *
+ * <p><b>Outcomes ({@code O}).</b> An activity reports <em>what happened</em> by returning one of its own
+ * outcome constants — {@code BAG_FULL}, {@code NO_ORE} — and the flow drawn in the Studio decides where each
+ * outcome goes next. The activity therefore never names another activity, so the flow can be rewired on the
+ * canvas without touching any Java. Studio generates the enum as a nested {@code Outcome} type:
+ * <pre>
+ *   public class Mining extends Activity&lt;Mining.Outcome&gt; {
+ *       public enum Outcome { DEFAULT, BAG_FULL, NO_ORE }
+ *       &#64;Override public Outcome run() { ...; return Outcome.BAG_FULL; }
+ *   }
+ * </pre>
+ * The type parameter (rather than a shared marker interface) is what makes {@link #execute()} statically
+ * return <em>this</em> activity's enum, so the driver's {@code switch} over it is exhaustive and
+ * compiler-checked instead of a cast.
  *
  * <p><b>Controlling activities by name.</b> Every activity registers itself by {@link #name()} on
  * construction, so any code — another activity, {@code GoHome}, {@code Startup} — can turn one on or off with
@@ -19,14 +33,17 @@ import java.util.Map;
  * Studio "disable activity ▾" block emits ({@code Activity.disable("Mining")}). The instance
  * {@link #disable()} / {@link #enable()} still work for an activity acting on itself.
  */
-public abstract class Activity {
+public abstract class Activity<O extends Enum<O>> {
 
     /**
      * All constructed activities, keyed by {@link #name()} — the lookup behind the static
      * {@link #disable(String)} / {@link #enable(String)}. Insertion-ordered for predictable iteration; one
      * instance per activity name (the generated registry builds each subclass once), so last-registered wins.
+     *
+     * <p>The wildcard is deliberate: enabling an activity by name has nothing to do with its outcome type, so
+     * this map deliberately forgets it. Nothing here ever calls {@link #run()}.
      */
-    private static final Map<String, Activity> REGISTRY = new LinkedHashMap<>();
+    private static final Map<String, Activity<?>> REGISTRY = new LinkedHashMap<>();
 
     private final String name;
 
@@ -52,7 +69,7 @@ public abstract class Activity {
         register(this);
     }
 
-    private static void register(Activity activity) {
+    private static void register(Activity<?> activity) {
         REGISTRY.put(activity.name, activity);
     }
 
@@ -73,7 +90,7 @@ public abstract class Activity {
 
     /** Sets the named activity's runtime enablement. Unknown name → a warning and no-op. */
     public static void setEnabled(String name, boolean enabled) {
-        Activity activity = REGISTRY.get(name);
+        Activity<?> activity = REGISTRY.get(name);
         if (activity == null) {
             Debug.error("[Activity] setEnabled: no activity named '" + name + "' — known: "
                     + REGISTRY.keySet() + ". Ignoring.");
@@ -128,8 +145,16 @@ public abstract class Activity {
         setEnabled(false);
     }
 
-    /** Do the activity. Runs against the current capture source; may throw {@link BotStuckException}. */
-    public abstract void run();
+    /**
+     * Do the activity, and report which of its {@code O} outcomes happened — the value the drawn flow routes
+     * on. Runs against the current capture source; may throw {@link BotStuckException}.
+     *
+     * <p>Return the outcome that describes <em>what happened here</em> ({@code BAG_FULL}), never where to go
+     * next: the destination is the canvas's business. Studio's generated stub ends with
+     * {@code return Outcome.DEFAULT;}, so an activity that has nothing special to report needs no thought at
+     * all — the default outcome follows the card's plain output wire.
+     */
+    public abstract O run();
 
     /** Overridable no-op: called before {@link #run()} (e.g. navigate to the activity's screen). */
     protected void before() {}
@@ -141,18 +166,22 @@ public abstract class Activity {
     protected void onStuck(BotStuckException e) {}
 
     /**
-     * Runs this activity end-to-end: {@link #before()} → {@link #run()} → {@link #after()}. A
-     * {@link BotStuckException} from {@code run()} is handed to {@link #onStuck(BotStuckException)} and then
-     * rethrown so the {@link Bot#supervise supervisor} can recover.
+     * Runs this activity end-to-end: {@link #before()} → {@link #run()} → {@link #after()}, and returns the
+     * outcome {@code run()} reported. A {@link BotStuckException} from {@code run()} is handed to
+     * {@link #onStuck(BotStuckException)} and then rethrown so the {@link Bot#supervise supervisor} can
+     * recover — a stuck activity produces no outcome, because the flow isn't what decides where to go next in
+     * that case; the supervisor is.
      */
-    public final void execute() {
+    public final O execute() {
         before();
+        O outcome;
         try {
-            run();
+            outcome = run();
         } catch (BotStuckException e) {
             onStuck(e);
             throw e;
         }
         after();
+        return outcome;
     }
 }

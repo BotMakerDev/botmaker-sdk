@@ -3,7 +3,10 @@ package com.botmaker.sdk.api.bot;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -19,13 +22,14 @@ class ActivityTest {
         Activity.clearRegistry();
     }
 
-    /** Minimal activity whose configured default is fixed at construction; {@code run()} is a no-op. */
-    private static final class Fake extends Activity {
+    /** Minimal activity whose configured default is fixed at construction; {@code run()} reports DEFAULT. */
+    private static final class Fake extends Activity<Fake.Outcome> {
+        enum Outcome { DEFAULT }
         private final boolean configured;
         Fake(boolean configured) { this.configured = configured; }
         Fake(String name, boolean configured) { super(name); this.configured = configured; }
         @Override public boolean isEnabled() { return configured; }
-        @Override public void run() {}
+        @Override public Outcome run() { return Outcome.DEFAULT; }
     }
 
     @Test
@@ -70,6 +74,45 @@ class ActivityTest {
 
         Activity.enable("Mining");
         assertTrue(mining.active(), "and can be re-enabled by name");
+    }
+
+    /** An activity with more than one outcome, so {@code execute()} has something to actually carry back. */
+    private static final class Branching extends Activity<Branching.Outcome> {
+        enum Outcome { DEFAULT, BAG_FULL }
+        private final Outcome reported;
+        private final StringBuilder trace;
+        Branching(Outcome reported, StringBuilder trace) { this.reported = reported; this.trace = trace; }
+        @Override public boolean isEnabled() { return true; }
+        @Override protected void before() { trace.append("before "); }
+        @Override protected void after() { trace.append("after"); }
+        @Override public Outcome run() { trace.append("run "); return reported; }
+    }
+
+    @Test
+    void executeReturnsTheOutcomeRunReported() {
+        StringBuilder trace = new StringBuilder();
+        Branching activity = new Branching(Branching.Outcome.BAG_FULL, trace);
+
+        // Statically Branching.Outcome, not a marker type — the driver switches over this without a cast.
+        Branching.Outcome outcome = activity.execute();
+
+        assertSame(Branching.Outcome.BAG_FULL, outcome, "the flow routes on what run() reported");
+        assertEquals("before run after", trace.toString(), "the hooks still wrap run()");
+    }
+
+    @Test
+    void aStuckActivityReportsNoOutcomeAndStillRethrows() {
+        StringBuilder trace = new StringBuilder();
+        Activity<Branching.Outcome> stuck = new Activity<>() {
+            @Override public boolean isEnabled() { return true; }
+            @Override protected void onStuck(BotStuckException e) { trace.append("onStuck "); }
+            @Override protected void after() { trace.append("after "); }
+            @Override public Branching.Outcome run() { throw new BotStuckException("no ore"); }
+        };
+
+        assertThrows(BotStuckException.class, stuck::execute,
+                "being stuck is the supervisor's business, not the flow's — it must not become an outcome");
+        assertEquals("onStuck ", trace.toString(), "after() is skipped when run() didn't finish");
     }
 
     @Test

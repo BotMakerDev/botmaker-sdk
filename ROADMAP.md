@@ -8,6 +8,24 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-20 — `Activity` is outcome-typed (`Activity<O extends Enum<O>>`)
+
+**Done**
+
+- **`Activity.run()` returns an outcome instead of `void`**, and `execute()` carries it back:
+  `Activity<O extends Enum<O>>`, `abstract O run()`, `final O execute()`. An activity reports *what happened*
+  (`BAG_FULL`, `NO_ORE`) and the flow drawn in Studio decides where each outcome goes — the activity never
+  names another activity, so rewiring the canvas touches no Java. (API break — allowed; lands with the
+  matching Studio flow-driver codegen.)
+- **Generic rather than a shared marker interface** because `execute()` is `final`: a marker would force every
+  driver dispatch through a cast, and a covariant override can't remove it on a final method. The type
+  parameter makes `MINING.execute()` statically `Mining.Outcome`, so the generated `switch` over it is
+  exhaustive and compiler-checked — the whole reason for using an enum here.
+- The static name registry is now `Map<String, Activity<?>>`: enabling by name has nothing to do with the
+  outcome type, so it deliberately forgets it. `disable`/`enable`/`setEnabled(String, …)` are unchanged.
+- A stuck activity still produces **no** outcome — `BotStuckException` propagates to the supervisor rather
+  than becoming a routable result, since recovery, not the flow, decides what happens next.
+
 ## 2026-07-20 — `Emulator.platform()` returns `PlatformId`
 
 **Done**
