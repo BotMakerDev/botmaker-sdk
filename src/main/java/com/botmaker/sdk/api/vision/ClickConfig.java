@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.sdk.api.Debug;
+import com.botmaker.shared.capture.NativeControllerFactory;
 
 /**
  * Global configuration for click behavior and delays.
@@ -93,6 +94,37 @@ public class ClickConfig {
     }
 
     /**
+     * Whether this bot drives the <b>real</b> mouse and keyboard instead of sending quiet synthetic events to
+     * the target window. Read-only mirror of the last {@link #useRealInput} call.
+     */
+    public static boolean REAL_INPUT = false;
+
+    /**
+     * Switch to real device input — call this when the target is a <b>game</b>.
+     *
+     * <p>By default BotMaker delivers synthetic events straight to the target window, which clicks a
+     * background window without ever moving the cursor. Games (and anything else reading raw input) ignore
+     * those events by design: on X11 they carry a {@code send_event} flag the client rejects, and on Windows
+     * they land in a message queue a raw-input game never reads. The click is dropped silently — neither OS
+     * reports delivery — which is why nothing can auto-detect this and why it is a setting.
+     *
+     * <p>Turning it on trades background operation for the click landing: the pointer moves to each target and
+     * returns to where it was, and the target window is raised, because real input goes to whatever is
+     * topmost.
+     *
+     * <p><b>One-way.</b> On Linux this swaps the process-wide input backend, which cannot be swapped back, so
+     * {@code useRealInput(false)} only prevents a future escalation rather than undoing one. Call it once,
+     * before the first click — generated projects put it at the top of {@code main}.
+     */
+    public static void useRealInput(boolean enable) {
+        REAL_INPUT = enable;
+        if (enable) {
+            boolean ok = NativeControllerFactory.get().useReliableInput();
+            Debug.log("[Input] real device input " + (ok ? "active" : "UNAVAILABLE — clicks may not register"));
+        }
+    }
+
+    /**
      * Resets the click/vision tuning to its defaults. Does not touch the global {@link Debug} switch — that has
      * its own lifecycle (project default + runtime toggle).
      */
@@ -103,5 +135,7 @@ public class ClickConfig {
         DEFAULT_CONFIDENCE = 0.8;
         DEFAULT_COMPARE_MARGIN = 0.05;
         MAX_RETRY_ATTEMPTS = 20;
+        // REAL_INPUT is deliberately not reset: the backend swap it caused is one-way, so clearing the flag
+        // would only make it lie about how input is actually being delivered.
     }
 }

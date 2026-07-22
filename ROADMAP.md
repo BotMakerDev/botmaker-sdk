@@ -8,6 +8,33 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-22 — Clicks and keys that land in a game
+
+**Done**
+
+- **`Mouse.click` was the odd one out.** `rightClick`/`middleClick`/`doubleClick`/`drag` already drove real
+  input, while `click` alone called `postLeftClickScreen` — a posted `WM_LBUTTONDOWN` on Windows and an
+  `XSendEvent` on Linux, both of which games drop by design. All of them now go through shared's
+  `NativeController.clickRestoringCursor`, so the pointer moves to the target and returns to where it was.
+  `doubleClick` restores only after both presses (restoring between them would read as two single clicks),
+  and `drag` restores only after the button is released.
+- **`ClickConfig.useRealInput(boolean)`** — the switch a bot uses to say "my target is a game". Lives here
+  with the other tuning knobs, in the same shape as the existing `enableDebugMode` delegate. This cannot be
+  auto-detected: neither X nor Windows reports whether a synthetic event was accepted — the target simply
+  drops it — so "the click didn't land" is unobservable and it has to be a setting. One-way, because on
+  Linux it swaps the process-wide input backend; call it once before the first click. Studio's generated
+  `Game bot` template now emits it at the top of `main`, so it is visible and editable as a block rather
+  than hidden in a properties file.
+
+**Deferred / next**
+
+- An earlier iteration routed this through a `ProjectDefaults` key (`input.real`) read at start-up. Replaced
+  because it made the SDK's behaviour depend on a file format Studio had to write correctly — an implicit
+  contract — where `ClickConfig` is explicit API the bot author can see. If a Studio-side toggle is wanted
+  later, it should rewrite that generated statement, not reintroduce the key.
+
+---
+
 ## 2026-07-22 — Debug: one switch, every method, silent when off
 
 **Done**

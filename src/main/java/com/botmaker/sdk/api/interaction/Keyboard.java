@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.capture.GenericWindow;
+import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 
 /**
@@ -20,6 +21,10 @@ import com.botmaker.shared.capture.NativeControllerFactory;
  * focused-window path.
  */
 public class Keyboard {
+
+    private static NativeController controller() {
+        return NativeControllerFactory.get();
+    }
 
     /** Press and hold a key on the ambient {@link Source} (remember to {@link #release}). */
     public static void press(Key key) {
@@ -67,10 +72,10 @@ public class Keyboard {
         GenericWindow w = source == null ? null : source.targetWindow();
         Debug.log("[Keyboard] press " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
         if (w == null) {
-            NativeControllerFactory.get().keyDown(key.nativeCode());
+            controller().keyDown(key.nativeCode());
             return;
         }
-        NativeControllerFactory.get().keyDown(w, key.nativeCode());
+        controller().keyDown(w, key.nativeCode());
     }
 
     /** Release a held {@code key} on {@code source}'s window. */
@@ -78,10 +83,10 @@ public class Keyboard {
         GenericWindow w = source == null ? null : source.targetWindow();
         Debug.log("[Keyboard] release " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
         if (w == null) {
-            NativeControllerFactory.get().keyUp(key.nativeCode());
+            controller().keyUp(key.nativeCode());
             return;
         }
-        NativeControllerFactory.get().keyUp(w, key.nativeCode());
+        controller().keyUp(w, key.nativeCode());
     }
 
     /** Press then release {@code key} on {@code source}'s window. */
@@ -108,9 +113,9 @@ public class Keyboard {
         Debug.log("[Keyboard] type \"" + text + "\""
                 + (w == null ? " (focused window)" : " -> " + w.getTitle()));
         if (w == null) {
-            NativeControllerFactory.get().typeText(text);
+            controller().typeText(text);
             return;
         }
-        NativeControllerFactory.get().typeText(w, text);
+        controller().typeText(w, text);
     }
 }
