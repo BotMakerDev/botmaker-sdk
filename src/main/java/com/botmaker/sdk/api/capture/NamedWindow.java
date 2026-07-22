@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.capture;
 
+import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 
 import java.awt.image.BufferedImage;
@@ -28,7 +29,12 @@ public final class NamedWindow implements CaptureSource {
 
     @Override
     public BufferedImage capture() {
-        return resolve().map(Window::capture).orElse(null);
+        Optional<Window> w = resolve();
+        if (w.isEmpty()) {
+            Debug.error("[Source] no window matching \"" + titleSubstring + "\" — capture returns null");
+            return null;
+        }
+        return w.get().capture();
     }
 
     @Override

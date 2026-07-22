@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.capture;
 
+import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 
 /**
@@ -46,10 +47,13 @@ public final class Source {
      */
     public static void set(CaptureSource source) {
         current = (source == null) ? resolveDefault() : source;
+        Debug.log("[Source] set -> " + current);
     }
 
     private static CaptureSource resolveDefault() {
         CaptureSource projectDefault = ProjectDefaults.source();
-        return projectDefault != null ? projectDefault : CaptureSource.desktop();
+        CaptureSource resolved = projectDefault != null ? projectDefault : CaptureSource.desktop();
+        Debug.log("[Source] default -> " + resolved);
+        return resolved;
     }
 }

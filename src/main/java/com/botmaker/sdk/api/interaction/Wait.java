@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
+import com.botmaker.sdk.api.Debug;
+
 /**
  * Utility class for delays and waiting.
  */
@@ -12,6 +14,7 @@ public class Wait {
      */
     public static void milliseconds(int milliseconds) {
         if (milliseconds <= 0) return;
+        Debug.log("[Wait] " + milliseconds + "ms");
 
         try {
             Thread.sleep(milliseconds);

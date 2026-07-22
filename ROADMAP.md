@@ -8,6 +8,30 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-22 — Debug: one switch, every method, silent when off
+
+**Done**
+
+- **`Debug` is now a delegate over `botmaker-shared`'s new `com.botmaker.shared.Diag`** — same API
+  (`isEnabled`/`enable`/`disable`/`set`/`log`/`error`), plus an `error(String, Throwable)` overload that
+  replaces every `printStackTrace()`. The flag lives in `shared` because `shared` prints diagnostics of its
+  own and can't depend on the SDK; one toggle now silences both modules.
+- **Ungated prints routed through `Debug`** — `ImageClicker`, `ImageFinder`, `OpencvManager`,
+  `RobotCapture`, `SpectacleCapture`, `UriLauncher`. These bypassed the flag entirely, which is the "it
+  debugs even when it's off" symptom. `ImageWaiter`/`Pixel`/`Text` had the *right* gate but wrote through
+  `System.out` inside an `if (Debug.isEnabled())` block; collapsed to a plain `Debug.log`/`Debug.error`.
+- **Traces added to the facades that had none** — `Mouse` (every click/move/button/drag/scroll),
+  `Keyboard` (press/release/tap/combo/type, naming the target window or "focused window"), `Wait`,
+  `Emulator` + `Emulators`, `Source.set`/default resolution, `Window` (find/foreground/click/focus/move/
+  resize), `NamedWindow` (an unresolvable title is now an explicit error line, not a silent `null` capture),
+  `Watchdog` (enable/disable + the stuck throw). Previously debug output was vision- and launch-only, so an
+  input problem produced nothing at all — the `Mouse`/`Keyboard` lines are what make the click fixes
+  observable.
+- **Not gated, deliberately:** `BotMaker.print` (that's the bot's own output) and the
+  `\u0001BM-INPUT:` marker Studio parses.
+
+---
+
 ## 2026-07-22 — Faugus Launcher as a launch target
 
 **Done**

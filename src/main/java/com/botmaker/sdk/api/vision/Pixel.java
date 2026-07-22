@@ -255,10 +255,7 @@ public class Pixel {
             List<RawColorMatch> raw = ColorMatcher.findClusters(img, target, tolerance, minPixels);
             return map(raw, source, img, target);
         } catch (Exception e) {
-            if (Debug.isEnabled()) {
-                System.err.println("Error finding colour: " + e.getMessage());
-                e.printStackTrace();
-            }
+            Debug.error("[Vision] error finding colour: " + e.getMessage(), e);
             return new ArrayList<>();
         }
     }

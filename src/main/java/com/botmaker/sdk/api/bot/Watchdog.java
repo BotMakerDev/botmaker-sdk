@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.observe.BotObserver;
 import com.botmaker.sdk.api.observe.Bots;
@@ -47,6 +48,7 @@ public final class Watchdog {
         if (!enabled) {
             Bots.addObserver(COUNTER);
             enabled = true;
+            Debug.log("[Watchdog] enabled");
         }
     }
 
@@ -55,6 +57,7 @@ public final class Watchdog {
         if (enabled) {
             Bots.removeObserver(COUNTER);
             enabled = false;
+            Debug.log("[Watchdog] disabled");
         }
     }
 
@@ -74,6 +77,7 @@ public final class Watchdog {
             int repeats = s.repeats;
             String sig = s.signature;
             progress();
+            Debug.error("[Watchdog] stuck after " + repeats + " checks repeating " + sig);
             throw new BotStuckException("Bot appears stuck: no progress for " + repeats
                     + " consecutive checks (repeating " + sig + ")");
         }

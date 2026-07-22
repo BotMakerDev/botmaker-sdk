@@ -536,7 +536,7 @@ public class ImageClicker {
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
         }
         if (Debug.isEnabled() && !winners.isEmpty()) {
-            System.out.println("Clicked " + winners.size() + " compare-winning locations");
+            Debug.log("Clicked " + winners.size() + " compare-winning locations");
         }
         return winners.size();
     }
@@ -605,7 +605,7 @@ public class ImageClicker {
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
         }
         if (Debug.isEnabled() && !matches.isEmpty()) {
-            System.out.println("Clicked " + matches.size() + " instances of " + template.getId());
+            Debug.log("Clicked " + matches.size() + " instances of " + template.getId());
         }
         return matches.size();
     }
@@ -677,7 +677,7 @@ public class ImageClicker {
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
         }
         if (Debug.isEnabled() && !all.isEmpty()) {
-            System.out.println("Clicked " + all.size() + " instances across the group");
+            Debug.log("Clicked " + all.size() + " instances across the group");
         }
         return all.size();
     }
@@ -864,14 +864,14 @@ public class ImageClicker {
             Wait.milliseconds(delayMs);
 
             if (Debug.isEnabled()) {
-                System.out.println("Clicked " + result.getTemplateId() + " at " + clickPoint +
+                Debug.log("Clicked " + result.getTemplateId() + " at " + clickPoint +
                         " (confidence: " + String.format("%.3f", result.getConfidence()) + ")");
             }
             return true;
         }
         Wait.milliseconds(ClickConfig.DEFAULT_NOT_FOUND_DELAY);
         if (Debug.isEnabled()) {
-            System.out.println("Template not found");
+            Debug.log("Template not found");
         }
         return false;
     }

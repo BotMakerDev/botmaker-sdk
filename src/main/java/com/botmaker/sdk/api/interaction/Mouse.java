@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
+import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.shared.capture.NativeController;
@@ -17,6 +18,7 @@ public class Mouse {
      */
     public static void click(Point p) {
         if (p == null) return;
+        Debug.log("[Mouse] click " + p);
         // Delegate to internal implementation, explicitly casting double coordinates to int
         controller().postLeftClickScreen((int) p.x, (int) p.y);
     }
@@ -33,6 +35,7 @@ public class Mouse {
     public static void click(CaptureSource source, int x, int y) {
         if (source == null) return;
         Point o = source.origin();
+        Debug.log("[Mouse] click " + x + "," + y + " relative to " + o);
         click((int) o.x + x, (int) o.y + y);
     }
 
@@ -41,11 +44,13 @@ public class Mouse {
     /** Move the cursor to an absolute screen coordinate. */
     public static void move(Point p) {
         if (p == null) return;
+        Debug.log("[Mouse] move " + p);
         controller().mouseMove((int) p.x, (int) p.y);
     }
 
     /** Move the cursor to absolute screen coordinates {@code (x, y)}. */
     public static void move(int x, int y) {
+        Debug.log("[Mouse] move " + x + "," + y);
         controller().mouseMove(x, y);
     }
 
@@ -53,6 +58,7 @@ public class Mouse {
 
     /** Hold a mouse button down at the current cursor position. */
     public static void down(MouseButton button) {
+        Debug.log("[Mouse] " + button + " down");
         controller().mouseButton(button.code(), true);
     }
 
@@ -64,6 +70,7 @@ public class Mouse {
 
     /** Release a held mouse button. */
     public static void up(MouseButton button) {
+        Debug.log("[Mouse] " + button + " up");
         controller().mouseButton(button.code(), false);
     }
 
@@ -74,15 +81,18 @@ public class Mouse {
     }
 
     public static void rightClick(Point p) {
+        Debug.log("[Mouse] rightClick " + p);
         clickButtonAt(p, MouseButton.RIGHT);
     }
 
     public static void middleClick(Point p) {
+        Debug.log("[Mouse] middleClick " + p);
         clickButtonAt(p, MouseButton.MIDDLE);
     }
 
     /** Two quick left presses at the given point. */
     public static void doubleClick(Point p) {
+        Debug.log("[Mouse] doubleClick " + p);
         if (p != null) move(p);
         down(MouseButton.LEFT);
         up(MouseButton.LEFT);
@@ -101,6 +111,7 @@ public class Mouse {
      * velocity (map panning, slingshots, drawing) see a smooth gesture instead of a teleport.
      */
     public static void drag(Point start, Point end, long durationMs) {
+        Debug.log("[Mouse] drag " + start + " -> " + end + " over " + durationMs + "ms");
         move(start);
         down(MouseButton.LEFT);
         if (durationMs > 0 && start != null && end != null) {
@@ -129,16 +140,19 @@ public class Mouse {
      * down / toward you. Prefer the clearer {@link #scrollUp(int)} / {@link #scrollDown(int)}.
      */
     public static void scroll(int notches) {
+        Debug.log("[Mouse] scroll " + notches);
         controller().scroll(notches);
     }
 
     /** Scroll up / away from you by {@code notches} (always a positive amount). */
     public static void scrollUp(int notches) {
+        Debug.log("[Mouse] scrollUp " + notches);
         controller().scroll(Math.abs(notches));
     }
 
     /** Scroll down / toward you by {@code notches} (always a positive amount). */
     public static void scrollDown(int notches) {
+        Debug.log("[Mouse] scrollDown " + notches);
         controller().scroll(-Math.abs(notches));
     }
 }

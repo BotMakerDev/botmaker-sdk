@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
+import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -66,6 +67,7 @@ public final class Emulator implements CaptureSource {
         if (p == null) {
             return;
         }
+        Debug.log("[Emulator] click " + p + " on " + name());
         device.tap((int) p.x, (int) p.y);
     }
 
@@ -73,36 +75,43 @@ public final class Emulator implements CaptureSource {
 
     /** Taps ({@code x},{@code y}) in emulator pixels. */
     public void tap(int x, int y) {
+        Debug.log("[Emulator] tap " + x + "," + y + " on " + name());
         device.tap(x, y);
     }
 
     /** Swipes/drags from ({@code x1},{@code y1}) to ({@code x2},{@code y2}) over {@code durationMs}. */
     public void swipe(int x1, int y1, int x2, int y2, long durationMs) {
+        Debug.log("[Emulator] swipe " + x1 + "," + y1 + " -> " + x2 + "," + y2 + " over " + durationMs + "ms");
         device.swipe(x1, y1, x2, y2, durationMs);
     }
 
     /** Presses the Back button. */
     public void back() {
+        Debug.log("[Emulator] back");
         device.key(KEYCODE_BACK);
     }
 
     /** Presses the Home button. */
     public void home() {
+        Debug.log("[Emulator] home");
         device.key(KEYCODE_HOME);
     }
 
     /** Types {@code text} into the focused field. */
     public void text(String text) {
+        Debug.log("[Emulator] text \"" + text + "\"");
         device.text(text);
     }
 
     /** Sends an Android key event by keycode. */
     public void key(int keyCode) {
+        Debug.log("[Emulator] key " + keyCode);
         device.key(keyCode);
     }
 
     /** Launches an installed app by package name (its launcher activity). */
     public void startApp(String packageName) {
+        Debug.log("[Emulator] startApp " + packageName);
         device.startApp(packageName);
     }
 
@@ -111,6 +120,7 @@ public final class Emulator implements CaptureSource {
         if (packageName == null || packageName.isBlank()) {
             return;
         }
+        Debug.log("[Emulator] stopApp " + packageName);
         device.shell("am force-stop " + packageName.trim());
     }
 
@@ -133,6 +143,7 @@ public final class Emulator implements CaptureSource {
 
     /** Reboots the Android guest ({@code adb reboot}); the ADB connection drops until it comes back up. */
     public void reboot() {
+        Debug.log("[Emulator] reboot " + name());
         device.shell("reboot");
     }
 
@@ -142,6 +153,7 @@ public final class Emulator implements CaptureSource {
      * powers off the Android guest. Returns whether a stop was dispatched. After this the connection is dead.
      */
     public boolean stop() {
+        Debug.log("[Emulator] stop " + name());
         if (instance.canStop() && EmulatorLauncher.stop(instance)) {
             return true;
         }
@@ -155,6 +167,7 @@ public final class Emulator implements CaptureSource {
 
     /** Sets this emulator as the bot's ambient {@link Source} — shorthand for {@code Source.set(this)}. */
     public void use() {
+        Debug.log("[Emulator] use " + this);
         Source.set(this);
     }
 
@@ -170,6 +183,7 @@ public final class Emulator implements CaptureSource {
 
     /** Closes the underlying ADB connection. After this the emulator can no longer be captured or tapped. */
     public void disconnect() {
+        Debug.log("[Emulator] disconnect " + name());
         device.close();
     }
 

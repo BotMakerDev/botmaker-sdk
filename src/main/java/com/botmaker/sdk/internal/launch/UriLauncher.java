@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.launch;
 
+import com.botmaker.sdk.api.Debug;
 import java.awt.Desktop;
 import java.net.URI;
 import java.util.List;
@@ -41,7 +42,7 @@ public final class UriLauncher {
                 return true;
             }
         } catch (Exception e) {
-            System.err.println("Desktop.browse failed for " + uri + ": " + e.getMessage());
+            Debug.error("Desktop.browse failed for " + uri + ": " + e.getMessage());
         }
         return false;
     }
@@ -68,7 +69,7 @@ public final class UriLauncher {
             new ProcessBuilder(command).inheritIO().start();
             return true;
         } catch (Exception e) {
-            System.err.println("Native opener failed for " + uri + ": " + e.getMessage());
+            Debug.error("Native opener failed for " + uri + ": " + e.getMessage());
             return false;
         }
     }

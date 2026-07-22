@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.capture;
 
+import com.botmaker.sdk.api.Debug;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -36,9 +37,9 @@ public final class SpectacleCapture implements CaptureBackend {
                     return image;
                 }
             }
-            System.err.println("[capture] Spectacle returned no image (exit " + exit + "); falling back to Robot.");
+            Debug.error("[capture] Spectacle returned no image (exit " + exit + "); falling back to Robot.");
         } catch (Exception e) {
-            System.err.println("[capture] Spectacle capture failed: " + e.getMessage() + "; falling back to Robot.");
+            Debug.error("[capture] Spectacle capture failed: " + e.getMessage() + "; falling back to Robot.");
         } finally {
             if (out != null) {
                 try { Files.deleteIfExists(out); } catch (Exception ignored) {}

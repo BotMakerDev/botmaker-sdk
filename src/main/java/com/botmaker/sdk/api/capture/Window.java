@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.capture;
 
+import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
 import com.botmaker.shared.capture.GenericWindow;
@@ -38,6 +39,7 @@ public class Window implements CaptureSource {
     /** The window that currently has focus, or empty if none could be resolved. */
     public static Optional<Window> foreground() {
         GenericWindow gw = controller().getForegroundWindow();
+        Debug.log("[Window] foreground -> " + (gw == null ? "none" : gw.getTitle()));
         return gw == null ? Optional.empty() : Optional.of(new Window(gw));
     }
 
@@ -62,9 +64,12 @@ public class Window implements CaptureSource {
             return Optional.empty();
         }
         String needle = titleSubstring.toLowerCase();
-        return all().stream()
+        Optional<Window> hit = all().stream()
                 .filter(w -> w.title().toLowerCase().contains(needle))
                 .findFirst();
+        Debug.log("[Window] find \"" + titleSubstring + "\" -> "
+                + hit.map(Window::title).orElse("no match"));
+        return hit;
     }
 
     // --- CaptureSource ---
@@ -110,16 +115,19 @@ public class Window implements CaptureSource {
 
     /** Click at coordinates relative to this window's top-left (converted to absolute internally). */
     public void click(int relativeX, int relativeY) {
+        Debug.log("[Window] click " + relativeX + "," + relativeY + " in " + title());
         controller().postLeftClick(handle, relativeX, relativeY);
     }
 
     /** Bring this window to the foreground and give it input focus. */
     public void focus() {
+        Debug.log("[Window] focus " + title());
         controller().focusWindow(handle);
     }
 
     /** Move this window's top-left corner to the given absolute screen coordinate. */
     public void move(int x, int y) {
+        Debug.log("[Window] move " + title() + " -> " + x + "," + y);
         controller().moveWindow(handle, x, y);
     }
 
@@ -128,6 +136,7 @@ public class Window implements CaptureSource {
      * cropped at, since template matching breaks when the window is a different size.
      */
     public void resize(int width, int height) {
+        Debug.log("[Window] resize " + title() + " -> " + width + "x" + height);
         controller().resizeWindow(handle, width, height);
     }
 

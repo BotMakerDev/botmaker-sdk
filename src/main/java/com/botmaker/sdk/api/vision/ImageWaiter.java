@@ -88,18 +88,14 @@ public class ImageWaiter {
             MatchResult result = ImageFinder.findInternal(template, source, confidence);
             VisionContext.setLastMatch(result);
             if (result.isFound()) {
-                if (Debug.isEnabled()) {
-                    long elapsed = System.currentTimeMillis() - startTime;
-                    System.out.println("Found " + template.getId() + " after " + elapsed + "ms");
-                }
+                Debug.log("[Vision] found " + template.getId() + " after "
+                        + (System.currentTimeMillis() - startTime) + "ms");
                 return true;
             }
             Wait.milliseconds(100);
         }
 
-        if (Debug.isEnabled()) {
-            System.out.println("Timeout waiting for " + template.getId());
-        }
+        Debug.log("[Vision] timeout waiting for " + template.getId());
         VisionContext.setLastMatch(MatchResult.notFound());
         return false;
     }
@@ -175,18 +171,14 @@ public class ImageWaiter {
             MatchResult result = ImageFinder.findInternal(template, source, confidence);
             VisionContext.setLastMatch(result);
             if (!result.isFound()) {
-                if (Debug.isEnabled()) {
-                    long elapsed = System.currentTimeMillis() - startTime;
-                    System.out.println(template.getId() + " disappeared after " + elapsed + "ms");
-                }
+                Debug.log("[Vision] " + template.getId() + " disappeared after "
+                        + (System.currentTimeMillis() - startTime) + "ms");
                 return true;
             }
             Wait.milliseconds(100);
         }
 
-        if (Debug.isEnabled()) {
-            System.out.println("Timeout: " + template.getId() + " still visible");
-        }
+        Debug.log("[Vision] timeout: " + template.getId() + " still visible");
         // Set last match to notFound since we timed out waiting for it to disappear
         VisionContext.setLastMatch(MatchResult.notFound());
         return false;
@@ -262,9 +254,7 @@ public class ImageWaiter {
             Point clickPoint = ClickConfig.RANDOMIZE_CLICKS ? result.getRandomClickPoint() : result.getCenter();
             Mouse.click(clickPoint);
             Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
-            if (Debug.isEnabled()) {
-                System.out.println("Found and clicked " + template.getId());
-            }
+            Debug.log("[Vision] found and clicked " + template.getId());
             return true;
         }
         return false;

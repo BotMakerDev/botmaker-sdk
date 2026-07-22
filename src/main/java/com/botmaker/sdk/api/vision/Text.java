@@ -272,10 +272,7 @@ public final class Text {
             }
             return out;
         } catch (Exception e) {
-            if (Debug.isEnabled()) {
-                System.err.println("Error reading text: " + e.getMessage());
-                e.printStackTrace();
-            }
+            Debug.error("[Vision] error reading text: " + e.getMessage(), e);
             return new ArrayList<>();
         }
     }

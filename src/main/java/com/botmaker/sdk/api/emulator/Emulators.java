@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
+import com.botmaker.sdk.api.Debug;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
@@ -35,6 +36,7 @@ public final class Emulators {
         for (EmulatorInstance instance : Platforms.discoverAll()) {
             tryConnect(instance).ifPresent(running::add);
         }
+        Debug.log("[Emulator] list: " + running.size() + " running");
         return running;
     }
 
@@ -50,6 +52,7 @@ public final class Emulators {
         for (EmulatorInstance instance : Platforms.discoverAll()) {
             all.add(new EmulatorRef(instance));
         }
+        Debug.log("[Emulator] listAll: " + all.size() + " configured");
         return all;
     }
 
@@ -60,7 +63,9 @@ public final class Emulators {
      * {@link #named(String)} for readiness afterwards.
      */
     public static boolean launch(String name) {
-        return findInstance(name).map(EmulatorLauncher::launch).orElse(false);
+        boolean dispatched = findInstance(name).map(EmulatorLauncher::launch).orElse(false);
+        Debug.log("[Emulator] launch '" + name + "' -> " + (dispatched ? "dispatched" : "no such instance"));
+        return dispatched;
     }
 
     /**
@@ -68,7 +73,9 @@ public final class Emulators {
      * was dispatched; {@code false} if there's no such instance or the product exposes no stop command.
      */
     public static boolean stop(String name) {
-        return findInstance(name).map(EmulatorLauncher::stop).orElse(false);
+        boolean dispatched = findInstance(name).map(EmulatorLauncher::stop).orElse(false);
+        Debug.log("[Emulator] stop '" + name + "' -> " + (dispatched ? "dispatched" : "no such instance"));
+        return dispatched;
     }
 
     /**
@@ -77,6 +84,7 @@ public final class Emulators {
      * @throws IllegalStateException if no emulator is currently running
      */
     public static Emulator first() {
+        Debug.log("[Emulator] first: scanning for a running instance");
         for (EmulatorInstance instance : Platforms.discoverAll()) {
             var emu = tryConnect(instance);
             if (emu.isPresent()) {
@@ -99,6 +107,7 @@ public final class Emulators {
             throw new IllegalArgumentException("name must not be empty");
         }
         String needle = name.trim();
+        Debug.log("[Emulator] named '" + needle + "'");
         for (EmulatorInstance instance : Platforms.discoverAll()) {
             if (needle.equals(instance.name())) {
                 var emu = tryConnect(instance);
@@ -146,6 +155,7 @@ public final class Emulators {
      * @throws RuntimeException if the connection can't be established
      */
     public static Emulator connect(String host, int port) {
+        Debug.log("[Emulator] connect " + host + ":" + port);
         // Recover the real product identity when this endpoint matches a discovered instance; otherwise stamp
         // an UNKNOWN descriptor (no launch/stop commands) rather than mislabeling it a specific product.
         EmulatorInstance instance = findInstanceByEndpoint(host, port)

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api;
 
+import com.botmaker.shared.Diag;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 
 /**
@@ -19,50 +20,56 @@ import com.botmaker.sdk.internal.config.ProjectDefaults;
  *
  * <p>Emit your own trace through {@link #log(String)} / {@link #error(String)}: they print only when debugging
  * is enabled, so bot code never has to wrap prints in an {@code if}.
+ *
+ * <p>The flag itself lives in {@code botmaker-shared}'s {@link Diag}, which this class only delegates to.
+ * {@code shared} can't depend on the SDK, yet its window/capture/input code prints diagnostics of its own —
+ * keeping the state in the lower module is what makes this <em>one</em> switch rather than two that drift.
  */
 public final class Debug {
 
-    private static volatile boolean enabled = initialState();
-
     private Debug() {}
 
-    /** Default on; a project {@code debug=false} baked in by Studio starts a bot quiet. */
-    private static boolean initialState() {
+    static {
+        // Seed the shared flag from the project's `debug` key; absent/unparseable leaves it on.
         Boolean configured = ProjectDefaults.debug();
-        return configured == null || configured;
+        Diag.set(configured == null || configured);
     }
 
     /** Whether debug output is currently on. All SDK diagnostic prints consult this. */
     public static boolean isEnabled() {
-        return enabled;
+        return Diag.isEnabled();
     }
 
     /** Turns debug output on for the rest of the run. */
     public static void enable() {
-        enabled = true;
+        Diag.set(true);
     }
 
     /** Turns debug output off for the rest of the run (a quiet production run). */
     public static void disable() {
-        enabled = false;
+        Diag.set(false);
     }
 
     /** Sets debug output on or off. */
     public static void set(boolean on) {
-        enabled = on;
+        Diag.set(on);
     }
 
     /** Prints {@code message} to stdout when debugging is on; a no-op when off. */
     public static void log(String message) {
-        if (enabled) {
-            System.out.println(message);
-        }
+        Diag.log(message);
     }
 
     /** Prints {@code message} to stderr when debugging is on; a no-op when off. */
     public static void error(String message) {
-        if (enabled) {
-            System.err.println(message);
-        }
+        Diag.error(message);
+    }
+
+    /**
+     * Prints {@code message} then {@code t}'s stack trace to stderr, when debugging is on. Use this instead of
+     * {@code t.printStackTrace()}, which would print on a quiet run.
+     */
+    public static void error(String message, Throwable t) {
+        Diag.error(message, t);
     }
 }

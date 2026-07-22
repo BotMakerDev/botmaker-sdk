@@ -148,8 +148,7 @@ public class ImageFinder {
 
         } catch (Exception e) {
             if (Debug.isEnabled()) {
-                System.err.println("Error finding template: " + e.getMessage());
-                e.printStackTrace();
+                Debug.error("Error finding template: " + e.getMessage(), e);
             }
             return MatchResult.notFound();
         } finally {
@@ -614,8 +613,7 @@ public class ImageFinder {
             return best;
         } catch (Exception e) {
             if (Debug.isEnabled()) {
-                System.err.println("Error in compare: " + e.getMessage());
-                e.printStackTrace();
+                Debug.error("Error in compare: " + e.getMessage(), e);
             }
             return MatchResult.notFound();
         } finally {
@@ -662,8 +660,7 @@ public class ImageFinder {
             return MatchResult.notFound();
         } catch (Exception e) {
             if (Debug.isEnabled()) {
-                System.err.println("Error in compareAny: " + e.getMessage());
-                e.printStackTrace();
+                Debug.error("Error in compareAny: " + e.getMessage(), e);
             }
             return MatchResult.notFound();
         } finally {
@@ -708,8 +705,7 @@ public class ImageFinder {
             return results;
         } catch (Exception e) {
             if (Debug.isEnabled()) {
-                System.err.println("Error in compareAll: " + e.getMessage());
-                e.printStackTrace();
+                Debug.error("Error in compareAll: " + e.getMessage(), e);
             }
             return new ArrayList<>();
         } finally {
@@ -825,8 +821,7 @@ public class ImageFinder {
 
         } catch (Exception e) {
             if (Debug.isEnabled()) {
-                System.err.println("Error in findAll: " + e.getMessage());
-                e.printStackTrace();
+                Debug.error("Error in findAll: " + e.getMessage(), e);
             }
             return new ArrayList<>();
         } finally {

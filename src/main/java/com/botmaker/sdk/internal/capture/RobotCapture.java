@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.capture;
 
+import com.botmaker.sdk.api.Debug;
 import java.awt.AWTException;
 import java.awt.Rectangle;
 import java.awt.Robot;
@@ -17,7 +18,7 @@ public final class RobotCapture implements CaptureBackend {
             Rectangle virtualBounds = ScreenCapture.getVirtualScreenBounds();
             return new Robot().createScreenCapture(virtualBounds);
         } catch (AWTException e) {
-            System.err.println("[capture] Robot desktop capture failed: " + e.getMessage());
+            Debug.error("[capture] Robot desktop capture failed: " + e.getMessage());
             return null;
         }
     }

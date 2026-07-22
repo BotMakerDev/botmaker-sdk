@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.opencv;
 
+import com.botmaker.sdk.api.Debug;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -269,7 +270,7 @@ public final class OpencvManager {
                                                      double confidenceThreshold, double overlapThreshold,
                                                      com.botmaker.sdk.api.Size authored) {
         if (template.empty() || background.empty()) {
-            System.err.println("Error: Invalid input images for findMultipleMatches.");
+            Debug.error("Error: Invalid input images for findMultipleMatches.");
             return new ArrayList<>();
         }
 
@@ -279,7 +280,7 @@ public final class OpencvManager {
         Mat localTemplate = resizeTemplate(template, scale);
         Mat localBackground = background.clone();
         if (localBackground.width() < localTemplate.width() || localBackground.height() < localTemplate.height()) {
-            System.err.println("Error: Template dimensions are larger than the background image.");
+            Debug.error("Error: Template dimensions are larger than the background image.");
             localTemplate.release();
             localBackground.release();
             return new ArrayList<>();
