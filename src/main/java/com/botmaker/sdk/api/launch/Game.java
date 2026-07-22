@@ -158,6 +158,37 @@ public class Game {
                 + "'. Is the Heroic Games Launcher installed?");
     }
 
+    /**
+     * Launches a game through <a href="https://faugus.github.io/">Faugus Launcher</a> by its <em>game id</em> —
+     * the {@code gameid} from Faugus's local library (Studio's Faugus game picker fills this in for you). Faugus
+     * runs non-Steam Windows games and launchers (Battle.net, the EA App, HoYoPlay, …) through umu/Proton.
+     *
+     * <p>Faugus registers no protocol handler, so this goes straight to its CLI —
+     * {@code faugus-launcher --game <gameId>}, then the Flatpak form
+     * {@code flatpak run io.github.Faugus.faugus-launcher --game <gameId>}. Faugus matches {@code gameid}
+     * exactly against its {@code games.json}, so the id must be the stored one, not the title.
+     *
+     * @param gameId the Faugus {@code gameid} launch token, e.g. {@code "battlenet"}
+     * @throws IllegalArgumentException if {@code gameId} is null/blank
+     * @throws RuntimeException         if neither CLI form could be invoked
+     */
+    public static void launchFaugus(String gameId) {
+        if (gameId == null || gameId.isBlank()) {
+            throw new IllegalArgumentException("gameId must not be empty");
+        }
+        String id = gameId.trim();
+        // Log before invoking: a silent failure still shows which command was tried.
+        Debug.log("[Game] launchFaugus " + id);
+        if (tryStart("faugus-launcher", "--game", id)) {
+            return;
+        }
+        if (tryStart("flatpak", "run", "io.github.Faugus.faugus-launcher", "--game", id)) {
+            return;
+        }
+        throw new RuntimeException("Failed to launch Faugus game '" + id
+                + "'. Is Faugus Launcher installed?");
+    }
+
     /** Best-effort {@link ProcessBuilder#start()}; logs and returns false rather than throwing on failure. */
     private static boolean tryStart(String... command) {
         try {

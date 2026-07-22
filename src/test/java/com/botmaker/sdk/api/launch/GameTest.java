@@ -42,6 +42,13 @@ class GameTest {
     }
 
     @Test
+    void launchFaugusRejectsEmptyGameId() {
+        assertThrows(IllegalArgumentException.class, () -> Game.launchFaugus(null));
+        assertThrows(IllegalArgumentException.class, () -> Game.launchFaugus(""));
+        assertThrows(IllegalArgumentException.class, () -> Game.launchFaugus("   "));
+    }
+
+    @Test
     void killAndIsRunningRejectEmptyName() {
         assertThrows(IllegalArgumentException.class, () -> Game.kill(null));
         assertThrows(IllegalArgumentException.class, () -> Game.kill("  "));

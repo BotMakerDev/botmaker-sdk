@@ -8,6 +8,19 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-22 — Faugus Launcher as a launch target
+
+**Done**
+
+- **`Game.launchFaugus(String gameId)`** — Faugus registers no protocol handler, so it goes straight to the
+  CLI: `faugus-launcher --game <id>`, then `flatpak run io.github.Faugus.faugus-launcher --game <id>`. The id
+  is Faugus's `gameid` (matched exactly by its runner), not the title.
+- **`LaunchTarget.Faugus(gameId)`** with spec `faugus:<gameId>`, wired into `parse` and the spec table.
+  `startIfNotRunning` comes free from the window-based default. Faugus is how non-Steam Windows launchers
+  (Battle.net, EA App, HoYoPlay) run under umu/Proton, which is what the maintainer actually automates.
+
+---
+
 ## 2026-07-22 — "Already running" is decided on the window, not the process
 
 **Done**

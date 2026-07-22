@@ -12,8 +12,9 @@ import java.util.Optional;
 
 /**
  * A parsed, launchable description of <em>what the bot automates</em> — the value behind the ambient
- * {@link Target} holder. One of four things a Studio game picker can produce: a Steam game, an Epic game, a
- * plain executable, or an app running inside a named Android emulator.
+ * {@link Target} holder. One of the things a Studio game picker can produce: a game in a launcher's library
+ * (Steam, Epic, Heroic, Faugus), a plain executable or command line, or an app running inside a named Android
+ * emulator.
  *
  * <p>Persisted as a single {@code launch.target} string in {@code botmaker-project.properties} (see
  * {@code ProjectDefaults}) using the {@link #spec()} form:
@@ -21,6 +22,7 @@ import java.util.Optional;
  *   steam:&lt;appId&gt;
  *   epic:&lt;appName&gt;
  *   heroic:&lt;appName&gt;
+ *   faugus:&lt;gameId&gt;
  *   cli:&lt;command line&gt;
  *   exe:&lt;path&gt;
  *   emu-app:&lt;package&gt;@&lt;instanceName&gt;
@@ -101,6 +103,7 @@ public sealed interface LaunchTarget {
             case "steam" -> new Steam(rest);
             case "epic" -> new Epic(rest);
             case "heroic" -> new Heroic(rest);
+            case "faugus" -> new Faugus(rest);
             case "cli" -> new Cli(rest);
             case "exe" -> new Exe(rest);
             case "emu-app" -> parseEmulatorApp(rest);
@@ -156,6 +159,22 @@ public sealed interface LaunchTarget {
         @Override
         public String spec() {
             return "heroic:" + appName;
+        }
+    }
+
+    /**
+     * A <a href="https://faugus.github.io/">Faugus Launcher</a> entry, launched by its {@code gameid} (see
+     * {@link Game#launchFaugus(String)}) — how non-Steam Windows launchers and games run under umu/Proton.
+     */
+    record Faugus(String gameId) implements LaunchTarget {
+        @Override
+        public void start() {
+            Game.launchFaugus(gameId);
+        }
+
+        @Override
+        public String spec() {
+            return "faugus:" + gameId;
         }
     }
 

@@ -37,6 +37,14 @@ class LaunchTargetTest {
     }
 
     @Test
+    void parsesFaugus() {
+        LaunchTarget t = LaunchTarget.parse("faugus:battlenet");
+        assertInstanceOf(LaunchTarget.Faugus.class, t);
+        assertEquals("battlenet", ((LaunchTarget.Faugus) t).gameId());
+        assertEquals("faugus:battlenet", t.spec());
+    }
+
+    @Test
     void parsesCliKeepingArgsAndColons() {
         // Only the first colon separates the kind, so the command's own colons/args survive verbatim.
         LaunchTarget t = LaunchTarget.parse("cli:heroic --no-gui launch Firestone");
