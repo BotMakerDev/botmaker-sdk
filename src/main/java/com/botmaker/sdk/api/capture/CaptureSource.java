@@ -41,6 +41,20 @@ public interface CaptureSource {
     }
 
     /**
+     * Whether {@link #isPresent()} actually means something for this source. The whole {@link #desktop()}
+     * and a {@link #monitor(int) monitor} always answer {@code true} to {@code isPresent()} because they
+     * always exist — so a caller asking "is the target already up?" would get a permanent, meaningless
+     * "yes". Only a source tied to a specific application window ({@link #window(String)} and a concrete
+     * {@link Window}) reports a real presence, and only those override this to {@code true}.
+     *
+     * <p>Used by {@link com.botmaker.sdk.api.launch.LaunchTarget#startIfNotRunning()} to decide whether the
+     * ambient source can answer "already running", or whether it must fall back to a process-name probe.
+     */
+    default boolean hasWindowIdentity() {
+        return false;
+    }
+
+    /**
      * Sends a primary click at absolute point {@code p} — the location a matcher produced on <em>this</em>
      * source. The default is a real desktop click ({@link com.botmaker.sdk.api.interaction.Mouse#click(Point)}),
      * which is correct for the on-screen sources (desktop / monitor / window). A source whose pixels are
@@ -113,6 +127,16 @@ public interface CaptureSource {
             public void click(Point p) {
                 // Route the click to the underlying surface so a region of an emulator still taps via ADB.
                 parent.click(p);
+            }
+
+            @Override
+            public boolean isPresent() {
+                return parent.isPresent();
+            }
+
+            @Override
+            public boolean hasWindowIdentity() {
+                return parent.hasWindowIdentity();
             }
 
             @Override

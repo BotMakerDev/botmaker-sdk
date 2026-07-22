@@ -324,8 +324,20 @@ public class Game {
                 p.waitFor();
                 return out.toLowerCase().contains(name.toLowerCase());
             }
-            // pgrep exits 0 when at least one process matches, 1 when none do.
-            return new ProcessBuilder("pgrep", "-f", name).start().waitFor() == 0;
+            // `--` so a name starting with '-' isn't read as a flag. pgrep -f matches whole command lines,
+            // which includes the bot's own JVM when the name appears in its arguments — so read the pids and
+            // discard our own rather than trusting the exit code.
+            Process p = new ProcessBuilder("pgrep", "-f", "--", name).start();
+            String out = new String(p.getInputStream().readAllBytes());
+            p.waitFor();
+            long self = ProcessHandle.current().pid();
+            for (String line : out.split("\\R")) {
+                String pid = line.trim();
+                if (!pid.isEmpty() && Long.parseLong(pid) != self) {
+                    return true;
+                }
+            }
+            return false;
         } catch (Exception e) {
             Debug.log("[Game] isRunning(" + name + ") check failed: " + e.getMessage());
             return false;

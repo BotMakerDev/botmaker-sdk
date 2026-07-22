@@ -1,6 +1,8 @@
 package com.botmaker.sdk.api.launch;
 import com.botmaker.sdk.api.Debug;
 
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.emulator.Emulator;
 import com.botmaker.sdk.api.emulator.EmulatorRef;
 import com.botmaker.sdk.api.emulator.Emulators;
@@ -34,12 +36,38 @@ public sealed interface LaunchTarget {
 
     /**
      * Brings the target up only if it isn't already running — the cold-start path, so a game the user already
-     * opened by hand isn't relaunched. Defaults to {@link #start()} (for targets where re-launching an already
-     * running game is a harmless focus, e.g. Steam/Epic); variants that can cheaply detect "already running"
-     * override this to skip.
+     * opened by hand isn't relaunched.
+     *
+     * <p>"Already running" is decided on the <em>surface the bot automates</em>, not on a process: the ambient
+     * {@link Source#current() capture source}'s window. A process-name probe cannot work here — a game started
+     * through Steam's {@code reaper}, Heroic's {@code legendary} or a Proton/Wine wrapper runs under a process
+     * name that has nothing to do with the token in the {@link #spec()} — whereas the window the bot captures
+     * is by definition the thing that has to be up. When the ambient source has no window notion
+     * ({@link CaptureSource#hasWindowIdentity()} is false — the desktop, a monitor, an emulator), this falls
+     * through to {@link #start()}; the variants whose spec token <em>is</em> a real process name
+     * ({@link Exe}, {@link Cli}) override it to probe that name instead.
      */
     default void startIfNotRunning() {
+        if (targetWindowOpen(spec())) {
+            return;
+        }
         start();
+    }
+
+    /**
+     * True when the ambient capture source is a window source that is open right now — i.e. the target is
+     * already up. False when it is absent <em>or</em> when the source can't answer the question at all.
+     */
+    private static boolean targetWindowOpen(String spec) {
+        CaptureSource source = Source.current();
+        if (source == null || !source.hasWindowIdentity()) {
+            return false;
+        }
+        if (!source.isPresent()) {
+            return false;
+        }
+        Debug.log("[Target] " + spec + ": target window already open — skipping cold launch");
+        return true;
     }
 
     /** Restarts the target from a clean state. Defaults to {@link #start()}; only some variants can force-stop. */
@@ -149,8 +177,12 @@ public sealed interface LaunchTarget {
             Game.launch(parts[0], args);
         }
 
+        /** Window check first (see the interface default), then the command's own process name. */
         @Override
         public void startIfNotRunning() {
+            if (targetWindowOpen(spec())) {
+                return;
+            }
             String name = processName();
             if (name != null && Game.isRunning(name)) {
                 Debug.log("[Target] cli '" + name + "' already running — skipping cold launch");
@@ -201,8 +233,12 @@ public sealed interface LaunchTarget {
             Game.launch(path);
         }
 
+        /** Window check first (see the interface default), then the executable's own process name. */
         @Override
         public void startIfNotRunning() {
+            if (targetWindowOpen(spec())) {
+                return;
+            }
             String name = processName(path);
             if (name != null && Game.isRunning(name)) {
                 Debug.log("[Target] exe '" + name + "' already running — skipping cold launch");

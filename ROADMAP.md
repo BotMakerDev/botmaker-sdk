@@ -8,6 +8,28 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-22 — "Already running" is decided on the window, not the process
+
+**Done**
+
+- **`LaunchTarget.startIfNotRunning()` now has a real shared default**: it asks the ambient
+  `Source.current()` whether the target's window is open and skips the cold launch when it is. Previously
+  `Steam`/`Epic`/`Heroic` inherited a default that just called `start()` (so they always relaunched), and
+  `Exe`/`Cli` probed a *process name* — which never matches a game started through Steam's `reaper`, Heroic's
+  `legendary` or a Proton/Wine wrapper, where the running process has nothing to do with the spec token. The
+  window the bot captures is by definition the thing that has to be up, so it is the right probe, and it is
+  uniform across every launcher and both OSes.
+- **`CaptureSource.hasWindowIdentity()`** (default `false`, `true` on `NamedWindow`, delegated by
+  `region(...)`) gates that check. `isPresent()` is hardcoded `true` for `desktop()`/`monitor()` because they
+  always exist, so trusting it there would report "already running" forever; when it is false the target falls
+  through to `start()` — or, for `Exe`/`Cli` (the only variants whose spec token *is* a real process name), to
+  the existing process probe, which they keep as a fallback. `EmulatorApp`'s ADB path is untouched.
+- **`Game.isRunning(String)` no longer matches the bot's own JVM**: `pgrep -f` matches whole command lines, so
+  a name that appeared in the bot's own arguments made every game look running. It now passes `--` (so a name
+  starting with `-` isn't read as a flag), reads the pids and discards `ProcessHandle.current().pid()`.
+- `LaunchTargetRunningTest` covers the three branches (window present → skip, window absent → launch, source
+  with no window identity → never skips) against a fake `NativeController`.
+
 ## 2026-07-22 — No-arg `Keyboard` targets the project source; Heroic + CLI launch targets
 
 **Done**

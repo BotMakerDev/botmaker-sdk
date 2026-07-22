@@ -41,6 +41,12 @@ public final class NamedWindow implements CaptureSource {
         return resolve().isPresent();
     }
 
+    /** A title-matched window is the one source whose {@link #isPresent()} is a real "is it up?" answer. */
+    @Override
+    public boolean hasWindowIdentity() {
+        return true;
+    }
+
     /** The live window when present (so observers see its identity), else this. */
     @Override
     public CaptureSource base() {
