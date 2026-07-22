@@ -47,6 +47,12 @@ public final class NamedWindow implements CaptureSource {
         return resolve().map(w -> (CaptureSource) w).orElse(this);
     }
 
+    /** The resolved window's native handle when open, else {@code null} (→ global focused-window keys). */
+    @Override
+    public com.botmaker.shared.capture.GenericWindow targetWindow() {
+        return resolve().map(Window::targetWindow).orElse(null);
+    }
+
     @Override
     public String toString() {
         return "Window[title~=" + titleSubstring + "]";

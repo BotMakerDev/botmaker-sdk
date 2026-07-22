@@ -35,6 +35,13 @@ class GameTest {
     }
 
     @Test
+    void launchHeroicRejectsEmptyAppId() {
+        assertThrows(IllegalArgumentException.class, () -> Game.launchHeroic(null));
+        assertThrows(IllegalArgumentException.class, () -> Game.launchHeroic(""));
+        assertThrows(IllegalArgumentException.class, () -> Game.launchHeroic("   "));
+    }
+
+    @Test
     void killAndIsRunningRejectEmptyName() {
         assertThrows(IllegalArgumentException.class, () -> Game.kill(null));
         assertThrows(IllegalArgumentException.class, () -> Game.kill("  "));

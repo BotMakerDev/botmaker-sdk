@@ -120,6 +120,57 @@ public class Game {
     }
 
     /**
+     * Launches a game through the <a href="https://heroicgameslauncher.com/">Heroic Games Launcher</a> by its
+     * <em>app name</em> — the launch token from Heroic's local library (Studio's Heroic game picker fills this
+     * in for you). This is the practical way to launch Epic/GOG games on Linux, where the native store clients
+     * don't run.
+     *
+     * <p>Opens the {@code heroic://launch/<appName>} protocol URL (handled by an installed Heroic, native or
+     * Flatpak) and falls back to Heroic's CLI — {@code heroic --no-gui launch <appName>}, then the Flatpak form
+     * {@code flatpak run com.heroicgameslauncher.hgl --no-gui launch <appName>}.
+     *
+     * @param appName the Heroic application name / launch token, e.g. {@code "Firestone"}
+     * @throws IllegalArgumentException if {@code appName} is null/blank
+     * @throws RuntimeException         if neither the Heroic URL nor a CLI fallback could be invoked
+     */
+    public static void launchHeroic(String appName) {
+        if (appName == null || appName.isBlank()) {
+            throw new IllegalArgumentException("appName must not be empty");
+        }
+        String id = appName.trim();
+        String uri = "heroic://launch/" + id;
+        // Log before invoking: if Heroic doesn't come up, the console still shows the URI/CLI we tried, so a
+        // silent failure (e.g. no registered heroic:// handler) is diagnosable instead of "nothing happened".
+        Debug.log("[Game] launchHeroic " + id + " → " + uri);
+        if (UriLauncher.open(uri)) {
+            Debug.log("[Game] launchHeroic: opener invoked for " + uri);
+            return;
+        }
+        // Fallbacks: Heroic's CLI, first on PATH, then as a Flatpak (its most common Linux install form).
+        Debug.log("[Game] launchHeroic: opener declined " + uri + ", falling back to the Heroic CLI");
+        if (tryStart("heroic", "--no-gui", "launch", id)) {
+            return;
+        }
+        if (tryStart("flatpak", "run", "com.heroicgameslauncher.hgl", "--no-gui", "launch", id)) {
+            return;
+        }
+        throw new RuntimeException("Failed to launch Heroic game '" + id
+                + "'. Is the Heroic Games Launcher installed?");
+    }
+
+    /** Best-effort {@link ProcessBuilder#start()}; logs and returns false rather than throwing on failure. */
+    private static boolean tryStart(String... command) {
+        try {
+            new ProcessBuilder(command).start();
+            Debug.log("[Game] ran: " + String.join(" ", command));
+            return true;
+        } catch (Exception e) {
+            Debug.log("[Game] command failed (" + command[0] + "): " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Launches an Epic game by app name only if {@code source}'s window is not already open.
      *
      * @param appName the Epic application name (see {@link #launchEpic(String)})

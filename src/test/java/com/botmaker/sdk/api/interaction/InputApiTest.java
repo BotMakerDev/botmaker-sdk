@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
 import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import org.junit.jupiter.api.AfterEach;
@@ -88,6 +89,44 @@ class InputApiTest {
     void typeDelegatesToController() {
         Keyboard.type("Hi");
         assertEquals(List.of("typeText(Hi)"), fake.events);
+    }
+
+    @Test
+    void targetedTapRoutesToTheResolvedWindow() {
+        // CaptureSource.window(...) resolves to the recording controller's single window ("Test Game Window").
+        Keyboard.tap(CaptureSource.window("Test"), Key.ENTER);
+        assertEquals(List.of(
+                "keyDown(Test Game Window," + Key.ENTER.nativeCode() + ")",
+                "keyUp(Test Game Window," + Key.ENTER.nativeCode() + ")"
+        ), fake.windowInput);
+    }
+
+    @Test
+    void targetedComboHoldsThenReleasesInReverseOnTheWindow() {
+        Keyboard.combo(CaptureSource.window("Test"), Key.CTRL, Key.C);
+        assertEquals(List.of(
+                "keyDown(Test Game Window," + Key.CTRL.nativeCode() + ")",
+                "keyDown(Test Game Window," + Key.C.nativeCode() + ")",
+                "keyUp(Test Game Window," + Key.C.nativeCode() + ")",
+                "keyUp(Test Game Window," + Key.CTRL.nativeCode() + ")"
+        ), fake.windowInput);
+    }
+
+    @Test
+    void targetedTypeRoutesToTheWindow() {
+        Keyboard.type(CaptureSource.window("Test"), "Hi");
+        assertEquals(List.of("typeText(Test Game Window,Hi)"), fake.windowInput);
+    }
+
+    @Test
+    void aSourceWithNoWindowFallsBackToTheGlobalFocusedPath() {
+        // The desktop has no single target window, so keys go through the window-less (focused) path.
+        Keyboard.tap(CaptureSource.desktop(), Key.ENTER);
+        assertTrue(fake.windowInput.isEmpty(), "no window-targeted events expected");
+        assertEquals(List.of(
+                "keyDown(" + Key.ENTER.nativeCode() + ")",
+                "keyUp(" + Key.ENTER.nativeCode() + ")"
+        ), fake.events);
     }
 
     @Test

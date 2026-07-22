@@ -80,6 +80,11 @@ public class Window implements CaptureSource {
         return new Point(r.x, r.y);
     }
 
+    @Override
+    public GenericWindow targetWindow() {
+        return handle;
+    }
+
     // --- Accessors ---
 
     public String title() {

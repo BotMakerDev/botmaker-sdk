@@ -8,6 +8,41 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-22 — No-arg `Keyboard` targets the project source; Heroic + CLI launch targets
+
+**Done**
+
+- **No-arg `Keyboard.press/release/type` now target the ambient `Source.current()`** instead of whatever holds
+  focus — the same "where" every no-source vision/mouse call uses, so a bot configured to a game window types
+  into that window. They delegate to the `(CaptureSource, …)` overloads, which already fall back to the
+  focused-window path when the source has no single window (`desktop()`/`monitor()`/emulator/unopened). `tap`/
+  `combo` compose from `press`/`release`, so they follow automatically.
+- **`Game.launchHeroic(appName)`** — launches Epic/GOG games through the Heroic Games Launcher (the practical
+  path on Linux): opens `heroic://launch/<appName>` via `UriLauncher`, falling back to the Heroic CLI
+  (`heroic --no-gui launch`, then the Flatpak `flatpak run com.heroicgameslauncher.hgl --no-gui launch`).
+- **Two new `LaunchTarget` variants**: `Heroic(appName)` (`heroic:<appName>`) and `Cli(commandLine)`
+  (`cli:<command>`, tokenized on whitespace and run via `Game.launch`; `startIfNotRunning`/`restart` keyed on
+  the first token as the process name). Both added to `LaunchTarget.parse`; round-trip covered in
+  `LaunchTargetTest`. Studio's picker (`HeroicLibraryScanner` + "Heroic game…"/"CLI command…") produces them.
+
+## 2026-07-22 — `Keyboard` is targetable at a `CaptureSource` (symmetric with `Mouse`)
+
+**Done**
+
+- **`Keyboard.press/release/tap/combo/type(CaptureSource, …)`** overloads, mirroring
+  `Mouse.click(CaptureSource, …)`: they deliver keys to *that* window instead of whatever holds focus, so a bot
+  can type into a background window without focusing it. Pure additions — the no-arg methods are unchanged.
+- **The seam is `CaptureSource.targetWindow()`** (default `null`): a resolved `Window` (and a `region(...)` of
+  one) returns its native `GenericWindow`; `desktop()`/`monitor()`/an unopened `window(...)`/an emulator return
+  `null`, so the targeted call transparently falls back to the focused-window path. `NamedWindow` resolves
+  lazily like its capture path.
+- Backed by shared's new `NativeController.keyDown/keyUp/typeText(GenericWindow, …)` (2026-07-22, shared
+  ROADMAP). No Studio change: the palette discovers the new overloads by scanning the SDK jar at runtime, and
+  a `CaptureSource`-typed first argument is already auto-seeded from the project default.
+- Verified: `InputApiTest` gained targeted tap/combo/type routing + a no-window fallback case (12 tests green).
+
+---
+
 ## 2026-07-20 — `Activity` is outcome-typed (`Activity<O extends Enum<O>>`)
 
 **Done**

@@ -18,6 +18,8 @@ import java.util.Optional;
  * <pre>
  *   steam:&lt;appId&gt;
  *   epic:&lt;appName&gt;
+ *   heroic:&lt;appName&gt;
+ *   cli:&lt;command line&gt;
  *   exe:&lt;path&gt;
  *   emu-app:&lt;package&gt;@&lt;instanceName&gt;
  * </pre>
@@ -70,6 +72,8 @@ public sealed interface LaunchTarget {
         return switch (kind) {
             case "steam" -> new Steam(rest);
             case "epic" -> new Epic(rest);
+            case "heroic" -> new Heroic(rest);
+            case "cli" -> new Cli(rest);
             case "exe" -> new Exe(rest);
             case "emu-app" -> parseEmulatorApp(rest);
             default -> null;
@@ -108,6 +112,85 @@ public sealed interface LaunchTarget {
         @Override
         public String spec() {
             return "epic:" + appName;
+        }
+    }
+
+    /**
+     * A Heroic Games Launcher title, launched by its Heroic {@code AppName} (see {@link Game#launchHeroic(String)}).
+     * The practical way to run Epic/GOG games on Linux.
+     */
+    record Heroic(String appName) implements LaunchTarget {
+        @Override
+        public void start() {
+            Game.launchHeroic(appName);
+        }
+
+        @Override
+        public String spec() {
+            return "heroic:" + appName;
+        }
+    }
+
+    /**
+     * An arbitrary command line, run as an external process — the escape hatch for any launcher we don't model
+     * directly (a custom script, {@code legendary}, {@code lutris}, a Flatpak invocation, …). The command is
+     * split on whitespace into an executable + arguments and handed to {@link Game#launch(String, String...)}.
+     */
+    record Cli(String commandLine) implements LaunchTarget {
+        @Override
+        public void start() {
+            String[] parts = tokens();
+            if (parts.length == 0) {
+                Debug.log("[Target] cli: empty command — nothing to launch");
+                return;
+            }
+            String[] args = new String[parts.length - 1];
+            System.arraycopy(parts, 1, args, 0, args.length);
+            Game.launch(parts[0], args);
+        }
+
+        @Override
+        public void startIfNotRunning() {
+            String name = processName();
+            if (name != null && Game.isRunning(name)) {
+                Debug.log("[Target] cli '" + name + "' already running — skipping cold launch");
+                return;
+            }
+            start();
+        }
+
+        @Override
+        public void restart() {
+            String name = processName();
+            if (name != null) {
+                Game.kill(name);
+            }
+            start();
+        }
+
+        @Override
+        public String spec() {
+            return "cli:" + commandLine;
+        }
+
+        /** The command split on whitespace: executable first, then arguments. */
+        private String[] tokens() {
+            if (commandLine == null || commandLine.isBlank()) {
+                return new String[0];
+            }
+            return commandLine.trim().split("\\s+");
+        }
+
+        /** The executable's file name — the process/image name {@link Game#kill}/{@link Game#isRunning} match. */
+        private String processName() {
+            String[] parts = tokens();
+            if (parts.length == 0) {
+                return null;
+            }
+            String exe = parts[0];
+            int slash = Math.max(exe.lastIndexOf('/'), exe.lastIndexOf('\\'));
+            String name = (slash >= 0 && slash < exe.length() - 1) ? exe.substring(slash + 1) : exe;
+            return name.isBlank() ? null : name;
         }
     }
 

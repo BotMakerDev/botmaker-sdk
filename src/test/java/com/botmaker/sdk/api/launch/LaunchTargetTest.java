@@ -29,6 +29,23 @@ class LaunchTargetTest {
     }
 
     @Test
+    void parsesHeroic() {
+        LaunchTarget t = LaunchTarget.parse("heroic:Firestone");
+        assertInstanceOf(LaunchTarget.Heroic.class, t);
+        assertEquals("Firestone", ((LaunchTarget.Heroic) t).appName());
+        assertEquals("heroic:Firestone", t.spec());
+    }
+
+    @Test
+    void parsesCliKeepingArgsAndColons() {
+        // Only the first colon separates the kind, so the command's own colons/args survive verbatim.
+        LaunchTarget t = LaunchTarget.parse("cli:heroic --no-gui launch Firestone");
+        assertInstanceOf(LaunchTarget.Cli.class, t);
+        assertEquals("heroic --no-gui launch Firestone", ((LaunchTarget.Cli) t).commandLine());
+        assertEquals("cli:heroic --no-gui launch Firestone", t.spec());
+    }
+
+    @Test
     void parsesExeKeepingWindowsDriveColon() {
         // Only the first colon separates the kind, so a Windows path's drive colon survives.
         LaunchTarget t = LaunchTarget.parse("exe:C:\\Games\\game.exe");

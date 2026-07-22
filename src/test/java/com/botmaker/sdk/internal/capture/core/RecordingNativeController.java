@@ -16,6 +16,8 @@ import java.util.List;
 public class RecordingNativeController implements NativeController {
 
     public final List<String> events = new ArrayList<>();
+    /** Targeted (window-routed) key events, kept separate so window-resolution noise doesn't pollute asserts. */
+    public final List<String> windowInput = new ArrayList<>();
     public GenericWindow window =
             new GenericWindow("h", "Test Game Window", new Rectangle(100, 50, 800, 600));
 
@@ -40,6 +42,17 @@ public class RecordingNativeController implements NativeController {
     @Override public void keyDown(int nativeKeyCode) { events.add("keyDown(" + nativeKeyCode + ")"); }
     @Override public void keyUp(int nativeKeyCode) { events.add("keyUp(" + nativeKeyCode + ")"); }
     @Override public void typeText(String text) { events.add("typeText(" + text + ")"); }
+
+    @Override public void keyDown(GenericWindow w, int nativeKeyCode) {
+        windowInput.add("keyDown(" + title(w) + "," + nativeKeyCode + ")");
+    }
+    @Override public void keyUp(GenericWindow w, int nativeKeyCode) {
+        windowInput.add("keyUp(" + title(w) + "," + nativeKeyCode + ")");
+    }
+    @Override public void typeText(GenericWindow w, String text) {
+        windowInput.add("typeText(" + title(w) + "," + text + ")");
+    }
+    private static String title(GenericWindow w) { return w == null ? "null" : w.getTitle(); }
     @Override public void mouseMove(int xAbs, int yAbs) { events.add("mouseMove(" + xAbs + "," + yAbs + ")"); }
     @Override public void mouseButton(int button, boolean press) { events.add("mouseButton(" + button + "," + press + ")"); }
     @Override public void scroll(int amount) { events.add("scroll(" + amount + ")"); }

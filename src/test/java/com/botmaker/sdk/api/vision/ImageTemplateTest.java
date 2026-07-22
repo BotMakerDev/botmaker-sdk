@@ -15,16 +15,16 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class ImageTemplateTest {
 
-    private static final String IMAGE = "src/main/resources/images/accept_button.png";
+    private static final String IMAGE = "src/main/resources/images/default_template.png";
 
     private static ImageTemplate template() {
-        assumeTrue(Files.exists(Path.of(IMAGE)), "accept_button.png is required for these tests");
+        assumeTrue(Files.exists(Path.of(IMAGE)), "default_template.png is required for these tests");
         return new ImageTemplate(IMAGE);
     }
 
     @Test
     void derivesIdFromFileName() {
-        assertEquals("accept_button", new ImageTemplate("images/accept_button.png").getId());
+        assertEquals("default_template", new ImageTemplate("images/default_template.png").getId());
         assertEquals("btn", new ImageTemplate("btn").getId()); // no extension
     }
 
@@ -49,8 +49,8 @@ class ImageTemplateTest {
         try (ImageTemplate t = template()) {
             Mat mat = t.getMat();
             assertFalse(mat.empty());
-            assertEquals(377, t.width());
-            assertEquals(245, t.height());
+            assertEquals(32, t.width());
+            assertEquals(32, t.height());
             // Same Mat instance returned while loaded.
             assertSame(mat, t.getMat());
         }
@@ -65,7 +65,7 @@ class ImageTemplateTest {
         t.unload();
         Mat second = t.getMat(); // must transparently reload
         assertFalse(second.empty());
-        assertEquals(377, second.cols());
+        assertEquals(32, second.cols());
 
         t.close();
     }

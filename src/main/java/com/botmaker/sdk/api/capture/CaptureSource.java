@@ -127,6 +127,12 @@ public interface CaptureSource {
                 int by = (pr != null ? pr.y : 0) + Math.max(0, sub.y);
                 return new Rect(bx, by, sub.width, sub.height);
             }
+
+            @Override
+            public com.botmaker.shared.capture.GenericWindow targetWindow() {
+                // A region of a window still targets that window for keyboard input (keys have no sub-rect).
+                return parent.targetWindow();
+            }
         };
     }
 
@@ -150,6 +156,21 @@ public interface CaptureSource {
      * this source captures the whole surface. Only region sub-sources return a non-null value.
      */
     default Rect subRegion() {
+        return null;
+    }
+
+    // --- Input targeting ---
+
+    /**
+     * The native OS window this source represents, when it is a real on-screen application window — the seam
+     * that lets {@link com.botmaker.sdk.api.interaction.Keyboard#press(CaptureSource, com.botmaker.sdk.api.interaction.Key)
+     * Keyboard} deliver keys to <em>this</em> window specifically (the keyboard counterpart of {@link #click(Point)}).
+     * Defaults to {@code null}: the whole {@link #desktop()}, a {@link #monitor(int) monitor}, a
+     * {@link #window(String) window} that isn't open yet, and an emulator all have no single desktop window to
+     * route keys to, so keyboard input falls back to the global focused-window path. Only a resolved
+     * {@link Window} (and a {@link #region(Rect) region} of one) returns a non-null handle.
+     */
+    default com.botmaker.shared.capture.GenericWindow targetWindow() {
         return null;
     }
 }
