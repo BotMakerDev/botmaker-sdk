@@ -39,22 +39,69 @@ public sealed interface LaunchTarget {
     /**
      * Brings the target up only if it isn't already running — the cold-start path, so a game the user already
      * opened by hand isn't relaunched.
-     *
-     * <p>"Already running" is decided on the <em>surface the bot automates</em>, not on a process: the ambient
-     * {@link Source#current() capture source}'s window. A process-name probe cannot work here — a game started
-     * through Steam's {@code reaper}, Heroic's {@code legendary} or a Proton/Wine wrapper runs under a process
-     * name that has nothing to do with the token in the {@link #spec()} — whereas the window the bot captures
-     * is by definition the thing that has to be up. When the ambient source has no window notion
-     * ({@link CaptureSource#hasWindowIdentity()} is false — the desktop, a monitor, an emulator), this falls
-     * through to {@link #start()}; the variants whose spec token <em>is</em> a real process name
-     * ({@link Exe}, {@link Cli}) override it to probe that name instead.
      */
     default void startIfNotRunning() {
-        if (targetWindowOpen(spec())) {
+        if (isRunning()) {
             return;
         }
         start();
     }
+
+    /**
+     * Whether the target is up right now, decided by layered <em>observation</em> — no timers, no cooldown, no
+     * "we launched it recently so it must be running". Each layer answers from something the OS actually
+     * reports, and the first "yes" wins:
+     *
+     * <ol>
+     *   <li>the ambient {@link Source#current() capture source}'s window, when it has a window identity at all —
+     *       the cheapest answer, and the one that is by definition the surface the bot automates;</li>
+     *   <li>a process this bot itself spawned for this {@link #spec()} still being alive (only ever recorded by
+     *       {@link Exe}/{@link Cli}, whose spawned process really is the target);</li>
+     *   <li>any live process whose <em>command line</em> mentions this target's {@link #runningToken() token} —
+     *       deliberately matching the wrapper (Steam's {@code reaper}, {@code proton}, {@code umu-run},
+     *       {@code legendary}), since that is what a launcher-started game actually runs as;</li>
+     *   <li>a window titled after the token, enumerated from the OS rather than from the capture source.</li>
+     * </ol>
+     *
+     * <p>This replaced a probe that asked only the capture source: when the project captures the desktop or a
+     * monitor, {@link CaptureSource#hasWindowIdentity()} is false, so the answer was an unconditional "not
+     * running" and every Steam/Epic/Heroic/Faugus target relaunched on every run.
+     *
+     * <p>Known gap, accepted knowingly: for the ~second between {@link #start()} handing off to a launcher and
+     * the wrapper process appearing, every layer is legitimately false, so a bot calling this in a tight loop
+     * could launch twice. {@link Game#launchAndWait} — which blocks on the window appearing — is the answer for
+     * that, and the {@code [Target]} traces make it visible when it happens.
+     */
+    default boolean isRunning() {
+        if (targetWindowOpen(spec())) {
+            return true;
+        }
+        if (RunningProbe.spawnedAlive(spec())) {
+            Debug.log("[Target] " + spec() + ": the process we launched is still alive");
+            return true;
+        }
+        String token = runningToken();
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        if (RunningProbe.commandLineMentions(token)) {
+            Debug.log("[Target] " + spec() + ": a live process mentions '" + token + "'");
+            return true;
+        }
+        if (RunningProbe.windowTitled(token)) {
+            Debug.log("[Target] " + spec() + ": a window is titled after '" + token + "'");
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * The distinctive string a live incarnation of this target carries — in a process command line, and often in
+     * a window title. Not the {@link #spec()}: that is our own encoding, whereas this is the launcher's own
+     * launch identity ({@code AppId=570}, an Epic/Heroic {@code AppName}, an executable's file name).
+     * {@code null} when the variant has no such token and answers {@link #isRunning()} another way.
+     */
+    String runningToken();
 
     /**
      * True when the ambient capture source is a window source that is open right now — i.e. the target is
@@ -127,6 +174,28 @@ public sealed interface LaunchTarget {
             Game.launchSteam(appId);
         }
 
+        /**
+         * Steam publishes the app id it is currently running, so ask it before guessing — then fall through to
+         * the shared layers, since that key is not written for every launch path (non-Steam shortcuts).
+         */
+        @Override
+        public boolean isRunning() {
+            if (RunningProbe.steamReportsRunning(appId)) {
+                Debug.log("[Target] steam:" + appId + ": Steam reports it as the running app");
+                return true;
+            }
+            return LaunchTarget.super.isRunning();
+        }
+
+        /**
+         * Not the bare id — a number that short would match any command line by accident. Steam's own launch
+         * wrapper spells it {@code reaper SteamLaunch AppId=<id> --}, which is unambiguous.
+         */
+        @Override
+        public String runningToken() {
+            return "AppId=" + appId;
+        }
+
         @Override
         public String spec() {
             return "steam:" + appId;
@@ -138,6 +207,12 @@ public sealed interface LaunchTarget {
         @Override
         public void start() {
             Game.launchEpic(appName);
+        }
+
+        /** The Epic {@code AppName} is what the launcher passes down to the game's own command line. */
+        @Override
+        public String runningToken() {
+            return appName;
         }
 
         @Override
@@ -156,6 +231,12 @@ public sealed interface LaunchTarget {
             Game.launchHeroic(appName);
         }
 
+        /** Heroic hands the {@code AppName} to {@code legendary}/{@code gogdl}, which keeps it in its argv. */
+        @Override
+        public String runningToken() {
+            return appName;
+        }
+
         @Override
         public String spec() {
             return "heroic:" + appName;
@@ -170,6 +251,12 @@ public sealed interface LaunchTarget {
         @Override
         public void start() {
             Game.launchFaugus(gameId);
+        }
+
+        /** Faugus builds the umu/Proton command line around the {@code gameid} it was asked for. */
+        @Override
+        public String runningToken() {
+            return gameId;
         }
 
         @Override
@@ -193,21 +280,14 @@ public sealed interface LaunchTarget {
             }
             String[] args = new String[parts.length - 1];
             System.arraycopy(parts, 1, args, 0, args.length);
-            Game.launch(parts[0], args);
+            // The command we run *is* the target (no launcher hand-off), so the handle stays worth keeping.
+            RunningProbe.record(spec(), Game.launch(parts[0], args));
         }
 
-        /** Window check first (see the interface default), then the command's own process name. */
+        /** The executable's own name — this variant's process really does run under it. */
         @Override
-        public void startIfNotRunning() {
-            if (targetWindowOpen(spec())) {
-                return;
-            }
-            String name = processName();
-            if (name != null && Game.isRunning(name)) {
-                Debug.log("[Target] cli '" + name + "' already running — skipping cold launch");
-                return;
-            }
-            start();
+        public String runningToken() {
+            return processName();
         }
 
         @Override
@@ -249,21 +329,14 @@ public sealed interface LaunchTarget {
     record Exe(String path) implements LaunchTarget {
         @Override
         public void start() {
-            Game.launch(path);
+            // The process we spawn *is* the target, so keep its handle as a first-hand "still running" answer.
+            RunningProbe.record(spec(), Game.launch(path));
         }
 
-        /** Window check first (see the interface default), then the executable's own process name. */
+        /** The executable's own name — this variant's process really does run under it. */
         @Override
-        public void startIfNotRunning() {
-            if (targetWindowOpen(spec())) {
-                return;
-            }
-            String name = processName(path);
-            if (name != null && Game.isRunning(name)) {
-                Debug.log("[Target] exe '" + name + "' already running — skipping cold launch");
-                return;
-            }
-            start();
+        public String runningToken() {
+            return processName(path);
         }
 
         @Override
@@ -314,6 +387,40 @@ public sealed interface LaunchTarget {
                 emu.stopApp(packageName);
                 emu.startApp(packageName);
             });
+        }
+
+        /**
+         * Asked over ADB, the same channel this variant's capture path uses: the instance must be up and the
+         * app must be the one in the foreground. Nothing on the host process table describes an app running
+         * <em>inside</em> an emulator, so the generic layers cannot answer this one.
+         */
+        @Override
+        public boolean isRunning() {
+            Optional<EmulatorRef> match = Emulators.listAll().stream()
+                    .filter(ref -> instance.equals(ref.name()))
+                    .findFirst();
+            if (match.isEmpty() || !match.get().running()) {
+                return false;
+            }
+            Emulator emu = null;
+            try {
+                emu = match.get().connect();
+                String current = emu.currentApp();
+                return current != null && current.contains(packageName);
+            } catch (Exception e) {
+                Debug.log("[Target] emu-app: probing " + instance + " failed: " + e.getMessage());
+                return false;
+            } finally {
+                if (emu != null) {
+                    emu.disconnect();
+                }
+            }
+        }
+
+        /** Handled by {@link #isRunning()} over ADB; there is no host-side token to match. */
+        @Override
+        public String runningToken() {
+            return null;
         }
 
         @Override

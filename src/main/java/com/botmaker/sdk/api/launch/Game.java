@@ -29,10 +29,12 @@ public class Game {
      *
      * @param executablePath path to the program to run (absolute, or resolvable on {@code PATH})
      * @param args           optional command-line arguments
+     * @return the started process — the caller's first-hand handle on the target, used by
+     *         {@link LaunchTarget#isRunning()} for the variants whose spawned process really is the target
      * @throws IllegalArgumentException if {@code executablePath} is null/blank
      * @throws RuntimeException         if the process could not be started
      */
-    public static void launch(String executablePath, String... args) {
+    public static Process launch(String executablePath, String... args) {
         if (executablePath == null || executablePath.isBlank()) {
             throw new IllegalArgumentException("executablePath must not be empty");
         }
@@ -47,7 +49,7 @@ public class Game {
             // Log the command before running it: a launch that "does nothing" is otherwise invisible, since a
             // detached process gives no feedback. This line makes the attempt show up in the Studio console.
             Debug.log("[Game] launch: " + String.join(" ", command));
-            new ProcessBuilder(command).start();
+            return new ProcessBuilder(command).start();
         } catch (Exception e) {
             throw new RuntimeException("Failed to launch '" + executablePath + "': " + e.getMessage(), e);
         }

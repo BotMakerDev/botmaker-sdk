@@ -8,6 +8,52 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-22 — `startIfNotRunning` stops relaunching a game that is already up
+
+**Done**
+
+- **The probe asked the wrong thing.** `LaunchTarget.startIfNotRunning()` decided "already running" purely from
+  the ambient capture source's window. When a project captures the **desktop or a monitor**,
+  `CaptureSource.hasWindowIdentity()` is false, so the answer was an unconditional "not running" and every
+  Steam/Epic/Heroic/Faugus target relaunched on every run. A plain PID probe can't replace it either: the
+  `steam://` / `xdg-open` / `faugus-launcher` process we spawn hands off and exits within a second, so the game
+  was never our child.
+- **New `LaunchTarget.isRunning()`, layered over observations — no cooldown, no "we launched it recently".**
+  First hit wins: (1) the ambient source's window, when it has a window identity at all — the cheap answer;
+  (2) a process *we* spawned for this `spec()` still being alive; (3) any live process whose **command line**
+  mentions the target's `runningToken()`, via `ProcessHandle.allProcesses()`; (4) a window titled after that
+  token, enumerated from the OS through `NativeController.getAllWindows()` rather than from the capture source.
+  `startIfNotRunning()` is now `if (isRunning()) return; start();`, and `Target.isRunning()` exposes it to bots.
+- **`runningToken()` is the launcher's launch identity, not our `spec()`.** Steam's is `AppId=<id>`, *not* the
+  bare id — a 3-digit number would match unrelated command lines by accident, whereas Steam's own wrapper
+  spells it `reaper SteamLaunch AppId=570 --`. Epic/Heroic use the `AppName`, Faugus the `gameid`, `exe:`/`cli:`
+  the executable's file name. Matching the **wrapper** is the point: `reaper`, `proton`, `umu-run` and
+  `legendary` all carry the token, and one of them is what a launcher-started game actually runs as.
+- **Steam gets its own authority first.** Steam publishes the app id it is running — Windows
+  `HKCU\Software\Valve\Steam\RunningAppID` (via shared's `WindowsRegistry`, normalising the `0x…` DWORD form),
+  Linux `~/.steam/registry.vdf`. A mismatch **falls through** to the shared layers rather than answering "no":
+  the key isn't written for every launch path (non-Steam shortcuts), so it can confirm but must not veto.
+- **`EmulatorApp` answers over ADB** — instance up *and* `currentApp()` matching the package. Nothing on the
+  host process table describes an app running *inside* an emulator, so the generic layers can't see it.
+- `Game.launch` returns the spawned `Process` so layer 2 can record it; `exe:`/`cli:` are the only variants that
+  do, since theirs is the only spawned process that *is* the target. `tryStart` deliberately stayed `boolean` —
+  recording a launcher process that exits a second later would be a handle that always says "dead".
+- The old `Exe`/`Cli` `startIfNotRunning` overrides (which shelled out to `pgrep -f`/`tasklist` via
+  `Game.isRunning(String)`) are gone — layer 3 does the same job in-process. `Game.isRunning(String)` stays as a
+  bot-facing block.
+- **Accepted residual risk:** for the ~second between `start()` handing off and the wrapper appearing, every
+  layer is legitimately false, so a bot calling `startIfNotRunning()` in a tight loop could double-launch.
+  `Game.launchAndWait` (blocks on the window) is the existing answer, and the `[Target]` traces make it visible.
+- Covered by `LaunchTargetProbeTest`: the desktop-source regression, Steam's token shape, the command-line scan
+  against a real process, and a recorded handle that stops counting once it exits.
+
+**Deferred / next**
+
+- Nothing verifies the Steam registry/VDF read on a real machine yet — both paths are keyed off files this repo
+  has no fixture for. Manual check: start a Steam game, confirm `isRunning()` traces "Steam reports it".
+
+---
+
 ## 2026-07-22 — Clicks and keys that land in a game
 
 **Done**

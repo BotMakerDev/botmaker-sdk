@@ -79,6 +79,15 @@ public final class Target {
         t.startIfNotRunning();
     }
 
+    /**
+     * Whether the current target is up right now (see {@link LaunchTarget#isRunning()} for the layers it asks).
+     * {@code false} when no target is configured — there is nothing that could be running.
+     */
+    public static boolean isRunning() {
+        LaunchTarget t = current();
+        return t != null && t.isRunning();
+    }
+
     /** Restarts the current target from a clean state (see {@link LaunchTarget#restart()}). No-op when none. */
     public static void restart() {
         LaunchTarget t = current();
