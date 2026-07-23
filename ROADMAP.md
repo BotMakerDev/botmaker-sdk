@@ -8,6 +8,24 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-23 — `Game`/`LaunchTarget` become facades over `shared.launch`
+
+**Done**
+
+- The OS half of `api.launch.Game` (protocol URLs, CLI ladders, `kill`, `isRunning(String)`),
+  `api.launch.RunningProbe` and `internal.launch.UriLauncher` **moved to `com.botmaker.shared.launch`** so
+  Studio can launch and describe a target without depending on the SDK. See shared's ROADMAP for the full
+  move and for the Heroic false-positive fix that rode along with it.
+- What stayed, because it needs SDK types: `Game`'s `CaptureSource`-shaped methods (`isRunning(CaptureSource)`,
+  `waitForLaunch`, `launchIfNotRunning`, `launchAndWait`, `launchEpicIfNotRunning`) are unchanged, and
+  `LaunchTarget` keeps its sealed hierarchy plus the one running-detection layer shared cannot see — the
+  ambient `Source.current()` window. Each variant is now just its `launchSpec()`; `start`/`isRunning`/
+  `restart`/`spec`/`runningToken` are defaults delegating to `Launcher`/`LaunchSpec`.
+- No compat shims (the API is freely breakable until a published bot consumes it): `RunningProbe` is gone from
+  `api.launch` and `internal/launch` no longer exists. Bot-facing names and behaviour are unchanged.
+
+---
+
 ## 2026-07-22 — `startIfNotRunning` stops relaunching a game that is already up
 
 **Done**

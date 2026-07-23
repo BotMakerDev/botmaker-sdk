@@ -1,9 +1,8 @@
 package com.botmaker.sdk.api.launch;
-import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.interaction.Wait;
-import com.botmaker.sdk.internal.launch.UriLauncher;
+import com.botmaker.shared.launch.GameLauncher;
 
 /**
  * Launches a game so a bot can automate it.
@@ -18,6 +17,11 @@ import com.botmaker.sdk.internal.launch.UriLauncher;
  * <p>Launching a store game requires that store's client (Steam / Epic Games Launcher) to be installed and
  * signed in — the client owns that session; this SDK never touches store credentials. If the client is not
  * running, invoking the launch starts it and it prompts the user to sign in through its own UI.
+ *
+ * <p>This class is the bot-facing <em>name</em> for launching; the protocol URLs, CLI ladders and process
+ * control themselves live in {@code shared.launch.GameLauncher}, because Studio needs to launch a target too
+ * (to verify one without compiling a bot) and cannot depend on the SDK. Only the methods that take a
+ * {@link CaptureSource} — the running/wait pairs below — are genuinely SDK-shaped and stay whole here.
  */
 public class Game {
 
@@ -35,24 +39,7 @@ public class Game {
      * @throws RuntimeException         if the process could not be started
      */
     public static Process launch(String executablePath, String... args) {
-        if (executablePath == null || executablePath.isBlank()) {
-            throw new IllegalArgumentException("executablePath must not be empty");
-        }
-        java.util.List<String> command = new java.util.ArrayList<>();
-        command.add(executablePath);
-        if (args != null) {
-            for (String arg : args) {
-                if (arg != null) command.add(arg);
-            }
-        }
-        try {
-            // Log the command before running it: a launch that "does nothing" is otherwise invisible, since a
-            // detached process gives no feedback. This line makes the attempt show up in the Studio console.
-            Debug.log("[Game] launch: " + String.join(" ", command));
-            return new ProcessBuilder(command).start();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to launch '" + executablePath + "': " + e.getMessage(), e);
-        }
+        return GameLauncher.exe(executablePath, args);
     }
 
     /**
@@ -64,26 +51,7 @@ public class Game {
      * @throws RuntimeException         if neither the Steam URL nor the CLI fallback could be invoked
      */
     public static void launchSteam(String appId) {
-        if (appId == null || appId.isBlank()) {
-            throw new IllegalArgumentException("appId must not be empty");
-        }
-        String id = appId.trim();
-        String uri = "steam://rungameid/" + id;
-        // Log before invoking: if Steam doesn't come up, the console still shows the URI/CLI we tried, so a
-        // silent failure (e.g. no registered steam:// handler) is diagnosable instead of "nothing happened".
-        Debug.log("[Game] launchSteam " + id + " → " + uri);
-        if (UriLauncher.open(uri)) {
-            Debug.log("[Game] launchSteam: opener invoked for " + uri);
-            return;
-        }
-        // Fallback: the Steam CLI (requires `steam` on PATH).
-        Debug.log("[Game] launchSteam: opener declined " + uri + ", falling back to `steam -applaunch " + id + "`");
-        try {
-            new ProcessBuilder("steam", "-applaunch", id).start();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to launch Steam game '" + id
-                    + "'. Is Steam installed? " + e.getMessage(), e);
-        }
+        GameLauncher.steam(appId);
     }
 
     /** Convenience overload accepting a numeric appId. */
@@ -105,20 +73,7 @@ public class Game {
      * @throws RuntimeException         if the Epic protocol URL could not be invoked (launcher not installed?)
      */
     public static void launchEpic(String appName) {
-        if (appName == null || appName.isBlank()) {
-            throw new IllegalArgumentException("appName must not be empty");
-        }
-        String id = appName.trim();
-        String uri = "com.epicgames.launcher://apps/" + id + "?action=launch&silent=true";
-        // Log before invoking: if the launcher doesn't come up, the console still shows the URI we tried, so a
-        // silent failure (e.g. no registered com.epicgames.launcher:// handler) is diagnosable.
-        Debug.log("[Game] launchEpic " + id + " → " + uri);
-        if (UriLauncher.open(uri)) {
-            Debug.log("[Game] launchEpic: opener invoked for " + uri);
-            return;
-        }
-        throw new RuntimeException("Failed to launch Epic game '" + id
-                + "'. Is the Epic Games Launcher installed?");
+        GameLauncher.epic(appName);
     }
 
     /**
@@ -136,28 +91,7 @@ public class Game {
      * @throws RuntimeException         if neither the Heroic URL nor a CLI fallback could be invoked
      */
     public static void launchHeroic(String appName) {
-        if (appName == null || appName.isBlank()) {
-            throw new IllegalArgumentException("appName must not be empty");
-        }
-        String id = appName.trim();
-        String uri = "heroic://launch/" + id;
-        // Log before invoking: if Heroic doesn't come up, the console still shows the URI/CLI we tried, so a
-        // silent failure (e.g. no registered heroic:// handler) is diagnosable instead of "nothing happened".
-        Debug.log("[Game] launchHeroic " + id + " → " + uri);
-        if (UriLauncher.open(uri)) {
-            Debug.log("[Game] launchHeroic: opener invoked for " + uri);
-            return;
-        }
-        // Fallbacks: Heroic's CLI, first on PATH, then as a Flatpak (its most common Linux install form).
-        Debug.log("[Game] launchHeroic: opener declined " + uri + ", falling back to the Heroic CLI");
-        if (tryStart("heroic", "--no-gui", "launch", id)) {
-            return;
-        }
-        if (tryStart("flatpak", "run", "com.heroicgameslauncher.hgl", "--no-gui", "launch", id)) {
-            return;
-        }
-        throw new RuntimeException("Failed to launch Heroic game '" + id
-                + "'. Is the Heroic Games Launcher installed?");
+        GameLauncher.heroic(appName);
     }
 
     /**
@@ -175,32 +109,7 @@ public class Game {
      * @throws RuntimeException         if neither CLI form could be invoked
      */
     public static void launchFaugus(String gameId) {
-        if (gameId == null || gameId.isBlank()) {
-            throw new IllegalArgumentException("gameId must not be empty");
-        }
-        String id = gameId.trim();
-        // Log before invoking: a silent failure still shows which command was tried.
-        Debug.log("[Game] launchFaugus " + id);
-        if (tryStart("faugus-launcher", "--game", id)) {
-            return;
-        }
-        if (tryStart("flatpak", "run", "io.github.Faugus.faugus-launcher", "--game", id)) {
-            return;
-        }
-        throw new RuntimeException("Failed to launch Faugus game '" + id
-                + "'. Is Faugus Launcher installed?");
-    }
-
-    /** Best-effort {@link ProcessBuilder#start()}; logs and returns false rather than throwing on failure. */
-    private static boolean tryStart(String... command) {
-        try {
-            new ProcessBuilder(command).start();
-            Debug.log("[Game] ran: " + String.join(" ", command));
-            return true;
-        } catch (Exception e) {
-            Debug.log("[Game] command failed (" + command[0] + "): " + e.getMessage());
-            return false;
-        }
+        GameLauncher.faugus(gameId);
     }
 
     /**
@@ -319,22 +228,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code processName} is null/blank
      */
     public static void kill(String processName) {
-        if (processName == null || processName.isBlank()) {
-            throw new IllegalArgumentException("processName must not be empty");
-        }
-        String name = processName.trim();
-        String[] command = isWindows()
-                ? new String[]{"taskkill", "/F", "/IM", name}
-                : new String[]{"pkill", "-f", name};
-        Debug.log("[Game] kill " + name + " → " + String.join(" ", command));
-        try {
-            int code = new ProcessBuilder(command).inheritIO().start().waitFor();
-            // taskkill=128 / pkill=1 both mean "no matching process" — expected, not a failure.
-            Debug.log("[Game] kill " + name + ": exit " + code
-                    + (code == 0 ? " (terminated)" : " (nothing to kill / already gone)"));
-        } catch (Exception e) {
-            Debug.log("[Game] kill " + name + " failed to invoke: " + e.getMessage());
-        }
+        GameLauncher.kill(processName);
     }
 
     /**
@@ -346,38 +240,6 @@ public class Game {
      * @throws IllegalArgumentException if {@code processName} is null/blank
      */
     public static boolean isRunning(String processName) {
-        if (processName == null || processName.isBlank()) {
-            throw new IllegalArgumentException("processName must not be empty");
-        }
-        String name = processName.trim();
-        try {
-            if (isWindows()) {
-                Process p = new ProcessBuilder("tasklist", "/FI", "IMAGENAME eq " + name).start();
-                String out = new String(p.getInputStream().readAllBytes());
-                p.waitFor();
-                return out.toLowerCase().contains(name.toLowerCase());
-            }
-            // `--` so a name starting with '-' isn't read as a flag. pgrep -f matches whole command lines,
-            // which includes the bot's own JVM when the name appears in its arguments — so read the pids and
-            // discard our own rather than trusting the exit code.
-            Process p = new ProcessBuilder("pgrep", "-f", "--", name).start();
-            String out = new String(p.getInputStream().readAllBytes());
-            p.waitFor();
-            long self = ProcessHandle.current().pid();
-            for (String line : out.split("\\R")) {
-                String pid = line.trim();
-                if (!pid.isEmpty() && Long.parseLong(pid) != self) {
-                    return true;
-                }
-            }
-            return false;
-        } catch (Exception e) {
-            Debug.log("[Game] isRunning(" + name + ") check failed: " + e.getMessage());
-            return false;
-        }
-    }
-
-    private static boolean isWindows() {
-        return System.getProperty("os.name", "").toLowerCase().contains("win");
+        return GameLauncher.isProcessRunning(processName);
     }
 }

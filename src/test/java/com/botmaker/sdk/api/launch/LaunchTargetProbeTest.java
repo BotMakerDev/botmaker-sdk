@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.launch.RunningProbe;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
