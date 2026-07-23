@@ -9,8 +9,9 @@ import com.botmaker.shared.capture.NativeControllerFactory;
 
 /**
  * Simulated keyboard input. Keys are expressed with the OS-neutral {@link Key} enum; combos and
- * typing are provided for convenience. Backed per-OS by XTest (Linux) / {@code keybd_event}
- * (Windows) through the internal native controller.
+ * typing are provided for convenience. Backed per-OS by a pluggable input backend on Linux
+ * (uinput/xdotool/XTest/XSendEvent — see {@code LinuxController}) and {@code keybd_event} on Windows, through
+ * the internal native controller.
  *
  * <p>The no-argument methods target the project's ambient {@link Source#current() capture source} — the same
  * "where" every no-source vision/mouse call uses — so a bot configured to a game window types into that window
@@ -19,6 +20,14 @@ import com.botmaker.shared.capture.NativeControllerFactory;
  * When the source has no single desktop window ({@code desktop()}/{@code monitor()}/an unopened window/an
  * emulator, i.e. {@link CaptureSource#targetWindow()} is {@code null}) the call transparently falls back to the
  * focused-window path.
+ *
+ * <p><b>What "targets a window" costs, on Linux.</b> Under the cursor-safe default backend the key is
+ * delivered to the window in the background — but games and many toolkits reject those synthetic events, so
+ * they see nothing. Once real input is enabled ({@code ClickConfig.useRealInput(true)}, or anything else that
+ * escalates the backend) the events come from a kernel virtual device that a game cannot tell from a real
+ * keyboard — and such a device carries no window, so targeting is implemented as <em>raise the window, then
+ * type</em>. Keys therefore reach the game, but the game is brought to the foreground first. There is no
+ * mechanism on X11 that is both background and accepted by a game; that trade is the whole choice.
  */
 public class Keyboard {
 

@@ -8,6 +8,23 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-23 — `Keyboard`'s javadoc stops promising something it never did
+
+**Done**
+
+- The class javadoc said keys are "Backed per-OS by XTest (Linux)". Linux input has been a pluggable backend
+  (xsendevent / uinput / xdotool / XTest) for a while, and which one is active decides whether a key reaches a
+  game at all — so the one line a bot author reads was both stale and hiding the thing that matters.
+- Documented the actual trade the targeted overloads make on Linux: under the cursor-safe default the key is
+  delivered in the background but games reject it; once real input is on, it comes from a kernel virtual
+  device a game cannot distinguish from a real keyboard — and that device carries no window, so targeting is
+  implemented as *raise the window, then type*. Keys land, but the game is brought forward. See shared's
+  ROADMAP entry of the same date for the backend work behind this.
+- No signature changes: the fix is in `LinuxController` behind the existing `keyDown(window, code)` entry
+  point, so `Keyboard`'s targeted overloads keep their meaning and simply start working.
+
+---
+
 ## 2026-07-23 — `internal` shrinks to what is genuinely SDK-shaped
 
 **Done**
