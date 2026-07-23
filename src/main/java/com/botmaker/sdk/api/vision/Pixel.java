@@ -5,8 +5,8 @@ import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.internal.opencv.ColorMatcher;
-import com.botmaker.sdk.internal.opencv.RawColorMatch;
+import com.botmaker.shared.opencv.ColorMatcher;
+import com.botmaker.shared.opencv.RawColorMatch;
 
 import java.awt.Color;
 import java.awt.image.BufferedImage;

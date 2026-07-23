@@ -1,7 +1,9 @@
 package com.botmaker.sdk.internal.opencv;
 
-
-import com.botmaker.sdk.internal.capture.ScreenCapture;
+import com.botmaker.shared.capture.ScreenCapture;
+import com.botmaker.shared.opencv.OpenCvNative;
+import com.botmaker.shared.opencv.OpencvManager;
+import com.botmaker.shared.opencv.RawMatch;
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 

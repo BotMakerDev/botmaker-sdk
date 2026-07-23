@@ -7,8 +7,8 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.observe.Bots;
 import com.botmaker.sdk.api.observe.MatchEvent;
 import com.botmaker.sdk.api.observe.Surface;
-import com.botmaker.sdk.internal.opencv.OpencvManager;
-import com.botmaker.sdk.internal.opencv.RawMatch;
+import com.botmaker.shared.opencv.OpencvManager;
+import com.botmaker.shared.opencv.RawMatch;
 import org.opencv.core.Mat;
 
 import java.awt.image.BufferedImage;
@@ -129,7 +129,7 @@ public class ImageFinder {
             background = OpencvManager.bufferedImageToMat(screenshot);
 
             // Get the raw best match (below-threshold included) so a miss can still report its real score.
-            RawMatch best = OpencvManager.findBest(template.getMat(), background, false, template.captureResolution());
+            RawMatch best = OpencvManager.findBest(template.getMat(), background, false, template.authoredSize());
 
             if (best != null && best.score() >= confidence) {
                 Point origin = source.origin();
@@ -599,7 +599,7 @@ public class ImageFinder {
             MatchResult best = MatchResult.notFound();
             for (ImageTemplate good : goods) {
                 RawMatch gm = OpencvManager.findBestMatch(good.getMat(), background, false, confidence,
-                        good.captureResolution());
+                        good.authoredSize());
                 if (gm == null) {
                     continue;
                 }
@@ -644,7 +644,7 @@ public class ImageFinder {
 
             for (ImageTemplate good : goods) {
                 RawMatch gm = OpencvManager.findBestMatch(good.getMat(), background, false, confidence,
-                        good.captureResolution());
+                        good.authoredSize());
                 if (gm == null) {
                     continue;
                 }
@@ -692,7 +692,7 @@ public class ImageFinder {
             List<MatchResult> results = new ArrayList<>();
             for (ImageTemplate good : goods) {
                 List<RawMatch> matches = OpencvManager.findMultipleMatches(good.getMat(), background, false,
-                        confidence, good.captureResolution());
+                        confidence, good.authoredSize());
                 for (RawMatch gm : matches) {
                     if (beatsAllBads(gm, bads, background, margin)) {
                         results.add(new MatchResult(
@@ -803,7 +803,7 @@ public class ImageFinder {
 
             List<RawMatch> matches =
                     OpencvManager.findMultipleMatches(template.getMat(), background, false, confidence,
-                            template.captureResolution());
+                            template.authoredSize());
 
             Point origin = source.origin();
             int offsetX = (int) origin.x;

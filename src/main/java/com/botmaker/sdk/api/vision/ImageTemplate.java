@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.sdk.api.Size;
-import com.botmaker.sdk.internal.opencv.OpenCvNative;
+import com.botmaker.shared.opencv.OpenCvNative;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.opencv.core.Mat;
@@ -107,6 +107,16 @@ public class ImageTemplate implements AutoCloseable {
             captureResolution = loadCaptureResolution();
         }
         return captureResolution;
+    }
+
+    /**
+     * {@link #captureResolution()} as a {@link java.awt.Dimension} — the form shared's matcher takes, since
+     * {@code shared.opencv} cannot see the SDK's {@link Size}. This one method is the whole SDK↔shared
+     * mapping for authored resolution; the matching call sites go through it rather than each converting.
+     */
+    java.awt.Dimension authoredSize() {
+        Size s = captureResolution();
+        return s == null ? null : new java.awt.Dimension((int) s.width, (int) s.height);
     }
 
     /** Best-effort read of {@code captureWidth}/{@code captureHeight} from the sidecar next to the PNG. */

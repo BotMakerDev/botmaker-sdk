@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.capture;
 
 import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.internal.capture.ScreenCapture;
+import com.botmaker.shared.capture.ScreenCapture;
 
 import java.awt.image.BufferedImage;
 

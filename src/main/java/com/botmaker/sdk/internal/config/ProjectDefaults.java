@@ -4,64 +4,32 @@ import com.botmaker.sdk.api.Size;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Desktop;
 import com.botmaker.sdk.api.capture.Monitor;
+import com.botmaker.shared.config.ProjectProperties;
 
-import java.io.InputStream;
-import java.util.Properties;
+import java.awt.Dimension;
 
 /**
- * Reads the optional per-project defaults that Studio bakes into a generated bot as a classpath
- * resource ({@value #RESOURCE}). Everything here is best-effort: a missing file, missing key, or
- * unparseable value yields {@code null} so callers fall back to their own defaults (the whole
- * {@link Desktop} for the source, native pixels for the resolution). Loaded once and cached.
+ * Typed view of the per-project defaults Studio bakes into a generated bot.
  *
- * <p>Recognised keys:
- * <ul>
- *   <li>{@code capture.source} — {@code desktop} | {@code monitor:<index>} | {@code window:<titleSubstring>}
- *       | {@code emulator:<instanceName>}</li>
- *   <li>{@code capture.width} / {@code capture.height} — the resolution templates were authored at</li>
- *   <li>{@code launch.target} — what the bot launches:
- *       {@code steam:<appId>} | {@code epic:<appName>} | {@code exe:<path>} | {@code emu-app:<pkg>@<instance>}
- *       (parsed by {@code api.launch.LaunchTarget}, read raw here)</li>
- *   <li>{@code debug} — {@code true}/{@code false} (default on): the initial state of the global
- *       {@code api.Debug} output switch</li>
- * </ul>
+ * <p>The file itself — its classpath location, its key names, the caching and the best-effort parsing —
+ * belongs to shared's {@link ProjectProperties}, because Studio <em>writes</em> those very keys and two
+ * hand-kept copies of a key set do not stay identical. What is left here is only the part shared cannot do:
+ * mapping the raw values onto SDK types ({@link CaptureSource}, {@link Size}).
+ *
+ * <p>Still best-effort throughout: a missing file, missing key or unparseable value yields {@code null} so
+ * callers fall back to their own defaults (the whole {@link Desktop} for the source, native pixels for the
+ * resolution).
  */
 public final class ProjectDefaults {
 
-    public static final String RESOURCE = "/botmaker-project.properties";
-
-    private static volatile Properties cached;
-    private static volatile boolean loaded;
-
     private ProjectDefaults() {}
-
-    private static Properties props() {
-        if (!loaded) {
-            synchronized (ProjectDefaults.class) {
-                if (!loaded) {
-                    Properties p = new Properties();
-                    try (InputStream in = ProjectDefaults.class.getResourceAsStream(RESOURCE)) {
-                        if (in != null) {
-                            p.load(in);
-                        }
-                    } catch (Exception ignored) {
-                        // best-effort: absent/unreadable config leaves p empty
-                    }
-                    cached = p;
-                    loaded = true;
-                }
-            }
-        }
-        return cached;
-    }
 
     /** The configured project default capture source, or {@code null} when unset/unparseable. */
     public static CaptureSource source() {
-        String spec = props().getProperty("capture.source");
-        if (spec == null || spec.isBlank()) {
+        String spec = ProjectProperties.captureSource();
+        if (spec == null) {
             return null;
         }
-        spec = spec.trim();
         try {
             if (spec.equalsIgnoreCase("desktop")) {
                 return new Desktop();
@@ -82,53 +50,29 @@ public final class ProjectDefaults {
     }
 
     /**
-     * The raw {@code launch.target} spec, or {@code null} when unset — {@code api.launch.Target} parses it via
-     * {@code api.launch.LaunchTarget}. Kept as a raw string here so this internal config reader stays free of the
-     * launch facade.
+     * The raw {@code launch.target} spec, or {@code null} when unset — {@code api.launch.Target} parses it
+     * via {@code api.launch.LaunchTarget}. Kept as a raw string so this reader stays free of the launch
+     * facade.
      */
     public static String launchTarget() {
-        String spec = props().getProperty("launch.target");
-        return (spec == null || spec.isBlank()) ? null : spec.trim();
+        return ProjectProperties.launchTarget();
     }
 
     /**
-     * The configured debug-output default: {@code TRUE}/{@code FALSE} for an explicit {@code debug} key
-     * ({@code true}/{@code 1}/{@code yes}/{@code on} → on; {@code false}/{@code 0}/{@code no}/{@code off} → off),
-     * or {@code null} when the key is absent/unparseable so {@link com.botmaker.sdk.api.Debug} keeps its
-     * default (on).
+     * The configured debug-output default, or {@code null} when the key is absent/unparseable so
+     * {@link com.botmaker.sdk.api.Debug} keeps its default (on).
      */
     public static Boolean debug() {
-        String spec = props().getProperty("debug");
-        if (spec == null || spec.isBlank()) {
-            return null;
-        }
-        return switch (spec.trim().toLowerCase()) {
-            case "true", "1", "yes", "on" -> Boolean.TRUE;
-            case "false", "0", "no", "off" -> Boolean.FALSE;
-            default -> null;
-        };
+        return ProjectProperties.debug();
     }
 
     /**
-     * The project's default capture resolution (the resolution its templates were authored at), or
-     * {@code null} when unset. Used by the matcher to rescale a live capture taken at a different
-     * resolution before template matching.
+     * The project's default capture resolution (the resolution its templates were authored at) as the SDK's
+     * {@link Size}, or {@code null} when unset. The matcher itself reads the {@link Dimension} form straight
+     * from {@link ProjectProperties#defaultResolution()} — this exists for API-shaped callers.
      */
     public static Size defaultResolution() {
-        String w = props().getProperty("capture.width");
-        String h = props().getProperty("capture.height");
-        if (w == null || h == null) {
-            return null;
-        }
-        try {
-            int width = Integer.parseInt(w.trim());
-            int height = Integer.parseInt(h.trim());
-            if (width > 0 && height > 0) {
-                return new Size(width, height);
-            }
-        } catch (NumberFormatException ignored) {
-            // unparseable — treat as unset
-        }
-        return null;
+        Dimension d = ProjectProperties.defaultResolution();
+        return d == null ? null : new Size(d.width, d.height);
     }
 }

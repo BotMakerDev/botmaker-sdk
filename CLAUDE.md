@@ -88,43 +88,52 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   - `api.BotMaker` — console IO. `readX()` prints a SOH-wrapped `BM-INPUT:<type>` marker to stdout
     before blocking on stdin; Studio detects/strips it to show a modal input prompt. Changing that
     marker on one side without the other breaks input prompts.
-- **`com.botmaker.sdk.internal.*`** is plumbing, free to rework: `opencv`, `capture`, `observe`,
-  `launch`. (The old `inspector` / `interaction` packages and the `ddmlib` dependency were removed for the
-  Phase-3 emulator rewrite; there is no SDK `internal/emulator` — the ADB transport + discovery live in
-  **shared** now, see below.)
+- **`com.botmaker.sdk.internal.*`** is plumbing, free to rework — and now nearly empty, because most of what
+  was in it was not SDK-specific: `opencv`, `capture` (desktop backends), `launch` and the emulator transport
+  all live in **shared**, where Studio can reach them too. What is left is genuinely SDK-shaped:
+  - `internal/observe/IpcObserver` — it *implements* `api.observe.BotObserver` and consumes
+    `MatchEvent`/`ClickEvent`/`Surface`/`Bots`; it is the adapter from SDK observer callbacks onto shared's
+    already-shared telemetry wire (`shared.ipc.TelemetryClient`). Moving it would move the SDK types with it.
+  - `internal/config/ProjectDefaults` — a thin typed accessor mapping shared's `ProjectProperties` (which owns
+    the file, the key names and the parsing) onto `CaptureSource`/`Size`.
+  - the manual harnesses `internal/Main`, `capture/CaptureTest`, `capture/ImageDisplay`,
+    `capture/linux/LinuxControllerTest`, `opencv/OpencvTest` — `main`-method dev tools, not JUnit tests.
 
 ### OpenCV / native loading
 
 The native library is `org.openpnp:opencv` (self-contained — bundles the OS native and loads it via
-`nu.pattern.OpenCV.loadLocally()`). **All loading goes through the single idempotent loader
-`internal/opencv/OpenCvNative.ensureLoaded()`** (volatile + synchronized, runs once). It is invoked
-from a `static {}` block on the classes that first touch an `org.opencv` type — `ImageTemplate` (which
-owns the image `Mat`) and `OpencvManager` — so every find/match path loads the native before any Mat
-is created, independent of JVM class-link order. Do not rely on scattered per-class blocks elsewhere;
-a class that links an OpenCV type without a guaranteed-loaded path is how "opencv not loaded" errors
-return. `ImageFinder.find` deliberately does **not** catch `Error`s (e.g. `UnsatisfiedLinkError`), so a
-genuine load failure surfaces instead of masquerading as "not found".
+`nu.pattern.OpenCV.loadLocally()`). **All loading goes through shared's single idempotent loader
+`com.botmaker.shared.opencv.OpenCvNative.ensureLoaded()`.** It is invoked from a `static {}` block on the
+classes that first touch an `org.opencv` type — `ImageTemplate` (which owns the image `Mat`) and shared's
+`OpencvManager` — so every find/match path loads the native before any Mat is created, independent of JVM
+class-link order. Do not rely on scattered per-class blocks elsewhere; a class that links an OpenCV type
+without a guaranteed-loaded path is how "opencv not loaded" errors return. `ImageFinder.find` deliberately
+does **not** catch `Error`s (e.g. `UnsatisfiedLinkError`), so a genuine load failure surfaces instead of
+masquerading as "not found".
 
-`OpencvManager` is the matching engine: it works directly on `org.opencv.core.Mat` and returns the
-internal `RawMatch` record (plain ints + score, no OpenCV types), which `ImageFinder`
-maps onto the public `MatchResult`. The OpenCV `Mat` lives in `ImageTemplate` — the old `Template` /
-`InternalMatch` / `MatType` wrapper layer has been collapsed.
+**The matching engines live in shared** (`shared.opencv`: `OpencvManager`, `ColorMatcher`,
+`ResolutionScaler`), because Studio's Magic Wand matches at edit time exactly as a bot does at run time — and
+because it collapses three independent copies of the OpenCV loader into one. They work directly on
+`org.opencv.core.Mat` and return the raw `RawMatch`/`RawColorMatch` records (plain ints + score, no OpenCV
+types); **mapping those onto the public `MatchResult`/`ColorMatch` is the SDK's job**, in `api.vision`. The
+OpenCV `Mat` still lives in `ImageTemplate` — the old `Template`/`InternalMatch`/`MatType` wrapper layer has
+been collapsed.
+
+Because shared cannot see `api.Size`, the matcher takes the authored resolution as a `java.awt.Dimension`.
+`ImageTemplate.authoredSize()` is the single conversion point; the vision call sites go through it rather
+than each converting.
 
 ### Screen capture
 
-`internal/capture/ScreenCapture` is the **single** desktop-capture facade. Both `api.capture.Screen`
-and every `NativeController.captureDesktop()` (Windows/Linux) route through it; there is one
-`getVirtualScreenBounds()` (the AWT all-monitor union). Full-desktop capture is delegated to a
-`CaptureBackend` (sealed: `RobotCapture`, `SpectacleCapture`) chosen by `CaptureBackend.select()`:
+`com.botmaker.shared.capture.ScreenCapture` is the **single** desktop-capture facade, and it now lives in
+shared beside per-window capture — the platform knowledge is the same either way, and Studio's picker wants
+the same grab. `api.capture.Screen`/`Desktop`/`Monitor` and every `NativeController.captureDesktop()` route
+through it; there is one `getVirtualScreenBounds()` (the AWT all-monitor union). See
+`../botmaker-shared/CLAUDE.md` for the backend selection (`RobotCapture` vs `SpectacleCapture`) and the
+Wayland notes.
 
-- **`RobotCapture`** — AWT `Robot` over the virtual bounds. Windows, X11, and XWayland.
-- **`SpectacleCapture`** — KDE Wayland (AWT `Robot` returns black under native Wayland). Runs
-  `spectacle -b -n -f -o <tmp>`; `-f` captures the **entire desktop / all monitors with no picker**.
-  Falls back to `RobotCapture` on failure.
-
-To add cross-compositor Wayland support (GNOME/sway), add a portal/PipeWire `CaptureBackend` and wire
-it into `select()` — no caller changes needed. Per-window capture (Windows GDI `PrintWindow` / Robot)
-also lives in `ScreenCapture` and is unchanged.
+The Swing `ImageDisplay` preview window stayed here: its only callers are the `internal` dev harnesses
+(`internal/Main`, `CaptureTest`), and a JFrame is not something the JavaFX Studio would ever consume.
 
 ### Mouse clicks & the Wayland input limitation
 

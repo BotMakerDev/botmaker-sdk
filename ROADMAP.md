@@ -8,6 +8,31 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-23 — `internal` shrinks to what is genuinely SDK-shaped
+
+**Done**
+
+- **Moved to shared:** `internal/opencv/*` (the matching engines, the raw records and the OpenCV loader) and
+  the desktop-capture backends `internal/capture/{ScreenCapture,CaptureBackend,RobotCapture,SpectacleCapture}`,
+  together with the `opencv` and `CaptureBackend` tests. Studio matches at edit time and captures at edit
+  time; only the SDK had this code. See shared's ROADMAP for the full move and for the three-OpenCV-loaders
+  finding.
+- **`internal/config/ProjectDefaults` is now a thin typed accessor.** The file, its key names, the caching and
+  the parsing belong to shared's `ProjectProperties` — Studio writes exactly those keys — leaving here only
+  what shared cannot do: mapping the raw values onto `CaptureSource` and `Size`.
+- **The SDK owns the mapping to its public types.** `api.vision` maps `RawMatch`/`RawColorMatch` onto
+  `MatchResult`/`ColorMatch` as before, and the new `ImageTemplate.authoredSize()` is the single place the
+  authored resolution converts from `api.Size` to the `java.awt.Dimension` shared's matcher takes. No SDK
+  type crosses into shared.
+- **What stayed, and why:** `internal/observe/IpcObserver` implements `api.observe.BotObserver` and consumes
+  `MatchEvent`/`ClickEvent`/`Surface`/`Bots` — it *is* the SDK-side adapter onto shared's telemetry wire, so
+  moving it would drag the SDK types along. The `main`-method dev harnesses (`internal/Main`, `CaptureTest`,
+  `OpencvTest`, `capture/linux/LinuxControllerTest`) stay, as does the Swing `ImageDisplay` they are the only
+  callers of.
+- No compatibility shims, per the freely-breakable note. 95 tests pass.
+
+---
+
 ## 2026-07-23 — `Game`/`LaunchTarget` become facades over `shared.launch`
 
 **Done**

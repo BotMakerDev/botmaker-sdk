@@ -175,7 +175,7 @@ public class LinuxControllerTest {
 		System.out.println("\n=== Test: Desktop Capture ===");
 
 		long startTime = System.nanoTime();
-		BufferedImage image = com.botmaker.sdk.internal.capture.ScreenCapture.captureDesktop();
+		BufferedImage image = com.botmaker.shared.capture.ScreenCapture.captureDesktop();
 		long captureTime = System.nanoTime() - startTime;
 
 		if (image != null && image.getWidth() > 0 && image.getHeight() > 0) {

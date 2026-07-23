@@ -5,7 +5,7 @@ import com.botmaker.sdk.api.vision.ImageClicker;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
-import com.botmaker.sdk.internal.opencv.OpenCvNative;
+import com.botmaker.shared.opencv.OpenCvNative;
 
 import static com.botmaker.sdk.api.vision.ImageClicker.click;
 

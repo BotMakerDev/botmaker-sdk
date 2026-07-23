@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal;
 
 import com.botmaker.sdk.internal.capture.ImageDisplay;
-import com.botmaker.sdk.internal.opencv.OpenCvNative;
+import com.botmaker.shared.opencv.OpenCvNative;
 
 import static com.botmaker.sdk.internal.capture.CaptureTest.testLiveCapture;
 

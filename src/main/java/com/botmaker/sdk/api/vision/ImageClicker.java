@@ -705,27 +705,27 @@ public class ImageClicker {
                                                CaptureSource source, double confidence, double margin) {
         // Import the compare method from ImageFinder
         // We'll duplicate the logic here for now to avoid circular dependencies
-        com.botmaker.sdk.internal.opencv.RawMatch bestRaw = null;
+        com.botmaker.shared.opencv.RawMatch bestRaw = null;
         MatchResult best = MatchResult.notFound();
         java.awt.image.BufferedImage screenshot = source.capture();
         if (screenshot == null) {
             return MatchResult.notFound();
         }
-        org.opencv.core.Mat background = com.botmaker.sdk.internal.opencv.OpencvManager.bufferedImageToMat(screenshot);
+        org.opencv.core.Mat background = com.botmaker.shared.opencv.OpencvManager.bufferedImageToMat(screenshot);
         try {
             Point origin = source.origin();
             int offsetX = (int) origin.x;
             int offsetY = (int) origin.y;
 
             for (ImageTemplate good : goods) {
-                com.botmaker.sdk.internal.opencv.RawMatch gm = com.botmaker.sdk.internal.opencv.OpencvManager.findBestMatch(
-                        good.getMat(), background, false, confidence, good.captureResolution());
+                com.botmaker.shared.opencv.RawMatch gm = com.botmaker.shared.opencv.OpencvManager.findBestMatch(
+                        good.getMat(), background, false, confidence, good.authoredSize());
                 if (gm == null) {
                     continue;
                 }
                 boolean wins = true;
                 for (ImageTemplate bad : bads) {
-                    double badScore = com.botmaker.sdk.internal.opencv.OpencvManager.scoreAround(
+                    double badScore = com.botmaker.shared.opencv.OpencvManager.scoreAround(
                             bad.getMat(), background, false, gm.x(), gm.y(), 4);
                     if (badScore >= gm.score() - margin) {
                         wins = false;
@@ -756,15 +756,15 @@ public class ImageClicker {
         if (screenshot == null) {
             return MatchResult.notFound();
         }
-        org.opencv.core.Mat background = com.botmaker.sdk.internal.opencv.OpencvManager.bufferedImageToMat(screenshot);
+        org.opencv.core.Mat background = com.botmaker.shared.opencv.OpencvManager.bufferedImageToMat(screenshot);
         try {
             Point origin = source.origin();
             int offsetX = (int) origin.x;
             int offsetY = (int) origin.y;
 
             for (ImageTemplate good : goods) {
-                com.botmaker.sdk.internal.opencv.RawMatch gm = com.botmaker.sdk.internal.opencv.OpencvManager.findBestMatch(
-                        good.getMat(), background, false, confidence, good.captureResolution());
+                com.botmaker.shared.opencv.RawMatch gm = com.botmaker.shared.opencv.OpencvManager.findBestMatch(
+                        good.getMat(), background, false, confidence, good.authoredSize());
                 if (gm == null) {
                     continue;
                 }
@@ -793,17 +793,17 @@ public class ImageClicker {
         if (screenshot == null) {
             return winners;
         }
-        org.opencv.core.Mat background = com.botmaker.sdk.internal.opencv.OpencvManager.bufferedImageToMat(screenshot);
+        org.opencv.core.Mat background = com.botmaker.shared.opencv.OpencvManager.bufferedImageToMat(screenshot);
         try {
             Point origin = source.origin();
             int offsetX = (int) origin.x;
             int offsetY = (int) origin.y;
 
             for (ImageTemplate good : goods) {
-                List<com.botmaker.sdk.internal.opencv.RawMatch> matches =
-                        com.botmaker.sdk.internal.opencv.OpencvManager.findMultipleMatches(
-                                good.getMat(), background, false, confidence, good.captureResolution());
-                for (com.botmaker.sdk.internal.opencv.RawMatch gm : matches) {
+                List<com.botmaker.shared.opencv.RawMatch> matches =
+                        com.botmaker.shared.opencv.OpencvManager.findMultipleMatches(
+                                good.getMat(), background, false, confidence, good.authoredSize());
+                for (com.botmaker.shared.opencv.RawMatch gm : matches) {
                     if (beatsAll(gm.x(), gm.y(), gm.score(), background, bads, margin)) {
                         winners.add(new MatchResult(
                                 new Point(gm.x() + offsetX, gm.y() + offsetY),
@@ -826,7 +826,7 @@ public class ImageClicker {
     private static boolean beatsAll(int x, int y, double goodScore, org.opencv.core.Mat background,
                                     List<ImageTemplate> bads, double margin) {
         for (ImageTemplate bad : bads) {
-            double badScore = com.botmaker.sdk.internal.opencv.OpencvManager.scoreAround(
+            double badScore = com.botmaker.shared.opencv.OpencvManager.scoreAround(
                     bad.getMat(), background, false, x, y, 4);
             if (badScore >= goodScore - margin) {
                 return false;
