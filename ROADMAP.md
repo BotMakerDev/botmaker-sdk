@@ -8,6 +8,41 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-28 — Bot-owned-display plan, Phase B: bot-runtime routing onto a nested `:N` session
+
+The session infrastructure (shared) and the Studio pilot producer (Phase A) were in place, but the **generated
+bot's own runtime** still drove the global `:0` singleton — `Mouse`/`Keyboard` used `NativeControllerFactory.get()`
+and `Source` resolved windows by title. Phase B routes the bot runtime onto the active session, so an isolated
+bot clicks/types/reads its game on its private `:N` display exactly as a plain bot does on `:0`.
+
+**Done**
+
+- **Input choke points** — `Mouse.controller()` / `Keyboard.controller()` now return
+  `ActiveSession.get().controller()` when a session is registered, else the `:0` singleton. With no session
+  (the default) behaviour is byte-for-byte today's; `InputApiTest` is unchanged and still green.
+- **`api.capture.SessionSource`** — a `CaptureSource` over the active `DesktopSession`: `capture()` is the
+  session's frame of its owned window, `targetWindow()`/`origin()` come from `attached()`. This is where the
+  "a nested session owns one window, so there's no capture *target* to pick" answer lands in the SDK — the
+  `capture.source` title selector is bypassed while a session is active.
+- **`Source.current()`** prefers a `SessionSource` whenever `ActiveSession` is set and the bot hasn't pinned a
+  source; an explicit `Source.set(...)` still wins (and `set(null)` clears the pin, handing control back to the
+  session). Non-isolated bots keep the project-default path unchanged.
+- **The bot-runtime producer** — `internal.session.SessionBootstrap`, reached from `Target.start()`/
+  `startIfNotRunning()`: gated **off by default** behind the `botmaker.session.isolated` system property (or
+  `BOTMAKER_SESSION_ISOLATED` env). When on, it brings up a `NestedSession` (Xephyr default;
+  `botmaker.session.backend=gamescope` opts into 3D) sized from the project's authored resolution, registers it
+  via `ActiveSession`, and launches the target into it — idempotent, with graceful fallback to `:0` when
+  bring-up fails or no window maps. A persisted project setting + Studio UX for isolated runs is the follow-up;
+  the property gate keeps the seam testable and reversible without touching Studio or the project file format.
+- Tests: `SessionRoutingTest` (input routes to the session controller when active, the global one when not;
+  `Source` follows the session window; an explicit pin wins) and `SessionBootstrapTest` (the pure gate /
+  backend / size selection). Full sdk suite green (106). Live bring-up stays manual (needs a real X server).
+
+**Deferred / next** — Phase C (shared): gamescope-variant live test. Then real bot-on-`:N` end-to-end on a box
+with a display; a persisted `session.isolated` project key + Studio toggle; `restart()` relaunch into `:N`.
+
+---
+
 ## 2026-07-23 — `Keyboard`'s javadoc stops promising something it never did
 
 **Done**

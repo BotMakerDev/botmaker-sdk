@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.launch;
 import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.internal.config.ProjectDefaults;
+import com.botmaker.sdk.internal.session.SessionBootstrap;
 
 /**
  * The SDK's global, ambient <em>launch target</em> — the "what" the bot automates, the launch-side counterpart
@@ -62,6 +63,11 @@ public final class Target {
             Debug.log("[Target] start: no launch target configured — nothing to launch");
             return;
         }
+        // Isolated bots launch into a private nested :N display (and route input/vision through it); a plain
+        // bot takes the normal :0 launch below. See SessionBootstrap for the gate.
+        if (SessionBootstrap.launchIsolated(t.launchSpec())) {
+            return;
+        }
         t.start();
     }
 
@@ -74,6 +80,11 @@ public final class Target {
         LaunchTarget t = current();
         if (t == null) {
             Debug.log("[Target] startIfNotRunning: no launch target configured — nothing to launch");
+            return;
+        }
+        // Isolated: bring up (once) the private :N session and launch into it — its "already running" is the
+        // session already existing, so this is idempotent. Non-isolated bots keep the :0 cold-start probe.
+        if (SessionBootstrap.launchIsolated(t.launchSpec())) {
             return;
         }
         t.startIfNotRunning();

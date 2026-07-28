@@ -5,11 +5,20 @@ import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.session.ActiveSession;
+import com.botmaker.shared.session.DesktopSession;
 
 public class Mouse {
 
+    /**
+     * The controller every method below drives through. When an {@link ActiveSession} is registered (an
+     * isolated bot on its private {@code :N} display) this is the session's {@code :N}-bound controller, so
+     * the same click/move/type code targets the nested display; otherwise it is the process-wide {@code :0}
+     * singleton — today's behaviour, unchanged whenever no session is active.
+     */
     private static NativeController controller() {
-        return NativeControllerFactory.get();
+        DesktopSession session = ActiveSession.get();
+        return session != null ? session.controller() : NativeControllerFactory.get();
     }
 
     /**

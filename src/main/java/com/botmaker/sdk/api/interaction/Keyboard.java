@@ -6,6 +6,8 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.session.ActiveSession;
+import com.botmaker.shared.session.DesktopSession;
 
 /**
  * Simulated keyboard input. Keys are expressed with the OS-neutral {@link Key} enum; combos and
@@ -31,8 +33,14 @@ import com.botmaker.shared.capture.NativeControllerFactory;
  */
 public class Keyboard {
 
+    /**
+     * The controller keys are delivered through — the {@link ActiveSession}'s {@code :N}-bound controller when
+     * an isolated session is registered, else the process-wide {@code :0} singleton (today's behaviour). See
+     * {@link Mouse}'s equivalent choke point.
+     */
     private static NativeController controller() {
-        return NativeControllerFactory.get();
+        DesktopSession session = ActiveSession.get();
+        return session != null ? session.controller() : NativeControllerFactory.get();
     }
 
     /** Press and hold a key on the ambient {@link Source} (remember to {@link #release}). */
