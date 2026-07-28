@@ -8,6 +8,18 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-28 — Bot-owned-display plan, Phase D: `Window.find` uses shared ranked matching
+
+`Window.find` (and thus `NamedWindow`/`CaptureSource.window(title)`) took the **first** window whose title
+contained the needle, so a bot pointed at "Firestone" could bind a wiki tab or launcher entry instead of the
+game.
+
+**Done:**
+- `find` now delegates to shared `WindowMatch.best(controller().getAllWindows(), needle)` — an exact/prefix/
+  whole-word hit beats an incidental substring, dynamic title suffixes are tolerated, and the shortest/largest
+  matching window wins ties. Same matcher the Studio pilot uses, so runtime and editor resolve identically.
+  No API change; `all()`/`foreground()` unchanged. SDK input/routing suites stay green.
+
 ## 2026-07-28 — Bot-owned-display plan, Phase B: bot-runtime routing onto a nested `:N` session
 
 The session infrastructure (shared) and the Studio pilot producer (Phase A) were in place, but the **generated

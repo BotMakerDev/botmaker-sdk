@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.Rect;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.capture.WindowMatch;
 
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
@@ -55,18 +56,18 @@ public class Window implements CaptureSource {
     }
 
     /**
-     * The first window whose title contains {@code titleSubstring} (case-insensitive), or empty if
-     * none match. Matching against a substring is deliberately lenient so bots survive dynamic
-     * title suffixes (score, level, document name, …).
+     * The window {@code titleSubstring} <em>most</em> refers to (case-insensitive), or empty if none
+     * contains it. Ranking is delegated to shared {@link WindowMatch} so the bot runtime and Studio's
+     * pilot pick the same window: an exact/prefix/whole-word hit beats an incidental substring hit (a
+     * wiki tab or launcher entry named after the game), and dynamic title suffixes (score, level,
+     * document name, …) are tolerated — while the shortest, largest matching window wins ties.
      */
     public static Optional<Window> find(String titleSubstring) {
         if (titleSubstring == null) {
             return Optional.empty();
         }
-        String needle = titleSubstring.toLowerCase();
-        Optional<Window> hit = all().stream()
-                .filter(w -> w.title().toLowerCase().contains(needle))
-                .findFirst();
+        GenericWindow gw = WindowMatch.best(controller().getAllWindows(), titleSubstring);
+        Optional<Window> hit = gw == null ? Optional.empty() : Optional.of(new Window(gw));
         Debug.log("[Window] find \"" + titleSubstring + "\" -> "
                 + hit.map(Window::title).orElse("no match"));
         return hit;
