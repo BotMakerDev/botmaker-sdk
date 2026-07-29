@@ -1,5 +1,7 @@
 package com.botmaker.sdk.internal.session;
 
+import com.botmaker.shared.launch.LaunchKind;
+import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.session.ActiveSession;
 import com.botmaker.shared.session.NestedSession;
 import org.junit.jupiter.api.AfterEach;
@@ -37,17 +39,25 @@ class SessionBootstrapTest {
     void launchIsolatedNoOpsWhenNotRequested() {
         System.clearProperty(SessionBootstrap.ISOLATED_PROPERTY);
         // Returns false (caller runs its normal :0 launch) and never registers a session.
-        assertFalse(SessionBootstrap.launchIsolated(new com.botmaker.shared.launch.LaunchSpec(
-                com.botmaker.shared.launch.LaunchKind.EXE, "/bin/true")));
+        assertFalse(SessionBootstrap.launchIsolated(new LaunchSpec(LaunchKind.EXE, "/bin/true")));
         assertFalse(ActiveSession.isActive());
     }
 
     @Test
-    void backendDefaultsToXephyrAndOptsIntoGamescope() {
+    void backendAutoSelectsFromKindAndHonoursOverride() {
         System.clearProperty(SessionBootstrap.BACKEND_PROPERTY);
-        assertEquals(NestedSession.Backend.XEPHYR, SessionBootstrap.backend());
+        // Kind-driven with no override: a plain command → Xephyr, a game → gamescope.
+        assertEquals(NestedSession.Backend.XEPHYR,
+                SessionBootstrap.backend(new LaunchSpec(LaunchKind.CLI, "echo hi")));
+        assertEquals(NestedSession.Backend.GAMESCOPE,
+                SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")));
+        // The explicit override wins over the kind-driven default (forces Xephyr even for a game).
+        System.setProperty(SessionBootstrap.BACKEND_PROPERTY, "xephyr");
+        assertEquals(NestedSession.Backend.XEPHYR,
+                SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")));
         System.setProperty(SessionBootstrap.BACKEND_PROPERTY, "gamescope");
-        assertEquals(NestedSession.Backend.GAMESCOPE, SessionBootstrap.backend());
+        assertEquals(NestedSession.Backend.GAMESCOPE,
+                SessionBootstrap.backend(new LaunchSpec(LaunchKind.CLI, "echo hi")));
     }
 
     @Test
@@ -61,9 +71,18 @@ class SessionBootstrapTest {
     @Test
     void optionsCarryTheSelectedBackendAndSize() {
         System.setProperty(SessionBootstrap.BACKEND_PROPERTY, "gamescope");
-        NestedSession.Options o = SessionBootstrap.options();
+        NestedSession.Options o = SessionBootstrap.options(new LaunchSpec(LaunchKind.CLI, "echo hi"));
         assertEquals(NestedSession.Backend.GAMESCOPE, o.backend());
         assertEquals(SessionBootstrap.DEFAULT_WIDTH, o.width());
         assertEquals(SessionBootstrap.DEFAULT_HEIGHT, o.height());
+    }
+
+    @Test
+    void optionsTrackTheLaunchKindWithoutAnOverride() {
+        System.clearProperty(SessionBootstrap.BACKEND_PROPERTY);
+        assertEquals(NestedSession.Backend.GAMESCOPE,
+                SessionBootstrap.options(new LaunchSpec(LaunchKind.STEAM, "570")).backend());
+        assertEquals(NestedSession.Backend.XEPHYR,
+                SessionBootstrap.options(new LaunchSpec(LaunchKind.CLI, "echo hi")).backend());
     }
 }

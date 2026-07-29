@@ -8,6 +8,24 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-29 — Bot-owned-display plan, Phase G: auto-select the backend by launch kind
+
+`SessionBootstrap` picked its backend from `botmaker.session.backend` alone (default Xephyr), so an isolated
+game launch crashed on Xephyr's software GL. It now consumes shared's `SessionBackends` so the backend follows
+the launch kind, and declines bring-up (loud install hint, graceful `:0`) when the required backend is absent.
+
+**Done:**
+- `backend()` / `options()` → `backend(LaunchSpec)` / `options(LaunchSpec)`: the `BACKEND_PROPERTY` override
+  still wins, but with no override the backend is `SessionBackends.preferredBackend(spec)` — a game gets
+  gamescope, a plain command gets Xephyr.
+- `launchIsolated`: before bring-up, if the chosen backend isn't installed (`SessionBackends.isAvailable`),
+  logs `SessionBackends.installHint` and returns `false` (runs on `:0`) — a bot never crashes on a Xephyr that
+  can't run its game, and gamescope-missing is a clear message, not a SIGTRAP loop.
+- `SessionBootstrapTest` updated: backend auto-selects from kind, override wins, options track the kind.
+
+**Deferred / next:** Phase H makes isolation the default via a `session.isolated` project setting; Phase I
+routes explicit `Game.launch*` through the same seam.
+
 ## 2026-07-28 — Bot-owned-display plan, Phase D: `Window.find` uses shared ranked matching
 
 `Window.find` (and thus `NamedWindow`/`CaptureSource.window(title)`) took the **first** window whose title

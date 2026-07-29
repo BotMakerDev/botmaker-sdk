@@ -6,6 +6,7 @@ import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.session.ActiveSession;
 import com.botmaker.shared.session.NestedSession;
+import com.botmaker.shared.session.SessionBackends;
 
 /**
  * The bot-runtime producer: the one place that, for an <em>isolated</em> bot, brings up a private nested
@@ -16,17 +17,23 @@ import com.botmaker.shared.session.NestedSession;
  * <p><b>Gated, and off by default.</b> Isolation is opt-in via the {@code botmaker.session.isolated} system
  * property (or {@code BOTMAKER_SESSION_ISOLATED} env), so a plain bot keeps today's global {@code :0} behaviour
  * byte-for-byte — {@link #launchIsolated} returns {@code false} and the caller runs its normal launch. The
- * backend is Xephyr (2D) unless {@code botmaker.session.backend=gamescope} selects the hardware-3D path; the
- * display is sized from the project's authored resolution, falling back to {@value #DEFAULT_WIDTH}x{@value
- * #DEFAULT_HEIGHT}. This is deliberately minimal — a persisted project setting and full Studio UX for isolated
- * runs are a follow-up; the gate keeps the seam testable and reversible without touching Studio or the project
- * file format.
+ * backend is <em>auto-selected from the launch kind</em> via {@link SessionBackends} — a game (store launcher /
+ * Proton / exe) gets gamescope for a real GPU, a plain command gets Xephyr — with {@code
+ * botmaker.session.backend} as an explicit override; the display is sized from the project's authored
+ * resolution, falling back to {@value #DEFAULT_WIDTH}x{@value #DEFAULT_HEIGHT}. When a game needs gamescope and
+ * it isn't installed, bring-up is declined (loud install hint, graceful {@code :0}) rather than crashing on
+ * Xephyr's software GL. The gate keeps the seam testable and reversible without touching the project file
+ * format.
  */
 public final class SessionBootstrap {
 
 	/** System property (or {@code BOTMAKER_SESSION_ISOLATED} env) that opts a bot into a nested {@code :N} run. */
 	public static final String ISOLATED_PROPERTY = "botmaker.session.isolated";
-	/** System property selecting the backend when isolated: {@code gamescope} for 3D, else Xephyr. */
+	/**
+	 * System property that <em>overrides</em> the auto-selected backend when isolated: {@code gamescope} for 3D,
+	 * {@code xephyr} for 2D. When unset the backend is chosen from the launch kind by
+	 * {@link SessionBackends#preferredBackend(LaunchSpec)} — a game gets a GPU, a plain command gets Xephyr.
+	 */
 	public static final String BACKEND_PROPERTY = "botmaker.session.backend";
 
 	/** Nested display size used when the project has no authored resolution. */
@@ -43,18 +50,26 @@ public final class SessionBootstrap {
 		return isTrue(System.getProperty(ISOLATED_PROPERTY)) || isTrue(System.getenv("BOTMAKER_SESSION_ISOLATED"));
 	}
 
-	/** The requested backend — {@link NestedSession.Backend#GAMESCOPE} only when explicitly selected, else Xephyr. */
-	public static NestedSession.Backend backend() {
+	/**
+	 * The backend to isolate {@code spec} on: the {@link #BACKEND_PROPERTY} override when set, else the
+	 * kind-driven choice from {@link SessionBackends#preferredBackend(LaunchSpec)} (a game → gamescope for a real
+	 * GPU, a plain command → Xephyr). Auto-selecting by kind is what stops a store launcher SIGTRAPping on
+	 * Xephyr's software GL.
+	 */
+	public static NestedSession.Backend backend(LaunchSpec spec) {
 		String v = System.getProperty(BACKEND_PROPERTY);
-		return "gamescope".equalsIgnoreCase(v == null ? null : v.trim())
-			? NestedSession.Backend.GAMESCOPE
-			: NestedSession.Backend.XEPHYR;
+		if (v != null && !v.isBlank()) {
+			return "gamescope".equalsIgnoreCase(v.trim())
+				? NestedSession.Backend.GAMESCOPE
+				: NestedSession.Backend.XEPHYR;
+		}
+		return SessionBackends.preferredBackend(spec);
 	}
 
-	/** The nested-display options for this bot: the requested backend at the project (or fallback) resolution. */
-	public static NestedSession.Options options() {
+	/** The nested-display options for {@code spec}: its selected backend at the project (or fallback) resolution. */
+	public static NestedSession.Options options(LaunchSpec spec) {
 		int[] size = size();
-		return backend() == NestedSession.Backend.GAMESCOPE
+		return backend(spec) == NestedSession.Backend.GAMESCOPE
 			? NestedSession.Options.gamescope(size[0], size[1])
 			: NestedSession.Options.xephyr(size[0], size[1]);
 	}
@@ -81,9 +96,17 @@ public final class SessionBootstrap {
 			// Already brought up and launched on a prior call — don't relaunch.
 			return true;
 		}
+		NestedSession.Backend chosen = backend(spec);
+		if (!SessionBackends.isAvailable(chosen)) {
+			// The backend this target needs isn't installed. For a game that means gamescope: falling back to
+			// Xephyr is exactly the crash we're avoiding, so we run on :0 and tell the user what to install.
+			Debug.log("[Session] isolated launch needs " + chosen + " but it isn't installed — running on :0. Hint: "
+				+ SessionBackends.installHint(chosen));
+			return false;
+		}
 		NestedSession session = null;
 		try {
-			session = NestedSession.start(options());
+			session = NestedSession.start(options(spec));
 			ActiveSession.set(session);
 			session.launch(spec);
 			if (session.attached() == null) {
@@ -93,7 +116,7 @@ public final class SessionBootstrap {
 				session.close();
 				return false;
 			}
-			Debug.log("[Session] isolated: running " + spec.spec() + " on nested " + backend() + " display");
+			Debug.log("[Session] isolated: running " + spec.spec() + " on nested " + chosen + " display");
 			return true;
 		} catch (Exception e) {
 			String why = e.getMessage() == null ? e.toString() : e.getMessage();
