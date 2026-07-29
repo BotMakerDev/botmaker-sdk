@@ -1,8 +1,10 @@
 package com.botmaker.sdk.internal.session;
 
 import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.Session;
 import com.botmaker.sdk.api.Size;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
+import com.botmaker.shared.launch.HostLauncherProbe;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.session.ActiveSession;
 import com.botmaker.shared.session.NestedSession;
@@ -14,10 +16,11 @@ import com.botmaker.shared.session.SessionBackends;
  * all follow it), and launches the target into it. The pilot's equivalent is Studio's {@code NestedSessionLauncher};
  * this is its bot-process twin, reached from the generated bot's {@code Target.start()}.
  *
- * <p><b>On by default, with an opt-out.</b> Isolation is driven by the project's {@code session.isolated}
- * setting, which defaults to {@code true} ({@link ProjectDefaults#sessionIsolated()}), so a bot run with its
- * project file on the classpath isolates unless it opts out; the {@code botmaker.session.isolated} system
- * property (or {@code BOTMAKER_SESSION_ISOLATED} env) still overrides in either direction. When isolation is
+ * <p><b>On by default, with an opt-out.</b> Isolation resolves through one ladder, highest first: an explicit
+ * {@link Session} call in bot code → the {@code botmaker.session.isolated} system property →
+ * {@code BOTMAKER_SESSION_ISOLATED} → the project's {@code session.isolated} key → {@code true}. Bot code sits at
+ * the top so a bot can force its own behaviour on a machine whose environment disagrees; the project key sits at
+ * the bottom because it is the weakest statement of intent. When isolation is
  * off, {@link #launchIsolated} returns {@code false} and the caller runs its normal global {@code :0} launch. The
  * backend is <em>auto-selected from the launch kind</em> via {@link SessionBackends} — a game (store launcher /
  * Proton / exe) gets gamescope for a real GPU, a plain command gets Xephyr — with {@code
@@ -52,7 +55,10 @@ public final class SessionBootstrap {
 	 * either direction, winning over the project setting when set to a recognised boolean.
 	 */
 	public static boolean isolationRequested() {
-		Boolean override = overrideBool(System.getProperty(ISOLATED_PROPERTY));
+		Boolean override = Session.override();
+		if (override == null) {
+			override = overrideBool(System.getProperty(ISOLATED_PROPERTY));
+		}
 		if (override == null) {
 			override = overrideBool(System.getenv("BOTMAKER_SESSION_ISOLATED"));
 		}
@@ -60,22 +66,22 @@ public final class SessionBootstrap {
 	}
 
 	/**
-	 * The backend to isolate {@code spec} on: the {@link #BACKEND_PROPERTY} override when set, else the
+	 * The backend to isolate {@code spec} on, highest precedence first: a bot's {@link Session#useBackend} pin,
+	 * the {@link #BACKEND_PROPERTY} system property, the project's {@code session.backend} key, else the
 	 * kind-driven choice from {@link SessionBackends#preferredBackend(LaunchSpec)} (a game → gamescope for a real
 	 * GPU, a plain command → Xephyr). Auto-selecting by kind is what stops a store launcher SIGTRAPping on
 	 * Xephyr's software GL.
+	 *
+	 * <p>Every rung parses through {@link NestedSession.Backend#fromId}, which is total and empty for anything
+	 * that isn't a backend id — {@code "auto"} included. That is a fix, not just tidying: the previous
+	 * {@code "gamescope".equalsIgnoreCase(x) ? GAMESCOPE : XEPHYR} mapped an explicit {@code auto} (and any typo)
+	 * onto Xephyr, i.e. onto the software GL that crashes the games this whole ladder exists to run.
 	 */
 	public static NestedSession.Backend backend(LaunchSpec spec) {
-		String override = System.getProperty(BACKEND_PROPERTY);
-		if (override == null || override.isBlank()) {
-			override = ProjectDefaults.sessionBackend();
-		}
-		if (override != null && !override.isBlank()) {
-			return "gamescope".equalsIgnoreCase(override.trim())
-				? NestedSession.Backend.GAMESCOPE
-				: NestedSession.Backend.XEPHYR;
-		}
-		return SessionBackends.preferredBackend(spec);
+		return NestedSession.Backend.fromId(Session.pinnedBackend())
+			.or(() -> NestedSession.Backend.fromId(System.getProperty(BACKEND_PROPERTY)))
+			.or(() -> NestedSession.Backend.fromId(ProjectDefaults.sessionBackend()))
+			.orElseGet(() -> SessionBackends.preferredBackend(spec));
 	}
 
 	/** The nested-display options for {@code spec}: its selected backend at the project (or fallback) resolution. */
@@ -122,8 +128,15 @@ public final class SessionBootstrap {
 			ActiveSession.set(session);
 			session.launch(spec);
 			if (session.attached() == null) {
-				// Display came up but the game never mapped a window on :N — tear down and fall back to :0.
-				Debug.log("[Session] isolated launch: no window appeared on the nested display — falling back to :0");
+				// Display came up but the game never mapped a window on :N — tear down and fall back to :0. The
+				// overwhelmingly common cause is a host launcher already running on :0: a second Heroic/Steam
+				// invocation is forwarded to that instance, which maps the game on the real desktop instead. Say
+				// so in the same words Studio uses (shared owns the wording) rather than leaving the user with a
+				// bare "no window appeared".
+				Debug.log("[Session] isolated launch: no window appeared on the nested display — falling back to :0"
+					+ (HostLauncherProbe.isRunning(spec)
+						? ". " + HostLauncherProbe.refusalMessage(spec.kind())
+						: ""));
 				ActiveSession.clear();
 				session.close();
 				return false;

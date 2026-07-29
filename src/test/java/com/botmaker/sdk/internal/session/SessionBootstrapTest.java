@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.session;
 
+import com.botmaker.sdk.api.Session;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.session.ActiveSession;
@@ -20,7 +21,58 @@ class SessionBootstrapTest {
     void tearDown() {
         System.clearProperty(SessionBootstrap.ISOLATED_PROPERTY);
         System.clearProperty(SessionBootstrap.BACKEND_PROPERTY);
+        // Session's overrides are static and outrank everything below them — a leak would silently pin every
+        // later test in this JVM.
+        Session.clearOverrides();
         ActiveSession.clear();
+    }
+
+    @Test
+    void anExplicitSessionCallOutranksTheSystemProperty() {
+        // The top rung of the ladder: bot code must be able to force its own behaviour on a machine whose
+        // environment says the opposite, in both directions.
+        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "false");
+        Session.enable();
+        assertTrue(SessionBootstrap.isolationRequested());
+
+        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "true");
+        Session.disable();
+        assertFalse(SessionBootstrap.isolationRequested());
+    }
+
+    @Test
+    void isEnabledReportsTheResolvedAnswerNotJustWhatBotCodeAsked() {
+        // Session.isEnabled() is the whole ladder, so a bot that never calls anything still reads the truth.
+        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "false");
+        assertFalse(Session.isEnabled());
+        Session.enable();
+        assertTrue(Session.isEnabled());
+    }
+
+    @Test
+    void useBackendOutranksThePropertyAndAutoRestoresTheKindDrivenChoice() {
+        System.setProperty(SessionBootstrap.BACKEND_PROPERTY, "xephyr");
+        Session.useBackend("gamescope");
+        assertEquals(NestedSession.Backend.GAMESCOPE,
+                SessionBootstrap.backend(new LaunchSpec(LaunchKind.CLI, "echo hi")));
+
+        // "auto" is not a backend: it un-pins, dropping to the next rung (here, the xephyr property).
+        Session.useBackend("auto");
+        assertEquals(NestedSession.Backend.XEPHYR,
+                SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")));
+    }
+
+    @Test
+    void autoAndTyposDoNotSilentlyPinXephyr() {
+        // The regression this ladder's total parse fixes: `session.backend=auto` (and any typo) used to hit
+        // `"gamescope".equalsIgnoreCase(x) ? GAMESCOPE : XEPHYR` and pin a game to Xephyr's software GL — the
+        // exact crash the kind-driven choice exists to prevent. Both must fall through to the kind.
+        for (String value : new String[]{"auto", "gamescpoe", ""}) {
+            System.setProperty(SessionBootstrap.BACKEND_PROPERTY, value);
+            assertEquals(NestedSession.Backend.GAMESCOPE,
+                    SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")),
+                    "a game must still get gamescope with session.backend='" + value + "'");
+        }
     }
 
     @Test

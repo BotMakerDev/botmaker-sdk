@@ -8,6 +8,41 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-29 — Isolated-launch fixes, Phase 3: `api.Session`, isolation as a first-class SDK setting
+
+Isolation was real but unspoken: it lived only in `botmaker-project.properties` plus two environment overrides,
+so a bot's own source never said whether it ran on a private display. It is now a facade shaped exactly like
+`api.Debug` — the setting a bot reads and writes the way it reads and writes every other setting.
+
+**Done:**
+- **`api.Session`**: `isEnabled()`/`enable()`/`disable()`/`set(boolean)` plus `useBackend("gamescope"|"xephyr"|
+  "auto")`. Default on, so the *default costs no code* — the generated `BotSettings` will emit `Session.disable()`
+  only when the project opts out (Phase 4), leaving a default project's source free of session boilerplate.
+- **One precedence ladder, bot code at the top**: explicit `Session` call → `botmaker.session.isolated` sysprop →
+  `BOTMAKER_SESSION_ISOLATED` → the project's `session.isolated` key → `true`; `useBackend` follows the same
+  shape over `botmaker.session.backend` / `session.backend`, bottoming out in the *kind-driven* choice rather
+  than a fixed backend. Bot code outranks the environment so a bot can force its own behaviour on a machine that
+  disagrees. `Session.isEnabled()` reports the **resolved** answer, not merely what bot code asked for.
+- **Deliberately not seeded from the project file** the way `Debug` seeds its flag: seeding would make "the
+  project says true" indistinguishable from "the bot said true", and the override could then never be ranked
+  above the environment. `Session` holds a nullable override; `SessionBootstrap` owns the ladder.
+- **Bug fixed on the way**: `SessionBootstrap.backend` resolved every rung with
+  `"gamescope".equalsIgnoreCase(x) ? GAMESCOPE : XEPHYR`, so an explicit `session.backend=auto` — or any typo —
+  pinned a *game* to Xephyr's software GL, the exact crash the kind-driven choice exists to prevent. Every rung
+  now parses through the new total `NestedSession.Backend.fromId` (shared owns it, since Studio needs the same
+  parse), which is empty for `auto`/unknown and therefore falls through to the next rung.
+- **The bot-side fallback now explains itself**: when the display comes up but nothing maps on `:N`, the trace
+  appends `HostLauncherProbe.refusalMessage(kind)` if a host launcher is running — the same wording Studio uses,
+  because a forwarded Heroic/Steam invocation mapping the game on `:0` is the overwhelmingly common cause.
+- **Tests**: `SessionBootstrapTest` covers each rung — an explicit call beating the sysprop in both directions,
+  `isEnabled()` reporting the resolved value, `useBackend` beating the property, `"auto"` un-pinning, and the
+  `auto`/typo regression above. `Session.clearOverrides()` exists for the teardown (process-wide statics).
+
+**Deferred / next:** Phase 4 — Studio's generated `BotSettings` line, the "Session" dialog section, and using
+the refusal message on the Launch buttons.
+
+---
+
 ## 2026-07-29 — Bot-owned-display plan, Phase I: explicit `Game.launch*` isolates too
 
 `Target.start()` routed through `SessionBootstrap.launchIsolated`, but a hand-written
