@@ -24,8 +24,16 @@ class SessionBootstrapTest {
     }
 
     @Test
-    void isolationIsOffByDefault() {
+    void isolationIsOnByDefault() {
+        // No project file on the test classpath → session.isolated defaults to true → isolation on by default.
         System.clearProperty(SessionBootstrap.ISOLATED_PROPERTY);
+        assertTrue(SessionBootstrap.isolationRequested());
+    }
+
+    @Test
+    void systemPropertyOverridesToOff() {
+        // The explicit override wins over the default-on project setting, in the off direction.
+        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "false");
         assertFalse(SessionBootstrap.isolationRequested());
     }
 
@@ -37,8 +45,9 @@ class SessionBootstrapTest {
 
     @Test
     void launchIsolatedNoOpsWhenNotRequested() {
-        System.clearProperty(SessionBootstrap.ISOLATED_PROPERTY);
-        // Returns false (caller runs its normal :0 launch) and never registers a session.
+        // Explicitly opt out (the default is now on) — returns false so the caller runs its normal :0 launch,
+        // and never registers a session.
+        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "false");
         assertFalse(SessionBootstrap.launchIsolated(new LaunchSpec(LaunchKind.EXE, "/bin/true")));
         assertFalse(ActiveSession.isActive());
     }

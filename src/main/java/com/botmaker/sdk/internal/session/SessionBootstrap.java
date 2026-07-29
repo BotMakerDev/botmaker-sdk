@@ -14,9 +14,11 @@ import com.botmaker.shared.session.SessionBackends;
  * all follow it), and launches the target into it. The pilot's equivalent is Studio's {@code NestedSessionLauncher};
  * this is its bot-process twin, reached from the generated bot's {@code Target.start()}.
  *
- * <p><b>Gated, and off by default.</b> Isolation is opt-in via the {@code botmaker.session.isolated} system
- * property (or {@code BOTMAKER_SESSION_ISOLATED} env), so a plain bot keeps today's global {@code :0} behaviour
- * byte-for-byte — {@link #launchIsolated} returns {@code false} and the caller runs its normal launch. The
+ * <p><b>On by default, with an opt-out.</b> Isolation is driven by the project's {@code session.isolated}
+ * setting, which defaults to {@code true} ({@link ProjectDefaults#sessionIsolated()}), so a bot run with its
+ * project file on the classpath isolates unless it opts out; the {@code botmaker.session.isolated} system
+ * property (or {@code BOTMAKER_SESSION_ISOLATED} env) still overrides in either direction. When isolation is
+ * off, {@link #launchIsolated} returns {@code false} and the caller runs its normal global {@code :0} launch. The
  * backend is <em>auto-selected from the launch kind</em> via {@link SessionBackends} — a game (store launcher /
  * Proton / exe) gets gamescope for a real GPU, a plain command gets Xephyr — with {@code
  * botmaker.session.backend} as an explicit override; the display is sized from the project's authored
@@ -43,11 +45,18 @@ public final class SessionBootstrap {
 	private SessionBootstrap() {}
 
 	/**
-	 * Whether this bot was asked to run isolated on a private display. True when {@link #ISOLATED_PROPERTY} is
-	 * {@code "true"} (case-insensitive) or the {@code BOTMAKER_SESSION_ISOLATED} env var is set to {@code true}.
+	 * Whether this bot runs isolated on a private display. <b>Default: the project's {@code session.isolated}
+	 * setting, which itself defaults to {@code true}</b> ({@link ProjectDefaults#sessionIsolated()}) — so a bot
+	 * run anywhere with its project file on the classpath isolates unless it opts out. The {@link
+	 * #ISOLATED_PROPERTY} system property (or {@code BOTMAKER_SESSION_ISOLATED} env) is an explicit override in
+	 * either direction, winning over the project setting when set to a recognised boolean.
 	 */
 	public static boolean isolationRequested() {
-		return isTrue(System.getProperty(ISOLATED_PROPERTY)) || isTrue(System.getenv("BOTMAKER_SESSION_ISOLATED"));
+		Boolean override = overrideBool(System.getProperty(ISOLATED_PROPERTY));
+		if (override == null) {
+			override = overrideBool(System.getenv("BOTMAKER_SESSION_ISOLATED"));
+		}
+		return override != null ? override : ProjectDefaults.sessionIsolated();
 	}
 
 	/**
@@ -57,9 +66,12 @@ public final class SessionBootstrap {
 	 * Xephyr's software GL.
 	 */
 	public static NestedSession.Backend backend(LaunchSpec spec) {
-		String v = System.getProperty(BACKEND_PROPERTY);
-		if (v != null && !v.isBlank()) {
-			return "gamescope".equalsIgnoreCase(v.trim())
+		String override = System.getProperty(BACKEND_PROPERTY);
+		if (override == null || override.isBlank()) {
+			override = ProjectDefaults.sessionBackend();
+		}
+		if (override != null && !override.isBlank()) {
+			return "gamescope".equalsIgnoreCase(override.trim())
 				? NestedSession.Backend.GAMESCOPE
 				: NestedSession.Backend.XEPHYR;
 		}
@@ -129,7 +141,15 @@ public final class SessionBootstrap {
 		}
 	}
 
-	private static boolean isTrue(String value) {
-		return value != null && "true".equalsIgnoreCase(value.trim());
+	/** A recognised boolean override ({@code true}/{@code false} and friends), or {@code null} when unset/unparseable. */
+	private static Boolean overrideBool(String value) {
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		return switch (value.trim().toLowerCase()) {
+			case "true", "1", "yes", "on" -> Boolean.TRUE;
+			case "false", "0", "no", "off" -> Boolean.FALSE;
+			default -> null;
+		};
 	}
 }

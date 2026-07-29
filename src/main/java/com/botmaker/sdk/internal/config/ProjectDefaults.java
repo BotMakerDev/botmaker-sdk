@@ -67,6 +67,20 @@ public final class ProjectDefaults {
     }
 
     /**
+     * Whether the project wants the bot to run isolated on a private nested display — <b>default true</b>
+     * (see {@link ProjectProperties#sessionIsolated()}), so a bot run anywhere with its project file on the
+     * classpath isolates unless it explicitly opts out with {@code session.isolated=false}. Never {@code null}.
+     */
+    public static boolean sessionIsolated() {
+        return ProjectProperties.sessionIsolated();
+    }
+
+    /** The explicit backend override ({@code gamescope}/{@code xephyr}), or {@code null} to let the kind pick. */
+    public static String sessionBackend() {
+        return ProjectProperties.sessionBackend();
+    }
+
+    /**
      * The project's default capture resolution (the resolution its templates were authored at) as the SDK's
      * {@link Size}, or {@code null} when unset. The matcher itself reads the {@link Dimension} form straight
      * from {@link ProjectProperties#defaultResolution()} — this exists for API-shaped callers.

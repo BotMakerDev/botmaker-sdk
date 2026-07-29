@@ -8,6 +8,24 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-29 — Bot-owned-display plan, Phase H: isolation is on by default
+
+Isolation was gated on a system property nothing set, so a bot only isolated from BotPilot. Drive it from the
+project's `session.isolated` setting (default true) so a bot run *anywhere* with its project file on the
+classpath isolates — no `DebuggingService`/`CodeExecutionService` change needed, since those already run the
+bot JVM with the project root as cwd and `src/main/resources` on the classpath.
+
+**Done:**
+- `ProjectDefaults.sessionIsolated()` (delegates to shared, default true) and `sessionBackend()`.
+- `SessionBootstrap.isolationRequested()` now defaults from `ProjectDefaults.sessionIsolated()`, with the
+  `botmaker.session.isolated` system property / `BOTMAKER_SESSION_ISOLATED` env as an override in either
+  direction. `backend(spec)` also honours the project's `session.backend` as an override alongside the
+  system property.
+- `SessionBootstrapTest`: default-on, system-property-overrides-to-off, opt-out disables bring-up.
+
+**Deferred / next:** Phase I routes explicit `Game.launch*` through the same seam; Phase J surfaces the
+opt-out toggle in Studio and backgrounds its Launch buttons.
+
 ## 2026-07-29 — Bot-owned-display plan, Phase G: auto-select the backend by launch kind
 
 `SessionBootstrap` picked its backend from `botmaker.session.backend` alone (default Xephyr), so an isolated
