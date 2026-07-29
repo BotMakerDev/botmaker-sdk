@@ -4,7 +4,7 @@ import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Session;
 import com.botmaker.sdk.api.Size;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
-import com.botmaker.shared.launch.HostLauncherProbe;
+import com.botmaker.shared.launch.LaunchIsolation;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.session.ActiveSession;
 import com.botmaker.shared.session.NestedSession;
@@ -114,6 +114,13 @@ public final class SessionBootstrap {
 			// Already brought up and launched on a prior call — don't relaunch.
 			return true;
 		}
+		LaunchIsolation.Verdict verdict = LaunchIsolation.check(spec);
+		if (!verdict.isolatable()) {
+			// Asked before anything is spawned: a target that cannot be confined would otherwise cost the full
+			// window budget and then land on :0 anyway, with a guess as the explanation.
+			Debug.log("[Session] isolated launch declined — running on :0. " + verdict.reason());
+			return false;
+		}
 		NestedSession.Backend chosen = backend(spec);
 		if (!SessionBackends.isAvailable(chosen)) {
 			// The backend this target needs isn't installed. For a game that means gamescope: falling back to
@@ -128,15 +135,11 @@ public final class SessionBootstrap {
 			ActiveSession.set(session);
 			session.launch(spec);
 			if (session.attached() == null) {
-				// Display came up but the game never mapped a window on :N — tear down and fall back to :0. The
-				// overwhelmingly common cause is a host launcher already running on :0: a second Heroic/Steam
-				// invocation is forwarded to that instance, which maps the game on the real desktop instead. Say
-				// so in the same words Studio uses (shared owns the wording) rather than leaving the user with a
-				// bare "no window appeared".
-				Debug.log("[Session] isolated launch: no window appeared on the nested display — falling back to :0"
-					+ (HostLauncherProbe.isRunning(spec)
-						? ". " + HostLauncherProbe.refusalMessage(spec.kind())
-						: ""));
+				// Display came up but the game never mapped a window on :N — tear down and fall back to :0. What
+				// actually happened is read off the process table rather than guessed at, in the same words
+				// Studio uses (shared owns the wording).
+				Debug.log("[Session] isolated launch: no window appeared on the nested display — falling back "
+					+ "to :0. " + LaunchIsolation.noWindowDiagnosis(spec));
 				ActiveSession.clear();
 				session.close();
 				return false;

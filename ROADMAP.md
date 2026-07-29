@@ -8,6 +8,23 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-29 — Isolated-launch fixes, Phase 7: decline to `:0` with a reason, before spawning anything
+
+`SessionBootstrap.launchIsolated` used to find out that a target couldn't be confined only *after* bringing up a
+display and burning the whole window budget on it — then fall back to `:0` with a guess as the explanation.
+
+**Done**
+
+- **The isolatability question is asked first.** `launchIsolated` consults shared's new
+  `LaunchIsolation.check(spec)` before choosing a backend; a non-isolatable target logs the verdict's reason and
+  returns `false` (the caller's normal `:0` launch) without spawning an X server. The reason is shared's wording,
+  so a headless bot run and Studio's Launch button say the same thing.
+- **The post-launch message reports what happened instead of guessing.** When a window never appears on `:N`,
+  `LaunchIsolation.noWindowDiagnosis(spec)` distinguishes "it is running, but outside the private display" from
+  "nothing is running under that target" by reading the process table — the two used to be offered as one "or".
+
+---
+
 ## 2026-07-29 — Isolated-launch fixes, Phase 3: `api.Session`, isolation as a first-class SDK setting
 
 Isolation was real but unspoken: it lived only in `botmaker-project.properties` plus two environment overrides,
