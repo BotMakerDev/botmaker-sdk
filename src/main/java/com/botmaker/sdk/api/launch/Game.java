@@ -90,7 +90,8 @@ public class Game {
 
     /**
      * Launches a Steam game by its appId (the number in the game's Steam store URL / SteamDB). Opens the
-     * cross-platform {@code steam://rungameid/<appId>} URL and falls back to {@code steam -applaunch <appId>}.
+     * cross-platform {@code steam://rungameid/<appId>} URL and falls back to {@code steam -applaunch <appId>},
+     * then that command's Flatpak form.
      *
      * @param appId the Steam application id, e.g. {@code "570"}
      * @throws IllegalArgumentException if {@code appId} is null/blank
@@ -135,8 +136,9 @@ public class Game {
      * don't run.
      *
      * <p>Opens the {@code heroic://launch/<appName>} protocol URL (handled by an installed Heroic, native or
-     * Flatpak) and falls back to Heroic's CLI — {@code heroic --no-gui launch <appName>}, then the Flatpak form
-     * {@code flatpak run com.heroicgameslauncher.hgl --no-gui launch <appName>}.
+     * Flatpak) and falls back to running Heroic ourselves with that same URL in its argv —
+     * {@code heroic --no-gui --no-sandbox heroic://launch/<appName>}, then the Flatpak form. Heroic has no
+     * {@code launch} subcommand: the URL <em>is</em> its command line.
      *
      * @param appName the Heroic application name / launch token, e.g. {@code "Firestone"}
      * @throws IllegalArgumentException if {@code appName} is null/blank
