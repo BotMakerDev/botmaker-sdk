@@ -8,6 +8,26 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-29 — Bot-owned-display plan, Phase I: explicit `Game.launch*` isolates too
+
+`Target.start()` routed through `SessionBootstrap.launchIsolated`, but a hand-written
+`Game.launchHeroic("Firestone")` went straight to `GameLauncher` on `:0`. Extend the same seam to every
+explicit launch entry point.
+
+**Done:**
+- `Game.launch`/`launchSteam`/`launchEpic`/`launchHeroic`/`launchFaugus` build the call's `LaunchSpec` and
+  try `SessionBootstrap.launchIsolated(spec)` first, falling back to the `GameLauncher.*` host launch only
+  when isolation is off / declined. `launch(exe)` with no args → `EXE` (gamescope under isolation);
+  `launch(exe, args…)` → a `CLI` command preserving the args (Xephyr, per the cli policy); a blank path → the
+  host path so the usual validation error still fires. `launch()` returns `null` when routed into `:N` (no
+  host process handle) — documented. The `…IfNotRunning` variants isolate transitively via these.
+- `GameTest`: a fake active session proves a launch is routed into `:N` (returns null / no host spawn);
+  opt-out falls back to a real host process; the reject-empty contracts still hold.
+
+**Deferred / next:** Phase J surfaces the opt-out toggle in Studio and backgrounds its Launch buttons.
+Carrying `exe:` arguments into an isolated display (today args force the CLI/Xephyr path) needs a shared
+`LaunchCommands`/`NestedSession` change — left for when it matters.
+
 ## 2026-07-29 — Bot-owned-display plan, Phase H: isolation is on by default
 
 Isolation was gated on a system property nothing set, so a bot only isolated from BotPilot. Drive it from the

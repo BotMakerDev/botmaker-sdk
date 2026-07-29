@@ -2,7 +2,10 @@ package com.botmaker.sdk.api.launch;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.interaction.Wait;
+import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.shared.launch.GameLauncher;
+import com.botmaker.shared.launch.LaunchKind;
+import com.botmaker.shared.launch.LaunchSpec;
 
 /**
  * Launches a game so a bot can automate it.
@@ -22,23 +25,66 @@ import com.botmaker.shared.launch.GameLauncher;
  * control themselves live in {@code shared.launch.GameLauncher}, because Studio needs to launch a target too
  * (to verify one without compiling a bot) and cannot depend on the SDK. Only the methods that take a
  * {@link CaptureSource} — the running/wait pairs below — are genuinely SDK-shaped and stay whole here.
+ *
+ * <p><b>Background isolation.</b> When the bot runs isolated (the default — see {@link SessionBootstrap}),
+ * every launch entry point here first tries to bring the target up in the bot's private nested {@code :N}
+ * display, exactly like {@code Target.start()}; only when isolation is off (or the required backend is
+ * missing) does it fall back to the host {@code :0} launch in {@code GameLauncher}. So a hand-written
+ * {@code Game.launchHeroic("Firestone")} lands in the private display without the bot author doing anything.
  */
 public class Game {
 
     private Game() {}
 
     /**
+     * Try to launch {@code spec} into the bot's private nested display. Returns {@code true} when isolation
+     * handled it (the caller must not also run its host launch); {@code false} — including for a {@code null}
+     * spec — when the caller should fall back to the normal {@code :0} launch. Idempotent via
+     * {@link SessionBootstrap#launchIsolated}: brings the session up once, reuses it after.
+     */
+    private static boolean isolate(LaunchSpec spec) {
+        return spec != null && SessionBootstrap.launchIsolated(spec);
+    }
+
+    /** A store-kind spec ({@code appId}/{@code appName}/{@code gameId}), or {@code null} when the token is blank. */
+    private static LaunchSpec storeSpec(LaunchKind kind, String token) {
+        return (token == null || token.isBlank()) ? null : new LaunchSpec(kind, token);
+    }
+
+    /**
+     * The spec for a direct {@link #launch} call: a bare {@link LaunchKind#EXE} when there are no arguments
+     * (a native game — gets a GPU under isolation), else a {@link LaunchKind#CLI} command line preserving the
+     * arguments (an arbitrary command — stays on the lighter Xephyr). {@code null} for a blank path, so the
+     * host path runs and throws the usual validation error.
+     */
+    private static LaunchSpec exeSpec(String executablePath, String... args) {
+        if (executablePath == null || executablePath.isBlank()) {
+            return null;
+        }
+        if (args == null || args.length == 0) {
+            return new LaunchSpec(LaunchKind.EXE, executablePath.trim());
+        }
+        return new LaunchSpec(LaunchKind.CLI, executablePath.trim() + " " + String.join(" ", args));
+    }
+
+    /**
      * Starts an executable, optionally with arguments. The process is detached — its input/output is not tied
      * to the bot.
      *
+     * <p>When the bot runs isolated the program is launched into the private display instead, and this returns
+     * {@code null} (there is no host process to hand back — the target lives on {@code :N}); use a
+     * {@link CaptureSource} to detect it. Only the non-isolated host launch returns a {@link Process}.
+     *
      * @param executablePath path to the program to run (absolute, or resolvable on {@code PATH})
      * @param args           optional command-line arguments
-     * @return the started process — the caller's first-hand handle on the target, used by
-     *         {@link LaunchTarget#isRunning()} for the variants whose spawned process really is the target
+     * @return the started host process, or {@code null} when the launch was routed into the private display
      * @throws IllegalArgumentException if {@code executablePath} is null/blank
      * @throws RuntimeException         if the process could not be started
      */
     public static Process launch(String executablePath, String... args) {
+        if (isolate(exeSpec(executablePath, args))) {
+            return null;
+        }
         return GameLauncher.exe(executablePath, args);
     }
 
@@ -51,6 +97,9 @@ public class Game {
      * @throws RuntimeException         if neither the Steam URL nor the CLI fallback could be invoked
      */
     public static void launchSteam(String appId) {
+        if (isolate(storeSpec(LaunchKind.STEAM, appId))) {
+            return;
+        }
         GameLauncher.steam(appId);
     }
 
@@ -73,6 +122,9 @@ public class Game {
      * @throws RuntimeException         if the Epic protocol URL could not be invoked (launcher not installed?)
      */
     public static void launchEpic(String appName) {
+        if (isolate(storeSpec(LaunchKind.EPIC, appName))) {
+            return;
+        }
         GameLauncher.epic(appName);
     }
 
@@ -91,6 +143,9 @@ public class Game {
      * @throws RuntimeException         if neither the Heroic URL nor a CLI fallback could be invoked
      */
     public static void launchHeroic(String appName) {
+        if (isolate(storeSpec(LaunchKind.HEROIC, appName))) {
+            return;
+        }
         GameLauncher.heroic(appName);
     }
 
@@ -109,6 +164,9 @@ public class Game {
      * @throws RuntimeException         if neither CLI form could be invoked
      */
     public static void launchFaugus(String gameId) {
+        if (isolate(storeSpec(LaunchKind.FAUGUS, gameId))) {
+            return;
+        }
         GameLauncher.faugus(gameId);
     }
 
