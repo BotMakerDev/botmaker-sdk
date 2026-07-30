@@ -147,7 +147,7 @@ public class CaptureTest {
 		System.out.println("Place le curseur, puis appuie sur ENTER dans la console");
 		waitForKeyPress();
 		Point p = getMousePosition();
-		osController.postLeftClickScreen(p.x, p.y);
+		osController.click(p.x, p.y, 1);
 		System.out.println("Click envoyé à ("+p.x+", "+p.y+")");
 	}
 }

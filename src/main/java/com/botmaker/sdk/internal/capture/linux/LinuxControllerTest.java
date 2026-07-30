@@ -229,7 +229,7 @@ public class LinuxControllerTest {
 		System.out.println("Note: Your mouse cursor should NOT move (using XTest)");
 		Thread.sleep(2000);
 
-		controller.postLeftClickScreen(mousePos.x, mousePos.y);
+		controller.click(mousePos.x, mousePos.y, 1);
 		System.out.println("✓ Click sent!");
 	}
 

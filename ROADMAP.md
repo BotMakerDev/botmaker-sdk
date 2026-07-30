@@ -8,6 +8,25 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-30 — Follow-on: `postLeftClickScreen` → `click(x, y, button)`
+
+shared folded `NativeController.postLeftClickScreen` onto the new `click(x, y, button)` — the same call
+hardcoded to button 1, under a name left over from the `XSendEvent` era (see shared's Phase 10 A3/A4 entry for
+why the click paths were reworked). Nothing in the SDK's public API touches it; this is the mechanical
+follow-on.
+
+### Done
+
+- `internal/capture/CaptureTest` and `internal/capture/linux/LinuxControllerTest` (the manual harnesses) call
+  `click(x, y, 1)`.
+- The `NativeController` test doubles drop their `postLeftClickScreen` overrides — `click` has a portable
+  default (move → settle → press → hold → release), so `RecordingNativeController` keeps recording the same
+  `move`/`button` calls it always did.
+- `Mouse.click` is unchanged: it still takes `clickRestoringCursor`, which is the right policy on `:0`, and is
+  now that default plus a warp back rather than a second copy of the sequence.
+
+---
+
 ## 2026-07-29 — Isolated-launch fixes, Phase 7: decline to `:0` with a reason, before spawning anything
 
 `SessionBootstrap.launchIsolated` used to find out that a target couldn't be confined only *after* bringing up a

@@ -108,7 +108,6 @@ class LaunchTargetRunningTest {
         @Override public List<GenericWindow> getChildWindows(GenericWindow parent) { return List.of(); }
         @Override public BufferedImage captureWindow(GenericWindow window) { return null; }
         @Override public void postLeftClick(GenericWindow window, int relativeX, int relativeY) {}
-        @Override public void postLeftClickScreen(int xAbs, int yAbs) {}
         @Override public void focusWindow(GenericWindow window) {}
         @Override public void moveWindow(GenericWindow window, int x, int y) {}
         @Override public void resizeWindow(GenericWindow window, int width, int height) {}

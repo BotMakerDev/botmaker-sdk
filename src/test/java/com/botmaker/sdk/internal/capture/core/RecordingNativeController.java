@@ -33,7 +33,6 @@ public class RecordingNativeController implements NativeController {
     @Override public void postLeftClick(GenericWindow w, int relativeX, int relativeY) {
         events.add("postLeftClick(" + relativeX + "," + relativeY + ")");
     }
-    @Override public void postLeftClickScreen(int xAbs, int yAbs) { events.add("postLeftClickScreen(" + xAbs + "," + yAbs + ")"); }
 
     @Override public void focusWindow(GenericWindow w) { events.add("focusWindow"); }
     @Override public void moveWindow(GenericWindow w, int x, int y) { events.add("moveWindow(" + x + "," + y + ")"); }
