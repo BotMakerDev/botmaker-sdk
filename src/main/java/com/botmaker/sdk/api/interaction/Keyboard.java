@@ -6,8 +6,8 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
-import com.botmaker.shared.session.ActiveSession;
-import com.botmaker.shared.session.DesktopSession;
+import com.botmaker.session.ActiveSession;
+import com.botmaker.session.DesktopSession;
 
 /**
  * Simulated keyboard input. Keys are expressed with the OS-neutral {@link Key} enum; combos and

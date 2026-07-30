@@ -3,8 +3,8 @@ package com.botmaker.sdk.internal.session;
 import com.botmaker.sdk.api.Session;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
-import com.botmaker.shared.session.ActiveSession;
-import com.botmaker.shared.session.NestedSession;
+import com.botmaker.session.ActiveSession;
+import com.botmaker.session.impl.NestedSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 

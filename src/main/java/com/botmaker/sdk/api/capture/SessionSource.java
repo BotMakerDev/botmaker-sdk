@@ -2,7 +2,7 @@ package com.botmaker.sdk.api.capture;
 
 import com.botmaker.sdk.api.Point;
 import com.botmaker.shared.capture.GenericWindow;
-import com.botmaker.shared.session.DesktopSession;
+import com.botmaker.session.DesktopSession;
 
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;

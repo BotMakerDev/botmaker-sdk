@@ -2,8 +2,8 @@ package com.botmaker.sdk.api.capture;
 
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
-import com.botmaker.shared.session.ActiveSession;
-import com.botmaker.shared.session.DesktopSession;
+import com.botmaker.session.ActiveSession;
+import com.botmaker.session.DesktopSession;
 
 /**
  * The SDK's global, ambient <em>capture source</em> — the "where" that every no-source vision and

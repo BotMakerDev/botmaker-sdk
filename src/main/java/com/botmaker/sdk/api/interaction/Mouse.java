@@ -5,9 +5,9 @@ import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
-import com.botmaker.shared.session.ActiveSession;
-import com.botmaker.shared.session.DesktopSession;
-import com.botmaker.shared.session.PointerPolicy;
+import com.botmaker.session.ActiveSession;
+import com.botmaker.session.DesktopSession;
+import com.botmaker.session.PointerPolicy;
 
 public class Mouse {
 

@@ -20,6 +20,9 @@
              build time by CI (jitpack.yml) via -Dbotmaker.shared.version=<tag> — never committed here, so a
              clean checkout matches the reactor/dev value and there is no stale pin to get out of sync. -->
         <botmaker.shared.version>0.0.0-SNAPSHOT</botmaker.shared.version>
+        <!-- botmaker-session version. Same contract as botmaker.shared.version above: always 0.0.0-SNAPSHOT
+             in the committed pom, injected at build time by CI for a released tag. -->
+        <botmaker.session.version>0.0.0-SNAPSHOT</botmaker.session.version>
     </properties>
 
     <repositories>
@@ -40,6 +43,15 @@
             <groupId>com.github.LiQiyeDev</groupId>
             <artifactId>botmaker-shared</artifactId>
             <version>${botmaker.shared.version}</version>
+        </dependency>
+
+        <!-- Private display sessions (com.botmaker.session.*): the nested :N display a bot isolates into,
+             reached from Target.start() via internal.session.SessionBootstrap. Same coordinate/property
+             contract as shared above. It depends on shared itself, so this is additive, not a replacement. -->
+        <dependency>
+            <groupId>com.github.LiQiyeDev</groupId>
+            <artifactId>botmaker-session</artifactId>
+            <version>${botmaker.session.version}</version>
         </dependency>
 
         <!-- JavaCV / OpenCV (native bindings used for image matching) -->

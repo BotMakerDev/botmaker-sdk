@@ -6,10 +6,10 @@ import com.botmaker.sdk.api.Size;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.launch.LaunchIsolation;
 import com.botmaker.shared.launch.LaunchSpec;
-import com.botmaker.shared.session.ActiveSession;
-import com.botmaker.shared.session.AdoptedSession;
-import com.botmaker.shared.session.NestedSession;
-import com.botmaker.shared.session.SessionBackends;
+import com.botmaker.session.ActiveSession;
+import com.botmaker.session.impl.AdoptedSession;
+import com.botmaker.session.impl.NestedSession;
+import com.botmaker.session.display.SessionBackends;
 
 /**
  * The bot-runtime producer: the one place that, for an <em>isolated</em> bot, brings up a private nested
