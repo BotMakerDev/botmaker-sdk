@@ -7,6 +7,7 @@ import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.session.ActiveSession;
 import com.botmaker.shared.session.DesktopSession;
+import com.botmaker.shared.session.PointerPolicy;
 
 public class Mouse {
 
@@ -17,23 +18,32 @@ public class Mouse {
      * singleton — today's behaviour, unchanged whenever no session is active.
      */
     private static NativeController controller() {
-        DesktopSession session = ActiveSession.get();
+        DesktopSession session = session();
         return session != null ? session.controller() : NativeControllerFactory.get();
     }
 
     /**
-     * Left-clicks at absolute screen coordinates, leaving the cursor where it started.
+     * The session every gesture below asks about before deciding whether to hand the cursor back — see
+     * {@link PointerPolicy}. {@code null} means the user's own desktop, where the courtesy warp is the point.
+     */
+    private static DesktopSession session() {
+        return ActiveSession.get();
+    }
+
+    /**
+     * Left-clicks at absolute screen coordinates. On the user's desktop the cursor is put back where it started;
+     * in a private session it stays on the target — see {@link PointerPolicy}, and note that warping away there
+     * is what made a game render a hover highlight instead of registering the click.
      *
      * <p>This drives real pointer input rather than posting a synthetic event to the window under the point.
      * Synthetic events are silently dropped by games (and by anything else reading raw input), which is why
-     * clicks used to do nothing in-game; the cost is that the pointer visibly moves and comes back, and that
-     * the click lands on whatever is <em>topmost</em> at that coordinate. See
-     * {@link NativeController#clickRestoringCursor}.
+     * clicks used to do nothing in-game; the cost is that the pointer visibly moves (and, on {@code :0}, comes
+     * back), and that the click lands on whatever is <em>topmost</em> at that coordinate.
      */
     public static void click(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] click " + p);
-        controller().clickRestoringCursor((int) p.x, (int) p.y, MouseButton.LEFT.code());
+        PointerPolicy.click(controller(), session(), (int) p.x, (int) p.y, MouseButton.LEFT.code());
     }
 
     public static void click(int x, int y) {
@@ -90,13 +100,13 @@ public class Mouse {
     public static void rightClick(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] rightClick " + p);
-        controller().clickRestoringCursor((int) p.x, (int) p.y, MouseButton.RIGHT.code());
+        PointerPolicy.click(controller(), session(), (int) p.x, (int) p.y, MouseButton.RIGHT.code());
     }
 
     public static void middleClick(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] middleClick " + p);
-        controller().clickRestoringCursor((int) p.x, (int) p.y, MouseButton.MIDDLE.code());
+        PointerPolicy.click(controller(), session(), (int) p.x, (int) p.y, MouseButton.MIDDLE.code());
     }
 
     /**
@@ -107,13 +117,34 @@ public class Mouse {
     public static void doubleClick(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] doubleClick " + p);
-        java.awt.Point origin = controller().cursorPosition();
+        NativeController controller = controller();
+        java.awt.Point origin = controller.cursorPosition();
         move(p);
-        down(MouseButton.LEFT);
-        up(MouseButton.LEFT);
-        down(MouseButton.LEFT);
-        up(MouseButton.LEFT);
-        if (origin != null) controller().mouseMove(origin.x, origin.y);
+        pressAndRelease(controller, MouseButton.LEFT);
+        pressAndRelease(controller, MouseButton.LEFT);
+        PointerPolicy.restoreTo(controller, session(), origin);
+    }
+
+    /**
+     * One press/release pair with the controller's own hold in between. Issued back to back they span less than a
+     * frame at 60 fps, and a target sampling input once per frame can miss the press entirely — which is why
+     * {@link NativeController#click} holds and why the double-click's two pairs are not bare
+     * {@link #down(MouseButton)}/{@link #up(MouseButton)} calls.
+     */
+    private static void pressAndRelease(NativeController controller, MouseButton button) {
+        controller.mouseButton(button.code(), true);
+        pause(controller.pressHoldMs());
+        controller.mouseButton(button.code(), false);
+    }
+
+    /** Sleep that keeps the interrupt flag — a gesture's pauses are not worth throwing over. */
+    private static void pause(long ms) {
+        if (ms <= 0) return;
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /** Press-and-hold at {@code start}, move straight to {@code end}, then release (an instant drag). */
@@ -152,7 +183,7 @@ public class Mouse {
             move(end);
         }
         up(MouseButton.LEFT);
-        if (origin != null) controller().mouseMove(origin.x, origin.y);
+        PointerPolicy.restoreTo(controller(), session(), origin);
     }
 
     /**

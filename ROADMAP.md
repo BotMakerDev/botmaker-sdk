@@ -8,6 +8,29 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-30 — Phase 12: `Mouse` stops throwing away every click it makes in a session
+
+The reported symptom was a bot that found its template, clicked, and got only the game's **hover** effect — on a
+session it had correctly adopted. `Mouse.click`/`rightClick`/`middleClick` called
+`NativeController.clickRestoringCursor` unconditionally, and `doubleClick`/`drag` did their own
+`cursorPosition()` → `mouseMove(origin)`, so on a private display the pointer was warped off the target
+microseconds after the release. A UI that polls pointer position per frame (rather than reading the event's
+coordinate) then applied the click wherever the cursor had gone.
+
+### Done
+
+- Every gesture now goes through shared's `PointerPolicy`: `click` for the press paths, `restoreTo` for the
+  end-of-gesture restore in `doubleClick`/`drag`. On `:0` nothing changes — the cursor is still handed back, which
+  is the only reason synthesized input is tolerable there. The policy lives in shared because Studio's pilot had
+  implemented it and the SDK had not; see `botmaker-shared/ROADMAP.md` for that half.
+- **`Mouse.doubleClick` now holds each press** for `controller().pressHoldMs()` instead of being
+  `down(); up(); down(); up();` — back-to-back that is under one frame at 60 fps, so a target sampling input once
+  per frame could drop it entirely. Same reason `NativeController.click` and `ControllerPointer.click` hold.
+- `MouseSessionPointerTest` (4) pins all of it by asserting the *absence* of the trailing warp in a session, its
+  presence on `:0`, the same for a drag, and that the double-click's holds actually elapse.
+
+---
+
 ## 2026-07-30 — Phase 11 (step 3): adopt the session we were handed
 
 `SessionBootstrap.launchIsolated` gains a rung above every other: when the spawning process offers a live private

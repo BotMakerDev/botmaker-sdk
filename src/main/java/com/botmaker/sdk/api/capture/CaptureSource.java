@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.capture;
 
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
+import com.botmaker.sdk.api.interaction.Mouse;
 
 import java.awt.image.BufferedImage;
 
@@ -64,7 +65,7 @@ public interface CaptureSource {
      * seam that lets the whole vision→click pipeline target an emulator without any matcher change.
      */
     default void click(Point p) {
-        com.botmaker.sdk.api.interaction.Mouse.click(p);
+        Mouse.click(p);
     }
 
     // --- The three canonical sources ---
