@@ -7,6 +7,7 @@ import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.launch.LaunchIsolation;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.session.ActiveSession;
+import com.botmaker.shared.session.AdoptedSession;
 import com.botmaker.shared.session.NestedSession;
 import com.botmaker.shared.session.SessionBackends;
 
@@ -15,6 +16,12 @@ import com.botmaker.shared.session.SessionBackends;
  * {@code :N} display, registers it with {@link ActiveSession} (so {@code Mouse}/{@code Keyboard}/{@code Source}
  * all follow it), and launches the target into it. The pilot's equivalent is Studio's {@code NestedSessionLauncher};
  * this is its bot-process twin, reached from the generated bot's {@code Target.start()}.
+ *
+ * <p><b>A session it is handed beats a session it builds.</b> When the process that spawned this bot already owns
+ * a private display with the target up — Studio's background launcher does, after "▶ Launch now" — it passes it
+ * through {@link AdoptedSession#DISPLAY_PROPERTY} and the bot joins it instead of bringing up a second one.
+ * Without that, the second bring-up would hand its launch to the copy already running (every store launcher is
+ * single-instance) and the game would appear on a display nobody is watching.
  *
  * <p><b>On by default, with an opt-out.</b> Isolation resolves through one ladder, highest first: an explicit
  * {@link Session} call in bot code → the {@code botmaker.session.isolated} system property →
@@ -112,6 +119,24 @@ public final class SessionBootstrap {
 		}
 		if (ActiveSession.isActive()) {
 			// Already brought up and launched on a prior call — don't relaunch.
+			return true;
+		}
+		// Above every other rung: a live session we were handed is better than any session we could build. Studio
+		// passes it when the game is already up in its background session — bringing up a second private display
+		// would hand the launch to that first copy (the launcher is single-instance) and the game would end up
+		// somewhere nobody is watching.
+		AdoptedSession adopted = AdoptedSession.fromProperties();
+		if (adopted != null && adopted.attached() == null) {
+			// A private display with nothing on it is not the session anyone meant: the target isn't up there, so
+			// adopting would give the bot a black frame and no way to fix it (an adopted session never launches).
+			Debug.log("[Session] the offered display " + adopted.displayName() + " has no window — not adopting it");
+			adopted.close();
+			adopted = null;
+		}
+		if (adopted != null) {
+			ActiveSession.set(adopted);
+			Debug.log("[Session] adopted the live display " + adopted.displayName() + " — not launching "
+				+ spec.spec() + " again");
 			return true;
 		}
 		// Before the verdict, not after: the probes behind it read a dead session's leftovers as a launcher that is

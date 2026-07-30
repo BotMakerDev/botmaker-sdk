@@ -8,6 +8,20 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-30 — Phase 11 (step 3): adopt the session we were handed
+
+`SessionBootstrap.launchIsolated` gains a rung above every other: when the spawning process offers a live private
+display (`botmaker.session.display` — Studio's background launcher passes it after "▶ Launch now"), the bot joins
+it via shared's `AdoptedSession` and **does not launch the target again**. Building a second session instead means
+handing the launch to the copy already running there (every store launcher is single-instance), so the game ends up
+on a display nobody is watching.
+
+The rung sits *below* the isolation gate, so `session.isolated=false` still means `:0` — an offer, not an
+imposition. An offered display with no window on it is declined and closed: the target isn't up there, and an
+adopted session can't launch it, so adopting would hand the bot a black frame with no way out.
+
+---
+
 ## 2026-07-30 — Phase 11 (step 2): sweep before deciding whether to isolate
 
 `SessionBootstrap.launchIsolated` now calls `NestedSession.reapOrphanSessions()` **before**
