@@ -114,6 +114,10 @@ public final class SessionBootstrap {
 			// Already brought up and launched on a prior call — don't relaunch.
 			return true;
 		}
+		// Before the verdict, not after: the probes behind it read a dead session's leftovers as a launcher that is
+		// up (measured — a bot refused to isolate because of a Heroic that had been closed for hours), and the only
+		// other sweep is inside a successful NestedSession.start, which a refusal never reaches.
+		NestedSession.reapOrphanSessions();
 		LaunchIsolation.Verdict verdict = LaunchIsolation.check(spec);
 		if (!verdict.isolatable()) {
 			// Asked before anything is spawned: a target that cannot be confined would otherwise cost the full

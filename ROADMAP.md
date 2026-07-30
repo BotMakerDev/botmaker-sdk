@@ -8,6 +8,16 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-30 — Phase 11 (step 2): sweep before deciding whether to isolate
+
+`SessionBootstrap.launchIsolated` now calls `NestedSession.reapOrphanSessions()` **before**
+`LaunchIsolation.check`. The probes behind that verdict read a dead session's leftovers as a launcher that is up
+— measured: a bot refused to isolate, naming a Heroic that had been closed for hours — and the only other sweep
+lives inside a successful `NestedSession.start`, which a refusal never reaches. Sweeping late meant refusing a
+launch on a dead session's account and running the bot on the user's real desktop instead.
+
+---
+
 ## 2026-07-30 — Follow-on: `postLeftClickScreen` → `click(x, y, button)`
 
 shared folded `NativeController.postLeftClickScreen` onto the new `click(x, y, button)` — the same call
