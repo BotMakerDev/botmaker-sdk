@@ -11,17 +11,17 @@ import static com.botmaker.sdk.api.vision.ImageClicker.click;
 
 public class Main {
 
-	static {
-		OpenCvNative.ensureLoaded();
-	}
+    static {
+        OpenCvNative.ensureLoaded();
+    }
 
-	public static void main(String[] args) {
+    public static void main(String[] args) {
 
-		System.out.print("Hello and welcome!");
+        System.out.print("Hello and welcome!");
 
-		for (int i = 1; i <= 5; i++) {
-			System.out.println("i = " + i);
-		}
+        for (int i = 1; i <= 5; i++) {
+            System.out.println("i = " + i);
+        }
         Boolean r= click(new ImageTemplate("src/main/resources/images/accept_button.png"));
     }
 }
