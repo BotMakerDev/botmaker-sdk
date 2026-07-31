@@ -8,6 +8,46 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-31 — refactor Phase 3: the test floor (SD5 partial, SD6)
+
+Part of the repo-wide refactor scheduled in `../docs/refactor/02-execution-order.md`; this module's share is
+units **SD5** and **SD6**, test-only. **118 → 143 tests**, no production code touched.
+
+### Done
+
+- **MISSING 1 — `MissingTemplateTest`, and B9 is reproduced.** `find()` and `findAny()` on a template whose
+  PNG does not exist return normally, indistinguishable from "not on screen"; both red on this commit,
+  `@Disabled` pending **SD3**. The two tests that already pass are as important: `getMat()` *does* produce the
+  precise diagnostic (naming the file), so every fix is about propagating it rather than writing it. And a
+  fourth test pins the distinction the fix must not lose — a template that **loads** and is genuinely absent
+  stays an ordinary quiet miss, or SD3 trades a silent wrong answer for a bot that throws on most polls.
+- **MISSING 2 — `MatchResultNullContractTest`.** All eight accessors, both directions (`!found ⇒ null` and
+  `found ⇒ non-null`), plus the geometry that makes the guard worth passing and 500 samples proving the random
+  click point lands inside the match. `miss()` gets its own case: it looks like an exception to the rule and
+  is not — a real below-threshold score for telemetry, everything else still null. A ninth test asserts the
+  **accessor list is complete** by reflection, so adding an accessor cannot silently shrink what the other
+  tests claim to cover.
+- **MISSING 5 — `SessionBackendLadderTest`.** `SessionBootstrapTest` covered the isolation ladder; the
+  *backend* ladder had nothing. Four rungs pinned in order, plus the property that matters most: the bottom
+  rung is **not a constant but a function of the launch kind**, so flattening the ladder into a default would
+  look equivalent and send every game to Xephyr's software GL. Totality is pinned too — `auto` and typos fall
+  through — because that exact case has already been a bug here once.
+- **MISSING 6 — `ImageTemplateReloadTest`.** The reload guard overwrites a non-null-but-empty `Mat` without
+  releasing it, leaking one native handle per reload; red on this commit, `@Disabled` pending **SD9**. Worth
+  noting what writing it turned up: the only way to reach that state through the public API is to release the
+  returned `Mat` directly, which the javadoc forbids. So either the branch is reachable and leaks, or it is
+  dead code shaped like a reload path — and SD9 should decide which rather than patching it.
+
+### Not written — SD5's remaining items
+
+**MISSING 3** (`compare*` agreement across `ImageClicker` and `ImageFinder`), **MISSING 4** (`api.emulator`,
+0.0% over 176 lines) and **MISSING 7** (`Bots`' optional-bridge `LinkageError` degradation) are **not in this
+commit**. They are the three that need a fixture this module does not have yet — a matcher harness, a fake ADB
+device, and a classloader that can fail one class on demand — and writing any of them badly would produce the
+green-but-vacuous test Phase 2 deleted a class for. Scheduled to land with the rest of Phase 3.
+
+---
+
 ## 2026-07-31 — refactor Phase 2: the harnesses leave the published jar
 
 Part of the repo-wide refactor scheduled in `../docs/refactor/02-execution-order.md`; this module's
