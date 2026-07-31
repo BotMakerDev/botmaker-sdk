@@ -8,6 +8,46 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-07-31 — refactor Phase 2: the harnesses leave the published jar
+
+Part of the repo-wide refactor scheduled in `../docs/refactor/02-execution-order.md`; this module's
+share is units **SD1** and **SD2**.
+
+### Done
+
+- **Deleted six dead files, 728 lines — 8.5% of the module.** None was referenced by anything, in
+  any of the four modules or any test:
+
+  | File | Lines | What was in it |
+  |---|---:|---|
+  | `internal/capture/linux/LinuxControllerTest` | 348 | 96 prints, a `main()`, the module's only `ProcessBuilder`, 3 broad catches, a `printStackTrace` |
+  | `internal/opencv/OpencvTest` | 149 | 9 prints, a `main()` |
+  | `internal/capture/CaptureTest` + `internal/capture/ImageDisplay` | 180 | 18 prints, 3 `printStackTrace`, a Swing `JFrame` |
+  | `internal/Main` | 25 | `ImageDisplay imageDisplay = null;` — declared, assigned null, never used — and a `placeholder()` that printed `"[Debug] Placeholder function executed."` |
+  | `com/botmaker/sdk/Main` | 26 | an IDE hello-world scaffold **shipped in the published jar**: printed "Hello and welcome!", then clicked `src/main/resources/images/accept_button.png`, a path `.gitignore` guarantees is absent from a clean checkout |
+
+  `CLAUDE.md` documented them as "manual `main`-method harnesses, not JUnit tests", so they were
+  deliberate once. They were also the module's only untested code, they were `main()`s no one had
+  run, and they were on the classpath of every bot the SDK ships to. **All five `printStackTrace`
+  calls in this module went with them** — the SDK now has none.
+- **Deleted `ImageFinderGroupTest`** — a class with zero `@Test` methods whose javadoc claimed the
+  screen-dependent group paths were "exercised by the manual `com.botmaker.sdk.Main` harness". Both
+  halves of that sentence were false, and a reader had no way to tell. The group paths are genuinely
+  uncovered; the audit's MISSING list is where that is now recorded.
+- **Coverage moved 32.0% → 38.4% line, 73.1% → 80.3% class, without a test being written** — 417
+  missed lines stopped existing. (The audit predicted ≈65%; see the note below.)
+
+### Note on the ≈65% estimate
+
+`13-sdk.md` §14 projected "post-deletion the same tests read **≈65%**". That is arithmetically out of
+reach for this deletion and the plan should not be read as having a missed target: 797 covered lines
+against 2494 total is 32.0%, and 65% would need the total down near 1226 — a cut of ~1270 missed
+lines from a deletion of 728 source lines, of which only 417 were executable. The real number is
+**38.4%**. Recorded here rather than silently absorbed, per `01-audit-method.md`'s rule about items
+the plan got wrong.
+
+---
+
 ## 2026-07-30 — Phase 12: `Mouse` stops throwing away every click it makes in a session
 
 The reported symptom was a bot that found its template, clicked, and got only the game's **hover** effect — on a

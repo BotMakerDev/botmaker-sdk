@@ -25,9 +25,11 @@ mvn install        # Install to the local Maven repo (umbrella coordinate); for 
                    #   up local changes use ./dev-install.sh instead (see Publishing › Local dev)
 ```
 
-Demo / manual entry points (run from the IDE): `com.botmaker.sdk.Main` (smoke-tests the public find
-path) and `com.botmaker.sdk.internal.Main` (internal capture harness). The `internal/**/*Test.java`
-classes are manual `main`-method harnesses, not JUnit tests.
+There are no `main`-method entry points. The module is a library: everything under `src/main` is
+reachable from a generated bot, and everything that verifies it is JUnit under `src/test`. The five
+manual harnesses that used to sit in `internal/` (and a hello-world `Main` that shipped in the
+published jar) were deleted in 2026-07 — they were unreferenced, untested, and on every bot's
+classpath. A new diagnostic goes in `src/test` with the JUnit the rest of the module uses.
 
 ## Publishing
 
@@ -96,8 +98,9 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
     already-shared telemetry wire (`shared.ipc.TelemetryClient`). Moving it would move the SDK types with it.
   - `internal/config/ProjectDefaults` — a thin typed accessor mapping shared's `ProjectProperties` (which owns
     the file, the key names and the parsing) onto `CaptureSource`/`Size`.
-  - the manual harnesses `internal/Main`, `capture/CaptureTest`, `capture/ImageDisplay`,
-    `capture/linux/LinuxControllerTest`, `opencv/OpencvTest` — `main`-method dev tools, not JUnit tests.
+  (The manual harnesses that were also left behind here — `internal/Main`, `capture/CaptureTest`,
+  `capture/ImageDisplay`, `capture/linux/LinuxControllerTest`, `opencv/OpencvTest` — have since been
+  deleted; they were dev tools nothing referenced.)
 
 ### OpenCV / native loading
 
@@ -132,8 +135,8 @@ through it; there is one `getVirtualScreenBounds()` (the AWT all-monitor union).
 `../botmaker-shared/CLAUDE.md` for the backend selection (`RobotCapture` vs `SpectacleCapture`) and the
 Wayland notes.
 
-The Swing `ImageDisplay` preview window stayed here: its only callers are the `internal` dev harnesses
-(`internal/Main`, `CaptureTest`), and a JFrame is not something the JavaFX Studio would ever consume.
+(A Swing `ImageDisplay` preview window used to live here for the `internal` dev harnesses; it went with
+them. A JFrame was never something the JavaFX Studio would consume.)
 
 ### Mouse clicks & the Wayland input limitation
 
