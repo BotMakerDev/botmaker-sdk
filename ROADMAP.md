@@ -8,6 +8,30 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-01 — improvements Phase 8: `Tolerance` and `MinPixels`, the two `Pixel` knobs as types
+
+**152 → 156 tests.** New: `api/vision/Tolerance.java`, `api/vision/MinPixels.java`,
+`api/vision/ToleranceAndMinPixelsTest.java`.
+
+### Done
+
+- **`Pixel`'s `double tolerance` → `Tolerance`, `int minPixels` → `MinPixels`.** Both are records with the
+  named constants that used to sit on `Pixel` as bare numbers (`Pixel.TIGHT` → `Tolerance.TIGHT`,
+  `Pixel.DEFAULT_MIN_PIXELS` → `MinPixels.DEFAULT`) plus a validating `of(...)`. The old constants are gone
+  from `Pixel` — the API is freely breakable and there is no shim.
+- **Why types.** The numbers are unreadable on their own: ΔE has no obvious scale and is not a percentage
+  (so `0.12` meant as "12%" silently becomes a near-exact match), and `minPixels` is an *area* that reads as
+  a width (`20` asks for a 4×5 blob, not one 20 across). Both failures are silent — the bot simply never
+  sees its colour. The constructors now reject a negative ΔE and a sub-1 area rather than degrading into
+  "matches nothing" / "matches everything".
+- **`MinPixels.equivalentSide()`** lives on the type, not in the Studio's editor, so the value and its
+  preview cannot disagree about what the unit is.
+- **The dispatch payoff.** Studio now selects the editors for these arguments by *type*. The alternative was
+  a `(method, argIndex)` table in Studio duplicating `Pixel`'s overload list — tolerance is index 1 of
+  `find`/`coverage`/`waitFor` but index 3 of `matchesAt` — which would have gone stale on the next overload.
+
+---
+
 ## 2026-08-01 — improvements Phase 7: `ClickConfig` → `api.BotSettings`, seeded from the project
 
 **143 → 152 tests.** New: `api/BotSettings.java`, `api/BotSettingsTest.java`. Removed:

@@ -85,6 +85,12 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   signature-stability discipline once real bots ship. It contains:
   - `api.vision` — `ImageFinder` (find + `exists` + the lambda control-flow `whileExists`/`ifExists`
     /`untilExists`), `ImageClicker`, `ImageWaiter`, `MatchResult`, `ImageTemplate`.
+  - `api.vision.Tolerance` / `api.vision.MinPixels` — `Pixel`'s two precision knobs as value types rather
+    than a bare `double`/`int`. Both are records with named constants (`Tolerance.TIGHT`,
+    `MinPixels.DEFAULT`) and a validating `of(...)`. They are types because the numbers are unreadable
+    alone — ΔE has no obvious scale, and `minPixels` is an *area* routinely misread as a width — and
+    because it lets Studio dispatch their editors by **type** instead of by a `(method, argIndex)` table
+    that would silently stop firing whenever `Pixel` gains an overload.
   - `api.BotSettings` — the bot's runtime tuning (delays, confidence, compare margin, retry budget, real
     input), seeded from the project's `botmaker-project.properties` on first read. Was `api.vision.ClickConfig`.
   - `api.capture.Screen` (`capture()`), `api.interaction.Mouse`/`Wait`, `api.core.Direction`,
