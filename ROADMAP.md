@@ -8,6 +8,28 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-02 — `MinPixels` → `MinMatch`: two thresholds that answer two questions
+
+**157 → 161 tests.** Changed: `api/vision/MinPixels.java` (deleted) → `api/vision/MinMatch.java`,
+`api/vision/Pixel.java`, `api/vision/ColorMatch.java`, `api/vision/PixelTest.java`,
+`ToleranceAndMinPixelsTest` → `ToleranceAndMinMatchTest`.
+
+### Done
+
+- **`record MinMatch(int area, int count)`** replaces `MinPixels` on every `Pixel` search. `area` is the old
+  minimum blob area; `count` is new — how many matching pixels the search must see in total, however they
+  clump. `DEFAULT` (4, 0), `ANY` (1, 0), and factories `area(n)` / `count(n)` / `of(a, c)`.
+- **Why one type and not two arguments.** An area floor over an unbounded search mostly says "not a speck",
+  which is rarely the question anyone had — it reads as useless alone, which is exactly how it was reported.
+  A count with no area floor cannot tell one solid patch from the same pixels sprinkled across the screen.
+  Bundling them makes it impossible to set one and leave the other at a default nobody considered.
+- **Validation is asymmetric on purpose:** `area` must be ≥ 1 (a cluster of nothing cannot be honoured),
+  `count` may be 0 (the honest "no requirement", and what both constants use).
+- The no-region convenience overloads keep a threshold (`MinMatch.DEFAULT`) rather than splitting the API
+  between regioned and unregioned searches.
+
+---
+
 ## 2026-08-02 — improvements Phase 9: the launch step moves into `Bot.start`
 
 **156 → 157 tests.** Changed: `api/bot/Bot.java`, `api/bot/StartMode.java`, `api/launch/Target.java`,

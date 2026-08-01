@@ -61,7 +61,7 @@ public class ColorMatch {
         return color;
     }
 
-    /** Number of matched pixels in this cluster — the quantity {@code minPixels} gates on. */
+    /** Number of matched pixels in this cluster — the quantity {@code MinMatch.area} gates on. */
     public int getPixelCount() {
         return pixelCount;
     }

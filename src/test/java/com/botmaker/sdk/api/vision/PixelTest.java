@@ -39,7 +39,7 @@ class PixelTest {
     void findReportsAbsoluteCoordinates() {
         CaptureSource source = new FakeSource(sceneWithRedPatch(), 500, 300);
 
-        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinPixels.of(4)));
+        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.DEFAULT));
 
         ColorMatch m = VisionContext.getLastColorMatch();
         assertTrue(m.isFound());
@@ -60,10 +60,10 @@ class PixelTest {
     @Test
     void aMissLeavesANotFoundResultRatherThanStaleData() {
         CaptureSource source = new FakeSource(sceneWithRedPatch(), 0, 0);
-        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinPixels.of(4)));
+        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.DEFAULT));
         assertTrue(VisionContext.lastColorMatchFound());
 
-        assertFalse(Pixel.find(Color.MAGENTA, Tolerance.EXACT, source, MinPixels.of(4)));
+        assertFalse(Pixel.find(Color.MAGENTA, Tolerance.EXACT, source, MinMatch.DEFAULT));
         ColorMatch m = VisionContext.getLastColorMatch();
         assertFalse(m.isFound(), "a miss must overwrite the previous hit");
         assertNull(m.getCenter());
@@ -71,13 +71,13 @@ class PixelTest {
     }
 
     @Test
-    void minPixelsIsLocationPrecisionNotColourPrecision() {
+    void theAreaThresholdIsLocationPrecisionNotColourPrecision() {
         BufferedImage img = sceneWithRedPatch();
         CaptureSource source = new FakeSource(img, 0, 0);
 
         // The patch is 400px. Demanding more than that finds nothing, at the very same colour tolerance.
-        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinPixels.of(400)));
-        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinPixels.of(401)));
+        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.area(400)));
+        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.area(401)));
     }
 
     @Test
@@ -106,10 +106,31 @@ class PixelTest {
             for (int x = 60; x < 65; x++) img.setRGB(x, y, Color.RED.getRGB());   // a smaller 25px patch
         CaptureSource source = new FakeSource(img, 0, 0);
 
-        assertEquals(2, Pixel.findAll(Color.RED, Tolerance.TIGHT, source, MinPixels.of(4)));
+        assertEquals(2, Pixel.findAll(Color.RED, Tolerance.TIGHT, source, MinMatch.DEFAULT));
         List<ColorMatch> all = VisionContext.getLastColorMatchList();
         assertEquals(400, all.get(0).getPixelCount());
         assertEquals(25, all.get(1).getPixelCount());
+    }
+
+    @Test
+    void theCountThresholdSeesColourTheAreaThresholdRejects() {
+        // Two 25px patches: 50 red pixels present, but no blob anywhere near 400. The area test says no, the
+        // count test says yes, and neither is wrong — they were asked different questions. This is the whole
+        // reason MinMatch carries both, and it is behaviour the old single threshold could not express.
+        BufferedImage img = new BufferedImage(100, 80, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < 80; y++)
+            for (int x = 0; x < 100; x++) img.setRGB(x, y, Color.WHITE.getRGB());
+        for (int y = 10; y < 15; y++)
+            for (int x = 10; x < 15; x++) img.setRGB(x, y, Color.RED.getRGB());
+        for (int y = 60; y < 65; y++)
+            for (int x = 60; x < 65; x++) img.setRGB(x, y, Color.RED.getRGB());
+        CaptureSource source = new FakeSource(img, 0, 0);
+
+        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.area(400)));
+        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.count(50)));
+        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.count(51)));
+        // And the pair is an AND: a count it passes cannot rescue an area it fails.
+        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.of(400, 50)));
     }
 
     @Test
@@ -131,9 +152,9 @@ class PixelTest {
         CaptureSource full = new FakeSource(sceneWithRedPatch(), 0, 0);
         // The red patch lives at (10,20)-(30,40); a region well away from it must not see it.
         CaptureSource elsewhere = full.region(new Rect(50, 50, 40, 25));
-        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, elsewhere, MinPixels.of(4)));
+        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, elsewhere, MinMatch.DEFAULT));
 
         CaptureSource onIt = full.region(new Rect(5, 15, 40, 30));
-        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, onIt, MinPixels.of(4)));
+        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, onIt, MinMatch.DEFAULT));
     }
 }

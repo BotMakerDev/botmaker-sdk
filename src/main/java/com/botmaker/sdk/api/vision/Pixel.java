@@ -27,10 +27,17 @@ import java.util.List;
  *   <li><b>Colour precision</b> — {@link Tolerance}: how far a pixel's colour may sit from the target, as a
  *       CIELAB ΔE distance. {@link Tolerance#EXACT}, {@link Tolerance#TIGHT}, {@link Tolerance#DEFAULT},
  *       {@link Tolerance#LOOSE}, or {@link Tolerance#of(double)} for anything between.</li>
- *   <li><b>Location precision</b> — the {@code region} you search, plus {@link MinPixels}: the smallest
- *       connected blob that counts, as an <em>area</em>. It is what stops one stray anti-aliased pixel from
- *       reporting a hit; raise it to demand a real patch of colour.</li>
+ *   <li><b>Location precision</b> — the {@code region} you search, plus {@link MinMatch}: how much of the
+ *       colour has to be there. It carries two thresholds, an <em>area</em> (the smallest connected blob that
+ *       counts, which stops one stray anti-aliased pixel reporting a hit) and a <em>count</em> (matching
+ *       pixels in total, however they clump).</li>
  * </ul>
+ *
+ * <p>The two {@link MinMatch} thresholds are one value rather than two arguments because an area floor on its
+ * own is weak: over a whole screen it mostly says "not a speck", which is rarely the question. Pairing it
+ * with a count is what turns it into a real assertion — "one patch this big, out of at least this much of the
+ * colour" — and bundling them means you cannot set one while leaving the other at a default you never
+ * considered.
  *
  * <p>Both are types rather than a bare {@code double} and {@code int} — see each for why, but in short:
  * {@code find(RED, 12.0, hud, 40)} does not say what 12 is measured in or that 40 is an area, and both are
@@ -39,7 +46,7 @@ import java.util.List;
  * <pre>{@code
  * // Is the health bar still red, in the top-left corner of the game window?
  * CaptureSource hud = CaptureSource.window("MyGame").region(new Rect(10, 10, 200, 30));
- * if (Pixel.find(Color.RED, Tolerance.DEFAULT, hud, MinPixels.of(40))) {
+ * if (Pixel.find(Color.RED, Tolerance.DEFAULT, hud, MinMatch.of(400, 2000))) {
  *     Mouse.click(VisionContext.getLastColorMatch().getCenter());
  * }
  * }</pre>
@@ -100,25 +107,25 @@ public class Pixel {
 
     /** Finds {@code target} anywhere on the current source, at the default tolerance and min blob size. */
     public static boolean find(Color target) {
-        return find(target, Tolerance.DEFAULT, Source.current(), MinPixels.DEFAULT);
+        return find(target, Tolerance.DEFAULT, Source.current(), MinMatch.DEFAULT);
     }
 
     /** Finds {@code target} anywhere on the current source at {@code tolerance} (ΔE). */
     public static boolean find(Color target, Tolerance tolerance) {
-        return find(target, tolerance, Source.current(), MinPixels.DEFAULT);
+        return find(target, tolerance, Source.current(), MinMatch.DEFAULT);
     }
 
     /** Finds {@code target} within {@code source} (use {@code source.region(...)} to narrow the area). */
     public static boolean find(Color target, Tolerance tolerance, CaptureSource source) {
-        return find(target, tolerance, source, MinPixels.DEFAULT);
+        return find(target, tolerance, source, MinMatch.DEFAULT);
     }
 
     /**
-     * Finds {@code target} within {@code source}, requiring a connected blob of at least {@code minPixels} of area.
-     * The best (largest) cluster is stored in {@link VisionContext#getLastColorMatch()}.
+     * Finds {@code target} within {@code source}, subject to {@code minMatch}'s blob-area and total-count
+     * thresholds. The best (largest) cluster is stored in {@link VisionContext#getLastColorMatch()}.
      */
-    public static boolean find(Color target, Tolerance tolerance, CaptureSource source, MinPixels minPixels) {
-        ColorMatch result = findInternal(target, tolerance, source, minPixels);
+    public static boolean find(Color target, Tolerance tolerance, CaptureSource source, MinMatch minMatch) {
+        ColorMatch result = findInternal(target, tolerance, source, minMatch);
         VisionContext.setLastColorMatch(result);
         return result.isFound();
     }
@@ -129,37 +136,37 @@ public class Pixel {
      *
      * @return how many clusters matched
      */
-    public static int findAll(Color target, Tolerance tolerance, CaptureSource source, MinPixels minPixels) {
-        List<ColorMatch> all = findAllInternal(target, tolerance, source, minPixels);
+    public static int findAll(Color target, Tolerance tolerance, CaptureSource source, MinMatch minMatch) {
+        List<ColorMatch> all = findAllInternal(target, tolerance, source, minMatch);
         VisionContext.setLastColorMatchList(all);
         return all.size();
     }
 
-    /** {@link #findAll(Color, Tolerance, CaptureSource, MinPixels)} against the current source. */
+    /** {@link #findAll(Color, Tolerance, CaptureSource, MinMatch)} against the current source. */
     public static int findAll(Color target, Tolerance tolerance) {
-        return findAll(target, tolerance, Source.current(), MinPixels.DEFAULT);
+        return findAll(target, tolerance, Source.current(), MinMatch.DEFAULT);
     }
 
     /**
      * Finds a colour in the inclusive RGB band [{@code low}, {@code high}] — an explicit per-channel range
      * rather than a distance from one colour. Use when you want "any fairly-red pixel" expressed as bounds.
      */
-    public static boolean findInRange(Color low, Color high, CaptureSource source, MinPixels minPixels) {
+    public static boolean findInRange(Color low, Color high, CaptureSource source, MinMatch minMatch) {
         Rect region = source.subRegion();
         BufferedImage img = source.capture();
         if (img == null) {
             VisionContext.setLastColorMatch(ColorMatch.notFound());
             return false;
         }
-        List<RawColorMatch> raw = ColorMatcher.findClustersInRange(img, low, high, minPixels.pixels());
+        List<RawColorMatch> raw = ColorMatcher.findClustersInRange(img, low, high, minMatch.area(), minMatch.count());
         List<ColorMatch> mapped = map(raw, source, img, midpoint(low, high));
         VisionContext.setLastColorMatchList(mapped);
         return !mapped.isEmpty();
     }
 
-    /** {@link #findInRange(Color, Color, CaptureSource, MinPixels)} against the current source. */
+    /** {@link #findInRange(Color, Color, CaptureSource, MinMatch)} against the current source. */
     public static boolean findInRange(Color low, Color high) {
-        return findInRange(low, high, Source.current(), MinPixels.DEFAULT);
+        return findInRange(low, high, Source.current(), MinMatch.DEFAULT);
     }
 
     // ---------------------------------------------------------------------
@@ -190,11 +197,11 @@ public class Pixel {
      *
      * @return true if it appeared; the match is in {@link VisionContext#getLastColorMatch()}
      */
-    public static boolean waitFor(Color target, Tolerance tolerance, CaptureSource source, MinPixels minPixels,
+    public static boolean waitFor(Color target, Tolerance tolerance, CaptureSource source, MinMatch minMatch,
                                   long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
-            if (find(target, tolerance, source, minPixels)) return true;
+            if (find(target, tolerance, source, minMatch)) return true;
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
@@ -205,17 +212,17 @@ public class Pixel {
         return false;
     }
 
-    /** {@link #waitFor(Color, Tolerance, CaptureSource, MinPixels, long)} against the current source. */
+    /** {@link #waitFor(Color, Tolerance, CaptureSource, MinMatch, long)} against the current source. */
     public static boolean waitFor(Color target, Tolerance tolerance, long timeoutMs) {
-        return waitFor(target, tolerance, Source.current(), MinPixels.DEFAULT, timeoutMs);
+        return waitFor(target, tolerance, Source.current(), MinMatch.DEFAULT, timeoutMs);
     }
 
     /** Polls until {@code target} is <em>gone</em> from {@code source}, or {@code timeoutMs} elapses. */
-    public static boolean waitForGone(Color target, Tolerance tolerance, CaptureSource source, MinPixels minPixels,
+    public static boolean waitForGone(Color target, Tolerance tolerance, CaptureSource source, MinMatch minMatch,
                                       long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
-            if (!find(target, tolerance, source, minPixels)) return true;
+            if (!find(target, tolerance, source, minMatch)) return true;
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
@@ -230,19 +237,19 @@ public class Pixel {
     // internals
     // ---------------------------------------------------------------------
 
-    static ColorMatch findInternal(Color target, Tolerance tolerance, CaptureSource source, MinPixels minPixels) {
-        List<ColorMatch> all = findAllInternal(target, tolerance, source, minPixels);
+    static ColorMatch findInternal(Color target, Tolerance tolerance, CaptureSource source, MinMatch minMatch) {
+        List<ColorMatch> all = findAllInternal(target, tolerance, source, minMatch);
         return all.isEmpty() ? ColorMatch.notFound() : all.get(0);
     }
 
     static List<ColorMatch> findAllInternal(Color target, Tolerance tolerance, CaptureSource source,
-                                            MinPixels minPixels) {
+                                            MinMatch minMatch) {
         // A genuine native-load failure surfaces as an Error (e.g. UnsatisfiedLinkError) and is intentionally
         // NOT caught, so it cannot masquerade as "no such colour".
         try {
             BufferedImage img = source.capture();
             if (img == null) return new ArrayList<>();
-            List<RawColorMatch> raw = ColorMatcher.findClusters(img, target, tolerance.deltaE(), minPixels.pixels());
+            List<RawColorMatch> raw = ColorMatcher.findClusters(img, target, tolerance.deltaE(), minMatch.area(), minMatch.count());
             return map(raw, source, img, target);
         } catch (Exception e) {
             Debug.error("[Vision] error finding colour: " + e.getMessage(), e);
