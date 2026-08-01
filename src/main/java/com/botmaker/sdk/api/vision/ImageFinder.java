@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.vision;
 import com.botmaker.sdk.api.Debug;
 
+import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -47,7 +48,7 @@ public class ImageFinder {
      * @see #find(ImageTemplate, CaptureSource, double)
      */
     public static boolean find(ImageTemplate template) {
-        return find(template, Source.current(), ClickConfig.DEFAULT_CONFIDENCE);
+        return find(template, Source.current(), BotSettings.confidence());
     }
 
     /**
@@ -75,7 +76,7 @@ public class ImageFinder {
      * @return true if the template was found, false otherwise
      */
     public static boolean find(ImageTemplate template, CaptureSource source) {
-        return find(template, source, ClickConfig.DEFAULT_CONFIDENCE);
+        return find(template, source, BotSettings.confidence());
     }
 
     /**
@@ -174,7 +175,7 @@ public class ImageFinder {
      * @see #findAny(CaptureSource, double, ImageTemplate...)
      */
     public static boolean findAny(ImageTemplate... templates) {
-        return findAny(Source.current(), ClickConfig.DEFAULT_CONFIDENCE, templates);
+        return findAny(Source.current(), BotSettings.confidence(), templates);
     }
 
     /**
@@ -202,7 +203,7 @@ public class ImageFinder {
      * @return true if any template was found, false otherwise
      */
     public static boolean findAny(CaptureSource source, ImageTemplate... templates) {
-        return findAny(source, ClickConfig.DEFAULT_CONFIDENCE, templates);
+        return findAny(source, BotSettings.confidence(), templates);
     }
 
     /**
@@ -244,7 +245,7 @@ public class ImageFinder {
      * @see #findAny(ImageTemplateGroup, CaptureSource, double)
      */
     public static boolean findAny(ImageTemplateGroup group) {
-        return findAny(Source.current(), ClickConfig.DEFAULT_CONFIDENCE, group.toArray());
+        return findAny(Source.current(), BotSettings.confidence(), group.toArray());
     }
 
     /**
@@ -272,7 +273,7 @@ public class ImageFinder {
      * @return true if any template in the group was found, false otherwise
      */
     public static boolean findAny(ImageTemplateGroup group, CaptureSource source) {
-        return findAny(source, ClickConfig.DEFAULT_CONFIDENCE, group.toArray());
+        return findAny(source, BotSettings.confidence(), group.toArray());
     }
 
     /**
@@ -307,7 +308,7 @@ public class ImageFinder {
      * @see #findBest(ImageTemplateGroup, CaptureSource, double)
      */
     public static boolean findBest(ImageTemplateGroup group) {
-        return findBest(group, Source.current(), ClickConfig.DEFAULT_CONFIDENCE);
+        return findBest(group, Source.current(), BotSettings.confidence());
     }
 
     /**
@@ -335,7 +336,7 @@ public class ImageFinder {
      * @return true if any template in the group was found, false otherwise
      */
     public static boolean findBest(ImageTemplateGroup group, CaptureSource source) {
-        return findBest(group, source, ClickConfig.DEFAULT_CONFIDENCE);
+        return findBest(group, source, BotSettings.confidence());
     }
 
     /**
@@ -380,7 +381,7 @@ public class ImageFinder {
      */
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
         MatchResult result = compare(good.templates(), bad.templates(), Source.current(),
-                ClickConfig.DEFAULT_CONFIDENCE, ClickConfig.DEFAULT_COMPARE_MARGIN);
+                BotSettings.confidence(), BotSettings.compareMargin());
         VisionContext.setLastMatch(result);
         return result.isFound();
     }
@@ -399,7 +400,7 @@ public class ImageFinder {
      */
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
         MatchResult result = compare(good.templates(), bad.templates(), Source.current(),
-                ClickConfig.DEFAULT_CONFIDENCE, margin);
+                BotSettings.confidence(), margin);
         VisionContext.setLastMatch(result);
         return result.isFound();
     }
@@ -418,7 +419,7 @@ public class ImageFinder {
      */
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         MatchResult result = compare(good.templates(), bad.templates(), source,
-                ClickConfig.DEFAULT_CONFIDENCE, ClickConfig.DEFAULT_COMPARE_MARGIN);
+                BotSettings.confidence(), BotSettings.compareMargin());
         VisionContext.setLastMatch(result);
         return result.isFound();
     }
@@ -438,7 +439,7 @@ public class ImageFinder {
      */
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                           double margin) {
-        MatchResult result = compare(good.templates(), bad.templates(), source, ClickConfig.DEFAULT_CONFIDENCE, margin);
+        MatchResult result = compare(good.templates(), bad.templates(), source, BotSettings.confidence(), margin);
         VisionContext.setLastMatch(result);
         return result.isFound();
     }
@@ -458,7 +459,7 @@ public class ImageFinder {
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
     public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
-        return findAnyCompare(good, bad, Source.current(), ClickConfig.DEFAULT_COMPARE_MARGIN);
+        return findAnyCompare(good, bad, Source.current(), BotSettings.compareMargin());
     }
 
     /**
@@ -488,7 +489,7 @@ public class ImageFinder {
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
     public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
-        return findAnyCompare(good, bad, source, ClickConfig.DEFAULT_COMPARE_MARGIN);
+        return findAnyCompare(good, bad, source, BotSettings.compareMargin());
     }
 
     /**
@@ -506,7 +507,7 @@ public class ImageFinder {
     public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                          double margin) {
         MatchResult result = compareAny(good.templates(), bad.templates(), source,
-                ClickConfig.DEFAULT_CONFIDENCE, margin);
+                BotSettings.confidence(), margin);
         VisionContext.setLastMatch(result);
         return result.isFound();
     }
@@ -524,7 +525,7 @@ public class ImageFinder {
      * @return the number of winning good matches found
      */
     public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
-        return findAllCompare(good, bad, Source.current(), ClickConfig.DEFAULT_COMPARE_MARGIN);
+        return findAllCompare(good, bad, Source.current(), BotSettings.compareMargin());
     }
 
     /**
@@ -554,7 +555,7 @@ public class ImageFinder {
      * @return the number of winning good matches found
      */
     public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
-        return findAllCompare(good, bad, source, ClickConfig.DEFAULT_COMPARE_MARGIN);
+        return findAllCompare(good, bad, source, BotSettings.compareMargin());
     }
 
     /**
@@ -572,7 +573,7 @@ public class ImageFinder {
     public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                      double margin) {
         List<MatchResult> results = compareAll(good.templates(), bad.templates(), source,
-                ClickConfig.DEFAULT_CONFIDENCE, margin);
+                BotSettings.confidence(), margin);
         VisionContext.setLastMatchList(results);
         return results.size();
     }
@@ -739,7 +740,7 @@ public class ImageFinder {
      * @return the number of matches found
      */
     public static int findAll(ImageTemplate template) {
-        return findAll(template, Source.current(), ClickConfig.DEFAULT_CONFIDENCE);
+        return findAll(template, Source.current(), BotSettings.confidence());
     }
 
     /**
@@ -767,7 +768,7 @@ public class ImageFinder {
      * @return the number of matches found
      */
     public static int findAll(ImageTemplate template, CaptureSource source) {
-        return findAll(template, source, ClickConfig.DEFAULT_CONFIDENCE);
+        return findAll(template, source, BotSettings.confidence());
     }
 
     /**
@@ -843,7 +844,7 @@ public class ImageFinder {
      * @return the total number of matches found across all templates in the group
      */
     public static int findAll(ImageTemplateGroup group) {
-        return findAll(group, Source.current(), ClickConfig.DEFAULT_CONFIDENCE);
+        return findAll(group, Source.current(), BotSettings.confidence());
     }
 
     /**
@@ -871,7 +872,7 @@ public class ImageFinder {
      * @return the total number of matches found across all templates in the group
      */
     public static int findAll(ImageTemplateGroup group, CaptureSource source) {
-        return findAll(group, source, ClickConfig.DEFAULT_CONFIDENCE);
+        return findAll(group, source, BotSettings.confidence());
     }
 
     /**
@@ -941,7 +942,7 @@ public class ImageFinder {
      * @return true if the template was found and the action was run, false otherwise
      */
     public static boolean ifFind(ImageTemplate template, CaptureSource source, Consumer<MatchResult> action) {
-        MatchResult result = findInternal(template, source, ClickConfig.DEFAULT_CONFIDENCE);
+        MatchResult result = findInternal(template, source, BotSettings.confidence());
         VisionContext.setLastMatch(result);
         if (result.isFound()) {
             action.accept(result);
@@ -969,7 +970,7 @@ public class ImageFinder {
      */
     public static void whileFind(ImageTemplate template, CaptureSource source, Consumer<MatchResult> action) {
         MatchResult result;
-        while ((result = findInternal(template, source, ClickConfig.DEFAULT_CONFIDENCE)).isFound()) {
+        while ((result = findInternal(template, source, BotSettings.confidence())).isFound()) {
             VisionContext.setLastMatch(result);
             action.accept(result);
         }
@@ -1027,7 +1028,7 @@ public class ImageFinder {
      * @return true if any template was found and the action was run, false otherwise
      */
     public static boolean ifFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<MatchResult> action) {
-        MatchResult result = findAnyInternal(source, ClickConfig.DEFAULT_CONFIDENCE, group.toArray());
+        MatchResult result = findAnyInternal(source, BotSettings.confidence(), group.toArray());
         VisionContext.setLastMatch(result);
         if (result.isFound()) {
             action.accept(result);
@@ -1082,7 +1083,7 @@ public class ImageFinder {
      */
     public static void whileFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<MatchResult> action) {
         MatchResult result;
-        while ((result = findAnyInternal(source, ClickConfig.DEFAULT_CONFIDENCE, group.toArray())).isFound()) {
+        while ((result = findAnyInternal(source, BotSettings.confidence(), group.toArray())).isFound()) {
             VisionContext.setLastMatch(result);
             action.accept(result);
         }

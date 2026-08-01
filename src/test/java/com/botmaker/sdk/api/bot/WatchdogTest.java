@@ -3,7 +3,7 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.observe.Bots;
 import com.botmaker.sdk.api.observe.MatchEvent;
 import com.botmaker.sdk.api.observe.Surface;
-import com.botmaker.sdk.api.vision.ClickConfig;
+import com.botmaker.sdk.api.BotSettings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * Standalone (no Studio, no OpenCV, no real screen) tests for {@link Watchdog}. Drives it with {@code "miss"}
  * match events (a null result) so no {@code MatchResult} needs constructing, and pins
- * {@link ClickConfig#MAX_RETRY_ATTEMPTS} low for the duration.
+ * {@link BotSettings#maxRetryAttempts()} low for the duration.
  */
 class WatchdogTest {
 
@@ -22,8 +22,8 @@ class WatchdogTest {
 
     @BeforeEach
     void setUp() {
-        savedMax = ClickConfig.MAX_RETRY_ATTEMPTS;
-        ClickConfig.MAX_RETRY_ATTEMPTS = 3;
+        savedMax = BotSettings.maxRetryAttempts();
+        BotSettings.setMaxRetryAttempts(3);
         Watchdog.enable();
         Watchdog.reset();
     }
@@ -32,7 +32,7 @@ class WatchdogTest {
     void tearDown() {
         Watchdog.disable();
         Watchdog.reset();
-        ClickConfig.MAX_RETRY_ATTEMPTS = savedMax;
+        BotSettings.setMaxRetryAttempts(savedMax);
     }
 
     private static void fireMiss(int times) {

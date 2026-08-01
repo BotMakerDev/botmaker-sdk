@@ -5,7 +5,7 @@ import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.observe.BotObserver;
 import com.botmaker.sdk.api.observe.Bots;
 import com.botmaker.sdk.api.observe.MatchEvent;
-import com.botmaker.sdk.api.vision.ClickConfig;
+import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.vision.MatchResult;
 
 /**
@@ -68,12 +68,12 @@ public final class Watchdog {
 
     /**
      * Throws {@link BotStuckException} if the bot has shown no progress for
-     * {@link ClickConfig#MAX_RETRY_ATTEMPTS} consecutive match attempts; otherwise returns. Resets the
+     * {@link BotSettings#maxRetryAttempts()} consecutive match attempts; otherwise returns. Resets the
      * counter when it throws so recovery starts from a clean slate. Safe to call when disabled (never throws).
      */
     public static void checkpoint() {
         State s = STATE.get();
-        if (s.repeats >= ClickConfig.MAX_RETRY_ATTEMPTS) {
+        if (s.repeats >= BotSettings.maxRetryAttempts()) {
             int repeats = s.repeats;
             String sig = s.signature;
             progress();

@@ -25,7 +25,7 @@ import com.botmaker.session.DesktopSession;
  *
  * <p><b>What "targets a window" costs, on Linux.</b> Under the cursor-safe default backend the key is
  * delivered to the window in the background — but games and many toolkits reject those synthetic events, so
- * they see nothing. Once real input is enabled ({@code ClickConfig.useRealInput(true)}, or anything else that
+ * they see nothing. Once real input is enabled ({@code BotSettings.useRealInput(true)}, or anything else that
  * escalates the backend) the events come from a kernel virtual device that a game cannot tell from a real
  * keyboard — and such a device carries no window, so targeting is implemented as <em>raise the window, then
  * type</em>. Keys therefore reach the game, but the game is brought to the foreground first. There is no

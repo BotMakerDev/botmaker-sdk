@@ -8,6 +8,43 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-01 — improvements Phase 7: `ClickConfig` → `api.BotSettings`, seeded from the project
+
+**143 → 152 tests.** New: `api/BotSettings.java`, `api/BotSettingsTest.java`. Removed:
+`api/vision/ClickConfig.java`.
+
+### Done
+
+- **`api.vision.ClickConfig` → `api.BotSettings`.** It moves out of `api.vision` because it was never only
+  about vision (it carried the input backend and the retry budget), and it is now shaped like
+  `api.capture.Source`: one ambient value, seeded lazily from the project, overridable at runtime.
+- **The public mutable fields became accessors, and that is the load-bearing part.** `DEFAULT_CONFIDENCE`,
+  `RANDOMIZE_CLICKS`, `MAX_RETRY_ATTEMPTS` and friends were `public static` fields read directly by ~60 call
+  sites in `ImageFinder`/`ImageClicker`/`ImageWaiter`/`Watchdog`. A bare field read cannot trigger a lazy
+  load, so the project's values would have applied only if something happened to call a method first. They
+  are now `confidence()`, `randomizeClicks()`, `maxRetryAttempts()`, … each going through `ensureLoaded()`.
+  The `DEFAULT_*` names survive as genuine constants (the SDK's own defaults).
+- **`useRealInput` no longer needs a generated call, and that is what makes dropping the file safe.** It
+  swaps the process-wide Linux input backend, one-way, and must run *before the first click* — which is why
+  generated projects put it at the top of `main`. `input.real` is now applied inside `ensureLoaded()`, so
+  every click path performs the swap by reading a setting, ahead of the click that needs it. `loaded` is set
+  *before* the swap, so anything the native controller touches that reads a setting back does not re-enter.
+  This fails silently when wrong (the click is dropped and neither OS reports it), so it is tested directly:
+  `readingAnySettingEscalatesInputWhenTheProjectAsksForIt` asserts a plain `confidence()` read escalates.
+- **`DEFAULT_COMPARE_MARGIN` gained a real setter** (`setCompareMargin`), validated to 0–1. It used to be
+  assigned as a bare field, which is why the generated file wrote `ClickConfig.DEFAULT_COMPARE_MARGIN = x;`
+  rather than a call.
+- **`resetToDefaults()` marks itself loaded** rather than clearing the flag: the point of a reset is to end
+  up on the SDK defaults, so a later read must not re-seed the project's values over the top.
+
+### Deferred / next
+
+- `Debug`'s own project default (`debug`) is still read by `ProjectDefaults` rather than by `BotSettings`.
+  Folding it in would make one class own every project-seeded runtime value, but `Debug` has its own
+  lifecycle (it is toggled from Studio at run time over the telemetry wire) and is deliberately left alone.
+
+---
+
 ## 2026-07-31 — refactor Phase 3: the test floor (SD5 partial, SD6)
 
 Part of the repo-wide refactor scheduled in `../docs/refactor/02-execution-order.md`; this module's share is

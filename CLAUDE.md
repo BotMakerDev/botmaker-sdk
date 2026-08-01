@@ -84,7 +84,9 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   the only cost is the ordered cross-module release (see the umbrella `../CLAUDE.md`). Reinstate
   signature-stability discipline once real bots ship. It contains:
   - `api.vision` — `ImageFinder` (find + `exists` + the lambda control-flow `whileExists`/`ifExists`
-    /`untilExists`), `ImageClicker`, `ImageWaiter`, `MatchResult`, `ImageTemplate`, `ClickConfig`.
+    /`untilExists`), `ImageClicker`, `ImageWaiter`, `MatchResult`, `ImageTemplate`.
+  - `api.BotSettings` — the bot's runtime tuning (delays, confidence, compare margin, retry budget, real
+    input), seeded from the project's `botmaker-project.properties` on first read. Was `api.vision.ClickConfig`.
   - `api.capture.Screen` (`capture()`), `api.interaction.Mouse`/`Wait`, `api.core.Direction`,
     geometry `api.Point`/`Rect`/`Size`.
   - `api.BotMaker` — console IO. `readX()` prints a SOH-wrapped `BM-INPUT:<type>` marker to stdout

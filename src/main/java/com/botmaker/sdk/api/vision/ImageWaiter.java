@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.vision;
 import com.botmaker.sdk.api.Debug;
 
+import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -34,7 +35,7 @@ public class ImageWaiter {
      * @see #waitFor(ImageTemplate, CaptureSource, int, double)
      */
     public static boolean waitFor(ImageTemplate template, int timeoutSeconds) {
-        return waitFor(template, Source.current(), timeoutSeconds, ClickConfig.DEFAULT_CONFIDENCE);
+        return waitFor(template, Source.current(), timeoutSeconds, BotSettings.confidence());
     }
 
     /**
@@ -64,7 +65,7 @@ public class ImageWaiter {
      * @return true if the template was found within timeout, false if the timeout elapsed
      */
     public static boolean waitFor(ImageTemplate template, CaptureSource source, int timeoutSeconds) {
-        return waitFor(template, source, timeoutSeconds, ClickConfig.DEFAULT_CONFIDENCE);
+        return waitFor(template, source, timeoutSeconds, BotSettings.confidence());
     }
 
     /**
@@ -117,7 +118,7 @@ public class ImageWaiter {
      * @see #waitUntilGone(ImageTemplate, CaptureSource, int, double)
      */
     public static boolean waitUntilGone(ImageTemplate template, int timeoutSeconds) {
-        return waitUntilGone(template, Source.current(), timeoutSeconds, ClickConfig.DEFAULT_CONFIDENCE);
+        return waitUntilGone(template, Source.current(), timeoutSeconds, BotSettings.confidence());
     }
 
     /**
@@ -147,7 +148,7 @@ public class ImageWaiter {
      * @return true if the template disappeared within the timeout, false if the timeout elapsed
      */
     public static boolean waitUntilGone(ImageTemplate template, CaptureSource source, int timeoutSeconds) {
-        return waitUntilGone(template, source, timeoutSeconds, ClickConfig.DEFAULT_CONFIDENCE);
+        return waitUntilGone(template, source, timeoutSeconds, BotSettings.confidence());
     }
 
     /**
@@ -201,7 +202,7 @@ public class ImageWaiter {
      * @see #waitAndClick(ImageTemplate, CaptureSource, int, double)
      */
     public static boolean waitAndClick(ImageTemplate template, int timeoutSeconds) {
-        return waitAndClick(template, Source.current(), timeoutSeconds, ClickConfig.DEFAULT_CONFIDENCE);
+        return waitAndClick(template, Source.current(), timeoutSeconds, BotSettings.confidence());
     }
 
     /**
@@ -231,7 +232,7 @@ public class ImageWaiter {
      * @return true if the template was found and clicked within the timeout, false otherwise
      */
     public static boolean waitAndClick(ImageTemplate template, CaptureSource source, int timeoutSeconds) {
-        return waitAndClick(template, source, timeoutSeconds, ClickConfig.DEFAULT_CONFIDENCE);
+        return waitAndClick(template, source, timeoutSeconds, BotSettings.confidence());
     }
 
     /**
@@ -251,9 +252,9 @@ public class ImageWaiter {
                                        int timeoutSeconds, double confidence) {
         if (waitFor(template, source, timeoutSeconds, confidence)) {
             MatchResult result = VisionContext.getLastMatch();
-            Point clickPoint = ClickConfig.RANDOMIZE_CLICKS ? result.getRandomClickPoint() : result.getCenter();
+            Point clickPoint = BotSettings.randomizeClicks() ? result.getRandomClickPoint() : result.getCenter();
             Mouse.click(clickPoint);
-            Wait.milliseconds(ClickConfig.DEFAULT_FOUND_DELAY);
+            Wait.milliseconds(BotSettings.foundDelay());
             Debug.log("[Vision] found and clicked " + template.getId());
             return true;
         }

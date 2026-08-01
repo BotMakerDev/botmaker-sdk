@@ -10,7 +10,7 @@ import com.botmaker.sdk.internal.config.ProjectDefaults;
  *   <li>the lifecycle/launch traces — {@code [Bot]}, {@code [Game]}, {@code [Target]}, {@code [Activity]}
  *       — that used to print unconditionally, and</li>
  *   <li>the vision traces (find/click/wait/pixel/text) that used to be gated by the separate
- *       {@code ClickConfig.DEBUG_MODE}; {@code ClickConfig.enableDebugMode(...)} now delegates here.</li>
+ *       {@code ClickConfig.DEBUG_MODE}; {@code BotSettings.enableDebugMode(...)} now delegates here.</li>
  * </ul>
  *
  * <p><b>Default: on.</b> A bot prints its trace out of the box so a first run is legible; turn it off for a

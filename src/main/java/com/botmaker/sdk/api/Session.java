@@ -12,9 +12,9 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * machine while it runs. A non-isolated bot shares the real {@code :0} with you and has none of those
  * properties.
  *
- * <p><b>Default: on.</b> Isolation is the intended way to run, so it needs no code at all; only opting out does.
- * The generated {@code BotSettings} therefore emits {@link #disable()} only when the project's checkbox is off,
- * and nothing when it isn't — a default project's generated source stays free of session boilerplate.
+ * <p><b>Default: on.</b> Isolation is the intended way to run, so it needs no code at all; only opting out does —
+ * and a project that opts out in Studio does it through the {@code session.isolated} key below rather than a
+ * generated call, so a default project's source stays free of session boilerplate either way.
  *
  * <p><b>Precedence</b>, highest first — an explicit call always wins so a bot can force its own behaviour on a
  * machine whose environment says otherwise:
