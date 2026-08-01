@@ -6,9 +6,10 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
 
 /**
  * The SDK's global, ambient <em>launch target</em> — the "what" the bot automates, the launch-side counterpart
- * to {@link com.botmaker.sdk.api.capture.Source} (the "where" it looks). A game-bot's generated
- * {@code Startup.run()} is just {@code Target.start();}, so the supervisor (re)launches whatever the project is
- * configured to run without the user hand-editing any launch code.
+ * to {@link com.botmaker.sdk.api.capture.Source} (the "where" it looks). A game bot's start-up step
+ * is just {@link #startIfNotRunning()} / {@link #restart()} — {@link com.botmaker.sdk.api.bot.Bot#start(Runnable,
+ * Runnable)} calls them for you — so the supervisor (re)launches whatever the project is configured to run
+ * without the user hand-editing any launch code.
  *
  * <p>On first use the current target initialises from the <strong>project default</strong> — the
  * {@code launch.target} key Studio bakes into {@code botmaker-project.properties} (see {@link ProjectDefaults}).

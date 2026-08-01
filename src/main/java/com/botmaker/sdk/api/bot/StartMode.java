@@ -1,8 +1,8 @@
 package com.botmaker.sdk.api.bot;
 
 /**
- * Why the supervisor is invoking the game start-up step, so the generated {@code Startup} can do the right
- * thing for each case rather than launching unconditionally every time.
+ * Why the supervisor is invoking the game start-up step, so it can do the right thing for each case rather
+ * than launching unconditionally every time.
  *
  * <ul>
  *   <li>{@link #COLD} — the one-time start before the first loop pass. The game may already be open (the user

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.launch.Target;
 
 import java.util.function.Consumer;
 
@@ -12,11 +13,13 @@ import java.util.function.Consumer;
  * back to a known-good state before restarting. This is the "restart the bot on failure" machinery a game
  * bot needs; the body, the recovery hooks and the per-activity logic stay in editable user code.
  *
- * <p>The 3-arg {@link #supervise(Runnable, Runnable, Consumer)} also runs your start-up sequence <em>once</em>
- * before the first loop pass — {@code startGame(COLD)} then {@code goHome()} — so a fresh launch actually opens
- * the game and reaches a known screen instead of assuming it is already running. The start-up step is handed a
- * {@link StartMode} so it can tell a first {@code COLD} launch (don't relaunch an already-open game) from a
- * {@code RESTART} recovery (shut a frozen game down first).
+ * <p>Both {@link #start} forms also run a start-up sequence <em>once</em> before the first loop pass —
+ * {@code startGame(COLD)} then {@code goHome()} — so a fresh launch actually opens the game and reaches a known
+ * screen instead of assuming it is already running. The start-up step is handed a {@link StartMode} so it can
+ * tell a first {@code COLD} launch (don't relaunch an already-open game) from a {@code RESTART} recovery (shut
+ * a frozen game down first). {@link #start(Runnable, Runnable)} supplies that step itself, from the project's
+ * configured {@link com.botmaker.sdk.api.launch.Target}; pass your own to
+ * {@link #start(Runnable, Runnable, Consumer)} when the game needs more than launching.
  *
  * <p>The bot ends when {@link #stop()} is called — from an activity that is done, or automatically by the
  * generated loop once every activity is disabled. {@code stop()} unwinds the supervise loop cleanly and
@@ -42,14 +45,39 @@ public final class Bot {
     }
 
     /**
-     * Starts the bot: the single public entry point. Runs {@code body} forever, recovering with
-     * {@code recovery} whenever it throws. Delegates to the internal supervise loop.
+     * Starts the bot: the single public entry point, and the one a generated game bot uses. Runs {@code body}
+     * forever, with the standard "get home, then (re)start the configured launch target" lifecycle around it —
+     * a one-time cold start before the first pass, and a {@code goHome} → restart recovery on every crash or
+     * stuck state.
      *
-     * @param body     the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
-     * @param recovery run after a crash/stuck to restore a known-good state before the next attempt
+     * <p>The start-up step is the SDK's own: {@link Target#startIfNotRunning()} on the cold start,
+     * {@link Target#restart()} on a recovery, driven by the {@link StartMode} the supervisor supplies. That is
+     * the whole of what generated projects used to carry as a read-only {@code Startup.java} — the launch
+     * target itself was never in that file, it is read from {@code botmaker-project.properties} at runtime, so
+     * the file said nothing a bot's own project didn't already say. A project with no target configured simply
+     * launches nothing.
+     *
+     * <p>Use {@link #start(Runnable, Runnable, Consumer)} to supply a start-up step of your own instead.
+     *
+     * @param body   the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
+     * @param goHome navigate from wherever the bot is back to a safe/home screen
      */
-    public static void start(Runnable body, Runnable recovery) {
-        supervise(body, recovery);
+    public static void start(Runnable body, Runnable goHome) {
+        supervise(body, goHome, Bot::launchConfiguredTarget);
+    }
+
+    /**
+     * The default start-up step: bring the project's configured launch target up, choosing skip-if-already-
+     * running on a first {@code COLD} launch over force-stop-then-relaunch on a {@code RESTART} recovery.
+     *
+     * <p>Private because a bot that wants something else passes its own {@code Consumer<StartMode>} to the
+     * 3-arg {@link #start}; the two {@link Target} calls it would delegate to are public.
+     */
+    private static void launchConfiguredTarget(StartMode mode) {
+        switch (mode) {
+            case COLD -> Target.startIfNotRunning();
+            case RESTART -> Target.restart();
+        }
     }
 
     /**

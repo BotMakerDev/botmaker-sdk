@@ -80,6 +80,21 @@ class BotTest {
     }
 
     @Test
+    void theTwoArgStartSuppliesTheLaunchStepItselfInsteadOfAGeneratedStartupFile() {
+        // The 2-arg start is what a generated game bot calls now that Startup.java is gone: it must still run
+        // the full cold-start lifecycle, launch step included. With no target configured the launch is a
+        // documented no-op, so what is observable — and what would have been lost silently had the overload
+        // simply dropped the step — is that goHome still runs once, before the first body pass.
+        com.botmaker.sdk.api.launch.Target.set((String) null);
+        StringBuilder order = new StringBuilder();
+        assertThrows(StopLoop.class, () -> Bot.start(
+                () -> { order.append("B"); throw new StopLoop(); },
+                () -> order.append("H")));
+        assertEquals("HB", order.toString(),
+                "cold start runs the configured target then goHome, before the first body pass");
+    }
+
+    @Test
     void stopBreaksTheLoopAndSuperviseReturnsWithoutRecovering() {
         // Bot.stop() is the clean exit: supervise returns normally (no StopLoop needed) and never recovers.
         AtomicInteger body = new AtomicInteger();

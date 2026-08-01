@@ -8,6 +8,32 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-02 — improvements Phase 9: the launch step moves into `Bot.start`
+
+**156 → 157 tests.** Changed: `api/bot/Bot.java`, `api/bot/StartMode.java`, `api/launch/Target.java`,
+`api/bot/BotTest.java`.
+
+### Done
+
+- **`Bot.start(Runnable body, Runnable goHome)` now supplies the start-up step itself** —
+  `Target.startIfNotRunning()` on the cold start, `Target.restart()` on a recovery, switched on the
+  `StartMode` the supervisor already hands out. That is the entire body of the `Startup.java` Studio used to
+  generate into every game bot: the launch target was never in that file, it is read from
+  `botmaker-project.properties` at runtime, so the file was a per-project copy of SDK behaviour with only its
+  `package` line to make it the project's. It is no longer generated (see the Studio roadmap).
+- **This retypes the existing 2-arg overload rather than adding one.** `start(body, recovery)` and
+  `start(body, goHome)` have the same erasure, so they cannot coexist. The generic
+  "run forever, recover with this" form is subsumed by the 3-arg `start(body, goHome, startGame)` — pass a
+  no-op start-up step — and the shape that every generated bot actually calls is now the short one. Free to
+  do because no published bot consumes the API yet; a shim would have been the wrong trade.
+- **`launchConfiguredTarget` is private.** A bot wanting different start-up passes its own
+  `Consumer<StartMode>`; the two `Target` calls it delegates to are public, so nothing is walled off.
+- The new test asserts the observable half — with no target configured the launch is a documented no-op, so
+  what would have been lost silently if the overload had simply dropped the step is that `goHome` still runs
+  once, before the first body pass.
+
+---
+
 ## 2026-08-01 — improvements Phase 8: `Tolerance` and `MinPixels`, the two `Pixel` knobs as types
 
 **152 → 156 tests.** New: `api/vision/Tolerance.java`, `api/vision/MinPixels.java`,
