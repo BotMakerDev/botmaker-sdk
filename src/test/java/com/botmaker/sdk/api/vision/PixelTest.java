@@ -39,7 +39,7 @@ class PixelTest {
     void findReportsAbsoluteCoordinates() {
         CaptureSource source = new FakeSource(sceneWithRedPatch(), 500, 300);
 
-        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.DEFAULT));
+        assertTrue(Pixel.find(Color.RED, source, Precision.TIGHT));
 
         ColorMatch m = VisionContext.getLastColorMatch();
         assertTrue(m.isFound());
@@ -60,10 +60,10 @@ class PixelTest {
     @Test
     void aMissLeavesANotFoundResultRatherThanStaleData() {
         CaptureSource source = new FakeSource(sceneWithRedPatch(), 0, 0);
-        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.DEFAULT));
+        assertTrue(Pixel.find(Color.RED, source, Precision.TIGHT));
         assertTrue(VisionContext.lastColorMatchFound());
 
-        assertFalse(Pixel.find(Color.MAGENTA, Tolerance.EXACT, source, MinMatch.DEFAULT));
+        assertFalse(Pixel.find(Color.MAGENTA, source, Precision.EXACT));
         ColorMatch m = VisionContext.getLastColorMatch();
         assertFalse(m.isFound(), "a miss must overwrite the previous hit");
         assertNull(m.getCenter());
@@ -76,8 +76,8 @@ class PixelTest {
         CaptureSource source = new FakeSource(img, 0, 0);
 
         // The patch is 400px. Demanding more than that finds nothing, at the very same colour tolerance.
-        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.area(400)));
-        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.area(401)));
+        assertTrue(Pixel.find(Color.RED, source, Precision.TIGHT.minArea(400)));
+        assertFalse(Pixel.find(Color.RED, source, Precision.TIGHT.minArea(401)));
     }
 
     @Test
@@ -94,9 +94,9 @@ class PixelTest {
     @Test
     void matchesAtUsesColourToleranceOnly() {
         CaptureSource source = new FakeSource(sceneWithRedPatch(), 0, 0);
-        assertTrue(Pixel.matchesAt(15, 25, Color.RED, Tolerance.EXACT, source));
-        assertFalse(Pixel.matchesAt(15, 25, Color.GREEN, Tolerance.LOOSE, source));
-        assertFalse(Pixel.matchesAt(0, 0, Color.RED, Tolerance.TIGHT, source), "white is not red");
+        assertTrue(Pixel.matchesAt(15, 25, Color.RED, source, Precision.EXACT));
+        assertFalse(Pixel.matchesAt(15, 25, Color.GREEN, source, Precision.LOOSE));
+        assertFalse(Pixel.matchesAt(0, 0, Color.RED, source, Precision.TIGHT), "white is not red");
     }
 
     @Test
@@ -106,7 +106,7 @@ class PixelTest {
             for (int x = 60; x < 65; x++) img.setRGB(x, y, Color.RED.getRGB());   // a smaller 25px patch
         CaptureSource source = new FakeSource(img, 0, 0);
 
-        assertEquals(2, Pixel.findAll(Color.RED, Tolerance.TIGHT, source, MinMatch.DEFAULT));
+        assertEquals(2, Pixel.findAll(Color.RED, source, Precision.TIGHT));
         List<ColorMatch> all = VisionContext.getLastColorMatchList();
         assertEquals(400, all.get(0).getPixelCount());
         assertEquals(25, all.get(1).getPixelCount());
@@ -116,7 +116,7 @@ class PixelTest {
     void theCountThresholdSeesColourTheAreaThresholdRejects() {
         // Two 25px patches: 50 red pixels present, but no blob anywhere near 400. The area test says no, the
         // count test says yes, and neither is wrong — they were asked different questions. This is the whole
-        // reason MinMatch carries both, and it is behaviour the old single threshold could not express.
+        // reason Precision carries both, and it is behaviour the old single threshold could not express.
         BufferedImage img = new BufferedImage(100, 80, BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < 80; y++)
             for (int x = 0; x < 100; x++) img.setRGB(x, y, Color.WHITE.getRGB());
@@ -126,25 +126,47 @@ class PixelTest {
             for (int x = 60; x < 65; x++) img.setRGB(x, y, Color.RED.getRGB());
         CaptureSource source = new FakeSource(img, 0, 0);
 
-        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.area(400)));
-        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.count(50)));
-        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.count(51)));
+        assertFalse(Pixel.find(Color.RED, source, Precision.TIGHT.minArea(400)));
+        assertTrue(Pixel.find(Color.RED, source, Precision.TIGHT.minArea(1).minCount(50)));
+        assertFalse(Pixel.find(Color.RED, source, Precision.TIGHT.minArea(1).minCount(51)));
         // And the pair is an AND: a count it passes cannot rescue an area it fails.
-        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, source, MinMatch.of(400, 50)));
+        assertFalse(Pixel.find(Color.RED, source, Precision.TIGHT.minArea(400).minCount(50)));
+    }
+
+    @Test
+    void anOperationThatCannotUseAKnobIgnoresItRatherThanChangingItsAnswer() {
+        // One type for every search means some calls are handed fields they have no use for. That is the
+        // accepted cost of not making callers assemble three arguments, and it is only safe while "no use
+        // for" means exactly no effect — if a stray minArea could quietly turn a matchesAt into a miss, the
+        // collapse would have reintroduced the silent wrongness these types exist to remove.
+        CaptureSource source = new FakeSource(sceneWithRedPatch(), 0, 0);
+
+        // matchesAt tests one pixel: there is no blob to measure and no total to reach.
+        assertTrue(Pixel.matchesAt(15, 25, Color.RED, source,
+                Precision.EXACT.minArea(100_000).minCount(100_000)));
+        // coverage counts every matching pixel and never clusters.
+        assertEquals(Pixel.coverage(Color.RED, source, Precision.TIGHT),
+                Pixel.coverage(Color.RED, source, Precision.TIGHT.minArea(100_000).minCount(100_000)), 1e-9);
+        // findInRange takes a band, so it has no target colour for a ΔE to measure from — but it does read
+        // both quantity gates, which is the half of Precision it genuinely uses.
+        assertTrue(Pixel.findInRange(new Color(150, 0, 0), new Color(255, 80, 80), source,
+                Precision.EXACT.minArea(400)));
+        assertFalse(Pixel.findInRange(new Color(150, 0, 0), new Color(255, 80, 80), source,
+                Precision.LOOSE.minArea(401)));
     }
 
     @Test
     void coverageIsTheMatchingFractionOfTheSource() {
         CaptureSource source = new FakeSource(sceneWithRedPatch(), 0, 0);
         // 400 red px out of 100*80 = 8000 -> 0.05
-        assertEquals(0.05, Pixel.coverage(Color.RED, Tolerance.TIGHT, source), 0.005);
+        assertEquals(0.05, Pixel.coverage(Color.RED, source, Precision.TIGHT), 0.005);
     }
 
     @Test
     void distanceIsPerceptual() {
         assertEquals(0.0, Pixel.distance(Color.RED, Color.RED), 1e-9);
         assertTrue(Pixel.distance(Color.RED, Color.GREEN) > 50);
-        assertTrue(Pixel.distance(Color.RED, new Color(250, 5, 5)) < Tolerance.TIGHT.deltaE());
+        assertTrue(Pixel.distance(Color.RED, new Color(250, 5, 5)) < Precision.TIGHT.deltaE());
     }
 
     @Test
@@ -152,9 +174,9 @@ class PixelTest {
         CaptureSource full = new FakeSource(sceneWithRedPatch(), 0, 0);
         // The red patch lives at (10,20)-(30,40); a region well away from it must not see it.
         CaptureSource elsewhere = full.region(new Rect(50, 50, 40, 25));
-        assertFalse(Pixel.find(Color.RED, Tolerance.TIGHT, elsewhere, MinMatch.DEFAULT));
+        assertFalse(Pixel.find(Color.RED, elsewhere, Precision.TIGHT));
 
         CaptureSource onIt = full.region(new Rect(5, 15, 40, 30));
-        assertTrue(Pixel.find(Color.RED, Tolerance.TIGHT, onIt, MinMatch.DEFAULT));
+        assertTrue(Pixel.find(Color.RED, onIt, Precision.TIGHT));
     }
 }

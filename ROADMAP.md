@@ -8,25 +8,39 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
-## 2026-08-02 — `MinPixels` → `MinMatch`: two thresholds that answer two questions
+## 2026-08-02 — `Tolerance` + `MinPixels` → one `Precision`
 
-**157 → 161 tests.** Changed: `api/vision/MinPixels.java` (deleted) → `api/vision/MinMatch.java`,
-`api/vision/Pixel.java`, `api/vision/ColorMatch.java`, `api/vision/PixelTest.java`,
-`ToleranceAndMinPixelsTest` → `ToleranceAndMinMatchTest`.
+**157 → 164 tests.** Deleted `api/vision/{Tolerance,MinPixels}.java`; added `api/vision/Precision.java`.
+Changed: `api/vision/Pixel.java`, `api/vision/ColorMatch.java`, `api/vision/PixelTest.java`,
+`ToleranceAndMinPixelsTest` → `PrecisionTest`.
+
+(Landed in two steps the same day: `MinPixels` first became a paired `MinMatch(area, count)`, then that and
+`Tolerance` collapsed into `Precision`. Only the end state is described here — `MinMatch` never left this
+repo.)
 
 ### Done
 
-- **`record MinMatch(int area, int count)`** replaces `MinPixels` on every `Pixel` search. `area` is the old
-  minimum blob area; `count` is new — how many matching pixels the search must see in total, however they
-  clump. `DEFAULT` (4, 0), `ANY` (1, 0), and factories `area(n)` / `count(n)` / `of(a, c)`.
-- **Why one type and not two arguments.** An area floor over an unbounded search mostly says "not a speck",
-  which is rarely the question anyone had — it reads as useless alone, which is exactly how it was reported.
-  A count with no area floor cannot tell one solid patch from the same pixels sprinkled across the screen.
-  Bundling them makes it impossible to set one and leave the other at a default nobody considered.
-- **Validation is asymmetric on purpose:** `area` must be ≥ 1 (a cluster of nothing cannot be honoured),
-  `count` may be 0 (the honest "no requirement", and what both constants use).
-- The no-region convenience overloads keep a threshold (`MinMatch.DEFAULT`) rather than splitting the API
-  between regioned and unregioned searches.
+- **`record Precision(double deltaE, int minArea, int minCount)`** is now the single strictness argument of
+  every `Pixel` search. Anchors `EXACT`/`TIGHT`/`DEFAULT`/`LOOSE` (the old `Tolerance` constants, each
+  carrying the default area floor of 4 and no count requirement), `of(deltaE)` / `of(deltaE, area, count)`,
+  and withers `tolerance(d)` / `minArea(n)` / `minCount(n)` so you start from an anchor and move one knob.
+- **`minCount` is new** — matching pixels in total, however they clump, gated on the raw mask by shared's
+  `ColorMatcher` before clustering. An area floor over an unbounded search mostly says "not a speck", which
+  is rarely the question anyone had; the count is what turns it into a real assertion.
+- **Argument order is now `(what, where, how)`** — `find(RED, hud, Precision.TIGHT.minArea(400))`. The
+  source comes before the precision throughout, including `waitFor`/`waitForGone` (timeout last).
+- **Three operations read only part of it, by design and by test.** `matchesAt` tests one pixel and
+  `coverage` never clusters, so both read only `deltaE`; `findInRange` takes a colour band, so it reads only
+  the two quantity gates. Each says so in its javadoc, and `PixelTest` pins that a knob they cannot use has
+  *exactly* no effect — the collapse is only safe while that holds.
+- **Validation is asymmetric on purpose:** `deltaE ≥ 0` and non-NaN, `minArea ≥ 1` (a cluster of nothing
+  cannot be honoured), `minCount ≥ 0` (the honest "no requirement", and what every anchor uses).
+
+### Deferred / next
+
+- Studio's `ToleranceArgPicker` + `MinPixelsArgPicker` still dispatch on the old type names and must become
+  one `Precision` editor — which should show only the knobs the call it is attached to actually uses, turning
+  the javadoc caveat above into something the UI enforces. Planned as Phase B alongside the colour sampler.
 
 ---
 
