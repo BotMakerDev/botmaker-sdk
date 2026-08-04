@@ -8,6 +8,34 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-04 — The wait length is `java.time.Duration`, and the range is a call
+
+**192 tests** (was 195; `DurationTest`'s 8 became `WaitTest`'s 5). Deleted `api/interaction/Duration.java`
+and `DurationTest.java`; added `api/interaction/WaitTest.java`; changed `api/interaction/Wait.java`.
+Improvements round 2 phase 3.
+
+The entry below introduced a BotMaker `Duration`. It is gone: `java.time.Duration` already models a length of
+time, every Java author knows it, and the duplicate **simple name was itself a live hazard** — Studio's
+`ImportManager` mapped the bare name `Duration` to `java.time.Duration` while the picker inserted the SDK's,
+so anything resolving that name through the import table imported the wrong class.
+
+Its one irreplaceable feature, the range, moved to **`Wait.between(min, max)`**. That is the more important
+half of this change and it is not a mechanical port: the old range was a *value* whose `millis()` accessor
+re-rolled on **every read**, so two reads of the same object disagreed — the logged wait was never guaranteed
+to be the slept wait, and only `Wait.time` reading it exactly once kept that honest. Rolling at the call site
+removes the trap entirely, and there is nothing left that a plain `java.time.Duration` cannot say.
+
+Decisions worth keeping:
+
+- **`between` waits, it does not return a `Duration`.** A helper returning a randomized length would put the
+  roll back at a distance from the sleep. The bot-facing API is "wait a random amount", which is a verb.
+- **Mixed units are now free.** `Wait.between(Duration.ofMillis(800), Duration.ofSeconds(2))` is two
+  independent arguments, where the old range type had to reject mixed ends because its picker could only show
+  one unit.
+- **The unit an author typed is still not recoverable from the value** (`ofSeconds(1)` *is* `ofMillis(1000)`),
+  so Studio's picker keeps reading the unit off the factory name in the source, not off the number.
+- `Wait.milliseconds(int)` / `seconds(double)` / `minutes(double)` stay as literal shorthands, unchanged.
+
 ## 2026-08-04 — `Duration`: a wait that carries its unit, and can be a range
 
 **183 → 195 tests.** Added `api/interaction/Duration.java`, `api/interaction/DurationTest.java`,
