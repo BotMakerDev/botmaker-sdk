@@ -310,6 +310,46 @@ public final class Time {
     }
 
     /**
+     * Checks whether the current time of day falls between {@code start} and {@code end} (both inclusive to
+     * the minute) — the minute-precision form of {@link #isBetween(int, int)}, for a window that doesn't
+     * start on the hour: {@code Time.isBetween(LocalTime.of(5, 30), LocalTime.of(6, 0))}.
+     *
+     * <p>Wraps around midnight the same way: a window whose end is before its start is read as spanning
+     * midnight, which is what "the reset window is 23:50 to 00:10" means.
+     *
+     * @param start the start of the window
+     * @param end   the end of the window
+     * @return true when now is inside the window
+     * @throws IllegalArgumentException if either bound is null
+     */
+    public static boolean isBetween(LocalTime start, LocalTime end) {
+        if (start == null || end == null) {
+            throw new IllegalArgumentException("Both ends of the window are required");
+        }
+        LocalTime nowTime = currentTime().withSecond(0).withNano(0);
+        if (!start.isAfter(end)) {
+            return !nowTime.isBefore(start) && !nowTime.isAfter(end);
+        }
+        return !nowTime.isBefore(start) || !nowTime.isAfter(end);   // wraps midnight
+    }
+
+    /**
+     * Checks whether today is one of {@code days} — for a task that only runs on certain weekdays
+     * ({@code Time.isDay(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)}).
+     *
+     * @param days the days to test against; none given ⇒ false
+     * @return true when today is one of them
+     */
+    public static boolean isDay(DayOfWeek... days) {
+        if (days == null) return false;
+        DayOfWeek todayIs = dayOfWeek();
+        for (DayOfWeek day : days) {
+            if (todayIs == day) return true;
+        }
+        return false;
+    }
+
+    /**
      * Checks if the current UTC time is between the specified hours (inclusive).
      *
      * @param startHour the start hour (0-23)

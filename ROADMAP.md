@@ -8,6 +8,38 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-04 — `Duration`: a wait that carries its unit, and can be a range
+
+**183 → 195 tests.** Added `api/interaction/Duration.java`, `api/interaction/DurationTest.java`,
+`api/TimeWindowTest.java`. Changed: `api/interaction/Wait.java`, `api/Time.java`.
+
+`Wait.milliseconds(2)` and `Wait.seconds(2)` differ by a factor of a thousand and read identically, and a slot
+typed `int` gives Studio nothing to dispatch an editor on. `Duration` is the same argument already recorded
+here for `Precision`: a value type so the editor is chosen **by type**, never by a `(method, argIndex)` table
+that stops firing the day the facade gains an overload.
+
+The second half is the one that matters for bots: a `Duration` may be a **range**
+(`Duration.between(Duration.ms(800), Duration.ms(1500))`), re-rolled on every read. Humanized delays are the
+normal case, not an advanced one — a bot that waits exactly 1000ms between every action is trivially
+identifiable as one — so the range lives in the type every waiting call already takes, rather than in a
+separate API an author has to go find. A fixed duration is just the range whose ends are equal, which is why
+`millis()` is the only accessor callers need.
+
+Decisions worth keeping:
+
+- **`Wait.time(Duration)` is added, not swapped in.** The plan said retype `milliseconds`/`seconds`; keeping
+  them costs nothing (a one-off fixed pause reads best as `Wait.seconds(2)`, and the SDK uses them for its own
+  poll intervals), and the picker fires on the `Duration` type wherever it appears. Studio's palette inserts
+  `Wait.time(Duration.seconds(1))`, so the editable form is the one users meet.
+- **Milliseconds are the storage unit**, so `Duration.seconds(1.5)` *equals* `Duration.ms(1500)` — which means
+  the unit the author typed is not recoverable from the value. Studio's picker therefore reads the unit off the
+  *source*, not the number.
+- **`Time` gained the two daily-reset predicates the Studio pickers needed something to edit:**
+  `isBetween(LocalTime, LocalTime)` (minute precision, wraps midnight — a 23:50–00:10 reset window read as
+  "start ≤ now ≤ end" matches nothing, all day, silently) and `isDay(DayOfWeek...)`.
+
+---
+
 ## 2026-08-04 — `PopupGuard`: dismiss the game's interruptions before every vision step
 
 **177 → 183 tests.** Added `api/bot/PopupGuard.java`, `api/bot/PopupGuardTest.java`. Changed:
