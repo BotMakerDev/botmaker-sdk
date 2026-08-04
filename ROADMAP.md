@@ -8,6 +8,24 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-04 — CI: the OCR tests error where there is no libtesseract
+
+**164 tests, unchanged.** Changed: `api/vision/TextTest.java`, `.github/workflows/build.yml`. This repo's
+GitHub Actions run was red with 3 errors, all of them `TextTest` — the SDK's only tests that recognize text,
+routing straight into shared's `OcrEngine`.
+
+### Done
+
+- **`TextTest` skips instead of erroring without a system `libtesseract`,** via a `@BeforeEach` assumption
+  probing `Class.forName("net.sourceforge.tess4j.TessAPI")`. The probe catches `Throwable`: the binding loads
+  lazily and fails as an `UnsatisfiedLinkError` (then `NoClassDefFoundError` on every later attempt), which
+  surefire counts as an *error* rather than a failure, and `OcrEngine` intentionally does not catch it so a
+  genuine load failure can't masquerade as "no text". Same guard shape as shared's `OcrEngineTest`.
+- **CI installs the natives** (`libtesseract-dev libleptonica-dev`) so that guard never fires there — a
+  skipped test is not a passing one. Windows needs nothing: Tess4J bundles its DLLs.
+
+---
+
 ## 2026-08-02 — `Tolerance` + `MinPixels` → one `Precision`
 
 **157 → 164 tests.** Deleted `api/vision/{Tolerance,MinPixels}.java`; added `api/vision/Precision.java`.

@@ -37,6 +37,13 @@ jobs:
           java-version: '21'
           cache: maven
 
+      # api/vision/TextTest routes into shared's OcrEngine, which is self-contained on Windows but needs the
+      # system libraries on Linux. Without them the tests skip themselves, and skipped is not covered. The
+      # -dev packages carry the unversioned .so symlinks JNA resolves by bare name; the traineddata is
+      # bundled in shared's jar, so no tesseract-ocr-* language package is needed.
+      - name: Install OCR natives
+        run: sudo apt-get update && sudo apt-get install -y libtesseract-dev libleptonica-dev
+
       - name: Install botmaker-shared and botmaker-session (0.0.0-SNAPSHOT)
         run: |
           mvn -B -f .deps/botmaker-shared/pom.xml install -DskipTests

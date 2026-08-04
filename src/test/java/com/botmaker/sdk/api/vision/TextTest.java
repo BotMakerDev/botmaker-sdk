@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.vision;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.awt.Color;
@@ -13,6 +14,7 @@ import java.awt.image.BufferedImage;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Verifies the SDK {@link Text} facade end to end against a fixed-origin {@link CaptureSource} stub:
@@ -23,6 +25,25 @@ class TextTest {
 
     private static final int ORIGIN_X = 300;
     private static final int ORIGIN_Y = 200;
+
+    /**
+     * {@link Text} recognizes through shared's {@code OcrEngine}, which is self-contained on Windows but needs
+     * a system {@code libtesseract} on Linux. The binding loads it lazily and fails as an {@code Error} that
+     * {@code OcrEngine} deliberately does not catch — so probe for it rather than let every test error out.
+     */
+    private static boolean tesseractAvailable() {
+        try {
+            Class.forName("net.sourceforge.tess4j.TessAPI"); // initializes INSTANCE, which loads the library
+            return true;
+        } catch (Throwable noNative) { // UnsatisfiedLinkError, then NoClassDefFoundError on every later attempt
+            return false;
+        }
+    }
+
+    @BeforeEach
+    void requireTesseract() {
+        assumeTrue(tesseractAvailable(), "no system libtesseract on this machine");
+    }
 
     /** A CaptureSource that serves a rendered image whose pixel (0,0) sits at (ORIGIN_X, ORIGIN_Y). */
     private static CaptureSource stub(String text) {
