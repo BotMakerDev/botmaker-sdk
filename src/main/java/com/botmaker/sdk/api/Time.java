@@ -104,12 +104,16 @@ public final class Time {
     }
 
     /**
-     * Returns the current month (1-12).
+     * Returns the current month.
+     *
+     * <p>Typed rather than a 1–12 {@code int} for the same reason {@link #dayOfWeek()} is: the number is
+     * ambiguous by one either way (is 1 January or is it zero-based, as it is in half the languages a bot
+     * author has met?) and nothing in an {@code int} says which. {@code Month.JANUARY} says it.
      *
      * @return the current month in the system default timezone
      */
-    public static int month() {
-        return today().getMonthValue();
+    public static Month month() {
+        return today().getMonth();
     }
 
     /**
@@ -281,37 +285,18 @@ public final class Time {
     // --- Time ranges ---
 
     /**
-     * Checks if the current time is between the specified hours (inclusive).
-     * Useful for creating time-based conditions.
-     *
-     * @param startHour the start hour (0-23)
-     * @param endHour the end hour (0-23)
-     * @return true if current hour is between startHour and endHour (inclusive)
-     * @throws IllegalArgumentException if hours are not in range 0-23
-     */
-    public static boolean isBetween(int startHour, int endHour) {
-        if (startHour < 0 || startHour > 23 || endHour < 0 || endHour > 23) {
-            throw new IllegalArgumentException("Hours must be between 0 and 23");
-        }
-
-        int currentHour = hour();
-
-        if (startHour <= endHour) {
-            // Normal case: startHour <= currentHour <= endHour
-            return currentHour >= startHour && currentHour <= endHour;
-        } else {
-            // Wrap-around case: currentHour >= startHour OR currentHour <= endHour
-            return currentHour >= startHour || currentHour <= endHour;
-        }
-    }
-
-    /**
      * Checks whether the current time of day falls between {@code start} and {@code end} (both inclusive to
-     * the minute) — the minute-precision form of {@link #isBetween(int, int)}, for a window that doesn't
-     * start on the hour: {@code Time.isBetween(LocalTime.of(5, 30), LocalTime.of(6, 0))}.
+     * the minute) — for a window that doesn't start on the hour:
+     * {@code Time.isBetween(LocalTime.of(5, 30), LocalTime.of(6, 0))}.
      *
-     * <p>Wraps around midnight the same way: a window whose end is before its start is read as spanning
-     * midnight, which is what "the reset window is 23:50 to 00:10" means.
+     * <p>Wraps around midnight: a window whose end is before its start is read as spanning midnight, which is
+     * what "the reset window is 23:50 to 00:10" means.
+     *
+     * <p>This replaced an {@code isBetween(int startHour, int endHour)} that took bare hours. Whole-hour
+     * windows are still one call — {@code isBetween(LocalTime.of(5, 0), LocalTime.of(7, 0))} — and the pair of
+     * bare numbers could say nothing about being hours, which cost both a runtime range check the type makes
+     * impossible to fail and, in the Studio, a {@code (method, argIndex)} lookup that had to know where in
+     * each overload the hours sat.
      *
      * @param start the start of the window
      * @param end   the end of the window
@@ -319,10 +304,28 @@ public final class Time {
      * @throws IllegalArgumentException if either bound is null
      */
     public static boolean isBetween(LocalTime start, LocalTime end) {
+        return isWithin(currentTime(), start, end);
+    }
+
+    /**
+     * The UTC counterpart of {@link #isBetween(LocalTime, LocalTime)} — for a window pinned to a server's
+     * reset rather than to the machine's local clock.
+     *
+     * @param start the start of the window, in UTC
+     * @param end   the end of the window, in UTC
+     * @return true when now is inside the window
+     * @throws IllegalArgumentException if either bound is null
+     */
+    public static boolean isBetweenUtc(LocalTime start, LocalTime end) {
+        return isWithin(LocalTime.now(ZoneId.of("UTC")), start, end);
+    }
+
+    /** Both windows, one rule: inclusive to the minute, and a window that reads backwards spans midnight. */
+    private static boolean isWithin(LocalTime now, LocalTime start, LocalTime end) {
         if (start == null || end == null) {
             throw new IllegalArgumentException("Both ends of the window are required");
         }
-        LocalTime nowTime = currentTime().withSecond(0).withNano(0);
+        LocalTime nowTime = now.withSecond(0).withNano(0);
         if (!start.isAfter(end)) {
             return !nowTime.isBefore(start) && !nowTime.isAfter(end);
         }
@@ -346,27 +349,19 @@ public final class Time {
     }
 
     /**
-     * Checks if the current UTC time is between the specified hours (inclusive).
+     * Checks whether this month is one of {@code months} — for seasonal content
+     * ({@code Time.isMonth(Month.DECEMBER)}).
      *
-     * @param startHour the start hour (0-23)
-     * @param endHour the end hour (0-23)
-     * @return true if current UTC hour is between startHour and endHour (inclusive)
-     * @throws IllegalArgumentException if hours are not in range 0-23
+     * @param months the months to test against; none given ⇒ false
+     * @return true when this month is one of them
      */
-    public static boolean isBetweenUtc(int startHour, int endHour) {
-        if (startHour < 0 || startHour > 23 || endHour < 0 || endHour > 23) {
-            throw new IllegalArgumentException("Hours must be between 0 and 23");
+    public static boolean isMonth(Month... months) {
+        if (months == null) return false;
+        Month thisMonth = month();
+        for (Month candidate : months) {
+            if (thisMonth == candidate) return true;
         }
-
-        int currentHour = hourUtc();
-
-        if (startHour <= endHour) {
-            // Normal case: startHour <= currentHour <= endHour
-            return currentHour >= startHour && currentHour <= endHour;
-        } else {
-            // Wrap-around case: currentHour >= startHour OR currentHour <= endHour
-            return currentHour >= startHour || currentHour <= endHour;
-        }
+        return false;
     }
 
     // --- Current timestamp ---

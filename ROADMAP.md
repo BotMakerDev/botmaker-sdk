@@ -8,6 +8,28 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-04 — The month is a `Month`, and the hour windows are gone
+
+**195 tests** (was 192). Changed `api/Time.java` and `TimeWindowTest.java`. Improvements round 2 phase 4.
+
+`month()` returns `java.time.Month` instead of a 1–12 `int`, following `dayOfWeek()`, which has returned
+`DayOfWeek` since it was written. The number was ambiguous by one in the direction that never fails to
+compile: half the languages a bot author has met index months from zero, and a bot reading `month() == 11` as
+December was wrong all year, silently. Added `isMonth(Month...)` mirroring `isDay(DayOfWeek...)`.
+
+Removed `isBetween(int startHour, int endHour)` and `isBetweenUtc(int, int)` in favour of the `LocalTime`
+pair. A whole-hour window is still one call — `isBetween(LocalTime.of(5, 0), LocalTime.of(7, 0))` — and the
+bare pair cost two things: a runtime 0–23 range check that the type makes impossible to fail, and, in Studio,
+the last `(method, argIndex)` picker hook for this facade (deleted there in the same phase).
+
+**Deviation from the plan, deliberate:** the plan said to remove `isBetweenUtc` outright, but nothing else in
+the facade expresses a UTC window, and a server reset is exactly the case that is pinned to UTC rather than to
+the machine's zone. So it survives retyped as `isBetweenUtc(LocalTime, LocalTime)`. Both windows now share one
+private `isWithin(now, start, end)` — the midnight wrap was duplicated before, and it is the rule that fails
+silently (read as `start ≤ now ≤ end`, a 23:50–00:10 window matches nothing, all day).
+
+---
+
 ## 2026-08-04 — The wait length is `java.time.Duration`, and the range is a call
 
 **192 tests** (was 195; `DurationTest`'s 8 became `WaitTest`'s 5). Deleted `api/interaction/Duration.java`
