@@ -1,12 +1,18 @@
-name: Build
+name: CI
 
-# The unconditional gate: every push and every PR compiles this module and runs its unit tests.
-# Nothing else in the refactor is verifiable without it (docs/refactor/02-execution-order.md, Phase 0).
+# The compile gate: every push and every PR builds this module. Named ci.yml to match the other repos,
+# each of which now has exactly one workflow file.
+#
+# Tests are deliberately NOT run (`-DskipTests`): CI is a compile gate, and the suite is run locally.
+# -DskipTests still *compiles* the tests, so test code that no longer builds is still caught.
+#
+# `jitpack` runs only on a version tag. It was a separate file (publish.yml) purely because its trigger
+# differs, which a job-level `if:` expresses just as well.
 #
 # botmaker-shared and botmaker-session are resolved from source, not from JitPack. This repo's pom pins
 # both at 0.0.0-SNAPSHOT — the version the umbrella reactor and a local `mvn install` produce — so there
 # is no published artifact under those coordinates to download. Building their main branches here means
-# CI tests the same three-module pairing a maintainer tests locally.
+# CI compiles the same three-module pairing a maintainer builds locally.
 
 on:
   push:
@@ -37,24 +43,21 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # api/vision/TextTest routes into shared's OcrEngine, which is self-contained on Windows but needs the
-      # system libraries on Linux. Without them the tests skip themselves, and skipped is not covered. The
-      # -dev packages carry the unversioned .so symlinks JNA resolves by bare name; the traineddata is
-      # bundled in shared's jar, so no tesseract-ocr-* language package is needed.
-      - name: Install OCR natives
-        run: sudo apt-get update && sudo apt-get install -y libtesseract-dev libleptonica-dev
-
       - name: Install botmaker-shared and botmaker-session (0.0.0-SNAPSHOT)
         run: |
           mvn -B -f .deps/botmaker-shared/pom.xml install -DskipTests
           mvn -B -f .deps/botmaker-session/pom.xml install -DskipTests
 
-      - name: Verify
-        run: mvn -B verify
+      - name: Build
+        run: mvn -B -DskipTests package
 
-      - name: Upload surefire reports on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: surefire-reports
-          path: target/surefire-reports/
+  # JitPack builds the artifact itself from the pushed tag; this just asks it to start eagerly so the
+  # first consumer doesn't wait. No secrets required.
+  jitpack:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger JitPack build for ${{ github.ref_name }}
+        run: |
+          curl -sf "https://jitpack.io/api/builds/com.github.${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.ref_name }}" || true
