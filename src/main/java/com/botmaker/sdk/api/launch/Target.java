@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.launch;
+import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.capture.CaptureSource;
 
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
@@ -106,5 +108,47 @@ public final class Target {
         if (t != null) {
             t.restart();
         }
+    }
+
+    /**
+     * Launches the current target and waits for its window to appear.
+     * Uses the default launch wait timeout from BotSettings.
+     *
+     * @return true if the target's window appeared within the timeout, false if it timed out
+     */
+    public static boolean launchAndWait() {
+        LaunchTarget t = current();
+        if (t == null) {
+            Debug.log("[Target] launchAndWait: no launch target configured — nothing to launch");
+            return false;
+        }
+
+        if (SessionBootstrap.launchIsolated(t.launchSpec())) {
+            // For isolated sessions, we need to wait for the session window
+            return Game.waitForDefaultSource(BotSettings.defaultLaunchWaitTimeout());
+        }
+
+        t.startIfNotRunning();
+        return Game.waitForLaunch(CaptureSource.fromProjectDefault(), BotSettings.defaultLaunchWaitTimeout());
+    }
+
+    /**
+     * Waits for the current target's window to appear.
+     *
+     * @param timeoutMillis the maximum time to wait, in milliseconds
+     * @return true if the target's window appeared within the timeout, false if it timed out
+     */
+    public static boolean waitForLaunch(long timeoutMillis) {
+        LaunchTarget t = current();
+        if (t == null) {
+            Debug.log("[Target] waitForLaunch: no launch target configured — nothing to wait for");
+            return false;
+        }
+
+        if (SessionBootstrap.launchIsolated(t.launchSpec())) {
+            return Game.waitForDefaultSource(timeoutMillis);
+        }
+
+        return Game.waitForLaunch(CaptureSource.fromProjectDefault(), timeoutMillis);
     }
 }

@@ -1,8 +1,11 @@
 package com.botmaker.sdk.api;
 
+import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.config.ProjectProperties;
+
+import java.time.ZoneId;
 
 /**
  * The bot's runtime tuning — how long it pauses around a match, how sure it has to be, and whether it drives
@@ -50,6 +53,9 @@ public final class BotSettings {
      */
     public static final int DEFAULT_MAX_RETRY_ATTEMPTS = 20;
 
+    /** Default timeout for waiting for game launch/window to appear, in milliseconds. */
+    public static final long DEFAULT_LAUNCH_WAIT_TIMEOUT = 60000;
+
     private static volatile int foundDelay = DEFAULT_FOUND_DELAY;
     private static volatile int notFoundDelay = DEFAULT_NOT_FOUND_DELAY;
     private static volatile boolean randomizeClicks = DEFAULT_RANDOMIZE_CLICKS;
@@ -57,6 +63,8 @@ public final class BotSettings {
     private static volatile double compareMargin = DEFAULT_COMPARE_MARGIN;
     private static volatile int maxRetryAttempts = DEFAULT_MAX_RETRY_ATTEMPTS;
     private static volatile boolean realInput;
+    private static volatile long defaultLaunchWaitTimeout = DEFAULT_LAUNCH_WAIT_TIMEOUT;
+    private static volatile ZoneId defaultTimeZone = ZoneId.systemDefault();
 
     /**
      * Whether the project defaults have been folded in yet. Every read goes through {@link #ensureLoaded()},
@@ -104,6 +112,48 @@ public final class BotSettings {
     public static int maxRetryAttempts() {
         ensureLoaded();
         return maxRetryAttempts;
+    }
+
+    /** The default timeout for waiting for game launch/window to appear, in milliseconds. */
+    public static long defaultLaunchWaitTimeout() {
+        ensureLoaded();
+        return defaultLaunchWaitTimeout;
+    }
+
+    /**
+     * Returns the project's default capture source configuration.
+     * This allows bots to use the same capture source that Studio configured for the project.
+     *
+     * @return the project's default capture source, or the current source if not configured
+     */
+    public static CaptureSource defaultCaptureSource() {
+        return CaptureSource.fromProjectDefault();
+    }
+
+    /**
+     * Returns the default timezone for time-related operations.
+     *
+     * @return the default timezone
+     */
+    public static ZoneId defaultTimeZone() {
+        ensureLoaded();
+        return defaultTimeZone;
+    }
+
+    /**
+     * Sets the default timezone for time-related operations.
+     *
+     * @param zoneId the timezone ID to use as default
+     */
+    public static void setDefaultTimeZone(String zoneId) {
+        ensureLoaded();
+        if (zoneId == null) {
+            defaultTimeZone = ZoneId.systemDefault();
+        } else {
+            defaultTimeZone = ZoneId.of(zoneId);
+        }
+        // Also set the Time class default
+        Time.setDefaultTimeZone(defaultTimeZone);
     }
 
     /**
@@ -160,6 +210,19 @@ public final class BotSettings {
             throw new IllegalArgumentException("Max attempts must be at least 1");
         }
         maxRetryAttempts = attempts;
+    }
+
+    /**
+     * Sets the default timeout for waiting for game launch/window to appear.
+     *
+     * @param timeoutMillis timeout in milliseconds, must be positive
+     */
+    public static void setDefaultLaunchWaitTimeout(long timeoutMillis) {
+        ensureLoaded();
+        if (timeoutMillis <= 0) {
+            throw new IllegalArgumentException("Launch wait timeout must be positive");
+        }
+        defaultLaunchWaitTimeout = timeoutMillis;
     }
 
     /**
@@ -272,6 +335,7 @@ public final class BotSettings {
             if (configuredRetries != null) {
                 maxRetryAttempts = configuredRetries;
             }
+            // Launch wait timeout: uses SDK default (60000 ms). Can be extended to read from project properties later.
             // Set before the real-input swap below, not after: that swap reaches into the native controller,
             // and anything it touches which reads a setting back must find the load already done rather than
             // re-entering this block.

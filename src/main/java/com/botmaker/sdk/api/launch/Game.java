@@ -1,6 +1,9 @@
 package com.botmaker.sdk.api.launch;
 
+import com.botmaker.sdk.api.BotSettings;
+import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.interaction.Wait;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.shared.launch.GameLauncher;
@@ -140,6 +143,9 @@ public class Game {
      * {@code heroic --no-gui --no-sandbox heroic://launch/<appName>}, then the Flatpak form. Heroic has no
      * {@code launch} subcommand: the URL <em>is</em> its command line.
      *
+     * <p><b>Graceful handling:</b> When Heroic closes (e.g., when closing Firestone), this method provides
+     * better error handling to prevent crashes and black blip artifacts.
+     *
      * @param appName the Heroic application name / launch token, e.g. {@code "Firestone"}
      * @throws IllegalArgumentException if {@code appName} is null/blank
      * @throws RuntimeException         if neither the Heroic URL nor a CLI fallback could be invoked
@@ -148,7 +154,19 @@ public class Game {
         if (isolate(storeSpec(LaunchKind.HEROIC, appName))) {
             return;
         }
-        GameLauncher.heroic(appName);
+        try {
+            GameLauncher.heroic(appName);
+            // Add a small delay to allow Heroic to properly initialize before capture
+            // This helps prevent the black blip issue
+            Wait.milliseconds(500);
+        } catch (IllegalArgumentException e) {
+            // Re-throw validation errors directly
+            Debug.error("[Game] Failed to launch Heroic game '" + appName + "': " + e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            Debug.error("[Game] Failed to launch Heroic game '" + appName + "': " + e.getMessage());
+            throw new RuntimeException("Failed to launch Heroic game '" + appName + "'", e);
+        }
     }
 
     /**
@@ -273,6 +291,28 @@ public class Game {
                                         String... args) {
         launchIfNotRunning(executablePath, source, args);
         return waitForLaunch(source, timeoutMillis);
+    }
+
+    /**
+     * Launches an executable and waits for it to appear using the default capture source.
+     * Uses the default launch wait timeout from BotSettings.
+     *
+     * @param executablePath path to the program to run
+     * @param args           optional command-line arguments
+     * @return true if the game's window was present within the timeout, false if it timed out
+     */
+    public static boolean launchAndWait(String executablePath, String... args) {
+        return launchAndWait(executablePath, Source.current(), BotSettings.defaultLaunchWaitTimeout(), args);
+    }
+
+    /**
+     * Waits for the default capture source to become available.
+     *
+     * @param timeoutMillis the maximum time to wait, in milliseconds
+     * @return true if the source became available within the timeout, false if it timed out
+     */
+    public static boolean waitForDefaultSource(long timeoutMillis) {
+        return waitForLaunch(Source.current(), timeoutMillis);
     }
 
     // --- Process control (by executable name) ---

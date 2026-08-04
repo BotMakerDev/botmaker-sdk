@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.bot;
+import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.launch.Target;
 
@@ -69,14 +70,23 @@ public final class Bot {
     /**
      * The default start-up step: bring the project's configured launch target up, choosing skip-if-already-
      * running on a first {@code COLD} launch over force-stop-then-relaunch on a {@code RESTART} recovery.
+     * Always waits for the game window to appear after launching (as requested by user).
      *
      * <p>Private because a bot that wants something else passes its own {@code Consumer<StartMode>} to the
      * 3-arg {@link #start}; the two {@link Target} calls it would delegate to are public.
      */
     private static void launchConfiguredTarget(StartMode mode) {
         switch (mode) {
-            case COLD -> Target.startIfNotRunning();
-            case RESTART -> Target.restart();
+            case COLD -> {
+                Target.startIfNotRunning();
+                // Always wait for the game window to appear before starting activities
+                Target.waitForLaunch(BotSettings.defaultLaunchWaitTimeout());
+            }
+            case RESTART -> {
+                Target.restart();
+                // Always wait for the game window to appear after restart
+                Target.waitForLaunch(BotSettings.defaultLaunchWaitTimeout());
+            }
         }
     }
 

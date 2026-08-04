@@ -94,6 +94,17 @@ public interface CaptureSource {
         return new NamedWindow(titleSubstring);
     }
 
+    /**
+     * Creates a capture source from the project's default capture target configuration.
+     * This allows bots to use the same capture source that Studio configured for the project.
+     *
+     * @return a capture source based on the project's default capture target, or the current source if not configured
+     */
+    static CaptureSource fromProjectDefault() {
+        CaptureSource source = com.botmaker.sdk.internal.config.ProjectDefaults.source();
+        return source != null ? source : Source.current();
+    }
+
     // --- Region: a Rect that belongs to THIS source ---
 
     /**
