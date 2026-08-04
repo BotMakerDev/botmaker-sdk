@@ -115,6 +115,53 @@ public class ImageFinder {
     }
 
     /**
+     * Internal: the best match of <em>every</em> template in {@code group} that clears {@code confidence}, all
+     * read from a <b>single</b> capture. Does not update VisionContext — the caller is responsible for that.
+     *
+     * <p>This cannot delegate to {@link #findAnyInternal}: that one short-circuits on the first hit, which is
+     * precisely the information loss {@link Matches} exists to undo. It captures once and re-matches the same
+     * background {@link Mat} per template instead of calling {@link #findInternal} in a loop, so N templates
+     * still cost one screenshot — the "one capture per check" property the lambda helpers promise — and so
+     * every answer in the returned {@code Matches} describes the same instant.
+     */
+    static Matches findAllTemplates(ImageTemplateGroup group, CaptureSource source, double confidence) {
+        Mat background = null;
+        try {
+            BufferedImage screenshot = source.capture();
+            if (screenshot == null) {
+                return Matches.none();
+            }
+            background = OpencvManager.bufferedImageToMat(screenshot);
+            Point origin = source.origin();
+
+            List<MatchResult> results = new ArrayList<>();
+            for (ImageTemplate template : group.templates()) {
+                RawMatch best = OpencvManager.findBest(template.getMat(), background, false, template.authoredSize());
+                if (best != null && best.score() >= confidence) {
+                    Point location = new Point(best.x() + origin.x, best.y() + origin.y);
+                    MatchResult result = new MatchResult(
+                            location, best.width(), best.height(), best.score(), template.getId());
+                    emitMatch(source, result);
+                    results.add(result);
+                } else {
+                    emitMatch(source, MatchResult.miss(best != null ? best.score() : 0.0));
+                }
+            }
+            return Matches.of(results);
+
+        } catch (Exception e) {
+            if (Debug.isEnabled()) {
+                Debug.error("Error finding template group: " + e.getMessage(), e);
+            }
+            return Matches.none();
+        } finally {
+            if (background != null) {
+                background.release();
+            }
+        }
+    }
+
+    /**
      * Internal method that performs the actual find operation and returns the MatchResult.
      * Does not update VisionContext - caller is responsible for that.
      */
@@ -1000,117 +1047,131 @@ public class ImageFinder {
         }
     }
 
-    // --- Lambda control-flow over a group: "Any" (first visible) / "All" (every one visible) ---
+    // --- Lambda control-flow over a group: "Any" (at least one visible) / "All" (every one visible) ---
     //
-    // The "Any" variants hand your action the live match (the first template, in order, that clears the
-    // threshold). The "All" variants take a Runnable — "every template is present" has no single
-    // meaningful MatchResult, so there is nothing to hand you (mirrors untilFind' Runnable).
+    // Both hand your action a Matches — every template of the group that cleared the threshold in that one
+    // frame, so the body can branch on the *combination* that is present. That is the question a bot actually
+    // asks ("a mail popup AND its claim-all button?"), and neither of the shapes these used to have could
+    // answer it: the "Any" variants passed a single MatchResult (the first hit — a second template visible in
+    // the same frame was simply invisible to you), and the "All" variants passed a bare Runnable on the
+    // grounds that "every template is present" has no single meaningful MatchResult. Matches is the type that
+    // answers that, so both old shapes are gone.
 
     /**
-     * Run {@code action} once with the match if any template in the group is currently visible.
-     * The match result is stored in {@link VisionContext}.
+     * Run {@code action} once with the frame's matches if any template in the group is currently visible.
+     * The matches are stored in {@link VisionContext}.
      *
      * @param group  the template group to search for
-     * @param action the action to run with the match result
+     * @param action the action to run with the frame's matches
      * @return true if any template was found and the action was run, false otherwise
      */
-    public static boolean ifFindAny(ImageTemplateGroup group, Consumer<MatchResult> action) {
+    public static boolean ifFindAny(ImageTemplateGroup group, Consumer<Matches> action) {
         return ifFindAny(group, Source.current(), action);
     }
 
     /**
-     * Run {@code action} once with the match if any template in the group is currently visible on a specific source.
-     * The match result is stored in {@link VisionContext}.
+     * Run {@code action} once with the frame's matches if any template in the group is currently visible on a
+     * specific source. The matches are stored in {@link VisionContext}.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
-     * @param action the action to run with the match result
+     * @param action the action to run with the frame's matches
      * @return true if any template was found and the action was run, false otherwise
      */
-    public static boolean ifFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<MatchResult> action) {
-        MatchResult result = findAnyInternal(source, BotSettings.confidence(), group.toArray());
-        VisionContext.setLastMatch(result);
-        if (result.isFound()) {
-            action.accept(result);
+    public static boolean ifFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
+        Matches found = findAllTemplates(group, source, BotSettings.confidence());
+        VisionContext.setLastMatches(found);
+        if (!found.isEmpty()) {
+            action.accept(found);
             return true;
         }
         return false;
     }
 
     /**
-     * Run {@code action} once if all templates in the group are currently visible.
+     * Run {@code action} once with the frame's matches if all templates in the group are currently visible.
      *
      * @param group  the template group to search for
-     * @param action the action to run
+     * @param action the action to run with the frame's matches
      * @return true if all templates were found and the action was run, false otherwise
      */
-    public static boolean ifFindAll(ImageTemplateGroup group, Runnable action) {
+    public static boolean ifFindAll(ImageTemplateGroup group, Consumer<Matches> action) {
         return ifFindAll(group, Source.current(), action);
     }
 
     /**
-     * Run {@code action} once if all templates in the group are currently visible on a specific source.
+     * Run {@code action} once with the frame's matches if all templates in the group are currently visible on a
+     * specific source.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
-     * @param action the action to run
+     * @param action the action to run with the frame's matches
      * @return true if all templates were found and the action was run, false otherwise
      */
-    public static boolean ifFindAll(ImageTemplateGroup group, CaptureSource source, Runnable action) {
-        if (group.templates().stream().allMatch(t -> find(t, source))) {
-            action.run();
+    public static boolean ifFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
+        Matches found = findAllTemplates(group, source, BotSettings.confidence());
+        VisionContext.setLastMatches(found);
+        if (found.hasAll(group.toArray())) {
+            action.accept(found);
             return true;
         }
         return false;
     }
 
     /**
-     * Keep running {@code action} (with the fresh match each time) as long as any template in the group stays visible.
+     * Keep running {@code action} (with a fresh frame's matches each time) as long as any template in the group
+     * stays visible.
      *
      * @param group  the template group to search for
-     * @param action the action to run with each match result
+     * @param action the action to run with each frame's matches
      */
-    public static void whileFindAny(ImageTemplateGroup group, Consumer<MatchResult> action) {
+    public static void whileFindAny(ImageTemplateGroup group, Consumer<Matches> action) {
         whileFindAny(group, Source.current(), action);
     }
 
     /**
-     * Keep running {@code action} (with the fresh match each time) as long as any template in the group stays visible on a specific source.
+     * Keep running {@code action} (with a fresh frame's matches each time) as long as any template in the group
+     * stays visible on a specific source.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
-     * @param action the action to run with each match result
+     * @param action the action to run with each frame's matches
      */
-    public static void whileFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<MatchResult> action) {
-        MatchResult result;
-        while ((result = findAnyInternal(source, BotSettings.confidence(), group.toArray())).isFound()) {
-            VisionContext.setLastMatch(result);
-            action.accept(result);
+    public static void whileFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
+        Matches found;
+        while (!(found = findAllTemplates(group, source, BotSettings.confidence())).isEmpty()) {
+            VisionContext.setLastMatches(found);
+            action.accept(found);
         }
-        VisionContext.setLastMatch(MatchResult.notFound());
+        VisionContext.setLastMatches(Matches.none());
     }
 
     /**
-     * Keep running {@code action} as long as all templates in the group stay visible.
+     * Keep running {@code action} (with a fresh frame's matches each time) as long as all templates in the
+     * group stay visible.
      *
      * @param group  the template group to search for
-     * @param action the action to run
+     * @param action the action to run with each frame's matches
      */
-    public static void whileFindAll(ImageTemplateGroup group, Runnable action) {
+    public static void whileFindAll(ImageTemplateGroup group, Consumer<Matches> action) {
         whileFindAll(group, Source.current(), action);
     }
 
     /**
-     * Keep running {@code action} as long as all templates in the group stay visible on a specific source.
+     * Keep running {@code action} (with a fresh frame's matches each time) as long as all templates in the
+     * group stay visible on a specific source.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
-     * @param action the action to run
+     * @param action the action to run with each frame's matches
      */
-    public static void whileFindAll(ImageTemplateGroup group, CaptureSource source, Runnable action) {
-        while (group.templates().stream().allMatch(t -> find(t, source))) {
-            action.run();
+    public static void whileFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
+        Matches found;
+        while ((found = findAllTemplates(group, source, BotSettings.confidence())).hasAll(group.toArray())) {
+            VisionContext.setLastMatches(found);
+            action.accept(found);
         }
+        VisionContext.setLastMatches(Matches.none());
     }
 
     /**

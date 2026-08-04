@@ -33,6 +33,7 @@ public final class VisionContext {
 
     private static final ThreadLocal<MatchResult> lastMatch = new ThreadLocal<>();
     private static final ThreadLocal<List<MatchResult>> lastMatchList = new ThreadLocal<>();
+    private static final ThreadLocal<Matches> lastMatches = new ThreadLocal<>();
     private static final ThreadLocal<ColorMatch> lastColorMatch = new ThreadLocal<>();
     private static final ThreadLocal<List<ColorMatch>> lastColorMatchList = new ThreadLocal<>();
     private static final ThreadLocal<TextMatch> lastTextMatch = new ThreadLocal<>();
@@ -73,12 +74,29 @@ public final class VisionContext {
     }
 
     /**
-     * Clears the last match result and match list for the current thread.
+     * Returns the most recent group result for the current thread — every template of the last
+     * {@link ImageFinder#ifFindAny}/{@link ImageFinder#whileFindAny}/{@code *All} check that was visible — or
+     * {@link Matches#none()} if no such check has run on this thread.
+     *
+     * <p>Prefer the lambda's own parameter: {@code whileFindAny(POPUPS, found -> …)} hands you exactly this
+     * value, scoped to the frame it describes. This accessor is the out-of-band escape hatch, for the same
+     * reason {@link #getLastMatch()} is.
+     *
+     * @return the last group result, never null
+     */
+    public static Matches getLastMatches() {
+        Matches result = lastMatches.get();
+        return result != null ? result : Matches.none();
+    }
+
+    /**
+     * Clears the last match result, match list and group result for the current thread.
      * Useful at the start of a bot action to ensure a clean state.
      */
     public static void clearLastMatch() {
         lastMatch.remove();
         lastMatchList.remove();
+        lastMatches.remove();
     }
 
     /**
@@ -114,6 +132,19 @@ public final class VisionContext {
      *
      * @param results the list of match results to store
      */
+    /**
+     * Internal method: updates the last group result for the current thread.
+     *
+     * <p>Also seeds {@link #getLastMatch()} with {@code matches.best()} so the single-match accessor keeps
+     * meaning something after a group check — the palette's seeded
+     * {@code MatchResult match = VisionContext.getLastMatch()} entry relies on it.
+     */
+    static void setLastMatches(Matches matches) {
+        lastMatches.set(matches);
+        lastMatch.set(matches.best());
+        lastMatchList.remove();
+    }
+
     static void setLastMatchList(List<MatchResult> results) {
         lastMatchList.set(results);
         if (!results.isEmpty()) {

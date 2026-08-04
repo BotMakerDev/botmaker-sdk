@@ -8,6 +8,56 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-04 — `Matches`: the group lambdas hand back the whole combination
+
+**164 → 177 tests.** Added `api/vision/Matches.java`, `api/vision/MatchesTest.java`,
+`api/vision/MatchesFindTest.java`. Changed: `api/vision/ImageFinder.java`, `api/vision/ImageClicker.java`,
+`api/vision/VisionContext.java`.
+
+The group lambda helpers were unusable for the job real bots need them for — "which of these templates are on
+screen right now, and what do I do about *that combination*". `ifFindAny`/`whileFindAny` passed a single
+`MatchResult` (the first hit, so a second template visible in the same frame was simply invisible to the
+body), and `ifFindAll`/`whileFindAll` passed a bare `Runnable` on the recorded grounds that "every template is
+present has no single meaningful `MatchResult`". Both shapes are gone; per this repo's *API stability* note
+they were removed outright, with no compatibility overload.
+
+### Done
+
+- **`api/vision/Matches`** — immutable, built from one frame, keyed by `MatchResult.getTemplateId()`:
+  `has` / `hasAll` / `hasAny` / `get` / `all` / `best` / `isEmpty` / `count`. Two contracts that bot code
+  leans on without thinking, both tested: `get` returns `MatchResult.notFound()` rather than null, so
+  `click(found.get(x))` is safe to write unguarded for a template that wasn't there; and lookups key on
+  *template id*, not object identity, so a template reloaded from the same file still answers `has`. Two
+  templates sharing an id can only hold one slot — the higher-confidence match wins it.
+- **All four group lambda helpers now take `Consumer<Matches>`** (`ifFindAny`, `whileFindAny`, `ifFindAll`,
+  `whileFindAll`). Single-template `ifFind`/`whileFind` keep `Consumer<MatchResult>` — one template has one
+  answer. `untilFind*` keep their `Runnable`: they run *while nothing is found*, so there is genuinely nothing
+  to hand over.
+- **`ImageFinder.findAllTemplates(group, source, confidence)`** — one capture, one `Mat`, re-matched per
+  template. It deliberately does not loop `findInternal` (that screenshots once per template) and cannot
+  delegate to `findAnyInternal` (that short-circuits on the first hit — precisely the information loss
+  `Matches` undoes). N templates therefore still cost one frame, and every answer in a `Matches` describes the
+  same instant. `MatchesFindTest` asserts the capture count directly, since nothing else would catch a
+  regression to the N-frame shape.
+- **`ImageClicker.click(MatchResult)` / `click(MatchResult, CaptureSource)`** — the missing companion. Picking
+  a match out of a `Matches` and acting on *that one* had no expression: every `click` overload re-located a
+  template first, so the only way to click a chosen match was `Mouse.click(match.getCenter())`, which bypasses
+  the `CaptureSource` click routing an emulator source depends on.
+- **`VisionContext.getLastMatches()`** beside the existing slots, set by the four helpers.
+  `setLastMatches` also seeds `lastMatch` with `matches.best()`, so Studio's palette-seeded
+  `MatchResult match = VisionContext.getLastMatch()` keeps meaning something after a group check.
+
+### Deferred / next
+
+- **Studio still generates the old shapes.** `blocks/vision/LambdaCallBlock` declares
+  `Variant("ifFindAll", true, false)` — `hasParam = false`, i.e. a `Runnable` body — which no longer compiles
+  against this API, and it never renders the lambda parameter at all, so `found` is unreachable in the block
+  editor. Both are the next phase's work, in the Studio repo.
+- `findAllTemplates` is package-private: the lambda helpers are the intended surface. If a bot ever wants the
+  combination without a loop, promote it as `ImageFinder.matches(group)` rather than growing a second path.
+
+---
+
 ## 2026-08-04 — CI: the OCR tests error where there is no libtesseract
 
 **164 tests, unchanged.** Changed: `api/vision/TextTest.java`, `.github/workflows/build.yml`. This repo's

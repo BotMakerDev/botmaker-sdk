@@ -103,6 +103,39 @@ public class ImageClicker {
         return clickResult(source, result, delayMs > 0 ? delayMs : BotSettings.foundDelay());
     }
 
+    // --- click an already-located match (no second capture) ---
+
+    /**
+     * Clicks a match you already have — typically one picked out of a {@link Matches} by the group lambda
+     * helpers ({@code found.get(claimAll)}). No capture and no matching happen: the click lands at the
+     * coordinate the match already carries, which is the point of branching on a frame's matches and then
+     * acting on the one you chose.
+     *
+     * <p>Companion to {@link Matches#get(ImageTemplate)}, which returns {@link MatchResult#notFound()} rather
+     * than null for an absent template — so {@code click(found.get(x))} is safe to write unguarded and simply
+     * returns false when {@code x} wasn't there.
+     *
+     * @param result the match to click
+     * @return true if the match was found and clicked, false if it was a miss
+     */
+    public static boolean click(MatchResult result) {
+        return click(result, Source.current());
+    }
+
+    /**
+     * Clicks an already-located match on a specific capture source. The source only routes the click (a window
+     * session may inject rather than move the real pointer); the coordinate comes from the match.
+     *
+     * @param result the match to click
+     * @param source the capture source to click through
+     * @return true if the match was found and clicked, false if it was a miss
+     */
+    public static boolean click(MatchResult result, CaptureSource source) {
+        if (result == null) return false;
+        VisionContext.setLastMatch(result);
+        return clickResult(source, result);
+    }
+
     // --- clickAny (first template, in order, that clears the threshold) ---
 
     /**
