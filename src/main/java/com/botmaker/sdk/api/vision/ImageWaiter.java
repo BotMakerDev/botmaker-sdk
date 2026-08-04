@@ -3,6 +3,7 @@ import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.interaction.Mouse;
@@ -86,6 +87,9 @@ public class ImageWaiter {
         long timeoutMs = timeoutSeconds * 1000L;
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
+            // Per poll, not once at entry: a popup that opens *during* the wait is exactly the case that would
+            // otherwise burn the whole timeout waiting for something it is covering.
+            PopupGuard.check();
             MatchResult result = ImageFinder.findInternal(template, source, confidence);
             VisionContext.setLastMatch(result);
             if (result.isFound()) {
@@ -169,6 +173,7 @@ public class ImageWaiter {
         long timeoutMs = timeoutSeconds * 1000L;
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
+            PopupGuard.check();   // per poll, as in waitFor
             MatchResult result = ImageFinder.findInternal(template, source, confidence);
             VisionContext.setLastMatch(result);
             if (!result.isFound()) {

@@ -3,6 +3,7 @@ import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.interaction.Wait;
@@ -98,6 +99,7 @@ public class ImageClicker {
      * @return true if the template was found and clicked, false otherwise
      */
     public static boolean click(ImageTemplate template, CaptureSource source, double confidence, int delayMs) {
+        PopupGuard.check();
         MatchResult result = ImageFinder.findInternal(template, source, confidence);
         VisionContext.setLastMatch(result);
         return clickResult(source, result, delayMs > 0 ? delayMs : BotSettings.foundDelay());
@@ -271,6 +273,7 @@ public class ImageClicker {
      * @return true if the template was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplate template) {
+        PopupGuard.check();
         CaptureSource source = Source.current();
         return clickResult(source, ImageFinder.findInternal(template, source, BotSettings.confidence()));
     }
@@ -286,6 +289,7 @@ public class ImageClicker {
      * @return true if the template was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplate template, double confidence) {
+        PopupGuard.check();
         CaptureSource source = Source.current();
         return clickResult(source, ImageFinder.findInternal(template, source, confidence));
     }
@@ -301,6 +305,7 @@ public class ImageClicker {
      * @return true if the template was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplate template, CaptureSource source) {
+        PopupGuard.check();
         return clickResult(source, ImageFinder.findInternal(template, source, BotSettings.confidence()));
     }
 
@@ -316,6 +321,7 @@ public class ImageClicker {
      * @return true if the template was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplate template, CaptureSource source, double confidence) {
+        PopupGuard.check();
         return clickResult(source, ImageFinder.findInternal(template, source, confidence));
     }
 
@@ -332,6 +338,7 @@ public class ImageClicker {
      * @return true if any template in the group was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplateGroup group) {
+        PopupGuard.check();
         CaptureSource source = Source.current();
         MatchResult result = findBestInternal(group, source, BotSettings.confidence());
         VisionContext.setLastMatch(result);
@@ -349,6 +356,7 @@ public class ImageClicker {
      * @return true if any template in the group was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplateGroup group, double confidence) {
+        PopupGuard.check();
         CaptureSource source = Source.current();
         MatchResult result = findBestInternal(group, source, confidence);
         VisionContext.setLastMatch(result);
@@ -366,6 +374,7 @@ public class ImageClicker {
      * @return true if any template in the group was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplateGroup group, CaptureSource source) {
+        PopupGuard.check();
         MatchResult result = findBestInternal(group, source, BotSettings.confidence());
         VisionContext.setLastMatch(result);
         return clickResult(source, result);
@@ -383,6 +392,7 @@ public class ImageClicker {
      * @return true if any template in the group was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplateGroup group, CaptureSource source, double confidence) {
+        PopupGuard.check();
         MatchResult result = findBestInternal(group, source, confidence);
         VisionContext.setLastMatch(result);
         return clickResult(source, result);
@@ -402,6 +412,7 @@ public class ImageClicker {
      * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
      */
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
+        PopupGuard.check();
         CaptureSource source = Source.current();
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), BotSettings.compareMargin());
@@ -422,6 +433,7 @@ public class ImageClicker {
      * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
      */
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
+        PopupGuard.check();
         CaptureSource source = Source.current();
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
@@ -442,6 +454,7 @@ public class ImageClicker {
      * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
      */
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
+        PopupGuard.check();
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), BotSettings.compareMargin());
         VisionContext.setLastMatch(result);
@@ -463,6 +476,7 @@ public class ImageClicker {
      */
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                           double margin) {
+        PopupGuard.check();
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
         VisionContext.setLastMatch(result);
@@ -513,6 +527,7 @@ public class ImageClicker {
      */
     public static boolean clickAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                           double margin) {
+        PopupGuard.check();
         MatchResult result = compareAnyInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
         VisionContext.setLastMatch(result);
@@ -560,6 +575,7 @@ public class ImageClicker {
      */
     public static int clickAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                       double margin) {
+        PopupGuard.check();
         List<MatchResult> winners = compareAllInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
         VisionContext.setLastMatchList(winners);
@@ -630,6 +646,7 @@ public class ImageClicker {
      * @return the number of instances clicked
      */
     public static int clickAll(ImageTemplate template, CaptureSource source, double confidence) {
+        PopupGuard.check();
         List<MatchResult> matches = ImageFinder.findAllInternal(template, source, confidence);
         VisionContext.setLastMatchList(matches);
         for (MatchResult match : matches) {
@@ -699,6 +716,7 @@ public class ImageClicker {
      * @return the total number of instances clicked across all templates in the group
      */
     public static int clickAll(ImageTemplateGroup group, CaptureSource source, double confidence) {
+        PopupGuard.check();
         List<MatchResult> all = new java.util.ArrayList<>();
         for (ImageTemplate template : group.templates()) {
             all.addAll(ImageFinder.findAllInternal(template, source, confidence));

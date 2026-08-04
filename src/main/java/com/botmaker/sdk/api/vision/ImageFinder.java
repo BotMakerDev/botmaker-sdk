@@ -3,6 +3,7 @@ import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.observe.Bots;
@@ -95,6 +96,7 @@ public class ImageFinder {
      * @return true if the template was found at or above the confidence threshold, false otherwise
      */
     public static boolean find(ImageTemplate template, CaptureSource source, double confidence) {
+        PopupGuard.check();
         MatchResult result = findInternal(template, source, confidence);
         VisionContext.setLastMatch(result);
         return result.isFound();
@@ -266,6 +268,7 @@ public class ImageFinder {
      * @return true if any template was found, false otherwise
      */
     public static boolean findAny(CaptureSource source, double confidence, ImageTemplate... templates) {
+        PopupGuard.check();
         for (ImageTemplate template : templates) {
             MatchResult result = findInternal(template, source, confidence);
             if (result.isFound()) {
@@ -399,6 +402,7 @@ public class ImageFinder {
      * @return true if any template in the group was found, false otherwise
      */
     public static boolean findBest(ImageTemplateGroup group, CaptureSource source, double confidence) {
+        PopupGuard.check();
         MatchResult best = MatchResult.notFound();
         for (ImageTemplate template : group.templates()) {
             MatchResult result = findInternal(template, source, confidence);
@@ -486,6 +490,7 @@ public class ImageFinder {
      */
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                           double margin) {
+        PopupGuard.check();
         MatchResult result = compare(good.templates(), bad.templates(), source, BotSettings.confidence(), margin);
         VisionContext.setLastMatch(result);
         return result.isFound();
@@ -553,6 +558,7 @@ public class ImageFinder {
      */
     public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                          double margin) {
+        PopupGuard.check();
         MatchResult result = compareAny(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
         VisionContext.setLastMatch(result);
@@ -619,6 +625,7 @@ public class ImageFinder {
      */
     public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                      double margin) {
+        PopupGuard.check();
         List<MatchResult> results = compareAll(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
         VisionContext.setLastMatchList(results);
@@ -831,6 +838,7 @@ public class ImageFinder {
      * @return the number of matches found
      */
     public static int findAll(ImageTemplate template, CaptureSource source, double confidence) {
+        PopupGuard.check();
         List<MatchResult> results = findAllInternal(template, source, confidence);
         VisionContext.setLastMatchList(results);
         return results.size();
@@ -934,6 +942,7 @@ public class ImageFinder {
      * @return the total number of matches found across all templates in the group
      */
     public static int findAll(ImageTemplateGroup group, CaptureSource source, double confidence) {
+        PopupGuard.check();
         List<MatchResult> all = new ArrayList<>();
         for (ImageTemplate template : group.templates()) {
             all.addAll(findAllInternal(template, source, confidence));
@@ -989,6 +998,7 @@ public class ImageFinder {
      * @return true if the template was found and the action was run, false otherwise
      */
     public static boolean ifFind(ImageTemplate template, CaptureSource source, Consumer<MatchResult> action) {
+        PopupGuard.check();
         MatchResult result = findInternal(template, source, BotSettings.confidence());
         VisionContext.setLastMatch(result);
         if (result.isFound()) {
@@ -1016,6 +1026,7 @@ public class ImageFinder {
      * @param action   the action to run with each match result
      */
     public static void whileFind(ImageTemplate template, CaptureSource source, Consumer<MatchResult> action) {
+        PopupGuard.check();
         MatchResult result;
         while ((result = findInternal(template, source, BotSettings.confidence())).isFound()) {
             VisionContext.setLastMatch(result);
@@ -1079,6 +1090,7 @@ public class ImageFinder {
      * @return true if any template was found and the action was run, false otherwise
      */
     public static boolean ifFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
+        PopupGuard.check();
         Matches found = findAllTemplates(group, source, BotSettings.confidence());
         VisionContext.setLastMatches(found);
         if (!found.isEmpty()) {
@@ -1109,6 +1121,7 @@ public class ImageFinder {
      * @return true if all templates were found and the action was run, false otherwise
      */
     public static boolean ifFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
+        PopupGuard.check();
         Matches found = findAllTemplates(group, source, BotSettings.confidence());
         VisionContext.setLastMatches(found);
         if (found.hasAll(group.toArray())) {
@@ -1138,6 +1151,7 @@ public class ImageFinder {
      * @param action the action to run with each frame's matches
      */
     public static void whileFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
+        PopupGuard.check();
         Matches found;
         while (!(found = findAllTemplates(group, source, BotSettings.confidence())).isEmpty()) {
             VisionContext.setLastMatches(found);
@@ -1166,6 +1180,7 @@ public class ImageFinder {
      * @param action the action to run with each frame's matches
      */
     public static void whileFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
+        PopupGuard.check();
         Matches found;
         while ((found = findAllTemplates(group, source, BotSettings.confidence())).hasAll(group.toArray())) {
             VisionContext.setLastMatches(found);

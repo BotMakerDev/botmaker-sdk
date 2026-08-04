@@ -8,6 +8,39 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-04 — `PopupGuard`: dismiss the game's interruptions before every vision step
+
+**177 → 183 tests.** Added `api/bot/PopupGuard.java`, `api/bot/PopupGuardTest.java`. Changed:
+`api/vision/ImageFinder.java`, `api/vision/ImageClicker.java`, `api/vision/ImageWaiter.java`.
+
+Games interrupt with daily rewards, mail, level-ups and ads, and each one hides whatever the next `find` was
+looking for. Without a guard every activity has to open with its own defensive dismissal code and get it
+right. `PopupGuard` runs one project-wide check instead, from inside the finder/clicker/waiter — the only
+place it cannot be forgotten. The *logic* stays the bot author's: Studio generates an editable `Popups`
+activity and installs it with `PopupGuard.install(Popups.INSTANCE::execute)`. Blind-clicking anything
+cross-shaped is wrong (the same cross often belongs to the screen the bot is working on, and a popup's body
+usually isn't clickable), so dismissal is a question about which *combination* is present — which is what
+`Matches` answers, and why that landed first.
+
+Three decisions worth keeping:
+
+- **Reentrancy is a `ThreadLocal` flag, not a lock.** The check is written with `ImageFinder`/`ImageClicker`
+  — the only way to write it — so it would re-enter the guard and recurse forever. `check()` is a no-op while
+  the check is already running on that thread, so the handler's own vision calls behave like ordinary ones.
+- **Guarded once per vision *statement*, not per capture.** The call sits in the overloads that take their
+  own capture, never in the ones that merely delegate to another guarded overload; a full screenshot per
+  guard makes double-firing expensive rather than merely untidy. `untilFind…` needs no guard of its own — it
+  polls through `find`/`findAny`, which are guarded — and the two waiters guard *inside* their poll loop,
+  because a popup opening mid-wait is exactly the case that would otherwise burn the whole timeout.
+- **`click(MatchResult)` is deliberately unguarded.** It clicks a coordinate located in an earlier frame;
+  dismissing a popup first would move the screen out from under it, which is how a "safe" guard misclicks.
+
+`PopupGuardTest` exercises all of this through the real facades rather than by calling `check()` directly:
+what can break silently is the wiring (an overload that forgot the call, or one that guards twice), and that
+is invisible to a unit test of the class alone.
+
+---
+
 ## 2026-08-04 — `Matches`: the group lambdas hand back the whole combination
 
 **164 → 177 tests.** Added `api/vision/Matches.java`, `api/vision/MatchesTest.java`,
