@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Session;
 import com.botmaker.sdk.api.Size;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
+import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.shared.launch.LaunchIsolation;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.ActiveSession;
@@ -41,6 +42,8 @@ public final class SessionBootstrap {
 
     /** System property (or {@code BOTMAKER_SESSION_ISOLATED} env) that opts a bot into a nested {@code :N} run. */
     public static final String ISOLATED_PROPERTY = "botmaker.session.isolated";
+    /** The environment form of {@link #ISOLATED_PROPERTY}, for a bot started from a shell or a service unit. */
+    public static final String ISOLATED_ENV = "BOTMAKER_SESSION_ISOLATED";
     /**
      * System property that <em>overrides</em> the auto-selected backend when isolated: {@code gamescope} for 3D,
      * {@code xephyr} for 2D. When unset the backend is chosen from the launch kind by
@@ -64,10 +67,10 @@ public final class SessionBootstrap {
     public static boolean isolationRequested() {
         Boolean override = Session.override();
         if (override == null) {
-            override = overrideBool(System.getProperty(ISOLATED_PROPERTY));
+            override = ProjectProperties.parseBoolean(System.getProperty(ISOLATED_PROPERTY));
         }
         if (override == null) {
-            override = overrideBool(System.getenv("BOTMAKER_SESSION_ISOLATED"));
+            override = ProjectProperties.parseBoolean(System.getenv(ISOLATED_ENV));
         }
         return override != null ? override : ProjectDefaults.sessionIsolated();
     }
@@ -186,15 +189,4 @@ public final class SessionBootstrap {
         }
     }
 
-    /** A recognised boolean override ({@code true}/{@code false} and friends), or {@code null} when unset/unparseable. */
-    private static Boolean overrideBool(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return switch (value.trim().toLowerCase()) {
-            case "true", "1", "yes", "on" -> Boolean.TRUE;
-            case "false", "0", "no", "off" -> Boolean.FALSE;
-            default -> null;
-        };
-    }
 }

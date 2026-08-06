@@ -8,6 +8,27 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-06 — the project-file readers stop re-spelling shared's grammar
+
+**195 tests (unchanged).** Changed: `internal/config/ProjectDefaults.java`,
+`internal/session/SessionBootstrap.java`. Phase 5 of the stringly-typed sweep; the shared half (the new
+`CaptureSourceKind`, `ProjectProperties.parseBoolean`) is in `../botmaker-shared/ROADMAP.md`, same date.
+
+- **`ProjectDefaults.source()` switches over `CaptureSourceKind`** instead of testing four literals with
+  hand-counted substring offsets (`substring(8)` for `"monitor:"`, `7` for `"window:"`, `9` for
+  `"emulator:"`). Studio writes these specs and this reads them back, so the grammar belongs to shared; what
+  is left here is the one thing shared cannot do — mapping a form onto `Desktop`/`Monitor`/`Window`/
+  `EmulatorSource`. Because the switch is exhaustive over the enum, a fifth capture form added in shared now
+  fails this compile rather than silently reading as "no default source".
+- One behaviour change falls out of it: `window:` (or `emulator:`) with nothing after the colon now yields
+  no default source instead of a source named `""`. An empty name matched every window.
+- **`SessionBootstrap.overrideBool` deleted** in favour of `ProjectProperties.parseBoolean` — it was a
+  byte-identical copy of shared's `true/1/yes/on` switch, and two copies of a lenient vocabulary drift
+  quietly (an env override that rejects `on` while the project key accepts it). Its env var name is now a
+  constant, `ISOLATED_ENV`, beside the `ISOLATED_PROPERTY` it mirrors.
+
+---
+
 ## 2026-08-04 — The month is a `Month`, and the hour windows are gone
 
 **195 tests** (was 192). Changed `api/Time.java` and `TimeWindowTest.java`. Improvements round 2 phase 4.

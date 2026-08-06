@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.Size;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Desktop;
 import com.botmaker.sdk.api.capture.Monitor;
+import com.botmaker.shared.config.CaptureSourceKind;
 import com.botmaker.shared.config.ProjectProperties;
 
 import java.awt.Dimension;
@@ -24,29 +25,36 @@ public final class ProjectDefaults {
 
     private ProjectDefaults() {}
 
-    /** The configured project default capture source, or {@code null} when unset/unparseable. */
+    /**
+     * The configured project default capture source, or {@code null} when unset/unparseable. The spec's
+     * grammar belongs to shared's {@link CaptureSourceKind} — Studio writes those same four forms — so all
+     * that happens here is the mapping onto the SDK's {@link CaptureSource} implementations.
+     */
     public static CaptureSource source() {
         String spec = ProjectProperties.captureSource();
         if (spec == null) {
             return null;
         }
-        try {
-            if (spec.equalsIgnoreCase("desktop")) {
-                return new Desktop();
-            }
-            if (spec.regionMatches(true, 0, "monitor:", 0, 8)) {
-                return new Monitor(Integer.parseInt(spec.substring(8).trim()));
-            }
-            if (spec.regionMatches(true, 0, "window:", 0, 7)) {
-                return CaptureSource.window(spec.substring(7).trim());
-            }
-            if (spec.regionMatches(true, 0, "emulator:", 0, 9)) {
-                return new com.botmaker.sdk.api.emulator.EmulatorSource(spec.substring(9).trim());
-            }
-        } catch (RuntimeException ignored) {
-            // unparseable — fall through to null
+        CaptureSourceKind kind = CaptureSourceKind.of(spec);
+        if (kind == null) {
+            return null;
         }
-        return null;
+        String argument = kind.argumentOf(spec);
+        if (kind.takesArgument() && argument == null) {
+            // "window:" with nothing after it names no window — the caller's own default is the better answer
+            return null;
+        }
+        try {
+            return switch (kind) {
+                case DESKTOP -> new Desktop();
+                case MONITOR -> new Monitor(Integer.parseInt(argument));
+                case WINDOW -> CaptureSource.window(argument);
+                case EMULATOR -> new com.botmaker.sdk.api.emulator.EmulatorSource(argument);
+            };
+        } catch (RuntimeException ignored) {
+            // unparseable argument (a non-numeric monitor index, an empty name) — no default source
+            return null;
+        }
     }
 
     /**
