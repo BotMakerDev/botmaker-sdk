@@ -50,7 +50,7 @@ class SessionBootstrapTest {
     }
 
     @Test
-    void useBackendOutranksThePropertyAndAutoRestoresTheKindDrivenChoice() {
+    void useBackendOutranksThePropertyAndAutoUnpinsToTheRungBelow() {
         System.setProperty(SessionBootstrap.BACKEND_PROPERTY, "xephyr");
         Session.useBackend("gamescope");
         assertEquals(NestedSession.Backend.GAMESCOPE,
@@ -105,14 +105,14 @@ class SessionBootstrapTest {
     }
 
     @Test
-    void backendAutoSelectsFromKindAndHonoursOverride() {
+    void backendDefaultsToGamescopeAndHonoursOverride() {
         System.clearProperty(SessionBootstrap.BACKEND_PROPERTY);
-        // Kind-driven with no override: a plain command → Xephyr, a game → gamescope.
-        assertEquals(NestedSession.Backend.XEPHYR,
+        // No override: gamescope, whatever the kind.
+        assertEquals(NestedSession.Backend.GAMESCOPE,
                 SessionBootstrap.backend(new LaunchSpec(LaunchKind.CLI, "echo hi")));
         assertEquals(NestedSession.Backend.GAMESCOPE,
                 SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")));
-        // The explicit override wins over the kind-driven default (forces Xephyr even for a game).
+        // The explicit override wins over the default (forces Xephyr even for a game).
         System.setProperty(SessionBootstrap.BACKEND_PROPERTY, "xephyr");
         assertEquals(NestedSession.Backend.XEPHYR,
                 SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")));
@@ -139,11 +139,11 @@ class SessionBootstrapTest {
     }
 
     @Test
-    void optionsTrackTheLaunchKindWithoutAnOverride() {
+    void optionsFollowTheDefaultWithoutAnOverride() {
         System.clearProperty(SessionBootstrap.BACKEND_PROPERTY);
         assertEquals(NestedSession.Backend.GAMESCOPE,
                 SessionBootstrap.options(new LaunchSpec(LaunchKind.STEAM, "570")).backend());
-        assertEquals(NestedSession.Backend.XEPHYR,
+        assertEquals(NestedSession.Backend.GAMESCOPE,
                 SessionBootstrap.options(new LaunchSpec(LaunchKind.CLI, "echo hi")).backend());
     }
 }

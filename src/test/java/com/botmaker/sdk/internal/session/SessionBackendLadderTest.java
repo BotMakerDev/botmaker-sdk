@@ -63,19 +63,20 @@ class SessionBackendLadderTest {
     }
 
     @Test
-    void thePropertyBeatsTheKindDrivenDefault() {
+    void thePropertyBeatsTheDefault() {
         System.setProperty(PROPERTY, "xephyr");
 
         assertEquals(NestedSession.Backend.XEPHYR, SessionBootstrap.backend(game()),
-                "-Dbotmaker.session.backend is the operator's override and must beat auto-selection");
+                "-Dbotmaker.session.backend is the operator's override and must beat the default");
     }
 
     /**
-     * The bottom rung, and the one that must not become a constant: with nothing configured, the answer is a
-     * function of what is being launched.
+     * The bottom rung: with nothing configured, every launch kind isolates on gamescope. Xephyr is now reachable
+     * only by naming it — the rungs above — because "lighter for a plain command" bought nothing and left the
+     * least-exercised launch kinds on the only backend whose software GL crashes what a session usually runs.
      */
     @Test
-    void withNothingConfiguredTheKindDecides() {
+    void withNothingConfiguredEveryKindGetsGamescope() {
         NestedSession.Backend forAGame = SessionBootstrap.backend(game());
         NestedSession.Backend forACommand = SessionBootstrap.backend(plainCommand());
 
@@ -84,8 +85,8 @@ class SessionBackendLadderTest {
         assertEquals(NestedSession.Backend.GAMESCOPE, forAGame,
                 "a store-launcher game must get gamescope: Xephyr is software GL and that is the SIGTRAP this "
                         + "ladder exists to avoid");
-        assertEquals(NestedSession.Backend.XEPHYR, forACommand,
-                "a plain command has no use for a GPU-backed compositor");
+        assertEquals(NestedSession.Backend.GAMESCOPE, forACommand,
+                "and a plain command gets it too — one path, the one that is actually exercised");
     }
 
     // ---- Totality: an unrecognised value falls through rather than resolving ----
@@ -93,10 +94,10 @@ class SessionBackendLadderTest {
     /**
      * {@code auto} is the case that already caused this bug once: it is a real thing a user types, it is not a
      * backend id, and the old {@code equalsIgnoreCase} ternary mapped it onto Xephyr — onto the crash. It must
-     * fall through to the kind-driven choice.
+     * fall through to the default.
      */
     @Test
-    void anExplicitAutoFallsThroughToTheKindDrivenChoice() {
+    void anExplicitAutoFallsThroughToTheDefault() {
         Session.useBackend("auto");
 
         assertEquals(NestedSession.Backend.GAMESCOPE, SessionBootstrap.backend(game()),
@@ -107,12 +108,11 @@ class SessionBackendLadderTest {
     void aTypoFallsThroughRatherThanResolvingToABackendItDoesNotName() {
         System.setProperty(PROPERTY, "gamscope"); // one letter out
 
-        assertEquals(NestedSession.Backend.GAMESCOPE, SessionBootstrap.backend(game()),
-                "an unparseable value must not silently select the other backend — it must fall to the next "
-                        + "rung, which for a game is gamescope");
-        assertEquals(NestedSession.Backend.XEPHYR, SessionBootstrap.backend(plainCommand()),
-                "and for a plain command, the same fall-through gives Xephyr — proving it fell through rather "
-                        + "than matching");
+        // Xephyr is now the only thing a *match* on this property could not produce by accident: the default is
+        // gamescope, so seeing XEPHYR here would mean the unparseable value had been mapped onto a backend —
+        // which is exactly the old bug.
+        assertEquals(NestedSession.Backend.GAMESCOPE, SessionBootstrap.backend(game()));
+        assertEquals(NestedSession.Backend.GAMESCOPE, SessionBootstrap.backend(plainCommand()));
     }
 
     @Test
@@ -126,10 +126,10 @@ class SessionBackendLadderTest {
     /** Ids are matched case- and whitespace-insensitively, so a hand-edited property still resolves. */
     @Test
     void idsAreNormalisedBeforeMatching() {
-        System.setProperty(PROPERTY, "  GameScope  ");
+        System.setProperty(PROPERTY, "  XePhyr  ");
 
-        assertEquals(NestedSession.Backend.GAMESCOPE, SessionBootstrap.backend(plainCommand()),
-                "a plain command defaults to Xephyr, so seeing GAMESCOPE here proves the property was parsed "
+        assertEquals(NestedSession.Backend.XEPHYR, SessionBootstrap.backend(plainCommand()),
+                "everything defaults to gamescope, so seeing XEPHYR here proves the property was parsed "
                         + "despite its casing and padding");
     }
 

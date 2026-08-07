@@ -45,9 +45,9 @@ public final class SessionBootstrap {
     /** The environment form of {@link #ISOLATED_PROPERTY}, for a bot started from a shell or a service unit. */
     public static final String ISOLATED_ENV = "BOTMAKER_SESSION_ISOLATED";
     /**
-     * System property that <em>overrides</em> the auto-selected backend when isolated: {@code gamescope} for 3D,
-     * {@code xephyr} for 2D. When unset the backend is chosen from the launch kind by
-     * {@link SessionBackends#preferredBackend(LaunchSpec)} — a game gets a GPU, a plain command gets Xephyr.
+     * System property that <em>overrides</em> the default backend when isolated: {@code gamescope} for 3D,
+     * {@code xephyr} for 2D. When unset the backend is {@link SessionBackends#preferredBackend(LaunchSpec)},
+     * which is gamescope for every launch kind.
      */
     public static final String BACKEND_PROPERTY = "botmaker.session.backend";
 
@@ -77,10 +77,10 @@ public final class SessionBootstrap {
 
     /**
      * The backend to isolate {@code spec} on, highest precedence first: a bot's {@link Session#useBackend} pin,
-     * the {@link #BACKEND_PROPERTY} system property, the project's {@code session.backend} key, else the
-     * kind-driven choice from {@link SessionBackends#preferredBackend(LaunchSpec)} (a game → gamescope for a real
-     * GPU, a plain command → Xephyr). Auto-selecting by kind is what stops a store launcher SIGTRAPping on
-     * Xephyr's software GL.
+     * the {@link #BACKEND_PROPERTY} system property, the project's {@code session.backend} key, else
+     * {@link SessionBackends#preferredBackend(LaunchSpec)} — gamescope, for every kind. Defaulting to gamescope
+     * rather than to Xephyr is what stops a store launcher SIGTRAPping on Xephyr's software GL; the three pins
+     * above it exist so a Xephyr run remains possible, never so one can happen by accident.
      *
      * <p>Every rung parses through {@link NestedSession.Backend#fromId}, which is total and empty for anything
      * that isn't a backend id — {@code "auto"} included. That is a fix, not just tidying: the previous
