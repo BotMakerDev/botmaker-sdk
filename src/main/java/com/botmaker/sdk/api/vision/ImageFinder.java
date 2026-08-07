@@ -127,6 +127,9 @@ public class ImageFinder {
      * every answer in the returned {@code Matches} describes the same instant.
      */
     static Matches findAllTemplates(ImageTemplateGroup group, CaptureSource source, double confidence) {
+        if (group.isEmpty()) {
+            return Matches.none();   // nothing to look for — don't pay for a capture to prove it
+        }
         Mat background = null;
         try {
             BufferedImage screenshot = source.capture();
@@ -1121,6 +1124,7 @@ public class ImageFinder {
      * @return true if all templates were found and the action was run, false otherwise
      */
     public static boolean ifFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
+        if (group.isEmpty()) return false;   // "all of nothing" is vacuously true; an empty group matches nothing
         PopupGuard.check();
         Matches found = findAllTemplates(group, source, BotSettings.confidence());
         VisionContext.setLastMatches(found);
@@ -1180,6 +1184,7 @@ public class ImageFinder {
      * @param action the action to run with each frame's matches
      */
     public static void whileFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
+        if (group.isEmpty()) return;   // vacuous hasAll would spin this loop forever on an empty group
         PopupGuard.check();
         Matches found;
         while ((found = findAllTemplates(group, source, BotSettings.confidence())).hasAll(group.toArray())) {
@@ -1207,6 +1212,7 @@ public class ImageFinder {
      * @param action the action to run
      */
     public static void untilFindAny(ImageTemplateGroup group, CaptureSource source, Runnable action) {
+        if (group.isEmpty()) return;   // nothing can ever appear, so this would run action forever
         while (!findAny(group, source)) {
             action.run();
         }
@@ -1230,6 +1236,7 @@ public class ImageFinder {
      * @param action the action to run
      */
     public static void untilFindAll(ImageTemplateGroup group, CaptureSource source, Runnable action) {
+        if (group.isEmpty()) return;   // allMatch over nothing is vacuously true; keep it "matches nothing"
         while (!group.templates().stream().allMatch(t -> find(t, source))) {
             action.run();
         }

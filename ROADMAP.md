@@ -8,6 +8,35 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-07 — an empty `ImageTemplateGroup` is legal, and means "matches nothing"
+
+**Changed:** `api/vision/ImageTemplateGroup.java`, `api/vision/ImageFinder.java`; new
+`ImageFinderEmptyGroupTest`, updated `ImageTemplateGroupTest`. Driven by the Studio side of the same day's
+work (`../botmaker-studio/ROADMAP.md`): the generated `Popups` scaffold now ships a real `whileFindAny` loop
+with its group still to be filled in, which is impossible while the empty group throws.
+
+**Done**
+
+- **`ImageTemplateGroup.of()` no longer throws `IllegalArgumentException`.** The non-empty invariant only ever
+  protected against a group that finds nothing — which is exactly what a scaffold wants to express, and the
+  same thing a group whose templates are all missing from the screen already does. The record now just copies
+  the list (still rejecting `null`), and gained `isEmpty()`.
+- **"Matches nothing" is enforced, not assumed.** Four helpers got it wrong by default, and each is a
+  one-line guard now: `ifFindAll` and `whileFindAll` because `Matches.hasAll(new ImageTemplate[0])` is
+  *vacuously true* (the first would run its action on a blank screen; the second would loop forever doing
+  so), `untilFindAny` because nothing can ever appear so it would run its action forever, and `untilFindAll`
+  for the symmetric vacuous `allMatch`. The plain queries (`findAny`/`findBest`/`findAll`, and every
+  `ImageClicker` group entry point) already degrade correctly — they iterate the templates.
+- **An empty group costs no capture.** `findAllTemplates` returns `Matches.none()` before touching the
+  source. This is the one that would have been felt: a scaffolded bot runs its popup check before *every*
+  vision step, so an empty group that still grabbed a frame would have doubled the capture work of every bot
+  that hadn't filled one in yet.
+- **`ImageFinderEmptyGroupTest`** asserts all of it against a `CaptureSource` that fails the test if it is
+  captured or clicked, with `@Timeout(10)` on every case so a regression in the loop guards hangs the one
+  test rather than the build.
+
+---
+
 ## 2026-08-06 — the project-file readers stop re-spelling shared's grammar
 
 **195 tests (unchanged).** Changed: `internal/config/ProjectDefaults.java`,

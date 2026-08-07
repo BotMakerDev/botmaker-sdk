@@ -9,8 +9,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests {@link ImageTemplateGroup} — the immutable, non-empty multi-template value. No display or
- * OpenCV needed (templates are never loaded here).
+ * Tests {@link ImageTemplateGroup} — the immutable multi-template value. No display or OpenCV needed
+ * (templates are never loaded here).
  */
 class ImageTemplateGroupTest {
 
@@ -40,11 +40,22 @@ class ImageTemplateGroupTest {
         assertThrows(UnsupportedOperationException.class, () -> g.templates().add(t("b")));
     }
 
+    /**
+     * An empty group is legal — the generated {@code Popups} scaffold ships one so the editor can show a
+     * real {@code whileFindAny} block before any template exists. It used to throw, which is what made that
+     * scaffold impossible; {@link ImageFinderEmptyGroupTest} covers what the finder then does with it.
+     */
     @Test
-    void emptyIsRejected() {
-        assertThrows(IllegalArgumentException.class, ImageTemplateGroup::of);
-        assertThrows(IllegalArgumentException.class, () -> ImageTemplateGroup.of(List.of()));
-        assertThrows(IllegalArgumentException.class, () -> new ImageTemplateGroup(null));
+    void emptyIsAllowed() {
+        assertTrue(ImageTemplateGroup.of().isEmpty());
+        assertTrue(ImageTemplateGroup.of(List.of()).isEmpty());
+        assertEquals(0, ImageTemplateGroup.of().toArray().length);
+        assertFalse(ImageTemplateGroup.of(t("a")).isEmpty());
+    }
+
+    @Test
+    void nullListIsRejected() {
+        assertThrows(NullPointerException.class, () -> new ImageTemplateGroup(null));
     }
 
     @Test
