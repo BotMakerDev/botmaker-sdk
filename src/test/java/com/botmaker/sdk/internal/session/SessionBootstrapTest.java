@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.session;
 import com.botmaker.sdk.api.Session;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.ActiveSession;
 import com.botmaker.session.impl.NestedSession;
 import org.junit.jupiter.api.AfterEach;
@@ -124,9 +125,12 @@ class SessionBootstrapTest {
     @Test
     void sizeFallsBackToTheDefaultWhenNoProjectResolution() {
         // No botmaker-project.properties on the test classpath → no authored resolution → the fallback size.
-        int[] size = SessionBootstrap.size();
-        assertEquals(SessionBootstrap.DEFAULT_WIDTH, size[0]);
-        assertEquals(SessionBootstrap.DEFAULT_HEIGHT, size[1]);
+        SessionBackends.DisplaySize size = SessionBootstrap.size();
+        assertEquals(SessionBootstrap.DEFAULT_WIDTH, size.width());
+        assertEquals(SessionBootstrap.DEFAULT_HEIGHT, size.height());
+        // And it says so: a bot that finds nothing needs to be able to tell a display sized to its templates
+        // from one sized to a default that matches nothing it captured.
+        assertEquals(SessionBackends.SizeSource.FALLBACK, size.source());
     }
 
     @Test

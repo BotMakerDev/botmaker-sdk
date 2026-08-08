@@ -51,9 +51,12 @@ public final class SessionBootstrap {
      */
     public static final String BACKEND_PROPERTY = "botmaker.session.backend";
 
-    /** Nested display size used when the project has no authored resolution. */
-    public static final int DEFAULT_WIDTH = 1280;
-    public static final int DEFAULT_HEIGHT = 720;
+    /**
+     * Nested display size used when the project has no authored resolution — single-sourced in
+     * {@link SessionBackends}, which Studio's launcher answers from too.
+     */
+    public static final int DEFAULT_WIDTH = SessionBackends.DEFAULT_WIDTH;
+    public static final int DEFAULT_HEIGHT = SessionBackends.DEFAULT_HEIGHT;
 
     private SessionBootstrap() {}
 
@@ -96,16 +99,21 @@ public final class SessionBootstrap {
 
     /** The nested-display options for {@code spec}: its selected backend at the project (or fallback) resolution. */
     public static NestedSession.Options options(LaunchSpec spec) {
-        int[] size = size();
-        return SessionBackends.optionsFor(spec, backend(spec), size[0], size[1]);
+        SessionBackends.DisplaySize size = size();
+        return SessionBackends.optionsFor(spec, backend(spec), size.width(), size.height());
     }
 
-    /** The nested display size from the project's authored resolution, or the default when unset/non-positive. */
-    static int[] size() {
+    /**
+     * The nested display size from the project's authored resolution, or the default when unset — and which of
+     * the two it was.
+     *
+     * <p>The source is carried rather than resolved away because a bot is the consumer least able to ask: it
+     * runs headless, and a bot that finds nothing has no way to tell a display sized to its templates from one
+     * sized to a default that matches nothing it captured. {@link #launchIsolated} logs it for exactly that.
+     */
+    static SessionBackends.DisplaySize size() {
         Size r = ProjectDefaults.defaultResolution();
-        int w = r == null ? 0 : (int) r.width;
-        int h = r == null ? 0 : (int) r.height;
-        return new int[]{w > 0 ? w : DEFAULT_WIDTH, h > 0 ? h : DEFAULT_HEIGHT};
+        return SessionBackends.sizeFor(r == null ? 0 : (int) r.width, r == null ? 0 : (int) r.height);
     }
 
     /**
@@ -174,7 +182,8 @@ public final class SessionBootstrap {
                 session.close();
                 return false;
             }
-            Debug.log("[Session] isolated: running " + spec.spec() + " on nested " + chosen + " display");
+            Debug.log("[Session] isolated: running " + spec.spec() + " on nested " + chosen + " display at "
+                + size().describe());
             return true;
         } catch (Exception e) {
             String why = e.getMessage() == null ? e.toString() : e.getMessage();
