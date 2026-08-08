@@ -8,6 +8,50 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-08 — a debug run reads as a narrative
+
+**Changed:** new `internal/trace/Trace.java`; `api/bot/Activity.java`, `api/bot/Bot.java`,
+`api/bot/PopupGuard.java`, `api/vision/ImageFinder.java`; new `TraceTest`, `DebugTraceTest`.
+
+`Debug`/`Diag` already existed, were on by default and printed to the stdout Studio captures — the
+interesting moments simply never printed. A run's console showed launch chatter and then nothing until it
+crashed.
+
+**Done**
+
+- **`internal/trace/Trace`** — `elapsed(millis)` (a duration as a person says it: `340ms`, `1.4s`, `Locale.ROOT`
+  so a French desktop doesn't render `1,4s`) and `Trace.Runs`, which collapses a burst of one repeating event
+  into a single line. A run closes either when its opposite happens (`flush`) or when it outlives 5s (`tick`),
+  the second so a bot waiting five minutes for a template isn't silent for five minutes — that reads as a hang.
+- **`[Activity] Mining → BAG_FULL (1.2s)`** from `Activity.execute()`, and `→ stuck: <msg>` on a
+  `BotStuckException` before it is rethrown. This is the coarsest "what is the bot doing" unit, and `execute()`
+  is the only place that can print it: the flow driver switches on the outcome without ever naming the activity.
+- **`[Bot] cold start` / `[Bot] goHome` / `[Bot] restarting the game`** around the supervisor's start-up and
+  recovery, where a bot spends its most confusing time — without them, `goHome` navigating a game that is
+  already gone and a restart waiting on a launch are one indistinguishable silence.
+- **`[Vision] find Foo → (312,88) 0.94`** on a hit, from the two single-frame chokepoints (`findInternal`,
+  `findAllTemplates`) so every overload — `find`/`findAny`/`findBest`/`ifFind`/`whileFind`/`ifFindAny` — is
+  covered once. The centre, not the top-left: that is the point a click lands on. **Misses are collapsed** per
+  template (`[Vision] Foo not found ×47 in 3.4s`); a wait loop polls many times a second and printing each
+  would bury every other line. The counter lives in the finder because "how long has this template been
+  missing" is a property of the template, not of the overload that asked.
+- **`[Popup] checked ×214 in 5.0s`**, plus an immediate `[Popup] check took 820ms` past 500ms. Deliberately
+  *not* the plan's "`checking` on entry + elapsed on exit": the guard runs before every vision step, so that
+  would wrap two lines around every find — the same drowning the vision misses are collapsed to avoid. A slow
+  check is the actual signal, because it turns a working bot into one that looks hung.
+- Every line goes through `Debug`, so `Debug.disable()` is silence rather than less noise — `DebugTraceTest`
+  asserts empty output for each chokepoint, which is the half that is easy to lose to a stray `println`.
+
+**Deferred / next**
+
+- The trace is stdout only. The structured IPC stream stays reserved for geometry the pilot draws
+  (`TelemetryEvent`), and `[Vision]` deliberately does not duplicate what `emitMatch` already sends there.
+- `compare`/`compareAny`/`compareAll` and `findAllInternal` emit observer events but no `[Vision]` line. They
+  are batch shapes where "the hit" isn't a single result; if a compare-heavy bot proves hard to read, give
+  them a count line rather than one per template.
+
+---
+
 ## 2026-08-08 — the ambient source skips a session whose pixels aren't on X11
 
 **Changed:** `api/capture/Source.java`.

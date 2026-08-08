@@ -155,14 +155,21 @@ public final class Bot {
      */
     static void supervise(Runnable body, Runnable goHome, Consumer<StartMode> startGame) {
         Runnable recovery = () -> {
+            // Both halves are announced because a recovery is where a bot spends its most confusing time:
+            // without these, "goHome" navigating a game that is already gone and "restart" waiting on a
+            // launch are one indistinguishable silence.
+            Debug.log("[Bot] goHome");
             goHome.run();
+            Debug.log("[Bot] restarting the game");
             startGame.accept(StartMode.RESTART);
         };
         Watchdog.enable();
         // Cold start: open the game and reach a known screen once, before the loop. A failure here recovers
         // exactly as a mid-run failure would, so a bad first launch still self-heals instead of exiting.
         try {
+            Debug.log("[Bot] cold start");
             startGame.accept(StartMode.COLD);
+            Debug.log("[Bot] goHome");
             goHome.run();
         } catch (BotStoppedException e) {
             Debug.log("[Bot] Stopped by request during start-up.");

@@ -1,5 +1,8 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.internal.trace.Trace;
+
 /**
  * The "dismiss whatever the game just interrupted us with" hook: a check the SDK runs <em>before every vision
  * step</em>, so a bot's own logic never has to ask "is a popup covering the screen right now?".
@@ -89,10 +92,50 @@ public final class PopupGuard {
         Runnable current = handler;
         if (current == null || !enabled || Boolean.TRUE.equals(running.get())) return;
         running.set(Boolean.TRUE);
+        long startedAt = System.currentTimeMillis();
         try {
             current.run();
         } finally {
             running.set(Boolean.FALSE);
+            trace(System.currentTimeMillis() - startedAt);
+        }
+    }
+
+    // --- Debug trace ---
+    //
+    // A check that takes longer than a screenshot is the thing worth seeing: the guard runs before *every*
+    // vision step, so a slow one turns a bot that is working into a bot that looks hung, and the console's
+    // account of that stall is otherwise a gap between two unrelated lines. That one is printed as it
+    // happens.
+    //
+    // The other few hundred checks a second are not worth a line each — printing "checking" on entry and its
+    // duration on exit would put two lines around every find in the log, which is the same drowning the
+    // vision misses are collapsed to avoid. They are counted and reported as a run instead, so the trace
+    // still says the guard is alive and roughly what it costs.
+
+    /** Past this, one check is an event rather than overhead, and gets its own line. */
+    private static final long SLOW_CHECK_MS = 500;
+
+    /** The single run — there is one guard, so nothing distinguishes one check from another. */
+    private static final String RUN_KEY = "check";
+
+    private static final Trace.Runs CHECKS = new Trace.Runs();
+
+    private static void trace(long millis) {
+        if (!Debug.isEnabled()) return;
+        if (millis >= SLOW_CHECK_MS) {
+            // Close the quiet run first, so the slow line lands after the checks that preceded it, not
+            // before them.
+            report(CHECKS.flush(RUN_KEY));
+            Debug.log("[Popup] check took " + Trace.elapsed(millis));
+            return;
+        }
+        report(CHECKS.tick(RUN_KEY));
+    }
+
+    private static void report(Trace.Runs.Run run) {
+        if (run != null) {
+            Debug.log("[Popup] checked " + run);
         }
     }
 }

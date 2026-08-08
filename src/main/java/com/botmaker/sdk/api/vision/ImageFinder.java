@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.observe.Bots;
 import com.botmaker.sdk.api.observe.MatchEvent;
 import com.botmaker.sdk.api.observe.Surface;
+import com.botmaker.sdk.internal.trace.Trace;
 import com.botmaker.shared.opencv.OpencvManager;
 import com.botmaker.shared.opencv.RawMatch;
 import org.opencv.core.Mat;
@@ -16,6 +17,7 @@ import org.opencv.core.Mat;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -147,9 +149,11 @@ public class ImageFinder {
                     MatchResult result = new MatchResult(
                             location, best.width(), best.height(), best.score(), template.getId());
                     emitMatch(source, result);
+                    traceHit(template, result);
                     results.add(result);
                 } else {
                     emitMatch(source, MatchResult.miss(best != null ? best.score() : 0.0));
+                    traceMiss(template);
                 }
             }
             return Matches.of(results);
@@ -190,6 +194,7 @@ public class ImageFinder {
                 MatchResult result = new MatchResult(
                         location, best.width(), best.height(), best.score(), template.getId());
                 emitMatch(source, result);
+                traceHit(template, result);
                 return result;
             }
 
@@ -197,6 +202,7 @@ public class ImageFinder {
             // borderline), but return not-found result.
             MatchResult missResult = MatchResult.miss(best != null ? best.score() : 0.0);
             emitMatch(source, missResult);
+            traceMiss(template);
             return MatchResult.notFound();
 
         } catch (Exception e) {
@@ -952,6 +958,40 @@ public class ImageFinder {
         }
         VisionContext.setLastMatchList(all);
         return all.size();
+    }
+
+    // --- Debug trace: what the bot is looking at, without the wall of misses ---
+    //
+    // A hit is rare and interesting, so it prints. A miss is neither: untilFind/waitFor poll many times a
+    // second and every poll misses until the last one, so printing each would bury every other line in the
+    // log. Misses are therefore counted per template and reported once when the run ends — the template is
+    // finally found, or the run gets old enough that staying silent would read as a hang. The counter lives
+    // here rather than at each call site because "how long has this template been missing" is a property of
+    // the template, not of the particular find overload that happened to ask.
+
+    private static final Trace.Runs MISSES = new Trace.Runs();
+
+    /** Records a hit and prints it, closing (and reporting) any run of misses it just ended. */
+    private static void traceHit(ImageTemplate template, MatchResult result) {
+        if (!Debug.isEnabled()) return;
+        reportMisses(template.getId(), MISSES.flush(template.getId()));
+        // The centre rather than the top-left: it is the point a click would land on, so the number in the
+        // log is the number to compare against where the pointer actually went.
+        Point centre = result.getCenter();
+        Debug.log("[Vision] find " + template.getId() + " → (" + (int) centre.x + "," + (int) centre.y + ") "
+                + String.format(Locale.ROOT, "%.2f", result.getConfidence()));
+    }
+
+    /** Records a miss, printing only when its run has gone on long enough to be worth saying so. */
+    private static void traceMiss(ImageTemplate template) {
+        if (!Debug.isEnabled()) return;
+        reportMisses(template.getId(), MISSES.tick(template.getId()));
+    }
+
+    private static void reportMisses(String templateId, Trace.Runs.Run run) {
+        if (run != null) {
+            Debug.log("[Vision] " + templateId + " not found " + run);
+        }
     }
 
     // --- Observability: report each match attempt to registered BotObservers (see api.observe.Bots) ---

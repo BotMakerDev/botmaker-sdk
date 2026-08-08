@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.internal.trace.Trace;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -173,15 +174,24 @@ public abstract class Activity<O extends Enum<O>> {
      * that case; the supervisor is.
      */
     public final O execute() {
+        // The activity and its outcome are the coarsest unit of "what is the bot doing", so this one line is
+        // what makes a debug console read as a story rather than as vision events. It is also the only place
+        // that can print it: the outcome is what run() returns, and the flow driver switches on it without
+        // ever naming the activity that produced it.
+        long startedAt = System.currentTimeMillis();
         before();
         O outcome;
         try {
             outcome = run();
         } catch (BotStuckException e) {
+            Debug.error("[Activity] " + name + " → stuck: " + e.getMessage()
+                    + " (" + Trace.elapsed(System.currentTimeMillis() - startedAt) + ")");
             onStuck(e);
             throw e;
         }
         after();
+        Debug.log("[Activity] " + name + " → " + outcome
+                + " (" + Trace.elapsed(System.currentTimeMillis() - startedAt) + ")");
         return outcome;
     }
 }
