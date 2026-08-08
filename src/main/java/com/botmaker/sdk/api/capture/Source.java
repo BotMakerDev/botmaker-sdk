@@ -35,14 +35,18 @@ public final class Source {
 
     /**
      * The current global capture source. When a bot drives a private {@link DesktopSession} (a nested
-     * {@code :N} display) and hasn't pinned a source, this is the session's owned window (a
-     * {@link SessionSource}); otherwise it initialises lazily to the project default (or the whole
-     * {@link Desktop} when none is configured). Never {@code null}.
+     * {@code :N} display) whose pixels are readable over X11 ({@link DesktopSession#x11Capturable()}) and hasn't
+     * pinned a source, this is the session's owned window (a {@link SessionSource}); otherwise it initialises
+     * lazily to the project default (or the whole {@link Desktop} when none is configured). Never {@code null}.
      */
     public static CaptureSource current() {
         if (!pinned) {
             DesktopSession session = ActiveSession.get();
-            if (session != null) {
+            // A session whose pixels are not on X11 (gamescope hosting a Wayland-only client such as Waydroid)
+            // would hand back a valid frame of an empty root — black, no error, and every find silently missing.
+            // Falling through to the project default reaches the source that *can* see those pixels, which for a
+            // Waydroid bot is its EmulatorSource over ADB.
+            if (session != null && session.x11Capturable()) {
                 return new SessionSource(session);
             }
         }

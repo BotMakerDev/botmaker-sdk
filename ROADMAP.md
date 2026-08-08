@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-08 — the ambient source skips a session whose pixels aren't on X11
+
+**Changed:** `api/capture/Source.java`.
+
+**Done**
+
+- `Source.current()` now yields a `SessionSource` only when the active session answers
+  `DesktopSession.x11Capturable()` (new in `botmaker-session`, same date). A session hosting a Wayland-only
+  client — Waydroid under `gamescope --expose-wayland` — hands back a valid frame of an empty X11 root, so
+  every no-source `find` matched against black and missed, with nothing logged to say why. Falling through
+  reaches `ProjectDefaults.source()`, which for a Waydroid bot is its `EmulatorSource` over ADB.
+- An explicit `Source.set(...)` pin is unaffected: it already wins over an active session and still does.
+
+---
+
 ## 2026-08-07 — an empty `ImageTemplateGroup` is legal, and means "matches nothing"
 
 **Changed:** `api/vision/ImageTemplateGroup.java`, `api/vision/ImageFinder.java`; new
