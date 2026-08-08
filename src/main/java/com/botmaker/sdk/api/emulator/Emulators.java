@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.emulator;
 
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.shared.emulator.AdbDevice;
+import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.EmulatorLauncher;
@@ -165,7 +166,7 @@ public final class Emulators {
 
     private static Optional<Emulator> tryConnect(EmulatorInstance instance) {
         try {
-            AdbDevice device = AdbDevice.connect(instance.host(), instance.adbPort());
+            AdbDevice device = AdbDevice.connect(instance.adb());
             return Optional.of(new Emulator(device, instance));
         } catch (Exception e) {
             // instance configured but not running / ADB port closed — skip it
@@ -189,8 +190,9 @@ public final class Emulators {
 
     /** The first discovered instance whose ADB endpoint matches {@code host:port}, or empty. */
     private static Optional<EmulatorInstance> findInstanceByEndpoint(String host, int port) {
+        String wanted = new AdbEndpoint.Tcp(host, port).label();
         for (EmulatorInstance instance : Platforms.discoverAll()) {
-            if (instance.adbPort() == port && instance.host().equals(host)) {
+            if (wanted.equals(instance.endpoint())) {
                 return Optional.of(instance);
             }
         }

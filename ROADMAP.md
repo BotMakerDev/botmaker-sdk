@@ -8,6 +8,23 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-08 — an emulator ref's liveness stops being a socket
+
+**Done**
+
+- Followed shared's `EmulatorInstance` onto `AdbEndpoint` (its `host` + `adbPort` pair is gone — see
+  `../botmaker-shared/ROADMAP.md` for why a phone on a USB cable cannot be written as a host and a port).
+- **`EmulatorRef.running()` delegates to the endpoint** instead of opening its own `Socket`. It was one of
+  the two hand-rolled copies of that probe; a TCP connect is meaningless for a device the host adb server
+  owns by serial, so the answer has to live with the address. `connect()` and `Emulators.tryConnect` take
+  `AdbDevice.connect(instance.adb())`, which routes a serial through the adb server and a TCP address through
+  dadb directly, exactly as before for every emulator.
+
+No bot-facing signature changed: `Emulators.connect(host, port)` still takes a host and a port, since that is
+the right shape for the thing it does.
+
+---
+
 ## 2026-08-08 — the observer API sees gestures, not just clicks
 
 **Changed:** new `api/observe/SwipeEvent.java`; `api/observe/BotObserver.java`, `api/observe/Bots.java`,

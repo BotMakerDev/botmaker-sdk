@@ -5,8 +5,6 @@ import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
 import com.botmaker.shared.emulator.PlatformId;
 
-import java.net.InetSocketAddress;
-import java.net.Socket;
 
 /**
  * A lightweight, <em>unconnected</em> handle to a discovered emulator instance — what
@@ -33,7 +31,7 @@ public final class EmulatorRef {
         return instance.platformId();
     }
 
-    /** The {@code host:port} where this instance's ADB listens (whether or not it's up). */
+    /** Where this instance's ADB is — {@code host:port}, or a device serial (whether or not it's up). */
     public String endpoint() {
         return instance.endpoint();
     }
@@ -44,16 +42,15 @@ public final class EmulatorRef {
     }
 
     /**
-     * A quick TCP liveness probe of the ADB port — {@code true} if something is listening. Cheaper than a full
-     * ADB handshake; a {@code true} means the instance is (very likely) running, not that ADB is authorized.
+     * A quick liveness probe — {@code true} if something is answering. Cheaper than a full ADB handshake; a
+     * {@code true} means the instance is (very likely) running, not that ADB is authorized.
+     *
+     * <p>What "answering" means depends on where the instance is, which is why this delegates rather than
+     * opening a socket: a TCP connect settles it for an emulator, but a phone on a cable is only visible as an
+     * online serial in the host adb server's list. See {@code AdbEndpoint}.
      */
     public boolean running() {
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(instance.host(), instance.adbPort()), 300);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        return instance.reachable();
     }
 
     /** Starts this instance via its host console tool. {@code false} if unsupported or the spawn fails. */
@@ -72,7 +69,7 @@ public final class EmulatorRef {
      * @throws RuntimeException if the connection can't be established
      */
     public Emulator connect() {
-        return new Emulator(AdbDevice.connect(instance.host(), instance.adbPort()), instance);
+        return new Emulator(AdbDevice.connect(instance.adb()), instance);
     }
 
     @Override
