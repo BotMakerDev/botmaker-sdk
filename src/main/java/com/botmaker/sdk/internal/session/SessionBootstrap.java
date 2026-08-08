@@ -97,9 +97,7 @@ public final class SessionBootstrap {
     /** The nested-display options for {@code spec}: its selected backend at the project (or fallback) resolution. */
     public static NestedSession.Options options(LaunchSpec spec) {
         int[] size = size();
-        return backend(spec) == NestedSession.Backend.GAMESCOPE
-            ? NestedSession.Options.gamescope(size[0], size[1])
-            : NestedSession.Options.xephyr(size[0], size[1]);
+        return SessionBackends.optionsFor(spec, backend(spec), size[0], size[1]);
     }
 
     /** The nested display size from the project's authored resolution, or the default when unset/non-positive. */
