@@ -3,6 +3,9 @@ package com.botmaker.sdk.api.interaction;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.observe.Bots;
+import com.botmaker.sdk.api.observe.Surface;
+import com.botmaker.sdk.api.observe.SwipeEvent;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.session.ActiveSession;
@@ -184,6 +187,11 @@ public class Mouse {
         }
         up(MouseButton.LEFT);
         PointerPolicy.restoreTo(controller(), session(), origin);
+        // After the release, not before the press: an observer drawing this is drawing something that
+        // happened, and a gesture that threw part-way through is not one.
+        if (Bots.hasObservers() && start != null && end != null) {
+            Bots.fireSwipe(new SwipeEvent(Surface.ofScreen(), start, end, durationMs));
+        }
     }
 
     /**

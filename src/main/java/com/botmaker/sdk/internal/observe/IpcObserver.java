@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.observe.Bots;
 import com.botmaker.sdk.api.observe.ClickEvent;
 import com.botmaker.sdk.api.observe.MatchEvent;
 import com.botmaker.sdk.api.observe.Surface;
+import com.botmaker.sdk.api.observe.SwipeEvent;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.shared.ipc.TelemetryClient;
 import com.botmaker.shared.ipc.TelemetryEvent;
@@ -60,6 +61,11 @@ public final class IpcObserver implements BotObserver {
         client.send(toTelemetry(event));
     }
 
+    @Override
+    public void onSwipe(SwipeEvent event) {
+        client.send(toTelemetry(event));
+    }
+
     // --- SDK-native events → shared wire vocabulary ---
 
     private static TelemetryEvent toTelemetry(MatchEvent event) {
@@ -69,6 +75,14 @@ public final class IpcObserver implements BotObserver {
         double confidence = result != null ? result.getConfidence() : 0.0;
         return new TelemetryEvent.Match(
                 target(event.surface()), rect(event.region()), matched, confidence, found, botLine());
+    }
+
+    private static TelemetryEvent toTelemetry(SwipeEvent event) {
+        return new TelemetryEvent.Swipe(
+                target(event.surface()),
+                (int) event.start().x, (int) event.start().y,
+                (int) event.end().x, (int) event.end().y,
+                event.durationMs(), botLine());
     }
 
     private static TelemetryEvent toTelemetry(ClickEvent event) {

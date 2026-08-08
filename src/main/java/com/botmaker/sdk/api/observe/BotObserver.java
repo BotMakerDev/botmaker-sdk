@@ -17,4 +17,7 @@ public interface BotObserver {
 
     /** The interaction layer performed a click. */
     default void onClick(ClickEvent event) {}
+
+    /** The interaction layer performed a drag/swipe — reported once, when the gesture is complete. */
+    default void onSwipe(SwipeEvent event) {}
 }

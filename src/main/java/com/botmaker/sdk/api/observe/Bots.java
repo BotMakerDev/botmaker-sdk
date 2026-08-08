@@ -62,4 +62,14 @@ public final class Bots {
             }
         }
     }
+
+    /** Dispatches a swipe event to every observer; a misbehaving observer cannot break the bot. */
+    public static void fireSwipe(SwipeEvent event) {
+        for (BotObserver observer : OBSERVERS) {
+            try {
+                observer.onSwipe(event);
+            } catch (RuntimeException ignored) {
+            }
+        }
+    }
 }

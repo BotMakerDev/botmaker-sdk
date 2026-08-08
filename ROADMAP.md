@@ -8,6 +8,26 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-08 — the observer API sees gestures, not just clicks
+
+**Changed:** new `api/observe/SwipeEvent.java`; `api/observe/BotObserver.java`, `api/observe/Bots.java`,
+`api/interaction/Mouse.java`, `api/emulator/Emulator.java`, `internal/observe/IpcObserver.java`;
+`IpcObserverTest`.
+
+**Done**
+
+- **`SwipeEvent(surface, start, end, durationMs)`** + `BotObserver.onSwipe` (a default no-op, like the rest)
+  + `Bots.fireSwipe`. Fired from the two places a bot actually drags: `Mouse.drag` (desktop) and
+  `Emulator.swipe` (ADB). One event for the completed gesture, not one per interpolated move — the moves are
+  how the driver got there, and an observer that logged each would print a hundred lines for one flick.
+- **Emitted after the release, not before the press**, and behind `Bots.hasObservers()` like every other
+  emission: an overlay draws what happened, and a gesture that threw part-way through did not happen.
+- `IpcObserver.onSwipe` translates it to `TelemetryEvent.Swipe`. `Emulator.swipe` passes emulator-local
+  coordinates through unchanged, exactly as `click()` does — that route's `origin()` is (0,0), so the numbers
+  ADB was handed are already the ones an overlay draws on the streamed frame.
+
+---
+
 ## 2026-08-08 — a debug run reads as a narrative
 
 **Changed:** new `internal/trace/Trace.java`; `api/bot/Activity.java`, `api/bot/Bot.java`,

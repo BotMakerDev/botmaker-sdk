@@ -4,6 +4,9 @@ import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.observe.Bots;
+import com.botmaker.sdk.api.observe.Surface;
+import com.botmaker.sdk.api.observe.SwipeEvent;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
@@ -83,6 +86,12 @@ public final class Emulator implements CaptureSource {
     public void swipe(int x1, int y1, int x2, int y2, long durationMs) {
         Debug.log("[Emulator] swipe " + x1 + "," + y1 + " -> " + x2 + "," + y2 + " over " + durationMs + "ms");
         device.swipe(x1, y1, x2, y2, durationMs);
+        // Emulator pixels are already what the pilot streams for this route (origin (0,0)), so the same
+        // coordinates ADB was handed are the ones an overlay draws — no mapping, as with click().
+        if (Bots.hasObservers()) {
+            Bots.fireSwipe(new SwipeEvent(
+                    Surface.of(this), new Point(x1, y1), new Point(x2, y2), durationMs));
+        }
     }
 
     /** Presses the Back button. */

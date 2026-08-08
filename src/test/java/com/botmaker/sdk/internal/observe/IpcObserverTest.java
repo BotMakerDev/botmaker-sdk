@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.Rect;
 import com.botmaker.sdk.api.observe.ClickEvent;
 import com.botmaker.sdk.api.observe.MatchEvent;
 import com.botmaker.sdk.api.observe.Surface;
+import com.botmaker.sdk.api.observe.SwipeEvent;
 import com.botmaker.shared.ipc.TelemetryClient;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import com.botmaker.shared.ipc.TelemetryServer;
@@ -54,6 +55,28 @@ class IpcObserverTest {
             assertEquals(new TelemetryEvent.Rect(0, 0, 50, 50), match.region());
             assertNull(match.rect());
             assertFalse(match.found());
+        }
+    }
+
+    @Test
+    void aSwipeCrossesTheWireWithBothEndsAndItsDuration() throws Exception {
+        BlockingQueue<TelemetryEvent> received = new ArrayBlockingQueue<>(8);
+        try (TelemetryServer server = new TelemetryServer("t", received::offer);
+             TelemetryClient client = new TelemetryClient(server.port(), "t")) {
+
+            new IpcObserver(client).onSwipe(new SwipeEvent(
+                    Surface.ofWindow("Nested Game", new Rect(100, 50, 640, 480)),
+                    new Point(200, 400), new Point(200, 120), 450));
+
+            TelemetryEvent.Swipe swipe =
+                    assertInstanceOf(TelemetryEvent.Swipe.class, received.poll(3, TimeUnit.SECONDS));
+            assertEquals(200, swipe.x1());
+            assertEquals(400, swipe.y1());
+            assertEquals(200, swipe.x2());
+            assertEquals(120, swipe.y2());
+            // The one field the two endpoints alone cannot imply — and the reason the record carries it.
+            assertEquals(450, swipe.durationMs());
+            assertEquals("Nested Game", swipe.target().title());
         }
     }
 }
