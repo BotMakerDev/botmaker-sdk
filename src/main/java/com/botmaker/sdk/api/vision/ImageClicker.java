@@ -138,6 +138,66 @@ public class ImageClicker {
         return clickResult(source, result);
     }
 
+    // --- click what the surrounding group check already found (no second capture) ---
+    //
+    // The fast path for a busy loop. `whileFindAny(POPUPS, found -> ImageClicker.click(POPUP))` captures and
+    // matches twice per iteration to act on a template the enclosing call has *already* located in this frame;
+    // these two verbs act on that frame directly, so an iteration costs one capture instead of two.
+    //
+    // They are frame-scoped rather than "last match"-scoped on purpose: see VisionContext.requireFrame.
+
+    /**
+     * Clicks the best match of the frame the surrounding group check is running over — no capture, no matching,
+     * no second look at the screen.
+     *
+     * <p>Only valid inside an {@link ImageFinder#ifFindAny}/{@link ImageFinder#whileFindAny}/{@code …All}
+     * callback, where the {@link Matches} snapshot describes the screen as it is right now. <b>Outside one it
+     * throws {@link IllegalStateException}</b> rather than clicking the coordinate of a frame that has since
+     * scrolled away — check {@link VisionContext#inFrame()} if you need to ask.
+     *
+     * <pre>{@code
+     * ImageFinder.whileFindAny(POPUPS, found -> ImageClicker.clickLast());   // dismiss popups, one capture each
+     * }</pre>
+     *
+     * <p>"Best" is the highest-confidence match in the frame, ties going to the group's declaration order —
+     * the same rule as {@link Matches#best()}. To choose a different one, click it by name:
+     * {@code ImageClicker.click(found.get(mail))}, which is equally capture-free.
+     *
+     * @return true if the frame had a match and it was clicked, false if the frame was empty
+     * @throws IllegalStateException if called outside a group find's callback
+     */
+    public static boolean clickLast() {
+        VisionContext.Frame frame = VisionContext.requireFrame("ImageClicker.clickLast()");
+        return clickResult(frame.source(), frame.matches().best());
+    }
+
+    /**
+     * Clicks every match of the frame the surrounding group check is running over — one click per template that
+     * was visible, in the group's declaration order, with the usual found-delay between them. No capture and no
+     * matching happen.
+     *
+     * <p>Same contract as {@link #clickLast()}: only valid inside a group find's callback, and loud outside one.
+     *
+     * <p>Note this clicks each visible <em>template</em> once, not every occurrence of each — a frame's
+     * {@link Matches} holds one match per template. For every occurrence of one template, use
+     * {@link #clickAll(ImageTemplate)}, which does capture again.
+     *
+     * @return how many matches were clicked (0 if the frame was empty)
+     * @throws IllegalStateException if called outside a group find's callback
+     */
+    public static int clickAllLast() {
+        VisionContext.Frame frame = VisionContext.requireFrame("ImageClicker.clickAllLast()");
+        List<MatchResult> matches = frame.matches().all();
+        VisionContext.setLastMatchList(matches);
+        for (MatchResult match : matches) {
+            clickResult(frame.source(), match);
+        }
+        if (Debug.isEnabled() && !matches.isEmpty()) {
+            Debug.log("Clicked " + matches.size() + " matches of the current frame");
+        }
+        return matches.size();
+    }
+
     // --- clickAny (first template, in order, that clears the threshold) ---
 
     /**

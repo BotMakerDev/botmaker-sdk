@@ -1137,7 +1137,7 @@ public class ImageFinder {
         Matches found = findAllTemplates(group, source, BotSettings.confidence());
         VisionContext.setLastMatches(found);
         if (!found.isEmpty()) {
-            action.accept(found);
+            VisionContext.runInFrame(found, source, action);
             return true;
         }
         return false;
@@ -1169,7 +1169,7 @@ public class ImageFinder {
         Matches found = findAllTemplates(group, source, BotSettings.confidence());
         VisionContext.setLastMatches(found);
         if (found.hasAll(group.toArray())) {
-            action.accept(found);
+            VisionContext.runInFrame(found, source, action);
             return true;
         }
         return false;
@@ -1198,8 +1198,7 @@ public class ImageFinder {
         PopupGuard.check();
         Matches found;
         while (!(found = findAllTemplates(group, source, BotSettings.confidence())).isEmpty()) {
-            VisionContext.setLastMatches(found);
-            action.accept(found);
+            VisionContext.runInFrame(found, source, action);
         }
         VisionContext.setLastMatches(Matches.none());
     }
@@ -1228,8 +1227,7 @@ public class ImageFinder {
         PopupGuard.check();
         Matches found;
         while ((found = findAllTemplates(group, source, BotSettings.confidence())).hasAll(group.toArray())) {
-            VisionContext.setLastMatches(found);
-            action.accept(found);
+            VisionContext.runInFrame(found, source, action);
         }
         VisionContext.setLastMatches(Matches.none());
     }

@@ -8,6 +8,40 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-16 — clicking what the group check already found
+
+**Changed:** `api/vision/VisionContext.java` (the frame), `api/vision/ImageFinder.java` (the four group
+helpers), `api/vision/ImageClicker.java` (`clickLast`/`clickAllLast`); new `ClickLastFrameTest`.
+
+**Done**
+
+- **`ImageClicker.clickLast()` / `clickAllLast()`** — click the best / every match of the frame the enclosing
+  group check is running over, with no capture and no matching. `whileFindAny(POPUPS, found ->
+  ImageClicker.click(POPUP))` captures twice per iteration to act on a template the loop had already located;
+  these cost one. `clickAllLast` clicks each visible *template* once (a `Matches` holds one match per
+  template), not every occurrence — that is still `clickAll(template)`, which does look again.
+- **`VisionContext` gained a frame**, distinct from `getLastMatches()`. The frame is `(Matches, CaptureSource)`
+  and exists only for the duration of a callback (`runInFrame`, restoring any outer frame in a `finally`, so a
+  nested group check doesn't leave the thread frameless and a throwing callback doesn't leak one).
+  `getLastMatches()` outlives its callback, which is fine for reading and wrong for acting: a coordinate is
+  only valid for the frame it was measured in. Carrying the source with it also means the verbs click through
+  whatever surface the find used, with no source argument to get wrong.
+- **Outside a callback both verbs throw `IllegalStateException`** naming the caller and the fix, rather than
+  falling back on the last match — a click at a coordinate the screen has moved past is a silent wrong answer
+  that reads as a flaky bot. `VisionContext.inFrame()` is the public way to ask first.
+- **Named `clickLast`, not the no-arg `click()`/`clickAll()` the plan sketched.** Studio's "Click Image" block
+  seeds its arguments from *the overload with the fewest parameters*, so a no-arg `click()` would have
+  silently turned that block into a click-the-last-match, and `ImageClicker.click()` in a bot's source says
+  nothing about what it clicks. `clickLast` also matches the vocabulary already in `VisionContext`
+  (`getLastMatch`, `lastMatchFound`).
+
+**Studio needs no change for these to appear.** Facade *methods* come from the bot's own resolved SDK jar
+(`ProjectAnalyzer` via ClassGraph) and their docs from its `:sources` jar, so both verbs show up in the
+ImageClicker submenu once a bot pins an SDK that has them — only a new *class* would need a `palette/SdkType`
+constant, and `IMAGE_CLICKER` is long since there.
+
+---
+
 ## 2026-08-08 — an emulator ref's liveness stops being a socket
 
 **Done**

@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.capture.CaptureSource;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -87,6 +89,67 @@ public final class VisionContext {
     public static Matches getLastMatches() {
         Matches result = lastMatches.get();
         return result != null ? result : Matches.none();
+    }
+
+    // --- the current frame -------------------------------------------------
+    //
+    // getLastMatches() above answers "what did the last group check see", which outlives the callback that saw
+    // it. That is fine for reading and useless for *acting*: a coordinate is only valid for the frame it was
+    // measured in, so a click on a stale one lands wherever the screen has since moved. The frame below is the
+    // narrower fact — "a group callback is running right now, over these matches, on this source" — and it is
+    // what ImageClicker.clickLast()/clickAllLast() require. It is scoped to the callback by runInFrame's
+    // finally, so it cannot leak past the instant it describes.
+
+    private static final ThreadLocal<Frame> frame = new ThreadLocal<>();
+
+    /** The matches a group callback is running over, and the source they were measured on. */
+    record Frame(Matches matches, CaptureSource source) {}
+
+    /**
+     * Internal: runs {@code action} as the callback of a group find, with {@code matches} as the current frame.
+     *
+     * <p>Restores whatever frame was current before rather than clearing, so a group check nested inside
+     * another's callback puts the outer frame back on the way out instead of leaving the thread frameless.
+     */
+    static void runInFrame(Matches matches, CaptureSource source, java.util.function.Consumer<Matches> action) {
+        Frame previous = frame.get();
+        frame.set(new Frame(matches, source));
+        setLastMatches(matches);
+        try {
+            action.accept(matches);
+        } finally {
+            if (previous == null) frame.remove();
+            else frame.set(previous);
+        }
+    }
+
+    /**
+     * Whether the calling thread is inside a group find's callback — i.e. whether the frame-scoped verbs
+     * ({@link ImageClicker#clickLast()}, {@link ImageClicker#clickAllLast()}) have something to act on.
+     *
+     * @return true while a {@code ifFindAny}/{@code whileFindAny}/{@code …All} callback is running
+     */
+    public static boolean inFrame() {
+        return frame.get() != null;
+    }
+
+    /**
+     * Internal: the current frame, or an {@link IllegalStateException} naming {@code caller}.
+     *
+     * <p>Deliberately loud. The alternative — falling back on {@link #getLastMatch()} — would click a
+     * coordinate measured against a frame that is no longer on screen, and a click at the wrong place is a
+     * silent wrong answer that looks like a flaky bot.
+     */
+    static Frame requireFrame(String caller) {
+        Frame current = frame.get();
+        if (current == null) {
+            throw new IllegalStateException(caller + " clicks what the surrounding group check already found, so"
+                    + " it only works inside an ImageFinder.ifFindAny/whileFindAny/ifFindAll/whileFindAll"
+                    + " callback. Outside one there is no current frame, and the last match's coordinate no"
+                    + " longer describes the screen — use ImageClicker.click(template) to look again, or"
+                    + " ImageClicker.click(VisionContext.getLastMatch()) if you really mean the stale one.");
+        }
+        return current;
     }
 
     /**
