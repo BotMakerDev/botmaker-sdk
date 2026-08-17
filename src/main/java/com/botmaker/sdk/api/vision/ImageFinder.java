@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
-import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.BotSettings;
+import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -119,8 +119,9 @@ public class ImageFinder {
     }
 
     /**
-     * Internal: the best match of <em>every</em> template in {@code group} that clears {@code confidence}, all
-     * read from a <b>single</b> capture. Does not update VisionContext — the caller is responsible for that.
+     * Internal: one frame — the best match of <em>every</em> template in {@code group} that clears
+     * {@code confidence}, all read from a <b>single</b> capture, together with the screenshot they were read
+     * from. Does not update VisionContext — the caller is responsible for that.
      *
      * <p>This cannot delegate to {@link #findAnyInternal}: that one short-circuits on the first hit, which is
      * precisely the information loss {@link Matches} exists to undo. It captures once and re-matches the same
@@ -128,15 +129,16 @@ public class ImageFinder {
      * still cost one screenshot — the "one capture per check" property the lambda helpers promise — and so
      * every answer in the returned {@code Matches} describes the same instant.
      */
-    static Matches findAllTemplates(ImageTemplateGroup group, CaptureSource source, double confidence) {
+    static VisionContext.Frame findFrame(ImageTemplateGroup group, CaptureSource source, double confidence) {
         if (group.isEmpty()) {
-            return Matches.none();   // nothing to look for — don't pay for a capture to prove it
+            // nothing to look for — don't pay for a capture to prove it
+            return new VisionContext.Frame(Matches.none(), source, null, group);
         }
         Mat background = null;
         try {
             BufferedImage screenshot = source.capture();
             if (screenshot == null) {
-                return Matches.none();
+                return new VisionContext.Frame(Matches.none(), source, null, group);
             }
             background = OpencvManager.bufferedImageToMat(screenshot);
             Point origin = source.origin();
@@ -156,13 +158,13 @@ public class ImageFinder {
                     traceMiss(template);
                 }
             }
-            return Matches.of(results);
+            return new VisionContext.Frame(Matches.of(results), source, screenshot, group);
 
         } catch (Exception e) {
             if (Debug.isEnabled()) {
                 Debug.error("Error finding template group: " + e.getMessage(), e);
             }
-            return Matches.none();
+            return new VisionContext.Frame(Matches.none(), source, null, group);
         } finally {
             if (background != null) {
                 background.release();
@@ -858,12 +860,26 @@ public class ImageFinder {
      * Does not update VisionContext - caller is responsible for that.
      */
     static List<MatchResult> findAllInternal(ImageTemplate template, CaptureSource source, double confidence) {
+        BufferedImage screenshot = source.capture();
+        if (screenshot == null) {
+            return new ArrayList<>();
+        }
+        return findAllIn(screenshot, template, source, confidence);
+    }
+
+    /**
+     * Internal: every location of {@code template} in <em>already-captured</em> pixels, at or above
+     * {@code confidence}, in absolute coordinates via {@code source}'s origin.
+     *
+     * <p>Split out of {@link #findAllInternal} so the frame-scoped
+     * {@link ImageClicker#clickAllLast() clickAllLast} can ask "and where else is this?" of the screenshot the
+     * enclosing group check already took, instead of taking another one. The two answers then describe the same
+     * instant, which is the whole reason the frame retains its pixels.
+     */
+    static List<MatchResult> findAllIn(BufferedImage screenshot, ImageTemplate template, CaptureSource source,
+                                       double confidence) {
         Mat background = null;
         try {
-            BufferedImage screenshot = source.capture();
-            if (screenshot == null) {
-                return new ArrayList<>();
-            }
             background = OpencvManager.bufferedImageToMat(screenshot);
 
             List<RawMatch> matches =
@@ -1134,10 +1150,10 @@ public class ImageFinder {
      */
     public static boolean ifFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         PopupGuard.check();
-        Matches found = findAllTemplates(group, source, BotSettings.confidence());
-        VisionContext.setLastMatches(found);
-        if (!found.isEmpty()) {
-            VisionContext.runInFrame(found, source, action);
+        VisionContext.Frame frame = findFrame(group, source, BotSettings.confidence());
+        VisionContext.setLastMatches(frame.matches());
+        if (!frame.matches().isEmpty()) {
+            VisionContext.runInFrame(frame, action);
             return true;
         }
         return false;
@@ -1166,10 +1182,10 @@ public class ImageFinder {
     public static boolean ifFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         if (group.isEmpty()) return false;   // "all of nothing" is vacuously true; an empty group matches nothing
         PopupGuard.check();
-        Matches found = findAllTemplates(group, source, BotSettings.confidence());
-        VisionContext.setLastMatches(found);
-        if (found.hasAll(group.toArray())) {
-            VisionContext.runInFrame(found, source, action);
+        VisionContext.Frame frame = findFrame(group, source, BotSettings.confidence());
+        VisionContext.setLastMatches(frame.matches());
+        if (frame.matches().hasAll(group.toArray())) {
+            VisionContext.runInFrame(frame, action);
             return true;
         }
         return false;
@@ -1196,9 +1212,9 @@ public class ImageFinder {
      */
     public static void whileFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         PopupGuard.check();
-        Matches found;
-        while (!(found = findAllTemplates(group, source, BotSettings.confidence())).isEmpty()) {
-            VisionContext.runInFrame(found, source, action);
+        VisionContext.Frame frame;
+        while (!(frame = findFrame(group, source, BotSettings.confidence())).matches().isEmpty()) {
+            VisionContext.runInFrame(frame, action);
         }
         VisionContext.setLastMatches(Matches.none());
     }
@@ -1225,9 +1241,9 @@ public class ImageFinder {
     public static void whileFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         if (group.isEmpty()) return;   // vacuous hasAll would spin this loop forever on an empty group
         PopupGuard.check();
-        Matches found;
-        while ((found = findAllTemplates(group, source, BotSettings.confidence())).hasAll(group.toArray())) {
-            VisionContext.runInFrame(found, source, action);
+        VisionContext.Frame frame;
+        while ((frame = findFrame(group, source, BotSettings.confidence())).matches().hasAll(group.toArray())) {
+            VisionContext.runInFrame(frame, action);
         }
         VisionContext.setLastMatches(Matches.none());
     }

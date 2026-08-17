@@ -8,6 +8,38 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-17 — three click verbs, and a template names itself
+
+**Changed:** `api/vision/VisionContext.java` (the frame keeps its pixels; `requireFrame` → `currentFrame`),
+`api/vision/ImageFinder.java` (`findAllTemplates` → `findFrame`; new `findAllIn`),
+`api/vision/ImageClicker.java` (`clickEachLast`/`clickAllLast` + filtered overloads),
+`api/vision/ImageTemplate.java` (sidecar reading moved out); new `internal/vision/TemplateMetadata.java`;
+`ClickLastFrameTest` rewritten.
+
+**Done**
+
+- **`clickAllLast()` split into `clickEachLast()` and `clickAllLast()`.** The old name meant "one click per
+  visible template", which is what `clickEachLast()` is now called. `clickAllLast()` is the question that had
+  no verb: **every occurrence of every visible template** — the whole row of chests, not the best one of each.
+  It costs no capture either: the frame now retains the screenshot it was measured in, so the finer question
+  is asked of that same instant by re-matching (`ImageFinder.findAllIn`) rather than by looking again. That is
+  also what distinguishes it from `clickAll(template)`, which does look again.
+- **Filtered overloads** — `clickEachLast(t…)` / `clickAllLast(t…)`. A branch that matched three templates can
+  act on the two it cares about with no second capture. The filter can only narrow: a template the frame never
+  saw is not searched for, so the click order stays the group's rather than the argument's.
+- **The frame verbs no longer throw.** `VisionContext.requireFrame` is gone; `currentFrame()` answers null and
+  every verb reports "nothing clicked" (`false` / `0`) outside a callback, exactly as it already did for an
+  empty frame. The reasoning against clicking a *stale* coordinate still holds and is still enforced — it was
+  the remedy that was wrong. A bot that drifts out of a callback should carry on, not die.
+- **`TemplateMetadata` owns the `<name>.json` sidecar.** `ImageTemplate.loadCaptureResolution()` and its two
+  mutable cache fields are gone; the template's contract to the matcher is `authoredSize()` and nothing else.
+  The sidecar is a Studio artefact — its file convention, key names and JSON parser are editor plumbing, not
+  something a value type constructed from a path should know. Now cached by **path** rather than per instance,
+  so a bot that rebuilds the same template every loop iteration reads the file once per JVM instead of
+  stat-ing it per match.
+
+---
+
 ## 2026-08-16 — clicking what the group check already found
 
 **Changed:** `api/vision/VisionContext.java` (the frame), `api/vision/ImageFinder.java` (the four group

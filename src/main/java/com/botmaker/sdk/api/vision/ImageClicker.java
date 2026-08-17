@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
-import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.BotSettings;
+import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.observe.Bots;
 import com.botmaker.sdk.api.observe.ClickEvent;
 import com.botmaker.sdk.api.observe.Surface;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -142,18 +143,29 @@ public class ImageClicker {
     //
     // The fast path for a busy loop. `whileFindAny(POPUPS, found -> ImageClicker.click(POPUP))` captures and
     // matches twice per iteration to act on a template the enclosing call has *already* located in this frame;
-    // these two verbs act on that frame directly, so an iteration costs one capture instead of two.
+    // these verbs act on that frame directly, so an iteration costs one capture instead of two.
     //
-    // They are frame-scoped rather than "last match"-scoped on purpose: see VisionContext.requireFrame.
+    // Three questions, three verbs, and the names say which is which:
+    //   clickLast()      — the best one match of the frame.
+    //   clickEachLast()  — one click per template that was visible.
+    //   clickAllLast()   — every occurrence of every template that was visible.
+    // "Each" against "All" is the distinction a frame's Matches cannot express on its own (it holds the best
+    // match per template), which is why the last one re-matches the frame's retained pixels. Every one of them
+    // also takes a filtering `template…` overload, so a branch that matched three templates can act on the two
+    // it cares about without looking at the screen again.
+    //
+    // They are frame-scoped rather than "last match"-scoped on purpose: see VisionContext.currentFrame.
+    // Outside a frame they do nothing and say so in the return value — never an exception, and never a click
+    // on a coordinate whose frame has scrolled away.
 
     /**
      * Clicks the best match of the frame the surrounding group check is running over — no capture, no matching,
      * no second look at the screen.
      *
-     * <p>Only valid inside an {@link ImageFinder#ifFindAny}/{@link ImageFinder#whileFindAny}/{@code …All}
+     * <p>Meaningful inside an {@link ImageFinder#ifFindAny}/{@link ImageFinder#whileFindAny}/{@code …All}
      * callback, where the {@link Matches} snapshot describes the screen as it is right now. <b>Outside one it
-     * throws {@link IllegalStateException}</b> rather than clicking the coordinate of a frame that has since
-     * scrolled away — check {@link VisionContext#inFrame()} if you need to ask.
+     * clicks nothing and returns false</b> — it will not click the coordinate of a frame that has since
+     * scrolled away. Ask {@link VisionContext#inFrame()} if you need to tell that apart from an empty frame.
      *
      * <pre>{@code
      * ImageFinder.whileFindAny(POPUPS, found -> ImageClicker.clickLast());   // dismiss popups, one capture each
@@ -163,31 +175,107 @@ public class ImageClicker {
      * the same rule as {@link Matches#best()}. To choose a different one, click it by name:
      * {@code ImageClicker.click(found.get(mail))}, which is equally capture-free.
      *
-     * @return true if the frame had a match and it was clicked, false if the frame was empty
-     * @throws IllegalStateException if called outside a group find's callback
+     * @return true if the frame had a match and it was clicked, false otherwise
      */
     public static boolean clickLast() {
-        VisionContext.Frame frame = VisionContext.requireFrame("ImageClicker.clickLast()");
-        return clickResult(frame.source(), frame.matches().best());
+        VisionContext.Frame frame = VisionContext.currentFrame();
+        return frame != null && clickResult(frame.source(), frame.matches().best());
     }
 
     /**
-     * Clicks every match of the frame the surrounding group check is running over — one click per template that
-     * was visible, in the group's declaration order, with the usual found-delay between them. No capture and no
-     * matching happen.
+     * Clicks one match per template that was visible in the frame, in the group's declaration order, with the
+     * usual found-delay between them. No capture and no matching happen.
      *
-     * <p>Same contract as {@link #clickLast()}: only valid inside a group find's callback, and loud outside one.
+     * <p>This is one click per <em>template</em>, not per occurrence — a frame's {@link Matches} holds the best
+     * match of each template. When a template appears several times and you want them all, that is
+     * {@link #clickAllLast()}.
      *
-     * <p>Note this clicks each visible <em>template</em> once, not every occurrence of each — a frame's
-     * {@link Matches} holds one match per template. For every occurrence of one template, use
-     * {@link #clickAll(ImageTemplate)}, which does capture again.
+     * @return how many matches were clicked (0 outside a frame, or if the frame was empty)
+     */
+    public static int clickEachLast() {
+        VisionContext.Frame frame = VisionContext.currentFrame();
+        return frame == null ? 0 : clickEach(frame, frame.matches().all());
+    }
+
+    /**
+     * {@link #clickEachLast()} restricted to the named templates — one click per template of {@code templates}
+     * that was visible in the frame, skipping the rest of the frame and anything that wasn't there.
      *
-     * @return how many matches were clicked (0 if the frame was empty)
-     * @throws IllegalStateException if called outside a group find's callback
+     * <pre>{@code
+     * ImageFinder.whileFindAny(POPUPS, found -> ImageClicker.clickEachLast(mail, gift));   // ignore the ad
+     * }</pre>
+     *
+     * @param templates the templates to act on; the frame's own order is kept, not this argument's
+     * @return how many matches were clicked
+     */
+    public static int clickEachLast(ImageTemplate... templates) {
+        VisionContext.Frame frame = VisionContext.currentFrame();
+        if (frame == null || templates == null) return 0;
+        List<MatchResult> chosen = new ArrayList<>();
+        for (MatchResult match : frame.matches().all()) {
+            if (namedAmong(match, templates)) chosen.add(match);
+        }
+        return clickEach(frame, chosen);
+    }
+
+    /**
+     * Clicks <em>every occurrence</em> of every template that was visible in the frame — the whole row of
+     * chests, not just the best one of each.
+     *
+     * <p>The extra occurrences are found by re-matching the frame's own screenshot, so this still costs no
+     * capture: it is the same instant the enclosing check measured, asked a second, finer question. (That is
+     * the difference from {@link #clickAll(ImageTemplate)}, which looks at the screen again.) Only templates
+     * the frame already saw are re-matched — one that wasn't there is not searched for a second time.
+     *
+     * @return how many matches were clicked (0 outside a frame, or if the frame was empty)
      */
     public static int clickAllLast() {
-        VisionContext.Frame frame = VisionContext.requireFrame("ImageClicker.clickAllLast()");
-        List<MatchResult> matches = frame.matches().all();
+        VisionContext.Frame frame = VisionContext.currentFrame();
+        if (frame == null) return 0;
+        return clickAllOccurrences(frame, visibleTemplates(frame, null));
+    }
+
+    /**
+     * {@link #clickAllLast()} restricted to the named templates — every occurrence of each of
+     * {@code templates} that was visible in the frame.
+     *
+     * @param templates the templates to act on
+     * @return how many matches were clicked
+     */
+    public static int clickAllLast(ImageTemplate... templates) {
+        VisionContext.Frame frame = VisionContext.currentFrame();
+        if (frame == null || templates == null) return 0;
+        return clickAllOccurrences(frame, visibleTemplates(frame, List.of(templates)));
+    }
+
+    /** Whether {@code match} is the match of one of {@code templates}, compared the way {@link Matches} keys. */
+    private static boolean namedAmong(MatchResult match, ImageTemplate[] templates) {
+        for (ImageTemplate template : templates) {
+            if (template != null && template.getId().equals(match.getTemplateId())) return true;
+        }
+        return false;
+    }
+
+    /**
+     * The templates of {@code frame}'s group that were visible, optionally narrowed to {@code wanted}. Narrowing
+     * by the frame's own group rather than by the argument keeps the click order the group's, and means a
+     * template that was never looked for cannot be smuggled in by the filter.
+     */
+    private static List<ImageTemplate> visibleTemplates(VisionContext.Frame frame, List<ImageTemplate> wanted) {
+        List<ImageTemplate> visible = new ArrayList<>();
+        if (frame.group() == null) return visible;
+        for (ImageTemplate template : frame.group().templates()) {
+            if (!frame.matches().has(template)) continue;
+            if (wanted != null && wanted.stream().noneMatch(w -> w != null && w.getId().equals(template.getId()))) {
+                continue;
+            }
+            visible.add(template);
+        }
+        return visible;
+    }
+
+    /** Clicks {@code matches} in order, recording them as the last match list. */
+    private static int clickEach(VisionContext.Frame frame, List<MatchResult> matches) {
         VisionContext.setLastMatchList(matches);
         for (MatchResult match : matches) {
             clickResult(frame.source(), match);
@@ -196,6 +284,17 @@ public class ImageClicker {
             Debug.log("Clicked " + matches.size() + " matches of the current frame");
         }
         return matches.size();
+    }
+
+    /** Re-matches {@code templates} against the frame's own pixels and clicks every occurrence found. */
+    private static int clickAllOccurrences(VisionContext.Frame frame, List<ImageTemplate> templates) {
+        if (frame.pixels() == null || templates.isEmpty()) return 0;
+        List<MatchResult> occurrences = new ArrayList<>();
+        for (ImageTemplate template : templates) {
+            occurrences.addAll(ImageFinder.findAllIn(
+                    frame.pixels(), template, frame.source(), BotSettings.confidence()));
+        }
+        return clickEach(frame, occurrences);
     }
 
     // --- clickAny (first template, in order, that clears the threshold) ---

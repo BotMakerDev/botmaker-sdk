@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * only one, and it must be the better match.
  *
  * <p>Pure unit test: {@link ImageTemplate} does not touch its file until {@code getMat()}, so no fixture image
- * and no OpenCV load is needed here. The single-capture property of {@code findAllTemplates} is covered
+ * and no OpenCV load is needed here. The single-capture property of {@code findFrame} is covered
  * separately by {@link MatchesFindTest}, which needs real matching.
  */
 class MatchesTest {

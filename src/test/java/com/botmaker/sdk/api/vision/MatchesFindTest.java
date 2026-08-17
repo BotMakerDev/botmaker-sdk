@@ -99,7 +99,7 @@ class MatchesFindTest {
     }
 
     @Test
-    void findAllTemplatesReadsEveryTemplateFromASingleCapture(@TempDir Path tmp) throws Exception {
+    void findFrameReadsEveryTemplateFromASingleCapture(@TempDir Path tmp) throws Exception {
         BufferedImage mailPatch = patch(1), claimPatch = patch(2);
         ImageTemplate mail = write(tmp, "mail", mailPatch);
         ImageTemplate claim = write(tmp, "claim", claimPatch);
@@ -107,7 +107,7 @@ class MatchesFindTest {
 
         CountingSource source = new CountingSource(List.of(frameWith(mailPatch, claimPatch)));
 
-        Matches found = ImageFinder.findAllTemplates(ImageTemplateGroup.of(mail, claim, absent), source, 0.7);
+        Matches found = ImageFinder.findFrame(ImageTemplateGroup.of(mail, claim, absent), source, 0.7).matches();
 
         assertEquals(1, source.captures, "three templates must cost one screenshot, not three");
         assertTrue(found.has(mail));
@@ -181,7 +181,7 @@ class MatchesFindTest {
         ImageTemplate mail = write(tmp, "mail", mailPatch);
 
         CountingSource source = new CountingSource(List.of(frameWith(mailPatch)));
-        Matches found = ImageFinder.findAllTemplates(ImageTemplateGroup.of(mail), source, 0.7);
+        Matches found = ImageFinder.findFrame(ImageTemplateGroup.of(mail), source, 0.7).matches();
         int capturesAfterFind = source.captures;
 
         assertTrue(ImageClicker.click(found.get(mail), source));

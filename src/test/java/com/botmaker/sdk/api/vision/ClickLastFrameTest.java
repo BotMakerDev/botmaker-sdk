@@ -18,13 +18,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The frame-scoped click verbs: {@link ImageClicker#clickLast()} / {@link ImageClicker#clickAllLast()} act on
- * the matches the enclosing group check already found, and refuse to act at all outside one.
+ * The frame-scoped click verbs — {@link ImageClicker#clickLast()} (the best one),
+ * {@link ImageClicker#clickEachLast()} (one per visible template) and {@link ImageClicker#clickAllLast()}
+ * (every occurrence of each) — act on the matches the enclosing group check already found, and click nothing
+ * at all outside one.
  *
- * <p>The point of the feature is the capture count, so that is what is asserted: a group check whose callback
- * clicks costs <em>one</em> capture, where {@code found -> ImageClicker.click(template)} would cost two. The
- * source is a fake that serves a fixed frame and records clicks (the same shape as
- * {@code ImageClickerRoutingTest}), which also keeps the test headless — no display, only OpenCV matching.
+ * <p>The point of the feature is the capture count, so that is what is asserted throughout: a group check whose
+ * callback clicks costs <em>one</em> capture, where {@code found -> ImageClicker.click(template)} would cost
+ * two — and that holds even for {@code clickAllLast()}, which asks a finer question (where else is this?) of
+ * the screenshot the check already took rather than taking a second one. The source is a fake that serves a
+ * fixed frame and records clicks (the same shape as {@code ImageClickerRoutingTest}), which also keeps the
+ * test headless — no display, only OpenCV matching.
  */
 class ClickLastFrameTest {
 
@@ -85,6 +89,11 @@ class ClickLastFrameTest {
         return new ImageTemplate(file.toString());
     }
 
+    /** An empty frame over a source — enough to assert the scoping, with nothing to click. */
+    private static VisionContext.Frame frameOver(CaptureSource source) {
+        return new VisionContext.Frame(Matches.of(List.of()), source, null, ImageTemplateGroup.of());
+    }
+
     @Test
     void clickLastActsOnTheFrameWithoutCapturingAgain(@TempDir Path tmp) throws Exception {
         BufferedImage marker = patch(1);
@@ -106,7 +115,7 @@ class ClickLastFrameTest {
     }
 
     @Test
-    void clickAllLastClicksEveryTemplateOfTheFrameOnce(@TempDir Path tmp) throws Exception {
+    void clickEachLastClicksEveryTemplateOfTheFrameOnce(@TempDir Path tmp) throws Exception {
         BufferedImage first = patch(1);
         BufferedImage second = patch(2);
         ImageTemplate a = writeTemplate(tmp, "a.png", first);
@@ -118,15 +127,84 @@ class ClickLastFrameTest {
 
         int[] clicked = new int[1];
         ImageFinder.ifFindAny(ImageTemplateGroup.of(a, b), source,
-                found -> clicked[0] = ImageClicker.clickAllLast());
+                found -> clicked[0] = ImageClicker.clickEachLast());
 
         assertEquals(2, clicked[0], "both templates were visible in the frame");
         assertEquals(2, source.clicks.size());
         assertEquals(1, source.captures, "one capture for the whole iteration");
     }
 
+    /** The filtered overload: the branch matched both, and acts on the one it named. */
     @Test
-    void outsideAGroupCallbackTheFrameVerbsRefuseToClickAStaleCoordinate(@TempDir Path tmp) throws Exception {
+    void clickEachLastActsOnlyOnTheTemplatesItWasGiven(@TempDir Path tmp) throws Exception {
+        BufferedImage first = patch(1);
+        BufferedImage second = patch(2);
+        ImageTemplate a = writeTemplate(tmp, "a.png", first);
+        ImageTemplate b = writeTemplate(tmp, "b.png", second);
+        BufferedImage screen = noise();
+        screen.getGraphics().drawImage(first, 20, 30, null);
+        screen.getGraphics().drawImage(second, 220, 180, null);
+        CountingSource source = new CountingSource(screen);
+
+        int[] clicked = new int[1];
+        ImageFinder.ifFindAny(ImageTemplateGroup.of(a, b), source,
+                found -> clicked[0] = ImageClicker.clickEachLast(b));
+
+        assertEquals(1, clicked[0], "only the named template was clicked");
+        assertEquals(1, source.clicks.size());
+        Point p = source.clicks.getFirst();
+        assertTrue(p.x >= 220 && p.x <= 220 + TEMPLATE_SIZE, "the click landed on b, at " + p);
+        assertEquals(1, source.captures, "filtering must not cost a capture");
+    }
+
+    /**
+     * {@code clickEachLast} against {@code clickAllLast}: the same frame, the same template drawn three times,
+     * and the two verbs give one click and three. The three cost no extra capture — they are re-matched against
+     * the frame's own pixels.
+     */
+    @Test
+    void clickAllLastClicksEveryOccurrenceWithoutCapturingAgain(@TempDir Path tmp) throws Exception {
+        BufferedImage chest = patch(4);
+        ImageTemplate template = writeTemplate(tmp, "chest.png", chest);
+        BufferedImage screen = noise();
+        screen.getGraphics().drawImage(chest, 20, 20, null);
+        screen.getGraphics().drawImage(chest, 150, 120, null);
+        screen.getGraphics().drawImage(chest, 300, 220, null);
+        CountingSource source = new CountingSource(screen);
+
+        int[] each = new int[1];
+        int[] all = new int[1];
+        ImageFinder.ifFindAny(ImageTemplateGroup.of(template), source, found -> {
+            each[0] = ImageClicker.clickEachLast();
+            all[0] = ImageClicker.clickAllLast();
+        });
+
+        assertEquals(1, each[0], "a frame's Matches holds the best match of each template, so: one");
+        assertEquals(3, all[0], "every occurrence of it in the same frame");
+        assertEquals(4, source.clicks.size());
+        assertEquals(1, source.captures, "the finer question is asked of the frame, not of the screen");
+    }
+
+    /** A template the frame never saw is not searched for by the filter — it can only narrow, never widen. */
+    @Test
+    void clickAllLastIgnoresATemplateTheFrameDidNotSee(@TempDir Path tmp) throws Exception {
+        BufferedImage present = patch(1);
+        ImageTemplate visible = writeTemplate(tmp, "visible.png", present);
+        ImageTemplate absent = writeTemplate(tmp, "absent.png", patch(9));
+        BufferedImage screen = noise();
+        screen.getGraphics().drawImage(present, 40, 40, null);
+        CountingSource source = new CountingSource(screen);
+
+        int[] clicked = new int[1];
+        ImageFinder.ifFindAny(ImageTemplateGroup.of(visible, absent), source,
+                found -> clicked[0] = ImageClicker.clickAllLast(absent));
+
+        assertEquals(0, clicked[0], "it was not in the frame, so there is nothing of it to click");
+        assertTrue(source.clicks.isEmpty());
+    }
+
+    @Test
+    void outsideAGroupCallbackTheFrameVerbsClickNothingAndSaySo(@TempDir Path tmp) throws Exception {
         BufferedImage marker = patch(1);
         ImageTemplate template = writeTemplate(tmp, "marker.png", marker);
         BufferedImage screen = noise();
@@ -138,27 +216,31 @@ class ClickLastFrameTest {
         ImageFinder.ifFindAny(ImageTemplateGroup.of(template), source, found -> { });
         assertFalse(VisionContext.inFrame(), "the callback has returned");
 
-        assertThrows(IllegalStateException.class, ImageClicker::clickLast);
-        assertThrows(IllegalStateException.class, ImageClicker::clickAllLast);
+        // Quiet, not loud: a bot that drifts out of a callback carries on. It still clicks nothing.
+        assertFalse(ImageClicker.clickLast());
+        assertEquals(0, ImageClicker.clickEachLast());
+        assertEquals(0, ImageClicker.clickAllLast());
+        assertEquals(0, ImageClicker.clickEachLast(template));
+        assertEquals(0, ImageClicker.clickAllLast(template));
         assertTrue(source.clicks.isEmpty(), "nothing may be clicked outside a frame");
     }
 
     @Test
     void theFrameIsScopedToTheCallbackAndNestsBackToTheOuterOne() {
-        Matches outer = Matches.of(List.of());
-        Matches inner = Matches.of(List.of());
         CountingSource source = new CountingSource(noise());
+        VisionContext.Frame outer = frameOver(source);
+        VisionContext.Frame inner = frameOver(source);
 
         assertFalse(VisionContext.inFrame(), "no frame before anything runs");
-        VisionContext.runInFrame(outer, source, m -> {
+        VisionContext.runInFrame(outer, m -> {
             assertTrue(VisionContext.inFrame());
-            VisionContext.runInFrame(inner, source, n -> assertTrue(VisionContext.inFrame()));
+            VisionContext.runInFrame(inner, n -> assertTrue(VisionContext.inFrame()));
             assertTrue(VisionContext.inFrame(), "a nested check must restore the outer frame, not clear it");
         });
         assertFalse(VisionContext.inFrame(), "and the outermost callback leaves none behind");
 
         // A callback that throws must not leak its frame either — the finally is the whole guarantee.
-        assertThrows(RuntimeException.class, () -> VisionContext.runInFrame(outer, source, m -> {
+        assertThrows(RuntimeException.class, () -> VisionContext.runInFrame(outer, m -> {
             throw new RuntimeException("boom");
         }));
         assertFalse(VisionContext.inFrame());
