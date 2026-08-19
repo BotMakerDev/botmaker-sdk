@@ -8,6 +8,24 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-19 — the side buttons
+
+**Changed:** `api/interaction/MouseButton.java`.
+
+**Done**
+
+- **`MouseButton` gains `BACK(8)` and `FORWARD(9)`.** The enum stopped at left/middle/right, so the two thumb
+  buttons on an ordinary gaming mouse were not sayable at all — a bot that wanted one had no value to pass.
+  The numbers are X11's, which the Linux backends already pass through untouched; shared's `WindowsController`
+  translates them (`MOUSEEVENTF_XDOWN` plus an `XBUTTON` selector in `dwData`), which is the one place the
+  mapping is not the identity.
+- **Named by what they do, not where they sit.** The class doc now says so outright, because it is the answer
+  to "how do we handle different mouse layouts": the OS reports the button the user configured it to be, so a
+  bot that says `BACK` keeps working on a left-handed mouse or one whose driver has remapped its side buttons,
+  and nothing in the editor has to ask which physical mouse the machine running the bot has.
+
+---
+
 ## 2026-08-17 — three click verbs, and a template names itself
 
 **Changed:** `api/vision/VisionContext.java` (the frame keeps its pixels; `requireFrame` → `currentFrame`),
