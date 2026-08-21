@@ -8,6 +8,25 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-21 — the SDK's JitPack build stops guessing its upstreams
+
+**Changed:** `jitpack.yml`, new `.deps.env`.
+
+**Done**
+
+- **`jitpack.yml` reads the shared/session refs from a committed `.deps.env` instead of resolving them
+  with `git ls-remote --tags | sort -V | tail -1`.** The guess was "the newest published tag", which is
+  only *usually* "the tag this release was cut against" — and it forced the umbrella `release.sh` to poll
+  JitPack between links (tag shared, wait for its `.pom`, tag session, wait, tag the SDK) so that the
+  newest tag would be the intended one. `.deps.env` is written into the SDK's own release commit by
+  `release.sh`, so an SDK tag now says which shared and session it was built against, and the release can
+  push all three tags back to back: JitPack resolves and builds a *pinned* dependency tag on demand.
+- The committed pom is still never edited — `botmaker.shared.version` / `botmaker.session.version` stay
+  `0.0.0-SNAPSHOT` and the refs arrive via `-D`. The `${SHARED_TAG:-v0.0.15}` fallbacks cover a tag cut
+  by hand, without `release.sh`, in a tree that has no `.deps.env`.
+
+---
+
 ## 2026-08-19 — the side buttons
 
 **Changed:** `api/interaction/MouseButton.java`.
