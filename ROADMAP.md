@@ -8,6 +8,58 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-22 — the bump level stops being a guess
+
+**Changed:** `pom.xml` (`api-check` profile), `tools/check-api-rules.py` (new),
+`.github/workflows/ci.yml`, `CLAUDE.md`. Umbrella side: `docs/refactor/21-api-compat.md` (new),
+`release.sh` (`check_api_bump`), `CLAUDE.md`.
+
+**Done**
+
+- **The contract starts at v1.1.0.** Everything up to v1.0.26 was released under the "freely breakable, no
+  published bot consumes it yet" licence; that licence is over. Semver for real: additive → minor,
+  breaking → major, and nothing removed without one full minor marked
+  `@Deprecated(since, forRemoval = true)` naming its replacement. `../docs/refactor/21-api-compat.md` is
+  authoritative.
+- **japicmp compares each build against the previously published jar**, in an `api-check` profile that is
+  **off by default** so the daily `mvn -pl botmaker-sdk -am install` stays offline. `<oldVersion>` is
+  always injected, never auto-detected: japicmp's auto-detect reads `maven-metadata.xml`, and JitPack's
+  lists every release twice (`v1.0.7` *and* `1.0.7` — what `JitPackSearch.dedupeVPrefix` exists to clean
+  up). Because it compares jars, it works **retroactively** — v1.0.26 is a fine baseline.
+- **Two questions, two owners.** "Was something removed that was never announced?" is wrong at every
+  version, so `tools/check-api-rules.py` answers it in CI *and* at release time (exit 2). "Is this break
+  allowed?" depends on the version being cut, which no PR build knows — `release.sh` owns it. That is why
+  japicmp's own `breakBuildOn*` flags are off: they would block every legitimate major-release PR.
+- **Verified end to end, not just built:** no-change → passes; a removal never marked `forRemoval` →
+  refused at *any* version, naming the member; a properly deprecated removal → refused as a patch
+  ("Release it as 10.0.0"), accepted as a major; a broken build → a distinct message rather than a false
+  API verdict.
+
+**Rejected along the way** (both were implemented before being replaced — don't re-propose them):
+
+- **A checked-in `api-baseline.txt`** of all 818 members plus a bespoke comparator. It worked, and it was
+  a hand-maintained, uncompilable mirror of the API. japicmp answers the same question against the real
+  artifact.
+- **japicmp's `postAnalysisScript`** (Groovy), the natural home for the deprecation rule: japicmp 0.26.1
+  bundles a Groovy that cannot read Java 26 class files (`Unsupported class file major version 70`) and
+  this box runs JDK 26 while CI runs 21. Pinning a newer Groovy just moves the race to the next JDK, so
+  the rule parses japicmp's XML instead.
+- **A `@since 1.1.0` sweep** over ~53 files: 818 identical tags carry no information, and comparing two
+  released jars gives exact per-version added/removed for free. `@since` is required only from 1.2.0 on.
+
+**Deferred / next**
+
+- **OpenRewrite recipes in the jar** (next phase) at `META-INF/rewrite/botmaker-sdk.yml` — the standard
+  slot, so `mvn rewrite:run` migrates a bot with no Studio at all — plus `META-INF/botmaker/
+  upgrade-notes.json` for what cannot be automated, cross-checked by `check-api-rules.py` so a breaking
+  change with no recipe is a red build. **Check early** whether a stock recipe can *insert* an argument at
+  call sites: `AddMethodParameter` targets declarations, not invocations.
+- **`src/main/resources/images/default_template.png` is gitignored** (`.gitignore:15`, the bare `images`
+  rule) — so a clean clone has no default template resource. Pre-existing, unrelated to this entry, and
+  left alone deliberately: whether that file belongs in git is the maintainer's call.
+
+---
+
 ## 2026-08-22 — the published SDK pom names real shared/session tags (it never did)
 
 **Changed:** `pom.xml` (flatten-maven-plugin + property comments), `.gitignore`.

@@ -23,7 +23,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 for the tags — the api-check step below needs the PREVIOUS release tag to compare
+      # against, and the default shallow checkout has no tags at all.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check out botmaker-shared
         uses: actions/checkout@v4
@@ -50,6 +54,44 @@ jobs:
 
       - name: Build
         run: mvn -B -DskipTests package
+
+      # The API compatibility gate. See ../docs/refactor/21-api-compat.md (umbrella) for the contract.
+      #
+      # What this DOES fail on: removing a public api.* member that the previous release never marked
+      # @Deprecated(since = "...", forRemoval = true). That is wrong at every version, so a PR is the
+      # cheapest place to find out.
+      #
+      # What it deliberately does NOT fail on: a breaking change as such. Whether a break is allowed
+      # depends on the version number being released, and no PR build knows that number — the umbrella's
+      # release.sh does, and it refuses a tag the diff doesn't justify. Failing here would block every
+      # legitimate major-release PR. The breaking changes are still printed, so they are visible in the log.
+      - name: Previous release tag
+        id: prev
+        run: |
+          # The newest vX.Y.Z that isn't the one being built (a tag push builds its own tag).
+          current="$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)"
+          prev="$(git tag --list 'v*' \
+                    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+                    | grep -vx "${current:-__none__}" \
+                    | sort -V | tail -1)"
+          echo "tag=$prev" >> "$GITHUB_OUTPUT"
+          echo "Comparing against ${prev:-<no previous release>}"
+
+      - name: API compatibility
+        if: steps.prev.outputs.tag != ''
+        run: |
+          mvn -B -q -Papi-check verify -Dmaven.test.skip=true \
+              -Dbotmaker.api.oldVersion='${{ steps.prev.outputs.tag }}'
+          # 0 = clean, 1 = breaking but properly deprecated (release.sh's call), 2 = rule violation.
+          # The `|| rc=$?` matters: this step runs under `bash -e`, so a bare non-zero exit from the
+          # script would kill the step before the code could be inspected — and every breaking change
+          # would read as a CI failure, which is exactly what this step is written to avoid.
+          rc=0
+          python3 tools/check-api-rules.py target/japicmp/japicmp.xml || rc=$?
+          if [ "$rc" -eq 2 ]; then
+            echo "::error::A public API member was removed without a deprecation cycle (see above)."
+            exit 1
+          fi
 
   # JitPack builds the artifact itself from the pushed tag; this just asks it to start eagerly so the
   # first consumer doesn't wait. No secrets required.

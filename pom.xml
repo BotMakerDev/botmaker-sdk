@@ -31,6 +31,23 @@
              in the committed pom, injected at build time by CI for a released tag, resolved into the
              published pom by flatten. -->
         <botmaker.session.version>0.0.0-SNAPSHOT</botmaker.session.version>
+
+        <!-- The released tag the api-check profile compares this build against. Always injected from
+             outside (CI computes the previous tag; release.sh passes the tag it is superseding) — there is
+             no sensible committed default, and japicmp's own "latest released version" auto-detection is
+             NOT usable here: it reads the repository's maven-metadata.xml, and JitPack's lists every SDK
+             release twice (`v1.0.7` AND `1.0.7`; see botmaker-studio JitPackSearch.dedupeVPrefix, which
+             exists solely to clean that up), so "latest" there is a coin flip. -->
+        <botmaker.api.oldVersion>NONE</botmaker.api.oldVersion>
+        <!-- Whether japicmp itself fails the build on an incompatible change. DEFAULT false, deliberately.
+             "Is this break allowed?" is a question about the version number being released, and neither a
+             PR build nor this pom knows that number — only release.sh does, so release.sh is the gate.
+             Left true, CI would block every legitimate major-release PR.
+
+             This does NOT make CI toothless: japicmp-rules.groovy enforces the rules that hold at EVERY
+             version (removing something never marked @Deprecated(forRemoval = true) is wrong in a major
+             release too), and it fails the build on its own regardless of this flag. -->
+        <botmaker.api.breakBuild>false</botmaker.api.breakBuild>
     </properties>
 
     <repositories>
@@ -238,4 +255,79 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- The API compatibility gate. See ../docs/refactor/21-api-compat.md for the contract it enforces.
+             Not active by default, deliberately: japicmp downloads the previously released jar, and
+             `mvn -pl botmaker-sdk -am install` is the daily dev loop, which must stay offline and fast. It
+             is switched on by this module's ci.yml (so a break fails the PR) and by the umbrella
+             release.sh (so a break cannot be tagged).
+
+             Note flattenMode=oss above DROPS <profiles> from the published pom. That is correct here — a
+             bot resolving this SDK has no use for our build-time gate — and is the opposite of the
+             situation in botmaker-shared, whose OS-activated native profiles a consumer genuinely needs.
+
+             Why compare against the published jar at all: an annotation cannot record a removal. It lives
+             ON the member, so deleting the member deletes the evidence. @Deprecated(forRemoval = true) is
+             a promise about the future; "this used to exist" is a fact about the past, and only the
+             previous artifact holds it. -->
+        <profile>
+            <id>api-check</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.siom79.japicmp</groupId>
+                        <artifactId>japicmp-maven-plugin</artifactId>
+                        <version>0.26.1</version>
+                        <executions>
+                            <execution>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>cmp</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <oldVersion>
+                                <dependency>
+                                    <groupId>com.github.LiQiyeDev</groupId>
+                                    <artifactId>botmaker-sdk</artifactId>
+                                    <version>${botmaker.api.oldVersion}</version>
+                                    <type>jar</type>
+                                </dependency>
+                            </oldVersion>
+                            <parameter>
+                                <!-- The contract's scope is the api package only; internal.* is plumbing a
+                                     bot never names, and stays freely changeable. -->
+                                <includes>
+                                    <include>com.botmaker.sdk.api</include>
+                                </includes>
+                                <!-- protected, not public: a bot can subclass and see protected members. -->
+                                <accessModifier>protected</accessModifier>
+                                <onlyModified>true</onlyModified>
+                                <!-- The old jar's transitive OpenCV/JNA need not resolve for signatures to
+                                     be compared, and demanding they do would make the gate fail for
+                                     reasons that have nothing to do with our API. -->
+                                <ignoreMissingClasses>true</ignoreMissingClasses>
+                                <breakBuildOnBinaryIncompatibleModifications>${botmaker.api.breakBuild}</breakBuildOnBinaryIncompatibleModifications>
+                                <breakBuildOnSourceIncompatibleModifications>${botmaker.api.breakBuild}</breakBuildOnSourceIncompatibleModifications>
+                                <!-- Deliberately NOT breakBuildBasedOnSemanticVersioning: it derives the
+                                     level from the two archives' version strings, and this pom's <version>
+                                     is cosmetic 0.0.0-SNAPSHOT (JitPack owns the real one). Feeding it a
+                                     fake version to satisfy the check would be worse than release.sh
+                                     comparing the numbers itself, which it already does.
+
+                                     Nor <postAnalysisScript>, which is the natural home for the
+                                     deprecation-cycle rule: japicmp 0.26.1 bundles a Groovy that cannot
+                                     read Java 26 class files ("Unsupported class file major version
+                                     70"), and this project's JDK is 26 while CI runs 21. The rule lives
+                                     in tools/check-api-rules.py instead, reading japicmp.xml — which is
+                                     JDK-proof, and is run by both ci.yml and release.sh. -->
+                            </parameter>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -78,11 +78,36 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 
 ### Public API vs internal plumbing
 
-- **`com.botmaker.sdk.api.*`** is the API generated bots compile against. **No published bot consumes it
-  yet, so it is currently freely breakable** — remove/rename/retype public methods when it makes the API
-  cleaner (e.g. the Compare API was trimmed to only `ImageTemplateGroup` overloads), without a compat shim;
-  the only cost is the ordered cross-module release (see the umbrella `../CLAUDE.md`). Reinstate
-  signature-stability discipline once real bots ship. It contains:
+- **`com.botmaker.sdk.api.*`** is the API generated bots compile against, and **as of v1.1.0 it is under a
+  compatibility contract** — the "freely breakable, no published bot consumes it yet" licence that governed
+  everything up to v1.0.26 has ended. The full contract is
+  **`../docs/refactor/21-api-compat.md`**; in one paragraph: real semver (additive → minor, breaking →
+  major), and nothing is removed without one full minor release marked
+  `@Deprecated(since = "x.y.z", forRemoval = true)` whose Javadoc `@deprecated` line names the replacement.
+  A member added after 1.1.0 carries `@since`; the 1.1.0 surface itself is recorded by the baseline rather
+  than by 800 identical tags.
+
+  **The enforcement is japicmp against the previously published jar**, in the `api-check` profile
+  (`pom.xml`). It is **off by default** — japicmp downloads the old jar, and `mvn -pl botmaker-sdk -am
+  install` is the daily loop, which stays offline and fast. Run it by hand with:
+
+  ```bash
+  mvn -pl botmaker-sdk -Papi-check verify -Dmaven.test.skip=true -Dbotmaker.api.oldVersion=v1.0.26
+  python3 botmaker-sdk/tools/check-api-rules.py botmaker-sdk/target/japicmp/japicmp.xml
+  ```
+
+  `tools/check-api-rules.py` reads japicmp's XML and exits **0** (clean), **1** (breaking, but everything
+  was deprecated first — legal in a major release) or **2** (something was removed that was never marked
+  `forRemoval` — wrong at *every* version). `ci.yml` fails a PR only on 2; `../release.sh`'s
+  `check_api_bump` owns the version question, because whether a break is allowed depends on the number
+  being tagged and no PR build knows that.
+
+  Two things that look like oversights and are not: japicmp's own `breakBuildOn*` flags are **off** (they
+  would block every legitimate major-release PR), and the rule is Python rather than japicmp's
+  `postAnalysisScript` **because japicmp 0.26.1's bundled Groovy cannot read Java 26 class files** while
+  CI runs 21 — a rule that passes in CI and explodes locally is worse than no rule.
+
+  It contains:
   - `api.vision` — `ImageFinder` (find + `exists` + the lambda control-flow `whileExists`/`ifExists`
     /`untilExists`), `ImageClicker`, `ImageWaiter`, `MatchResult`, `ImageTemplate`.
   - `api.vision.Tolerance` / `api.vision.MinPixels` — `Pixel`'s two precision knobs as value types rather
