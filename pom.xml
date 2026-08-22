@@ -18,10 +18,18 @@
         <!-- botmaker-shared version. Committed value is ALWAYS 0.0.0-SNAPSHOT: it resolves the sibling
              module in the umbrella reactor / dev-install. The real released shared tag is injected only at
              build time by CI (jitpack.yml) via -Dbotmaker.shared.version=<tag> — never committed here, so a
-             clean checkout matches the reactor/dev value and there is no stale pin to get out of sync. -->
+             clean checkout matches the reactor/dev value and there is no stale pin to get out of sync.
+
+             That injection only reaches CONSUMERS because of flatten-maven-plugin below. Maven installs and
+             publishes the COMMITTED pom, not the effective one, so a -D on the command line changes what
+             this build resolves and nothing about what a bot resolving this SDK from JitPack sees. Without
+             flatten, the published pom still said botmaker-shared:${botmaker.shared.version} with the
+             property at 0.0.0-SNAPSHOT, and every released SDK failed to resolve on any machine that had
+             never built this repo locally. Do not remove the plugin without replacing the mechanism. -->
         <botmaker.shared.version>0.0.0-SNAPSHOT</botmaker.shared.version>
         <!-- botmaker-session version. Same contract as botmaker.shared.version above: always 0.0.0-SNAPSHOT
-             in the committed pom, injected at build time by CI for a released tag. -->
+             in the committed pom, injected at build time by CI for a released tag, resolved into the
+             published pom by flatten. -->
         <botmaker.session.version>0.0.0-SNAPSHOT</botmaker.session.version>
     </properties>
 
@@ -139,6 +147,49 @@
                         </manifestEntries>
                     </archive>
                 </configuration>
+            </plugin>
+
+            <!-- Flatten Plugin: publish a pom whose ${...} are already resolved.
+
+                 This is what makes the botmaker.shared.version / botmaker.session.version contract above
+                 actually work. `mvn install -Dbotmaker.shared.version=v0.0.18` installs the COMMITTED pom
+                 (still carrying the property at 0.0.0-SNAPSHOT), so the injected tag never reached a
+                 consumer: a generated bot pinning a released SDK failed with "Could not find artifact
+                 com.github.LiQiyeDev:botmaker-shared:jar:0.0.0-SNAPSHOT in jitpack.io" on any machine with
+                 no local build in ~/.m2. Flatten substitutes the effective values into
+                 target/.flattened-pom.xml and installs THAT, so the published pom names the real tag.
+
+                 flattenMode=oss keeps dependencies/licenses/scm and drops build+profiles (neither is read
+                 by a consumer here — this module has no profiles; do not copy this to botmaker-shared,
+                 whose OS-activated native profiles a consumer DOES need). It also strips repositories,
+                 hence the explicit keep: the jitpack.io repo declared above is how a consumer reaches the
+                 transitive shared/session at all. The clean execution removes the generated file. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <flattenMode>oss</flattenMode>
+                    <pomElements>
+                        <repositories>keep</repositories>
+                    </pomElements>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <!-- Source Plugin: attaches source code so consumers get Javadoc/code in their IDE -->
