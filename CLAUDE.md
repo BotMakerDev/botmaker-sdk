@@ -84,8 +84,24 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   **`../docs/refactor/21-api-compat.md`**; in one paragraph: real semver (additive → minor, breaking →
   major), and nothing is removed without one full minor release marked
   `@Deprecated(since = "x.y.z", forRemoval = true)` whose Javadoc `@deprecated` line names the replacement.
-  A member added after 1.1.0 carries `@since`; the 1.1.0 surface itself is recorded by the baseline rather
-  than by 800 identical tags.
+  A member added after 1.1.0 carries `@since`; the 1.1.0 surface itself carries none, because comparing two
+  published jars already yields the exact per-version added/removed set and 818 identical tags would not.
+
+  **A break must also ship its migration.** `src/main/resources/META-INF/rewrite/botmaker-sdk.yml` holds
+  one OpenRewrite recipe per breaking release (`com.botmaker.sdk.UpgradeTo_2_0_0`, composed by
+  `UpgradeToLatest`); `META-INF/botmaker/upgrade-notes.json` holds a sentence for each change no recipe can
+  repair. Both ship inside the jar — `META-INF/rewrite/` is OpenRewrite's classpath-discovery slot — so a
+  user migrates with one command and **no edit to their pom**:
+
+  ```bash
+  mvn org.openrewrite.maven:rewrite-maven-plugin:6.46.1:run \
+      -Drewrite.recipeArtifactCoordinates=com.github.LiQiyeDev:botmaker-sdk:v2.0.0 \
+      -Drewrite.activeRecipes=com.botmaker.sdk.UpgradeTo_2_0_0
+  ```
+
+  Run it *before* bumping the pom (recipes come from the new jar, source must still type-attribute against
+  the old one), and keep the plugin version pinned at **6.46.1 or newer**: 6.12.0 cannot read
+  `META-INF/rewrite/` at all on JDK 24+.
 
   **The enforcement is japicmp against the previously published jar**, in the `api-check` profile
   (`pom.xml`). It is **off by default** — japicmp downloads the old jar, and `mvn -pl botmaker-sdk -am
@@ -96,11 +112,13 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   python3 botmaker-sdk/tools/check-api-rules.py botmaker-sdk/target/japicmp/japicmp.xml
   ```
 
-  `tools/check-api-rules.py` reads japicmp's XML and exits **0** (clean), **1** (breaking, but everything
-  was deprecated first — legal in a major release) or **2** (something was removed that was never marked
-  `forRemoval` — wrong at *every* version). `ci.yml` fails a PR only on 2; `../release.sh`'s
-  `check_api_bump` owns the version question, because whether a break is allowed depends on the number
-  being tagged and no PR build knows that.
+  `tools/check-api-rules.py` reads japicmp's XML and exits **0** (clean), **1** (breaking, but deprecated
+  first *and* migratable — legal in a major release), **2** (something was removed that was never marked
+  `forRemoval`) or **3** (something broke with no recipe and no upgrade note). 2 and 3 are wrong at *every*
+  version, so `ci.yml` fails a PR on either; `../release.sh`'s `check_api_bump` owns the version question,
+  because whether a break is *allowed* depends on the number being tagged and no PR build knows that. The
+  script needs **PyYAML** to read the recipe file — `ci.yml` installs it explicitly so the rule cannot
+  quietly stop being enforced.
 
   Two things that look like oversights and are not: japicmp's own `breakBuildOn*` flags are **off** (they
   would block every legitimate major-release PR), and the rule is Python rather than japicmp's

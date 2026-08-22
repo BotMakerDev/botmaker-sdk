@@ -57,9 +57,11 @@ jobs:
 
       # The API compatibility gate. See ../docs/refactor/21-api-compat.md (umbrella) for the contract.
       #
-      # What this DOES fail on: removing a public api.* member that the previous release never marked
-      # @Deprecated(since = "...", forRemoval = true). That is wrong at every version, so a PR is the
-      # cheapest place to find out.
+      # What this DOES fail on, both wrong at every version, so a PR is the cheapest place to find out:
+      #   - removing a public api.* member that the previous release never marked
+      #     @Deprecated(since = "...", forRemoval = true);
+      #   - breaking a public api.* member with no OpenRewrite recipe in META-INF/rewrite/ and no entry
+      #     in META-INF/botmaker/upgrade-notes.json, i.e. leaving users no way through the change.
       #
       # What it deliberately does NOT fail on: a breaking change as such. Whether a break is allowed
       # depends on the version number being released, and no PR build knows that number — the umbrella's
@@ -80,9 +82,14 @@ jobs:
       - name: API compatibility
         if: steps.prev.outputs.tag != ''
         run: |
+          # PyYAML is the checker's one non-stdlib import — it reads META-INF/rewrite/botmaker-sdk.yml to
+          # tell a break that ships a migration from one that does not. Installed explicitly rather than
+          # relied on from the runner image, so the rule can never silently stop being enforced.
+          python3 -m pip install --quiet --disable-pip-version-check pyyaml
           mvn -B -q -Papi-check verify -Dmaven.test.skip=true \
               -Dbotmaker.api.oldVersion='${{ steps.prev.outputs.tag }}'
-          # 0 = clean, 1 = breaking but properly deprecated (release.sh's call), 2 = rule violation.
+          # 0 = clean, 1 = breaking but legal in a major (release.sh's call, not ours),
+          # 2 = removed with no deprecation cycle, 3 = broken with no migration path.
           # The `|| rc=$?` matters: this step runs under `bash -e`, so a bare non-zero exit from the
           # script would kill the step before the code could be inspected — and every breaking change
           # would read as a CI failure, which is exactly what this step is written to avoid.
@@ -90,6 +97,10 @@ jobs:
           python3 tools/check-api-rules.py target/japicmp/japicmp.xml || rc=$?
           if [ "$rc" -eq 2 ]; then
             echo "::error::A public API member was removed without a deprecation cycle (see above)."
+            exit 1
+          fi
+          if [ "$rc" -eq 3 ]; then
+            echo "::error::A public API member broke with no migration recipe or upgrade note (see above)."
             exit 1
           fi
 

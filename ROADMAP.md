@@ -8,6 +8,50 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-22 — a break must ship the fix for itself
+
+**Changed:** `src/main/resources/META-INF/rewrite/botmaker-sdk.yml` (new),
+`src/main/resources/META-INF/botmaker/upgrade-notes.json` (new), `tools/check-api-rules.py`,
+`.github/workflows/ci.yml`, `pom.xml` (stale comment), `CLAUDE.md`. Umbrella side:
+`docs/refactor/21-api-compat.md` (§3–4), `release.sh`, `CLAUDE.md`.
+
+**Done**
+
+- **The SDK jar now carries the recipes that migrate its own consumers.** `META-INF/rewrite/` is
+  OpenRewrite's documented classpath-discovery slot, so the file needs no pom wiring to ship and no code
+  of ours to read. One recipe per breaking release, composed oldest-first by
+  `com.botmaker.sdk.UpgradeToLatest`. An earlier draft invented `migrations.json` for this; it was
+  reinventing the slot.
+- **A user migrates with one command and no edit to their pom.** `rewrite-maven-plugin` takes both the
+  recipe classpath and the recipe name as *user properties*
+  (`-Drewrite.recipeArtifactCoordinates`, `-Drewrite.activeRecipes`). Better than planned: nothing is
+  pinned in the bot, so this works on bots generated long before the feature existed, and a breaking SDK
+  release is never gated on a Studio release.
+- **RULE 2 in `check-api-rules.py` (exit 3):** every binary-incompatible change must be named by a recipe
+  or by an `upgrade-notes.json` entry. Wrong at every version — a major release still owes users a way
+  across — so CI fails on it and `release.sh` refuses even a `--sdk 2.0.0`. Needs PyYAML, which `ci.yml`
+  installs explicitly rather than trusting the runner image.
+- **The suspected recipe gap does not exist.** The plan flagged "inserting an argument at call sites" as
+  uncovered because `AddMethodParameter` targets declarations. `AddLiteralMethodArgument` and
+  `AddNullMethodArgument` do exactly that job at invocations. The real limit is narrower: a new parameter
+  whose default is an *expression* rather than a literal or null.
+- **Verified on a real bot, not just built:** the recipe was discovered from inside the installed jar,
+  rewrote the genuine call site in `~/BotMakerProjects/zeggze` (`Target.restart()` →
+  `startIfNotRunning()`), left the javadoc mention of it alone, touched no other file, and the bot still
+  compiled. Both coverage paths (recipe, note) were shown to turn exit 3 into exit 1, and the empty
+  aggregator was shown to run as a clean no-op — the case a user hits when already up to date.
+
+**Two version traps, both hit while building this**
+
+- **`rewrite-maven-plugin` 6.12.0 cannot read `META-INF/rewrite/` at all on JDK 24+.** Discovery goes
+  through ClassGraph's `enableMemoryMapping()`, which now throws there, so the failure lands squarely on
+  this feature's own code path. **6.46.1 is the floor**; it is what the end-to-end test ran on under JDK
+  26. This is the second time this toolchain has been JDK-coupled — see the Groovy note below.
+- **`search.maven.org`'s JSON API reported 6.12.0 as the newest release when 6.46.1 was out.** Read
+  `repo1.maven.org/…/maven-metadata.xml` and trust `<release>`.
+
+---
+
 ## 2026-08-22 — the bump level stops being a guess
 
 **Changed:** `pom.xml` (`api-check` profile), `tools/check-api-rules.py` (new),

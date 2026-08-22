@@ -1,0 +1,96 @@
+#
+# Migration recipes shipped inside the SDK jar.
+# See ../../../../../docs/refactor/21-api-compat.md (umbrella) for the contract these serve.
+#
+# WHY THIS FILE IS HERE AND NOT IN A FORMAT OF OUR OWN
+# ----------------------------------------------------
+# When a library breaks its API, the library is the only party that knows how to repair the call sites,
+# and OpenRewrite is the standard way to ship that knowledge with the artifact. `META-INF/rewrite/` is
+# its documented classpath-discovery slot: any recipe declared here is found automatically once this jar
+# is on the recipe classpath. An earlier draft invented `migrations.json` for exactly this job; it would
+# have needed its own parser, its own semantics and its own engine, all of which already exist here.
+#
+# HOW A USER RUNS IT — no edit to the bot's pom, ever
+# ---------------------------------------------------
+# The rewrite plugin takes both the recipe classpath and the recipe name as user properties, so the whole
+# migration is one command in the bot's directory:
+#
+#   mvn org.openrewrite.maven:rewrite-maven-plugin:6.46.1:run \
+#       -Drewrite.recipeArtifactCoordinates=com.github.LiQiyeDev:botmaker-sdk:v2.0.0 \
+#       -Drewrite.activeRecipes=com.botmaker.sdk.UpgradeTo_2_0_0
+#
+# Nothing is added to the bot's pom and no plugin is pinned there, which means this works on bots that
+# were generated long before any of this existed. Studio hands the user this exact line (Phase 4a); it is
+# not a Studio feature, it is a Maven one.
+#
+# PIN THE PLUGIN VERSION IN THAT COMMAND — do not let it float to whatever `mvn` picks, and do not
+# believe search.maven.org about what "latest" is. Two traps, both hit while building this:
+#
+#   * 6.12.0 CANNOT read this file on JDK 24+. Recipe discovery goes through ClassGraph's
+#     enableMemoryMapping(), which now throws there, so the failure lands exactly on the code path that
+#     loads META-INF/rewrite — the whole feature, not an edge of it. 6.46.1 is fixed and is what the
+#     end-to-end test ran on (JDK 26). Treat 6.46.1 as the floor.
+#   * search.maven.org's JSON API reported 6.12.0 as the newest release when 6.46.1 was out. Read
+#     https://repo1.maven.org/maven2/org/openrewrite/maven/rewrite-maven-plugin/maven-metadata.xml
+#     instead; <release> there is authoritative.
+#
+# ORDER MATTERS: run the rewrite while the pom still pins the OLD SDK. The recipes are read from the NEW
+# jar via -Drewrite.recipeArtifactCoordinates, but the bot's source must still parse and type-attribute
+# against the SDK it currently compiles against. Bump the pom afterwards.
+#
+# ADDING A RECIPE WHEN YOU BREAK SOMETHING
+# ----------------------------------------
+# This is not optional bookkeeping: `tools/check-api-rules.py` fails the build when japicmp reports a
+# binary-incompatible change to `com.botmaker.sdk.api` that is named neither by a recipe below nor by an
+# entry in META-INF/botmaker/upgrade-notes.json. "We forgot to write the migration" is a red build here
+# rather than a broken user project later.
+#
+#   1. Add a `com.botmaker.sdk.UpgradeTo_<major>_<minor>_<patch>` recipe below.
+#   2. Add it to UpgradeToLatest's recipeList, newest last (they compose in order).
+#   3. If the change genuinely cannot be automated, describe it in upgrade-notes.json instead.
+#
+# The stock recipes that cover our cases — all verified present in rewrite-java 8.56.1:
+#
+#   org.openrewrite.java.ChangeMethodName            renamed a method
+#   org.openrewrite.java.ChangeType                  moved/renamed a class
+#   org.openrewrite.java.ChangePackage               moved a whole package
+#   org.openrewrite.java.DeleteMethodArgument        dropped a parameter
+#   org.openrewrite.java.ReorderMethodArguments      reordered parameters
+#   org.openrewrite.java.AddLiteralMethodArgument    added a parameter with a constant default
+#   org.openrewrite.java.AddNullMethodArgument       added a parameter with no sensible default
+#   org.openrewrite.java.ChangeMethodTargetToStatic  instance method became static (and the reverse)
+#
+# Known limit, worth stating before you hit it: a new parameter whose default is an EXPRESSION rather
+# than a literal or null (a new enum constant, a factory call) has no stock recipe. That change is either
+# reshaped to take a literal, or it goes in upgrade-notes.json as unmigratable. Do not discover this at
+# release time — check it when you design the break.
+#
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: com.botmaker.sdk.UpgradeToLatest
+displayName: Migrate a BotMaker bot to the latest SDK
+description: >-
+  Applies every BotMaker SDK migration in order. Safe to run on a bot at any starting version: each
+  per-release recipe matches the API it is repairing, so the ones that do not apply change nothing.
+recipeList: []
+#
+# As breaking releases happen, they are appended here oldest-first and defined below, e.g.:
+#
+# recipeList:
+#   - com.botmaker.sdk.UpgradeTo_2_0_0
+#   - com.botmaker.sdk.UpgradeTo_3_0_0
+#
+# ---
+# type: specs.openrewrite.org/v1beta/recipe
+# name: com.botmaker.sdk.UpgradeTo_2_0_0
+# displayName: Migrate a BotMaker bot to SDK 2.0.0
+# description: Repairs call sites broken by the API changes in SDK 2.0.0.
+# recipeList:
+#   - org.openrewrite.java.ChangeMethodName:
+#       methodPattern: com.botmaker.sdk.api.interaction.Wait seconds(..)
+#       newMethodName: forSeconds
+#
+# There are no breaking releases yet: the contract starts at v1.1.0 and v1.1.0 is additive. The empty
+# recipeList above is deliberate and is exercised by the build — an aggregator with nothing to do must
+# stay a valid, runnable recipe, so that the command Studio prints never fails just because the user
+# happened to be up to date.

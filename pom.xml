@@ -44,9 +44,10 @@
              PR build nor this pom knows that number — only release.sh does, so release.sh is the gate.
              Left true, CI would block every legitimate major-release PR.
 
-             This does NOT make CI toothless: japicmp-rules.groovy enforces the rules that hold at EVERY
-             version (removing something never marked @Deprecated(forRemoval = true) is wrong in a major
-             release too), and it fails the build on its own regardless of this flag. -->
+             This does NOT make CI toothless: tools/check-api-rules.py enforces the two rules that hold
+             at EVERY version — removing something never marked @Deprecated(forRemoval = true), and
+             breaking something with no migration recipe or note — and ci.yml fails the build on either
+             regardless of this flag. -->
         <botmaker.api.breakBuild>false</botmaker.api.breakBuild>
     </properties>
 
