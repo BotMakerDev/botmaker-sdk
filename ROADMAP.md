@@ -31,6 +31,12 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
   job (which builds all three from source at that version) are unchanged.
 - Property comments rewritten: the old text claimed the `-D` injection was sufficient, which is the exact
   gap that produced the bug.
+- **`jitpack.yml` now requires `SHARED_TAG`/`SESSION_TAG` instead of defaulting them.** Flatten changes what
+  a stale fallback costs: `${SHARED_TAG:-v0.0.15}` was harmless while the published pom kept the unresolved
+  property (a wrong `-D` only affected that build), but it now gets **baked into the published pom**, so a
+  tag cut by hand without `.deps.env` would point every consumer at a long-dead shared. The build fails with
+  a readable message instead. Both branches exercised by replaying the generated install script with and
+  without `.deps.env` present.
 
 **Deferred / next**
 
