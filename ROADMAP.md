@@ -65,9 +65,10 @@ streaming it, so that replay had to be added or the refusal would have arrived w
 
 **Deferred / next**
 
-- **Studio does not yet apply any of this.** It still prints an `mvn rewrite:run` command for an engine
-  that no longer exists; that comes out next, along with reading the merged file. Until then the SDK half
-  is correct and the Studio half is stale.
+- **Studio reads the merged file now, but applies nothing from it.** *(updated 2026-08-22)* The
+  `mvn rewrite:run` card is gone and the report splits the span into what Studio could repair and what
+  needs the user — with Apply present and inert. The rewriter that carries the `fix` entries out is the
+  next piece of work.
 - **`renameField`/`moveMember` have no consumer yet.** They are in the kind set and the checker validates
   them, but Studio's scanner reads only methods and constructors — a break on `Key.ENTER` is demanded by
   CI and invisible to the upgrade report. That asymmetry is a known bug, scheduled.
