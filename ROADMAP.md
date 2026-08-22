@@ -50,6 +50,20 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 - **`search.maven.org`'s JSON API reported 6.12.0 as the newest release when 6.46.1 was out.** Read
   `repo1.maven.org/…/maven-metadata.xml` and trust `<release>`.
 
+**Deferred / next** *(added 2026-08-22, when the Studio half of the same plan landed)*
+
+- **None of this is published yet.** v1.0.26 is still the newest tag, and it carries neither the recipes
+  nor `upgrade-notes.json`. The first release under the contract is **v1.1.0** — additive-only by
+  definition, since it is the baseline everything after it is compared to. Until it is cut, Studio's
+  upgrade report has nothing to read: `SdkUpgradeService` finds no notes in any published jar and offers
+  no `mvn rewrite:run` command, which is correct behaviour, not a bug.
+- **Studio now consumes this jar's two `META-INF` files** (`../botmaker-studio` → *Project ▸ Upgrade
+  SDK…*): `upgrade-notes.json` is read out of the **target** jar and shown verbatim under *what cannot be
+  migrated*, and the presence of `META-INF/rewrite/botmaker-sdk.yml` is what decides whether a rewrite
+  command is offered at all. Renaming either entry, or changing the notes schema
+  (`versions` → `[{member, summary, action}]`, a constructor being `Fqcn#<init>`), breaks a Studio the
+  user is not upgrading at the same time. Treat both paths as API.
+
 ---
 
 ## 2026-08-22 — the bump level stops being a guess
