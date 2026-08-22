@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.AdbEndpoint;
@@ -23,6 +24,7 @@ import java.util.Optional;
  * emu.use();                          // point the whole bot at it (Source.set)
  * }</pre>
  */
+@ApiId("emulators")
 public final class Emulators {
 
     private Emulators() {}

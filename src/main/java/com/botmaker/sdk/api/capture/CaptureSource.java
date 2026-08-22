@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.capture;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
 import com.botmaker.sdk.api.interaction.Mouse;
@@ -20,6 +21,7 @@ import java.awt.image.BufferedImage;
  * matches within) that rectangle. Regions compose, so
  * {@code CaptureSource.window("Game").region(topBar)} is itself just another {@code CaptureSource}.
  */
+@ApiId("capture-source")
 public interface CaptureSource {
 
     /** Pixels of this source. May return {@code null} if the capture failed. */

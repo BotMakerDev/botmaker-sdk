@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
@@ -13,6 +14,7 @@ import com.botmaker.shared.emulator.PlatformId;
  * launching it. Query {@link #running()} for liveness, {@link #launch()}/{@link #stop()} to control it, and
  * {@link #connect()} to open an {@link Emulator} once it's up.
  */
+@ApiId("emulator-ref")
 public final class EmulatorRef {
 
     private final EmulatorInstance instance;

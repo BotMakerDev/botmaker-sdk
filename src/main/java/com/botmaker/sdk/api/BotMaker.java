@@ -9,6 +9,7 @@ import java.util.Scanner;
  * {@link Scanner} or {@code System.out} directly — the visual Print / Read blocks compile down
  * to {@code BotMaker.print(...)} and {@code BotMaker.readX()} calls.
  */
+@ApiId("bot-maker")
 public class BotMaker {
 
     /** Lazily created so simply referencing print() does not open stdin. */

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
  * ({@link #whileFind}, {@link #untilFind}, {@link #ifFind}) — each is one capture that hands the matched
  * {@link MatchResult} to your action.
  */
+@ApiId("image-finder")
 public class ImageFinder {
 
     // --- find (single template) ---

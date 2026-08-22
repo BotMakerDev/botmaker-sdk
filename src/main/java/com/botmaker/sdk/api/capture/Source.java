@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.capture;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.session.ActiveSession;
@@ -19,6 +20,7 @@ import com.botmaker.session.DesktopSession;
  * <p>Methods that <em>do</em> take an explicit {@link CaptureSource} always use that argument and
  * ignore this global; the global only fills in the no-source overloads.
  */
+@ApiId("source")
 public final class Source {
 
     private static volatile CaptureSource current;

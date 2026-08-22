@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.launch;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -31,6 +32,7 @@ import com.botmaker.shared.launch.Launcher;
  * switchable hierarchy a bot's generated code names, and the one running-detection layer shared cannot see —
  * the ambient {@link Source#current() capture source}'s own window.
  */
+@ApiId("launch-target")
 public sealed interface LaunchTarget {
 
     /** The parsed spec this target wraps — the value {@code shared.launch} operates on. */

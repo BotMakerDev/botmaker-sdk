@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.observe.BotObserver;
@@ -22,6 +23,7 @@ import com.botmaker.sdk.api.vision.MatchResult;
  * once per iteration (and which you may call inside any custom loop). {@link #progress()} lets logic the
  * vision layer can't see reset the counter. All state is per-thread.
  */
+@ApiId("watchdog")
 public final class Watchdog {
 
     private Watchdog() {}

@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.launch;
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -18,6 +19,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * When none is configured the target is {@code null} and {@link #start()} is a no-op: an empty game-bot scaffold
  * that hasn't picked a game yet simply doesn't launch anything. Override at runtime with {@link #set(String)}.
  */
+@ApiId("target")
 public final class Target {
 
     private static volatile LaunchTarget current;

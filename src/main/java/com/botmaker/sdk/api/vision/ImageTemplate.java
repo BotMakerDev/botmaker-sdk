@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.internal.vision.TemplateMetadata;
 import com.botmaker.shared.opencv.OpenCvNative;
 import org.opencv.core.Mat;
@@ -18,6 +19,7 @@ import java.nio.file.Paths;
  * {@code Template} wrapper; that indirection has been collapsed now that OpenCV loads reliably via
  * {@link OpenCvNative}.)
  */
+@ApiId("image-template")
 public class ImageTemplate implements AutoCloseable {
 
     static { OpenCvNative.ensureLoaded(); }

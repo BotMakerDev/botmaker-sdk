@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.bot;
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.launch.Target;
@@ -26,6 +27,7 @@ import java.util.function.Consumer;
  * generated loop once every activity is disabled. {@code stop()} unwinds the supervise loop cleanly and
  * {@code supervise} returns, rather than treating it as a crash to recover from.
  */
+@ApiId("bot")
 public final class Bot {
 
     private Bot() {}

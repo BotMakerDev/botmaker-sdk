@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.capture.CaptureSource;
 
 import java.util.ArrayList;
@@ -31,6 +32,7 @@ import java.util.List;
  * concurrent bot execution. Use {@link #clearLastMatch()} to reset the context for the
  * current thread (e.g., at the start of a bot action).
  */
+@ApiId("vision-context")
 public final class VisionContext {
 
     private static final ThreadLocal<MatchResult> lastMatch = new ThreadLocal<>();

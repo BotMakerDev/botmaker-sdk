@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.vision;
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.BotSettings;
@@ -17,6 +18,7 @@ import com.botmaker.sdk.api.interaction.Wait;
  * Every method in this class also updates {@link VisionContext#setLastMatch(MatchResult)} for the current thread,
  * enabling access to the most recent match via {@link VisionContext#getLastMatch()}.
  */
+@ApiId("image-waiter")
 public class ImageWaiter {
 
     // --- waitFor ---

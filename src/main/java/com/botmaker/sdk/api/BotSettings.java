@@ -24,6 +24,7 @@ import java.time.ZoneId;
  * {@link #useRealInput} for the one ordering constraint that made an explicit call look necessary, and why it
  * isn't.
  */
+@ApiId("bot-settings")
 public final class BotSettings {
 
     /** Pause after a successful match, in ms — long enough for a game's animation to settle. */

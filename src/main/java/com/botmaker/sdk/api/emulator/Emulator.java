@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -32,6 +33,7 @@ import java.util.List;
  * {@link #back}, {@link #home}, {@link #text}, {@link #key}, {@link #startApp}). Obtain instances from
  * {@link Emulators}. Not thread-safe for concurrent capture on one connection.
  */
+@ApiId("emulator")
 public final class Emulator implements CaptureSource {
 
     // Common Android key codes for the two verbs bots reach for most.

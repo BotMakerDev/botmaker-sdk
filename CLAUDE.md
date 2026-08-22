@@ -78,61 +78,44 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 
 ### Public API vs internal plumbing
 
-- **`com.botmaker.sdk.api.*`** is the API generated bots compile against, and **as of v1.1.0 it is under a
-  compatibility contract** — the "freely breakable, no published bot consumes it yet" licence that governed
-  everything up to v1.0.26 has ended. The full contract is
-  **`../docs/refactor/21-api-compat.md`**; in one paragraph: real semver (additive → minor, breaking →
-  major), and nothing is removed without one full minor release marked
+- **`com.botmaker.sdk.api.*`** is the API generated bots compile against. It is under a **compatibility
+  convention** — real semver, and a removal announced by one full minor marked
   `@Deprecated(since = "x.y.z", forRemoval = true)` whose Javadoc `@deprecated` line names the replacement.
   A member added after 1.1.0 carries `@since`; the 1.1.0 surface itself carries none, because comparing two
   published jars already yields the exact per-version added/removed set and 818 identical tags would not.
+  The full picture is **`../docs/refactor/21-api-compat.md`**.
 
-  **A break must also ship its migration**, in `src/main/resources/META-INF/botmaker/migrations.json` —
-  one file, keyed by the release that introduced the break, each entry naming a `member` and carrying
-  **exactly one** of a `fix` (Studio repairs the call sites: `renameMethod`, `renameType`, `renameField`,
-  `moveMember`, `dropArgument`, `reorderArguments`, `insertArgument`) or a `manual` sentence (it cannot,
-  and here is what to tell the user). It ships in the jar, and the file's own `_readme` is the authority on
-  the grammar — read it before adding an entry.
+  **Convention, not enforcement, and that is a deliberate 2026-08-22 decision.** There was a gate here:
+  japicmp against the previously published jar, `ApiRulesCheck` in `src/api-check/java`, an `api-check`
+  profile, and `release.sh` refusing a version number the diff did not justify. All of it is deleted. It
+  existed to protect a repair model where a break was carried across by **pointing one member at another**
+  — the old `fix` kinds — and there, a wrong or missing declaration produced a bot that compiled and
+  behaved differently, so the declarations had to be checkable. Studio no longer does that: it replaces a
+  call to a member that is gone with a **default value of the type it used to return** and marks the
+  enclosing function `@NeedsReview`. Nothing is declared, so nothing can be forgotten, and there is nothing
+  for a gate to verify. What it costs is stated plainly in `release.sh`: nothing now refuses a breaking
+  change released as a patch.
 
-  Two rules there are load-bearing and easy to get wrong. **Upgrading across several releases is ordered
-  replay**: every version in `(from, to]` is applied as its own pass, in ascending order, over the source
-  the previous pass produced — so a member renamed twice composes for free and nothing resolves a chain.
-  Never iterate to a fixpoint (`a→b` then `b→a` would loop). And **adding a `fix.kind` does not bump
-  `schema`**: an older Studio meeting an unknown kind degrades that entry to manual and disables auto-apply
-  for the whole upgrade, which is the entire point of the rule.
+  **Two things on this side still matter to an upgrade, and both are read by Studio, not by CI.**
 
-  This replaced an OpenRewrite recipe YAML plus a prose-only `upgrade-notes.json` in 2026-08. OpenRewrite
-  existed for one requirement — `mvn rewrite:run` migrating a bot with no Studio at all — and once that
-  stopped being required, an engine we do not control bought nothing Studio's own `CallMigrator` could not
-  do, at the price of a dependency on three OS installer legs. What was genuinely lost: type-attributed
-  overload resolution (Studio matches call sites by **arity**, having no bindings) and the standalone path.
+  **`@ApiId` is how a rename survives.** A jar diff sees `ImageClicker` go and `IClicker` arrive; it cannot
+  see they are the same class, and read as a removal that is hundreds of deleted statements in someone's
+  bot. Every public `api.*` type carries `@ApiId("kebab-case")` (`api/ApiId.java`, `CLASS` retention, read
+  from the jar by the ClassGraph scan Studio already runs). Both releases spell the id the same way, so the
+  pairing is a fact. **Rename the class freely; keep the id.** The one rule: an id names a *role* and is
+  **retired when the role disappears, never re-pointed** at a different class — its absence from the newer
+  jar is exactly the "this is not coming back" signal. Reusing one is survivable rather than catastrophic,
+  because an id pairs the **type name only** and every member is still checked individually, so an id kept
+  across a redesign degrades to defaults-and-review rather than a silently wrong rewrite.
 
-  **The enforcement is japicmp against the previously published jar**, in the `api-check` profile
-  (`pom.xml`). It is **off by default** — japicmp downloads the old jar, and `mvn -pl botmaker-sdk -am
-  install` is the daily loop, which stays offline and fast. The whole gate is one command:
+  **`src/main/resources/META-INF/botmaker/migrations.json` is renames only** — `schema` 2,
+  `{"versions": {"<v>": [{"from": ..., "to": ...}]}}` — and exists for what the ids cannot reach: anything
+  renamed relative to a release predating them (v1.0.26 carries none), and a pairing you want to state by
+  hand. The version keys are still there even though nothing replays any more: Studio composes every
+  version in `(from, to]` ascending into one map, because a bot jumping 1.x → 3.0 spells a twice-renamed
+  member the way 1.x did and neither entry matches that alone. The file's own `_readme` is the authority.
 
-  ```bash
-  mvn -pl botmaker-sdk -Papi-check verify -Dmaven.test.skip=true -Dbotmaker.api.oldVersion=v1.0.26
-  ```
-
-  The profile runs japicmp and then `ApiRulesCheck`, which reads japicmp's XML and writes
-  `target/japicmp/api-verdict.json`: **0** (clean), **1** (breaking, but deprecated first *and* migratable
-  — legal in a major release), **2** (something was removed that was never marked `forRemoval`), **3**
-  (something broke with no migration entry) or **4** (the migrations file itself is invalid). 2, 3 and 4
-  are wrong at *every* version, so `ci.yml` passes `-Dbotmaker.api.failOnViolation=true` and fails a PR on
-  them; `../release.sh`'s `check_api_bump` leaves the flag off, reads the verdict file and owns the version
-  question, because whether a break is *allowed* depends on the number being tagged and no PR build knows
-  that. **The verdict is a file rather than an exit code precisely so those two can differ** — it keeps
-  "the API broke" separate from "the build broke".
-
-  Three things that look like oversights and are not. japicmp's own `breakBuildOn*` flags are **off** (they
-  would block every legitimate major-release PR). The checker is **not** japicmp's `postAnalysisScript`,
-  because japicmp 0.26.1's bundled Groovy cannot read Java 26 class files while CI runs 21 — a rule that
-  passes in CI and explodes locally is worse than no rule. And it lives in its own source root
-  `src/api-check/java`, compiled only under the profile: `src/main` would ship build tooling on every bot's
-  classpath, and `src/test` is not compiled when `release.sh` runs the gate with `-Dmaven.test.skip=true`.
-
-  It contains:
+  The API contains:
   - `api.vision` — `ImageFinder` (find + `exists` + the lambda control-flow `whileExists`/`ifExists`
     /`untilExists`), `ImageClicker`, `ImageWaiter`, `MatchResult`, `ImageTemplate`.
   - `api.vision.Precision` — `Pixel`'s precision knobs as one value type rather than a bare

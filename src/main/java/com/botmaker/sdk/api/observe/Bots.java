@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.observe;
 
+import com.botmaker.sdk.api.ApiId;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -12,6 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * <p>The {@code fire*} methods are called by the SDK's own facades; user code only uses
  * {@link #addObserver}/{@link #removeObserver}.
  */
+@ApiId("bots")
 public final class Bots {
 
     private static final List<BotObserver> OBSERVERS = new CopyOnWriteArrayList<>();

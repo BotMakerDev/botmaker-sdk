@@ -3,6 +3,7 @@ package com.botmaker.sdk.api;
 import java.awt.Toolkit;
 import java.awt.Dimension;
 
+@ApiId("rect")
 public class Rect {
 
     public int x, y, width, height;

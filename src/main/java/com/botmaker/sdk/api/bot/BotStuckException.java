@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.sdk.api.ApiId;
+
 /**
  * Thrown when the {@link Watchdog} decides the bot is stuck — the screen has not advanced for
  * {@link com.botmaker.sdk.api.BotSettings#maxRetryAttempts()} consecutive match attempts
@@ -9,6 +11,7 @@ package com.botmaker.sdk.api.bot;
  * cluttering signatures. {@link Bot#supervise} catches it and runs the recovery hook
  * (typically {@code goHome()} then {@code startGame()}) before restarting the bot loop.
  */
+@ApiId("bot-stuck-exception")
 public class BotStuckException extends RuntimeException {
 
     public BotStuckException(String message) {

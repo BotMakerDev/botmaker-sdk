@@ -25,6 +25,7 @@ import com.botmaker.sdk.internal.config.ProjectDefaults;
  * {@code shared} can't depend on the SDK, yet its window/capture/input code prints diagnostics of its own —
  * keeping the state in the lower module is what makes this <em>one</em> switch rather than two that drift.
  */
+@ApiId("debug")
 public final class Debug {
 
     private Debug() {}

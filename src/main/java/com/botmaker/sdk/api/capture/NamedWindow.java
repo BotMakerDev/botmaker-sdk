@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.capture;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 
@@ -15,6 +16,7 @@ import java.util.Optional;
  *
  * <p>Obtain one via {@link CaptureSource#window(String)}.
  */
+@ApiId("named-window")
 public final class NamedWindow implements CaptureSource {
 
     private final String titleSubstring;

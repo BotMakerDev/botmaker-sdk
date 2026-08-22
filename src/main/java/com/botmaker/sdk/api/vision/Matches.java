@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.ApiId;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -38,6 +40,7 @@ import java.util.Map;
  *
  * <p>Immutable and iteration-ordered by the group's declaration order.
  */
+@ApiId("matches")
 public final class Matches {
 
     private static final Matches NONE = new Matches(Collections.emptyMap());

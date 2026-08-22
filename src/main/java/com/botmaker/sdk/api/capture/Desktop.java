@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.capture;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.shared.capture.ScreenCapture;
 
@@ -10,6 +11,7 @@ import java.awt.image.BufferedImage;
  * fallback source when no {@link Window} or {@link Monitor} is targeted and no project default is
  * configured. Prefer the factory {@link CaptureSource#desktop()} over constructing this directly.
  */
+@ApiId("desktop")
 public final class Desktop implements CaptureSource {
 
     @Override

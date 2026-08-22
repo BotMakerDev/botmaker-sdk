@@ -23,11 +23,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # fetch-depth: 0 for the tags — the api-check step below needs the PREVIOUS release tag to compare
-      # against, and the default shallow checkout has no tags at all.
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Check out botmaker-shared
         uses: actions/checkout@v4
@@ -55,48 +51,14 @@ jobs:
       - name: Build
         run: mvn -B -DskipTests package
 
-      # The API compatibility gate. See ../docs/refactor/21-api-compat.md (umbrella) for the contract.
-      #
-      # What this DOES fail on, both wrong at every version, so a PR is the cheapest place to find out:
-      #   - removing a public api.* member that the previous release never marked
-      #     @Deprecated(since = "...", forRemoval = true);
-      #   - breaking a public api.* member with no entry in META-INF/botmaker/migrations.json, i.e.
-      #     leaving users no way through the change.
-      #
-      # What it deliberately does NOT fail on: a breaking change as such. Whether a break is allowed
-      # depends on the version number being released, and no PR build knows that number — the umbrella's
-      # release.sh does, and it refuses a tag the diff doesn't justify. Failing here would block every
-      # legitimate major-release PR. The breaking changes are still printed, so they are visible in the log.
-      - name: Previous release tag
-        id: prev
-        run: |
-          # The newest vX.Y.Z that isn't the one being built (a tag push builds its own tag).
-          current="$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)"
-          prev="$(git tag --list 'v*' \
-                    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-                    | grep -vx "${current:-__none__}" \
-                    | sort -V | tail -1)"
-          echo "tag=$prev" >> "$GITHUB_OUTPUT"
-          echo "Comparing against ${prev:-<no previous release>}"
-
-      - name: API compatibility
-        if: steps.prev.outputs.tag != ''
-        run: |
-          # One command: the api-check profile runs japicmp and then ApiRulesCheck over its report.
-          # failOnViolation=true is the CI shape — it fails the step on verdict 2 (removed with no
-          # deprecation cycle), 3 (broken with no migration) or 4 (the migrations file itself is
-          # invalid), each of which is wrong at EVERY version. Verdict 1 — a legal breaking change —
-          # passes here on purpose; whether it is allowed depends on the number being tagged, which
-          # release.sh decides and no PR build can know.
-          mvn -B -Papi-check verify -Dmaven.test.skip=true \
-              -Dbotmaker.api.oldVersion='${{ steps.prev.outputs.tag }}' \
-              -Dbotmaker.api.failOnViolation=true
-
-      # The machine-readable verdict, kept whether or not the step above passed, so a failed PR shows
-      # exactly which members were named without anyone re-reading the log.
-      - name: API verdict
-        if: always() && steps.prev.outputs.tag != ''
-        run: cat target/japicmp/api-verdict.json || true
+      # There is deliberately no API compatibility gate here any more. It compared this build against the
+      # previously published jar with japicmp and demanded a migrations entry for every break — an
+      # apparatus that only earns its keep when a break has to be *repaired* by pointing one member at
+      # another. It no longer is: Studio replaces a call to a member that is gone with a default value and
+      # marks the enclosing function for review, which needs nothing declared and so nothing to check.
+      # What survives on this side is @ApiId (com.botmaker.sdk.api.ApiId) and the rename-only
+      # META-INF/botmaker/migrations.json, both read by Studio at upgrade time, neither verifiable here.
+      # See ../docs/refactor/21-api-compat.md (umbrella).
 
   # JitPack builds the artifact itself from the pushed tag; this just asks it to start eagerly so the
   # first consumer doesn't wait. No secrets required.

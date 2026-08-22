@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.sdk.api.ApiId;
+
 /**
  * Why the supervisor is invoking the game start-up step, so it can do the right thing for each case rather
  * than launching unconditionally every time.
@@ -13,6 +15,7 @@ package com.botmaker.sdk.api.bot;
  *
  * @see Bot#start(Runnable, Runnable, java.util.function.Consumer)
  */
+@ApiId("start-mode")
 public enum StartMode {
     /** First launch, before the loop: bring the game up only if it isn't already running. */
     COLD,

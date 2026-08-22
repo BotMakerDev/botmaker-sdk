@@ -8,6 +8,62 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-22 — `@ApiId`, renames only, and the end of api-check
+
+**Changed:** `src/main/java/com/botmaker/sdk/api/ApiId.java` (new) and every one of the 54 public types
+under `api/**` (annotation + import only); `src/main/resources/META-INF/botmaker/migrations.json` (rewritten
+to schema 2); `src/api-check/` (deleted), `pom.xml` (the `api-check` profile and the four `botmaker.api.*`
+properties deleted), `.github/workflows/ci.yml` (the three gate steps and `fetch-depth: 0` deleted),
+`CLAUDE.md`. Umbrella side: `release.sh` (`check_api_bump` + `level_between` deleted),
+`docs/refactor/21-api-compat.md` (§2–§5 rewritten), `CLAUDE.md`.
+
+**Done**
+
+- **The repair model inverted, and took the enforcement with it.** Yesterday's engine carried a break across
+  by *pointing one member at another*. The maintainer's judgement: that is guessing — two members need not
+  share a return type, an arity or any semantics, and the failure mode is a bot that compiles and behaves
+  differently, which is worse than a compile error. So a call to a member the newer jar does not offer is now
+  replaced with a **default value of the type it used to return** (`void` → the statement is deleted) and the
+  enclosing function is marked for review. Nothing is declared, so there is nothing to check.
+- **Deleted, all of it:** `ApiRulesCheck` and its `src/api-check/java` source root, the `api-check` profile,
+  japicmp, the `api-verdict.json` protocol, the CI gate steps, and `release.sh`'s `check_api_bump`. One day
+  old. **Stated cost, accepted:** nothing now refuses a breaking change released as a patch, and nothing
+  catches an unannounced removal at build time. §2 of `21-api-compat.md` is a convention.
+- **`@ApiId` is what survives, because a rename must stay a rename.** `@Retention(CLASS)`,
+  `@Target({TYPE, METHOD, FIELD})`, one kebab-case `String value()`. `ImageClicker` → `IClicker` read as a
+  removal is hundreds of deleted statements; with the id kept it is one rename, *known* rather than declared
+  or guessed. All 54 public `api.*` types carry one, ids unique.
+- **CLASS retention, verified end to end.** `javap -v` shows `RuntimeInvisibleAnnotations:
+  com.botmaker.sdk.api.ApiId(value="image-clicker")`, and a scratch ClassGraph probe against the built jar
+  printed `ImageClicker -> image-clicker`, `Precision -> precision`, `Key -> key` — through the same library
+  and the same `.enableAnnotationInfo()` scan Studio's `TypeSummaryManager` already runs. RUNTIME would put
+  the annotation in every running bot's reflection data for nothing.
+- **Three rules keep the ids honest**, all in the annotation's Javadoc: absence of an id **is** the "this
+  role is gone" signal, so it can never invent a counterpart; an id pairs the **type name only** — members
+  are still resolved one by one, so an id kept across a redesign degrades to defaults plus review marks; an
+  id is **retired, never re-pointed** at a different class.
+- **`migrations.json` is schema 2 and rename-only:** `{"schema": 2, "versions": {"<v>": [{from, to}]}}`.
+  `fix`, `manual`, `summary`, `when.arity`, the kind table, the coverage rule and the ordered replay are
+  gone. It is the fallback for what ids cannot reach — chiefly anything renamed relative to **v1.0.26, which
+  carries no ids** — and is expected to stay nearly empty. **Version keys stay** although replay does not: a
+  bot jumping 1.x → 3.0 still spells a twice-renamed member the 1.x way, so Studio composes every version in
+  `(from, to]` ascending into one map and makes a single pass. Composition, not passes.
+
+**Verified**
+
+`mvn -q -o -pl botmaker-sdk -am install -Dmaven.test.skip=true` clean and offline. The built jar carries
+`com/botmaker/sdk/api/ApiId.class` and the new `META-INF/botmaker/migrations.json`, and **no** apicheck
+class — the profile never reached the artifact. `grep` confirms zero `api-check`/`japicmp` mentions left in
+`pom.xml`; `bash -n release.sh` passes.
+
+**Deferred / next**
+
+The Studio half is unbuilt: pairing by id, defaults in place of fixes, the generated `@NeedsReview`
+annotation, marking the other three refactors (signature edit, template retarget, variable delete), and a
+review panel. Plan phases 2–5.
+
+---
+
 ## 2026-08-22 — one `migrations.json`, and the checker stops being Python
 
 **Changed:** `src/main/resources/META-INF/botmaker/migrations.json` (new),

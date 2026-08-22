@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
+import com.botmaker.sdk.api.ApiId;
 import com.sun.jna.Platform;
 
 /**
@@ -10,6 +11,7 @@ import com.sun.jna.Platform;
  * <p>Letter keys map to the physical key (lowercase keysym on Linux, VK letter on Windows); use
  * {@link Keyboard#type(String)} when you need shifted/uppercase characters produced for you.
  */
+@ApiId("key")
 public enum Key {
     // Letters (Linux lowercase keysym == ASCII 'a'..'z'; Windows VK 'A'..'Z')
     A(0x61, 0x41), B(0x62, 0x42), C(0x63, 0x43), D(0x64, 0x44), E(0x65, 0x45),

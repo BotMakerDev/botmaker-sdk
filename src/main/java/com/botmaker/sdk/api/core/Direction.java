@@ -1,9 +1,12 @@
 package com.botmaker.sdk.api.core;
 
+import com.botmaker.sdk.api.ApiId;
+
 /**
  * Represents a direction for sorting and selecting matches.
  * Used when multiple templates are found and you need to pick based on position.
  */
+@ApiId("direction")
 public enum Direction {
     /**
      * Top to bottom (smallest Y to largest Y).

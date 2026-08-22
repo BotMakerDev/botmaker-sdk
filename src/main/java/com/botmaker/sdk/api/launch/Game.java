@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.launch;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -35,6 +36,7 @@ import com.botmaker.shared.launch.LaunchSpec;
  * missing) does it fall back to the host {@code :0} launch in {@code GameLauncher}. So a hand-written
  * {@code Game.launchHeroic("Firestone")} lands in the private display without the bot author doing anything.
  */
+@ApiId("game")
 public class Game {
 
     private Game() {}

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
 
@@ -39,6 +40,7 @@ import com.botmaker.sdk.internal.trace.Trace;
  *
  * <p>Process-global, like {@link com.botmaker.sdk.api.BotSettings} — a bot has one screen and one guard.
  */
+@ApiId("popup-guard")
 public final class PopupGuard {
 
     private PopupGuard() {}

@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.bot;
+import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
 
@@ -34,6 +35,7 @@ import java.util.Map;
  * Studio "disable activity ▾" block emits ({@code Activity.disable("Mining")}). The instance
  * {@link #disable()} / {@link #enable()} still work for an activity acting on itself.
  */
+@ApiId("activity")
 public abstract class Activity<O extends Enum<O>> {
 
     /**
