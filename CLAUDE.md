@@ -87,53 +87,61 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   A member added after 1.1.0 carries `@since`; the 1.1.0 surface itself carries none, because comparing two
   published jars already yields the exact per-version added/removed set and 818 identical tags would not.
 
-  **A break must also ship its migration.** `src/main/resources/META-INF/rewrite/botmaker-sdk.yml` holds
-  one OpenRewrite recipe per breaking release (`com.botmaker.sdk.UpgradeTo_2_0_0`, composed by
-  `UpgradeToLatest`); `META-INF/botmaker/upgrade-notes.json` holds a sentence for each change no recipe can
-  repair. Both ship inside the jar — `META-INF/rewrite/` is OpenRewrite's classpath-discovery slot — so a
-  user migrates with one command and **no edit to their pom**:
+  **A break must also ship its migration**, in `src/main/resources/META-INF/botmaker/migrations.json` —
+  one file, keyed by the release that introduced the break, each entry naming a `member` and carrying
+  **exactly one** of a `fix` (Studio repairs the call sites: `renameMethod`, `renameType`, `renameField`,
+  `moveMember`, `dropArgument`, `reorderArguments`, `insertArgument`) or a `manual` sentence (it cannot,
+  and here is what to tell the user). It ships in the jar, and the file's own `_readme` is the authority on
+  the grammar — read it before adding an entry.
 
-  ```bash
-  mvn org.openrewrite.maven:rewrite-maven-plugin:6.46.1:run \
-      -Drewrite.recipeArtifactCoordinates=com.github.LiQiyeDev:botmaker-sdk:v2.0.0 \
-      -Drewrite.activeRecipes=com.botmaker.sdk.UpgradeTo_2_0_0
-  ```
+  Two rules there are load-bearing and easy to get wrong. **Upgrading across several releases is ordered
+  replay**: every version in `(from, to]` is applied as its own pass, in ascending order, over the source
+  the previous pass produced — so a member renamed twice composes for free and nothing resolves a chain.
+  Never iterate to a fixpoint (`a→b` then `b→a` would loop). And **adding a `fix.kind` does not bump
+  `schema`**: an older Studio meeting an unknown kind degrades that entry to manual and disables auto-apply
+  for the whole upgrade, which is the entire point of the rule.
 
-  Run it *before* bumping the pom (recipes come from the new jar, source must still type-attribute against
-  the old one), and keep the plugin version pinned at **6.46.1 or newer**: 6.12.0 cannot read
-  `META-INF/rewrite/` at all on JDK 24+.
+  This replaced an OpenRewrite recipe YAML plus a prose-only `upgrade-notes.json` in 2026-08. OpenRewrite
+  existed for one requirement — `mvn rewrite:run` migrating a bot with no Studio at all — and once that
+  stopped being required, an engine we do not control bought nothing Studio's own `CallMigrator` could not
+  do, at the price of a dependency on three OS installer legs. What was genuinely lost: type-attributed
+  overload resolution (Studio matches call sites by **arity**, having no bindings) and the standalone path.
 
   **The enforcement is japicmp against the previously published jar**, in the `api-check` profile
   (`pom.xml`). It is **off by default** — japicmp downloads the old jar, and `mvn -pl botmaker-sdk -am
-  install` is the daily loop, which stays offline and fast. Run it by hand with:
+  install` is the daily loop, which stays offline and fast. The whole gate is one command:
 
   ```bash
   mvn -pl botmaker-sdk -Papi-check verify -Dmaven.test.skip=true -Dbotmaker.api.oldVersion=v1.0.26
-  python3 botmaker-sdk/tools/check-api-rules.py botmaker-sdk/target/japicmp/japicmp.xml
   ```
 
-  `tools/check-api-rules.py` reads japicmp's XML and exits **0** (clean), **1** (breaking, but deprecated
-  first *and* migratable — legal in a major release), **2** (something was removed that was never marked
-  `forRemoval`) or **3** (something broke with no recipe and no upgrade note). 2 and 3 are wrong at *every*
-  version, so `ci.yml` fails a PR on either; `../release.sh`'s `check_api_bump` owns the version question,
-  because whether a break is *allowed* depends on the number being tagged and no PR build knows that. The
-  script needs **PyYAML** to read the recipe file — `ci.yml` installs it explicitly so the rule cannot
-  quietly stop being enforced.
+  The profile runs japicmp and then `ApiRulesCheck`, which reads japicmp's XML and writes
+  `target/japicmp/api-verdict.json`: **0** (clean), **1** (breaking, but deprecated first *and* migratable
+  — legal in a major release), **2** (something was removed that was never marked `forRemoval`), **3**
+  (something broke with no migration entry) or **4** (the migrations file itself is invalid). 2, 3 and 4
+  are wrong at *every* version, so `ci.yml` passes `-Dbotmaker.api.failOnViolation=true` and fails a PR on
+  them; `../release.sh`'s `check_api_bump` leaves the flag off, reads the verdict file and owns the version
+  question, because whether a break is *allowed* depends on the number being tagged and no PR build knows
+  that. **The verdict is a file rather than an exit code precisely so those two can differ** — it keeps
+  "the API broke" separate from "the build broke".
 
-  Two things that look like oversights and are not: japicmp's own `breakBuildOn*` flags are **off** (they
-  would block every legitimate major-release PR), and the rule is Python rather than japicmp's
-  `postAnalysisScript` **because japicmp 0.26.1's bundled Groovy cannot read Java 26 class files** while
-  CI runs 21 — a rule that passes in CI and explodes locally is worse than no rule.
+  Three things that look like oversights and are not. japicmp's own `breakBuildOn*` flags are **off** (they
+  would block every legitimate major-release PR). The checker is **not** japicmp's `postAnalysisScript`,
+  because japicmp 0.26.1's bundled Groovy cannot read Java 26 class files while CI runs 21 — a rule that
+  passes in CI and explodes locally is worse than no rule. And it lives in its own source root
+  `src/api-check/java`, compiled only under the profile: `src/main` would ship build tooling on every bot's
+  classpath, and `src/test` is not compiled when `release.sh` runs the gate with `-Dmaven.test.skip=true`.
 
   It contains:
   - `api.vision` — `ImageFinder` (find + `exists` + the lambda control-flow `whileExists`/`ifExists`
     /`untilExists`), `ImageClicker`, `ImageWaiter`, `MatchResult`, `ImageTemplate`.
-  - `api.vision.Tolerance` / `api.vision.MinPixels` — `Pixel`'s two precision knobs as value types rather
-    than a bare `double`/`int`. Both are records with named constants (`Tolerance.TIGHT`,
-    `MinPixels.DEFAULT`) and a validating `of(...)`. They are types because the numbers are unreadable
-    alone — ΔE has no obvious scale, and `minPixels` is an *area* routinely misread as a width — and
-    because it lets Studio dispatch their editors by **type** instead of by a `(method, argIndex)` table
-    that would silently stop firing whenever `Pixel` gains an overload.
+  - `api.vision.Precision` — `Pixel`'s precision knobs as one value type rather than a bare
+    `double`/`int`. A record with named constants (`Precision.EXACT`/`TIGHT`/`DEFAULT`/`LOOSE`) and a
+    validating `of(...)`. It is a type because the numbers are unreadable alone — ΔE has no obvious scale,
+    and the pixel count is an *area* routinely misread as a width — and because it lets Studio dispatch its
+    editor by **type** instead of by a `(method, argIndex)` table that would silently stop firing whenever
+    `Pixel` gains an overload. (It was two types, `Tolerance` and `MinPixels`, until they were merged; this
+    entry named them long after they were gone.)
   - `api.BotSettings` — the bot's runtime tuning (delays, confidence, compare margin, retry budget, real
     input), seeded from the project's `botmaker-project.properties` on first read. Was `api.vision.ClickConfig`.
   - `api.capture.Screen` (`capture()`), `api.interaction.Mouse`/`Wait`, `api.core.Direction`,

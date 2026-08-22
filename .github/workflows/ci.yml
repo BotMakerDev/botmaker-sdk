@@ -60,8 +60,8 @@ jobs:
       # What this DOES fail on, both wrong at every version, so a PR is the cheapest place to find out:
       #   - removing a public api.* member that the previous release never marked
       #     @Deprecated(since = "...", forRemoval = true);
-      #   - breaking a public api.* member with no OpenRewrite recipe in META-INF/rewrite/ and no entry
-      #     in META-INF/botmaker/upgrade-notes.json, i.e. leaving users no way through the change.
+      #   - breaking a public api.* member with no entry in META-INF/botmaker/migrations.json, i.e.
+      #     leaving users no way through the change.
       #
       # What it deliberately does NOT fail on: a breaking change as such. Whether a break is allowed
       # depends on the version number being released, and no PR build knows that number — the umbrella's
@@ -82,27 +82,21 @@ jobs:
       - name: API compatibility
         if: steps.prev.outputs.tag != ''
         run: |
-          # PyYAML is the checker's one non-stdlib import — it reads META-INF/rewrite/botmaker-sdk.yml to
-          # tell a break that ships a migration from one that does not. Installed explicitly rather than
-          # relied on from the runner image, so the rule can never silently stop being enforced.
-          python3 -m pip install --quiet --disable-pip-version-check pyyaml
-          mvn -B -q -Papi-check verify -Dmaven.test.skip=true \
-              -Dbotmaker.api.oldVersion='${{ steps.prev.outputs.tag }}'
-          # 0 = clean, 1 = breaking but legal in a major (release.sh's call, not ours),
-          # 2 = removed with no deprecation cycle, 3 = broken with no migration path.
-          # The `|| rc=$?` matters: this step runs under `bash -e`, so a bare non-zero exit from the
-          # script would kill the step before the code could be inspected — and every breaking change
-          # would read as a CI failure, which is exactly what this step is written to avoid.
-          rc=0
-          python3 tools/check-api-rules.py target/japicmp/japicmp.xml || rc=$?
-          if [ "$rc" -eq 2 ]; then
-            echo "::error::A public API member was removed without a deprecation cycle (see above)."
-            exit 1
-          fi
-          if [ "$rc" -eq 3 ]; then
-            echo "::error::A public API member broke with no migration recipe or upgrade note (see above)."
-            exit 1
-          fi
+          # One command: the api-check profile runs japicmp and then ApiRulesCheck over its report.
+          # failOnViolation=true is the CI shape — it fails the step on verdict 2 (removed with no
+          # deprecation cycle), 3 (broken with no migration) or 4 (the migrations file itself is
+          # invalid), each of which is wrong at EVERY version. Verdict 1 — a legal breaking change —
+          # passes here on purpose; whether it is allowed depends on the number being tagged, which
+          # release.sh decides and no PR build can know.
+          mvn -B -Papi-check verify -Dmaven.test.skip=true \
+              -Dbotmaker.api.oldVersion='${{ steps.prev.outputs.tag }}' \
+              -Dbotmaker.api.failOnViolation=true
+
+      # The machine-readable verdict, kept whether or not the step above passed, so a failed PR shows
+      # exactly which members were named without anyone re-reading the log.
+      - name: API verdict
+        if: always() && steps.prev.outputs.tag != ''
+        run: cat target/japicmp/api-verdict.json || true
 
   # JitPack builds the artifact itself from the pushed tag; this just asks it to start eagerly so the
   # first consumer doesn't wait. No secrets required.

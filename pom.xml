@@ -44,11 +44,16 @@
              PR build nor this pom knows that number — only release.sh does, so release.sh is the gate.
              Left true, CI would block every legitimate major-release PR.
 
-             This does NOT make CI toothless: tools/check-api-rules.py enforces the two rules that hold
-             at EVERY version — removing something never marked @Deprecated(forRemoval = true), and
-             breaking something with no migration recipe or note — and ci.yml fails the build on either
-             regardless of this flag. -->
+             This does NOT make CI toothless: ApiRulesCheck (src/api-check/java, run by the profile below)
+             enforces the two rules that hold at EVERY version — removing something never marked
+             @Deprecated(forRemoval = true), and breaking something with no migration entry — and ci.yml
+             fails the build on either regardless of this flag, via botmaker.api.failOnViolation. -->
         <botmaker.api.breakBuild>false</botmaker.api.breakBuild>
+        <!-- Whether ApiRulesCheck fails the build on a rule violation. DEFAULT false: the verdict always
+             lands in target/japicmp/api-verdict.json, and release.sh reads THAT rather than an exit code,
+             which is what keeps "the API broke" separate from "the build broke". ci.yml sets it true —
+             there, a violation of either rule is wrong at every version and should fail the PR. -->
+        <botmaker.api.failOnViolation>false</botmaker.api.failOnViolation>
     </properties>
 
     <repositories>
@@ -322,9 +327,70 @@
                                      deprecation-cycle rule: japicmp 0.26.1 bundles a Groovy that cannot
                                      read Java 26 class files ("Unsupported class file major version
                                      70"), and this project's JDK is 26 while CI runs 21. The rule lives
-                                     in tools/check-api-rules.py instead, reading japicmp.xml — which is
-                                     JDK-proof, and is run by both ci.yml and release.sh. -->
+                                     in src/api-check/java/…/ApiRulesCheck.java instead, reading
+                                     japicmp.xml — which is JDK-proof, and runs from the two executions
+                                     below for both ci.yml and release.sh. -->
                             </parameter>
+                        </configuration>
+                    </plugin>
+
+                    <!-- The rules checker is compiled from its OWN source root, into its OWN output
+                         directory, and only here.
+
+                         Not src/main: it would ship in the jar, on every generated bot's classpath — the
+                         same reason the internal/ dev harnesses were deleted in 2026-07. Not src/test
+                         either: release.sh runs this gate with -Dmaven.test.skip=true on purpose (a test
+                         that no longer builds is CI's problem, not the gate's), so test sources are not
+                         compiled when it matters. flattenMode=oss already strips <profiles> from the
+                         published pom, so none of this reaches a consumer. -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>compile-api-check</id>
+                                <phase>process-classes</phase>
+                                <goals>
+                                    <goal>compile</goal>
+                                </goals>
+                                <configuration>
+                                    <compileSourceRoots>
+                                        <root>${project.basedir}/src/api-check/java</root>
+                                    </compileSourceRoots>
+                                    <outputDirectory>${project.build.directory}/api-check-classes</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Bound to verify, AFTER japicmp's own execution above, so the report exists.
+                         failOnViolation is passed in rather than read by the checker so that the one
+                         property drives both this and the japicmp flags from a single place. -->
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.2.0</version>
+                        <executions>
+                            <execution>
+                                <id>check-api-rules</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <mainClass>com.botmaker.sdk.apicheck.ApiRulesCheck</mainClass>
+                            <additionalClasspathElements>
+                                <element>${project.build.directory}/api-check-classes</element>
+                            </additionalClasspathElements>
+                            <arguments>
+                                <argument>${project.build.directory}/japicmp/japicmp.xml</argument>
+                                <argument>${project.basedir}/src/main/resources/META-INF/botmaker/migrations.json</argument>
+                                <argument>${project.build.directory}/japicmp/api-verdict.json</argument>
+                                <argument>${botmaker.api.oldVersion}</argument>
+                                <argument>${botmaker.api.failOnViolation}</argument>
+                            </arguments>
                         </configuration>
                     </plugin>
                 </plugins>

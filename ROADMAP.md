@@ -8,6 +8,74 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-22 — one `migrations.json`, and the checker stops being Python
+
+**Changed:** `src/main/resources/META-INF/botmaker/migrations.json` (new),
+`src/api-check/java/com/botmaker/sdk/apicheck/ApiRulesCheck.java` (new);
+`src/main/resources/META-INF/rewrite/botmaker-sdk.yml`,
+`src/main/resources/META-INF/botmaker/upgrade-notes.json` and `tools/check-api-rules.py` (all deleted);
+`pom.xml`, `.github/workflows/ci.yml`, `CLAUDE.md`. Umbrella side: `release.sh`,
+`docs/refactor/21-api-compat.md` (§3–5), `docs/refactor/99-progress.md`, `CLAUDE.md`.
+
+**Done**
+
+- **OpenRewrite is gone, and the two files it needed are now one.**
+  `META-INF/botmaker/migrations.json` is keyed by the release that introduced each break; every entry
+  carries a `member`, a `summary`, and **exactly one** of a `fix` (Studio repairs the call sites) or a
+  `manual` sentence. The executable/prose split became a *field* rather than a file: one grammar, one
+  reader in the checker, one in Studio, one coverage rule. The file's `_readme` is the authority.
+- **Why, since the entry above argues the opposite.** OpenRewrite was chosen for one requirement —
+  `mvn rewrite:run` migrating a bot with no Studio at all, recorded as "a stated requirement, not a
+  bonus, and it is what rules out a bespoke format". **The maintainer withdrew that requirement.** With
+  it gone, an engine we do not control bought nothing `CallMigrator` could not do, and cost a dependency
+  (`rewrite-java-21` + `rewrite-maven`) on all three legs of Studio's package matrix plus a rewriter that
+  knows nothing of `MethodLock`/`LockedRegions`/`FileRole`. Genuinely lost: type-attributed overload
+  resolution (Studio matches by **arity**, having no bindings) and the standalone path.
+- **The swap cost nothing because nothing had shipped.** Neither pom depended on OpenRewrite, Studio
+  referenced it once as a string constant, the `recipeList` was empty, and v1.0.26 carries neither file.
+- **`check-api-rules.py` became `ApiRulesCheck`.** Reading the OpenRewrite YAML needed PyYAML — the
+  script's one non-stdlib import, which `ci.yml` had to install explicitly. With one JSON file left and
+  Jackson already a direct dependency, the rule is compiler-checked against the format's own shape. Both
+  rules and all four verdicts are unchanged in meaning.
+- **It lives in its own source root, `src/api-check/java`,** compiled by a `maven-compiler-plugin`
+  execution inside the `api-check` profile into `target/api-check-classes` and run by
+  `exec-maven-plugin`. Neither obvious home works: `src/main` would ship build tooling in the jar on
+  every generated bot's classpath (the reason the `internal/` harnesses were deleted), and `src/test` is
+  not compiled at all when `release.sh` runs the gate with `-Dmaven.test.skip=true`. `flattenMode=oss`
+  already strips `<profiles>` from the published pom, so none of it reaches a consumer — **verified** by
+  unzipping the built jar.
+- **The verdict is a file, not an exit code.** `target/japicmp/api-verdict.json` carries the code and the
+  offending members, and the build passes regardless unless `-Dbotmaker.api.failOnViolation=true`. That
+  is what keeps "the API broke" separate from "the build broke": CI sets the flag, `release.sh` leaves it
+  off and reads the file. A Maven plugin that simply failed would collapse the distinction. **New code
+  4** — the migrations file is itself invalid — always fails, since a broken input is not a verdict.
+- **The known coverage hole is closed.** The Python checker matched coverage against the whole file and
+  documented that an older release's recipe could satisfy a brand-new break. The checker now knows the
+  comparison baseline, so an entry only counts when filed under a version **strictly newer** than it.
+
+**Verified**
+
+Six verdicts against synthetic japicmp reports: removal with no cycle → 2 (**methods and fields alike**),
+removal with a cycle and no entry → 3, entry under a newer version → 1, the *same* entry under an older
+version → still 3, a bogus `fix.kind` → 4, `"schema": 99` → 4, `fix` and `manual` together → 4.
+`failOnViolation` shown to gate the exit code (2 vs 0) without changing the verdict. End to end: renaming
+a real public method (`Wait.seconds(int)`) made `./release.sh --sdk patch --dry-run` refuse and name the
+exact member, with the checker's report replayed — `release.sh` captures Maven's output rather than
+streaming it, so that replay had to be added or the refusal would have arrived with no list.
+
+**Deferred / next**
+
+- **Studio does not yet apply any of this.** It still prints an `mvn rewrite:run` command for an engine
+  that no longer exists; that comes out next, along with reading the merged file. Until then the SDK half
+  is correct and the Studio half is stale.
+- **`renameField`/`moveMember` have no consumer yet.** They are in the kind set and the checker validates
+  them, but Studio's scanner reads only methods and constructors — a break on `Key.ENTER` is demanded by
+  CI and invisible to the upgrade report. That asymmetry is a known bug, scheduled.
+- **Still nothing published.** v1.0.26 remains the newest tag and carries none of this. The first release
+  under the contract is **v1.1.0**.
+
+---
+
 ## 2026-08-22 — a break must ship the fix for itself
 
 **Changed:** `src/main/resources/META-INF/rewrite/botmaker-sdk.yml` (new),
