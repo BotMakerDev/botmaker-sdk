@@ -53,6 +53,21 @@ import java.lang.annotation.Target;
  * present means strict mode. A facade that is not itself {@code @Palette} is likewise uncurated and offers
  * everything, which is what lets the annotation be rolled out one facade at a time.
  *
+ * <h2>Records, and why {@link ElementType#RECORD_COMPONENT} is in the target set</h2>
+ *
+ * <p>A record's accessors are generated, so there is no declaration to annotate — and a curated record would
+ * therefore report its own components as <em>not offered</em>, which for {@code Rect} would mean
+ * {@code x()}, {@code y()}, {@code width()} and {@code height()}: the four things anyone actually asks a
+ * rectangle. Writing {@code @Palette} on the component instead is the language's own answer. An annotation on
+ * a record component propagates to whichever of the field, the accessor and the constructor parameter its
+ * {@code @Target} admits (JLS 8.10.3), and this one admits {@code METHOD} — so it lands on the accessor,
+ * exactly where the reader looks, and nowhere else.
+ *
+ * <p>Constructors remain outside the target set, and deliberately: Studio inserts {@code new Rect(…)} through
+ * a dedicated arg picker rather than from the method menu this annotation curates, so a per-constructor
+ * verdict would gate nothing. {@code BotSettings}'s {@code public static final} defaults are outside it for
+ * the same reason — a field is not a menu entry.
+ *
  * <h2>Why {@link RetentionPolicy#CLASS}</h2>
  *
  * <p>Same reason as the pointer pair and {@link Scaffolding}: Studio reads it straight from the published jar
@@ -61,6 +76,6 @@ import java.lang.annotation.Target;
  */
 @Documented
 @Retention(RetentionPolicy.CLASS)
-@Target({ElementType.TYPE, ElementType.METHOD})
+@Target({ElementType.TYPE, ElementType.METHOD, ElementType.RECORD_COMPONENT})
 public @interface Palette {
 }

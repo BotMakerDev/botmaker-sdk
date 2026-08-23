@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.bot;
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
@@ -34,10 +35,30 @@ import java.util.Map;
  * the static {@link #disable(String)} / {@link #enable(String)} without holding a reference. This is what the
  * Studio "disable activity ▾" block emits ({@code Activity.disable("Mining")}). The instance
  * {@link #disable()} / {@link #enable()} still work for an activity acting on itself.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}), and it is the first type in the sweep whose
+ * <em>instance</em> methods needed deciding too: {@code @Palette} gates a type, and Studio's ⚙ overload picker
+ * consults the curation for a call on a variable just as it does for a static one. Six are offered — the
+ * static {@link #disable(String)} / {@link #enable(String)}, and the instance {@link #name()},
+ * {@link #active()}, {@link #enable()}, {@link #disable()}. Five are not, for two distinct reasons:
+ *
+ * <ul>
+ *   <li><b>{@link #setEnabled(String, boolean)} and {@link #setEnabled(boolean)}</b> — the {@code boolean}
+ *       argument selects between two behaviours that already have their own names, exactly as
+ *       {@code Mouse.scroll(int)}'s sign and {@code Debug.set(boolean)}'s flag do. This class's own javadoc
+ *       already writes the preferred spelling ({@code Activity.disable("Mining")}) and the Studio block
+ *       already emits it; the annotation stops the menu offering three ways to say it.</li>
+ *   <li><b>{@link #isEnabled()}, {@link #run()} and {@link #execute()}</b> — these are <em>overridden</em>,
+ *       not called. {@code isEnabled()} and {@code run()} are abstract and the generated stub implements
+ *       them; {@code execute()} is the flow driver's entry point, and calling {@code run()} by hand would
+ *       skip the {@link #before()}/{@link #after()} hooks that are the reason {@code execute()} exists.
+ *       Offering an override target as if it were a call is a menu entry that can only produce a mistake.</li>
+ * </ul>
  */
 // Every activity stub extends it, the generated ActivityRegistry holds a List<Activity<?>> of them, and
 // GoHome/Popups are two more subclasses the scaffold writes. Renaming this type is a Studio release.
 @Scaffolding
+@Palette
 public abstract class Activity<O extends Enum<O>> {
 
     /**
@@ -84,11 +105,13 @@ public abstract class Activity<O extends Enum<O>> {
      * never crashes a running bot. This is the general "stop doing X" primitive, including one activity
      * disabling another.
      */
+    @Palette
     public static void disable(String name) {
         setEnabled(name, false);
     }
 
     /** Turns the named activity on for the rest of the run. Unknown name → a warning and no-op. */
+    @Palette
     public static void enable(String name) {
         setEnabled(name, true);
     }
@@ -110,6 +133,7 @@ public abstract class Activity<O extends Enum<O>> {
     }
 
     /** Human-readable name (used for logging / the activity registry). */
+    @Palette
     public String name() {
         return name;
     }
@@ -128,6 +152,7 @@ public abstract class Activity<O extends Enum<O>> {
      * {@link #setEnabled} if one has been set, otherwise the configured {@link #isEnabled()} default. This is
      * what lets a mid-run {@link #disable()} actually stop the activity from running on the next pass.
      */
+    @Palette
     @Scaffolding   // the generated FlowDriver's per-activity "is it on" branch
     public final boolean active() {
         return enabledOverride != null ? enabledOverride : isEnabled();
@@ -143,11 +168,13 @@ public abstract class Activity<O extends Enum<O>> {
     }
 
     /** Enables this activity for the rest of the run — shorthand for {@code setEnabled(true)}. */
+    @Palette
     public void enable() {
         setEnabled(true);
     }
 
     /** Disables this activity for the rest of the run — shorthand for {@code setEnabled(false)}. */
+    @Palette
     public void disable() {
         setEnabled(false);
     }

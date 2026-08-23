@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.util.Debug;
 
@@ -27,7 +28,23 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  * <p>{@link #milliseconds(int)} / {@link #seconds(double)} remain as literal shorthands — they are what a
  * one-off fixed pause reads best as, and the SDK itself uses them for its own fixed poll intervals.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): five of the six are offered, the paragraph above
+ * having already decided four of them. The one hidden is {@link #seconds(int)}, which is not a second
+ * operation but a second spelling — {@code seconds(5)} and {@code seconds(5.0)} sleep the same 5000ms, and
+ * the class javadoc's own list of the shorthands names {@code milliseconds(int)} and {@code seconds(double)}
+ * and passes over the {@code int} form in silence. Offering both puts a choice in the menu that has no
+ * consequence. It stays public: every existing {@code Wait.seconds(5)} still binds to it and still compiles.
+ *
+ * <p>{@link #time(Duration)} and {@link #between(Duration, Duration)} <b>are</b> offered, which is worth
+ * saying because {@code Duration} is a JDK type and this sweep hid {@code ZoneId} and {@code OcrOptions}
+ * parameters for being JDK-typed. That was never the rule. The rule is <em>an argument the editor cannot
+ * produce</em>, and {@code Duration} is the opposite case: Studio ships a real editor for it
+ * ({@code DurationPicker}, {@code DurationFields}), it is a declarable variable type, and the paragraph above
+ * records that this is precisely why the Wait block inserts the {@code Duration} form. A JDK type with a
+ * picker is fillable; an SDK type without one would not be.
  */
+@Palette
 public class Wait {
 
     /**
@@ -35,6 +52,7 @@ public class Wait {
      *
      * @param duration how long to wait; null, zero or negative returns immediately
      */
+    @Palette
     public static void time(Duration duration) {
         if (duration == null) return;
         long ms = duration.toMillis();
@@ -51,6 +69,7 @@ public class Wait {
      * @param min one end of the range; null falls back to waiting the other end
      * @param max the other end
      */
+    @Palette
     public static void between(Duration min, Duration max) {
         if (min == null || max == null) {
             time(min == null ? max : min);
@@ -72,6 +91,7 @@ public class Wait {
      *
      * @param milliseconds Time to wait
      */
+    @Palette
     @Scaffolding   // the generated FlowDriver's inter-activity gap (STEP_DELAY_MS)
     public static void milliseconds(int milliseconds) {
         if (milliseconds <= 0) return;
@@ -93,6 +113,7 @@ public class Wait {
      *
      * @param seconds Time to wait (can be fractional, e.g., 0.5)
      */
+    @Palette
     public static void seconds(double seconds) {
         milliseconds((int) (seconds * 1000));
     }
@@ -102,6 +123,7 @@ public class Wait {
      *
      * @param minutes Time to wait (can be fractional, e.g., 1.5)
      */
+    @Palette
     public static void minutes(double minutes) {
         time(Duration.ofMillis(Math.round(minutes * 60_000.0)));
     }

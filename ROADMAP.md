@@ -8,6 +8,62 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — the `@Palette` sweep, ten more facades and a change to `@Palette` itself (phase 3.11 of 12, part 2)
+
+**Changed:** ten more facades curated — `Source`, `Debug`, `BotMaker`, `Activity`, `Wait`, `Watchdog`,
+`PopupGuard`, `Window`, `Bot`, `Rect` — **45 offered, 14 hidden, nothing removed or deprecated**; and
+`@Palette` gained `ElementType.RECORD_COMPONENT` so a record's generated accessors can be curated at all.
+Verdicts and reasons in `docs/refactor/22-api-audit.md` §5. Three facades remain: `Target`, `Emulators`,
+`Session` (26 methods).
+
+**Done**
+
+- **The sweep's unit changed, deliberately.** §5's counts up to part 1 were public *statics*, which is what
+  `StatementMenu` builds a facade submenu from. But `@Palette` gates a **type**, and
+  `MethodInvocationBlock`'s ⚙ overload picker consults the curation for a call on a variable exactly as for a
+  static one — so a curated type that decided only its statics claims a verdict it never took. `Window`,
+  `Activity` and `Rect` therefore decide their instance methods too (+11, +8, +13).
+- **`Rect` 18/0, and it forced the annotation change.** A record's accessors are generated, so there is no
+  declaration to annotate: a curated `Rect` would have reported `x()`/`y()`/`width()`/`height()` as not
+  offered. The first pass at this phase left `Rect` uncurated for that reason — wrong, and an
+  over-generalisation, since the thirteen *declared* methods annotate fine and only the four accessors were
+  out of reach. `ElementType.RECORD_COMPONENT` is now in the target set; an annotation on a record component
+  propagates to whichever of field/accessor/parameter its target admits (JLS 8.10.3), and this one admits
+  `METHOD` only, so it lands on the accessor and nowhere else. `javap` confirms it on the generated `x()`.
+  Constructors stay outside the set: Studio inserts `new Rect(…)` through an arg picker, not this menu.
+- **`Bot` 1/3, `PopupGuard` 3/5, `Activity` 6/11 — one finding, three times: a member the generated code owns
+  is not a menu entry.** `Bot.start` (both), `PopupGuard.install`/`uninstall` and `Activity.execute()` are each
+  written once by the scaffold, and a second call from a menu can only undo what the scaffold set up — a nested
+  supervise loop, a replaced `Popups` handler, a `run()` skipping the hooks `execute()` exists to provide.
+  `Bot` is the extreme case: `start` does not return, so the scaffold's call is the only one that can exist.
+- **`Debug` 6/1 and `Activity`'s two `setEnabled`s — `Mouse.scroll(int)` again with a flag instead of a sign.**
+  A `boolean` argument selecting between two behaviours that already have named methods. `PopupGuard.enabled(boolean)`
+  is offered anyway, which is the same rule rather than an exception: there is no `enable()`/`disable()` pair to
+  prefer, and the finding is about duplication, not about booleans.
+- **`Wait` 5/1 corrects a rule this sweep could have misread.** `time(Duration)`/`between(…)` are offered
+  despite `Duration` being a JDK type: the rule was never "JDK-typed", it is *an argument the editor cannot
+  produce*, and Studio ships `DurationPicker`/`DurationFields` and treats `Duration` as a declarable `BotType`.
+  `Window`'s two hidden methods are the same rule on the return side — `BufferedImage` and `GenericWindow` are
+  neither declarable nor pickable, so a menu entry producing one hands back a value the user cannot name.
+  `seconds(int)` is hidden as a second spelling of `seconds(double)`; `Watchdog.reset()` likewise, its body
+  being `progress();`.
+- **`Source` 2/0, `BotMaker` 5/0** — nothing to trim. `BotMaker`'s four `readX` look like an overload family
+  and are not one: they differ in *return* type, so none can stand in for another.
+- SDK suite **230 tests, 0 failures**, `ApiPointersTest` **11/11** (rule 10 holds across all ten new curated
+  types). Studio **1392 tests, 0 failures** against the rebuilt SDK.
+
+**Deferred / next**
+
+- **Three facades left in 3.11:** `Target` 9, `Emulators` 9, `Session` 8. `Emulators` still carries the note
+  from 3.7 — its nine methods are the only reason `Emulator` and `EmulatorRef` are reachable, so its verdict
+  decides theirs.
+- `Point` and `Size` are not in the phase's list and stay uncurated. They are now *expressible* whenever
+  someone decides them, which they were not before this entry.
+- `MatchResult`, `ColorMatch`, `TextMatch`, `ImageTemplate` remain deliberately uncurated (3.10) — result
+  types rather than facades.
+
+---
+
 ## 2026-08-23 — the `@Palette` sweep continues: `Time`, `BotSettings`, `Mouse`, `Game`, `Keyboard` (phase 3.11 of 12, part 1)
 
 **Changed:** five of the eighteen facades outside `api.vision` curated — 81 offered, 11 hidden, nothing

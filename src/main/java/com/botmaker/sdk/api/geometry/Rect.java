@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.geometry;
 
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.Scaffolding;
 
 /**
@@ -10,6 +11,18 @@ import com.botmaker.sdk.api.meta.Scaffolding;
  * {@code x} and false for {@code x + width}. That is the same convention the capture stack uses, and it is
  * what makes two abutting regions tile without overlapping.
  *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): everything is offered — the static
+ * {@link #around(Point, int, int)}, all thirteen declared instance methods, and the four record components,
+ * which carry the annotation on the component so it propagates to the generated accessor. This is the first
+ * record in the sweep, and the reason it is fully offered is that a geometry type has no <em>spellings</em>
+ * to choose between: every method here answers a different question about the same four numbers.
+ *
+ * <p>{@link #expand(int)} and {@link #shrink(int)} are worth one line, because they are the shape this sweep
+ * spends most of its time steering <em>towards</em>. {@code shrink(a)} is exactly {@code expand(-a)} — the
+ * same signed-argument ambiguity as {@code Mouse.scroll(int)} — except that here the SDK never shipped the
+ * signed single method, only the two named ones. There is nothing to hide because the choice was made at
+ * declaration time.
+ *
  * @param x      pixels from the left of the coordinate space
  * @param y      pixels from the top of the coordinate space
  * @param width  pixels across
@@ -17,7 +30,8 @@ import com.botmaker.sdk.api.meta.Scaffolding;
  */
 // The generated Activities declares one per area variable, rebuilt from the four stored numbers.
 @Scaffolding
-public record Rect(int x, int y, int width, int height) {
+@Palette
+public record Rect(@Palette int x, @Palette int y, @Palette int width, @Palette int height) {
 
     /**
      * Declared only to carry {@link Scaffolding}: the annotation targets a constructor, not a record
@@ -44,51 +58,62 @@ public record Rect(int x, int y, int width, int height) {
     }
 
     /** A {@code width × height} region centred on {@code centre}. */
+    @Palette
     public static Rect around(Point centre, int width, int height) {
         return new Rect(centre.x() - width / 2, centre.y() - height / 2, width, height);
     }
 
+    @Palette
     public Point topLeft() {
         return new Point(x, y);
     }
 
+    @Palette
     public Point topRight() {
         return new Point(x + width, y);
     }
 
+    @Palette
     public Point bottomLeft() {
         return new Point(x, y + height);
     }
 
+    @Palette
     public Point bottomRight() {
         return new Point(x + width, y + height);
     }
 
     /** The centre pixel — the midpoint rounded, since a click lands on a whole pixel. */
+    @Palette
     public Point center() {
         return new Point(x + width / 2, y + height / 2);
     }
 
+    @Palette
     public Size size() {
         return new Size(width, height);
     }
 
     /** {@code width × height}. {@code long} because two screen dimensions can exceed an {@code int}. */
+    @Palette
     public long area() {
         return (long) width * height;
     }
 
     /** Whether either dimension is zero or negative, so the region encloses nothing. */
+    @Palette
     public boolean empty() {
         return width <= 0 || height <= 0;
     }
 
     /** Whether {@code p} falls inside, left/top inclusive and right/bottom exclusive. */
+    @Palette
     public boolean contains(Point p) {
         return x <= p.x() && p.x() < x + width && y <= p.y() && p.y() < y + height;
     }
 
     /** Whether the two regions share at least one pixel. */
+    @Palette
     public boolean overlaps(Rect other) {
         return x < other.x + other.width
                 && x + width > other.x
@@ -97,6 +122,7 @@ public record Rect(int x, int y, int width, int height) {
     }
 
     /** The shared region, or {@code null} when they do not {@linkplain #overlaps overlap}. */
+    @Palette
     public Rect intersection(Rect other) {
         if (!overlaps(other)) {
             return null;
@@ -109,11 +135,13 @@ public record Rect(int x, int y, int width, int height) {
     }
 
     /** This region grown by {@code amount} on every side. */
+    @Palette
     public Rect expand(int amount) {
         return new Rect(x - amount, y - amount, width + 2 * amount, height + 2 * amount);
     }
 
     /** This region shrunk by {@code amount} on every side. */
+    @Palette
     public Rect shrink(int amount) {
         return expand(-amount);
     }

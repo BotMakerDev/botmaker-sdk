@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
@@ -39,7 +40,25 @@ import com.botmaker.sdk.internal.trace.Trace;
  * screen out from under it. The same reasoning is why the guard runs <em>before</em> a find rather than after.
  *
  * <p>Process-global, like {@link BotSettings} — a bot has one screen and one guard.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): three of the five are offered — {@link #check()},
+ * {@link #enabled(boolean)} and {@link #isEnabled()}, which are the vocabulary of a bot <em>using</em> the
+ * guard. {@link #install(Runnable)} and {@link #uninstall()} are not: they are the wiring, written once by the
+ * generated entry point ({@code PopupGuard.install(Popups.INSTANCE::execute)}), and a second {@code install}
+ * inserted from a menu silently replaces the project's own {@code Popups} activity — the javadoc above says a
+ * second call replaces the first. Same reasoning as {@code Activity.execute()}: a member the generated code
+ * owns is not a menu entry, because reaching it by hand can only undo what the scaffold set up. Both stay
+ * public for a bot that genuinely wants a custom guard.
+ *
+ * <p><b>{@link #enabled(boolean)} is offered, and that is deliberate rather than an oversight.</b> A
+ * {@code boolean} argument selecting between two behaviours is exactly what this sweep hides in
+ * {@code Debug.set}, {@code Activity.setEnabled} and {@code Mouse.scroll} — but in every one of those the two
+ * values <em>already have their own named methods</em>, and the hiding is about the duplication, not about the
+ * boolean. Here there is no {@code enable()}/{@code disable()} pair, so hiding this would leave the guard with
+ * no way to be switched off at all. The rule applies where the alternative exists and is suspended where it
+ * does not — the same discipline {@code Time}'s two surviving {@code *Utc} methods record.
  */
+@Palette
 public final class PopupGuard {
 
     private PopupGuard() {}
@@ -73,12 +92,14 @@ public final class PopupGuard {
      * activity that is <em>itself</em> working through a popup-shaped screen must not have it dismissed
      * underneath it.
      */
+    @Palette
     @Scaffolding   // emitted per activity by the generated FlowDriver, as the paragraph above says
     public static void enabled(boolean on) {
         enabled = on;
     }
 
     /** Whether a check is installed and currently switched on. */
+    @Palette
     public static boolean isEnabled() {
         return enabled && handler != null;
     }
@@ -91,6 +112,7 @@ public final class PopupGuard {
      * <p>Exceptions propagate: a check that throws {@link BotStuckException} must reach the supervisor, and one
      * that throws anything else is a bug worth surfacing rather than a silent no-op before every find.
      */
+    @Palette
     public static void check() {
         Runnable current = handler;
         if (current == null || !enabled || Boolean.TRUE.equals(running.get())) return;

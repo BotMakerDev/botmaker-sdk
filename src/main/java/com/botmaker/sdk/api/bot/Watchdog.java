@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.vision.MatchResult;
@@ -21,7 +22,15 @@ import com.botmaker.sdk.internal.observe.MatchEvent;
  * <p>The throw happens deterministically at {@link #checkpoint()}, which the generated macro loop calls
  * once per iteration (and which you may call inside any custom loop). {@link #progress()} lets logic the
  * vision layer can't see reset the counter. All state is per-thread.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): five of the six are offered. The one hidden is
+ * {@link #reset()}, whose entire body is {@code progress();} — the same operation under a second name, kept
+ * because the supervisor reads better calling it {@code reset} after a restart than calling it
+ * {@code progress}. That is a good reason for the method to exist and no reason at all to put it in a menu
+ * beside the name it delegates to: a user choosing between two entries that do the identical thing is
+ * choosing nothing. It stays public, and the supervisor goes on calling it.
  */
+@Palette
 public final class Watchdog {
 
     private Watchdog() {}
@@ -44,6 +53,7 @@ public final class Watchdog {
     private static boolean enabled;
 
     /** Start watching (idempotent). Registers the counting observer. */
+    @Palette
     public static synchronized void enable() {
         if (!enabled) {
             Bots.addObserver(COUNTER);
@@ -53,6 +63,7 @@ public final class Watchdog {
     }
 
     /** Stop watching (idempotent). Removes the counting observer. */
+    @Palette
     public static synchronized void disable() {
         if (enabled) {
             Bots.removeObserver(COUNTER);
@@ -62,6 +73,7 @@ public final class Watchdog {
     }
 
     /** True while the watchdog is counting match attempts. */
+    @Palette
     public static synchronized boolean isEnabled() {
         return enabled;
     }
@@ -71,6 +83,7 @@ public final class Watchdog {
      * {@link BotSettings#maxRetryAttempts()} consecutive match attempts; otherwise returns. Resets the
      * counter when it throws so recovery starts from a clean slate. Safe to call when disabled (never throws).
      */
+    @Palette
     @Scaffolding   // the generated FlowDriver ticks it after every hand-off between activities
     public static void checkpoint() {
         State s = STATE.get();
@@ -85,6 +98,7 @@ public final class Watchdog {
     }
 
     /** Signal that the bot advanced; clears the no-progress counter. */
+    @Palette
     public static void progress() {
         State s = STATE.get();
         s.signature = null;

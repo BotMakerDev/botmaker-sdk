@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.launch.Target;
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.util.Debug;
 
@@ -25,7 +26,22 @@ import java.util.function.Consumer;
  * <p>The bot ends when {@link #stop()} is called — from an activity that is done, or automatically by the
  * generated loop once every activity is disabled. {@code stop()} unwinds the supervise loop cleanly and
  * {@code supervise} returns, rather than treating it as a crash to recover from.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): one of the three is offered, and it is the
+ * smallest offered fraction in the sweep. {@link #stop()} is offered — it is exactly the statement an
+ * activity that has finished its work writes, from anywhere in the call stack. <b>Neither {@link #start}
+ * overload is</b>, because {@code start} is not a statement in a bot: it <em>is</em> the bot. It is written
+ * once, by the generated entry point, and it does not return. Inserting a second one from a menu — inside an
+ * activity, inside the very {@code body} an outer {@code start} is already running — nests one supervise loop
+ * inside another, and the editor would have proposed it as if it were an ordinary call. The 3-arg form is
+ * doubly unreachable: its {@code Consumer<StartMode>} is a lambda the palette has no way to seed.
+ *
+ * <p>This is {@code PopupGuard.install} and {@code Activity.execute()} a third time — <b>a member the
+ * generated code owns is not a menu entry</b> — and here it is at its clearest, because the scaffold's call is
+ * not merely the first one, it is the only one that can exist. Both stay public: the entry point Studio
+ * generates calls one of them, and a hand-written bot needs to.
  */
+@Palette
 public final class Bot {
 
     private Bot() {}
@@ -41,6 +57,7 @@ public final class Bot {
      * finished its work, or a helper deep in the call stack. {@link #supervise} catches this and returns
      * instead of recovering. This is the deliberate "we're done" exit, as opposed to a crash.
      */
+    @Palette
     @Scaffolding   // the generated FlowDriver ends every run with it
     public static void stop() {
         throw new BotStoppedException();
