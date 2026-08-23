@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -31,7 +32,12 @@ import com.botmaker.session.DesktopSession;
  * keyboard — and such a device carries no window, so targeting is implemented as <em>raise the window, then
  * type</em>. Keys therefore reach the game, but the game is brought to the foreground first. There is no
  * mechanism on X11 that is both background and accepted by a game; that trade is the whole choice.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): all ten are offered. The shape is exactly the one
+ * {@code ImageFinder}'s rule keeps — five operations, each in the plain form and the {@link CaptureSource} form
+ * — with no third variant carrying a value a property already holds, so there is nothing here to trim.
  */
+@Palette
 public class Keyboard {
 
     /**
@@ -45,16 +51,19 @@ public class Keyboard {
     }
 
     /** Press and hold a key on the ambient {@link Source} (remember to {@link #release}). */
+    @Palette
     public static void press(Key key) {
         press(Source.current(), key);
     }
 
     /** Release a held key on the ambient {@link Source}. */
+    @Palette
     public static void release(Key key) {
         release(Source.current(), key);
     }
 
     /** Press then release a key. */
+    @Palette
     public static void tap(Key key) {
         Debug.log("[Keyboard] tap " + key);
         press(key);
@@ -65,6 +74,7 @@ public class Keyboard {
      * Press a chord: hold every key in order, then release them in reverse order — e.g.
      * {@code Keyboard.combo(Key.CTRL, Key.C)} for copy.
      */
+    @Palette
     public static void combo(Key... keys) {
         Debug.log("[Keyboard] combo " + java.util.Arrays.toString(keys));
         for (Key key : keys) {
@@ -79,6 +89,7 @@ public class Keyboard {
      * Type a string on the ambient {@link Source}, handling shifting for uppercase / shifted characters. Best
      * effort for non-ASCII input (falls back to the platform's keysym/VK mapping).
      */
+    @Palette
     public static void type(String text) {
         type(Source.current(), text);
     }
@@ -86,6 +97,7 @@ public class Keyboard {
     // --- Targeted overloads: deliver to a specific window instead of whatever has focus ---
 
     /** Press and hold {@code key}, delivered to {@code source}'s window (remember to {@link #release}). */
+    @Palette
     public static void press(CaptureSource source, Key key) {
         GenericWindow w = WindowBacked.of(source);
         Debug.log("[Keyboard] press " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
@@ -97,6 +109,7 @@ public class Keyboard {
     }
 
     /** Release a held {@code key} on {@code source}'s window. */
+    @Palette
     public static void release(CaptureSource source, Key key) {
         GenericWindow w = WindowBacked.of(source);
         Debug.log("[Keyboard] release " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
@@ -108,6 +121,7 @@ public class Keyboard {
     }
 
     /** Press then release {@code key} on {@code source}'s window. */
+    @Palette
     public static void tap(CaptureSource source, Key key) {
         Debug.log("[Keyboard] tap " + key + " on " + source);
         press(source, key);
@@ -115,6 +129,7 @@ public class Keyboard {
     }
 
     /** Press a chord on {@code source}'s window: hold each key in order, release in reverse. */
+    @Palette
     public static void combo(CaptureSource source, Key... keys) {
         Debug.log("[Keyboard] combo " + java.util.Arrays.toString(keys) + " on " + source);
         for (Key key : keys) {
@@ -126,6 +141,7 @@ public class Keyboard {
     }
 
     /** Type {@code text} into {@code source}'s window (see {@link #type(String)}). */
+    @Palette
     public static void type(CaptureSource source, String text) {
         GenericWindow w = WindowBacked.of(source);
         Debug.log("[Keyboard] type \"" + text + "\""

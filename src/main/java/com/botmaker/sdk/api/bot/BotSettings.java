@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.bot;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.config.ProjectProperties;
@@ -22,7 +23,16 @@ import com.botmaker.shared.config.ProjectProperties;
  * Studio and the SDK already share for everything else. Nothing calls {@code apply()} any more — see
  * {@link #useRealInput} for the one ordering constraint that made an explicit call look necessary, and why it
  * isn't.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): all nineteen are offered, and this is the one facade
+ * where that is a load-bearing decision rather than an absence of one. The sweep's rule elsewhere is <em>hide
+ * the parameter whose question a property already answers</em> — {@code ImageClicker}'s bare {@code confidence}
+ * and {@code delayMs} arguments are hidden because {@link #confidence()} and {@link #foundDelay()} are where
+ * they belong. This class <em>is</em> that destination. Hiding any of it, readers included, would make the
+ * justification false in the only place the user can act on it: the editor would have taken the per-call knob
+ * away and then not shown the knob that replaced it.
  */
+@Palette
 public final class BotSettings {
 
     /** Pause after a successful match, in ms — long enough for a game's animation to settle. */
@@ -77,42 +87,49 @@ public final class BotSettings {
     // --- reads ---
 
     /** Pause after a successful match, in ms. */
+    @Palette
     public static int foundDelay() {
         ensureLoaded();
         return foundDelay;
     }
 
     /** Pause after a failed match, in ms. */
+    @Palette
     public static int notFoundDelay() {
         ensureLoaded();
         return notFoundDelay;
     }
 
     /** Whether clicks land on a random point inside the match rather than its centre. */
+    @Palette
     public static boolean randomizeClicks() {
         ensureLoaded();
         return randomizeClicks;
     }
 
     /** The default template-match confidence (0..1) every no-confidence vision call uses. */
+    @Palette
     public static double confidence() {
         ensureLoaded();
         return confidence;
     }
 
     /** The default margin a good template must beat a distractor by. See {@link #DEFAULT_COMPARE_MARGIN}. */
+    @Palette
     public static double compareMargin() {
         ensureLoaded();
         return compareMargin;
     }
 
     /** How many no-progress checks the watchdog tolerates before declaring the bot stuck. */
+    @Palette
     public static int maxRetryAttempts() {
         ensureLoaded();
         return maxRetryAttempts;
     }
 
     /** The default timeout for waiting for game launch/window to appear, in milliseconds. */
+    @Palette
     public static long defaultLaunchWaitTimeout() {
         ensureLoaded();
         return defaultLaunchWaitTimeout;
@@ -124,6 +141,7 @@ public final class BotSettings {
      *
      * @return the project's default capture source, or the current source if not configured
      */
+    @Palette
     public static CaptureSource defaultCaptureSource() {
         return CaptureSource.fromProjectDefault();
     }
@@ -139,6 +157,7 @@ public final class BotSettings {
      * Whether this bot drives the <b>real</b> mouse and keyboard instead of posting quiet synthetic events to
      * the target window. Read-only mirror of the project setting and of the last {@link #useRealInput} call.
      */
+    @Palette
     public static boolean realInput() {
         ensureLoaded();
         return realInput;
@@ -146,6 +165,7 @@ public final class BotSettings {
 
     // --- writes ---
 
+    @Palette
     public static void setFoundDelay(int milliseconds) {
         ensureLoaded();
         if (milliseconds < 0) {
@@ -154,6 +174,7 @@ public final class BotSettings {
         foundDelay = milliseconds;
     }
 
+    @Palette
     public static void setNotFoundDelay(int milliseconds) {
         ensureLoaded();
         if (milliseconds < 0) {
@@ -162,11 +183,13 @@ public final class BotSettings {
         notFoundDelay = milliseconds;
     }
 
+    @Palette
     public static void enableRandomClicks(boolean enable) {
         ensureLoaded();
         randomizeClicks = enable;
     }
 
+    @Palette
     public static void setDefaultConfidence(double value) {
         ensureLoaded();
         if (value < 0.0 || value > 1.0) {
@@ -175,6 +198,7 @@ public final class BotSettings {
         confidence = value;
     }
 
+    @Palette
     public static void setCompareMargin(double value) {
         ensureLoaded();
         if (value < 0.0 || value > 1.0) {
@@ -183,6 +207,7 @@ public final class BotSettings {
         compareMargin = value;
     }
 
+    @Palette
     public static void setMaxRetryAttempts(int attempts) {
         ensureLoaded();
         if (attempts < 1) {
@@ -196,6 +221,7 @@ public final class BotSettings {
      *
      * @param timeoutMillis timeout in milliseconds, must be positive
      */
+    @Palette
     public static void setDefaultLaunchWaitTimeout(long timeoutMillis) {
         ensureLoaded();
         if (timeoutMillis <= 0) {
@@ -209,6 +235,7 @@ public final class BotSettings {
      * but it is a thin delegate to the single global switch {@link Debug} — vision, lifecycle and launch traces
      * all share one flag.
      */
+    @Palette
     public static void enableDebugMode(boolean enable) {
         Debug.set(enable);
     }
@@ -231,6 +258,7 @@ public final class BotSettings {
      * {@link #ensureLoaded()} rather than left to a generated call: every click path reads a setting from this
      * class first, so the load — and the swap — is always ahead of the click that needs it.
      */
+    @Palette
     public static void useRealInput(boolean enable) {
         ensureLoaded();
         applyRealInput(enable);
@@ -241,6 +269,7 @@ public final class BotSettings {
      * runtime override. Does not touch the global {@link Debug} switch — that has its own lifecycle (project
      * default plus runtime toggle) — and does not un-swap real input, which is one-way.
      */
+    @Palette
     public static void resetToDefaults() {
         synchronized (BotSettings.class) {
             // Marked loaded first: the point of a reset is to end up on the SDK defaults, so a later read must

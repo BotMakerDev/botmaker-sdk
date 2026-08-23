@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.interaction.Wait;
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.shared.launch.GameLauncher;
 import com.botmaker.shared.launch.LaunchKind;
@@ -34,7 +35,17 @@ import com.botmaker.shared.launch.LaunchSpec;
  * display, exactly like {@code Target.start()}; only when isolation is off (or the required backend is
  * missing) does it fall back to the host {@code :0} launch in {@code GameLauncher}. So a hand-written
  * {@code Game.launchHeroic("Firestone")} lands in the private display without the bot author doing anything.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): fifteen of the sixteen are offered. The only one
+ * hidden is {@link #launchSteam(int)}, which its own javadoc calls a <em>convenience overload</em> — it does
+ * nothing but {@code Integer.toString} its argument. Studio's game picker fills the appId in as a string, so
+ * the {@code int} form is a second spelling of a value the editor already produces in the first, and offering
+ * both makes the user choose between them for no reason. It stays public for the bot that holds a number.
+ * Every other pair here asks a different question rather than the same one differently: {@code isRunning} by
+ * {@link CaptureSource} tests a window, by process name tests the OS; the {@code *IfNotRunning} and
+ * {@code launchAndWait} shapes each combine two operations a bot would otherwise write out.
  */
+@Palette
 public class Game {
 
     private Game() {}
@@ -84,6 +95,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code executablePath} is null/blank
      * @throws RuntimeException         if the process could not be started
      */
+    @Palette
     public static Process launch(String executablePath, String... args) {
         if (isolate(exeSpec(executablePath, args))) {
             return null;
@@ -100,6 +112,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code appId} is null/blank
      * @throws RuntimeException         if neither the Steam URL nor the CLI fallback could be invoked
      */
+    @Palette
     public static void launchSteam(String appId) {
         if (isolate(storeSpec(LaunchKind.STEAM, appId))) {
             return;
@@ -125,6 +138,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code appName} is null/blank
      * @throws RuntimeException         if the Epic protocol URL could not be invoked (launcher not installed?)
      */
+    @Palette
     public static void launchEpic(String appName) {
         if (isolate(storeSpec(LaunchKind.EPIC, appName))) {
             return;
@@ -150,6 +164,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code appName} is null/blank
      * @throws RuntimeException         if neither the Heroic URL nor a CLI fallback could be invoked
      */
+    @Palette
     public static void launchHeroic(String appName) {
         if (isolate(storeSpec(LaunchKind.HEROIC, appName))) {
             return;
@@ -183,6 +198,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code gameId} is null/blank
      * @throws RuntimeException         if neither CLI form could be invoked
      */
+    @Palette
     public static void launchFaugus(String gameId) {
         if (isolate(storeSpec(LaunchKind.FAUGUS, gameId))) {
             return;
@@ -197,6 +213,7 @@ public class Game {
      * @param source  the capture source used to detect an existing instance
      * @return true if the game was launched, false if it was already running
      */
+    @Palette
     public static boolean launchEpicIfNotRunning(String appName, CaptureSource source) {
         if (isRunning(source)) {
             return false;
@@ -216,6 +233,7 @@ public class Game {
      * @return true if the source's window is currently present
      * @throws IllegalArgumentException if {@code source} is null
      */
+    @Palette
     public static boolean isRunning(CaptureSource source) {
         if (source == null) {
             throw new IllegalArgumentException("source must not be null");
@@ -232,6 +250,7 @@ public class Game {
      * @return true if the window appeared within the timeout, false if it timed out
      * @throws IllegalArgumentException if {@code source} is null
      */
+    @Palette
     public static boolean waitForLaunch(CaptureSource source, long timeoutMillis) {
         long deadline = System.currentTimeMillis() + Math.max(0, timeoutMillis);
         while (true) {
@@ -254,6 +273,7 @@ public class Game {
      * @param args           optional command-line arguments
      * @return true if the game was launched, false if it was already running
      */
+    @Palette
     public static boolean launchIfNotRunning(String executablePath, CaptureSource source, String... args) {
         if (isRunning(source)) {
             return false;
@@ -269,6 +289,7 @@ public class Game {
      * @param source the capture source used to detect an existing instance
      * @return true if the game was launched, false if it was already running
      */
+    @Palette
     public static boolean launchSteamIfNotRunning(String appId, CaptureSource source) {
         if (isRunning(source)) {
             return false;
@@ -287,6 +308,7 @@ public class Game {
      * @param args           optional command-line arguments
      * @return true if the game's window was present within the timeout, false if it timed out
      */
+    @Palette
     public static boolean launchAndWait(String executablePath, CaptureSource source, long timeoutMillis,
                                         String... args) {
         launchIfNotRunning(executablePath, source, args);
@@ -301,6 +323,7 @@ public class Game {
      * @param args           optional command-line arguments
      * @return true if the game's window was present within the timeout, false if it timed out
      */
+    @Palette
     public static boolean launchAndWait(String executablePath, String... args) {
         return launchAndWait(executablePath, Source.current(), BotSettings.defaultLaunchWaitTimeout(), args);
     }
@@ -311,6 +334,7 @@ public class Game {
      * @param timeoutMillis the maximum time to wait, in milliseconds
      * @return true if the source became available within the timeout, false if it timed out
      */
+    @Palette
     public static boolean waitForDefaultSource(long timeoutMillis) {
         return waitForLaunch(Source.current(), timeoutMillis);
     }
@@ -327,6 +351,7 @@ public class Game {
      * @param processName the executable name, e.g. {@code "Firestone.exe"} (Windows) or {@code "firestone"}
      * @throws IllegalArgumentException if {@code processName} is null/blank
      */
+    @Palette
     public static void kill(String processName) {
         GameLauncher.kill(processName);
     }
@@ -339,6 +364,7 @@ public class Game {
      * @param processName the executable name to look for
      * @throws IllegalArgumentException if {@code processName} is null/blank
      */
+    @Palette
     public static boolean isRunning(String processName) {
         return GameLauncher.isProcessRunning(processName);
     }

@@ -8,6 +8,48 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — the `@Palette` sweep continues: `Time`, `BotSettings`, `Mouse`, `Game`, `Keyboard` (phase 3.11 of 12, part 1)
+
+**Changed:** five of the eighteen facades outside `api.vision` curated — 81 offered, 11 hidden, nothing
+removed or deprecated. Verdicts and reasons in `docs/refactor/22-api-audit.md` §5.
+
+**Done**
+
+- **`Time` 22/9** — the phase's one genuinely new shape. The duplication here is not an overload family but a
+  parallel *vocabulary*: `hourUtc`, `minuteUtc`, `secondUtc`, `millisecondUtc` and `formatUtc` ask exactly what
+  their local twins ask, in the zone `setDefaultTimeZone` already sets. Hidden. But `nowUtc()` and
+  `isBetweenUtc` are **not** — a bot watching a local play window *and* a UTC server reset needs both zones in
+  one run, and a global default holds only one, so the property does not actually substitute there. The rule is
+  applied where it holds and suspended where it does not; UTC costs two entries instead of seven.
+- Two smaller `Time` verdicts: only the `String` half of each `ZoneId`/`String` pair is offered (`ZoneId` has no
+  `SdkType`, so the argument is unfillable from the editor — the same fact that hid `Text`'s `OcrOptions`
+  overloads in 3.10), which also hides `getDefaultTimeZone()` on its own; `nanoTime()` is a bare `System`
+  passthrough at a resolution no screen automation reads.
+- **`BotSettings` 19/0**, and the zero is load-bearing. Everything 3.10 hid, it hid by saying *a property
+  already answers that* — and this class is that property store. Hiding any of it, readers included, would make
+  the earlier justification false where the user acts on it: the per-call knob taken away, and its replacement
+  not shown.
+- **`Mouse` 15/1** and **`Game` 15/1** — in both the verdict was already written in the author's own javadoc
+  ("Prefer the clearer `scrollUp` / `scrollDown`"; "Convenience overload accepting a numeric appId") and the
+  menu had been contradicting it by offering every shape as an equal. `scroll(int)`'s signed argument is exactly
+  the ambiguity the named pair removes; `launchSteam(int)` only `Integer.toString`s a value Studio's game picker
+  already produces as a string.
+- **`Keyboard` 10/0** — five operations × the plain/`CaptureSource` pair, which is `ImageFinder`'s rule with no
+  third variant to trim.
+- SDK **230 tests green**, `ApiPointersTest` 11/11 (rule 10 — no curated method in an uncurated type — holds
+  across all five). Studio **1392 green** against the rebuilt SDK, `SdkSurfacePaletteTest` 8/8 and
+  `SignatureKeyAgreementTest` 1/1.
+
+**Deferred / next**
+
+- **Phase 3.11 part 2**, the remaining thirteen facades / 67 methods: `Target` 9, `Emulators` 9, `Session` 8,
+  `Debug` 7, `Wait` 6, `Watchdog` 6, `BotMaker` 5, `PopupGuard` 5, `Window` 3, `Bot` 3, `Activity` 3,
+  `Source` 2, `Rect` 1. One facade per commit; each stays uncurated (and its menu unchanged) until decided.
+- `Emulators` is the one carrying a note from 3.7: its nine methods are the only reason `Emulator` and
+  `EmulatorRef` are reachable at all, so its verdict decides theirs.
+
+---
+
 ## 2026-08-23 — the `@Palette` sweep: the vision facades (phase 3.10 of 12)
 
 **Changed:** `api/vision/` — `ImageClicker`, `Text`, `Pixel`, `Vision`, `ImageWaiter`, `Precision`,
