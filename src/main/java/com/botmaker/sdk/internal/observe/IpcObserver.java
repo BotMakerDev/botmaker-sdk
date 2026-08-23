@@ -65,8 +65,8 @@ public final class IpcObserver implements BotObserver {
     private static TelemetryEvent toTelemetry(MatchEvent event) {
         MatchResult result = event.result();
         boolean found = result != null && result.isFound();
-        TelemetryEvent.Rect matched = found ? rect(result.getRect()) : null;
-        double confidence = result != null ? result.getConfidence() : 0.0;
+        TelemetryEvent.Rect matched = found ? rect(result.rect()) : null;
+        double confidence = result != null ? result.confidence() : 0.0;
         return new TelemetryEvent.Match(
                 target(event.surface()), rect(event.region()), matched, confidence, found, botLine());
     }

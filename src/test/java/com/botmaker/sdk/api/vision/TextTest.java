@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Verifies the SDK {@link Text} facade end to end against a fixed-origin {@link CaptureSource} stub:
- * recognition works, results land in {@link VisionContext}, and boxes are shifted into absolute screen
+ * recognition works, results land in {@link Vision}, and boxes are shifted into absolute screen
  * coordinates by the source origin.
  */
 class TextTest {
@@ -68,23 +68,23 @@ class TextTest {
 
         assertTrue(Text.find("START", source), "should find START");
 
-        TextMatch last = VisionContext.getLastTextMatch();
+        TextMatch last = Vision.lastTextMatch();
         assertTrue(last.isFound(), "context has the match");
-        assertTrue(last.getText().toUpperCase().contains("START"), "text is START: " + last.getText());
+        assertTrue(last.text().toUpperCase().contains("START"), "text is START: " + last.text());
 
         // Box must be shifted into absolute coordinates by the origin.
-        Rect bounds = last.getBounds();
+        Rect bounds = last.bounds();
         assertTrue(bounds.x() >= ORIGIN_X, "x is absolute: " + bounds.x());
         assertTrue(bounds.y() >= ORIGIN_Y, "y is absolute: " + bounds.y());
 
-        Point center = last.getCenter();
+        Point center = last.center();
         assertTrue(center.x() > ORIGIN_X && center.y() > ORIGIN_Y, "center is absolute");
     }
 
     @Test
     void findReturnsFalseForAbsentText() {
         assertFalse(Text.find("GAMEOVER", stub("VICTORY")), "absent text not found");
-        assertFalse(VisionContext.getLastTextMatch().isFound(), "context reflects the miss");
+        assertFalse(Vision.lastTextMatch().isFound(), "context reflects the miss");
     }
 
     @Test

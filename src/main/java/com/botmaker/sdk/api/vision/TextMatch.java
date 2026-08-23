@@ -11,7 +11,7 @@ import com.botmaker.sdk.api.geometry.Rect;
  * the same way.
  *
  * <p>The bounding box is in <b>absolute screen coordinates</b> (the search's capture-source origin is
- * already applied), so {@link #getCenter()} can be handed straight to {@code Mouse}.
+ * already applied), so {@link #center()} can be handed straight to {@code Mouse}.
  */
 public class TextMatch {
 
@@ -43,31 +43,31 @@ public class TextMatch {
     }
 
     /** The recognized text, or {@code null} if not found. */
-    public String getText() {
+    public String text() {
         return text;
     }
 
     /** Tesseract's confidence for this text (0..100, higher is better); {@code 0} if not found. */
-    public float getConfidence() {
+    public float confidence() {
         return confidence;
     }
 
     /** The text's bounding box in absolute screen coordinates, or {@code null} if not found. */
-    public Rect getBounds() {
+    public Rect bounds() {
         // Rect is immutable, so the defensive copy this used to make is no longer needed.
         return found ? bounds : null;
     }
 
     /** Centre of the text's bounding box — a click target — or {@code null} if not found. */
-    public Point getCenter() {
+    public Point center() {
         if (!found) return null;
-        return bounds.getCenter();
+        return bounds.center();
     }
 
     /** Top-left of the text's bounding box, or {@code null} if not found. */
-    public Point getTopLeft() {
+    public Point topLeft() {
         if (!found) return null;
-        return bounds.getTopLeft();
+        return bounds.topLeft();
     }
 
     @Override

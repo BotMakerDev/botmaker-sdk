@@ -60,16 +60,16 @@ public final class Matches {
     static Matches of(List<MatchResult> results) {
         Map<String, MatchResult> map = new LinkedHashMap<>();
         for (MatchResult result : results) {
-            if (result == null || !result.isFound() || result.getTemplateId() == null) continue;
-            map.merge(result.getTemplateId(), result,
-                    (a, b) -> b.getConfidence() > a.getConfidence() ? b : a);
+            if (result == null || !result.isFound() || result.templateId() == null) continue;
+            map.merge(result.templateId(), result,
+                    (a, b) -> b.confidence() > a.confidence() ? b : a);
         }
         return map.isEmpty() ? NONE : new Matches(Collections.unmodifiableMap(map));
     }
 
     /** Whether {@code template} was visible in this frame. */
     public boolean has(ImageTemplate template) {
-        return template != null && byTemplateId.containsKey(template.getId());
+        return template != null && byTemplateId.containsKey(template.id());
     }
 
     /** Whether <em>every</em> given template was visible. Vacuously true for no arguments. */
@@ -96,7 +96,7 @@ public final class Matches {
      */
     public MatchResult get(ImageTemplate template) {
         if (template == null) return MatchResult.notFound();
-        MatchResult result = byTemplateId.get(template.getId());
+        MatchResult result = byTemplateId.get(template.id());
         return result != null ? result : MatchResult.notFound();
     }
 
@@ -112,7 +112,7 @@ public final class Matches {
     public MatchResult best() {
         MatchResult best = null;
         for (MatchResult result : byTemplateId.values()) {
-            if (best == null || result.getConfidence() > best.getConfidence()) best = result;
+            if (best == null || result.confidence() > best.confidence()) best = result;
         }
         return best != null ? best : MatchResult.notFound();
     }

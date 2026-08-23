@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
  * <p>The text counterpart to {@link ImageFinder} (templates) and {@link Pixel} (colour), and it follows the
  * same conventions: every call takes a {@link CaptureSource} (a window, a monitor, or the desktop); a search
  * <em>region</em> is expressed as a {@link CaptureSource#region(Rect) region of a source}; results come back
- * in <b>absolute screen coordinates</b>; the full result is parked in {@link VisionContext} so the
+ * in <b>absolute screen coordinates</b>; the full result is parked in {@link Vision} so the
  * boolean-returning calls stay readable; and no-source overloads use {@link Source#current()}.
  *
  * <p>The heavy lifting lives in {@code botmaker-shared}'s {@link OcrEngine} (OpenCV preprocessing +
@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
  * // Wait for a "Play" button's label, then click it.
  * CaptureSource game = CaptureSource.window("MyGame");
  * if (Text.waitFor("Play", game, 5000)) {
- *     Mouse.click(VisionContext.getLastTextMatch().getCenter());
+ *     Mouse.click(Vision.lastTextMatch().center());
  * }
  *
  * // Read a numeric HUD counter tuned for digits only.
@@ -79,7 +79,7 @@ public final class Text {
 
     /**
      * Whether {@code needle} appears within {@code source} (case-insensitive substring of a recognized
-     * line). The matching line is stored in {@link VisionContext#getLastTextMatch()}.
+     * line). The matching line is stored in {@link Vision#lastTextMatch()}.
      */
     public static boolean find(String needle, CaptureSource source) {
         return find(needle, source, DEFAULT_OPTIONS);
@@ -92,15 +92,15 @@ public final class Text {
 
     /** {@link #find(String, CaptureSource)} using {@code opts}. */
     public static boolean find(String needle, CaptureSource source, OcrOptions opts) {
-        TextMatch hit = firstMatching(recognize(source, opts), m -> containsIgnoreCase(m.getText(), needle));
-        VisionContext.setLastTextMatch(hit);
+        TextMatch hit = firstMatching(recognize(source, opts), m -> containsIgnoreCase(m.text(), needle));
+        Vision.setLastTextMatch(hit);
         return hit.isFound();
     }
 
     /**
      * Whether some recognized text within {@code source} <em>exactly</em> equals {@code target}
      * (case-insensitive, trimmed) — stricter than {@link #find}. The hit is stored in
-     * {@link VisionContext#getLastTextMatch()}.
+     * {@link Vision#lastTextMatch()}.
      */
     public static boolean findExact(String target, CaptureSource source) {
         return findExact(target, source, DEFAULT_OPTIONS);
@@ -109,15 +109,15 @@ public final class Text {
     /** {@link #findExact(String, CaptureSource)} using {@code opts}. */
     public static boolean findExact(String target, CaptureSource source, OcrOptions opts) {
         TextMatch hit = firstMatching(recognize(source, opts),
-                m -> m.getText() != null && m.getText().trim().equalsIgnoreCase(target.trim()));
-        VisionContext.setLastTextMatch(hit);
+                m -> m.text() != null && m.text().trim().equalsIgnoreCase(target.trim()));
+        Vision.setLastTextMatch(hit);
         return hit.isFound();
     }
 
     /**
      * Whether some recognized text within {@code source} matches the regular expression {@code regex}
      * (via {@link java.util.regex.Matcher#find}). The hit is stored in
-     * {@link VisionContext#getLastTextMatch()}.
+     * {@link Vision#lastTextMatch()}.
      */
     public static boolean findMatching(String regex, CaptureSource source) {
         return findMatching(regex, source, DEFAULT_OPTIONS);
@@ -127,8 +127,8 @@ public final class Text {
     public static boolean findMatching(String regex, CaptureSource source, OcrOptions opts) {
         Pattern pattern = Pattern.compile(regex);
         TextMatch hit = firstMatching(recognize(source, opts),
-                m -> m.getText() != null && pattern.matcher(m.getText()).find());
-        VisionContext.setLastTextMatch(hit);
+                m -> m.text() != null && pattern.matcher(m.text()).find());
+        Vision.setLastTextMatch(hit);
         return hit.isFound();
     }
 
@@ -143,7 +143,7 @@ public final class Text {
      * Whether {@code needle} appears within {@code source} <em>approximately</em> — case-insensitive, tolerating
      * up to {@link #DEFAULT_FUZZY_DISTANCE} character edits (insertions/deletions/substitutions). Forgives the
      * usual OCR misreads ({@code l↔1}, {@code O↔0}, a dropped letter) that make {@link #find}'s exact substring
-     * miss. The matching line is stored in {@link VisionContext#getLastTextMatch()}.
+     * miss. The matching line is stored in {@link Vision#lastTextMatch()}.
      */
     public static boolean findFuzzy(String needle, CaptureSource source) {
         return findFuzzy(needle, DEFAULT_FUZZY_DISTANCE, source, DEFAULT_OPTIONS);
@@ -161,8 +161,8 @@ public final class Text {
 
     /** {@link #findFuzzy(String, int, CaptureSource)} using {@code opts}. */
     public static boolean findFuzzy(String needle, int maxDistance, CaptureSource source, OcrOptions opts) {
-        TextMatch hit = firstMatching(recognize(source, opts), m -> fuzzyContains(m.getText(), needle, maxDistance));
-        VisionContext.setLastTextMatch(hit);
+        TextMatch hit = firstMatching(recognize(source, opts), m -> fuzzyContains(m.text(), needle, maxDistance));
+        Vision.setLastTextMatch(hit);
         return hit.isFound();
     }
 
@@ -172,7 +172,7 @@ public final class Text {
 
     /**
      * Every recognized text within {@code source} containing {@code needle} (case-insensitive). The list
-     * is stored in {@link VisionContext#getLastTextMatchList()}.
+     * is stored in {@link Vision#lastTextMatchList()}.
      *
      * @return how many matched
      */
@@ -184,21 +184,21 @@ public final class Text {
     public static int findAll(String needle, CaptureSource source, OcrOptions opts) {
         List<TextMatch> hits = new ArrayList<>();
         for (TextMatch m : recognize(source, opts)) {
-            if (containsIgnoreCase(m.getText(), needle)) hits.add(m);
+            if (containsIgnoreCase(m.text(), needle)) hits.add(m);
         }
-        VisionContext.setLastTextMatchList(hits);
+        Vision.setLastTextMatchList(hits);
         return hits.size();
     }
 
     /**
      * Every piece of recognized text within {@code source}, whatever it says — a general "read everything,
-     * with positions" call. The list is stored in {@link VisionContext#getLastTextMatchList()}.
+     * with positions" call. The list is stored in {@link Vision#lastTextMatchList()}.
      *
      * @return how many pieces of text were recognized
      */
     public static int readAll(CaptureSource source, OcrOptions opts) {
         List<TextMatch> all = recognize(source, opts);
-        VisionContext.setLastTextMatchList(all);
+        Vision.setLastTextMatchList(all);
         return all.size();
     }
 
@@ -214,7 +214,7 @@ public final class Text {
     /**
      * Polls until {@code needle} appears in {@code source} or {@code timeoutMs} elapses.
      *
-     * @return true if it appeared; the match is in {@link VisionContext#getLastTextMatch()}
+     * @return true if it appeared; the match is in {@link Vision#lastTextMatch()}
      */
     public static boolean waitFor(String needle, CaptureSource source, long timeoutMs) {
         return waitFor(needle, source, DEFAULT_OPTIONS, timeoutMs);

@@ -22,7 +22,7 @@ class ImageTemplateGroupTest {
     void ofVarargsHoldsTemplatesInOrder() {
         ImageTemplateGroup g = ImageTemplateGroup.of(t("a"), t("b"), t("c"));
         assertEquals(3, g.templates().size());
-        assertEquals("a", g.templates().get(0).getId());
+        assertEquals("a", g.templates().get(0).id());
         assertEquals(3, g.toArray().length);
     }
 

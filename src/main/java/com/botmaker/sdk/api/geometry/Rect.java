@@ -48,24 +48,24 @@ public record Rect(int x, int y, int width, int height) {
         return new Rect(centre.x() - width / 2, centre.y() - height / 2, width, height);
     }
 
-    public Point getTopLeft() {
+    public Point topLeft() {
         return new Point(x, y);
     }
 
-    public Point getTopRight() {
+    public Point topRight() {
         return new Point(x + width, y);
     }
 
-    public Point getBottomLeft() {
+    public Point bottomLeft() {
         return new Point(x, y + height);
     }
 
-    public Point getBottomRight() {
+    public Point bottomRight() {
         return new Point(x + width, y + height);
     }
 
     /** The centre pixel — the midpoint rounded, since a click lands on a whole pixel. */
-    public Point getCenter() {
+    public Point center() {
         return new Point(x + width / 2, y + height / 2);
     }
 

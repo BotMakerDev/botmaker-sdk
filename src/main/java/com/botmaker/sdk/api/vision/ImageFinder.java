@@ -42,8 +42,8 @@ public class ImageFinder {
     /**
      * Finds the specified template on the current capture source using the default confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param template the image template to search for
      * @return true if the template was found, false otherwise
@@ -58,8 +58,8 @@ public class ImageFinder {
     /**
      * Finds the specified template on the current capture source with a custom confidence threshold.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param template   the image template to search for
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -72,8 +72,8 @@ public class ImageFinder {
     /**
      * Finds the specified template on a specific capture source using the default confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param template the image template to search for
      * @param source   the capture source (window, monitor, or desktop region) to search within
@@ -88,10 +88,10 @@ public class ImageFinder {
      * This is the core matching method that performs the actual image capture and template matching.
      * <p>
      * The search is performed within the bounds of the capture source. The match result is stored
-     * in {@link VisionContext} and can be retrieved with {@link VisionContext#getLastMatch()}.
+     * in {@link Vision} and can be retrieved with {@link Vision#lastMatch()}.
      * <p>
      * The returned match result contains absolute screen coordinates, so clicks can be performed
-     * directly at the matched location using {@link VisionContext#getLastMatch()}.
+     * directly at the matched location using {@link Vision#lastMatch()}.
      *
      * @param template   the image template to search for
      * @param source     the capture source (window, monitor, or desktop region) to search within
@@ -101,13 +101,13 @@ public class ImageFinder {
     public static boolean find(ImageTemplate template, CaptureSource source, double confidence) {
         PopupGuard.check();
         MatchResult result = findInternal(template, source, confidence);
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return result.isFound();
     }
 
     /**
      * Internal method for findAny that returns MatchResult.
-     * Does not update VisionContext - caller is responsible for that.
+     * Does not update Vision - caller is responsible for that.
      */
     static MatchResult findAnyInternal(CaptureSource source, double confidence, ImageTemplate... templates) {
         for (ImageTemplate template : templates) {
@@ -122,7 +122,7 @@ public class ImageFinder {
     /**
      * Internal: one frame — the best match of <em>every</em> template in {@code group} that clears
      * {@code confidence}, all read from a <b>single</b> capture, together with the screenshot they were read
-     * from. Does not update VisionContext — the caller is responsible for that.
+     * from. Does not update Vision — the caller is responsible for that.
      *
      * <p>This cannot delegate to {@link #findAnyInternal}: that one short-circuits on the first hit, which is
      * precisely the information loss {@link Matches} exists to undo. It captures once and re-matches the same
@@ -130,16 +130,16 @@ public class ImageFinder {
      * still cost one screenshot — the "one capture per check" property the lambda helpers promise — and so
      * every answer in the returned {@code Matches} describes the same instant.
      */
-    static VisionContext.Frame findFrame(ImageTemplateGroup group, CaptureSource source, double confidence) {
+    static Vision.Frame findFrame(ImageTemplateGroup group, CaptureSource source, double confidence) {
         if (group.isEmpty()) {
             // nothing to look for — don't pay for a capture to prove it
-            return new VisionContext.Frame(Matches.none(), source, null, group);
+            return new Vision.Frame(Matches.none(), source, null, group);
         }
         Mat background = null;
         try {
             BufferedImage screenshot = source.capture();
             if (screenshot == null) {
-                return new VisionContext.Frame(Matches.none(), source, null, group);
+                return new Vision.Frame(Matches.none(), source, null, group);
             }
             background = OpencvManager.bufferedImageToMat(screenshot);
             Point origin = source.origin();
@@ -150,7 +150,7 @@ public class ImageFinder {
                 if (best != null && best.score() >= confidence) {
                     Point location = new Point(best.x() + origin.x(), best.y() + origin.y());
                     MatchResult result = new MatchResult(
-                            location, best.width(), best.height(), best.score(), template.getId());
+                            location, best.width(), best.height(), best.score(), template.id());
                     emitMatch(source, result);
                     traceHit(template, result);
                     results.add(result);
@@ -159,13 +159,13 @@ public class ImageFinder {
                     traceMiss(template);
                 }
             }
-            return new VisionContext.Frame(Matches.of(results), source, screenshot, group);
+            return new Vision.Frame(Matches.of(results), source, screenshot, group);
 
         } catch (Exception e) {
             if (Debug.isEnabled()) {
                 Debug.error("Error finding template group: " + e.getMessage(), e);
             }
-            return new VisionContext.Frame(Matches.none(), source, null, group);
+            return new Vision.Frame(Matches.none(), source, null, group);
         } finally {
             if (background != null) {
                 background.release();
@@ -175,7 +175,7 @@ public class ImageFinder {
 
     /**
      * Internal method that performs the actual find operation and returns the MatchResult.
-     * Does not update VisionContext - caller is responsible for that.
+     * Does not update Vision - caller is responsible for that.
      */
     static MatchResult findInternal(ImageTemplate template, CaptureSource source, double confidence) {
         // Note: a genuine native-load failure surfaces as an Error (e.g. UnsatisfiedLinkError),
@@ -195,7 +195,7 @@ public class ImageFinder {
                 Point origin = source.origin();
                 Point location = new Point(best.x() + origin.x(), best.y() + origin.y());
                 MatchResult result = new MatchResult(
-                        location, best.width(), best.height(), best.score(), template.getId());
+                        location, best.width(), best.height(), best.score(), template.id());
                 emitMatch(source, result);
                 traceHit(template, result);
                 return result;
@@ -226,8 +226,8 @@ public class ImageFinder {
      * Finds the first template (in order) that appears on the current capture source using the default confidence.
      * Templates are checked in the order provided, and the first one found above the threshold is returned.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param templates the image templates to search for, in priority order
      * @return true if any template was found, false otherwise
@@ -242,8 +242,8 @@ public class ImageFinder {
     /**
      * Finds the first template (in order) that appears on the current capture source with a custom confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
      * @param templates the image templates to search for, in priority order
@@ -256,8 +256,8 @@ public class ImageFinder {
     /**
      * Finds the first template (in order) that appears on a specific capture source using the default confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param source    the capture source to search within
      * @param templates the image templates to search for, in priority order
@@ -271,8 +271,8 @@ public class ImageFinder {
      * Finds the first template (in order) that appears on a specific capture source with a custom confidence.
      * This is the core implementation that iterates through templates and returns the first match found.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param source     the capture source to search within
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -284,11 +284,11 @@ public class ImageFinder {
         for (ImageTemplate template : templates) {
             MatchResult result = findInternal(template, source, confidence);
             if (result.isFound()) {
-                VisionContext.setLastMatch(result);
+                Vision.setLastMatch(result);
                 return true;
             }
         }
-        VisionContext.setLastMatch(MatchResult.notFound());
+        Vision.setLastMatch(MatchResult.notFound());
         return false;
     }
 
@@ -297,8 +297,8 @@ public class ImageFinder {
     /**
      * Finds the first template in the group that appears on the current capture source using the default confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group the template group to search for
      * @return true if any template in the group was found, false otherwise
@@ -313,8 +313,8 @@ public class ImageFinder {
     /**
      * Finds the first template in the group that appears on the current capture source with a custom confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group      the template group to search for
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -327,8 +327,8 @@ public class ImageFinder {
     /**
      * Finds the first template in the group that appears on a specific capture source using the default confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
@@ -341,8 +341,8 @@ public class ImageFinder {
     /**
      * Finds the first template in the group that appears on a specific capture source with a custom confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group      the template group to search for
      * @param source     the capture source to search within
@@ -360,8 +360,8 @@ public class ImageFinder {
      * Unlike {@link #findAny(ImageTemplateGroup)}, this evaluates every template and returns the best match
      * regardless of order.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group the template group to search for
      * @return true if any template in the group was found, false otherwise
@@ -376,8 +376,8 @@ public class ImageFinder {
     /**
      * Finds the highest-scoring match for any template in the group on the current capture source with a custom confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group      the template group to search for
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -390,8 +390,8 @@ public class ImageFinder {
     /**
      * Finds the highest-scoring match for any template in the group on a specific capture source.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
@@ -405,8 +405,8 @@ public class ImageFinder {
      * Finds the highest-scoring match for any template in the group on a specific capture source with a custom confidence.
      * This is the core implementation that evaluates every template in the group and returns the single best match.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group      the template group to search for
      * @param source     the capture source to search within
@@ -418,11 +418,11 @@ public class ImageFinder {
         MatchResult best = MatchResult.notFound();
         for (ImageTemplate template : group.templates()) {
             MatchResult result = findInternal(template, source, confidence);
-            if (result.isFound() && (!best.isFound() || result.getConfidence() > best.getConfidence())) {
+            if (result.isFound() && (!best.isFound() || result.confidence() > best.confidence())) {
                 best = result;
             }
         }
-        VisionContext.setLastMatch(best);
+        Vision.setLastMatch(best);
         return best.isFound();
     }
 
@@ -435,8 +435,8 @@ public class ImageFinder {
      * Among the {@code good} templates, return the best-scoring match that still beats every
      * {@code bad} template at its location by the default margin.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param good the group of good templates to search for
      * @param bad  the group of bad templates that must NOT out-score the good templates
@@ -445,7 +445,7 @@ public class ImageFinder {
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
         MatchResult result = compare(good.templates(), bad.templates(), Source.current(),
                 BotSettings.confidence(), BotSettings.compareMargin());
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return result.isFound();
     }
 
@@ -453,8 +453,8 @@ public class ImageFinder {
      * Among the {@code good} templates, return the best-scoring match that still beats every
      * {@code bad} template at its location by the specified margin.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param good  the group of good templates to search for
      * @param bad   the group of bad templates that must NOT out-score the good templates
@@ -464,7 +464,7 @@ public class ImageFinder {
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
         MatchResult result = compare(good.templates(), bad.templates(), Source.current(),
                 BotSettings.confidence(), margin);
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return result.isFound();
     }
 
@@ -472,8 +472,8 @@ public class ImageFinder {
      * Among the {@code good} templates, return the best-scoring match that still beats every
      * {@code bad} template at its location by the default margin.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param good   the group of good templates to search for
      * @param bad    the group of bad templates that must NOT out-score the good templates
@@ -483,7 +483,7 @@ public class ImageFinder {
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         MatchResult result = compare(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), BotSettings.compareMargin());
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return result.isFound();
     }
 
@@ -491,8 +491,8 @@ public class ImageFinder {
      * Among the {@code good} templates, return the best-scoring match that still beats every
      * {@code bad} template at its location by the specified margin.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param good   the group of good templates to search for
      * @param bad    the group of bad templates that must NOT out-score the good templates
@@ -504,7 +504,7 @@ public class ImageFinder {
                                           double margin) {
         PopupGuard.check();
         MatchResult result = compare(good.templates(), bad.templates(), source, BotSettings.confidence(), margin);
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return result.isFound();
     }
 
@@ -516,7 +516,7 @@ public class ImageFinder {
      * returns the single highest-scoring good), this stops at the first good that wins — the compare
      * analogue of {@link #findAny}.
      * <p>
-     * The match result is stored in {@link VisionContext}.
+     * The match result is stored in {@link Vision}.
      *
      * @param good the group of good templates to search for, in priority order
      * @param bad  the group of bad templates that must NOT out-score the good template
@@ -530,7 +530,7 @@ public class ImageFinder {
      * Return the first {@code good} template (in priority order) whose best match beats every
      * {@code bad} template at its location by the specified margin.
      * <p>
-     * The match result is stored in {@link VisionContext}.
+     * The match result is stored in {@link Vision}.
      *
      * @param good   the group of good templates to search for, in priority order
      * @param bad    the group of bad templates that must NOT out-score the good template
@@ -545,7 +545,7 @@ public class ImageFinder {
      * Return the first {@code good} template (in priority order) whose best match beats every
      * {@code bad} template at its location by the default margin, searched within {@code source}.
      * <p>
-     * The match result is stored in {@link VisionContext}.
+     * The match result is stored in {@link Vision}.
      *
      * @param good   the group of good templates to search for, in priority order
      * @param bad    the group of bad templates that must NOT out-score the good template
@@ -560,7 +560,7 @@ public class ImageFinder {
      * Return the first {@code good} template (in priority order) whose best match beats every
      * {@code bad} template at its location by the specified margin, searched within {@code source}.
      * <p>
-     * The match result is stored in {@link VisionContext}.
+     * The match result is stored in {@link Vision}.
      *
      * @param good   the group of good templates to search for, in priority order
      * @param bad    the group of bad templates that must NOT out-score the good template
@@ -573,7 +573,7 @@ public class ImageFinder {
         PopupGuard.check();
         MatchResult result = compareAny(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return result.isFound();
     }
 
@@ -583,7 +583,7 @@ public class ImageFinder {
      * Find every location of every {@code good} template that beats all {@code bad} templates there by
      * the default margin — the compare analogue of {@link #findAll}.
      * <p>
-     * The list of matches is stored in {@link VisionContext} ({@link VisionContext#getLastMatchList()}).
+     * The list of matches is stored in {@link Vision} ({@link Vision#lastMatchList()}).
      *
      * @param good the group of good templates to search for
      * @param bad  the group of bad templates that must NOT out-score a good match
@@ -597,7 +597,7 @@ public class ImageFinder {
      * Find every location of every {@code good} template that beats all {@code bad} templates there by
      * the specified margin.
      * <p>
-     * The list of matches is stored in {@link VisionContext} ({@link VisionContext#getLastMatchList()}).
+     * The list of matches is stored in {@link Vision} ({@link Vision#lastMatchList()}).
      *
      * @param good   the group of good templates to search for
      * @param bad    the group of bad templates that must NOT out-score a good match
@@ -612,7 +612,7 @@ public class ImageFinder {
      * Find every location of every {@code good} template that beats all {@code bad} templates there by
      * the default margin, searched within {@code source}.
      * <p>
-     * The list of matches is stored in {@link VisionContext} ({@link VisionContext#getLastMatchList()}).
+     * The list of matches is stored in {@link Vision} ({@link Vision#lastMatchList()}).
      *
      * @param good   the group of good templates to search for
      * @param bad    the group of bad templates that must NOT out-score a good match
@@ -627,7 +627,7 @@ public class ImageFinder {
      * Find every location of every {@code good} template that beats all {@code bad} templates there by
      * the specified margin, searched within {@code source}.
      * <p>
-     * The list of matches is stored in {@link VisionContext} ({@link VisionContext#getLastMatchList()}).
+     * The list of matches is stored in {@link Vision} ({@link Vision#lastMatchList()}).
      *
      * @param good   the group of good templates to search for
      * @param bad    the group of bad templates that must NOT out-score a good match
@@ -640,14 +640,14 @@ public class ImageFinder {
         PopupGuard.check();
         List<MatchResult> results = compareAll(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
-        VisionContext.setLastMatchList(results);
+        Vision.setLastMatchList(results);
         return results.size();
     }
 
     /**
      * Single-capture compare: find each good template's best match, keep the highest-scoring good
      * whose location out-scores every bad template (re-scored on the same frame) by {@code margin}.
-     * This is an internal method - callers are responsible for updating VisionContext.
+     * This is an internal method - callers are responsible for updating Vision.
      */
     private static MatchResult compare(List<ImageTemplate> goods, List<ImageTemplate> bads,
                                        CaptureSource source, double confidence, double margin) {
@@ -670,10 +670,10 @@ public class ImageFinder {
                 if (gm == null) {
                     continue;
                 }
-                if (beatsAllBads(gm, bads, background, margin) && (!best.isFound() || gm.score() > best.getConfidence())) {
+                if (beatsAllBads(gm, bads, background, margin) && (!best.isFound() || gm.score() > best.confidence())) {
                     best = new MatchResult(
                             new Point(gm.x() + offsetX, gm.y() + offsetY),
-                            gm.width(), gm.height(), gm.score(), good.getId());
+                            gm.width(), gm.height(), gm.score(), good.id());
                 }
             }
             emitMatch(source, best);
@@ -693,7 +693,7 @@ public class ImageFinder {
     /**
      * Single-capture compare, first-wins: return the first good template (in order) whose best match
      * out-scores every bad template (re-scored on the same frame) by {@code margin}. Internal — callers
-     * update VisionContext.
+     * update Vision.
      */
     private static MatchResult compareAny(List<ImageTemplate> goods, List<ImageTemplate> bads,
                                           CaptureSource source, double confidence, double margin) {
@@ -718,7 +718,7 @@ public class ImageFinder {
                 if (beatsAllBads(gm, bads, background, margin)) {
                     MatchResult result = new MatchResult(
                             new Point(gm.x() + offsetX, gm.y() + offsetY),
-                            gm.width(), gm.height(), gm.score(), good.getId());
+                            gm.width(), gm.height(), gm.score(), good.id());
                     emitMatch(source, result);
                     return result;
                 }
@@ -740,7 +740,7 @@ public class ImageFinder {
     /**
      * Single-capture compare, every-location: for every good template, keep each match location that
      * out-scores every bad template (re-scored on the same frame) by {@code margin}. Internal — callers
-     * update VisionContext.
+     * update Vision.
      */
     private static List<MatchResult> compareAll(List<ImageTemplate> goods, List<ImageTemplate> bads,
                                                 CaptureSource source, double confidence, double margin) {
@@ -764,7 +764,7 @@ public class ImageFinder {
                     if (beatsAllBads(gm, bads, background, margin)) {
                         results.add(new MatchResult(
                                 new Point(gm.x() + offsetX, gm.y() + offsetY),
-                                gm.width(), gm.height(), gm.score(), good.getId()));
+                                gm.width(), gm.height(), gm.score(), good.id()));
                     }
                 }
             }
@@ -799,8 +799,8 @@ public class ImageFinder {
     /**
      * Finds all occurrences of the template on the current capture source using the default confidence.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param template the image template to search for
      * @return the number of matches found
@@ -812,8 +812,8 @@ public class ImageFinder {
     /**
      * Finds all occurrences of the template on the current capture source with a custom confidence threshold.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param template   the image template to search for
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -826,8 +826,8 @@ public class ImageFinder {
     /**
      * Finds all occurrences of the template on a specific capture source using the default confidence.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param template the image template to search for
      * @param source   the capture source to search within
@@ -840,9 +840,9 @@ public class ImageFinder {
     /**
      * Finds all occurrences of the template on a specific capture source with a custom confidence threshold.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}. The first match is also stored in
-     * {@link VisionContext#getLastMatch()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}. The first match is also stored in
+     * {@link Vision#lastMatch()}.
      *
      * @param template   the image template to search for
      * @param source     the capture source to search within
@@ -852,13 +852,13 @@ public class ImageFinder {
     public static int findAll(ImageTemplate template, CaptureSource source, double confidence) {
         PopupGuard.check();
         List<MatchResult> results = findAllInternal(template, source, confidence);
-        VisionContext.setLastMatchList(results);
+        Vision.setLastMatchList(results);
         return results.size();
     }
 
     /**
      * Internal method that performs findAll and returns the list of results.
-     * Does not update VisionContext - caller is responsible for that.
+     * Does not update Vision - caller is responsible for that.
      */
     static List<MatchResult> findAllInternal(ImageTemplate template, CaptureSource source, double confidence) {
         BufferedImage screenshot = source.capture();
@@ -894,7 +894,7 @@ public class ImageFinder {
             List<MatchResult> results = matches.stream()
                     .map(r -> {
                         Point location = new Point(r.x() + offsetX, r.y() + offsetY);
-                        return new MatchResult(location, r.width(), r.height(), r.score(), template.getId());
+                        return new MatchResult(location, r.width(), r.height(), r.score(), template.id());
                     })
                     .collect(Collectors.toList());
 
@@ -918,8 +918,8 @@ public class ImageFinder {
     /**
      * Finds all occurrences of every template in the group on the current capture source.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param group the template group to search for
      * @return the total number of matches found across all templates in the group
@@ -931,8 +931,8 @@ public class ImageFinder {
     /**
      * Finds all occurrences of every template in the group on the current capture source with a custom confidence.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param group      the template group to search for
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -945,8 +945,8 @@ public class ImageFinder {
     /**
      * Finds all occurrences of every template in the group on a specific capture source.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
@@ -959,8 +959,8 @@ public class ImageFinder {
     /**
      * Finds all occurrences of every template in the group on a specific capture source with a custom confidence.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param group      the template group to search for
      * @param source     the capture source to search within
@@ -973,7 +973,7 @@ public class ImageFinder {
         for (ImageTemplate template : group.templates()) {
             all.addAll(findAllInternal(template, source, confidence));
         }
-        VisionContext.setLastMatchList(all);
+        Vision.setLastMatchList(all);
         return all.size();
     }
 
@@ -991,18 +991,18 @@ public class ImageFinder {
     /** Records a hit and prints it, closing (and reporting) any run of misses it just ended. */
     private static void traceHit(ImageTemplate template, MatchResult result) {
         if (!Debug.isEnabled()) return;
-        reportMisses(template.getId(), MISSES.flush(template.getId()));
+        reportMisses(template.id(), MISSES.flush(template.id()));
         // The centre rather than the top-left: it is the point a click would land on, so the number in the
         // log is the number to compare against where the pointer actually went.
-        Point centre = result.getCenter();
-        Debug.log("[Vision] find " + template.getId() + " → (" + centre.x() + "," + centre.y() + ") "
-                + String.format(Locale.ROOT, "%.2f", result.getConfidence()));
+        Point centre = result.center();
+        Debug.log("[Vision] find " + template.id() + " → (" + centre.x() + "," + centre.y() + ") "
+                + String.format(Locale.ROOT, "%.2f", result.confidence()));
     }
 
     /** Records a miss, printing only when its run has gone on long enough to be worth saying so. */
     private static void traceMiss(ImageTemplate template) {
         if (!Debug.isEnabled()) return;
-        reportMisses(template.getId(), MISSES.tick(template.getId()));
+        reportMisses(template.id(), MISSES.tick(template.id()));
     }
 
     private static void reportMisses(String templateId, Trace.Runs.Run run) {
@@ -1038,7 +1038,7 @@ public class ImageFinder {
 
     /**
      * Run {@code action} once with the match if {@code template} is currently visible.
-     * The match result is stored in {@link VisionContext}.
+     * The match result is stored in {@link Vision}.
      *
      * @param template the image template to search for
      * @param action   the action to run with the match result
@@ -1050,7 +1050,7 @@ public class ImageFinder {
 
     /**
      * Run {@code action} once with the match if {@code template} is currently visible on a specific source.
-     * The match result is stored in {@link VisionContext}.
+     * The match result is stored in {@link Vision}.
      *
      * @param template the image template to search for
      * @param source   the capture source to search within
@@ -1060,7 +1060,7 @@ public class ImageFinder {
     public static boolean ifFind(ImageTemplate template, CaptureSource source, Consumer<MatchResult> action) {
         PopupGuard.check();
         MatchResult result = findInternal(template, source, BotSettings.confidence());
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         if (result.isFound()) {
             action.accept(result);
             return true;
@@ -1089,10 +1089,10 @@ public class ImageFinder {
         PopupGuard.check();
         MatchResult result;
         while ((result = findInternal(template, source, BotSettings.confidence())).isFound()) {
-            VisionContext.setLastMatch(result);
+            Vision.setLastMatch(result);
             action.accept(result);
         }
-        VisionContext.setLastMatch(MatchResult.notFound());
+        Vision.setLastMatch(MatchResult.notFound());
     }
 
     /**
@@ -1130,7 +1130,7 @@ public class ImageFinder {
 
     /**
      * Run {@code action} once with the frame's matches if any template in the group is currently visible.
-     * The matches are stored in {@link VisionContext}.
+     * The matches are stored in {@link Vision}.
      *
      * @param group  the template group to search for
      * @param action the action to run with the frame's matches
@@ -1142,7 +1142,7 @@ public class ImageFinder {
 
     /**
      * Run {@code action} once with the frame's matches if any template in the group is currently visible on a
-     * specific source. The matches are stored in {@link VisionContext}.
+     * specific source. The matches are stored in {@link Vision}.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
@@ -1151,10 +1151,10 @@ public class ImageFinder {
      */
     public static boolean ifFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         PopupGuard.check();
-        VisionContext.Frame frame = findFrame(group, source, BotSettings.confidence());
-        VisionContext.setLastMatches(frame.matches());
+        Vision.Frame frame = findFrame(group, source, BotSettings.confidence());
+        Vision.setLastMatches(frame.matches());
         if (!frame.matches().isEmpty()) {
-            VisionContext.runInFrame(frame, action);
+            Vision.runInFrame(frame, action);
             return true;
         }
         return false;
@@ -1183,10 +1183,10 @@ public class ImageFinder {
     public static boolean ifFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         if (group.isEmpty()) return false;   // "all of nothing" is vacuously true; an empty group matches nothing
         PopupGuard.check();
-        VisionContext.Frame frame = findFrame(group, source, BotSettings.confidence());
-        VisionContext.setLastMatches(frame.matches());
+        Vision.Frame frame = findFrame(group, source, BotSettings.confidence());
+        Vision.setLastMatches(frame.matches());
         if (frame.matches().hasAll(group.toArray())) {
-            VisionContext.runInFrame(frame, action);
+            Vision.runInFrame(frame, action);
             return true;
         }
         return false;
@@ -1214,11 +1214,11 @@ public class ImageFinder {
      */
     public static void whileFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         PopupGuard.check();
-        VisionContext.Frame frame;
+        Vision.Frame frame;
         while (!(frame = findFrame(group, source, BotSettings.confidence())).matches().isEmpty()) {
-            VisionContext.runInFrame(frame, action);
+            Vision.runInFrame(frame, action);
         }
-        VisionContext.setLastMatches(Matches.none());
+        Vision.setLastMatches(Matches.none());
     }
 
     /**
@@ -1243,11 +1243,11 @@ public class ImageFinder {
     public static void whileFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         if (group.isEmpty()) return;   // vacuous hasAll would spin this loop forever on an empty group
         PopupGuard.check();
-        VisionContext.Frame frame;
+        Vision.Frame frame;
         while ((frame = findFrame(group, source, BotSettings.confidence())).matches().hasAll(group.toArray())) {
-            VisionContext.runInFrame(frame, action);
+            Vision.runInFrame(frame, action);
         }
-        VisionContext.setLastMatches(Matches.none());
+        Vision.setLastMatches(Matches.none());
     }
 
     /**

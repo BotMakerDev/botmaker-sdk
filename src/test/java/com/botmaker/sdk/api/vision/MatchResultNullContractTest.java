@@ -39,21 +39,21 @@ import static org.junit.jupiter.api.Assertions.fail;
  * does. Pinned first, so that change is a migration rather than a discovery.
  *
  * <p>{@link MatchResult#miss(double)} gets its own case because it is the one that looks like an exception to
- * the rule and is not: it carries a real below-threshold score for telemetry, so {@code getConfidence()} is
+ * the rule and is not: it carries a real below-threshold score for telemetry, so {@code confidence()} is
  * non-zero while {@code isFound()} is still false and every accessor is still null.
  */
 class MatchResultNullContractTest {
 
     /** The accessors that carry the null contract, named as a bot author would see them. */
     private static final List<Accessor> NULLABLE = List.of(
-            new Accessor("getCenter", MatchResult::getCenter),
-            new Accessor("getRandomClickPoint", MatchResult::getRandomClickPoint),
-            new Accessor("getTopLeft", MatchResult::getTopLeft),
-            new Accessor("getTopRight", MatchResult::getTopRight),
-            new Accessor("getBottomLeft", MatchResult::getBottomLeft),
-            new Accessor("getBottomRight", MatchResult::getBottomRight),
-            new Accessor("getRect", MatchResult::getRect),
-            new Accessor("getPointWithOffset", m -> m.getPointWithOffset(3, 4)));
+            new Accessor("center", MatchResult::center),
+            new Accessor("randomClickPoint", MatchResult::randomClickPoint),
+            new Accessor("topLeft", MatchResult::topLeft),
+            new Accessor("topRight", MatchResult::topRight),
+            new Accessor("bottomLeft", MatchResult::bottomLeft),
+            new Accessor("bottomRight", MatchResult::bottomRight),
+            new Accessor("rect", MatchResult::rect),
+            new Accessor("pointWithOffset", m -> m.pointWithOffset(3, 4)));
 
     private record Accessor(String name, Function<MatchResult, Object> read) {}
 
@@ -85,7 +85,7 @@ class MatchResultNullContractTest {
         MatchResult miss = MatchResult.miss(0.71);
 
         assertFalse(miss.isFound(), "a below-threshold score is not a find");
-        assertEquals(0.71, miss.getConfidence(), 1e-9,
+        assertEquals(0.71, miss.confidence(), 1e-9,
                 "the real near-miss score is the point of miss() — an observer showing 0 cannot tell "
                         + "'nothing like it on screen' from 'almost matched'");
         for (Accessor a : NULLABLE) {
@@ -96,10 +96,10 @@ class MatchResultNullContractTest {
     @Test
     void aNotFoundResultHasNoTemplateIdAndZeroSize() {
         MatchResult notFound = MatchResult.notFound();
-        assertNull(notFound.getTemplateId());
-        assertEquals(0, notFound.getWidth());
-        assertEquals(0, notFound.getHeight());
-        assertEquals(0.0, notFound.getConfidence(), 1e-9);
+        assertNull(notFound.templateId());
+        assertEquals(0, notFound.width());
+        assertEquals(0, notFound.height());
+        assertEquals(0.0, notFound.confidence(), 1e-9);
     }
 
     // ---- found ⇒ non-null, with the geometry that makes the guard worth passing ----
@@ -117,19 +117,19 @@ class MatchResultNullContractTest {
     void theCornersDescribeTheMatchedRectangle() {
         MatchResult m = found(); // (10,20) 40x30
 
-        assertEquals(10, m.getTopLeft().x());
-        assertEquals(20, m.getTopLeft().y());
-        assertEquals(50, m.getTopRight().x());
-        assertEquals(20, m.getTopRight().y());
-        assertEquals(10, m.getBottomLeft().x());
-        assertEquals(50, m.getBottomLeft().y());
-        assertEquals(50, m.getBottomRight().x());
-        assertEquals(50, m.getBottomRight().y());
+        assertEquals(10, m.topLeft().x());
+        assertEquals(20, m.topLeft().y());
+        assertEquals(50, m.topRight().x());
+        assertEquals(20, m.topRight().y());
+        assertEquals(10, m.bottomLeft().x());
+        assertEquals(50, m.bottomLeft().y());
+        assertEquals(50, m.bottomRight().x());
+        assertEquals(50, m.bottomRight().y());
 
-        assertEquals(30, m.getCenter().x(), "centre is top-left + half the width");
-        assertEquals(35, m.getCenter().y());
+        assertEquals(30, m.center().x(), "centre is top-left + half the width");
+        assertEquals(35, m.center().y());
 
-        Rect r = m.getRect();
+        Rect r = m.rect();
         assertEquals(10, r.x());
         assertEquals(20, r.y());
         assertEquals(40, r.width());
@@ -144,7 +144,7 @@ class MatchResultNullContractTest {
     void theRandomClickPointAlwaysLandsInsideTheMatch() {
         MatchResult m = found(); // (10,20) 40x30
         for (int i = 0; i < 500; i++) {
-            Point p = m.getRandomClickPoint();
+            Point p = m.randomClickPoint();
             assertTrue(p.x() >= 10 && p.x() <= 50, "x escaped the match: " + p.x());
             assertTrue(p.y() >= 20 && p.y() <= 50, "y escaped the match: " + p.y());
         }
@@ -152,7 +152,7 @@ class MatchResultNullContractTest {
 
     @Test
     void offsetsAreRelativeToTheTopLeft() {
-        Point p = found().getPointWithOffset(3, 4);
+        Point p = found().pointWithOffset(3, 4);
         assertEquals(13, p.x());
         assertEquals(24, p.y());
     }

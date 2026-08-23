@@ -117,7 +117,7 @@ class MatchesFindTest {
     }
 
     @Test
-    void ifFindAnyPassesTheWholeCombinationAndSeedsVisionContext(@TempDir Path tmp) throws Exception {
+    void ifFindAnyPassesTheWholeCombinationAndSeedsVision(@TempDir Path tmp) throws Exception {
         BufferedImage mailPatch = patch(1), claimPatch = patch(2);
         ImageTemplate mail = write(tmp, "mail", mailPatch);
         ImageTemplate claim = write(tmp, "claim", claimPatch);
@@ -132,8 +132,8 @@ class MatchesFindTest {
 
         assertTrue(ran);
         assertEquals(1, source.captures);
-        assertTrue(VisionContext.getLastMatches().hasAll(mail, claim));
-        assertTrue(VisionContext.getLastMatch().isFound(), "best() must still seed the single-match slot");
+        assertTrue(Vision.lastMatches().hasAll(mail, claim));
+        assertTrue(Vision.lastMatch().isFound(), "best() must still seed the single-match slot");
     }
 
     @Test
@@ -172,7 +172,7 @@ class MatchesFindTest {
 
         assertEquals(2, iterations[0]);
         assertEquals(3, source.captures, "one capture per iteration plus the terminating check");
-        assertTrue(VisionContext.getLastMatches().isEmpty(), "the context must reflect the final, clear frame");
+        assertTrue(Vision.lastMatches().isEmpty(), "the context must reflect the final, clear frame");
     }
 
     @Test

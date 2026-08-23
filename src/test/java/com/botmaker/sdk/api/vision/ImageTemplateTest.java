@@ -24,18 +24,18 @@ class ImageTemplateTest {
 
     @Test
     void derivesIdFromFileName() {
-        assertEquals("default_template", new ImageTemplate("images/default_template.png").getId());
-        assertEquals("btn", new ImageTemplate("btn").getId()); // no extension
+        assertEquals("default_template", new ImageTemplate("images/default_template.png").id());
+        assertEquals("btn", new ImageTemplate("btn").id()); // no extension
     }
 
     @Test
     void defaultAndCustomThreshold() {
-        assertEquals(0.8, new ImageTemplate(IMAGE).getThreshold(), 1e-9);
-        assertEquals(0.95, new ImageTemplate(IMAGE, 0.95).getThreshold(), 1e-9);
+        assertEquals(0.8, new ImageTemplate(IMAGE).threshold(), 1e-9);
+        assertEquals(0.95, new ImageTemplate(IMAGE, 0.95).threshold(), 1e-9);
 
         ImageTemplate t = new ImageTemplate(IMAGE);
         t.setThreshold(0.5);
-        assertEquals(0.5, t.getThreshold(), 1e-9);
+        assertEquals(0.5, t.threshold(), 1e-9);
     }
 
     @Test

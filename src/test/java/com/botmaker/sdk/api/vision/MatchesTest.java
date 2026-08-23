@@ -96,7 +96,7 @@ class MatchesTest {
         MatchResult first = found("mail", 0.8);
         MatchResult second = found("claim", 0.8);
 
-        assertEquals("claim", of(found("mail", 0.7), found("claim", 0.93)).best().getTemplateId());
+        assertEquals("claim", of(found("mail", 0.7), found("claim", 0.93)).best().templateId());
         assertSame(first, of(first, second).best(), "a tie keeps the group's priority order");
     }
 
@@ -116,7 +116,7 @@ class MatchesTest {
     void allIsOrderedAndUnmodifiable() {
         Matches m = of(found("mail", 0.9), found("claim", 0.8));
 
-        assertEquals(List.of("mail", "claim"), m.all().stream().map(MatchResult::getTemplateId).toList());
+        assertEquals(List.of("mail", "claim"), m.all().stream().map(MatchResult::templateId).toList());
         org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class,
                 () -> m.all().add(found("x", 1.0)));
     }

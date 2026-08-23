@@ -90,8 +90,8 @@ class ClickLastFrameTest {
     }
 
     /** An empty frame over a source — enough to assert the scoping, with nothing to click. */
-    private static VisionContext.Frame frameOver(CaptureSource source) {
-        return new VisionContext.Frame(Matches.of(List.of()), source, null, ImageTemplateGroup.of());
+    private static Vision.Frame frameOver(CaptureSource source) {
+        return new Vision.Frame(Matches.of(List.of()), source, null, ImageTemplateGroup.of());
     }
 
     @Test
@@ -211,10 +211,10 @@ class ClickLastFrameTest {
         screen.getGraphics().drawImage(marker, 60, 60, null);
         CountingSource source = new CountingSource(screen);
 
-        // A real find, so VisionContext.getLastMatch() holds a genuine coordinate: the point is that a *found*
+        // A real find, so Vision.lastMatch() holds a genuine coordinate: the point is that a *found*
         // match is still not something clickLast() will act on once its frame is over.
         ImageFinder.ifFindAny(ImageTemplateGroup.of(template), source, found -> { });
-        assertFalse(VisionContext.inFrame(), "the callback has returned");
+        assertFalse(Vision.inFrame(), "the callback has returned");
 
         // Quiet, not loud: a bot that drifts out of a callback carries on. It still clicks nothing.
         assertFalse(ImageClicker.clickLast());
@@ -228,21 +228,21 @@ class ClickLastFrameTest {
     @Test
     void theFrameIsScopedToTheCallbackAndNestsBackToTheOuterOne() {
         CountingSource source = new CountingSource(noise());
-        VisionContext.Frame outer = frameOver(source);
-        VisionContext.Frame inner = frameOver(source);
+        Vision.Frame outer = frameOver(source);
+        Vision.Frame inner = frameOver(source);
 
-        assertFalse(VisionContext.inFrame(), "no frame before anything runs");
-        VisionContext.runInFrame(outer, m -> {
-            assertTrue(VisionContext.inFrame());
-            VisionContext.runInFrame(inner, n -> assertTrue(VisionContext.inFrame()));
-            assertTrue(VisionContext.inFrame(), "a nested check must restore the outer frame, not clear it");
+        assertFalse(Vision.inFrame(), "no frame before anything runs");
+        Vision.runInFrame(outer, m -> {
+            assertTrue(Vision.inFrame());
+            Vision.runInFrame(inner, n -> assertTrue(Vision.inFrame()));
+            assertTrue(Vision.inFrame(), "a nested check must restore the outer frame, not clear it");
         });
-        assertFalse(VisionContext.inFrame(), "and the outermost callback leaves none behind");
+        assertFalse(Vision.inFrame(), "and the outermost callback leaves none behind");
 
         // A callback that throws must not leak its frame either — the finally is the whole guarantee.
-        assertThrows(RuntimeException.class, () -> VisionContext.runInFrame(outer, m -> {
+        assertThrows(RuntimeException.class, () -> Vision.runInFrame(outer, m -> {
             throw new RuntimeException("boom");
         }));
-        assertFalse(VisionContext.inFrame());
+        assertFalse(Vision.inFrame());
     }
 }

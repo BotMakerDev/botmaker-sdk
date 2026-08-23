@@ -58,17 +58,17 @@ public class ColorMatch {
     }
 
     /** The colour this search was looking for, or {@code null} if not found. */
-    public Color getColor() {
+    public Color color() {
         return color;
     }
 
     /** Number of matched pixels in this cluster — the quantity {@code Precision.minArea} gates on. */
-    public int getPixelCount() {
+    public int pixelCount() {
         return pixelCount;
     }
 
     /** Fraction (0..1) of the searched region covered by matching pixels. */
-    public double getCoverage() {
+    public double coverage() {
         return coverage;
     }
 
@@ -76,34 +76,34 @@ public class ColorMatch {
      * The cluster's centre of mass — a better click target than the bbox centre for a non-rectangular blob
      * (an L-shape's bbox centre can lie entirely outside the shape). {@code null} if not found.
      */
-    public Point getCenter() {
+    public Point center() {
         // Point is immutable, so the defensive copy this used to make is no longer needed.
         return found ? centroid : null;
     }
 
     /** Top-left of the cluster's bounding box, or {@code null} if not found. */
-    public Point getTopLeft() {
+    public Point topLeft() {
         return found ? location : null;
     }
 
     /** The cluster's bounding box, or {@code null} if not found. */
-    public Rect getBounds() {
+    public Rect bounds() {
         if (!found) return null;
         return new Rect(location, new Size(width, height));
     }
 
-    public int getWidth() {
+    public int width() {
         return width;
     }
 
-    public int getHeight() {
+    public int height() {
         return height;
     }
 
     @Override
     public String toString() {
         if (!found) return "ColorMatch{notFound}";
-        return "ColorMatch{color=" + color + ", center=" + getCenter()
+        return "ColorMatch{color=" + color + ", center=" + center()
                 + ", pixels=" + pixelCount + ", coverage=" + String.format("%.4f", coverage) + "}";
     }
 }

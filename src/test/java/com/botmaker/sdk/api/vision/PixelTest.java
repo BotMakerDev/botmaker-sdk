@@ -41,17 +41,17 @@ class PixelTest {
 
         assertTrue(Pixel.find(Color.RED, source, Precision.TIGHT));
 
-        ColorMatch m = VisionContext.getLastColorMatch();
+        ColorMatch m = Vision.lastColorMatch();
         assertTrue(m.isFound());
         // Patch is at (10,20)-(30,40) in image space; the source origin is (500,300).
-        assertEquals(510, m.getTopLeft().x());
-        assertEquals(320, m.getTopLeft().y());
+        assertEquals(510, m.topLeft().x());
+        assertEquals(320, m.topLeft().y());
         // The centre of mass is fractional and now rounded inside the SDK, so ±1 rather than exact.
-        assertTrue(Math.abs(520 - m.getCenter().x()) <= 1, "centre must be absolute, not image-local");
-        assertTrue(Math.abs(330 - m.getCenter().y()) <= 1);
-        assertEquals(400, m.getPixelCount());
+        assertTrue(Math.abs(520 - m.center().x()) <= 1, "centre must be absolute, not image-local");
+        assertTrue(Math.abs(330 - m.center().y()) <= 1);
+        assertEquals(400, m.pixelCount());
 
-        Rect bounds = m.getBounds();
+        Rect bounds = m.bounds();
         assertEquals(510, bounds.x());
         assertEquals(320, bounds.y());
         assertEquals(20, bounds.width());
@@ -62,13 +62,13 @@ class PixelTest {
     void aMissLeavesANotFoundResultRatherThanStaleData() {
         CaptureSource source = new FakeSource(sceneWithRedPatch(), 0, 0);
         assertTrue(Pixel.find(Color.RED, source, Precision.TIGHT));
-        assertTrue(VisionContext.lastColorMatchFound());
+        assertTrue(Vision.lastColorMatchFound());
 
         assertFalse(Pixel.find(Color.MAGENTA, source, Precision.EXACT));
-        ColorMatch m = VisionContext.getLastColorMatch();
+        ColorMatch m = Vision.lastColorMatch();
         assertFalse(m.isFound(), "a miss must overwrite the previous hit");
-        assertNull(m.getCenter());
-        assertNull(m.getBounds());
+        assertNull(m.center());
+        assertNull(m.bounds());
     }
 
     @Test
@@ -108,9 +108,9 @@ class PixelTest {
         CaptureSource source = new FakeSource(img, 0, 0);
 
         assertEquals(2, Pixel.findAll(Color.RED, source, Precision.TIGHT));
-        List<ColorMatch> all = VisionContext.getLastColorMatchList();
-        assertEquals(400, all.get(0).getPixelCount());
-        assertEquals(25, all.get(1).getPixelCount());
+        List<ColorMatch> all = Vision.lastColorMatchList();
+        assertEquals(400, all.get(0).pixelCount());
+        assertEquals(25, all.get(1).pixelCount());
     }
 
     @Test

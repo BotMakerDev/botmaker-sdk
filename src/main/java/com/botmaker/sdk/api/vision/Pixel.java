@@ -19,7 +19,7 @@ import java.util.List;
  * <p>The colour counterpart to {@link ImageFinder}. Same conventions: every search takes a
  * {@link CaptureSource} (a window, a monitor, or the desktop), a search <em>region</em> is expressed as a
  * {@link CaptureSource#region(Rect) region of a source} rather than a separate parameter, results come back
- * in <b>absolute screen coordinates</b>, and the full result is parked in {@link VisionContext} so the
+ * in <b>absolute screen coordinates</b>, and the full result is parked in {@link Vision} so the
  * boolean-returning calls stay readable. No-source overloads use {@link Source#current()}.
  *
  * <h2>How exacting the search is — one knob-set, {@link Precision}</h2>
@@ -39,7 +39,7 @@ import java.util.List;
  * // Is the health bar still red, in the top-left corner of the game window?
  * CaptureSource hud = CaptureSource.window("MyGame").region(new Rect(10, 10, 200, 30));
  * if (Pixel.find(Color.RED, hud, Precision.DEFAULT.minArea(400).minCount(2000))) {
- *     Mouse.click(VisionContext.getLastColorMatch().getCenter());
+ *     Mouse.click(Vision.getLastColorMatch().center());
  * }
  * }</pre>
  */
@@ -121,23 +121,23 @@ public class Pixel {
 
     /**
      * Finds {@code target} within {@code source} at {@code precision} — all three of its knobs apply. The
-     * best (largest) cluster is stored in {@link VisionContext#getLastColorMatch()}.
+     * best (largest) cluster is stored in {@link Vision#lastColorMatch()}.
      */
     public static boolean find(Color target, CaptureSource source, Precision precision) {
         ColorMatch result = findInternal(target, source, precision);
-        VisionContext.setLastColorMatch(result);
+        Vision.setLastColorMatch(result);
         return result.isFound();
     }
 
     /**
      * Finds every distinct cluster of {@code target} within {@code source}, largest first. The list is stored
-     * in {@link VisionContext#getLastColorMatchList()}.
+     * in {@link Vision#lastColorMatchList()}.
      *
      * @return how many clusters matched
      */
     public static int findAll(Color target, CaptureSource source, Precision precision) {
         List<ColorMatch> all = findAllInternal(target, source, precision);
-        VisionContext.setLastColorMatchList(all);
+        Vision.setLastColorMatchList(all);
         return all.size();
     }
 
@@ -157,13 +157,13 @@ public class Pixel {
         Rect region = source.subRegion();
         BufferedImage img = source.capture();
         if (img == null) {
-            VisionContext.setLastColorMatch(ColorMatch.notFound());
+            Vision.setLastColorMatch(ColorMatch.notFound());
             return false;
         }
         List<RawColorMatch> raw = ColorMatcher.findClustersInRange(
                 img, low, high, precision.minArea(), precision.minCount());
         List<ColorMatch> mapped = map(raw, source, img, midpoint(low, high));
-        VisionContext.setLastColorMatchList(mapped);
+        Vision.setLastColorMatchList(mapped);
         return !mapped.isEmpty();
     }
 
@@ -203,7 +203,7 @@ public class Pixel {
     /**
      * Polls until {@code target} appears in {@code source} or {@code timeoutMs} elapses.
      *
-     * @return true if it appeared; the match is in {@link VisionContext#getLastColorMatch()}
+     * @return true if it appeared; the match is in {@link Vision#lastColorMatch()}
      */
     public static boolean waitFor(Color target, CaptureSource source, Precision precision, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;

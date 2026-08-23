@@ -8,6 +8,49 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — `VisionContext` → `Vision`, and the accessors drop `get` (phase 3.8 of 12)
+
+**Changed:** `api/vision/VisionContext.java` → `api/vision/Vision.java`; the `get` prefix dropped from every
+accessor on `MatchResult`, `ColorMatch`, `TextMatch`, `ImageTemplate`, `Rect` and `Vision`; Studio's
+`palette/SdkType.VISION_CONTEXT` → `VISION` and the three `BotType` initializer seeds repointed.
+
+**Done**
+
+- **One spelling for accessors across `api`.** `api.geometry` became records of `int`s in phase 3.5, so
+  `Rect.width()` sat one import away from `MatchResult.getWidth()` — and `Rect` contained *both*
+  conventions itself, `getCenter()` next to `x()`, `size()` and `area()`. The rule adopted, and the whole of
+  it: **an accessor drops `get`; a mutator keeps `set`.** `ImageTemplate.setThreshold` is unchanged, and
+  `isFound`, `inFrame`, `lastMatchFound`, `clearLastMatch` and `ifLastMatch` were never accessors and keep
+  their names.
+- **`VisionContext` is `Vision`.** "Context" was a placeholder noun for a class that is really *what the last
+  search saw*, and the call site is what a bot author reads:
+  `VisionContext.getLastMatch().getCenter()` against `Vision.lastMatch().center()`. Its accessors moved with
+  it — `lastMatch`, `lastMatchList`, `lastMatches`, and the colour/text equivalents.
+- **The private `ThreadLocal` fields now share their accessors' names** (`lastMatch` the field, `lastMatch()`
+  the method). Legal — fields and methods are separate namespaces — and exactly what a record does; noted
+  because it reads as a clash at first glance and is not one.
+- **The compiler enumerated the call sites, not a grep.** `getWidth` alone matches 142 places in the two
+  modules and almost none of them are ours (JavaFX nodes, `BufferedImage`, shared's `GenericWindow`), so the
+  method was: rename in the declaring class, compile, fix exactly what javac names, repeat. The one class of
+  site javac *cannot* see — an SDK member named in a string literal — was swept separately, and found one:
+  `LambdaCallBlock`'s hint text offering `m.getCenter()` to the user.
+- **`MatchResultNullContractTest` needed both halves moved together**: it pairs a method reference with a
+  name *string* and reflects over `MatchResult` to prove the covered list is complete, so a half-rename would
+  have left it passing while covering nothing.
+
+**Deferred / next**
+
+- **Existing bots take a plain compile error**, by decision. `ImportManager.repairSdkImports` keys on a simple
+  name, so it carries a package move for free but not a class rename, and a *member* rename is the
+  `@ReplacedBy`/`@Replaces` machinery, deliberately unused pre-contract. Three bots, all the maintainer's —
+  the same trade phase 3.6 took.
+- **Phase 3.9 — `@Palette`, the curation layer.** This audit's §3 recorded methods *worth keeping but not
+  worth offering* and had no lever but deletion. `@com.botmaker.sdk.api.meta.Palette` separates the two:
+  strict whitelist, per overload, read from the jar by the ClassGraph scan Studio already runs. **Hiding is
+  not deprecating** — an unannotated method stays public, supported and under contract.
+
+---
+
 ## 2026-08-23 — the method audit: three type leaks and one duplicated field (phase 3.7 of 12)
 
 **Changed:** every public method in `api.*` read once before the contract starts at 1.1.0, with a verdict and
@@ -49,14 +92,8 @@ summary, not a substitute.
 
 **Deferred / next**
 
-- **Phase 3.8 — the accessor rename**, decided here and specified in §2 of the audit doc: `api.vision`'s value
-  types use JavaBean accessors while `api.geometry`'s records (phase 3.5) use the record spelling, one import
-  apart. Rule adopted: *an accessor drops `get`; a mutator keeps `set`*. Covers `MatchResult`, `ColorMatch`,
-  `TextMatch`, `ImageTemplate`, `Rect`, and **`VisionContext` → `Vision`** (a placeholder noun for a class that
-  is really "what the last search saw" — `Vision.lastMatch().center()`). Split out because it is **495 lines
-  across 55 files** and this repo forbids bulk text replacement, so it is a multi-turn sweep, not a paragraph
-  of this one. Existing bots take a plain compile error: `repairSdkImports` keys on a simple name, so it
-  carries a package move but not a class rename, and pointers are deliberately unused pre-contract.
+- **Phase 3.8 — the accessor rename** — decided here, specified in §2 of the audit doc, **landed the same
+  day**; see the entry above.
 - **The third leak stays open, deliberately:** `Text`'s nine `shared.ocr.OcrOptions` overloads plus
   `DEFAULT_OPTIONS`. Unlike the other two it is a working, documented feature, so removing it alone is a
   capability regression and replacing it means designing an `api.vision`-owned tuning type — which the plan

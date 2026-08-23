@@ -6,17 +6,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Global, thread-local context for vision operations. Provides access to the most recent
- * {@link MatchResult} from any {@link ImageFinder}, {@link ImageClicker}, or {@link ImageWaiter}
- * method call, enabling fluent coding patterns while preserving rich match information.
+ * What the last vision search saw. Global, thread-local access to the most recent {@link MatchResult} from any
+ * {@link ImageFinder}, {@link ImageClicker}, or {@link ImageWaiter} call, enabling fluent coding patterns while
+ * preserving rich match information.
  *
  * <p>Every find/click/wait call in the vision API automatically updates the last match result
  * for the current thread. This lets you write fluent code like:
  *
  * <pre>{@code
  * if (ImageClicker.click(button)) {
- *     MatchResult last = VisionContext.getLastMatch();
- *     System.out.println("Clicked at " + last.getCenter() + " with confidence " + last.getConfidence());
+ *     MatchResult last = Vision.lastMatch();
+ *     System.out.println("Clicked at " + last.center() + " with confidence " + last.confidence());
  * }
  * }</pre>
  *
@@ -24,14 +24,18 @@ import java.util.List;
  * of results is also available:
  * <pre>{@code
  * int count = ImageFinder.findAll(template);
- * List<MatchResult> results = VisionContext.getLastMatchList();
+ * List<MatchResult> results = Vision.lastMatchList();
  * }</pre>
  *
  * <p>The context is {@link ThreadLocal}, so it is automatically isolated per thread — safe for
  * concurrent bot execution. Use {@link #clearLastMatch()} to reset the context for the
  * current thread (e.g., at the start of a bot action).
+ *
+ * <p><b>Named {@code Vision} since 1.1.0</b>, previously {@code VisionContext}. "Context" was a placeholder
+ * noun for a class that is really <em>what the last search saw</em>, and the call site is what a bot author
+ * reads: {@code VisionContext.getLastMatch().getCenter()} against {@code Vision.lastMatch().center()}.
  */
-public final class VisionContext {
+public final class Vision {
 
     private static final ThreadLocal<MatchResult> lastMatch = new ThreadLocal<>();
     private static final ThreadLocal<List<MatchResult>> lastMatchList = new ThreadLocal<>();
@@ -41,7 +45,7 @@ public final class VisionContext {
     private static final ThreadLocal<TextMatch> lastTextMatch = new ThreadLocal<>();
     private static final ThreadLocal<List<TextMatch>> lastTextMatchList = new ThreadLocal<>();
 
-    private VisionContext() {}
+    private Vision() {}
 
     /**
      * Returns the most recent match result for the current thread, or {@link MatchResult#notFound()}
@@ -49,7 +53,7 @@ public final class VisionContext {
      *
      * @return the last match result, never null
      */
-    public static MatchResult getLastMatch() {
+    public static MatchResult lastMatch() {
         MatchResult result = lastMatch.get();
         return result != null ? result : MatchResult.notFound();
     }
@@ -60,19 +64,19 @@ public final class VisionContext {
      *
      * @return the last match result list, never null
      */
-    public static List<MatchResult> getLastMatchList() {
+    public static List<MatchResult> lastMatchList() {
         List<MatchResult> result = lastMatchList.get();
         return result != null ? result : new ArrayList<>();
     }
 
     /**
      * Returns whether the last match for the current thread was successful.
-     * Equivalent to {@code getLastMatch().isFound()}.
+     * Equivalent to {@code lastMatch().isFound()}.
      *
      * @return true if the last vision operation found a match
      */
     public static boolean lastMatchFound() {
-        return getLastMatch().isFound();
+        return lastMatch().isFound();
     }
 
     /**
@@ -82,18 +86,18 @@ public final class VisionContext {
      *
      * <p>Prefer the lambda's own parameter: {@code whileFindAny(POPUPS, found -> …)} hands you exactly this
      * value, scoped to the frame it describes. This accessor is the out-of-band escape hatch, for the same
-     * reason {@link #getLastMatch()} is.
+     * reason {@link #lastMatch()} is.
      *
      * @return the last group result, never null
      */
-    public static Matches getLastMatches() {
+    public static Matches lastMatches() {
         Matches result = lastMatches.get();
         return result != null ? result : Matches.none();
     }
 
     // --- the current frame -------------------------------------------------
     //
-    // getLastMatches() above answers "what did the last group check see", which outlives the callback that saw
+    // lastMatches() above answers "what did the last group check see", which outlives the callback that saw
     // it. That is fine for reading and useless for *acting*: a coordinate is only valid for the frame it was
     // measured in, so a click on a stale one lands wherever the screen has since moved. The frame below is the
     // narrower fact — "a group callback is running right now, over these matches, on this source, and these
@@ -149,7 +153,7 @@ public final class VisionContext {
      *
      * <p>Answering with null rather than throwing is deliberate, and is a change of mind: this used to be a
      * loud {@code IllegalStateException}, on the grounds that the alternative — falling back on
-     * {@link #getLastMatch()} — would click a coordinate measured against a frame that is no longer on screen.
+     * {@link #lastMatch()} — would click a coordinate measured against a frame that is no longer on screen.
      * That reasoning was right about the click and wrong about the remedy. The frame verbs still never click a
      * stale coordinate; they simply report that there was nothing to click, exactly as they already did for an
      * <em>empty</em> frame. A bot that drifts out of a callback should carry on, not die.
@@ -176,7 +180,7 @@ public final class VisionContext {
      * @return true if a match existed and the action was invoked, false otherwise
      */
     public static boolean ifLastMatch(java.util.function.Consumer<MatchResult> action) {
-        MatchResult result = getLastMatch();
+        MatchResult result = lastMatch();
         if (result.isFound()) {
             action.accept(result);
             return true;
@@ -204,9 +208,9 @@ public final class VisionContext {
     /**
      * Internal method: updates the last group result for the current thread.
      *
-     * <p>Also seeds {@link #getLastMatch()} with {@code matches.best()} so the single-match accessor keeps
+     * <p>Also seeds {@link #lastMatch()} with {@code matches.best()} so the single-match accessor keeps
      * meaning something after a group check — the palette's seeded
-     * {@code MatchResult match = VisionContext.getLastMatch()} entry relies on it.
+     * {@code MatchResult match = Vision.lastMatch()} entry relies on it.
      */
     static void setLastMatches(Matches matches) {
         lastMatches.set(matches);
@@ -234,7 +238,7 @@ public final class VisionContext {
      *
      * @return the last colour match, never null
      */
-    public static ColorMatch getLastColorMatch() {
+    public static ColorMatch lastColorMatch() {
         ColorMatch result = lastColorMatch.get();
         return result != null ? result : ColorMatch.notFound();
     }
@@ -245,17 +249,17 @@ public final class VisionContext {
      *
      * @return the last colour match list, never null
      */
-    public static List<ColorMatch> getLastColorMatchList() {
+    public static List<ColorMatch> lastColorMatchList() {
         List<ColorMatch> result = lastColorMatchList.get();
         return result != null ? result : new ArrayList<>();
     }
 
     /**
      * Returns whether the last colour search for the current thread found something.
-     * Equivalent to {@code getLastColorMatch().isFound()}.
+     * Equivalent to {@code lastColorMatch().isFound()}.
      */
     public static boolean lastColorMatchFound() {
-        return getLastColorMatch().isFound();
+        return lastColorMatch().isFound();
     }
 
     /** Clears the last colour match and colour match list for the current thread. */
@@ -270,7 +274,7 @@ public final class VisionContext {
      * @return true if a match existed and the action was invoked
      */
     public static boolean ifLastColorMatch(java.util.function.Consumer<ColorMatch> action) {
-        ColorMatch result = getLastColorMatch();
+        ColorMatch result = lastColorMatch();
         if (result.isFound()) {
             action.accept(result);
             return true;
@@ -302,7 +306,7 @@ public final class VisionContext {
      *
      * @return the last text match, never null
      */
-    public static TextMatch getLastTextMatch() {
+    public static TextMatch lastTextMatch() {
         TextMatch result = lastTextMatch.get();
         return result != null ? result : TextMatch.notFound();
     }
@@ -313,17 +317,17 @@ public final class VisionContext {
      *
      * @return the last text match list, never null
      */
-    public static List<TextMatch> getLastTextMatchList() {
+    public static List<TextMatch> lastTextMatchList() {
         List<TextMatch> result = lastTextMatchList.get();
         return result != null ? result : new ArrayList<>();
     }
 
     /**
      * Returns whether the last text search for the current thread found something.
-     * Equivalent to {@code getLastTextMatch().isFound()}.
+     * Equivalent to {@code lastTextMatch().isFound()}.
      */
     public static boolean lastTextMatchFound() {
-        return getLastTextMatch().isFound();
+        return lastTextMatch().isFound();
     }
 
     /** Clears the last text match and text match list for the current thread. */
@@ -338,7 +342,7 @@ public final class VisionContext {
      * @return true if a match existed and the action was invoked
      */
     public static boolean ifLastTextMatch(java.util.function.Consumer<TextMatch> action) {
-        TextMatch result = getLastTextMatch();
+        TextMatch result = lastTextMatch();
         if (result.isFound()) {
             action.accept(result);
             return true;

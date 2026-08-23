@@ -58,15 +58,15 @@ public class ImageTemplate implements AutoCloseable {
         this.threshold = threshold;
     }
 
-    public String getId() {
+    public String id() {
         return id;
     }
 
-    public String getFilePath() {
+    public String filePath() {
         return filePath;
     }
 
-    public double getThreshold() {
+    public double threshold() {
         return threshold;
     }
 

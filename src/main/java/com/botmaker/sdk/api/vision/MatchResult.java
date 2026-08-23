@@ -41,7 +41,7 @@ public class MatchResult {
     /**
      * A not-found result that still carries the best (below-threshold) score observed. Intended for telemetry
      * so an observer can show a real near-miss confidence instead of {@code 0}; {@link #isFound()} is still
-     * {@code false} and {@link #getCenter()}/click points still return {@code null}, so the public
+     * {@code false} and {@link #center()}/click points still return {@code null}, so the public
      * find contract is unchanged.
      */
     static MatchResult miss(double bestScore) {
@@ -52,16 +52,16 @@ public class MatchResult {
         return found;
     }
 
-    public double getConfidence() {
+    public double confidence() {
         return confidence;
     }
 
-    public Point getCenter() {
+    public Point center() {
         // The centre pixel — the midpoint rounded, since a click lands on a whole pixel.
         return found ? new Point(location.x() + width / 2, location.y() + height / 2) : null;
     }
 
-    public Point getRandomClickPoint() {
+    public Point randomClickPoint() {
         if (!found) return null;
 
         int randomXOffset = RANDOM.nextInt((width / 2) + 1);
@@ -73,40 +73,40 @@ public class MatchResult {
         );
     }
 
-    public Point getTopLeft() {
+    public Point topLeft() {
         return found ? location : null;
     }
 
-    public Point getTopRight() {
+    public Point topRight() {
         return found ? new Point(location.x() + width, location.y()) : null;
     }
 
-    public Point getBottomLeft() {
+    public Point bottomLeft() {
         return found ? new Point(location.x(), location.y() + height) : null;
     }
 
-    public Point getBottomRight() {
+    public Point bottomRight() {
         return found ? new Point(location.x() + width, location.y() + height) : null;
     }
 
-    public Point getPointWithOffset(int offsetX, int offsetY) {
+    public Point pointWithOffset(int offsetX, int offsetY) {
         if (!found) return null;
         return new Point(location.x() + offsetX, location.y() + offsetY);
     }
 
-    public Rect getRect() {
+    public Rect rect() {
         return found ? new Rect(location, new Size(width, height)) : null;
     }
 
-    public int getWidth() {
+    public int width() {
         return width;
     }
 
-    public int getHeight() {
+    public int height() {
         return height;
     }
 
-    public String getTemplateId() {
+    public String templateId() {
         return templateId;
     }
 

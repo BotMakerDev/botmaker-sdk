@@ -20,8 +20,8 @@ import java.util.List;
  * {@link CaptureSource#region(com.botmaker.sdk.api.geometry.Rect) region}), so a click can be pinned to a specific surface.
  * The template is located within the source; the click lands at the resulting absolute screen coordinate.
  * <p>
- * Every method in this class also updates {@link VisionContext} for the current thread,
- * enabling access to the most recent match via {@link VisionContext#getLastMatch()}.
+ * Every method in this class also updates {@link Vision} for the current thread,
+ * enabling access to the most recent match via {@link Vision#lastMatch()}.
  */
 public class ImageClicker {
 
@@ -30,8 +30,8 @@ public class ImageClicker {
     /**
      * Clicks the specified template on the current capture source using the default confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param template the image template to search for and click
      * @return true if the template was found and clicked, false otherwise
@@ -46,8 +46,8 @@ public class ImageClicker {
     /**
      * Clicks the specified template on the current capture source with a custom confidence threshold.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param template   the image template to search for and click
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -60,8 +60,8 @@ public class ImageClicker {
     /**
      * Clicks the specified template on a specific capture source using the default confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param template the image template to search for and click
      * @param source   the capture source (window, monitor, or desktop region) to search within
@@ -74,8 +74,8 @@ public class ImageClicker {
     /**
      * Clicks the specified template on a specific capture source with a custom confidence threshold.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param template   the image template to search for and click
      * @param source     the capture source (window, monitor, or desktop region) to search within
@@ -90,8 +90,8 @@ public class ImageClicker {
      * Clicks the specified template on a specific capture source with a custom confidence threshold and delay.
      * This is the core implementation that locates the template, clicks it, and waits for the specified delay.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param template   the image template to search for and click
      * @param source     the capture source (window, monitor, or desktop region) to search within
@@ -102,7 +102,7 @@ public class ImageClicker {
     public static boolean click(ImageTemplate template, CaptureSource source, double confidence, int delayMs) {
         PopupGuard.check();
         MatchResult result = ImageFinder.findInternal(template, source, confidence);
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result, delayMs > 0 ? delayMs : BotSettings.foundDelay());
     }
 
@@ -135,7 +135,7 @@ public class ImageClicker {
      */
     public static boolean click(MatchResult result, CaptureSource source) {
         if (result == null) return false;
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result);
     }
 
@@ -154,7 +154,7 @@ public class ImageClicker {
     // also takes a filtering `template…` overload, so a branch that matched three templates can act on the two
     // it cares about without looking at the screen again.
     //
-    // They are frame-scoped rather than "last match"-scoped on purpose: see VisionContext.currentFrame.
+    // They are frame-scoped rather than "last match"-scoped on purpose: see Vision.currentFrame.
     // Outside a frame they do nothing and say so in the return value — never an exception, and never a click
     // on a coordinate whose frame has scrolled away.
 
@@ -165,7 +165,7 @@ public class ImageClicker {
      * <p>Meaningful inside an {@link ImageFinder#ifFindAny}/{@link ImageFinder#whileFindAny}/{@code …All}
      * callback, where the {@link Matches} snapshot describes the screen as it is right now. <b>Outside one it
      * clicks nothing and returns false</b> — it will not click the coordinate of a frame that has since
-     * scrolled away. Ask {@link VisionContext#inFrame()} if you need to tell that apart from an empty frame.
+     * scrolled away. Ask {@link Vision#inFrame()} if you need to tell that apart from an empty frame.
      *
      * <pre>{@code
      * ImageFinder.whileFindAny(POPUPS, found -> ImageClicker.clickLast());   // dismiss popups, one capture each
@@ -178,7 +178,7 @@ public class ImageClicker {
      * @return true if the frame had a match and it was clicked, false otherwise
      */
     public static boolean clickLast() {
-        VisionContext.Frame frame = VisionContext.currentFrame();
+        Vision.Frame frame = Vision.currentFrame();
         return frame != null && clickResult(frame.source(), frame.matches().best());
     }
 
@@ -193,7 +193,7 @@ public class ImageClicker {
      * @return how many matches were clicked (0 outside a frame, or if the frame was empty)
      */
     public static int clickEachLast() {
-        VisionContext.Frame frame = VisionContext.currentFrame();
+        Vision.Frame frame = Vision.currentFrame();
         return frame == null ? 0 : clickEach(frame, frame.matches().all());
     }
 
@@ -209,7 +209,7 @@ public class ImageClicker {
      * @return how many matches were clicked
      */
     public static int clickEachLast(ImageTemplate... templates) {
-        VisionContext.Frame frame = VisionContext.currentFrame();
+        Vision.Frame frame = Vision.currentFrame();
         if (frame == null || templates == null) return 0;
         List<MatchResult> chosen = new ArrayList<>();
         for (MatchResult match : frame.matches().all()) {
@@ -230,7 +230,7 @@ public class ImageClicker {
      * @return how many matches were clicked (0 outside a frame, or if the frame was empty)
      */
     public static int clickAllLast() {
-        VisionContext.Frame frame = VisionContext.currentFrame();
+        Vision.Frame frame = Vision.currentFrame();
         if (frame == null) return 0;
         return clickAllOccurrences(frame, visibleTemplates(frame, null));
     }
@@ -243,7 +243,7 @@ public class ImageClicker {
      * @return how many matches were clicked
      */
     public static int clickAllLast(ImageTemplate... templates) {
-        VisionContext.Frame frame = VisionContext.currentFrame();
+        Vision.Frame frame = Vision.currentFrame();
         if (frame == null || templates == null) return 0;
         return clickAllOccurrences(frame, visibleTemplates(frame, List.of(templates)));
     }
@@ -251,7 +251,7 @@ public class ImageClicker {
     /** Whether {@code match} is the match of one of {@code templates}, compared the way {@link Matches} keys. */
     private static boolean namedAmong(MatchResult match, ImageTemplate[] templates) {
         for (ImageTemplate template : templates) {
-            if (template != null && template.getId().equals(match.getTemplateId())) return true;
+            if (template != null && template.id().equals(match.templateId())) return true;
         }
         return false;
     }
@@ -261,12 +261,12 @@ public class ImageClicker {
      * by the frame's own group rather than by the argument keeps the click order the group's, and means a
      * template that was never looked for cannot be smuggled in by the filter.
      */
-    private static List<ImageTemplate> visibleTemplates(VisionContext.Frame frame, List<ImageTemplate> wanted) {
+    private static List<ImageTemplate> visibleTemplates(Vision.Frame frame, List<ImageTemplate> wanted) {
         List<ImageTemplate> visible = new ArrayList<>();
         if (frame.group() == null) return visible;
         for (ImageTemplate template : frame.group().templates()) {
             if (!frame.matches().has(template)) continue;
-            if (wanted != null && wanted.stream().noneMatch(w -> w != null && w.getId().equals(template.getId()))) {
+            if (wanted != null && wanted.stream().noneMatch(w -> w != null && w.id().equals(template.id()))) {
                 continue;
             }
             visible.add(template);
@@ -275,8 +275,8 @@ public class ImageClicker {
     }
 
     /** Clicks {@code matches} in order, recording them as the last match list. */
-    private static int clickEach(VisionContext.Frame frame, List<MatchResult> matches) {
-        VisionContext.setLastMatchList(matches);
+    private static int clickEach(Vision.Frame frame, List<MatchResult> matches) {
+        Vision.setLastMatchList(matches);
         for (MatchResult match : matches) {
             clickResult(frame.source(), match);
         }
@@ -287,7 +287,7 @@ public class ImageClicker {
     }
 
     /** Re-matches {@code templates} against the frame's own pixels and clicks every occurrence found. */
-    private static int clickAllOccurrences(VisionContext.Frame frame, List<ImageTemplate> templates) {
+    private static int clickAllOccurrences(Vision.Frame frame, List<ImageTemplate> templates) {
         if (frame.pixels() == null || templates.isEmpty()) return 0;
         List<MatchResult> occurrences = new ArrayList<>();
         for (ImageTemplate template : templates) {
@@ -303,8 +303,8 @@ public class ImageClicker {
      * Clicks the first template (in order) that appears on the current capture source using the default confidence.
      * Templates are checked in the order provided, and the first one found above the threshold is clicked.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param templates the image templates to search for, in priority order
      * @return true if any template was found and clicked, false otherwise
@@ -316,8 +316,8 @@ public class ImageClicker {
     /**
      * Clicks the first template (in order) that appears on the current capture source with a custom confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
      * @param templates the image templates to search for, in priority order
@@ -330,8 +330,8 @@ public class ImageClicker {
     /**
      * Clicks the first template (in order) that appears on a specific capture source using the default confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param source    the capture source to search within
      * @param templates the image templates to search for, in priority order
@@ -345,8 +345,8 @@ public class ImageClicker {
      * Clicks the first template (in order) that appears on a specific capture source with a custom confidence.
      * This is the core implementation that iterates through templates and clicks the first match found.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param source     the capture source to search within
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -367,8 +367,8 @@ public class ImageClicker {
     /**
      * Clicks the first template in the group that appears on the current capture source using the default confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group the template group to search for
      * @return true if any template in the group was found and clicked, false otherwise
@@ -380,8 +380,8 @@ public class ImageClicker {
     /**
      * Clicks the first template in the group that appears on the current capture source with a custom confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group      the template group to search for
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -394,8 +394,8 @@ public class ImageClicker {
     /**
      * Clicks the first template in the group that appears on a specific capture source using the default confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
@@ -408,8 +408,8 @@ public class ImageClicker {
     /**
      * Clicks the first template in the group that appears on a specific capture source with a custom confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group      the template group to search for
      * @param source     the capture source to search within
@@ -425,15 +425,15 @@ public class ImageClicker {
     // There is deliberately no clickBest(ImageTemplate ...) counterpart. "Best" is only a question when there
     // are several templates to choose between; for a single one, findInternal already returns its best match,
     // so the four single-template overloads that used to sit here were click(ImageTemplate ...) under a second
-    // name — and a worse one: they never reached VisionContext.setLastMatch, so getLastMatch() went stale
+    // name — and a worse one: they never reached Vision.setLastMatch, so getLastMatch() went stale
     // after them, which their own Javadoc claimed the opposite of. Removed in 1.1.0; use click(...).
 
     /**
      * Clicks the highest-scoring match for any template in the group on the current capture source.
      * Unlike {@link #clickAny(ImageTemplateGroup)}, this evaluates every template and clicks the best match.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group the template group to search for
      * @return true if any template in the group was found and clicked, false otherwise
@@ -442,15 +442,15 @@ public class ImageClicker {
         PopupGuard.check();
         CaptureSource source = Source.current();
         MatchResult result = findBestInternal(group, source, BotSettings.confidence());
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result);
     }
 
     /**
      * Clicks the highest-scoring match for any template in the group on the current capture source with a custom confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group      the template group to search for
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -460,15 +460,15 @@ public class ImageClicker {
         PopupGuard.check();
         CaptureSource source = Source.current();
         MatchResult result = findBestInternal(group, source, confidence);
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result);
     }
 
     /**
      * Clicks the highest-scoring match for any template in the group on a specific capture source.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
@@ -477,15 +477,15 @@ public class ImageClicker {
     public static boolean clickBest(ImageTemplateGroup group, CaptureSource source) {
         PopupGuard.check();
         MatchResult result = findBestInternal(group, source, BotSettings.confidence());
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result);
     }
 
     /**
      * Clicks the highest-scoring match for any template in the group on a specific capture source with a custom confidence.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param group      the template group to search for
      * @param source     the capture source to search within
@@ -495,7 +495,7 @@ public class ImageClicker {
     public static boolean clickBest(ImageTemplateGroup group, CaptureSource source, double confidence) {
         PopupGuard.check();
         MatchResult result = findBestInternal(group, source, confidence);
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result);
     }
 
@@ -505,8 +505,8 @@ public class ImageClicker {
      * Among the {@code good} templates, clicks the best-scoring match that still beats every
      * {@code bad} template at its location by the default margin.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param good the group of good templates to search for
      * @param bad  the group of bad templates that must NOT out-score the good templates
@@ -517,7 +517,7 @@ public class ImageClicker {
         CaptureSource source = Source.current();
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), BotSettings.compareMargin());
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result);
     }
 
@@ -525,8 +525,8 @@ public class ImageClicker {
      * Among the {@code good} templates, clicks the best-scoring match that still beats every
      * {@code bad} template at its location by the specified margin.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param good  the group of good templates to search for
      * @param bad   the group of bad templates that must NOT out-score the good templates
@@ -538,7 +538,7 @@ public class ImageClicker {
         CaptureSource source = Source.current();
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result);
     }
 
@@ -546,8 +546,8 @@ public class ImageClicker {
      * Among the {@code good} templates, clicks the best-scoring match that still beats every
      * {@code bad} template at its location by the default margin.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param good   the group of good templates to search for
      * @param bad    the group of bad templates that must NOT out-score the good templates
@@ -558,7 +558,7 @@ public class ImageClicker {
         PopupGuard.check();
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), BotSettings.compareMargin());
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result);
     }
 
@@ -566,8 +566,8 @@ public class ImageClicker {
      * Among the {@code good} templates, clicks the best-scoring match that still beats every
      * {@code bad} template at its location by the specified margin.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param good   the group of good templates to search for
      * @param bad    the group of bad templates that must NOT out-score the good templates
@@ -580,7 +580,7 @@ public class ImageClicker {
         PopupGuard.check();
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result);
     }
 
@@ -593,8 +593,8 @@ public class ImageClicker {
      * winner), this respects group order and stops at the first winner — use it when the group is an ordered
      * preference list.
      * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
+     * The match result is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatch()}.
      *
      * @param good the ordered group of good templates to search for
      * @param bad  the group of bad templates that must NOT out-score the good templates
@@ -631,7 +631,7 @@ public class ImageClicker {
         PopupGuard.check();
         MatchResult result = compareAnyInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
-        VisionContext.setLastMatch(result);
+        Vision.setLastMatch(result);
         return clickResult(source, result);
     }
 
@@ -641,8 +641,8 @@ public class ImageClicker {
      * Clicks every location of every {@code good} template that beats all {@code bad} templates at that
      * location by the default margin. The good-vs-bad analogue of {@link #clickAll(ImageTemplateGroup)}.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param good the group of good templates to search for
      * @param bad  the group of bad templates that must NOT out-score the good templates
@@ -679,9 +679,9 @@ public class ImageClicker {
         PopupGuard.check();
         List<MatchResult> winners = compareAllInternal(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), margin);
-        VisionContext.setLastMatchList(winners);
+        Vision.setLastMatchList(winners);
         for (MatchResult match : winners) {
-            Point clickPoint = BotSettings.randomizeClicks() ? match.getRandomClickPoint() : match.getCenter();
+            Point clickPoint = BotSettings.randomizeClicks() ? match.randomClickPoint() : match.center();
             source.click(clickPoint);
             emitClick(clickPoint);
             Wait.milliseconds(BotSettings.foundDelay());
@@ -697,8 +697,8 @@ public class ImageClicker {
     /**
      * Clicks all occurrences of the template on the current capture source using the default confidence.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param template the image template to search for and click
      * @return the number of instances clicked
@@ -710,8 +710,8 @@ public class ImageClicker {
     /**
      * Clicks all occurrences of the template on the current capture source with a custom confidence threshold.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param template   the image template to search for and click
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -724,8 +724,8 @@ public class ImageClicker {
     /**
      * Clicks all occurrences of the template on a specific capture source using the default confidence.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param template the image template to search for and click
      * @param source   the capture source to search within
@@ -738,8 +738,8 @@ public class ImageClicker {
     /**
      * Clicks all occurrences of the template on a specific capture source with a custom confidence threshold.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param template   the image template to search for and click
      * @param source     the capture source to search within
@@ -749,15 +749,15 @@ public class ImageClicker {
     public static int clickAll(ImageTemplate template, CaptureSource source, double confidence) {
         PopupGuard.check();
         List<MatchResult> matches = ImageFinder.findAllInternal(template, source, confidence);
-        VisionContext.setLastMatchList(matches);
+        Vision.setLastMatchList(matches);
         for (MatchResult match : matches) {
-            Point clickPoint = BotSettings.randomizeClicks() ? match.getRandomClickPoint() : match.getCenter();
+            Point clickPoint = BotSettings.randomizeClicks() ? match.randomClickPoint() : match.center();
             source.click(clickPoint);
             emitClick(clickPoint);
             Wait.milliseconds(BotSettings.foundDelay());
         }
         if (Debug.isEnabled() && !matches.isEmpty()) {
-            Debug.log("Clicked " + matches.size() + " instances of " + template.getId());
+            Debug.log("Clicked " + matches.size() + " instances of " + template.id());
         }
         return matches.size();
     }
@@ -767,8 +767,8 @@ public class ImageClicker {
     /**
      * Clicks all occurrences of every template in the group on the current capture source.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param group the template group to search for and click
      * @return the total number of instances clicked across all templates in the group
@@ -780,8 +780,8 @@ public class ImageClicker {
     /**
      * Clicks all occurrences of every template in the group on the current capture source with a custom confidence.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param group      the template group to search for and click
      * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
@@ -794,8 +794,8 @@ public class ImageClicker {
     /**
      * Clicks all occurrences of every template in the group on a specific capture source.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param group  the template group to search for and click
      * @param source the capture source to search within
@@ -808,8 +808,8 @@ public class ImageClicker {
     /**
      * Clicks all occurrences of every template in the group on a specific capture source with a custom confidence.
      * <p>
-     * The list of match results is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatchList()}.
+     * The list of match results is stored in {@link Vision} and can be retrieved with
+     * {@link Vision#lastMatchList()}.
      *
      * @param group      the template group to search for and click
      * @param source     the capture source to search within
@@ -822,9 +822,9 @@ public class ImageClicker {
         for (ImageTemplate template : group.templates()) {
             all.addAll(ImageFinder.findAllInternal(template, source, confidence));
         }
-        VisionContext.setLastMatchList(all);
+        Vision.setLastMatchList(all);
         for (MatchResult match : all) {
-            Point clickPoint = BotSettings.randomizeClicks() ? match.getRandomClickPoint() : match.getCenter();
+            Point clickPoint = BotSettings.randomizeClicks() ? match.randomClickPoint() : match.center();
             source.click(clickPoint);
             emitClick(clickPoint);
             Wait.milliseconds(BotSettings.foundDelay());
@@ -844,7 +844,7 @@ public class ImageClicker {
         MatchResult best = MatchResult.notFound();
         for (ImageTemplate template : group.templates()) {
             MatchResult result = ImageFinder.findInternal(template, source, confidence);
-            if (result.isFound() && (!best.isFound() || result.getConfidence() > best.getConfidence())) {
+            if (result.isFound() && (!best.isFound() || result.confidence() > best.confidence())) {
                 best = result;
             }
         }
@@ -885,10 +885,10 @@ public class ImageClicker {
                         break;
                     }
                 }
-                if (wins && (!best.isFound() || gm.score() > best.getConfidence())) {
+                if (wins && (!best.isFound() || gm.score() > best.confidence())) {
                     best = new MatchResult(
                             new Point(gm.x() + offsetX, gm.y() + offsetY),
-                            gm.width(), gm.height(), gm.score(), good.getId());
+                            gm.width(), gm.height(), gm.score(), good.id());
                 }
             }
             return best;
@@ -924,7 +924,7 @@ public class ImageClicker {
                 if (beatsAll(gm.x(), gm.y(), gm.score(), background, bads, margin)) {
                     return new MatchResult(
                             new Point(gm.x() + offsetX, gm.y() + offsetY),
-                            gm.width(), gm.height(), gm.score(), good.getId());
+                            gm.width(), gm.height(), gm.score(), good.id());
                 }
             }
             return MatchResult.notFound();
@@ -960,7 +960,7 @@ public class ImageClicker {
                     if (beatsAll(gm.x(), gm.y(), gm.score(), background, bads, margin)) {
                         winners.add(new MatchResult(
                                 new Point(gm.x() + offsetX, gm.y() + offsetY),
-                                gm.width(), gm.height(), gm.score(), good.getId()));
+                                gm.width(), gm.height(), gm.score(), good.id()));
                     }
                 }
             }
@@ -1011,14 +1011,14 @@ public class ImageClicker {
      */
     private static boolean clickResult(CaptureSource source, MatchResult result, int delayMs) {
         if (result.isFound()) {
-            Point clickPoint = BotSettings.randomizeClicks() ? result.getRandomClickPoint() : result.getCenter();
+            Point clickPoint = BotSettings.randomizeClicks() ? result.randomClickPoint() : result.center();
             source.click(clickPoint);
             emitClick(clickPoint);
             Wait.milliseconds(delayMs);
 
             if (Debug.isEnabled()) {
-                Debug.log("Clicked " + result.getTemplateId() + " at " + clickPoint +
-                        " (confidence: " + String.format("%.3f", result.getConfidence()) + ")");
+                Debug.log("Clicked " + result.templateId() + " at " + clickPoint +
+                        " (confidence: " + String.format("%.3f", result.confidence()) + ")");
             }
             return true;
         }
