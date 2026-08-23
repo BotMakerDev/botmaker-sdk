@@ -135,12 +135,30 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   both ends, because a bot being upgraded holds only two jars:
 
   - **`@ReplacedBy`** on the deprecated element, read out of the bot's **own** jar — the bot still spells the
-    element the old way, so that is where the forward pointer has to be. `fqn`, `fqn#member` or
-    `fqn#<init>`, no arity (it sits on one overload). **`""` is an explicit "nothing takes my place"**, not
-    an omission — which is why it is *required* on every deprecated public element.
-  - **`@Replaces`** on the survivor, read out of the **target** jar — each entry `fqn[#member]@<version>`,
-    the version being the **last release the old spelling existed in**. This is the only place the answer
-    survives once the deprecated element is finally deleted. Entries accumulate and are never pruned.
+    element the old way, so that is where the forward pointer has to be. Each target is `fqn`, `fqn#member`
+    or `fqn#<init>`, no arity (it sits on one overload). **An empty value is an explicit "nothing takes my
+    place"**, not an omission — which is why it is *required* on every deprecated public element.
+  - **`@Replaces`** on the survivor, read out of the **target** jar — each entry
+    `fqn[#member][(arity)]@<version>`, the version being the **last release the old spelling existed in**.
+    This is the only place the answer survives once the deprecated element is finally deleted. Entries
+    accumulate and are never pruned. It carries **`note()` and `behaviourChanged()` too**, duplicating the
+    forward end's, because the two are read out of different jars and only one survives: a bot upgrading
+    *through* the deprecation release reads the forward pair, a bot that skipped it has only this one. The
+    forward note wins where both exist; the flag is a logical OR. The **arity is optional and exists only
+    here** — the forward end sits on one overload already, while this end may name an overload that is
+    already deleted and so has nothing left to count.
+
+  **`@ReplacedBy.value()` is a `String[]`, and that is the split.** One old member can become two, and
+  *which* one a given call meant is a property of **that call**, not of the member — `Mouse.scroll(int)`,
+  whose sign decides `scrollUp` from `scrollDown`, is the worked example, and no annotation can know a sign.
+  So the SDK does not resolve a split, it **offers** one: the targets in preference order (first preferred)
+  plus a parallel **`whens()`** carrying one sentence per candidate (*"when notches is positive"*), and
+  Studio puts the choice to the user once per call site. `@ReplacedBy("…#tap")` is unchanged in source and
+  in bytecode — a single value is already a one-element array — so the ordinary one-target pointer is the
+  degenerate case of all of it. On the back edge a split surfaces as **two survivors claiming one
+  `name@version`**, which is legal exactly when the claimed element's own `@ReplacedBy` names precisely
+  those two; that is checkable inside one build, and it is the only place a split still exists once the old
+  member is deleted.
 
   Either half alone resolves one hop; **composed, they resolve a chain** — `a`→`b` in 2.0 and `b`→`c` in 3.0
   land a bot still spelling it `a` on `c`, with the 2.0 jar never fetched. Write both halves **in the release
@@ -149,11 +167,14 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 
   **`ApiPointersTest` is the gate, and it is not the one that was deleted.** One offline ClassGraph scan of
   `target/classes`, run by CI on every build and by `release.sh check_api_pointers`. Five rules, each wrong
-  at every version: every deprecated `api.*` element carries a pointer; a non-empty target resolves; the
-  target carries the matching back-edge; no two survivors claim the same `name@version`; every entry is
-  well-formed. Rule 6 is opt-in — `-Dbotmaker.api.maxVersion` — because only the release caller knows the
-  version being cut. **It is not a coverage rule**: an uncovered break is a supported outcome (default value
-  plus review mark), and these five only ask that a link somebody *did* declare is complete.
+  at every version: every deprecated `api.*` element carries a pointer; **every** target resolves; **every**
+  target carries the matching back-edge; no two survivors claim the same `name@version` *without the claimed
+  element declaring them as a split*; every entry is well-formed, arity included. Rule 6 is opt-in —
+  `-Dbotmaker.api.maxVersion` — because only the release caller knows the version being cut. **It is not a
+  coverage rule**: an uncovered break is a supported outcome (default value plus review mark), and these
+  five only ask that a link somebody *did* declare is complete. Rule 11 is the split's own: a pointer naming
+  two or more candidates needs a non-blank `whens()` for each, since a menu of bare member names is not a
+  choice anybody can make, and a blank target may not be mixed in with real ones.
 
   **Three more annotations sit beside the pointer pair, all `@Retention(CLASS)`, all read from the jar by the
   same scan** (2026-08-23). Each records something that is cheap while both ends of a move still exist and

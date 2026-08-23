@@ -8,6 +8,63 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-24 — a pointer becomes a set: the split (phase 3 of 12, the half that was missing)
+
+**Changed:** `api/meta/ReplacedBy.java` (`value()` widened to `String[]`, new `whens()`),
+`api/meta/Replaces.java` (new `note()`, `behaviourChanged()`, an optional arity in the entry grammar),
+`ApiPointersTest` (rules 2, 3, 4, 5, 8, 9 reworked; new rule 11). **231 tests green.**
+
+**Done**
+
+- **Phase 3 landed only its first half on 2026-08-23**, and nothing recorded that. The four annotations
+  shipped; the *split* work the plan put in the same phase did not, and neither that entry nor a Deferred
+  note mentioned it. Phase 4 reads exactly these members, so it was blocked on them. This entry closes it.
+- **`@ReplacedBy.value()` is a `String[]`, ordered, first preferred.** The old single-`String` model could
+  not express a **split** at all — one old member becoming two, where *which* one a given call meant is a
+  property of that call rather than of the member. `Mouse.scroll(int)` is the worked example: the sign of
+  `notches` decides `scrollUp` from `scrollDown`, and no annotation can know a sign. `@ReplacedBy("…#tap")`
+  is unchanged in source and in bytecode — a single value is already a one-element array — so nothing that
+  was written before this needs touching.
+- **`whens()` is what makes a split a choice anybody can make.** One sentence per candidate, same order,
+  same length — *"when notches is positive"*, *"when negative"*. The target names say what each candidate is
+  called; only this says when it is the right one, which is the entire question Studio will put to the user
+  per call site in phase 4.5. Rule 11 refuses a split without it.
+- **`@Replaces` gained `note()` and `behaviourChanged()` — the same two the forward end has, duplicated on
+  purpose.** They are read out of *different jars* and only one of the two survives: a bot upgrading through
+  the deprecation release reads the forward end, a bot that skipped it finds that element gone and has only
+  this one. The forward note wins when both are present; the flag is a logical OR. Rule 8 now checks both
+  ends separately, because the forward note cannot rescue a flag on a jar that no longer exists.
+- **An entry may carry an arity — `fqn#member(2)@1.2.0`.** `@ReplacedBy` needs none (it sits *on* one
+  overload, whose parameter count is in the bytecode beside it); this end names an overload that may already
+  be deleted, so when only one of several was taken over, this is how the survivor says which. Rule 5 parses
+  it and — only while the named element is still in this build, since that is the one case where there is
+  anything to compare against — checks it matches one of its overloads.
+- **Rule 4 relaxed, and this is the interesting one.** "Two survivors claim one `name@version`" *is* what a
+  split looks like from the back edge, and once the old member is deleted that pair of claims is the only
+  place the split still exists. Refusing it flatly, as before, would have made a split readable during its
+  deprecation window and unreadable forever after. So a double claim is legal **exactly** when the claimed
+  element's own `@ReplacedBy` lists precisely those claimants — checkable inside one build, while both ends
+  are still compilable, which is this gate's whole design. Every other double claim is still an error, and
+  Studio still reads an undeclared contested entry as unpaired.
+- **Rules 2, 3 and 9 run per candidate.** A split is only as good as its weakest target: one unresolvable
+  candidate in a menu of two is a menu entry that cannot be chosen. Rule 11 additionally refuses a blank
+  target mixed in with real ones — `{}`/`{""}` is the whole-value statement *nothing takes my place*, and it
+  means nothing sitting beside a candidate that does.
+- **Each of the six new behaviours was verified by breaking it deliberately** — a legal declared split
+  passing first, then a mismatched `whens()` length, a blank `whens()` entry, an undeclared double claim, a
+  wrong arity, a mixed blank target, and `behaviourChanged` on the back edge with no note — reading each
+  failure message, then deleting the probe.
+
+**Deferred / next**
+
+- **Studio's `SdkUpgradeService` still reads the old single-`String` `value()` at runtime.** It reads both
+  annotations by FQN string through ClassGraph, so its *compile* is unaffected and nothing is broken today
+  (no `api.*` element carries either annotation yet). Phase 4 makes `replacedBy` a `List<String>` beside
+  `whens`, and gives `Claim` the nullable arity plus `note`/`behaviourChanged`; phase 4.5 makes the pairing
+  graph multi-valued and adds the per-call-site choice.
+
+---
+
 ## 2026-08-24 — the sweep reaches the types a bot can hold (phase 3.13 of 12)
 
 **Changed:** ten value types curated — `Point` 4/4, `Size` 4/4, `MatchResult` 13/13, `ColorMatch` 9/9,

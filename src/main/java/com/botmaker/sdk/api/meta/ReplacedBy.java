@@ -37,12 +37,22 @@ import java.lang.annotation.Target;
  * <p>A target is {@code fqn} for a type, {@code fqn#member} for a method or field, {@code fqn#<init>} for a
  * constructor. An enum constant <em>is</em> a static field, so {@code …interaction.Key#ENTER} names one.
  * There is <b>no arity</b> in the string: the annotation sits on one specific overload, so the parameter
- * count of both ends is already known from the bytecode.
+ * count of both ends is already known from the bytecode. ({@link Replaces} <em>does</em> admit an optional
+ * arity, because by the time it is read the overload it took over may no longer exist to be counted.)
+ *
+ * <h2>One old member, two new ones</h2>
+ *
+ * <p>{@link #value()} is an <b>array</b>, and a second one, {@link #whens()}, carries a sentence per
+ * candidate. That is the whole of the split mechanism, and it is deliberately not a resolution mechanism:
+ * the SDK states the alternatives and the condition each applies under, and the <em>user</em> picks, once per
+ * call site, from the candidates that compile there. See {@link #value()} for why per-site is the only
+ * correct granularity.
  *
  * <h2>The rules that make a pointer safe</h2>
  *
  * <ul>
  *   <li><b>An empty value is an explicit statement</b>, not an omission: nothing takes this element's place,
+ *       {@code {}} and {@code {""}} being the same statement,
  *       and Studio should replace its uses with a default value and mark them for review. The annotation is
  *       required on every deprecated public element precisely so that the author decides rather than forgets
  *       — a build gate checks it.
@@ -69,10 +79,35 @@ import java.lang.annotation.Target;
 public @interface ReplacedBy {
 
     /**
-     * What to use instead — {@code fqn}, {@code fqn#member} or {@code fqn#<init>} — or the empty string,
-     * meaning nothing takes this element's place.
+     * What to use instead — each {@code fqn}, {@code fqn#member} or {@code fqn#<init>} — <b>in preference
+     * order, first preferred</b>. Empty ({@code {}}, and equivalently {@code {""}}) means nothing takes this
+     * element's place.
+     *
+     * <p>Almost every pointer names exactly one target, and {@code @ReplacedBy("…#tap")} is still written and
+     * still means what it always did — an array-typed annotation element accepts a bare value. The array form
+     * exists for the case the single-target model could not express at all: a <b>split</b>, where one old
+     * member becomes two, and <em>which</em> one a given call meant is a property of that call rather than of
+     * the member. {@code Mouse#scroll(int)} is the worked example — the sign of {@code notches} decides
+     * whether it meant {@code scrollUp} or {@code scrollDown}, and no annotation can know the sign.
+     *
+     * <p>So a split does not resolve here; it is <b>offered</b>. Studio lists every call site with its own
+     * combo of the candidates that compile <em>there</em>, preselected to the first that survives, and
+     * {@link #whens()} is what makes that combo readable. A menu of bare member names is not a choice anybody
+     * can make, which is why the gate refuses a multi-target pointer whose {@code whens()} is missing.
      */
-    String value() default "";
+    String[] value() default {};
+
+    /**
+     * One sentence per {@link #value() candidate}, in the same order and the same length — <em>"when
+     * {@code notches} is positive"</em>, <em>"when negative"</em>. This is what the user actually chooses
+     * between at a call site; the target's own name says what it is called, never when it applies.
+     *
+     * <p>Empty is the normal state of a one-target pointer, where there is nothing to distinguish. It is
+     * refused on a split: the gate requires a non-blank sentence for every candidate as soon as there are two
+     * or more, because the alternative is a dialog asking someone to pick between two method names on no
+     * information.
+     */
+    String[] whens() default {};
 
     /**
      * The author's own sentence about this move, shown to the user <b>verbatim</b>.
