@@ -8,6 +8,47 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — `@Palette`: a method can leave the menu without leaving the API (phase 3.9 of 12)
+
+**Changed:** new `api/meta/Palette.java`; `api/vision/ImageFinder.java` annotated as the pilot (42 of its 54
+overloads offered); a tenth rule in `ApiPointersTest`.
+
+**Done**
+
+- **The lever the audit did not have.** `docs/refactor/22-api-audit.md` §3 kept recording methods that are
+  worth having and not worth browsing, and could do nothing about them: Studio's statement menu enumerates
+  *every* public static method of every facade, so "which methods exist" and "which methods Studio offers"
+  were one question and the only lever was deletion. `@Palette` separates them.
+- **Hiding is not deprecating.** An unannotated method stays public, supported, and under the same contract —
+  a bot calling it compiles, keeps compiling and is migrated across renames like any other call. It is simply
+  not *proposed*. `@Deprecated` says "stop using this"; the absence of `@Palette` says "we do not lead with
+  this", and promises nothing about the future.
+- **It is the one lever that outlives the free window.** Removing or renaming costs a major version from
+  1.1.0; adding an annotation costs nothing, ever. Curation stays available for the whole life of the API.
+- **Strict, and per overload.** In a curated jar nothing is offered without the annotation, so a newly added
+  method is invisible until someone decides it earns a menu entry. Per *overload* because the surface's size
+  is mostly one systematic pattern — most matchers exist in four shapes — which a per-name switch could not
+  touch.
+- **An old jar is detected, not guessed.** Studio looks for the annotation class itself in the index it
+  already builds of `com.botmaker.sdk.api` (which contains `api.meta`). Absent → uncurated → today's menu
+  byte for byte. No version comparison anywhere.
+- **A facade is uncurated until its type carries `@Palette`**, which is what lets the sweep proceed one
+  facade at a time. Rule 10 of the gate makes the *half-done* state the error instead: `@Palette` on a method
+  whose declaring type has none changes nothing and shows nothing, so it fails the build.
+- **The pilot rule on `ImageFinder`:** every operation is offered; of each matcher's four shapes, the plain
+  form and the `CaptureSource` form are, and the bare `double confidence` ones are not — a per-call threshold
+  is the second answer to a question `ImageTemplate.threshold()` already answers, and the image picker sets
+  that one. The `*Compare` families keep all four, their `double` being a comparison *margin* with no other
+  home. 42 offered, 12 hidden.
+
+**Deferred / next**
+
+- **Phases 3.10 / 3.11 — the sweep**, the remaining 25 facades (176 vision methods, then 159 elsewhere), one
+  facade per commit, recorded as §5 of the audit. The regression to watch: anything hidden that audit §3
+  recorded as kept *because a picker seeds it* — the varargs `findAny`/`clickAny` families.
+
+---
+
 ## 2026-08-23 — `VisionContext` → `Vision`, and the accessors drop `get` (phase 3.8 of 12)
 
 **Changed:** `api/vision/VisionContext.java` → `api/vision/Vision.java`; the `get` prefix dropped from every

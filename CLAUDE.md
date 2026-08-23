@@ -111,7 +111,7 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 
 - **`com.botmaker.sdk.api.*`** is the API generated bots compile against, and every class in it sits in a
   sub-package that says what it is: `api.geometry` (`Point`, `Rect`, `Size`, `Direction`), `api.meta` (the
-  four pointer annotations), `api.bot`, `api.capture`, `api.emulator`, `api.interaction`, `api.launch`,
+  four pointer annotations plus `Palette`), `api.bot`, `api.capture`, `api.emulator`, `api.interaction`, `api.launch`,
   `api.util` (`Time`, `BotMaker`, `Debug`), `api.vision`. **The `api` root holds no classes** — it was a
   junk drawer of annotations, geometry and five facades until 1.1.0, and a name landing there again means
   somebody skipped the question above. It is under a **compatibility convention** — real semver, and a removal announced by one full minor marked
@@ -179,6 +179,19 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
     contact surface, including the `Activities` variable helpers' `ImageTemplate`/`Precision`/`Key`/
     `MouseButton`/`Direction`/`Point`/`Rect`/`Size`. Nothing in this module reads the annotation; the
     dependency still runs one way, and it is here because this is where the rename gets typed.
+  - **`@Palette`** (2026-08-23) — *Studio offers this in its block palette*. **Hiding is not deprecating:** an
+    unannotated method stays public, supported and migrated like any other; it is simply not proposed. That
+    distinction is the whole point — Studio's statement menu enumerates every public static method of every
+    facade, so before this annotation a method could only leave the menu by leaving the API, which is the wall
+    the method audit kept hitting (`docs/refactor/22-api-audit.md` §3, §5). It is **strict** (nothing offered
+    without it, so a new method's default is *not offered*) and **per overload** (the surface's size is mostly
+    the with/without-`CaptureSource`, with/without-threshold pattern, which a per-name switch could not
+    touch). A **type** without it is uncurated and offers everything, which is what lets the sweep run one
+    facade at a time; rule 10 makes the half-done state — annotated methods in an unannotated type — the
+    error, since it changes nothing and shows nothing. Studio tells an SDK that predates curation from one
+    curated to nothing by looking for **this annotation class itself** in the index it already builds of
+    `com.botmaker.sdk.api`; no version comparison exists. Unlike the others this lever keeps working after
+    1.1.0 — adding an annotation is never a break.
 
   The API contains:
   - `api.vision` — `ImageFinder` (find + `exists` + the lambda control-flow `whileExists`/`ifExists`

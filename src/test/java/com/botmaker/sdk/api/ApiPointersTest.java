@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api;
 
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.ReplacedBy;
 import com.botmaker.sdk.api.meta.Replaces;
 import com.botmaker.sdk.api.meta.Scaffolding;
@@ -55,6 +56,8 @@ import static org.junit.jupiter.api.Assertions.fail;
  * back-edge is written, no entry is claimed twice, every entry parses. Rules 7–9 cover the three annotations
  * added beside them — {@link Since} is well-formed, a {@code behaviourChanged} move carries its sentence, and
  * a deprecated {@link Scaffolding} element names a real survivor because generated code cannot take a default.
+ * Rule 10 covers {@link Palette}: curation is per type, so annotating methods inside a type that is not itself
+ * annotated is a no-op nobody would notice.
  *
  * <p>The version-aware checks are the exception, and they are opt-in: {@code release.sh} passes
  * {@code -Dbotmaker.api.maxVersion=<the version being cut>} so that neither a {@code @Replaces} entry (rule 6)
@@ -68,6 +71,7 @@ class ApiPointersTest {
     private static final String REPLACES = Replaces.class.getName();
     private static final String SINCE = Since.class.getName();
     private static final String SCAFFOLDING = Scaffolding.class.getName();
+    private static final String PALETTE = Palette.class.getName();
     private static final String DEPRECATED = Deprecated.class.getName();
 
     /** Major.minor.patch, with an optional pre-release/build tail. No leading {@code v} — tags carry it, entries don't. */
@@ -98,7 +102,8 @@ class ApiPointersTest {
      * pre-1.1.0 surface deliberately does not, so absence is never an error here.
      */
     private record Element(String ref, String kind, boolean deprecated, String replacedBy, String note,
-                           boolean behaviourChanged, List<String> replaces, String since, boolean scaffolding) {
+                           boolean behaviourChanged, List<String> replaces, String since, boolean scaffolding,
+                           boolean palette) {
     }
 
     @BeforeAll
@@ -345,6 +350,39 @@ class ApiPointersTest {
                 survivor, or drop @Scaffolding once no generator emits it:""");
     }
 
+    /**
+     * 10 — a curated method lives in a curated type.
+     *
+     * <p>{@link Palette} is read strictly, but only per <em>type</em>: a facade that does not carry it is
+     * uncurated, and Studio offers every one of its public static methods exactly as it did before the
+     * annotation existed. That is deliberate — it is what lets the sweep proceed one facade at a time — but it
+     * makes one mistake completely silent. Annotating a handful of overloads inside a facade whose type
+     * declaration was never annotated hides nothing and shows nothing: the menu is unchanged, and the author
+     * who wrote twelve {@code @Palette}s is looking at all fifty-four methods wondering why.
+     *
+     * <p>So the half-finished state is the error, not the unstarted one. A type with no {@code @Palette}
+     * anywhere is fine; a type whose methods carry it while the type does not is a facade someone began
+     * curating and did not finish.
+     */
+    @Test
+    void curatedMethodsLiveInACuratedType() {
+        Set<String> curatedTypes = new LinkedHashSet<>();
+        for (Element e : elements) {
+            if ("type".equals(e.kind()) && e.palette()) curatedTypes.add(e.ref());
+        }
+        List<String> bad = new ArrayList<>();
+        for (Element e : elements) {
+            if (!e.palette() || "type".equals(e.kind())) continue;
+            String owner = e.ref().substring(0, e.ref().indexOf('#'));
+            if (!curatedTypes.contains(owner)) bad.add(e.kind() + " " + e.ref());
+        }
+        assertEmpty(bad, """
+                @Palette on a method whose declaring type is not @Palette. An uncurated type offers every
+                public static method it has, so these annotations change nothing and no menu will reflect
+                them. Annotate the type to switch it into strict mode — at which point ONLY the annotated
+                overloads are offered — or remove these:""");
+    }
+
     /** Sanity: the scan found the API at all, so a silently empty classpath cannot pass every rule above. */
     @Test
     void theScanSawTheApi() {
@@ -376,7 +414,8 @@ class ApiPointersTest {
             add(new Element(ci.getName(), "type", ci.hasAnnotation(DEPRECATED),
                     pointer(typePointer), note(typePointer), behaviourChanged(typePointer),
                     entries(ci.getAnnotationInfo(REPLACES)),
-                    since(ci.getAnnotationInfo(SINCE)), ci.hasAnnotation(SCAFFOLDING)));
+                    since(ci.getAnnotationInfo(SINCE)), ci.hasAnnotation(SCAFFOLDING),
+                    ci.hasAnnotation(PALETTE)));
 
             for (MethodInfo mi : ci.getDeclaredMethodAndConstructorInfo()) {
                 if (!mi.isPublic() || mi.isSynthetic() || mi.isBridge()) continue;
@@ -386,7 +425,8 @@ class ApiPointersTest {
                         mi.hasAnnotation(DEPRECATED),
                         pointer(p), note(p), behaviourChanged(p),
                         entries(mi.getAnnotationInfo(REPLACES)),
-                        since(mi.getAnnotationInfo(SINCE)), mi.hasAnnotation(SCAFFOLDING)));
+                        since(mi.getAnnotationInfo(SINCE)), mi.hasAnnotation(SCAFFOLDING),
+                        mi.hasAnnotation(PALETTE)));
             }
             for (FieldInfo fi : ci.getDeclaredFieldInfo()) {
                 if (!fi.isPublic() || fi.isSynthetic()) continue;
@@ -395,7 +435,8 @@ class ApiPointersTest {
                         fi.hasAnnotation(DEPRECATED),
                         pointer(p), note(p), behaviourChanged(p),
                         entries(fi.getAnnotationInfo(REPLACES)),
-                        since(fi.getAnnotationInfo(SINCE)), fi.hasAnnotation(SCAFFOLDING)));
+                        since(fi.getAnnotationInfo(SINCE)), fi.hasAnnotation(SCAFFOLDING),
+                        false)); // @Palette does not target fields — a constant is never a menu entry.
             }
         }
     }
