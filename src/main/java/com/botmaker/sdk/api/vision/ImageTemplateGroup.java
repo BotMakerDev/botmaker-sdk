@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.Scaffolding;
+
 import java.util.List;
 
 /**
@@ -22,12 +24,15 @@ import java.util.List;
  *
  * <p>Immutable: the backing list is copied and unmodifiable.
  */
+// The scaffold's Popups declares one (POPUPS) — see the paragraph above about the empty group.
+@Scaffolding
 public record ImageTemplateGroup(List<ImageTemplate> templates) {
 
     public ImageTemplateGroup {
         templates = List.copyOf(templates); // rejects null (list and elements), produces an unmodifiable copy
     }
 
+    @Scaffolding   // the scaffold emits ImageTemplateGroup.of(), the empty case
     public static ImageTemplateGroup of(ImageTemplate... templates) {
         return new ImageTemplateGroup(List.of(templates));
     }

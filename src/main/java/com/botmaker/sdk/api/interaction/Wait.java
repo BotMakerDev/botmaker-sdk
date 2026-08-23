@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
 import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.Scaffolding;
 
 import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;
@@ -71,6 +72,7 @@ public class Wait {
      *
      * @param milliseconds Time to wait
      */
+    @Scaffolding   // the generated FlowDriver's inter-activity gap (STEP_DELAY_MS)
     public static void milliseconds(int milliseconds) {
         if (milliseconds <= 0) return;
         Debug.log("[Wait] " + milliseconds + "ms");

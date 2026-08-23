@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api;
 
+// The generated Activities declares one per point variable, rebuilt from the two stored numbers.
+@Scaffolding
 public class Point {
 
     public double x, y;
@@ -9,6 +11,7 @@ public class Point {
         this.y = y;
     }
 
+    @Scaffolding   // the generated Activities' point(String) helper, which parses ints
     public Point(int x, int y) {
         this.x = x;
         this.y = y;

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.Scaffolding;
 import com.botmaker.sdk.internal.trace.Trace;
 
 /**
@@ -56,6 +57,7 @@ public final class PopupGuard {
      * Installs the project's popup check. Called once from the generated entry point with the project's
      * {@code Popups} activity; a second call replaces the first.
      */
+    @Scaffolding   // the game-bot scaffold's entry point: PopupGuard.install(Popups.INSTANCE::execute)
     public static void install(Runnable check) {
         handler = check;
     }
@@ -71,6 +73,7 @@ public final class PopupGuard {
      * activity that is <em>itself</em> working through a popup-shaped screen must not have it dismissed
      * underneath it.
      */
+    @Scaffolding   // emitted per activity by the generated FlowDriver, as the paragraph above says
     public static void enabled(boolean on) {
         enabled = on;
     }

@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.Scaffolding;
+
 /**
  * How exacting a {@link Pixel} search should be — every knob that decides whether something counts as a match,
  * in one value.
@@ -48,6 +50,9 @@ package com.botmaker.sdk.api.vision;
  * @param minArea  the minimum cluster area in pixels; always at least 1
  * @param minCount the minimum number of matching pixels in the whole search; 0 for no requirement
  */
+// The generated Activities declares one per precision variable, and rebuilds it from the three stored numbers
+// — so the three components are part of the scaffold's surface, not only the type name.
+@Scaffolding
 public record Precision(double deltaE, int minArea, int minCount) {
 
     /** The area floor the named constants start from: filters out stray anti-aliased pixels. */
@@ -62,6 +67,7 @@ public record Precision(double deltaE, int minArea, int minCount) {
     /** The whole colour family — "some kind of red" (ΔE ≈ 25). */
     public static final Precision LOOSE = new Precision(25.0, DEFAULT_MIN_AREA, 0);
 
+    @Scaffolding   // the generated Activities' precision(String) helper calls the canonical constructor
     public Precision {
         if (Double.isNaN(deltaE) || deltaE < 0) {
             throw new IllegalArgumentException("tolerance must be a ΔE distance ≥ 0, got: " + deltaE);

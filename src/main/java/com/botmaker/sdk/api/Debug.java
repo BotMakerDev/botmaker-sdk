@@ -61,6 +61,7 @@ public final class Debug {
     }
 
     /** Prints {@code message} to stderr when debugging is on; a no-op when off. */
+    @Scaffolding   // the generated FlowDriver's "gave up after N steps" line
     public static void error(String message) {
         Diag.error(message);
     }

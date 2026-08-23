@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
+import com.botmaker.sdk.api.Scaffolding;
+
 /**
  * Mouse buttons for the richer {@link Mouse} actions (down/up/drag).
  *
@@ -12,6 +14,8 @@ package com.botmaker.sdk.api.interaction;
  * <p>The numbers are X11's button numbering, which the Linux backends pass through untouched; Windows
  * translates them (the side buttons become {@code MOUSEEVENTF_XDOWN} plus an {@code XBUTTON} selector).
  */
+// Scaffolding for the same reason as Direction: the generated Activities holds one per mouse-button variable.
+@Scaffolding
 public enum MouseButton {
     LEFT(1), MIDDLE(2), RIGHT(3),
     /** The thumb button that goes back — the browser's Back, and what most games bind to a side button. */

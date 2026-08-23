@@ -1,9 +1,15 @@
 package com.botmaker.sdk.api.core;
 
+import com.botmaker.sdk.api.Scaffolding;
+
 /**
  * Represents a direction for sorting and selecting matches.
  * Used when multiple templates are found and you need to pick based on position.
  */
+// The generated Activities declares a field of this type per direction variable, and parses one back from
+// the stored name with Enum.valueOf — so the type is scaffolding, and so is whichever constant is declared
+// first, which is the fallback that helper falls back to.
+@Scaffolding
 public enum Direction {
     /**
      * Top to bottom (smallest Y to largest Y).

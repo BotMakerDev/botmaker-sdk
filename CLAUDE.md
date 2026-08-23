@@ -116,9 +116,34 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   `target/classes`, run by CI on every build and by `release.sh check_api_pointers`. Five rules, each wrong
   at every version: every deprecated `api.*` element carries a pointer; a non-empty target resolves; the
   target carries the matching back-edge; no two survivors claim the same `name@version`; every entry is
-  well-formed. A sixth is opt-in — `-Dbotmaker.api.maxVersion` — because only the release caller knows the
+  well-formed. Rule 6 is opt-in — `-Dbotmaker.api.maxVersion` — because only the release caller knows the
   version being cut. **It is not a coverage rule**: an uncovered break is a supported outcome (default value
   plus review mark), and these five only ask that a link somebody *did* declare is complete.
+
+  **Three more annotations sit beside the pointer pair, all `@Retention(CLASS)`, all read from the jar by the
+  same scan** (2026-08-23). Each records something that is cheap while both ends of a move still exist and
+  impossible afterwards:
+
+  - **`@ReplacedBy(note = "…")`** — the author's own sentence, shown to the user **verbatim**. The pointer
+    says *what*; nothing else can say *why*. (It is what `migrations.json`'s deleted `summary` used to be.)
+  - **`@ReplacedBy(behaviourChanged = true)`** — the replacement *does something different*. This is the one
+    gap the redirect model cannot see: Studio takes a pointer by comparing **shapes**, so "same shape,
+    different meaning" is exactly a silent, successful rename, and the bot compiles and misbehaves. Setting it
+    forces a review mark on every redirected site, with the note as its text — hence rule 8: `true` with a
+    blank `note` is refused, since a mark that says nothing costs a hand review and answers nothing.
+  - **`@Since("1.2.0")`** — the release an element first shipped in, so the upgrade dialog can group additions
+    by version instead of one flat alphabetical diff. **The pre-1.1.0 surface deliberately carries none** and
+    never will: the value is unrecoverable after the fact, and a guessed one asserts something false about a
+    release the user cannot check. Rule 7 checks only the shape (and, at release time, that it is not dated
+    ahead of the version being cut) — **absence is never an error**.
+  - **`@Scaffolding`** — *Studio writes this element into the files it generates*, so renaming it breaks bots
+    that never mentioned it. Generated files are regenerated, not migrated, and a defaulted value inside one
+    is a broken feature rather than a repair; Studio's only answer is to refuse the upgrade (and the Activity
+    Flow edit) until Studio itself is updated. Rule 9 therefore refuses a `@Deprecated` `@Scaffolding` element
+    with an **empty** `@ReplacedBy`. 28 elements carry it — the seed and regenerated generators' whole SDK
+    contact surface, including the `Activities` variable helpers' `ImageTemplate`/`Precision`/`Key`/
+    `MouseButton`/`Direction`/`Point`/`Rect`/`Size`. Nothing in this module reads the annotation; the
+    dependency still runs one way, and it is here because this is where the rename gets typed.
 
   The API contains:
   - `api.vision` — `ImageFinder` (find + `exists` + the lambda control-flow `whileExists`/`ifExists`

@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.vision;
 import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.Scaffolding;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -1198,6 +1199,7 @@ public class ImageFinder {
      * @param group  the template group to search for
      * @param action the action to run with each frame's matches
      */
+    @Scaffolding   // the game-bot scaffold's Popups.run() is this loop over an initially empty group
     public static void whileFindAny(ImageTemplateGroup group, Consumer<Matches> action) {
         whileFindAny(group, Source.current(), action);
     }

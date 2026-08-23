@@ -32,6 +32,7 @@ public class BotMaker {
     }
 
     /** Prints {@code value} followed by a newline. */
+    @Scaffolding   // the "Empty" project scaffold's whole main body
     public static void print(Object value) {
         System.out.println(value);
     }

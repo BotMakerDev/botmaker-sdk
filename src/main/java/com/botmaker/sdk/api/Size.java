@@ -1,10 +1,13 @@
 package com.botmaker.sdk.api;
 
 
+// The generated Activities declares one per size variable, rebuilt from the two stored numbers.
+@Scaffolding
 public class Size {
 
     public double width, height;
 
+    @Scaffolding   // the generated Activities' size(String) helper (ints, widened)
     public Size(double width, double height) {
         this.width = width;
         this.height = height;

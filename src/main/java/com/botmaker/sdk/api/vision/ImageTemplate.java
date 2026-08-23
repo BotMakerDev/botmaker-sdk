@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.Scaffolding;
 import com.botmaker.sdk.internal.vision.TemplateMetadata;
 import com.botmaker.shared.opencv.OpenCvNative;
 import org.opencv.core.Mat;
@@ -18,6 +19,8 @@ import java.nio.file.Paths;
  * {@code Template} wrapper; that indirection has been collapsed now that OpenCV loads reliably via
  * {@link OpenCvNative}.)
  */
+// The generated Activities declares one per image-template variable, and builds it from the stored path.
+@Scaffolding
 public class ImageTemplate implements AutoCloseable {
 
     static { OpenCvNative.ensureLoaded(); }
@@ -33,6 +36,7 @@ public class ImageTemplate implements AutoCloseable {
      * Constructor using file path.
      * @param filePath Path to the image (e.g. "images/accept_button.png")
      */
+    @Scaffolding   // the generated Activities' template(String) helper
     public ImageTemplate(String filePath) {
         if (filePath == null || filePath.isBlank()) {
             throw new IllegalArgumentException("File path cannot be empty");

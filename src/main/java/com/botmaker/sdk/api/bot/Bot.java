@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.Scaffolding;
 import com.botmaker.sdk.api.launch.Target;
 
 import java.util.function.Consumer;
@@ -41,6 +42,7 @@ public final class Bot {
      * finished its work, or a helper deep in the call stack. {@link #supervise} catches this and returns
      * instead of recovering. This is the deliberate "we're done" exit, as opposed to a crash.
      */
+    @Scaffolding   // the generated FlowDriver ends every run with it
     public static void stop() {
         throw new BotStoppedException();
     }
@@ -63,6 +65,7 @@ public final class Bot {
      * @param body   the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param goHome navigate from wherever the bot is back to a safe/home screen
      */
+    @Scaffolding   // the game-bot scaffold's entry point: Bot.start(FlowDriver::run, GoHome.INSTANCE::execute)
     public static void start(Runnable body, Runnable goHome) {
         supervise(body, goHome, Bot::launchConfiguredTarget);
     }

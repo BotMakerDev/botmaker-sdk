@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.bot;
 
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.Scaffolding;
 import com.botmaker.sdk.api.observe.BotObserver;
 import com.botmaker.sdk.api.observe.Bots;
 import com.botmaker.sdk.api.observe.MatchEvent;
@@ -71,6 +72,7 @@ public final class Watchdog {
      * {@link BotSettings#maxRetryAttempts()} consecutive match attempts; otherwise returns. Resets the
      * counter when it throws so recovery starts from a clean slate. Safe to call when disabled (never throws).
      */
+    @Scaffolding   // the generated FlowDriver ticks it after every hand-off between activities
     public static void checkpoint() {
         State s = STATE.get();
         if (s.repeats >= BotSettings.maxRetryAttempts()) {

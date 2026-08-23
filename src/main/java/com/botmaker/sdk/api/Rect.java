@@ -3,10 +3,13 @@ package com.botmaker.sdk.api;
 import java.awt.Toolkit;
 import java.awt.Dimension;
 
+// The generated Activities declares one per area variable, rebuilt from the four stored numbers.
+@Scaffolding
 public class Rect {
 
     public int x, y, width, height;
 
+    @Scaffolding   // the generated Activities' area(String) helper
     public Rect(int x, int y, int width, int height) {
         this.x = x;
         this.y = y;

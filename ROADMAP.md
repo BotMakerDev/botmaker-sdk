@@ -8,6 +8,50 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — four annotations written while both ends still exist (phase 3 of 12)
+
+**Changed:** `api/ReplacedBy.java` (`note`, `behaviourChanged`), new `api/Since.java`, new
+`api/Scaffolding.java`, `ApiPointersTest` (rules 7–9), and 18 `api.*` files annotated.
+
+**Done**
+
+- **`@ReplacedBy` gained `note` — the author's own sentence, shown verbatim.** Everything else about a move
+  is machine-readable and therefore says only *what*; this is the one channel for *why* ("the new one measures
+  from the template's centre"). `migrations.json` had a `summary` field that was deleted with it and nothing
+  replaced it. Studio prefers it over its own generated wording and never paraphrases or truncates it.
+- **`@ReplacedBy` gained `behaviourChanged` — the one gap the model cannot see by construction.** Studio
+  decides whether to take a pointer by comparing *shapes*, so a same-shape redirect lands silently, which is
+  the point of a rename. "Same shape, different behaviour" is that same case, and the bot then compiles and
+  quietly does something else. Nothing in the bytecode reveals it, so the author says it, and Studio marks
+  every redirected site for review with the note as the mark's text.
+- **New `@Since`, and deliberately *not* back-filled.** The version an element first shipped in is
+  unrecoverable after the fact — a jar diff needs both jars and nobody kept them — so a guessed value is worse
+  than none. **The pre-1.1.0 surface carries none**, which is a decision recorded in the annotation's Javadoc
+  rather than an omission; every element added from 1.1.0 on carries one. It is what lets the upgrade dialog
+  group additions by release instead of showing one flat alphabetical diff, and an absent value degrades to
+  exactly today's behaviour.
+- **New `@Scaffolding` — Studio writes this element into the files it generates.** These break differently
+  from the rest of the API: a bot's own code is migrated (default value + review mark, and it compiles),
+  generated code is *regenerated*, and a defaulted value inside a generated file is a broken feature rather
+  than a repair. Studio's only answer there is to refuse the upgrade, or the Activity Flow edit, until Studio
+  itself is updated — a much sharper consequence, and one an SDK author renaming `Watchdog#checkpoint` should
+  see at the declaration rather than a release later.
+- **28 elements annotated, read out of the generators rather than guessed.** Seeds:
+  `BotMaker#print`, `Bot#start`/`#stop`, `PopupGuard#install`, `Debug#error`, `Watchdog#checkpoint`,
+  `Activity` (+ `#isEnabled`, `#run`, `#active`, `#execute`), `ImageFinder#whileFindAny`,
+  `ImageTemplateGroup` (+ `#of`). Regenerated: the same plus `PopupGuard#enabled` and `Wait#milliseconds`,
+  and — through the `Activities` variable helpers — `ImageTemplate`, `Precision`, `Key`, `MouseButton`,
+  `Direction`, `Point`, `Rect`, `Size` with the constructors those helpers call. The plan's provisional list
+  named `ClickConfig` (gone — it is `BotSettings` now) and `Precision.TIGHT` (no generator emits it) and
+  missed the whole `Activities` half; phase 9 reconciles the set with Studio's own declaration mechanically,
+  so this stops being a list anybody maintains by eye.
+- **Three new gate rules in `ApiPointersTest`** (now 9 + the scan sanity check): every `@Since` is a semver
+  and, at release time, not dated after the version being cut — *absence is never an error*;
+  `behaviourChanged = true` requires a non-blank `note`, since a review mark with no sentence is worse than
+  the silent redirect it replaced; a `@Deprecated` `@Scaffolding` element requires a **non-empty**
+  `@ReplacedBy`, because "nothing takes my place" is not a repair generated code can take. Each was verified
+  by breaking it deliberately and reading the failure, then reverting.
+
 ## 2026-08-23 — the docs the pointer plan owed (phase 1 of 12)
 
 **Changed:** `CLAUDE.md` (the `@ApiId` + `migrations.json` bullets replaced by the pointer pair and the gate).

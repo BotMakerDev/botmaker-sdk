@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.Scaffolding;
 import com.botmaker.sdk.internal.trace.Trace;
 
 import java.util.LinkedHashMap;
@@ -34,6 +35,9 @@ import java.util.Map;
  * Studio "disable activity ▾" block emits ({@code Activity.disable("Mining")}). The instance
  * {@link #disable()} / {@link #enable()} still work for an activity acting on itself.
  */
+// Every activity stub extends it, the generated ActivityRegistry holds a List<Activity<?>> of them, and
+// GoHome/Popups are two more subclasses the scaffold writes. Renaming this type is a Studio release.
+@Scaffolding
 public abstract class Activity<O extends Enum<O>> {
 
     /**
@@ -116,6 +120,7 @@ public abstract class Activity<O extends Enum<O>> {
      * starting point; a running bot can override it with {@link #setEnabled}. The macro loop does not call
      * this directly — it consults {@link #active()}, which layers any runtime override on top.
      */
+    @Scaffolding   // every generated stub overrides it, wired to that activity's Activities flag
     public abstract boolean isEnabled();
 
     /**
@@ -123,6 +128,7 @@ public abstract class Activity<O extends Enum<O>> {
      * {@link #setEnabled} if one has been set, otherwise the configured {@link #isEnabled()} default. This is
      * what lets a mid-run {@link #disable()} actually stop the activity from running on the next pass.
      */
+    @Scaffolding   // the generated FlowDriver's per-activity "is it on" branch
     public final boolean active() {
         return enabledOverride != null ? enabledOverride : isEnabled();
     }
@@ -155,6 +161,7 @@ public abstract class Activity<O extends Enum<O>> {
      * {@code return Outcome.DEFAULT;}, so an activity that has nothing special to report needs no thought at
      * all — the default outcome follows the card's plain output wire.
      */
+    @Scaffolding   // every generated stub overrides it — it is the one method the user is asked to fill in
     public abstract O run();
 
     /** Overridable no-op: called before {@link #run()} (e.g. navigate to the activity's screen). */
@@ -173,6 +180,7 @@ public abstract class Activity<O extends Enum<O>> {
      * recover — a stuck activity produces no outcome, because the flow isn't what decides where to go next in
      * that case; the supervisor is.
      */
+    @Scaffolding   // the generated FlowDriver switches on it; GoHome/Popups are installed as INSTANCE::execute
     public final O execute() {
         // The activity and its outcome are the coarsest unit of "what is the bot doing", so this one line is
         // what makes a debug console read as a story rather than as vision events. It is also the only place
