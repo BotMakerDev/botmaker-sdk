@@ -17,7 +17,7 @@ import java.util.Optional;
  *
  * <p>Obtain one via {@link CaptureSource#window(String)}.
  */
-public final class NamedWindow implements CaptureSource {
+public final class NamedWindow implements CaptureSource, WindowBacked {
 
     private final String titleSubstring;
 

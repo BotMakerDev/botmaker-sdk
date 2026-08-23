@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.internal.capture.SessionSource;
+import com.botmaker.sdk.internal.capture.WindowBacked;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.session.ActiveSession;
@@ -67,7 +68,8 @@ class SessionRoutingTest {
         // origin is the attached window's on-screen top-left (RecordingNativeController's 100,50 rect)
         assertEquals(100, current.origin().x());
         assertEquals(50, current.origin().y());
-        assertEquals(sessionFake.window, current.targetWindow());
+        assertEquals(sessionFake.window, WindowBacked.of(current),
+                "keyboard routing reaches the session's window through WindowBacked, not through CaptureSource");
         assertTrue(current.isPresent());
     }
 

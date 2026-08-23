@@ -8,6 +8,62 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — the method audit: three type leaks and one duplicated field (phase 3.7 of 12)
+
+**Changed:** every public method in `api.*` read once before the contract starts at 1.1.0, with a verdict and
+a one-line reason recorded in **`docs/refactor/22-api-audit.md`** — the authoritative record; this entry is a
+summary, not a substitute.
+
+**Done**
+
+- **The audit's own rule, worth keeping:** *spend the window on what the window is for.* Removals and renames
+  are free today and expensive forever after; an **addition** is free today *and* free forever after (a minor
+  bump, any time). So this phase applied removals, demotions and renames, and deferred every "there should
+  also be an overload that…" — §4 of the doc lists six, none of which gets harder later.
+- **537 public methods is mostly an artefact.** Matchers take an optional `CaptureSource` and an optional
+  threshold, so most operations exist ×4: `ImageFinder`'s 54 methods are 16 operations. The menu collapses
+  overloads to one entry per name already. The audit's conclusion is *not* "cut deeply" — it is that the real
+  defects were invisible to a method count.
+- **Removed `ImageClicker.clickBest(ImageTemplate …)` ×4** — `click(ImageTemplate …)` under a second name
+  (both call `ImageFinder.findInternal`; "best" is only a question across several templates, which is what the
+  `ImageTemplateGroup` overloads, kept, are for). It was the worse of the two: it never reached
+  `VisionContext.setLastMatch`, so `getLastMatch()` went stale after it — the opposite of its own Javadoc.
+- **Removed `BotSettings.defaultTimeZone()` / `setDefaultTimeZone(String)`** — a genuine bug, not just a
+  duplicate. Two fields synced one way: `BotSettings` pushed into `Time`, but `Time.setDefaultTimeZone` (the
+  one `Time.now()` reads) never pushed back, so after a bot called it the two disagreed and `BotSettings`
+  answered a zone nothing was using. No project-properties key ever seeded it. `Time` owns the timezone.
+- **Two of three type leaks closed.** `api.*` is under contract from 1.1.0; shared and OpenCV are explicitly
+  freely breakable — so a public `api` signature naming their types promises a spelling nobody keeps.
+  `ImageTemplate.getMat()` (returned `org.opencv.core.Mat`; zero callers outside `api.vision`) is
+  package-private. `CaptureSource`/`Window.targetWindow()` (returned shared's `GenericWindow`) is now
+  `internal.capture.WindowBacked`, implemented by `Window`, `NamedWindow`, `SessionSource` and the new
+  `RegionSource`; `Keyboard` asks `WindowBacked.of(source)`. **Nothing in `api` names `GenericWindow` or
+  `Mat`.**
+- **`CaptureSource.region(Rect)` returns a named `internal.capture.RegionSource`** instead of an anonymous
+  class — an anonymous class can implement only the type it is written as, and a region of a window has to be
+  both a `CaptureSource` and `WindowBacked`. It also lands where every other implementation went in 3.6.
+- **The near-misses are written down** (§3): the `findAny`/`clickAny` varargs families were nearly cut as a
+  second spelling of the group form and are in fact first-class in the editor — `MethodInvocationBlock` gives
+  every `ImageTemplate` vararg its own image picker. `Emulators`' nine methods, which the plan singled out,
+  are all kept: `Role.VALUE` already keeps `Emulator`/`EmulatorRef` out of the palette.
+
+**Deferred / next**
+
+- **Phase 3.8 — the accessor rename**, decided here and specified in §2 of the audit doc: `api.vision`'s value
+  types use JavaBean accessors while `api.geometry`'s records (phase 3.5) use the record spelling, one import
+  apart. Rule adopted: *an accessor drops `get`; a mutator keeps `set`*. Covers `MatchResult`, `ColorMatch`,
+  `TextMatch`, `ImageTemplate`, `Rect`, and **`VisionContext` → `Vision`** (a placeholder noun for a class that
+  is really "what the last search saw" — `Vision.lastMatch().center()`). Split out because it is **495 lines
+  across 55 files** and this repo forbids bulk text replacement, so it is a multi-turn sweep, not a paragraph
+  of this one. Existing bots take a plain compile error: `repairSdkImports` keys on a simple name, so it
+  carries a package move but not a class rename, and pointers are deliberately unused pre-contract.
+- **The third leak stays open, deliberately:** `Text`'s nine `shared.ocr.OcrOptions` overloads plus
+  `DEFAULT_OPTIONS`. Unlike the other two it is a working, documented feature, so removing it alone is a
+  capability regression and replacing it means designing an `api.vision`-owned tuning type — which the plan
+  puts out of scope for an audit. Top follow-up in §4.
+
+---
+
 ## 2026-08-23 — the `api` package reorganised, eleven classes demoted to `internal` (phase 3.6 of 12)
 
 **Changed:** 21 classes moved package; `api/capture/Screen.java` deleted; ~65 files' imports repointed;

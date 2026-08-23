@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.interaction;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.internal.capture.WindowBacked;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -86,7 +87,7 @@ public class Keyboard {
 
     /** Press and hold {@code key}, delivered to {@code source}'s window (remember to {@link #release}). */
     public static void press(CaptureSource source, Key key) {
-        GenericWindow w = source == null ? null : source.targetWindow();
+        GenericWindow w = WindowBacked.of(source);
         Debug.log("[Keyboard] press " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
         if (w == null) {
             controller().keyDown(key.nativeCode());
@@ -97,7 +98,7 @@ public class Keyboard {
 
     /** Release a held {@code key} on {@code source}'s window. */
     public static void release(CaptureSource source, Key key) {
-        GenericWindow w = source == null ? null : source.targetWindow();
+        GenericWindow w = WindowBacked.of(source);
         Debug.log("[Keyboard] release " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
         if (w == null) {
             controller().keyUp(key.nativeCode());
@@ -126,7 +127,7 @@ public class Keyboard {
 
     /** Type {@code text} into {@code source}'s window (see {@link #type(String)}). */
     public static void type(CaptureSource source, String text) {
-        GenericWindow w = source == null ? null : source.targetWindow();
+        GenericWindow w = WindowBacked.of(source);
         Debug.log("[Keyboard] type \"" + text + "\""
                 + (w == null ? " (focused window)" : " -> " + w.getTitle()));
         if (w == null) {

@@ -3,11 +3,8 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.util.Time;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.config.ProjectProperties;
-
-import java.time.ZoneId;
 
 /**
  * The bot's runtime tuning — how long it pauses around a match, how sure it has to be, and whether it drives
@@ -66,7 +63,6 @@ public final class BotSettings {
     private static volatile int maxRetryAttempts = DEFAULT_MAX_RETRY_ATTEMPTS;
     private static volatile boolean realInput;
     private static volatile long defaultLaunchWaitTimeout = DEFAULT_LAUNCH_WAIT_TIMEOUT;
-    private static volatile ZoneId defaultTimeZone = ZoneId.systemDefault();
 
     /**
      * Whether the project defaults have been folded in yet. Every read goes through {@link #ensureLoaded()},
@@ -132,31 +128,12 @@ public final class BotSettings {
         return CaptureSource.fromProjectDefault();
     }
 
-    /**
-     * Returns the default timezone for time-related operations.
-     *
-     * @return the default timezone
-     */
-    public static ZoneId defaultTimeZone() {
-        ensureLoaded();
-        return defaultTimeZone;
-    }
-
-    /**
-     * Sets the default timezone for time-related operations.
-     *
-     * @param zoneId the timezone ID to use as default
-     */
-    public static void setDefaultTimeZone(String zoneId) {
-        ensureLoaded();
-        if (zoneId == null) {
-            defaultTimeZone = ZoneId.systemDefault();
-        } else {
-            defaultTimeZone = ZoneId.of(zoneId);
-        }
-        // Also set the Time class default
-        Time.setDefaultTimeZone(defaultTimeZone);
-    }
+    // The default timezone is deliberately NOT settings state. It used to be, and the copy here was a second
+    // field that only synced one way: BotSettings.setDefaultTimeZone pushed into Time, but Time.setDefaultTimeZone
+    // — the one Time.now() actually reads — never pushed back, so after a bot called Time.setDefaultTimeZone(...)
+    // the two disagreed and BotSettings.defaultTimeZone() answered a zone nothing was using. There is one owner
+    // now, com.botmaker.sdk.api.util.Time, and no project-properties key ever seeded this one anyway. Removed
+    // in 1.1.0; use Time.getDefaultTimeZone() / Time.setDefaultTimeZone(...).
 
     /**
      * Whether this bot drives the <b>real</b> mouse and keyboard instead of posting quiet synthetic events to

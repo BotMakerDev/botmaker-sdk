@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.sdk.internal.capture.RegionSource;
 import com.botmaker.sdk.api.interaction.Mouse;
 
 import java.awt.image.BufferedImage;
@@ -118,61 +119,7 @@ public interface CaptureSource {
      * coordinates. The rectangle is clamped to the source's bounds.
      */
     default CaptureSource region(Rect sub) {
-        CaptureSource parent = this;
-        return new CaptureSource() {
-            @Override
-            public BufferedImage capture() {
-                BufferedImage img = parent.capture();
-                if (img == null) return null;
-                int x = Math.max(0, sub.x());
-                int y = Math.max(0, sub.y());
-                int w = Math.min(sub.width(), img.getWidth() - x);
-                int h = Math.min(sub.height(), img.getHeight() - y);
-                if (w <= 0 || h <= 0) return null;
-                return img.getSubimage(x, y, w, h);
-            }
-
-            @Override
-            public Point origin() {
-                Point o = parent.origin();
-                return new Point(o.x() + Math.max(0, sub.x()), o.y() + Math.max(0, sub.y()));
-            }
-
-            @Override
-            public void click(Point p) {
-                // Route the click to the underlying surface so a region of an emulator still taps via ADB.
-                parent.click(p);
-            }
-
-            @Override
-            public boolean isPresent() {
-                return parent.isPresent();
-            }
-
-            @Override
-            public boolean hasWindowIdentity() {
-                return parent.hasWindowIdentity();
-            }
-
-            @Override
-            public CaptureSource base() {
-                return parent.base();
-            }
-
-            @Override
-            public Rect subRegion() {
-                Rect pr = parent.subRegion();
-                int bx = (pr != null ? pr.x() : 0) + Math.max(0, sub.x());
-                int by = (pr != null ? pr.y() : 0) + Math.max(0, sub.y());
-                return new Rect(bx, by, sub.width(), sub.height());
-            }
-
-            @Override
-            public com.botmaker.shared.capture.GenericWindow targetWindow() {
-                // A region of a window still targets that window for keyboard input (keys have no sub-rect).
-                return parent.targetWindow();
-            }
-        };
+        return new RegionSource(this, sub);
     }
 
     /** {@link #region(Rect)} from raw coordinates within this source. */
@@ -199,17 +146,11 @@ public interface CaptureSource {
     }
 
     // --- Input targeting ---
-
-    /**
-     * The native OS window this source represents, when it is a real on-screen application window — the seam
-     * that lets {@link com.botmaker.sdk.api.interaction.Keyboard#press(CaptureSource, com.botmaker.sdk.api.interaction.Key)
-     * Keyboard} deliver keys to <em>this</em> window specifically (the keyboard counterpart of {@link #click(Point)}).
-     * Defaults to {@code null}: the whole {@link #desktop()}, a {@link #monitor(int) monitor}, a
-     * {@link #window(String) window} that isn't open yet, and an emulator all have no single desktop window to
-     * route keys to, so keyboard input falls back to the global focused-window path. Only a resolved
-     * {@link Window} (and a {@link #region(Rect) region} of one) returns a non-null handle.
-     */
-    default com.botmaker.shared.capture.GenericWindow targetWindow() {
-        return null;
-    }
+    //
+    // There is deliberately no targetWindow() here any more. It returned botmaker-shared's GenericWindow, and
+    // shared is freely breakable by design while this interface is under contract from 1.1.0 — so the one
+    // method put a type nobody promises to keep into the surface everybody relies on. It is
+    // internal.capture.WindowBacked now: the sources that resolve to a desktop window implement it, keyboard
+    // routing asks WindowBacked.of(source), and nothing in api names GenericWindow. See that interface for the
+    // full account.
 }

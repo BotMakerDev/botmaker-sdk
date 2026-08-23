@@ -98,6 +98,17 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   of this decision, not a second one — a class that leaves `api` leaves that enum, which is how the palette
   stops offering it.
 
+- **A second rule, from the 1.1.0 method audit: no `api` signature may name a type the SDK does not version.**
+  `botmaker-shared` and OpenCV are *freely breakable* by design while `api.*` is under contract, so a public
+  `api` method returning one of their types promises a spelling nobody keeps — and no gate on either side can
+  see it break. `ImageTemplate.getMat()` (`org.opencv.core.Mat`) is package-private for this reason, and
+  `targetWindow()` (shared's `GenericWindow`) left `CaptureSource`/`Window` for
+  **`internal.capture.WindowBacked`**, which `Window`, `NamedWindow`, `SessionSource` and `RegionSource`
+  implement and `Keyboard` reaches via `WindowBacked.of(source)`. One leak is knowingly still open —
+  `Text`'s `shared.ocr.OcrOptions` overloads, which are a real feature with no `api`-owned replacement yet.
+  **`docs/refactor/22-api-audit.md` is the record** of that audit: every verdict, the near-misses and why they
+  were near-misses, and the additions it deliberately deferred.
+
 - **`com.botmaker.sdk.api.*`** is the API generated bots compile against, and every class in it sits in a
   sub-package that says what it is: `api.geometry` (`Point`, `Rect`, `Size`, `Direction`), `api.meta` (the
   four pointer annotations), `api.bot`, `api.capture`, `api.emulator`, `api.interaction`, `api.launch`,

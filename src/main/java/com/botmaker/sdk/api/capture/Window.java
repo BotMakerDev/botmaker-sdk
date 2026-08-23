@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.capture;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.internal.capture.WindowBacked;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -23,7 +24,7 @@ import java.util.Optional;
  *
  * <p>The underlying native handle is kept opaque; obtain a {@code Window} via the static factories.
  */
-public class Window implements CaptureSource {
+public class Window implements CaptureSource, WindowBacked {
 
     private final GenericWindow handle;
 

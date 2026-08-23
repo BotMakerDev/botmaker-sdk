@@ -420,71 +420,13 @@ public class ImageClicker {
         return clickAny(source, confidence, group.toArray());
     }
 
-    // --- clickBest (highest-scoring match) ---
-
-    /**
-     * Clicks the highest-scoring match for the template on the current capture source.
-     * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
-     *
-     * @param template the image template to search for
-     * @return true if the template was found and clicked, false otherwise
-     */
-    public static boolean clickBest(ImageTemplate template) {
-        PopupGuard.check();
-        CaptureSource source = Source.current();
-        return clickResult(source, ImageFinder.findInternal(template, source, BotSettings.confidence()));
-    }
-
-    /**
-     * Clicks the highest-scoring match for the template on the current capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
-     *
-     * @param template   the image template to search for
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if the template was found and clicked, false otherwise
-     */
-    public static boolean clickBest(ImageTemplate template, double confidence) {
-        PopupGuard.check();
-        CaptureSource source = Source.current();
-        return clickResult(source, ImageFinder.findInternal(template, source, confidence));
-    }
-
-    /**
-     * Clicks the highest-scoring match for the template on a specific capture source.
-     * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
-     *
-     * @param template the image template to search for
-     * @param source   the capture source to search within
-     * @return true if the template was found and clicked, false otherwise
-     */
-    public static boolean clickBest(ImageTemplate template, CaptureSource source) {
-        PopupGuard.check();
-        return clickResult(source, ImageFinder.findInternal(template, source, BotSettings.confidence()));
-    }
-
-    /**
-     * Clicks the highest-scoring match for the template on a specific capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link VisionContext} and can be retrieved with
-     * {@link VisionContext#getLastMatch()}.
-     *
-     * @param template   the image template to search for
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if the template was found and clicked, false otherwise
-     */
-    public static boolean clickBest(ImageTemplate template, CaptureSource source, double confidence) {
-        PopupGuard.check();
-        return clickResult(source, ImageFinder.findInternal(template, source, confidence));
-    }
-
     // --- clickBest over an ImageTemplateGroup ---
+    //
+    // There is deliberately no clickBest(ImageTemplate ...) counterpart. "Best" is only a question when there
+    // are several templates to choose between; for a single one, findInternal already returns its best match,
+    // so the four single-template overloads that used to sit here were click(ImageTemplate ...) under a second
+    // name — and a worse one: they never reached VisionContext.setLastMatch, so getLastMatch() went stale
+    // after them, which their own Javadoc claimed the opposite of. Removed in 1.1.0; use click(...).
 
     /**
      * Clicks the highest-scoring match for any template in the group on the current capture source.

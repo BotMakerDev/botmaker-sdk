@@ -23,7 +23,7 @@ import java.awt.image.BufferedImage;
  * ({@code capture()} returns {@code null}, {@link #isPresent()} is {@code false}) and follows the window if it
  * moves.
  */
-public final class SessionSource implements CaptureSource {
+public final class SessionSource implements CaptureSource, WindowBacked {
 
     private final DesktopSession session;
 

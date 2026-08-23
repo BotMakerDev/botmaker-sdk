@@ -78,8 +78,15 @@ public class ImageTemplate implements AutoCloseable {
      * Returns the OpenCV image data, loading it from disk on first access.
      * The returned {@link Mat} is owned by this template — do not release it directly; use
      * {@link #unload()} instead.
+     *
+     * <p><b>Package-private since 1.1.0, deliberately.</b> {@code Mat} is {@code org.opencv.core}'s type, and
+     * a public method returning it put a third-party class the SDK does not version into the surface that is
+     * under contract from 1.1.0 — an OpenCV upgrade could then break a bot with nothing here to notice. Every
+     * caller is a matcher in this package ({@link ImageFinder}, {@link ImageClicker}) plus this package's own
+     * tests; no bot has ever had a reason to hold a {@code Mat}. A bot that genuinely needs the pixels should
+     * be given an SDK-owned type instead, which stays possible as an addition at any time.
      */
-    public Mat getMat() {
+    Mat getMat() {
         if (mat == null || mat.empty()) {
             String absPath = new File(filePath).getAbsolutePath();
             // IMREAD_UNCHANGED keeps a transparent PNG's alpha channel (4-channel BGRA) so the matcher can
