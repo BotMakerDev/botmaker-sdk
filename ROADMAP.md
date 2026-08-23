@@ -8,6 +8,53 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — the pointer gate: `ApiPointersTest`, in CI and in `release.sh` (phase 2 of 6)
+
+**Changed:** `src/test/java/com/botmaker/sdk/api/ApiPointersTest.java` (new), `pom.xml` (ClassGraph
+4.8.179 at **test scope**), `.github/workflows/ci.yml` (one targeted step; the stale `@ApiId` /
+`migrations.json` paragraph rewritten), umbrella `release.sh` (`check_api_pointers` in the decide pass).
+
+**Done**
+
+- **A redirect is checked, not trusted — starting with the SDK's own end of it.** Six `@Test`s over a
+  ClassGraph scan of this build's `target/classes`: (1) every `@Deprecated` public `api.*` element carries
+  a `@ReplacedBy`, a target or a deliberate empty value; (2) a named target exists in this build; (3) the
+  target carries the matching `@Replaces` back-edge; (4) no two elements claim one `name@version`; (5)
+  every entry parses, its version is a semver, and it may name a live element only while that element is
+  the deprecated one pointing back; (6) — release-time only — no entry is dated after the version being
+  cut. A seventh asserts the scan saw the API at all, so an empty classpath cannot pass the other six
+  vacuously.
+- **Why it needs no previously published jar.** A deprecation window puts **both ends in the same build** —
+  the deprecated member is still there, that is what the window is for. So the back-edge is written and
+  verified while the element it names is still compilable, and by the time that element is deleted a
+  release later, the entry is already proven. Nothing here fetches, resolves or diffs an old artifact.
+- **It is not the gate that was deleted.** `docs/refactor/21-api-compat.md` §3 records a japicmp gate
+  removed on 2026-08-22 for enforcing **coverage** — and an uncovered break is now a *supported* outcome
+  (default value + review mark). No coverage rule and no version-bump rule return: these checks ask only
+  whether a link the author **did** declare is complete. §3's two traps are sidestepped too — the rules
+  are wrong at *every* version, so CI needs no version awareness, and there is no japicmp, no Java-26
+  Groovy and no third source root.
+- **The scan is pinned to the main output**, via the code source of `ReplacedBy.class`, not the plain
+  classpath: the test sources sit in the same package, and a fixture must not be able to fail — or
+  accidentally satisfy — a rule about the API surface.
+- **The failure message opens with the offenders, then explains.** Surefire's one-line summary is
+  truncated at the first newline and is all the CI log and `release.sh` show, so a message that opened
+  with prose named no element.
+- **Two places it bites.** `ci.yml` gains one step (the single documented exception to that file's
+  "CI is a compile gate, tests run locally" rule — the thing it protects cannot be caught later, since a
+  missing back-edge compiles fine and becomes unrecoverable the release the member is deleted).
+  `release.sh` gains `check_api_pointers`, called from the **decide** pass beside `check_sdk_floor`, for
+  its neighbour's reason: a pushed tag cannot be edited. It adds `-Dbotmaker.api.maxVersion=$SDK_VER`,
+  the one check only the release caller can make. Needs `mvn`; no network; `--force` overrides.
+- ClassGraph is **test scope only** — this is a library a bot compiles against, and the gate must never
+  put a scanner on a bot's classpath. It is the version Studio pins, so the gate and the consumer parse a
+  CLASS-retention annotation the same way by construction rather than by coincidence.
+
+**Deferred / next** — phases 3–6 are Studio-side and doc work: composed pairing from both ends in
+`SdkUpgradeService`, the checked `Redirect` at the call site, the Modernise action, then the docs.
+
+---
+
 ## 2026-08-23 — `@ReplacedBy` / `@Replaces` replace `@ApiId` (phase 1 of 6)
 
 **Changed:** `api/ReplacedBy.java` and `api/Replaces.java` (new); `api/ApiId.java` (deleted) and the

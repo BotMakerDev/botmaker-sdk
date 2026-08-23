@@ -111,6 +111,19 @@
             <version>1.10.2</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- ClassGraph, TEST SCOPE ONLY — it must never reach a bot's classpath; this is a library a bot
+             compiles against, not an application. It exists here for ApiPointersTest, which reads the
+             @ReplacedBy / @Replaces pointers straight out of this build's own target/classes and refuses a
+             link that is incomplete. Same version Studio pins, deliberately: Studio reads the very same
+             annotations out of a resolved SDK jar at upgrade time, so the gate and the consumer agree on
+             how a CLASS-retention annotation is parsed rather than agreeing by coincidence. -->
+        <dependency>
+            <groupId>io.github.classgraph</groupId>
+            <artifactId>classgraph</artifactId>
+            <version>4.8.179</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

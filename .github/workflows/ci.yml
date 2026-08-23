@@ -6,6 +6,12 @@ name: CI
 # Tests are deliberately NOT run (`-DskipTests`): CI is a compile gate, and the suite is run locally.
 # -DskipTests still *compiles* the tests, so test code that no longer builds is still caught.
 #
+# ApiPointersTest is the ONE documented exception, run in its own step below. It touches no native library,
+# no display and no network — it is a scan of this build's own target/classes — and what it protects cannot
+# be caught locally by anyone who did not think to run it: a @ReplacedBy whose back-edge was never written
+# still compiles, and only stops working a release later, when the deprecated member is deleted and the
+# annotation that named its successor goes with it. See the step's comment.
+#
 # `jitpack` runs only on a version tag. It was a separate file (publish.yml) purely because its trigger
 # differs, which a job-level `if:` expresses just as well.
 #
@@ -51,14 +57,23 @@ jobs:
       - name: Build
         run: mvn -B -DskipTests package
 
-      # There is deliberately no API compatibility gate here any more. It compared this build against the
-      # previously published jar with japicmp and demanded a migrations entry for every break — an
-      # apparatus that only earns its keep when a break has to be *repaired* by pointing one member at
-      # another. It no longer is: Studio replaces a call to a member that is gone with a default value and
-      # marks the enclosing function for review, which needs nothing declared and so nothing to check.
-      # What survives on this side is @ApiId (com.botmaker.sdk.api.ApiId) and the rename-only
-      # META-INF/botmaker/migrations.json, both read by Studio at upgrade time, neither verifiable here.
-      # See ../docs/refactor/21-api-compat.md (umbrella).
+      # The pointer gate. NOT the API compatibility gate that used to be here: that one compared this build
+      # against the previously published jar with japicmp and demanded a declared migration for every break
+      # — a COVERAGE rule — and it went because an uncovered break is now a supported outcome (Studio
+      # substitutes a default value of the old return type and marks the enclosing function @NeedsReview).
+      # No coverage rule is coming back, and nothing here refuses a breaking change or sizes a version bump.
+      #
+      # This checks only that a link somebody DID declare is complete: every @Deprecated api.* element
+      # carries a @ReplacedBy (a target, or a deliberate empty value), every target exists in this build and
+      # carries the matching @Replaces back-edge, and no two survivors claim one old spelling at one
+      # version. It works with no previously published jar because a deprecation window puts both ends in
+      # the same build — which is also why it is worth running in CI rather than at release time only: it
+      # can be satisfied while both ends exist, and never again afterwards.
+      #
+      # No japicmp, no extra source root, no version awareness (release.sh adds the one version-sensitive
+      # check via -Dbotmaker.api.maxVersion). See ../docs/refactor/21-api-compat.md (umbrella).
+      - name: API pointer gate (@ReplacedBy / @Replaces)
+        run: mvn -B test -Dtest=ApiPointersTest -DfailIfNoTests=false
 
   # JitPack builds the artifact itself from the pushed tag; this just asks it to start eagerly so the
   # first consumer doesn't wait. No secrets required.
