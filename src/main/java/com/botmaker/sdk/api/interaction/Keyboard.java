@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -32,7 +31,6 @@ import com.botmaker.session.DesktopSession;
  * type</em>. Keys therefore reach the game, but the game is brought to the foreground first. There is no
  * mechanism on X11 that is both background and accepted by a game; that trade is the whole choice.
  */
-@ApiId("keyboard")
 public class Keyboard {
 
     /**

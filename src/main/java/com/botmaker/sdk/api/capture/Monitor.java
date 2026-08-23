@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.capture;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.shared.capture.ScreenCapture;
 
@@ -13,7 +12,6 @@ import java.awt.image.BufferedImage;
  * back to the whole desktop's pixels. Prefer the factory {@link CaptureSource#monitor(int)} over
  * constructing this directly.
  */
-@ApiId("monitor")
 public final class Monitor implements CaptureSource {
 
     private final int index;

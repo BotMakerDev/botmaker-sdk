@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.observe;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Rect;
 import com.botmaker.sdk.api.vision.MatchResult;
 
@@ -9,5 +8,4 @@ import com.botmaker.sdk.api.vision.MatchResult;
  * the search {@code region} (null for a whole-surface search) and the {@link MatchResult} — which itself
  * exposes {@code isFound()}, the matched {@code getRect()}, confidence and template id.
  */
-@ApiId("match-event")
 public record MatchEvent(Surface surface, Rect region, MatchResult result) {}

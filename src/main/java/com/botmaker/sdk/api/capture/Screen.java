@@ -1,11 +1,9 @@
 package com.botmaker.sdk.api.capture;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.shared.capture.ScreenCapture;
 import java.awt.image.BufferedImage;
 
-@ApiId("screen")
 public class Screen {
     /**
      * Captures the entire desktop.

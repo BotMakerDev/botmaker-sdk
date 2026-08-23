@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.observe;
 
-import com.botmaker.sdk.api.ApiId;
-
 /**
  * Observes what a running bot's vision/interaction layer does, in real time — every template match and
  * every click. A first-class SDK feature usable with or without the Studio: register one to log actions,
@@ -12,7 +10,6 @@ import com.botmaker.sdk.api.ApiId;
  * the events you care about. Observers are invoked synchronously on the bot's own thread at the moment the
  * action happens — keep them fast and non-blocking; throwing is caught and ignored by the dispatcher.
  */
-@ApiId("bot-observer")
 public interface BotObserver {
 
     /** A template-match attempt completed (whether or not it was found). */

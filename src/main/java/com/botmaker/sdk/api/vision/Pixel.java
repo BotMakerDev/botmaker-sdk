@@ -1,5 +1,4 @@
 package com.botmaker.sdk.api.vision;
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.Point;
@@ -44,7 +43,6 @@ import java.util.List;
  * }
  * }</pre>
  */
-@ApiId("pixel")
 public class Pixel {
 
     // ---------------------------------------------------------------------

@@ -18,7 +18,6 @@ import java.time.format.DateTimeFormatter;
  *   <li>{@code Time.format("yyyy-MM-dd HH:mm:ss")} - Format current time</li>
  * </ul>
  */
-@ApiId("time")
 public final class Time {
 
     /** Default timezone used when no explicit timezone is specified. */

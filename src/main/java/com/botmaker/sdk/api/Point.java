@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api;
 
-@ApiId("point")
 public class Point {
 
     public double x, y;

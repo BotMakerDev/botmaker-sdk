@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.emulator;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 
@@ -18,7 +17,6 @@ import java.util.Optional;
  * visible yet" and retries, and a later capture connects once the instance has booted. A dropped connection
  * re-resolves on the next call.
  */
-@ApiId("emulator-source")
 public final class EmulatorSource implements CaptureSource {
 
     private final String instanceName;

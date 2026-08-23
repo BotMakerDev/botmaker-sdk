@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.observe;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Point;
 
 /**
@@ -12,5 +11,4 @@ import com.botmaker.sdk.api.Point;
  * and the moves in between are how the driver got that done. An observer drawing the swipe wants both ends at
  * once, and one that logs it would otherwise log a hundred lines for a single flick.
  */
-@ApiId("swipe-event")
 public record SwipeEvent(Surface surface, Point start, Point end, long durationMs) {}

@@ -1,5 +1,4 @@
 package com.botmaker.sdk.api.vision;
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 
 import com.botmaker.sdk.api.Point;
@@ -43,7 +42,6 @@ import java.util.regex.Pattern;
  * String amount = Text.read(gold, digits);
  * }</pre>
  */
-@ApiId("text")
 public final class Text {
 
     /**

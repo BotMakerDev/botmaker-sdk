@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
 
@@ -15,7 +14,6 @@ import java.awt.Color;
  * <p>All coordinates are <b>absolute screen coordinates</b> (the search's capture-source origin is already
  * applied), so they can be handed straight to {@code Mouse}.
  */
-@ApiId("color-match")
 public class ColorMatch {
 
     private final Point location;      // top-left of the cluster's bounding box, absolute

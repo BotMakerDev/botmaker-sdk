@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.ApiId;
-
 import java.util.List;
 
 /**
@@ -24,7 +22,6 @@ import java.util.List;
  *
  * <p>Immutable: the backing list is copied and unmodifiable.
  */
-@ApiId("image-template-group")
 public record ImageTemplateGroup(List<ImageTemplate> templates) {
 
     public ImageTemplateGroup {

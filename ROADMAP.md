@@ -8,6 +8,56 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — `@ReplacedBy` / `@Replaces` replace `@ApiId` (phase 1 of 6)
+
+**Changed:** `api/ReplacedBy.java` and `api/Replaces.java` (new); `api/ApiId.java` (deleted) and the
+annotation + import stripped from all 54 public types under `api/**`;
+`src/main/resources/META-INF/botmaker/migrations.json` (deleted, with its now-empty directory).
+
+**Done**
+
+- **A pointer instead of an identity.** `@ApiId` had two limits the maintainer hit: an id cannot be
+  corrected once published (retire-never-reuse makes a mistake permanent), and it pairs **types only** —
+  a renamed or moved *method* had no mechanism, which is why `migrations.json` survived beside it as a
+  second one. Both are replaced by a single pair of annotations that name a **replacement** rather than
+  asserting an identity, reach methods, constructors and fields, and can be corrected in a later release.
+- **Both ends, because a bot holds only two jars.** `@ReplacedBy` sits on the deprecated element and is
+  read out of the bot's **own (older)** jar — the bot still spells the member the old way. `@Replaces`
+  sits on the survivor and is read out of the **newer** jar, which is the only place the answer survives
+  once the deprecated member is finally deleted. Either resolves one hop; composed they resolve a chain
+  (`a`→`b` announced in 2.0, `b`→`c` in 3.0) for a bot that skipped both releases, **with no intermediate
+  jar ever fetched**.
+- **Grammar**, lifted from the deleted `migrations.json` `_readme` so nothing was re-invented: `fqn` for a
+  type, `fqn#member` for a method or field, `fqn#<init>` for a constructor (an enum constant *is* a static
+  field). A `@Replaces` entry additionally carries `@<version>` — the last release that spelling existed
+  in — which is what lets Studio filter by era and what distinguishes two entries naming the same member at
+  different points in the API's history. Neither `#` nor `@` occurs in a Java FQN, so the parse is
+  unambiguous. **No arity in the string:** the annotation sits on one overload, so the bytecode already
+  knows the parameter count of both ends.
+- **An empty `@ReplacedBy` is an explicit statement**, not an omission — "nothing takes this element's
+  place", which Studio reads as default-and-mark. The annotation stays required on every deprecated public
+  element so the author decides rather than forgets; phase 2's build gate is what checks that.
+- **Why a declared redirect is safe now when it was rejected a day ago.** The objection was that two
+  members need not share a return type. Studio holds both jars, so it no longer has to trust one: in
+  **statement** position the target's return type cannot matter and the redirect is always taken (today
+  that call is *deleted*, losing work); in **expression** position the redirect is taken only when the new
+  type fits where the old one did, and otherwise the call still falls back to a default value. A wrong
+  pointer therefore degrades, it does not produce a bot that compiles and misbehaves.
+- **CLASS retention, verified end to end.** A scratch class compiled against the built jar and read with
+  `javap -v` shows all three forms under `RuntimeInvisibleAnnotations` —
+  `ReplacedBy(value="com.example.New#tap")`, `Replaces(value=["com.example.Old#click@1.2.0"])`, and the
+  bare `ReplacedBy` whose empty value is left to the annotation's default. RUNTIME would put this in every
+  running bot's reflection data for nothing.
+
+**Deferred / next (this plan's remaining phases)**
+
+- Phase 2: `ApiPointersTest` + the CI step and `release.sh check_api_pointers` that make the link checkable
+  offline from a single build.
+- Phases 3–5 are Studio-side (composed pairing, the checked redirect at the call site, a Modernise action);
+  phase 6 is docs.
+
+---
+
 ## 2026-08-22 — `@ApiId`, renames only, and the end of api-check
 
 **Changed:** `src/main/java/com/botmaker/sdk/api/ApiId.java` (new) and every one of the 54 public types

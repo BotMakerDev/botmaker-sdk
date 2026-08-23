@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 
 import java.time.Duration;
@@ -28,7 +27,6 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p>{@link #milliseconds(int)} / {@link #seconds(double)} remain as literal shorthands — they are what a
  * one-off fixed pause reads best as, and the SDK itself uses them for its own fixed poll intervals.
  */
-@ApiId("wait")
 public class Wait {
 
     /**

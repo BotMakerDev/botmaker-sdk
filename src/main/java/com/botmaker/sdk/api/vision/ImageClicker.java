@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.BotSettings;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
@@ -24,7 +23,6 @@ import java.util.List;
  * Every method in this class also updates {@link VisionContext} for the current thread,
  * enabling access to the most recent match via {@link VisionContext#getLastMatch()}.
  */
-@ApiId("image-clicker")
 public class ImageClicker {
 
     // --- click (single template) ---

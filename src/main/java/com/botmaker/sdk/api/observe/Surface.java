@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.observe;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Window;
@@ -10,7 +9,6 @@ import com.botmaker.sdk.api.capture.Window;
  * absolute bounds) or the whole screen. Lets an observer that renders overlays know which window/screen to
  * draw on. Purely descriptive: it holds no native handle.
  */
-@ApiId("surface")
 public record Surface(String title, Rect bounds) {
 
     /** True when this refers to a specific window (as opposed to the whole screen). */

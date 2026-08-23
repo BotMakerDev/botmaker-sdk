@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.ApiId;
-
 /**
  * How exacting a {@link Pixel} search should be — every knob that decides whether something counts as a match,
  * in one value.
@@ -50,7 +48,6 @@ import com.botmaker.sdk.api.ApiId;
  * @param minArea  the minimum cluster area in pixels; always at least 1
  * @param minCount the minimum number of matching pixels in the whole search; 0 for no requirement
  */
-@ApiId("precision")
 public record Precision(double deltaE, int minArea, int minCount) {
 
     /** The area floor the named constants start from: filters out stray anti-aliased pixels. */

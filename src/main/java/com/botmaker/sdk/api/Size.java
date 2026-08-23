@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api;
 
 
-@ApiId("size")
 public class Size {
 
     public double width, height;

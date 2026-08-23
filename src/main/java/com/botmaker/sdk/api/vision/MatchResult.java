@@ -1,11 +1,9 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
 import java.util.Random;
 
-@ApiId("match-result")
 public class MatchResult {
 
     private static final Random RANDOM = new Random();

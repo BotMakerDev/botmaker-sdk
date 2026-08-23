@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Debug;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -13,7 +12,6 @@ import com.botmaker.session.ActiveSession;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.PointerPolicy;
 
-@ApiId("mouse")
 public class Mouse {
 
     /**

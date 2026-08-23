@@ -38,7 +38,6 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * <p>Linux-only in substance: on Windows there is no nested-display backend, bring-up declines and the bot runs
  * on the normal desktop. Calling these methods there is harmless.
  */
-@ApiId("session")
 public final class Session {
 
     private Session() {}

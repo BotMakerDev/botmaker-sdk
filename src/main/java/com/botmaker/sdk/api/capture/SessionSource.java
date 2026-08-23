@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.capture;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.session.DesktopSession;
@@ -22,7 +21,6 @@ import java.awt.image.BufferedImage;
  * ({@code capture()} returns {@code null}, {@link #isPresent()} is {@code false}) and follows the window if it
  * moves.
  */
-@ApiId("session-source")
 public final class SessionSource implements CaptureSource {
 
     private final DesktopSession session;

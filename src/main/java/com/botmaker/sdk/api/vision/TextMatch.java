@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.ApiId;
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
 
@@ -14,7 +13,6 @@ import com.botmaker.sdk.api.Rect;
  * <p>The bounding box is in <b>absolute screen coordinates</b> (the search's capture-source origin is
  * already applied), so {@link #getCenter()} can be handed straight to {@code Mouse}.
  */
-@ApiId("text-match")
 public class TextMatch {
 
     private final String text;
