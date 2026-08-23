@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.Scaffolding;
 
 import java.util.List;
@@ -25,7 +26,12 @@ import java.util.List;
  * <p>Immutable: the backing list is copied and unmodifiable.
  */
 // The scaffold's Popups declares one (POPUPS) — see the paragraph above about the empty group.
+//
+// Curated for the palette: both `of` factories and `isEmpty` are offered; `toArray` is not. It exists so the
+// varargs matchers can be reached from a group, which is plumbing between two SDK classes — the palette has no
+// reason to teach a bot author to hold an ImageTemplate[]. It stays public for the one who wants it.
 @Scaffolding
+@Palette
 public record ImageTemplateGroup(List<ImageTemplate> templates) {
 
     public ImageTemplateGroup {
@@ -33,15 +39,18 @@ public record ImageTemplateGroup(List<ImageTemplate> templates) {
     }
 
     @Scaffolding   // the scaffold emits ImageTemplateGroup.of(), the empty case
+    @Palette
     public static ImageTemplateGroup of(ImageTemplate... templates) {
         return new ImageTemplateGroup(List.of(templates));
     }
 
+    @Palette
     public static ImageTemplateGroup of(List<ImageTemplate> templates) {
         return new ImageTemplateGroup(templates);
     }
 
     /** Whether this group holds no templates — see the class note on what every operation then does. */
+    @Palette
     public boolean isEmpty() {
         return templates.isEmpty();
     }

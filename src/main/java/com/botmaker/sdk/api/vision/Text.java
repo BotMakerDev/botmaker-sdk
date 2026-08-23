@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.shared.ocr.OcrEngine;
 import com.botmaker.shared.ocr.OcrOptions;
 import com.botmaker.shared.ocr.TextResult;
@@ -41,7 +42,15 @@ import java.util.regex.Pattern;
  * OcrOptions digits = OcrOptions.defaults().withCharWhitelist("0123456789").withUpscale(3.0);
  * String amount = Text.read(gold, digits);
  * }</pre>
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): every operation is offered, but none of the
+ * {@link OcrOptions} overloads are. That is not a judgement on tuning — it is that {@code OcrOptions} lives in
+ * {@code botmaker-shared} rather than in {@code api}, so Studio has no picker, no import and no declarable
+ * type for it; an offered {@code read(source, opts)} would hand the user a block whose second argument they
+ * could not fill. Tuned OCR is written by hand, which is where {@code OcrOptions.defaults().withUpscale(…)}
+ * has to be written anyway. The methods stay public and supported.
  */
+@Palette
 public final class Text {
 
     /**
@@ -57,11 +66,13 @@ public final class Text {
     // ---------------------------------------------------------------------
 
     /** All recognized text within {@code source}, as one string. Empty string if nothing is read. */
+    @Palette
     public static String read(CaptureSource source) {
         return read(source, DEFAULT_OPTIONS);
     }
 
     /** {@link #read(CaptureSource)} against the current source. */
+    @Palette
     public static String read() {
         return read(Source.current(), DEFAULT_OPTIONS);
     }
@@ -81,11 +92,13 @@ public final class Text {
      * Whether {@code needle} appears within {@code source} (case-insensitive substring of a recognized
      * line). The matching line is stored in {@link Vision#lastTextMatch()}.
      */
+    @Palette
     public static boolean find(String needle, CaptureSource source) {
         return find(needle, source, DEFAULT_OPTIONS);
     }
 
     /** {@link #find(String, CaptureSource)} against the current source. */
+    @Palette
     public static boolean find(String needle) {
         return find(needle, Source.current(), DEFAULT_OPTIONS);
     }
@@ -102,6 +115,7 @@ public final class Text {
      * (case-insensitive, trimmed) — stricter than {@link #find}. The hit is stored in
      * {@link Vision#lastTextMatch()}.
      */
+    @Palette
     public static boolean findExact(String target, CaptureSource source) {
         return findExact(target, source, DEFAULT_OPTIONS);
     }
@@ -119,6 +133,7 @@ public final class Text {
      * (via {@link java.util.regex.Matcher#find}). The hit is stored in
      * {@link Vision#lastTextMatch()}.
      */
+    @Palette
     public static boolean findMatching(String regex, CaptureSource source) {
         return findMatching(regex, source, DEFAULT_OPTIONS);
     }
@@ -145,16 +160,19 @@ public final class Text {
      * usual OCR misreads ({@code l↔1}, {@code O↔0}, a dropped letter) that make {@link #find}'s exact substring
      * miss. The matching line is stored in {@link Vision#lastTextMatch()}.
      */
+    @Palette
     public static boolean findFuzzy(String needle, CaptureSource source) {
         return findFuzzy(needle, DEFAULT_FUZZY_DISTANCE, source, DEFAULT_OPTIONS);
     }
 
     /** {@link #findFuzzy(String, CaptureSource)} against the current source. */
+    @Palette
     public static boolean findFuzzy(String needle) {
         return findFuzzy(needle, DEFAULT_FUZZY_DISTANCE, Source.current(), DEFAULT_OPTIONS);
     }
 
     /** {@link #findFuzzy(String, CaptureSource)} with an explicit {@code maxDistance} edit tolerance. */
+    @Palette
     public static boolean findFuzzy(String needle, int maxDistance, CaptureSource source) {
         return findFuzzy(needle, maxDistance, source, DEFAULT_OPTIONS);
     }
@@ -176,6 +194,7 @@ public final class Text {
      *
      * @return how many matched
      */
+    @Palette
     public static int findAll(String needle, CaptureSource source) {
         return findAll(needle, source, DEFAULT_OPTIONS);
     }
@@ -203,6 +222,7 @@ public final class Text {
     }
 
     /** {@link #readAll(CaptureSource, OcrOptions)} at the default options. */
+    @Palette
     public static int readAll(CaptureSource source) {
         return readAll(source, DEFAULT_OPTIONS);
     }
@@ -216,6 +236,7 @@ public final class Text {
      *
      * @return true if it appeared; the match is in {@link Vision#lastTextMatch()}
      */
+    @Palette
     public static boolean waitFor(String needle, CaptureSource source, long timeoutMs) {
         return waitFor(needle, source, DEFAULT_OPTIONS, timeoutMs);
     }
@@ -231,6 +252,7 @@ public final class Text {
     }
 
     /** Polls until {@code needle} is <em>gone</em> from {@code source}, or {@code timeoutMs} elapses. */
+    @Palette
     public static boolean waitForGone(String needle, CaptureSource source, long timeoutMs) {
         return waitForGone(needle, source, DEFAULT_OPTIONS, timeoutMs);
     }

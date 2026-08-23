@@ -8,6 +8,62 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — the `@Palette` sweep: the vision facades (phase 3.10 of 12)
+
+**Changed:** `api/vision/` — `ImageClicker`, `Text`, `Pixel`, `Vision`, `ImageWaiter`, `Precision`,
+`ImageTemplateGroup` and `Matches` curated. 102 offered, 29 hidden, nothing removed. Verdicts and reasons in
+`docs/refactor/22-api-audit.md` §5.
+
+**Done**
+
+- **`ImageClicker` — 29 of 42.** The `ImageFinder` rule verbatim (plain and `CaptureSource` forms offered,
+  bare `double confidence` hidden, the three `*Compare` families keeping every shape), plus one extra: the
+  four-argument core `click(t, source, double, int delayMs)` is hidden twice over, because `delayMs` has a
+  home in `BotSettings.foundDelay()` exactly as the threshold has one in `ImageTemplate.threshold()`.
+- **`ImageWaiter` — 6 of 12.** The same rule, unmodified. The timeout stays a parameter in every offered
+  shape: it is the question these methods exist to ask.
+- **`Text` — 13 of 22, and this is where `@Palette` pays for itself.** The nine `shared.ocr.OcrOptions`
+  overloads are hidden. The audit's §4 had recorded them as the third type leak and left them open, since the
+  only lever was deletion and the overloads are genuinely useful. The palette answers it exactly:
+  `OcrOptions` lives in `botmaker-shared`, so it is not an `SdkType` — Studio has no picker for it, no import
+  and no declarable variable of that type, and an offered `read(source, opts)` hands the user a block whose
+  second argument **cannot be filled from the editor at all**. Hiding a broken menu entry costs the API
+  nothing; the methods stay public for hand-written code, which is where tuned OCR is written anyway.
+- **`Pixel` — 19 of 19, and the reason matters more than the count.** A mechanical reading of the rule would
+  have gutted it. The rule is not "hide the extra parameter", it is *"hide the parameter whose question a
+  property already answers"*. A `java.awt.Color` is a JDK type and cannot carry a tolerance the way
+  `ImageTemplate` does, so there is no property to teach instead — `Precision` **is** that place, it is a
+  palette type with its own picker, and it varies per colour rather than per bot.
+- **`Vision` 17 of 17, `Precision` 6 of 6, `Matches` 9 of 9, `ImageTemplateGroup` 3 of 4** (`toArray()`
+  hidden: it exists so the varargs matchers can be reached from a group, which is plumbing between two SDK
+  classes, and the palette has no reason to teach a bot author to hold an `ImageTemplate[]`).
+- **Annotating a facade that hides nothing is still worth the commit.** Strict mode means the type-level
+  annotation is what *fixes* the verdict — and a method added to `Pixel` or `Vision` later is hidden until
+  somebody decides otherwise, which is the polarity the phase was chosen for.
+- **Three facades carry instance verdicts, not only static ones.** `Precision`, `Matches` and
+  `ImageTemplateGroup` are values a bot holds — a `Precision` variable, the lambda parameter of `ifFindAny` —
+  so what they offer is asked through the value rather than through a static facade submenu. `toString` is an
+  `Object` override and never a menu entry in either vocabulary.
+- **§3's keep list re-checked, which the phase's verify step requires.** Everything §3 kept *because a picker
+  seeds it* is still offered: `clickAny(ImageTemplate…)`, `clickAny(CaptureSource, ImageTemplate…)`,
+  `clickEachLast(…)`, `clickAllLast(…)`, `Matches.hasAll`/`hasAny`, `ImageTemplateGroup.of(ImageTemplate…)`.
+  The only varargs shapes hidden also take a `double confidence`, and the picker is reachable through the
+  offered pair. This was the one regression the sweep could cause silently.
+- Two javadoc stragglers from the 3.8 accessor rename fixed in passing: `Pixel`'s class sample said
+  `Vision.getLastColorMatch()`, and `Matches` linked `MatchResult#getTemplateId()`.
+
+**Deferred / next**
+
+- **Phase 3.11 — everything outside `api.vision`**, 159 methods: `Time` 31, `BotSettings` 19, `Game` 16,
+  `Mouse` 16, `Keyboard` 10, `Target` 9, `Emulators` 9, `Session` 8, `Debug` 7, `Wait` 6, `Watchdog` 6,
+  `BotMaker` 5, `PopupGuard` 5, `Window` 3, `Bot` 3, `Activity` 3, `Source` 2, `Rect` 1. One facade per
+  commit, verdicts appended to audit §5.
+- **`MatchResult`, `ColorMatch`, `TextMatch` and `ImageTemplate` stay uncurated** — they are result types
+  rather than facades, and were out of 3.10's scope. Deciding them is a judgement 3.11 or later can make;
+  until then their menus are unchanged, which is exactly what the type-level gate is for.
+
+---
+
 ## 2026-08-23 — `@Palette`: a method can leave the menu without leaving the API (phase 3.9 of 12)
 
 **Changed:** new `api/meta/Palette.java`; `api/vision/ImageFinder.java` annotated as the pilot (42 of its 54

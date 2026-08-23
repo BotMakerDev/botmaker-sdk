@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.meta.Palette;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +35,12 @@ import java.util.List;
  * <p><b>Named {@code Vision} since 1.1.0</b>, previously {@code VisionContext}. "Context" was a placeholder
  * noun for a class that is really <em>what the last search saw</em>, and the call site is what a bot author
  * reads: {@code VisionContext.getLastMatch().getCenter()} against {@code Vision.lastMatch().center()}.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): everything is offered. There is no ×4 artefact to
+ * trim here — the seventeen methods are three parallel families of four (image, colour, text) plus
+ * {@link #inFrame()}, and each one asks a different question rather than the same question a different way.
  */
+@Palette
 public final class Vision {
 
     private static final ThreadLocal<MatchResult> lastMatch = new ThreadLocal<>();
@@ -53,6 +59,7 @@ public final class Vision {
      *
      * @return the last match result, never null
      */
+    @Palette
     public static MatchResult lastMatch() {
         MatchResult result = lastMatch.get();
         return result != null ? result : MatchResult.notFound();
@@ -64,6 +71,7 @@ public final class Vision {
      *
      * @return the last match result list, never null
      */
+    @Palette
     public static List<MatchResult> lastMatchList() {
         List<MatchResult> result = lastMatchList.get();
         return result != null ? result : new ArrayList<>();
@@ -75,6 +83,7 @@ public final class Vision {
      *
      * @return true if the last vision operation found a match
      */
+    @Palette
     public static boolean lastMatchFound() {
         return lastMatch().isFound();
     }
@@ -90,6 +99,7 @@ public final class Vision {
      *
      * @return the last group result, never null
      */
+    @Palette
     public static Matches lastMatches() {
         Matches result = lastMatches.get();
         return result != null ? result : Matches.none();
@@ -144,6 +154,7 @@ public final class Vision {
      *
      * @return true while a {@code ifFindAny}/{@code whileFindAny}/{@code …All} callback is running
      */
+    @Palette
     public static boolean inFrame() {
         return frame.get() != null;
     }
@@ -166,6 +177,7 @@ public final class Vision {
      * Clears the last match result, match list and group result for the current thread.
      * Useful at the start of a bot action to ensure a clean state.
      */
+    @Palette
     public static void clearLastMatch() {
         lastMatch.remove();
         lastMatchList.remove();
@@ -179,6 +191,7 @@ public final class Vision {
      * @param action the consumer to invoke with the match result
      * @return true if a match existed and the action was invoked, false otherwise
      */
+    @Palette
     public static boolean ifLastMatch(java.util.function.Consumer<MatchResult> action) {
         MatchResult result = lastMatch();
         if (result.isFound()) {
@@ -238,6 +251,7 @@ public final class Vision {
      *
      * @return the last colour match, never null
      */
+    @Palette
     public static ColorMatch lastColorMatch() {
         ColorMatch result = lastColorMatch.get();
         return result != null ? result : ColorMatch.notFound();
@@ -249,6 +263,7 @@ public final class Vision {
      *
      * @return the last colour match list, never null
      */
+    @Palette
     public static List<ColorMatch> lastColorMatchList() {
         List<ColorMatch> result = lastColorMatchList.get();
         return result != null ? result : new ArrayList<>();
@@ -258,11 +273,13 @@ public final class Vision {
      * Returns whether the last colour search for the current thread found something.
      * Equivalent to {@code lastColorMatch().isFound()}.
      */
+    @Palette
     public static boolean lastColorMatchFound() {
         return lastColorMatch().isFound();
     }
 
     /** Clears the last colour match and colour match list for the current thread. */
+    @Palette
     public static void clearLastColorMatch() {
         lastColorMatch.remove();
         lastColorMatchList.remove();
@@ -273,6 +290,7 @@ public final class Vision {
      *
      * @return true if a match existed and the action was invoked
      */
+    @Palette
     public static boolean ifLastColorMatch(java.util.function.Consumer<ColorMatch> action) {
         ColorMatch result = lastColorMatch();
         if (result.isFound()) {
@@ -306,6 +324,7 @@ public final class Vision {
      *
      * @return the last text match, never null
      */
+    @Palette
     public static TextMatch lastTextMatch() {
         TextMatch result = lastTextMatch.get();
         return result != null ? result : TextMatch.notFound();
@@ -317,6 +336,7 @@ public final class Vision {
      *
      * @return the last text match list, never null
      */
+    @Palette
     public static List<TextMatch> lastTextMatchList() {
         List<TextMatch> result = lastTextMatchList.get();
         return result != null ? result : new ArrayList<>();
@@ -326,11 +346,13 @@ public final class Vision {
      * Returns whether the last text search for the current thread found something.
      * Equivalent to {@code lastTextMatch().isFound()}.
      */
+    @Palette
     public static boolean lastTextMatchFound() {
         return lastTextMatch().isFound();
     }
 
     /** Clears the last text match and text match list for the current thread. */
+    @Palette
     public static void clearLastTextMatch() {
         lastTextMatch.remove();
         lastTextMatchList.remove();
@@ -341,6 +363,7 @@ public final class Vision {
      *
      * @return true if a match existed and the action was invoked
      */
+    @Palette
     public static boolean ifLastTextMatch(java.util.function.Consumer<TextMatch> action) {
         TextMatch result = lastTextMatch();
         if (result.isFound()) {
