@@ -8,6 +8,25 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — the docs the pointer plan owed (phase 1 of 12)
+
+**Changed:** `CLAUDE.md` (the `@ApiId` + `migrations.json` bullets replaced by the pointer pair and the gate).
+
+**Done**
+
+- **`@ApiId` and `migrations.json` are described as deleted, not as live.** The module's `CLAUDE.md` still
+  told a reader to keep an id across a rename and to write a pairing into a JSON file that no longer exists.
+  It now carries the pointer grammar (`fqn` / `fqn#member` / `fqn#<init>`; `""` as an explicit "nothing takes
+  my place"; `@Replaces` entries `fqn[#member]@<version>`, never pruned), why there are two ends (a bot holds
+  only two jars, and the back-edge is the only thing that survives the deprecated element's deletion), and
+  the rule that both halves are written **in the release that makes the change**.
+- **The gate is named as a gate, and bounded.** `ApiPointersTest`'s five always-true rules plus the opt-in
+  `-Dbotmaker.api.maxVersion`, with the sentence that keeps it from growing back into the thing that was
+  deleted: *it is not a coverage rule* — an uncovered break is a supported outcome.
+- Cross-module docs moved with it: `../docs/refactor/21-api-compat.md` §3–§4, `../docs/refactor/99-progress.md`,
+  the umbrella `CLAUDE.md` (*API stability* and *Releasing* — the latter had claimed an `--sdk` release needs
+  no `mvn` in the decide pass, which `check_api_pointers` made untrue).
+
 ## 2026-08-23 — the pointer gate: `ApiPointersTest`, in CI and in `release.sh` (phase 2 of 6)
 
 **Changed:** `src/test/java/com/botmaker/sdk/api/ApiPointersTest.java` (new), `pom.xml` (ClassGraph

@@ -90,30 +90,35 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   profile, and `release.sh` refusing a version number the diff did not justify. All of it is deleted. It
   existed to protect a repair model where a break was carried across by **pointing one member at another**
   — the old `fix` kinds — and there, a wrong or missing declaration produced a bot that compiled and
-  behaved differently, so the declarations had to be checkable. Studio no longer does that: it replaces a
-  call to a member that is gone with a **default value of the type it used to return** and marks the
-  enclosing function `@NeedsReview`. Nothing is declared, so nothing can be forgotten, and there is nothing
-  for a gate to verify. What it costs is stated plainly in `release.sh`: nothing now refuses a breaking
-  change released as a patch.
+  behaved differently, so the declarations had to be checkable. What it costs is stated plainly in
+  `release.sh`: nothing now refuses a breaking change released as a patch, and nothing sizes the bump.
 
-  **Two things on this side still matter to an upgrade, and both are read by Studio, not by CI.**
+  **What carries a rename is a pointer written at both ends — `@ReplacedBy` and `@Replaces`** (2026-08-23;
+  they replaced `@ApiId` and `META-INF/botmaker/migrations.json`, both deleted). A jar diff sees
+  `ImageClicker#click` go and `IClicker#tap` arrive and cannot see that one became the other; read as a
+  removal, that is hundreds of calls replaced by default values in someone's bot. So the SDK says it, at
+  both ends, because a bot being upgraded holds only two jars:
 
-  **`@ApiId` is how a rename survives.** A jar diff sees `ImageClicker` go and `IClicker` arrive; it cannot
-  see they are the same class, and read as a removal that is hundreds of deleted statements in someone's
-  bot. Every public `api.*` type carries `@ApiId("kebab-case")` (`api/ApiId.java`, `CLASS` retention, read
-  from the jar by the ClassGraph scan Studio already runs). Both releases spell the id the same way, so the
-  pairing is a fact. **Rename the class freely; keep the id.** The one rule: an id names a *role* and is
-  **retired when the role disappears, never re-pointed** at a different class — its absence from the newer
-  jar is exactly the "this is not coming back" signal. Reusing one is survivable rather than catastrophic,
-  because an id pairs the **type name only** and every member is still checked individually, so an id kept
-  across a redesign degrades to defaults-and-review rather than a silently wrong rewrite.
+  - **`@ReplacedBy`** on the deprecated element, read out of the bot's **own** jar — the bot still spells the
+    element the old way, so that is where the forward pointer has to be. `fqn`, `fqn#member` or
+    `fqn#<init>`, no arity (it sits on one overload). **`""` is an explicit "nothing takes my place"**, not
+    an omission — which is why it is *required* on every deprecated public element.
+  - **`@Replaces`** on the survivor, read out of the **target** jar — each entry `fqn[#member]@<version>`,
+    the version being the **last release the old spelling existed in**. This is the only place the answer
+    survives once the deprecated element is finally deleted. Entries accumulate and are never pruned.
 
-  **`src/main/resources/META-INF/botmaker/migrations.json` is renames only** — `schema` 2,
-  `{"versions": {"<v>": [{"from": ..., "to": ...}]}}` — and exists for what the ids cannot reach: anything
-  renamed relative to a release predating them (v1.0.26 carries none), and a pairing you want to state by
-  hand. The version keys are still there even though nothing replays any more: Studio composes every
-  version in `(from, to]` ascending into one map, because a bot jumping 1.x → 3.0 spells a twice-renamed
-  member the way 1.x did and neither entry matches that alone. The file's own `_readme` is the authority.
+  Either half alone resolves one hop; **composed, they resolve a chain** — `a`→`b` in 2.0 and `b`→`c` in 3.0
+  land a bot still spelling it `a` on `c`, with the 2.0 jar never fetched. Write both halves **in the release
+  that makes the change**, while both ends are still compilable: that is what lets the gate below verify the
+  link from a single build. A pointer is an ordinary annotation — correct a wrong one in a later release.
+
+  **`ApiPointersTest` is the gate, and it is not the one that was deleted.** One offline ClassGraph scan of
+  `target/classes`, run by CI on every build and by `release.sh check_api_pointers`. Five rules, each wrong
+  at every version: every deprecated `api.*` element carries a pointer; a non-empty target resolves; the
+  target carries the matching back-edge; no two survivors claim the same `name@version`; every entry is
+  well-formed. A sixth is opt-in — `-Dbotmaker.api.maxVersion` — because only the release caller knows the
+  version being cut. **It is not a coverage rule**: an uncovered break is a supported outcome (default value
+  plus review mark), and these five only ask that a link somebody *did* declare is complete.
 
   The API contains:
   - `api.vision` — `ImageFinder` (find + `exists` + the lambda control-flow `whileExists`/`ifExists`
