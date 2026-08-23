@@ -71,6 +71,15 @@ and their users only ever pick real released versions.
 Prefer **functional OOP**: minimize mutable class fields to avoid state-related bugs. Favor immutable
 values (`record`s like `MatchResult`, `RawMatch`, `Point`/`Rect`/`Size`) and pure transformations;
 pass dependencies in via parameters rather than holding mutable fields or static/singleton state.
+
+**The three geometry types are records of `int`s, and both halves of that are deliberate.** `Point`, `Rect`
+and `Size` were OpenCV `org.opencv.core.*` clones until 2026-08-23 — mutable public `double` fields,
+`set(double[])`, `clone()` — none of which anything used, while the missing `equals` on `Point` and `Rect`
+made `p1.equals(p2)` an identity comparison in every bot that tried it. They are `int` because every producer
+is a pixel and every consumer is an input event the native layer delivers at a whole pixel; the old `double`
+was cast straight back at fourteen call sites. **A fraction is rounded where it is created, never carried** —
+`Rect.getCenter`, `MatchResult.getCenter`, `Pixel`'s centre of mass, `Mouse.drag`'s interpolation. Because
+they are immutable, a getter hands back its field rather than a defensive copy; don't reintroduce one.
 Keep side effects (screen capture, native library loading, process launching) at the edges. The
 static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are stateless dispatchers.
 

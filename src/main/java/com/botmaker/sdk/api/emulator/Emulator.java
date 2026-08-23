@@ -71,7 +71,7 @@ public final class Emulator implements CaptureSource {
             return;
         }
         Debug.log("[Emulator] click " + p + " on " + name());
-        device.tap((int) p.x, (int) p.y);
+        device.tap(p.x(), p.y());
     }
 
     // --- Native emulator input verbs ---

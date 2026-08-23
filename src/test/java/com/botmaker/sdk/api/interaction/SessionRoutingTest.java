@@ -65,8 +65,8 @@ class SessionRoutingTest {
         CaptureSource current = Source.current();
         assertInstanceOf(SessionSource.class, current);
         // origin is the attached window's on-screen top-left (RecordingNativeController's 100,50 rect)
-        assertEquals(100, current.origin().x);
-        assertEquals(50, current.origin().y);
+        assertEquals(100, current.origin().x());
+        assertEquals(50, current.origin().y());
         assertEquals(sessionFake.window, current.targetWindow());
         assertTrue(current.isPresent());
     }

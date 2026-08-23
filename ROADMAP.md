@@ -8,6 +8,43 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — Point/Rect/Size are records of ints (phase 3.5 of 12)
+
+**Changed:** `api/Point.java`, `api/Rect.java`, `api/Size.java` rewritten as records; 13 call sites in
+`api.*`/`internal.*` and 8 test classes moved to accessors.
+
+**Done**
+
+- **The three geometry types were `org.opencv.core.*` clones and are now records.** Public mutable
+  `double` fields, `set(double[])`, `double[]` constructors, `clone()`, `Size(Point)`, `Rect(Point, Size)`
+  and `Rect.fullScreen()` were copied wholesale from OpenCV; **nothing in the SDK, Studio or any generated
+  file ever mutated one, and the vestigial half had zero callers**. The mutability bought nothing and cost a
+  real defect: `Point` and `Rect` declared no `equals`, so `p1.equals(p2)` in a bot was identity comparison —
+  a silently wrong answer rather than a compile error. Records give `equals`/`hashCode`/`toString` for free.
+- **`int`, not `double`, in all three.** Every producer is a pixel (a window origin, a match's top-left, a
+  capture region) and every consumer is an input event the native layer can only deliver at a whole pixel.
+  The old `double` was carried only to be cast straight back: `(int) p.x` appeared at fourteen call sites,
+  and `Size.toString` already printed `(int) width`. The three genuinely fractional producers — `Rect`'s and
+  `MatchResult`'s midpoints, `Pixel`'s centre of mass, `Mouse.drag`'s interpolation — **round at the point
+  they are built** rather than carrying the fraction to a consumer that will discard it. `Mouse.drag` rounds
+  per step instead of truncating, which had biased every step of a glide towards its start.
+- **Immutability deleted the defensive copies.** `ColorMatch.getCenter`/`getTopLeft`, `MatchResult.getTopLeft`
+  and `TextMatch.getBounds` each built a fresh instance to avoid handing out a mutable field; they now return
+  the field. `Rect(Point, Size)` replaced the two `new Rect((int) location.x, (int) location.y, w, h)` sites.
+- **Why now: this was the last release it is free in.** The contract starts at 1.1.0 and the newest tag is
+  v1.0.26. After that this is a major, and worse, it is the one break the pointer model provably cannot
+  carry — a public field becoming an accessor turns `p.x` into `p.x()`, and a bare instance-field read is not
+  a call, so `SdkReferences` never sees it and `CallMigrator` has nothing to rewrite. It would land in the
+  `TYPE_REMOVED`-style refusal branch across 42 public signatures.
+- **Studio needed no change.** `VariableWire.geometryHelper` already emitted `int[] n = ints(s, N);
+  new Point(n[0], n[1])` — the generated bots were always passing ints and the SDK was widening them. The
+  pickers write and parse the same `new Point(x, y)` text. `CLAUDE.md` line 72 had already been describing
+  these three as records for some time; it is now accurate.
+- **Deferred:** an audit of the rest of `api.*` for members in the same category (vestigial, misnamed or
+  never called) is worth doing in the same free window — see *Deferred / next*.
+
+---
+
 ## 2026-08-23 — four annotations written while both ends still exist (phase 3 of 12)
 
 **Changed:** `api/ReplacedBy.java` (`note`, `behaviourChanged`), new `api/Since.java`, new

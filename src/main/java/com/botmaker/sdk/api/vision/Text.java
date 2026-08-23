@@ -265,8 +265,8 @@ public final class Text {
             for (TextResult r : raw) {
                 Rectangle b = r.bounds();
                 Rect abs = new Rect(
-                        (int) (b.x + origin.x),
-                        (int) (b.y + origin.y),
+                        b.x + origin.x(),   // b is a java.awt.Rectangle — fields, not accessors
+                        b.y + origin.y(),
                         b.width, b.height);
                 out.add(new TextMatch(r.text(), abs, r.confidence()));
             }

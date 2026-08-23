@@ -91,7 +91,7 @@ class ImageClickerRoutingTest {
         assertTrue(clicked, "template should be located and clicked");
         assertNotNull(source.clicked, "click must go through CaptureSource.click, not Mouse");
         // The recorded point is within the matched template rectangle (allowing for click randomization).
-        double x = source.clicked.x, y = source.clicked.y;
+        int x = source.clicked.x(), y = source.clicked.y();
         assertTrue(x >= offsetX && x <= offsetX + TEMPLATE_SIZE,
                 "click x " + x + " within [" + offsetX + ", " + (offsetX + TEMPLATE_SIZE) + "]");
         assertTrue(y >= offsetY && y <= offsetY + TEMPLATE_SIZE,
@@ -106,7 +106,7 @@ class ImageClickerRoutingTest {
         region.click(new Point(33, 44));
 
         assertNotNull(source.clicked, "a region must delegate click() to its parent source");
-        assertTrue(source.clicked.x == 33 && source.clicked.y == 44,
+        assertTrue(source.clicked.x() == 33 && source.clicked.y() == 44,
                 "region must not mutate the click coordinate it forwards");
     }
 }

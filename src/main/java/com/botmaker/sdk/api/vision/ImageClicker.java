@@ -925,8 +925,8 @@ public class ImageClicker {
         org.opencv.core.Mat background = com.botmaker.shared.opencv.OpencvManager.bufferedImageToMat(screenshot);
         try {
             Point origin = source.origin();
-            int offsetX = (int) origin.x;
-            int offsetY = (int) origin.y;
+            int offsetX = origin.x();
+            int offsetY = origin.y();
 
             for (ImageTemplate good : goods) {
                 com.botmaker.shared.opencv.RawMatch gm = com.botmaker.shared.opencv.OpencvManager.findBestMatch(
@@ -970,8 +970,8 @@ public class ImageClicker {
         org.opencv.core.Mat background = com.botmaker.shared.opencv.OpencvManager.bufferedImageToMat(screenshot);
         try {
             Point origin = source.origin();
-            int offsetX = (int) origin.x;
-            int offsetY = (int) origin.y;
+            int offsetX = origin.x();
+            int offsetY = origin.y();
 
             for (ImageTemplate good : goods) {
                 com.botmaker.shared.opencv.RawMatch gm = com.botmaker.shared.opencv.OpencvManager.findBestMatch(
@@ -1007,8 +1007,8 @@ public class ImageClicker {
         org.opencv.core.Mat background = com.botmaker.shared.opencv.OpencvManager.bufferedImageToMat(screenshot);
         try {
             Point origin = source.origin();
-            int offsetX = (int) origin.x;
-            int offsetY = (int) origin.y;
+            int offsetX = origin.x();
+            int offsetY = origin.y();
 
             for (ImageTemplate good : goods) {
                 List<com.botmaker.shared.opencv.RawMatch> matches =

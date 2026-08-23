@@ -80,15 +80,15 @@ public final class IpcObserver implements BotObserver {
     private static TelemetryEvent toTelemetry(SwipeEvent event) {
         return new TelemetryEvent.Swipe(
                 target(event.surface()),
-                (int) event.start().x, (int) event.start().y,
-                (int) event.end().x, (int) event.end().y,
+                event.start().x(), event.start().y(),
+                event.end().x(), event.end().y(),
                 event.durationMs(), botLine());
     }
 
     private static TelemetryEvent toTelemetry(ClickEvent event) {
         return new TelemetryEvent.Click(
                 target(event.surface()),
-                (int) event.point().x, (int) event.point().y,
+                event.point().x(), event.point().y(),
                 event.button(), botLine());
     }
 
@@ -114,7 +114,7 @@ public final class IpcObserver implements BotObserver {
         if (surface != null && surface.isWindow()) {
             Rect b = surface.bounds();
             if (b != null) {
-                return new TelemetryEvent.Target(surface.title(), b.x, b.y, b.width, b.height);
+                return new TelemetryEvent.Target(surface.title(), b.x(), b.y(), b.width(), b.height());
             }
             return new TelemetryEvent.Target(surface.title(), 0, 0, 0, 0);
         }
@@ -122,6 +122,6 @@ public final class IpcObserver implements BotObserver {
     }
 
     private static TelemetryEvent.Rect rect(Rect r) {
-        return r == null ? null : new TelemetryEvent.Rect(r.x, r.y, r.width, r.height);
+        return r == null ? null : new TelemetryEvent.Rect(r.x(), r.y(), r.width(), r.height());
     }
 }

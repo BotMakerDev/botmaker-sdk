@@ -33,15 +33,15 @@ class WindowApiTest {
         assertEquals("Test Game Window", w.title());
 
         Rect bounds = w.bounds();
-        assertEquals(100, bounds.x);
-        assertEquals(50, bounds.y);
+        assertEquals(100, bounds.x());
+        assertEquals(50, bounds.y());
         assertEquals(800, w.width());
         assertEquals(600, w.height());
 
         // origin() is the window's absolute top-left — what a matcher adds to in-image coords.
         Point origin = w.origin();
-        assertEquals(100, (int) origin.x);
-        assertEquals(50, (int) origin.y);
+        assertEquals(100, origin.x());
+        assertEquals(50, origin.y());
     }
 
     @Test

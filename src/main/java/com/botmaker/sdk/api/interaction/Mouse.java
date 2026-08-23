@@ -46,7 +46,7 @@ public class Mouse {
     public static void click(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] click " + p);
-        PointerPolicy.click(controller(), session(), (int) p.x, (int) p.y, MouseButton.LEFT.code());
+        PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.LEFT.code());
     }
 
     public static void click(int x, int y) {
@@ -62,7 +62,7 @@ public class Mouse {
         if (source == null) return;
         Point o = source.origin();
         Debug.log("[Mouse] click " + x + "," + y + " relative to " + o);
-        click((int) o.x + x, (int) o.y + y);
+        click(o.x() + x, o.y() + y);
     }
 
     // --- Movement ---
@@ -71,7 +71,7 @@ public class Mouse {
     public static void move(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] move " + p);
-        controller().mouseMove((int) p.x, (int) p.y);
+        controller().mouseMove(p.x(), p.y());
     }
 
     /** Move the cursor to absolute screen coordinates {@code (x, y)}. */
@@ -103,13 +103,13 @@ public class Mouse {
     public static void rightClick(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] rightClick " + p);
-        PointerPolicy.click(controller(), session(), (int) p.x, (int) p.y, MouseButton.RIGHT.code());
+        PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.RIGHT.code());
     }
 
     public static void middleClick(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] middleClick " + p);
-        PointerPolicy.click(controller(), session(), (int) p.x, (int) p.y, MouseButton.MIDDLE.code());
+        PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.MIDDLE.code());
     }
 
     /**
@@ -172,7 +172,11 @@ public class Mouse {
             long perStep = durationMs / steps;
             for (int i = 1; i <= steps; i++) {
                 double t = (double) i / steps;
-                move(new Point(start.x + (end.x - start.x) * t, start.y + (end.y - start.y) * t));
+                // Interpolate in double and round per step: the cursor lands on whole pixels either way,
+                // and truncating instead would bias every step of the glide towards the start.
+                move(new Point(
+                        (int) Math.round(start.x() + (end.x() - start.x()) * t),
+                        (int) Math.round(start.y() + (end.y() - start.y()) * t)));
                 if (perStep > 0) {
                     try {
                         Thread.sleep(perStep);

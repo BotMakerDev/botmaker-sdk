@@ -21,7 +21,7 @@ class PixelTest {
     private static final int W = 100, H = 80;
 
     /** A capture source serving a fixed image, reporting a non-zero origin (as a window at (500,300) would). */
-    private record FakeSource(BufferedImage image, double ox, double oy) implements CaptureSource {
+    private record FakeSource(BufferedImage image, int ox, int oy) implements CaptureSource {
         @Override public BufferedImage capture() { return image; }
         @Override public Point origin() { return new Point(ox, oy); }
     }
@@ -44,17 +44,18 @@ class PixelTest {
         ColorMatch m = VisionContext.getLastColorMatch();
         assertTrue(m.isFound());
         // Patch is at (10,20)-(30,40) in image space; the source origin is (500,300).
-        assertEquals(510, m.getTopLeft().x, 0.5);
-        assertEquals(320, m.getTopLeft().y, 0.5);
-        assertEquals(520, m.getCenter().x, 1.0, "centre must be absolute, not image-local");
-        assertEquals(330, m.getCenter().y, 1.0);
+        assertEquals(510, m.getTopLeft().x());
+        assertEquals(320, m.getTopLeft().y());
+        // The centre of mass is fractional and now rounded inside the SDK, so ±1 rather than exact.
+        assertTrue(Math.abs(520 - m.getCenter().x()) <= 1, "centre must be absolute, not image-local");
+        assertTrue(Math.abs(330 - m.getCenter().y()) <= 1);
         assertEquals(400, m.getPixelCount());
 
         Rect bounds = m.getBounds();
-        assertEquals(510, bounds.x);
-        assertEquals(320, bounds.y);
-        assertEquals(20, bounds.width);
-        assertEquals(20, bounds.height);
+        assertEquals(510, bounds.x());
+        assertEquals(320, bounds.y());
+        assertEquals(20, bounds.width());
+        assertEquals(20, bounds.height());
     }
 
     @Test

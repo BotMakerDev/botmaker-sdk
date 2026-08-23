@@ -148,7 +148,7 @@ public class ImageFinder {
             for (ImageTemplate template : group.templates()) {
                 RawMatch best = OpencvManager.findBest(template.getMat(), background, false, template.authoredSize());
                 if (best != null && best.score() >= confidence) {
-                    Point location = new Point(best.x() + origin.x, best.y() + origin.y);
+                    Point location = new Point(best.x() + origin.x(), best.y() + origin.y());
                     MatchResult result = new MatchResult(
                             location, best.width(), best.height(), best.score(), template.getId());
                     emitMatch(source, result);
@@ -193,7 +193,7 @@ public class ImageFinder {
 
             if (best != null && best.score() >= confidence) {
                 Point origin = source.origin();
-                Point location = new Point(best.x() + origin.x, best.y() + origin.y);
+                Point location = new Point(best.x() + origin.x(), best.y() + origin.y());
                 MatchResult result = new MatchResult(
                         location, best.width(), best.height(), best.score(), template.getId());
                 emitMatch(source, result);
@@ -660,8 +660,8 @@ public class ImageFinder {
             background = OpencvManager.bufferedImageToMat(screenshot);
 
             Point origin = source.origin();
-            int offsetX = (int) origin.x;
-            int offsetY = (int) origin.y;
+            int offsetX = origin.x();
+            int offsetY = origin.y();
 
             MatchResult best = MatchResult.notFound();
             for (ImageTemplate good : goods) {
@@ -706,8 +706,8 @@ public class ImageFinder {
             background = OpencvManager.bufferedImageToMat(screenshot);
 
             Point origin = source.origin();
-            int offsetX = (int) origin.x;
-            int offsetY = (int) origin.y;
+            int offsetX = origin.x();
+            int offsetY = origin.y();
 
             for (ImageTemplate good : goods) {
                 RawMatch gm = OpencvManager.findBestMatch(good.getMat(), background, false, confidence,
@@ -753,8 +753,8 @@ public class ImageFinder {
             background = OpencvManager.bufferedImageToMat(screenshot);
 
             Point origin = source.origin();
-            int offsetX = (int) origin.x;
-            int offsetY = (int) origin.y;
+            int offsetX = origin.x();
+            int offsetY = origin.y();
 
             List<MatchResult> results = new ArrayList<>();
             for (ImageTemplate good : goods) {
@@ -888,8 +888,8 @@ public class ImageFinder {
                             template.authoredSize());
 
             Point origin = source.origin();
-            int offsetX = (int) origin.x;
-            int offsetY = (int) origin.y;
+            int offsetX = origin.x();
+            int offsetY = origin.y();
 
             List<MatchResult> results = matches.stream()
                     .map(r -> {
@@ -995,7 +995,7 @@ public class ImageFinder {
         // The centre rather than the top-left: it is the point a click would land on, so the number in the
         // log is the number to compare against where the pointer actually went.
         Point centre = result.getCenter();
-        Debug.log("[Vision] find " + template.getId() + " → (" + (int) centre.x + "," + (int) centre.y + ") "
+        Debug.log("[Vision] find " + template.getId() + " → (" + centre.x() + "," + centre.y() + ") "
                 + String.format(Locale.ROOT, "%.2f", result.getConfidence()));
     }
 

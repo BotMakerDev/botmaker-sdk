@@ -117,23 +117,23 @@ class MatchResultNullContractTest {
     void theCornersDescribeTheMatchedRectangle() {
         MatchResult m = found(); // (10,20) 40x30
 
-        assertEquals(10.0, m.getTopLeft().x, 1e-9);
-        assertEquals(20.0, m.getTopLeft().y, 1e-9);
-        assertEquals(50.0, m.getTopRight().x, 1e-9);
-        assertEquals(20.0, m.getTopRight().y, 1e-9);
-        assertEquals(10.0, m.getBottomLeft().x, 1e-9);
-        assertEquals(50.0, m.getBottomLeft().y, 1e-9);
-        assertEquals(50.0, m.getBottomRight().x, 1e-9);
-        assertEquals(50.0, m.getBottomRight().y, 1e-9);
+        assertEquals(10, m.getTopLeft().x());
+        assertEquals(20, m.getTopLeft().y());
+        assertEquals(50, m.getTopRight().x());
+        assertEquals(20, m.getTopRight().y());
+        assertEquals(10, m.getBottomLeft().x());
+        assertEquals(50, m.getBottomLeft().y());
+        assertEquals(50, m.getBottomRight().x());
+        assertEquals(50, m.getBottomRight().y());
 
-        assertEquals(30.0, m.getCenter().x, 1e-9, "centre is top-left + half the width");
-        assertEquals(35.0, m.getCenter().y, 1e-9);
+        assertEquals(30, m.getCenter().x(), "centre is top-left + half the width");
+        assertEquals(35, m.getCenter().y());
 
         Rect r = m.getRect();
-        assertEquals(10, r.x);
-        assertEquals(20, r.y);
-        assertEquals(40, r.width);
-        assertEquals(30, r.height);
+        assertEquals(10, r.x());
+        assertEquals(20, r.y());
+        assertEquals(40, r.width());
+        assertEquals(30, r.height());
     }
 
     /**
@@ -145,16 +145,16 @@ class MatchResultNullContractTest {
         MatchResult m = found(); // (10,20) 40x30
         for (int i = 0; i < 500; i++) {
             Point p = m.getRandomClickPoint();
-            assertTrue(p.x >= 10 && p.x <= 50, "x escaped the match: " + p.x);
-            assertTrue(p.y >= 20 && p.y <= 50, "y escaped the match: " + p.y);
+            assertTrue(p.x() >= 10 && p.x() <= 50, "x escaped the match: " + p.x());
+            assertTrue(p.y() >= 20 && p.y() <= 50, "y escaped the match: " + p.y());
         }
     }
 
     @Test
     void offsetsAreRelativeToTheTopLeft() {
         Point p = found().getPointWithOffset(3, 4);
-        assertEquals(13.0, p.x, 1e-9);
-        assertEquals(24.0, p.y, 1e-9);
+        assertEquals(13, p.x());
+        assertEquals(24, p.y());
     }
 
     // ---- the list above must not silently stop covering the class ----

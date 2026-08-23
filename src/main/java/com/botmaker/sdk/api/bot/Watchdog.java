@@ -113,8 +113,8 @@ public final class Watchdog {
             return "miss";
         }
         Point c = result.getCenter();
-        long gx = Math.round(c.x / 4.0);
-        long gy = Math.round(c.y / 4.0);
+        long gx = Math.round(c.x() / 4.0);
+        long gy = Math.round(c.y() / 4.0);
         return result.getTemplateId() + "@" + gx + "," + gy;
     }
 }

@@ -54,8 +54,8 @@ public class TextMatch {
 
     /** The text's bounding box in absolute screen coordinates, or {@code null} if not found. */
     public Rect getBounds() {
-        if (!found) return null;
-        return bounds.clone();
+        // Rect is immutable, so the defensive copy this used to make is no longer needed.
+        return found ? bounds : null;
     }
 
     /** Centre of the text's bounding box — a click target — or {@code null} if not found. */

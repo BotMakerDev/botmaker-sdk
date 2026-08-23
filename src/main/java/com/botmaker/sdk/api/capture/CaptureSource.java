@@ -121,10 +121,10 @@ public interface CaptureSource {
             public BufferedImage capture() {
                 BufferedImage img = parent.capture();
                 if (img == null) return null;
-                int x = Math.max(0, sub.x);
-                int y = Math.max(0, sub.y);
-                int w = Math.min(sub.width, img.getWidth() - x);
-                int h = Math.min(sub.height, img.getHeight() - y);
+                int x = Math.max(0, sub.x());
+                int y = Math.max(0, sub.y());
+                int w = Math.min(sub.width(), img.getWidth() - x);
+                int h = Math.min(sub.height(), img.getHeight() - y);
                 if (w <= 0 || h <= 0) return null;
                 return img.getSubimage(x, y, w, h);
             }
@@ -132,7 +132,7 @@ public interface CaptureSource {
             @Override
             public Point origin() {
                 Point o = parent.origin();
-                return new Point(o.x + Math.max(0, sub.x), o.y + Math.max(0, sub.y));
+                return new Point(o.x() + Math.max(0, sub.x()), o.y() + Math.max(0, sub.y()));
             }
 
             @Override
@@ -159,9 +159,9 @@ public interface CaptureSource {
             @Override
             public Rect subRegion() {
                 Rect pr = parent.subRegion();
-                int bx = (pr != null ? pr.x : 0) + Math.max(0, sub.x);
-                int by = (pr != null ? pr.y : 0) + Math.max(0, sub.y);
-                return new Rect(bx, by, sub.width, sub.height);
+                int bx = (pr != null ? pr.x() : 0) + Math.max(0, sub.x());
+                int by = (pr != null ? pr.y() : 0) + Math.max(0, sub.y());
+                return new Rect(bx, by, sub.width(), sub.height());
             }
 
             @Override

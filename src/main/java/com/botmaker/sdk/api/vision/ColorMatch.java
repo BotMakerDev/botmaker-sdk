@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.vision;
 
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
+import com.botmaker.sdk.api.Size;
 
 import java.awt.Color;
 
@@ -76,20 +77,19 @@ public class ColorMatch {
      * (an L-shape's bbox centre can lie entirely outside the shape). {@code null} if not found.
      */
     public Point getCenter() {
-        if (!found) return null;
-        return new Point(centroid.x, centroid.y);
+        // Point is immutable, so the defensive copy this used to make is no longer needed.
+        return found ? centroid : null;
     }
 
     /** Top-left of the cluster's bounding box, or {@code null} if not found. */
     public Point getTopLeft() {
-        if (!found) return null;
-        return new Point(location.x, location.y);
+        return found ? location : null;
     }
 
     /** The cluster's bounding box, or {@code null} if not found. */
     public Rect getBounds() {
         if (!found) return null;
-        return new Rect((int) location.x, (int) location.y, width, height);
+        return new Rect(location, new Size(width, height));
     }
 
     public int getWidth() {

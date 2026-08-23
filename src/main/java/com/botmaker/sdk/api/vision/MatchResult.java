@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.vision;
 
 import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.Rect;
+import com.botmaker.sdk.api.Size;
 import java.util.Random;
 
 public class MatchResult {
@@ -56,11 +57,8 @@ public class MatchResult {
     }
 
     public Point getCenter() {
-        if (!found) return null;
-        return new Point(
-                location.x + width / 2.0,
-                location.y + height / 2.0
-        );
+        // The centre pixel — the midpoint rounded, since a click lands on a whole pixel.
+        return found ? new Point(location.x() + width / 2, location.y() + height / 2) : null;
     }
 
     public Point getRandomClickPoint() {
@@ -70,8 +68,8 @@ public class MatchResult {
         int randomYOffset = RANDOM.nextInt((height / 2) + 1);
 
         return new Point(
-                location.x + randomXOffset + 1,
-                location.y + randomYOffset + 1
+                location.x() + randomXOffset + 1,
+                location.y() + randomYOffset + 1
         );
     }
 
@@ -80,25 +78,24 @@ public class MatchResult {
     }
 
     public Point getTopRight() {
-        return found ? new Point(location.x + width, location.y) : null;
+        return found ? new Point(location.x() + width, location.y()) : null;
     }
 
     public Point getBottomLeft() {
-        return found ? new Point(location.x, location.y + height) : null;
+        return found ? new Point(location.x(), location.y() + height) : null;
     }
 
     public Point getBottomRight() {
-        return found ? new Point(location.x + width, location.y + height) : null;
+        return found ? new Point(location.x() + width, location.y() + height) : null;
     }
 
     public Point getPointWithOffset(int offsetX, int offsetY) {
         if (!found) return null;
-        return new Point(location.x + offsetX, location.y + offsetY);
+        return new Point(location.x() + offsetX, location.y() + offsetY);
     }
 
     public Rect getRect() {
-        // Cast double coordinates to int for Rect
-        return found ? new Rect((int) location.x, (int) location.y, width, height) : null;
+        return found ? new Rect(location, new Size(width, height)) : null;
     }
 
     public int getWidth() {

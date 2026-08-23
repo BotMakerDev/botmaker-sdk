@@ -110,8 +110,8 @@ class ClickLastFrameTest {
         assertEquals(1, source.captures, "the callback's click must reuse the frame, not capture a second time");
         assertEquals(1, source.clicks.size());
         Point clicked = source.clicks.getFirst();
-        assertTrue(clicked.x >= offsetX && clicked.x <= offsetX + TEMPLATE_SIZE, "click x " + clicked.x);
-        assertTrue(clicked.y >= offsetY && clicked.y <= offsetY + TEMPLATE_SIZE, "click y " + clicked.y);
+        assertTrue(clicked.x() >= offsetX && clicked.x() <= offsetX + TEMPLATE_SIZE, "click x " + clicked.x());
+        assertTrue(clicked.y() >= offsetY && clicked.y() <= offsetY + TEMPLATE_SIZE, "click y " + clicked.y());
     }
 
     @Test
@@ -153,7 +153,7 @@ class ClickLastFrameTest {
         assertEquals(1, clicked[0], "only the named template was clicked");
         assertEquals(1, source.clicks.size());
         Point p = source.clicks.getFirst();
-        assertTrue(p.x >= 220 && p.x <= 220 + TEMPLATE_SIZE, "the click landed on b, at " + p);
+        assertTrue(p.x() >= 220 && p.x() <= 220 + TEMPLATE_SIZE, "the click landed on b, at " + p);
         assertEquals(1, source.captures, "filtering must not cost a capture");
     }
 

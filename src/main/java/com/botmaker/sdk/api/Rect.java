@@ -1,77 +1,49 @@
 package com.botmaker.sdk.api;
 
-import java.awt.Toolkit;
-import java.awt.Dimension;
-
+/**
+ * A rectangular region in pixels — a capture region, a match's bounds, a window's frame.
+ *
+ * <p>{@code x, y} is the top-left corner; the region spans {@code width} to the right and {@code height}
+ * down, so the right and bottom edges are <em>exclusive</em>: {@link #contains(Point)} is true for
+ * {@code x} and false for {@code x + width}. That is the same convention the capture stack uses, and it is
+ * what makes two abutting regions tile without overlapping.
+ *
+ * @param x      pixels from the left of the coordinate space
+ * @param y      pixels from the top of the coordinate space
+ * @param width  pixels across
+ * @param height pixels down
+ */
 // The generated Activities declares one per area variable, rebuilt from the four stored numbers.
 @Scaffolding
-public class Rect {
+public record Rect(int x, int y, int width, int height) {
 
-    public int x, y, width, height;
-
-    @Scaffolding   // the generated Activities' area(String) helper
-    public Rect(int x, int y, int width, int height) {
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
+    /**
+     * Declared only to carry {@link Scaffolding}: the annotation targets a constructor, not a record
+     * component, and the generated {@code Activities}' {@code area(String)} helper calls this one.
+     */
+    @Scaffolding
+    public Rect {
     }
 
+    /** An empty region at the origin — what a value-typed variable defaults to before it is set. */
     public Rect() {
         this(0, 0, 0, 0);
     }
 
-    public Rect(Point p1, Point p2) {
-        this.x = (int) Math.min(p1.x, p2.x);
-        this.y = (int) Math.min(p1.y, p2.y);
-        this.width = (int) Math.abs(p2.x - p1.x);
-        this.height = (int) Math.abs(p2.y - p1.y);
+    /** The region between two corners, in either order. */
+    public Rect(Point a, Point b) {
+        this(Math.min(a.x(), b.x()), Math.min(a.y(), b.y()),
+                Math.abs(b.x() - a.x()), Math.abs(b.y() - a.y()));
     }
 
-    public Rect(Point p, Size s) {
-        this((int) p.x, (int) p.y, (int) s.width, (int) s.height);
+    /** The region of size {@code s} with its top-left at {@code origin}. */
+    public Rect(Point origin, Size s) {
+        this(origin.x(), origin.y(), s.width(), s.height());
     }
 
-    public Rect(double[] vals) {
-        set(vals);
-    }
-
-    /**
-     * Creates a Rect representing the full screen.
-     */
-    public static Rect fullScreen() {
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        return new Rect(0, 0, screenSize.width, screenSize.height);
-    }
-
-    /**
-     * Creates a Rect centered around a point.
-     */
-    public static Rect around(Point center, int width, int height) {
-        return new Rect(
-                (int) center.x - width / 2,
-                (int) center.y - height / 2,
-                width,
-                height
-        );
-    }
-
-    public void set(double[] vals) {
-        if (vals != null) {
-            x = vals.length > 0 ? (int) vals[0] : 0;
-            y = vals.length > 1 ? (int) vals[1] : 0;
-            width = vals.length > 2 ? (int) vals[2] : 0;
-            height = vals.length > 3 ? (int) vals[3] : 0;
-        } else {
-            x = 0;
-            y = 0;
-            width = 0;
-            height = 0;
-        }
-    }
-
-    public Rect clone() {
-        return new Rect(x, y, width, height);
+    /** A {@code width × height} region centred on {@code centre}. */
+    public static Rect around(Point centre, int width, int height) {
+        return new Rect(centre.x() - width / 2, centre.y() - height / 2, width, height);
     }
 
     public Point getTopLeft() {
@@ -90,55 +62,56 @@ public class Rect {
         return new Point(x + width, y + height);
     }
 
+    /** The centre pixel — the midpoint rounded, since a click lands on a whole pixel. */
     public Point getCenter() {
-        return new Point(x + width / 2.0, y + height / 2.0);
+        return new Point(x + width / 2, y + height / 2);
     }
 
     public Size size() {
         return new Size(width, height);
     }
 
-    public double area() {
-        return width * height;
+    /** {@code width × height}. {@code long} because two screen dimensions can exceed an {@code int}. */
+    public long area() {
+        return (long) width * height;
     }
 
+    /** Whether either dimension is zero or negative, so the region encloses nothing. */
     public boolean empty() {
         return width <= 0 || height <= 0;
     }
 
+    /** Whether {@code p} falls inside, left/top inclusive and right/bottom exclusive. */
     public boolean contains(Point p) {
-        return x <= p.x && p.x < x + width && y <= p.y && p.y < y + height;
+        return x <= p.x() && p.x() < x + width && y <= p.y() && p.y() < y + height;
     }
 
+    /** Whether the two regions share at least one pixel. */
     public boolean overlaps(Rect other) {
-        return x < other.x + other.width &&
-                x + width > other.x &&
-                y < other.y + other.height &&
-                y + height > other.y;
+        return x < other.x + other.width
+                && x + width > other.x
+                && y < other.y + other.height
+                && y + height > other.y;
     }
 
+    /** The shared region, or {@code null} when they do not {@linkplain #overlaps overlap}. */
     public Rect intersection(Rect other) {
         if (!overlaps(other)) {
             return null;
         }
-
         int newX = Math.max(x, other.x);
         int newY = Math.max(y, other.y);
-        int newX2 = Math.min(x + width, other.x + other.width);
-        int newY2 = Math.min(y + height, other.y + other.height);
-
-        return new Rect(newX, newY, newX2 - newX, newY2 - newY);
+        return new Rect(newX, newY,
+                Math.min(x + width, other.x + other.width) - newX,
+                Math.min(y + height, other.y + other.height) - newY);
     }
 
+    /** This region grown by {@code amount} on every side. */
     public Rect expand(int amount) {
-        return new Rect(
-                x - amount,
-                y - amount,
-                width + 2 * amount,
-                height + 2 * amount
-        );
+        return new Rect(x - amount, y - amount, width + 2 * amount, height + 2 * amount);
     }
 
+    /** This region shrunk by {@code amount} on every side. */
     public Rect shrink(int amount) {
         return expand(-amount);
     }

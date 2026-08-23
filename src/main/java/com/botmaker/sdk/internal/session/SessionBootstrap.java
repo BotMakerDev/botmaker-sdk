@@ -113,7 +113,7 @@ public final class SessionBootstrap {
      */
     static SessionBackends.DisplaySize size() {
         Size r = ProjectDefaults.defaultResolution();
-        return SessionBackends.sizeFor(r == null ? 0 : (int) r.width, r == null ? 0 : (int) r.height);
+        return SessionBackends.sizeFor(r == null ? 0 : r.width(), r == null ? 0 : r.height());
     }
 
     /**

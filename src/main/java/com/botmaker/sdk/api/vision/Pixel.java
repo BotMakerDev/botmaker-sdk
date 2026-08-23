@@ -56,7 +56,7 @@ public class Pixel {
 
     /** The colour at {@code p} (absolute screen coordinates), or {@code null} if unreadable. */
     public static Color colorAt(Point p) {
-        return colorAt((int) p.x, (int) p.y, Source.current());
+        return colorAt(p.x(), p.y(), Source.current());
     }
 
     /**
@@ -67,8 +67,8 @@ public class Pixel {
         BufferedImage img = source.capture();
         if (img == null) return null;
         Point origin = source.origin();
-        int lx = x - (int) origin.x;
-        int ly = y - (int) origin.y;
+        int lx = x - origin.x();
+        int ly = y - origin.y();
         if (lx < 0 || ly < 0 || lx >= img.getWidth() || ly >= img.getHeight()) return null;
         return new Color(img.getRGB(lx, ly), false);
     }
@@ -271,10 +271,12 @@ public class Pixel {
         List<ColorMatch> out = new ArrayList<>(raw.size());
         for (RawColorMatch m : raw) {
             out.add(new ColorMatch(
-                    new Point(m.x() + origin.x, m.y() + origin.y),
+                    new Point(m.x() + origin.x(), m.y() + origin.y()),
                     m.width(), m.height(), m.pixelCount(),
                     total == 0 ? 0.0 : m.pixelCount() / (double) total,
-                    new Point(m.centroidX() + origin.x, m.centroidY() + origin.y),
+                    // The centre of mass is genuinely fractional; round it to the pixel it will be clicked on.
+                    new Point((int) Math.round(m.centroidX() + origin.x()),
+                            (int) Math.round(m.centroidY() + origin.y())),
                     color));
         }
         return out;

@@ -190,7 +190,7 @@ class MatchesFindTest {
         assertEquals(1, source.clicks.size());
         Point p = source.clicks.get(0);
         assertNotNull(p);
-        assertTrue(p.x >= 20 && p.x <= 20 + SIZE && p.y >= 90 && p.y <= 90 + SIZE,
+        assertTrue(p.x() >= 20 && p.x() <= 20 + SIZE && p.y() >= 90 && p.y() <= 90 + SIZE,
                 "click must land inside the matched rectangle, got " + p);
 
         assertFalse(ImageClicker.click(Matches.none().get(mail), source),

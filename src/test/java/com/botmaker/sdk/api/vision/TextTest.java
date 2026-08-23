@@ -74,11 +74,11 @@ class TextTest {
 
         // Box must be shifted into absolute coordinates by the origin.
         Rect bounds = last.getBounds();
-        assertTrue(bounds.x >= ORIGIN_X, "x is absolute: " + bounds.x);
-        assertTrue(bounds.y >= ORIGIN_Y, "y is absolute: " + bounds.y);
+        assertTrue(bounds.x() >= ORIGIN_X, "x is absolute: " + bounds.x());
+        assertTrue(bounds.y() >= ORIGIN_Y, "y is absolute: " + bounds.y());
 
         Point center = last.getCenter();
-        assertTrue(center.x > ORIGIN_X && center.y > ORIGIN_Y, "center is absolute");
+        assertTrue(center.x() > ORIGIN_X && center.y() > ORIGIN_Y, "center is absolute");
     }
 
     @Test
