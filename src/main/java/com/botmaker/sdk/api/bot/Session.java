@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 
 /**
@@ -37,7 +38,23 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  *
  * <p>Linux-only in substance: on Windows there is no nested-display backend, bring-up declines and the bot runs
  * on the normal desktop. Calling these methods there is harmless.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): four of the eight are offered, and the split here
+ * is unusually clean because this class already says which half is which in its own javadoc. The vocabulary —
+ * {@link #isEnabled()}, {@link #enable()}, {@link #disable()}, {@link #useBackend(String)} — is offered.
+ * {@link #set(boolean)} is not: it is {@code Debug.set(boolean)} exactly, a flag whose two values already have
+ * named methods, and {@code Session.disable()} says at the call site what {@code set(false)} makes the reader
+ * work out. {@link #pinnedBackend()} and {@link #override()} describe themselves as <em>internal plumbing</em>
+ * and are the readers behind {@code SessionBootstrap}'s ladder rather than anything a bot asks; {@code override()}
+ * additionally returns a tri-state {@code Boolean} whose {@code null} is the interesting value, which is not a
+ * thing the editor can hold. {@link #clearOverrides()} exists for tests, by its own admission.
+ *
+ * <p>{@code useBackend} is offered even though its argument is a bare {@code String}, and that is the
+ * fillable-argument rule rather than an exception to it: the accepted set is closed and named right here
+ * ({@code "gamescope"}, {@code "xephyr"}, {@code "auto"}), and an unrecognised name degrades to {@code auto}
+ * instead of throwing, so a menu entry cannot produce a bot that breaks.
  */
+@Palette
 public final class Session {
 
     private Session() {}
@@ -57,11 +74,13 @@ public final class Session {
      * Whether this bot will run on a private display — the resolved answer across the whole precedence ladder
      * above, not merely what bot code asked for.
      */
+    @Palette
     public static boolean isEnabled() {
         return SessionBootstrap.isolationRequested();
     }
 
     /** Runs this bot on a private display (the default; call it only to override an environment that says no). */
+    @Palette
     public static void enable() {
         set(true);
     }
@@ -70,6 +89,7 @@ public final class Session {
      * Runs this bot on the real desktop instead of a private display. The bot then shares your cursor and focus,
      * which is what you want while watching it work — and what you don't want while using the machine.
      */
+    @Palette
     public static void disable() {
         set(false);
     }
@@ -88,6 +108,7 @@ public final class Session {
      * <p>Pinning Xephyr for a game is the one combination worth warning about: its software GL is what makes
      * store launchers and Proton titles abort, which is why nothing auto-selects it for them.
      */
+    @Palette
     public static void useBackend(String backend) {
         backendOverride = backend == null || backend.isBlank() ? null : backend.trim();
     }

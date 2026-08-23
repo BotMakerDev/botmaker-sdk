@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.launch;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 
@@ -16,8 +17,27 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * <p>On first use the current target initialises from the <strong>project default</strong> — the
  * {@code launch.target} key Studio bakes into {@code botmaker-project.properties} (see {@link ProjectDefaults}).
  * When none is configured the target is {@code null} and {@link #start()} is a no-op: an empty game-bot scaffold
- * that hasn't picked a game yet simply doesn't launch anything. Override at runtime with {@link #set(String)}.
+ * that hasn't picked a game yet simply doesn't launch anything. Override at runtime with
+ * {@link #set(LaunchTarget)}.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): seven of the nine are offered — every verb is, and
+ * the two hidden members are the two that deal in a {@link LaunchTarget} the editor cannot put anywhere.
+ * {@link #current()} hands back one, and a launch target is not a declarable variable type in Studio (it is
+ * chosen through the launch dialog), so a menu entry producing one is the {@code Window.capture()} case again:
+ * a value the user cannot name, store or pass on.
+ *
+ * <p><b>Of the two {@code set} overloads only {@link #set(LaunchTarget)} is offered, and the {@code String}
+ * one is hidden</b> — which is the sweep's usual verdict inverted, and worth the sentence. Everywhere else the
+ * plain type wins over the SDK type because the editor can fill a {@code String} and cannot fill the other.
+ * Here it is the reverse: {@code set(String)} does not take a name, it takes a <em>spec grammar</em>
+ * ({@code steam:12345}, {@code exe:C:\…}) that a user has to already know, with nothing to help them write it,
+ * while {@code set(LaunchTarget)} has a dedicated picker — Studio's {@code LaunchTargetArgPicker} recognises
+ * the parameter type and offers the game library and a file chooser, committing
+ * {@code LaunchTarget.parse("…")}. So the rule was never "prefer {@code String}"; it is <b>prefer the argument
+ * the editor can produce</b>, and on this one method that is the typed form. {@code set(String)} stays public
+ * for a bot computing its target from a config value.
  */
+@Palette
 public final class Target {
 
     private static volatile LaunchTarget current;
@@ -51,6 +71,7 @@ public final class Target {
     }
 
     /** Overrides the current target with an already-parsed one. */
+    @Palette
     public static void set(LaunchTarget target) {
         current = target;
         initialised = true;
@@ -60,6 +81,7 @@ public final class Target {
      * Launches the current target. No-op when none is configured — a bot that hasn't chosen a game yet won't
      * fail to start; it just has nothing to launch.
      */
+    @Palette
     public static void start() {
         LaunchTarget t = current();
         if (t == null) {
@@ -79,6 +101,7 @@ public final class Target {
      * game the user already opened by hand on a first run (see {@link LaunchTarget#startIfNotRunning()}). No-op
      * when no target is configured.
      */
+    @Palette
     public static void startIfNotRunning() {
         LaunchTarget t = current();
         if (t == null) {
@@ -97,12 +120,14 @@ public final class Target {
      * Whether the current target is up right now (see {@link LaunchTarget#isRunning()} for the layers it asks).
      * {@code false} when no target is configured — there is nothing that could be running.
      */
+    @Palette
     public static boolean isRunning() {
         LaunchTarget t = current();
         return t != null && t.isRunning();
     }
 
     /** Restarts the current target from a clean state (see {@link LaunchTarget#restart()}). No-op when none. */
+    @Palette
     public static void restart() {
         LaunchTarget t = current();
         if (t != null) {
@@ -116,6 +141,7 @@ public final class Target {
      *
      * @return true if the target's window appeared within the timeout, false if it timed out
      */
+    @Palette
     public static boolean launchAndWait() {
         LaunchTarget t = current();
         if (t == null) {
@@ -138,6 +164,7 @@ public final class Target {
      * @param timeoutMillis the maximum time to wait, in milliseconds
      * @return true if the target's window appeared within the timeout, false if it timed out
      */
+    @Palette
     public static boolean waitForLaunch(long timeoutMillis) {
         LaunchTarget t = current();
         if (t == null) {

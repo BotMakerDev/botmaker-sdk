@@ -8,6 +8,56 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-24 — the `@Palette` sweep finishes the facades (phase 3.11 of 12, part 3)
+
+**Changed:** the last three facades curated — `Target` 7/9, `Session` 4/8, `Emulators` 4/9 — **15 offered, 11
+hidden, nothing removed or deprecated**. All eighteen facades and 159 methods are now decided; verdicts and
+reasons in `docs/refactor/22-api-audit.md` §5.
+
+**Done**
+
+- **`Target` inverted the sweep's usual argument verdict, which is what finally pinned down the rule.** Of its
+  two `set` overloads the **`LaunchTarget`** one is offered and the **`String`** one is hidden — the opposite
+  of `Time`, where only the `String` half of each `ZoneId`/`String` pair survived. They are not in conflict:
+  the rule was never *prefer `String`*, it is **prefer the argument the editor can produce**. `ZoneId` has no
+  picker; `LaunchTarget` has a dedicated one (`PickerRegistry` → `LaunchTargetArgPicker`, offering the game
+  library and a file chooser and committing `LaunchTarget.parse("…")`), while `set(String)` takes not a name
+  but a spec grammar (`steam:12345`, `exe:C:\…`) the user must already know. `current()` is hidden on the
+  return side of the same fact — a `LaunchTarget` is not declarable, so a menu entry producing one hands back
+  a value that cannot be named or stored. Every verb (`start`, `startIfNotRunning`, `restart`, `isRunning`,
+  `launchAndWait`, `waitForLaunch`) is offered.
+- **`Emulators` 4/9 — the return-value rule at full strength: a call whose only product is a handle the editor
+  cannot hold is not a menu entry.** Neither `Emulator` nor `EmulatorRef` is a declarable variable type
+  (Studio's `BotType` says in as many words that they "come from `Emulators.named(…)`"), so `first()`,
+  `named(String)` and `connect(String, int)` are hidden: inserted from a menu, each stands as a statement that
+  connects to an emulator and then discards it. `list()`/`listAll()` are the stronger form of the same fact —
+  a `List<…>` is not declarable at all — and `listAll` is documented as a picker's feed rather than as bot
+  vocabulary. What is offered is the four that *act*: `use()` and `use(String)`, which the SDK had already
+  shipped as `first().use()` / `named(name).use()` collapsed into one statement precisely for callers who
+  cannot hold the handle, plus `launch(String)` / `stop(String)`. The `Mouse.scroll(int)` shape again.
+- **That verdict decides phase 3.13's list.** With every handle-producing method hidden, `Emulator`,
+  `EmulatorRef` and `EmulatorSource` are unreachable from any menu, so they leave the value-type sweep — a
+  member menu they can never open is not worth curating. If Studio ever makes `Emulator` declarable, `first`
+  and `named` earn their annotation that day; an addition is free for the SDK's whole life.
+- **`Session` 4/8 needed the least deciding of any facade, because the class had already written the verdicts
+  down.** `pinnedBackend()` and `override()` call themselves *internal plumbing* (and `override()` returns a
+  tri-state `Boolean` whose `null` is the interesting value); `clearOverrides()` says it exists for tests;
+  `set(boolean)` is `Debug.set(boolean)` exactly — the third instance of *a flag whose two values already have
+  named methods*. `isEnabled`/`enable`/`disable`/`useBackend` are the vocabulary.
+- **`useBackend(String)` is the mirror of `Wait`'s `Duration`.** Its argument is a bare `String`, but the
+  accepted set is closed and named in the javadoc (`gamescope`, `xephyr`, `auto`) and an unrecognised name
+  degrades to `auto` rather than throwing — so a menu entry cannot produce a bot that breaks. Fillable is
+  about whether the editor can write a *valid* argument, not about which package the type came from.
+- Every hidden method stays public, supported and under the 1.1.0 contract. Hiding is not deprecating.
+
+**Deferred / next**
+
+- **Phase 3.13** — the value types, now 10 rather than 13: `Point`, `Size`, `MatchResult`, `ColorMatch`,
+  `TextMatch`, `ImageTemplate`, `CaptureSource`, `LaunchTarget`, `Key`, `MouseButton`.
+- Making `Emulator` declarable in Studio's `BotType` would reopen `Emulators.first`/`named`; not scheduled.
+
+---
+
 ## 2026-08-23 — the `@Palette` sweep, ten more facades and a change to `@Palette` itself (phase 3.11 of 12, part 2)
 
 **Changed:** ten more facades curated — `Source`, `Debug`, `BotMaker`, `Activity`, `Wait`, `Watchdog`,
