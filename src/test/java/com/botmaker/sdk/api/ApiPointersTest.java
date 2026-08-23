@@ -1,5 +1,9 @@
 package com.botmaker.sdk.api;
 
+import com.botmaker.sdk.api.meta.ReplacedBy;
+import com.botmaker.sdk.api.meta.Replaces;
+import com.botmaker.sdk.api.meta.Scaffolding;
+import com.botmaker.sdk.api.meta.Since;
 import io.github.classgraph.AnnotationInfo;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;

@@ -1,15 +1,15 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.BotSettings;
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.interaction.Wait;
-import com.botmaker.sdk.api.observe.Bots;
-import com.botmaker.sdk.api.observe.ClickEvent;
-import com.botmaker.sdk.api.observe.Surface;
+import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.internal.observe.Bots;
+import com.botmaker.sdk.internal.observe.ClickEvent;
+import com.botmaker.sdk.internal.observe.Surface;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * Locate a template and click it. Every method mirrors {@link ImageFinder}: a whole-desktop default plus a
  * {@link CaptureSource} form (window / monitor / desktop, optionally narrowed with
- * {@link CaptureSource#region(com.botmaker.sdk.api.Rect) region}), so a click can be pinned to a specific surface.
+ * {@link CaptureSource#region(com.botmaker.sdk.api.geometry.Rect) region}), so a click can be pinned to a specific surface.
  * The template is located within the source; the click lands at the resulting absolute screen coordinate.
  * <p>
  * Every method in this class also updates {@link VisionContext} for the current thread,
@@ -1088,7 +1088,7 @@ public class ImageClicker {
     }
 
     /**
-     * Reports a left click to registered {@link com.botmaker.sdk.api.observe.BotObserver}s.
+     * Reports a left click to registered {@link com.botmaker.sdk.internal.observe.BotObserver}s.
      * Guarded by {@code hasObservers()} so a normal bot run pays nothing.
      *
      * @param clickPoint the point where the click occurred

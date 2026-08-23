@@ -1,11 +1,11 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.observe.Bots;
-import com.botmaker.sdk.api.observe.Surface;
-import com.botmaker.sdk.api.observe.SwipeEvent;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.internal.observe.Bots;
+import com.botmaker.sdk.internal.observe.Surface;
+import com.botmaker.sdk.internal.observe.SwipeEvent;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.session.ActiveSession;

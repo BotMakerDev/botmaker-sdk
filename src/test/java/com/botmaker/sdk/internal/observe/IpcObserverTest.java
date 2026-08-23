@@ -1,11 +1,7 @@
 package com.botmaker.sdk.internal.observe;
 
-import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.api.Rect;
-import com.botmaker.sdk.api.observe.ClickEvent;
-import com.botmaker.sdk.api.observe.MatchEvent;
-import com.botmaker.sdk.api.observe.Surface;
-import com.botmaker.sdk.api.observe.SwipeEvent;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.shared.ipc.TelemetryClient;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import com.botmaker.shared.ipc.TelemetryServer;

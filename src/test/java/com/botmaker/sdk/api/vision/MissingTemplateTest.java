@@ -58,8 +58,8 @@ class MissingTemplateTest {
             }
 
             @Override
-            public com.botmaker.sdk.api.Point origin() {
-                return new com.botmaker.sdk.api.Point(0, 0);
+            public com.botmaker.sdk.api.geometry.Point origin() {
+                return new com.botmaker.sdk.api.geometry.Point(0, 0);
             }
         };
     }

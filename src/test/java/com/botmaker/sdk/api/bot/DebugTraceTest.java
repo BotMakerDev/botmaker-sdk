@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;

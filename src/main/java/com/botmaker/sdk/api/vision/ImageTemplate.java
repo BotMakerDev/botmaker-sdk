@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.Scaffolding;
+import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.internal.vision.TemplateMetadata;
 import com.botmaker.shared.opencv.OpenCvNative;
 import org.opencv.core.Mat;

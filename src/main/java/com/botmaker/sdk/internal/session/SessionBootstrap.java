@@ -1,8 +1,8 @@
 package com.botmaker.sdk.internal.session;
 
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Session;
-import com.botmaker.sdk.api.Size;
+import com.botmaker.sdk.api.bot.Session;
+import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.shared.launch.LaunchIsolation;

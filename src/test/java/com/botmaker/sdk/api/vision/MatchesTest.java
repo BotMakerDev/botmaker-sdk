@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.geometry.Point;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

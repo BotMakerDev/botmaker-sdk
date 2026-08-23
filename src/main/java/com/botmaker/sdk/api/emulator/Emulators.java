@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
-import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorInstance;

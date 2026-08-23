@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;

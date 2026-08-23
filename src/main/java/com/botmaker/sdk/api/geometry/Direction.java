@@ -1,6 +1,6 @@
-package com.botmaker.sdk.api.core;
+package com.botmaker.sdk.api.geometry;
 
-import com.botmaker.sdk.api.Scaffolding;
+import com.botmaker.sdk.api.meta.Scaffolding;
 
 /**
  * Represents a direction for sorting and selecting matches.

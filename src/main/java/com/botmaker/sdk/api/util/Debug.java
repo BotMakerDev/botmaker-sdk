@@ -1,7 +1,8 @@
-package com.botmaker.sdk.api;
+package com.botmaker.sdk.api.util;
 
-import com.botmaker.shared.Diag;
+import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
+import com.botmaker.shared.Diag;
 
 /**
  * The single, global debug-output switch for a running bot. One flag governs <em>all</em> of the SDK's

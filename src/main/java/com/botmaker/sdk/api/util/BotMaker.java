@@ -1,4 +1,6 @@
-package com.botmaker.sdk.api;
+package com.botmaker.sdk.api.util;
+
+import com.botmaker.sdk.api.meta.Scaffolding;
 
 import java.util.Scanner;
 

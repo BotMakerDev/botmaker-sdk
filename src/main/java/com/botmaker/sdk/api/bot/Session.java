@@ -1,4 +1,4 @@
-package com.botmaker.sdk.api;
+package com.botmaker.sdk.api.bot;
 
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 

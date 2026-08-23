@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.session;
 
-import com.botmaker.sdk.api.Session;
+import com.botmaker.sdk.api.bot.Session;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.display.SessionBackends;

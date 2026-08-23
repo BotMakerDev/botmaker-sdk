@@ -1,13 +1,12 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.api.Scaffolding;
-import com.botmaker.sdk.api.observe.BotObserver;
-import com.botmaker.sdk.api.observe.Bots;
-import com.botmaker.sdk.api.observe.MatchEvent;
-import com.botmaker.sdk.api.BotSettings;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.meta.Scaffolding;
+import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.internal.observe.BotObserver;
+import com.botmaker.sdk.internal.observe.Bots;
+import com.botmaker.sdk.internal.observe.MatchEvent;
 
 /**
  * Detects when a bot is <em>stuck</em> — no progress across many consecutive vision checks — and throws

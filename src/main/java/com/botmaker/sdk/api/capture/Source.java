@@ -1,6 +1,8 @@
 package com.botmaker.sdk.api.capture;
 
-import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.internal.capture.Desktop;
+import com.botmaker.sdk.internal.capture.SessionSource;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.session.ActiveSession;
 import com.botmaker.session.DesktopSession;

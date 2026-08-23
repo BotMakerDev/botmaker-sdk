@@ -1,8 +1,8 @@
 package com.botmaker.sdk.api.vision;
-import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.util.Debug;
 
-import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.api.Rect;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.ocr.OcrEngine;

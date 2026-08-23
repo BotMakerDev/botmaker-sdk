@@ -1,8 +1,8 @@
 package com.botmaker.sdk.api.capture;
 
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.api.Rect;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;

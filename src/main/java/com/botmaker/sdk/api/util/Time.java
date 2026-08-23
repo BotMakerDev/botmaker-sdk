@@ -1,4 +1,4 @@
-package com.botmaker.sdk.api;
+package com.botmaker.sdk.api.util;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;

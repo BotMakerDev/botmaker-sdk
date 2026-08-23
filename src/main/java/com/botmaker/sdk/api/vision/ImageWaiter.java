@@ -1,8 +1,8 @@
 package com.botmaker.sdk.api.vision;
-import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.util.Debug;
 
-import com.botmaker.sdk.api.BotSettings;
-import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -12,7 +12,7 @@ import com.botmaker.sdk.api.interaction.Wait;
 /**
  * Poll for a template to appear / disappear. Every method mirrors {@link ImageFinder}: a whole-desktop
  * default plus a {@link CaptureSource} form (window / monitor / desktop, optionally narrowed with
- * {@link CaptureSource#region(com.botmaker.sdk.api.Rect)}). Matches are returned in absolute coordinates.
+ * {@link CaptureSource#region(com.botmaker.sdk.api.geometry.Rect)}). Matches are returned in absolute coordinates.
  * <p>
  * Every method in this class also updates {@link VisionContext#setLastMatch(MatchResult)} for the current thread,
  * enabling access to the most recent match via {@link VisionContext#getLastMatch()}.

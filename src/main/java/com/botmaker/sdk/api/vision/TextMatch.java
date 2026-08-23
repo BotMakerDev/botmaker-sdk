@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.api.Rect;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
 
 /**
  * The result of a {@link Text} OCR search: one recognized word or line of text and where it sits.

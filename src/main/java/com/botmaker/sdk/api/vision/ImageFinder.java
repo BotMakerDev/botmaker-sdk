@@ -1,15 +1,15 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.BotSettings;
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.api.Scaffolding;
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.api.observe.Bots;
-import com.botmaker.sdk.api.observe.MatchEvent;
-import com.botmaker.sdk.api.observe.Surface;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.meta.Scaffolding;
+import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.internal.observe.Bots;
+import com.botmaker.sdk.internal.observe.MatchEvent;
+import com.botmaker.sdk.internal.observe.Surface;
 import com.botmaker.sdk.internal.trace.Trace;
 import com.botmaker.shared.opencv.OpencvManager;
 import com.botmaker.shared.opencv.RawMatch;
@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  * <p>Every matcher takes a {@link CaptureSource} — one of a {@link com.botmaker.sdk.api.capture.Window},
  * a {@link CaptureSource#monitor(int) monitor}, or the whole {@link CaptureSource#desktop() desktop} — so a
  * search can be pinned to a window or a single screen and still return absolute, clickable coordinates. A
- * search <em>region</em> is expressed as a {@link CaptureSource#region(com.botmaker.sdk.api.Rect) region of a
+ * search <em>region</em> is expressed as a {@link CaptureSource#region(com.botmaker.sdk.api.geometry.Rect) region of a
  * source}, not a separate parameter. The no-source overloads default to the whole desktop.
  *
  * <p>Besides {@code find}/{@code findAll}/{@code findAny} this class owns the lambda control-flow helpers
@@ -1011,7 +1011,7 @@ public class ImageFinder {
         }
     }
 
-    // --- Observability: report each match attempt to registered BotObservers (see api.observe.Bots) ---
+    // --- Observability: report each match attempt to registered BotObservers (see internal.observe.Bots) ---
     // Guarded by hasObservers() so a normal bot run (no observer) builds nothing and pays nothing.
     // The Surface is the source's whole-surface identity (window/screen); the region is its sub-rectangle
     // when the source was narrowed with CaptureSource.region(...), else null.

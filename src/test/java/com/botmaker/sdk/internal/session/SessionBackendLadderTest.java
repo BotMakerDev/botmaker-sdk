@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.session;
 
-import com.botmaker.sdk.api.Session;
+import com.botmaker.sdk.api.bot.Session;
 import com.botmaker.session.impl.NestedSession;
 import com.botmaker.shared.launch.LaunchSpec;
 import org.junit.jupiter.api.AfterEach;

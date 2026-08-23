@@ -1,6 +1,6 @@
-package com.botmaker.sdk.api.observe;
+package com.botmaker.sdk.internal.observe;
 
-import com.botmaker.sdk.api.Rect;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Window;
 

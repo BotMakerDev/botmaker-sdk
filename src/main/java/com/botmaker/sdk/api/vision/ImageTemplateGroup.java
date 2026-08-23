@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.Scaffolding;
+import com.botmaker.sdk.api.meta.Scaffolding;
 
 import java.util.List;
 

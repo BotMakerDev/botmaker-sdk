@@ -1,9 +1,9 @@
 package com.botmaker.sdk.internal.config;
 
-import com.botmaker.sdk.api.Size;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Desktop;
-import com.botmaker.sdk.api.capture.Monitor;
+import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.internal.capture.Desktop;
+import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.shared.config.CaptureSourceKind;
 import com.botmaker.shared.config.ProjectProperties;
 
@@ -68,7 +68,7 @@ public final class ProjectDefaults {
 
     /**
      * The configured debug-output default, or {@code null} when the key is absent/unparseable so
-     * {@link com.botmaker.sdk.api.Debug} keeps its default (on).
+     * {@link com.botmaker.sdk.api.util.Debug} keeps its default (on).
      */
     public static Boolean debug() {
         return ProjectProperties.debug();

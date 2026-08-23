@@ -1,8 +1,7 @@
 package com.botmaker.sdk.api.bot;
-import com.botmaker.sdk.api.BotSettings;
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Scaffolding;
 import com.botmaker.sdk.api.launch.Target;
+import com.botmaker.sdk.api.meta.Scaffolding;
+import com.botmaker.sdk.api.util.Debug;
 
 import java.util.function.Consumer;
 

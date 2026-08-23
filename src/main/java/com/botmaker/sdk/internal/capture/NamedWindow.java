@@ -1,7 +1,9 @@
-package com.botmaker.sdk.api.capture;
+package com.botmaker.sdk.internal.capture;
 
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Window;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.util.Debug;
 
 import java.awt.image.BufferedImage;
 import java.util.Optional;
@@ -19,7 +21,7 @@ public final class NamedWindow implements CaptureSource {
 
     private final String titleSubstring;
 
-    NamedWindow(String titleSubstring) {
+    public NamedWindow(String titleSubstring) {
         this.titleSubstring = titleSubstring;
     }
 

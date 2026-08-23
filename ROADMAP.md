@@ -8,6 +8,60 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-23 — the `api` package reorganised, eleven classes demoted to `internal` (phase 3.6 of 12)
+
+**Changed:** 21 classes moved package; `api/capture/Screen.java` deleted; ~65 files' imports repointed;
+Studio's `palette/SdkType` lost 10 constants; new `ImportManager.repairSdkImports` + `CodeEditor` entry
+point + `ImportManagerSdkMoveTest`; `SdkUpgradeService` now reads both pointer spellings.
+
+**Done**
+
+- **The `api` root is empty.** It held the four pointer annotations, the three geometry records and five
+  facades (`BotMaker`, `BotSettings`, `Debug`, `Session`, `Time`) while everything else already lived in a
+  sub-package that said what it was — and `api.core` existed to hold one enum. Now: **`api.geometry`**
+  (`Point`, `Rect`, `Size`, `Direction` — `api.core` dissolved), **`api.meta`** (`ReplacedBy`, `Replaces`,
+  `Since`, `Scaffolding`), **`api.util`** (`Time`, `BotMaker`, `Debug`), and `Session`/`BotSettings` into
+  the `api.bot` they belong to.
+
+- **Eleven classes left the public API on one rule: a type a bot can only ever *receive* is not API.** The
+  `CaptureSource` implementations (`Desktop`, `Monitor`, `NamedWindow`, `SessionSource`) are only ever
+  returned — `CaptureSource.desktop()/monitor()/window()` and `Source.current()` all declare the
+  *interface* — so they moved to `internal.capture`; `NamedWindow`'s constructor had to become public,
+  which is the only visible trace of the move. The observation stack (`Bots`, `BotObserver`, `Surface`,
+  `ClickEvent`, `MatchEvent`, `SwipeEvent`) had **zero** references in Studio and one consumer anywhere —
+  `internal.observe.IpcObserver`, which it now sits beside. `SwipeEvent` was never even in Studio's
+  `SdkType`, so it had been invisible API the whole time.
+
+- **`Screen` was deleted.** Zero callers in the SDK, in Studio, or in generated text; not a
+  `CaptureSource` despite `SdkType`'s comment saying it once was; and its `captureOrigin()` reached
+  `java.awt.Toolkit` through `ScreenCapture`, which is the wrong thing to hold in a headless session.
+
+- **No pointers, deliberately.** The contract starts at 1.1.0, the newest tag is v1.0.26 and the gallery
+  index holds three bots, all the maintainer's. A `@ReplacedBy` for a move nobody can be holding is noise
+  `ApiPointersTest` would then verify at every future version. Recorded in the CHANGELOG (phase 5) instead.
+
+- **Studio repairs the imports rather than letting projects open red.** Every existing bot has
+  `import com.botmaker.sdk.api.Point;`, which no longer resolves — a hard compile error on a line the user
+  never wrote. `ImportManager.repairSdkImports` repoints an `api.*` import by asking `SdkType` for the
+  simple name's current FQN. A name `SdkType` does not know is **left alone**, not dropped or guessed: a
+  wrong import compiles into a different type, an untouched one fails where the user can read why — and
+  nothing a bot could have named falls in that gap, which is the whole premise of the demotion.
+
+- **`SdkUpgradeService` reads both pointer spellings**, and the legacy one is load-bearing rather than
+  polite: the jar being upgraded *from* is by definition older, so for a bot coming off 1.0.x it is the
+  only jar carrying `@ReplacedBy` on the element that bot still calls. Reading only `api.meta` would have
+  turned every pre-1.1.0 redirect into an unpaired break.
+
+**Deferred / next**
+
+- **Phase 3.7 — the method audit.** `StatementMenu.sdkFacadeSubmenu` builds a submenu from *every* public
+  static method of every menu facade, resolved at runtime from the bot's own jar, so all ~537 public
+  methods are one click away and there is no curation layer. The criterion there is editorial ("would a bot
+  author reach for this?"), never "has it a caller" — every facade method has a possible caller by
+  construction.
+
+---
+
 ## 2026-08-23 — Point/Rect/Size are records of ints (phase 3.5 of 12)
 
 **Changed:** `api/Point.java`, `api/Rect.java`, `api/Size.java` rewritten as records; 13 call sites in

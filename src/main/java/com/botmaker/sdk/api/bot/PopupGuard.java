@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Scaffolding;
+import com.botmaker.sdk.api.meta.Scaffolding;
+import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
 
 /**
@@ -38,7 +38,7 @@ import com.botmaker.sdk.internal.trace.Trace;
  * clicks a coordinate you already located in an earlier frame, and dismissing a popup first would move the
  * screen out from under it. The same reasoning is why the guard runs <em>before</em> a find rather than after.
  *
- * <p>Process-global, like {@link com.botmaker.sdk.api.BotSettings} — a bot has one screen and one guard.
+ * <p>Process-global, like {@link BotSettings} — a bot has one screen and one guard.
  */
 public final class PopupGuard {
 

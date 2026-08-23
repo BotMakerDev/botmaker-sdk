@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.api.Rect;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

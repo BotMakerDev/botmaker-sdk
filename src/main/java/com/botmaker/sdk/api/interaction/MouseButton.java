@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.sdk.api.Scaffolding;
+import com.botmaker.sdk.api.meta.Scaffolding;
 
 /**
  * Mouse buttons for the richer {@link Mouse} actions (down/up/drag).

@@ -1,4 +1,4 @@
-package com.botmaker.sdk.api;
+package com.botmaker.sdk.api.meta;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

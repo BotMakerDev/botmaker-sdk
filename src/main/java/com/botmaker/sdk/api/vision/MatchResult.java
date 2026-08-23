@@ -1,8 +1,8 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.api.Rect;
-import com.botmaker.sdk.api.Size;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
 import java.util.Random;
 
 public class MatchResult {

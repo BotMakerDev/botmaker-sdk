@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.launch;
 
-import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.launch.LaunchKind;

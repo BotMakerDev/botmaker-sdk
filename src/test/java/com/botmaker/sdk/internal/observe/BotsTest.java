@@ -1,7 +1,7 @@
-package com.botmaker.sdk.api.observe;
+package com.botmaker.sdk.internal.observe;
 
-import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.api.Rect;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

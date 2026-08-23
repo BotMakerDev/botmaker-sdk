@@ -1,12 +1,6 @@
 package com.botmaker.sdk.internal.observe;
 
-import com.botmaker.sdk.api.Rect;
-import com.botmaker.sdk.api.observe.BotObserver;
-import com.botmaker.sdk.api.observe.Bots;
-import com.botmaker.sdk.api.observe.ClickEvent;
-import com.botmaker.sdk.api.observe.MatchEvent;
-import com.botmaker.sdk.api.observe.Surface;
-import com.botmaker.sdk.api.observe.SwipeEvent;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.shared.ipc.TelemetryClient;
 import com.botmaker.shared.ipc.TelemetryEvent;
@@ -15,7 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * The single piece of SDK code that knows the Studio exists — an internal, env-gated {@link BotObserver}
- * that ships {@link com.botmaker.sdk.api.observe} events over the {@code botmaker-shared} telemetry channel
+ * that ships this package's events over the {@code botmaker-shared} telemetry channel
  * to the Studio's live preview panel.
  *
  * <p>It self-installs from a static initializer (triggered by {@code Bots} loading the class by name), but

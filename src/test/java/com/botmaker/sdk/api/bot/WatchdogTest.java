@@ -1,9 +1,8 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.sdk.api.observe.Bots;
-import com.botmaker.sdk.api.observe.MatchEvent;
-import com.botmaker.sdk.api.observe.Surface;
-import com.botmaker.sdk.api.BotSettings;
+import com.botmaker.sdk.internal.observe.Bots;
+import com.botmaker.sdk.internal.observe.MatchEvent;
+import com.botmaker.sdk.internal.observe.Surface;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package com.botmaker.sdk.api.observe;
+package com.botmaker.sdk.internal.observe;
 
 /**
  * Observes what a running bot's vision/interaction layer does, in real time — every template match and

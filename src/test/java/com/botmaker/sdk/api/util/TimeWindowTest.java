@@ -1,4 +1,4 @@
-package com.botmaker.sdk.api;
+package com.botmaker.sdk.api.util;
 
 import org.junit.jupiter.api.Test;
 

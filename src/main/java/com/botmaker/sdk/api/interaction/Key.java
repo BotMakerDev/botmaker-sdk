@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.sdk.api.Scaffolding;
+import com.botmaker.sdk.api.meta.Scaffolding;
 import com.sun.jna.Platform;
 
 /**

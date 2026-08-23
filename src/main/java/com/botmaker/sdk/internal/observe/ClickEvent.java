@@ -1,6 +1,6 @@
-package com.botmaker.sdk.api.observe;
+package com.botmaker.sdk.internal.observe;
 
-import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.geometry.Point;
 
 /**
  * Reports a click performed by the interaction layer to registered {@link BotObserver}s. {@code point} is

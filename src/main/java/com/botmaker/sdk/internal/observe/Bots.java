@@ -1,4 +1,4 @@
-package com.botmaker.sdk.api.observe;
+package com.botmaker.sdk.internal.observe;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;

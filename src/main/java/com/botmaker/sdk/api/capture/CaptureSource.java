@@ -1,7 +1,10 @@
 package com.botmaker.sdk.api.capture;
 
-import com.botmaker.sdk.api.Point;
-import com.botmaker.sdk.api.Rect;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.capture.Desktop;
+import com.botmaker.sdk.internal.capture.Monitor;
+import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.api.interaction.Mouse;
 
 import java.awt.image.BufferedImage;
@@ -177,7 +180,7 @@ public interface CaptureSource {
         return region(new Rect(x, y, width, height));
     }
 
-    // --- Observability hooks (used by api.observe to describe the surface + searched region) ---
+    // --- Observability hooks (used by internal.observe to describe the surface + searched region) ---
 
     /**
      * The underlying whole-surface source (a {@link Window} or the screen) this source draws from, unwrapping

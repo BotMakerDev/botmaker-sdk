@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.launch;
 
-import com.botmaker.sdk.api.BotSettings;
-import com.botmaker.sdk.api.Debug;
+import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.interaction.Wait;

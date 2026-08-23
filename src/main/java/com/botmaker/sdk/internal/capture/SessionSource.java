@@ -1,6 +1,8 @@
-package com.botmaker.sdk.api.capture;
+package com.botmaker.sdk.internal.capture;
 
-import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.session.DesktopSession;
 

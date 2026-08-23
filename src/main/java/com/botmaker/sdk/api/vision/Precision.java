@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.Scaffolding;
+import com.botmaker.sdk.api.meta.Scaffolding;
 
 /**
  * How exacting a {@link Pixel} search should be — every knob that decides whether something counts as a match,

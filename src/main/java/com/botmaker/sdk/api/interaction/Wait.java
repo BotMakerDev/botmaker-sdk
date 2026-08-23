@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.sdk.api.Debug;
-import com.botmaker.sdk.api.Scaffolding;
+import com.botmaker.sdk.api.meta.Scaffolding;
+import com.botmaker.sdk.api.util.Debug;
 
 import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;

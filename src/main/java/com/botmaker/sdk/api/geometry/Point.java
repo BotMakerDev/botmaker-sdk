@@ -1,4 +1,6 @@
-package com.botmaker.sdk.api;
+package com.botmaker.sdk.api.geometry;
+
+import com.botmaker.sdk.api.meta.Scaffolding;
 
 /**
  * A screen coordinate, in pixels, absolute unless a method says otherwise.

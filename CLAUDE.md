@@ -87,8 +87,23 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 
 ### Public API vs internal plumbing
 
-- **`com.botmaker.sdk.api.*`** is the API generated bots compile against. It is under a **compatibility
-  convention** — real semver, and a removal announced by one full minor marked
+- **The line between the two is one question: can a bot *write the name down*?** A type it can only ever
+  *receive* — from a factory, as an event, as a return value — belongs in `internal`, however public its
+  methods are. That rule was applied in 1.1.0 and moved eleven classes out: the `CaptureSource`
+  implementations (`Desktop`, `Monitor`, `NamedWindow`, `SessionSource`), which only ever arrive from
+  `CaptureSource.desktop()/monitor()/window()` and `Source.current()` — all of which declare the *interface*
+  as their return type — and the whole observation stack (`Bots`, `BotObserver`, `Surface`, `ClickEvent`,
+  `MatchEvent`, `SwipeEvent`), whose only consumer was ever `internal.observe.IpcObserver`. `Screen` was
+  deleted outright: no callers, and not even a `CaptureSource`. **Studio's `palette/SdkType` is the mirror**
+  of this decision, not a second one — a class that leaves `api` leaves that enum, which is how the palette
+  stops offering it.
+
+- **`com.botmaker.sdk.api.*`** is the API generated bots compile against, and every class in it sits in a
+  sub-package that says what it is: `api.geometry` (`Point`, `Rect`, `Size`, `Direction`), `api.meta` (the
+  four pointer annotations), `api.bot`, `api.capture`, `api.emulator`, `api.interaction`, `api.launch`,
+  `api.util` (`Time`, `BotMaker`, `Debug`), `api.vision`. **The `api` root holds no classes** — it was a
+  junk drawer of annotations, geometry and five facades until 1.1.0, and a name landing there again means
+  somebody skipped the question above. It is under a **compatibility convention** — real semver, and a removal announced by one full minor marked
   `@Deprecated(since = "x.y.z", forRemoval = true)` whose Javadoc `@deprecated` line names the replacement.
   A member added after 1.1.0 carries `@since`; the 1.1.0 surface itself carries none, because comparing two
   published jars already yields the exact per-version added/removed set and 818 identical tags would not.

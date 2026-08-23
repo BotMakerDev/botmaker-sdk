@@ -5,7 +5,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * The two things a debug trace needs that {@link com.botmaker.sdk.api.Debug} does not provide: a duration
+ * The two things a debug trace needs that {@link com.botmaker.sdk.api.util.Debug} does not provide: a duration
  * rendered the way a person reads one, and a way to say "this happened 47 times" in one line instead of 47.
  *
  * <p><b>Why the collapsing exists.</b> A bot's interesting moments — an activity finishing, a popup dismissed,

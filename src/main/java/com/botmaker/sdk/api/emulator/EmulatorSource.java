@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
-import com.botmaker.sdk.api.Point;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 
 import java.awt.image.BufferedImage;
