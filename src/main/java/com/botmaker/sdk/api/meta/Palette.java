@@ -10,6 +10,35 @@ import java.lang.annotation.Target;
  * <b>BotMaker Studio offers this element in its block palette.</b> On a facade type it means "this class is
  * curated"; on a method it means "this exact overload earns a menu entry".
  *
+ * <h2>What it governs, and what it does not</h2>
+ *
+ * <p>This annotation is about <b>members</b>: given that the user has reached a type, which of its methods are
+ * proposed. Whether a type is reached <em>at all</em> — whether it gets its own submenu in the statement and
+ * expression menus, and in what order, under which icon — is a separate question with a separate home, and
+ * that home is Studio's {@code palette/SdkType.Role}. Studio has three answers there: {@code FACADE} (its own
+ * submenu), {@code FACADE_HIDDEN} (recognised as an SDK call, so a placed block gets the right chrome, but
+ * never offered — {@code Window}, {@code Debug}, {@code Watchdog}, {@code PopupGuard}, {@code Session}) and
+ * {@code VALUE} (an import target; reached only as a variable, like {@code Rect}).
+ *
+ * <p>The division is deliberate and was decided rather than inherited: menu membership is an editorial call
+ * Studio makes about its own menus, and it travels with an icon and a display order that mean nothing to the
+ * SDK. Folding it in here — a {@code menu = false} attribute — was considered and rejected.
+ *
+ * <p>Two consequences worth stating, because both look like bugs from the wrong end. A type that is
+ * {@code FACADE_HIDDEN} or {@code VALUE} is still worth curating: its members are reached through a variable's
+ * member menu and through an already-placed block's ⚙ picker, and those consult this annotation like anything
+ * else. And curating such a type changes nothing about whether it appears in the insert menus — it did not
+ * before and does not now.
+ *
+ * <p><b>Constants are never curated.</b> The target set has no {@code FIELD} and gains none. A member submenu
+ * lists methods and then, below a separator, the type's public constants; that second half is always offered
+ * whole. The sets are small and closed — {@code BotSettings} 7, {@code Precision} 4, {@code Text} 2,
+ * {@code Direction} 4 — and each entry is a named anchor rather than one spelling among rivals:
+ * {@code Precision.TIGHT} is the reason {@code Precision} has constants at all. Enum constants also reach
+ * Studio's activity-variable pickers through {@code SdkType.enumConstantNames()}, which reads the
+ * {@code Class<?>} directly and never consults the annotation index, so gating them here would be half an
+ * answer in any case.
+ *
  * <h2>The problem it solves</h2>
  *
  * <p>Studio's statement menu enumerates <em>every public static method</em> of every facade, resolved from the
