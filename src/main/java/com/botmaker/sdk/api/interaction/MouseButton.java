@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.Scaffolding;
 
 /**
@@ -13,9 +14,15 @@ import com.botmaker.sdk.api.meta.Scaffolding;
  *
  * <p>The numbers are X11's button numbering, which the Linux backends pass through untouched; Windows
  * translates them (the side buttons become {@code MOUSEEVENTF_XDOWN} plus an {@code XBUTTON} selector).
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): <b>no methods offered</b>, {@link Key}'s verdict for
+ * {@link Key}'s reason. {@link #code()} is X11's button numbering, which is precisely the "where it sits"
+ * answer the paragraph above says this enum exists to replace with a "what it does" one. The constants are
+ * untouched and are the entire surface a bot wants.
  */
 // Scaffolding for the same reason as Direction: the generated Activities holds one per mouse-button variable.
 @Scaffolding
+@Palette
 public enum MouseButton {
     LEFT(1), MIDDLE(2), RIGHT(3),
     /** The thumb button that goes back — the browser's Back, and what most games bind to a side button. */

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.geometry;
 
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.Scaffolding;
 
 /**
@@ -12,12 +13,19 @@ import com.botmaker.sdk.api.meta.Scaffolding;
  * there rather than carried through the type: a bot that clicks the centre of a match wants the pixel
  * nearest the centre, and had to round anyway.
  *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): everything is offered — {@code Rect}'s verdict for
+ * {@code Rect}'s reason, that a geometry type has no rival spellings to choose between, every member answering
+ * a different question about the same two numbers. The annotation is still worth carrying: it is what makes
+ * "this type was looked at and nothing was hidden" a recorded fact rather than an omission, which is the whole
+ * difference between a curated type and an uncurated one under strict mode.
+ *
  * @param x pixels from the left of the coordinate space
  * @param y pixels from the top of the coordinate space
  */
 // The generated Activities declares one per point variable, rebuilt from the two stored numbers.
 @Scaffolding
-public record Point(int x, int y) {
+@Palette
+public record Point(@Palette int x, @Palette int y) {
 
     /**
      * Declared only to carry {@link Scaffolding}: the annotation targets a constructor, not a record
@@ -33,11 +41,13 @@ public record Point(int x, int y) {
     }
 
     /** Whether this point falls inside {@code r} (left/top inclusive, right/bottom exclusive). */
+    @Palette
     public boolean inside(Rect r) {
         return r.contains(this);
     }
 
     /** This point moved by {@code dx}, {@code dy}. */
+    @Palette
     public Point offset(int dx, int dy) {
         return new Point(x + dx, y + dy);
     }

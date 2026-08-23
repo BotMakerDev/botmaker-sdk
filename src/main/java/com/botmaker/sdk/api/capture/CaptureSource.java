@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.capture;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
@@ -23,7 +24,24 @@ import java.awt.image.BufferedImage;
  * any of the three with {@link #region(Rect)} to get a sub-source that only captures (and therefore only
  * matches within) that rectangle. Regions compose, so
  * {@code CaptureSource.window("Game").region(topBar)} is itself just another {@code CaptureSource}.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): seven of thirteen. What is offered is the whole of
+ * how a bot <em>builds</em> a source — the four factories and the two {@link #region(Rect) region} narrowings,
+ * each of which hands back another {@code CaptureSource} the editor can hold — plus {@link #isPresent()}, the
+ * one question a bot asks of a source it already has.
+ *
+ * <p>The six hidden ones divide into three pairs, and none of them is deprecated in any sense.
+ * {@link #capture()} and {@link #origin()} go together: the first returns a {@code BufferedImage}, which is not
+ * a type the editor can declare a variable of, and the second's only documented use is adding it to a match
+ * from the first — so offering either alone would be offering half of an operation the palette cannot finish.
+ * {@link #base()} and {@link #subRegion()} are labelled observability hooks above and are read by
+ * {@code internal.observe}, not by bots. {@link #hasWindowIdentity()} and {@link #click(Point)} are
+ * <b>implementor surface</b>: they exist so a new kind of source can describe and route itself — {@code click}
+ * says so in as many words, "the single seam that lets the whole vision→click pipeline target an emulator" —
+ * and the supported bot path is {@code Emulators.use()} followed by plain {@code Mouse}. An override point is
+ * not a menu entry; that is the same verdict {@code Emulators} reached from the other direction.
  */
+@Palette
 public interface CaptureSource {
 
     /** Pixels of this source. May return {@code null} if the capture failed. */
@@ -41,6 +59,7 @@ public interface CaptureSource {
      * source ({@link #window(String)}) overrides it to report whether a matching window is open right
      * now. Used by {@link com.botmaker.sdk.api.launch.Game} to tell if a game is already running.
      */
+    @Palette
     default boolean isPresent() {
         return true;
     }
@@ -75,6 +94,7 @@ public interface CaptureSource {
     // --- The three canonical sources ---
 
     /** The whole virtual desktop (all monitors). The ultimate fallback source for every matcher. */
+    @Palette
     static CaptureSource desktop() {
         return new Desktop();
     }
@@ -83,6 +103,7 @@ public interface CaptureSource {
      * A single monitor (0-based {@code index} into the OS screen-device list), so a bot can match against
      * just one screen on a multi-monitor desktop. An out-of-range index falls back to the whole desktop.
      */
+    @Palette
     static CaptureSource monitor(int index) {
         return new Monitor(index);
     }
@@ -94,6 +115,7 @@ public interface CaptureSource {
      * reopens: {@link #capture()} returns {@code null} while it is absent, and {@link #isPresent()}
      * reports whether it is currently open.
      */
+    @Palette
     static CaptureSource window(String titleSubstring) {
         return new NamedWindow(titleSubstring);
     }
@@ -104,6 +126,7 @@ public interface CaptureSource {
      *
      * @return a capture source based on the project's default capture target, or the current source if not configured
      */
+    @Palette
     static CaptureSource fromProjectDefault() {
         CaptureSource source = com.botmaker.sdk.internal.config.ProjectDefaults.source();
         return source != null ? source : Source.current();
@@ -118,11 +141,13 @@ public interface CaptureSource {
      * captured image, a region also restricts (and speeds up) the search area — not just the reported
      * coordinates. The rectangle is clamped to the source's bounds.
      */
+    @Palette
     default CaptureSource region(Rect sub) {
         return new RegionSource(this, sub);
     }
 
     /** {@link #region(Rect)} from raw coordinates within this source. */
+    @Palette
     default CaptureSource region(int x, int y, int width, int height) {
         return region(new Rect(x, y, width, height));
     }

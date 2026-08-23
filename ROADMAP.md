@@ -8,6 +8,57 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-24 — the sweep reaches the types a bot can hold (phase 3.13 of 12)
+
+**Changed:** ten value types curated — `Point` 4/4, `Size` 4/4, `MatchResult` 13/13, `ColorMatch` 9/9,
+`TextMatch` 6/6, `ImageTemplate` 6/8, `CaptureSource` 7/13, `LaunchTarget` 5/8, `Key` 0/1, `MouseButton` 0/1 —
+**54 offered, 13 hidden, nothing removed or deprecated**. With the 18 facades of 3.9–3.11, every type in
+`api.*` a bot can reach now has a verdict. Table and reasons: `docs/refactor/22-api-audit.md` §5.
+
+**Done**
+
+- **These types had no reader until phase 3.12.** A value type is reached through a variable's member menu,
+  which is `MenuBuilders.buildScopeMenu`, which was unfiltered until 3.12 — so curating them earlier would
+  have changed nothing anybody could see. That is also why 3.10 skipped the three result types on the
+  reasoning that a result is *received* rather than called: true of the statement menu, and false of the
+  member menu 3.12 opened. The verdict was reversed and written into `MatchResult`'s javadoc, which had none.
+- **Five of the ten are fully offered, as a verdict rather than a shrug.** A result or geometry type has no
+  rival spellings: its members are different *questions* about one value, where a facade's overloads are
+  different *ways of asking* one question. The type-level annotation still earns its place — under strict mode
+  it is what makes "looked at, nothing hidden" a recorded fact instead of an omission.
+- **Where a value type does hide something it is one of two shapes.** *Plumbing returning a type the editor
+  cannot declare*: `CaptureSource.capture()`/`origin()` hidden as a pair (a `BufferedImage`, and the offset
+  whose only documented use is being added to a match from it), `LaunchTarget.launchSpec()` returning
+  `shared.launch`'s freely-breakable `LaunchSpec`, `ImageTemplate.unload()`/`close()` managing a `Mat` the bot
+  never sees. And *implementor surface*, which is new: `CaptureSource.hasWindowIdentity()`/`click(Point)` exist
+  to be **overridden** by a new kind of source — `click`'s own javadoc calls it "the single seam that lets the
+  whole vision→click pipeline target an emulator" — while the supported bot path is `Emulators.use()` then
+  plain `Mouse`. An override point is not a menu entry.
+- **`LaunchTarget.parse(String)` is `Target.set(String)` again**: a spec grammar the user must already know,
+  returning `null` rather than complaining. `LaunchTargetArgPicker` still writes `LaunchTarget.parse("…")` with
+  a spec it built itself, and a picker is not a menu, so hiding the method costs the picker nothing.
+- **`Key` and `MouseButton` are 0/1, where the type annotation *is* the verdict.** Both hide their one method
+  and keep every constant — fields are never curated, and enum constants reach the pickers through
+  `SdkType.enumConstantNames()`, which reads the `Class<?>` and never consults the index. That single method
+  is exactly what separates them from `Direction` and `StartMode`, which needed no annotation.
+- **`ApiPointersTest` rule 10 earned its keep mid-phase.** `MatchResult` was annotated on all thirteen members
+  and not on the class; the build failed naming every one of them. A curated method in an uncurated type is
+  invisible, and the gate is the only thing that would have noticed.
+- **`Palette`'s javadoc gains the value-type case** — the annotation is not facade-only, every type a bot can
+  hold is curated for its member menu, and the two hiding shapes above are named there.
+
+**Deferred / next**
+
+- **The result types stay classes, not records** — asked and answered this phase. A public record cannot keep
+  the package-private constructor that makes `ImageFinder`/`Pixel`/`Text` the only things able to mint a
+  result (JLS 8.10.3: the canonical constructor is at least as accessible as the record); the
+  `null`-when-not-found contract lives in accessors a record would have disagreeing with its own
+  `equals`/`toString`; and `MatchResult` is 6 fields behind 13 accessors, so the header would publish the
+  components on top of the members and undo this phase's curation. If value semantics are ever wanted, the
+  cheap version is hand-written `equals`/`hashCode` on the three.
+
+---
+
 ## 2026-08-24 — the `@Palette` sweep finishes the facades (phase 3.11 of 12, part 3)
 
 **Changed:** the last three facades curated — `Target` 7/9, `Session` 4/8, `Emulators` 4/9 — **15 offered, 11

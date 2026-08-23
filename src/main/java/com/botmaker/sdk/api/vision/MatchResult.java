@@ -3,8 +3,28 @@ package com.botmaker.sdk.api.vision;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.meta.Palette;
 import java.util.Random;
 
+/**
+ * What a template search found: whether it matched, how well, and where — in absolute screen coordinates,
+ * ready to hand to {@code Mouse}. A not-found result is a real object rather than {@code null}, with
+ * {@link #isFound()} false and every point accessor returning {@code null}.
+ *
+ * <p><b>Curated for the palette</b> (see {@link Palette}): all thirteen are offered, which is
+ * {@link com.botmaker.sdk.api.geometry.Rect}'s verdict for a reason worth restating, because phase 3.10 had
+ * skipped this type on the opposite one. It was left uncurated then on the grounds that a result is
+ * <em>received</em> rather than called — true of the statement menu, which is the only surface curation
+ * reached at the time, and false everywhere else: a bot that receives a match immediately calls something on
+ * it, and the member menu that appears when it does is exactly the surface phase 3.12 opened. So the type is
+ * decided now, and the answer is that a result type has no rival spellings to choose between — the eight
+ * points it can give you are eight different questions, not eight ways of asking one.
+ *
+ * <p>{@link #randomClickPoint()} is the one that might look like a duplicate of {@link #center()} and is not:
+ * clicking the exact centre of the same button a thousand times is the most legible signature a bot can leave,
+ * and this is the method that exists to not do that.
+ */
+@Palette
 public class MatchResult {
 
     private static final Random RANDOM = new Random();
@@ -48,19 +68,23 @@ public class MatchResult {
         return new MatchResult(bestScore);
     }
 
+    @Palette
     public boolean isFound() {
         return found;
     }
 
+    @Palette
     public double confidence() {
         return confidence;
     }
 
+    @Palette
     public Point center() {
         // The centre pixel — the midpoint rounded, since a click lands on a whole pixel.
         return found ? new Point(location.x() + width / 2, location.y() + height / 2) : null;
     }
 
+    @Palette
     public Point randomClickPoint() {
         if (!found) return null;
 
@@ -73,39 +97,48 @@ public class MatchResult {
         );
     }
 
+    @Palette
     public Point topLeft() {
         return found ? location : null;
     }
 
+    @Palette
     public Point topRight() {
         return found ? new Point(location.x() + width, location.y()) : null;
     }
 
+    @Palette
     public Point bottomLeft() {
         return found ? new Point(location.x(), location.y() + height) : null;
     }
 
+    @Palette
     public Point bottomRight() {
         return found ? new Point(location.x() + width, location.y() + height) : null;
     }
 
+    @Palette
     public Point pointWithOffset(int offsetX, int offsetY) {
         if (!found) return null;
         return new Point(location.x() + offsetX, location.y() + offsetY);
     }
 
+    @Palette
     public Rect rect() {
         return found ? new Rect(location, new Size(width, height)) : null;
     }
 
+    @Palette
     public int width() {
         return width;
     }
 
+    @Palette
     public int height() {
         return height;
     }
 
+    @Palette
     public String templateId() {
         return templateId;
     }

@@ -30,6 +30,16 @@ import java.lang.annotation.Target;
  * else. And curating such a type changes nothing about whether it appears in the insert menus — it did not
  * before and does not now.
  *
+ * <p><b>So this annotation is not facade-only.</b> Every type a bot can <em>hold</em> is curated for its member
+ * menu: the geometry records, the three vision results, {@code ImageTemplate}, {@code CaptureSource},
+ * {@code LaunchTarget}, {@code Key} and {@code MouseButton}. Most of them come out fully offered, and that is a
+ * verdict rather than a shrug — a result or a geometry type has no rival spellings to choose between, because
+ * its members are different questions about one value rather than different ways of asking one question. The
+ * annotation is still worth carrying on such a type: under strict mode it is what makes "this was looked at and
+ * nothing was hidden" a recorded fact instead of an omission. Where a value type <em>does</em> hide something,
+ * it is almost always the same two shapes — plumbing that hands back a type the editor cannot declare a
+ * variable of, and implementor surface that exists to be overridden rather than called.
+ *
  * <p><b>Constants are never curated.</b> The target set has no {@code FIELD} and gains none. A member submenu
  * lists methods and then, below a separator, the type's public constants; that second half is always offered
  * whole. The sets are small and closed — {@code BotSettings} 7, {@code Precision} 4, {@code Text} 2,
