@@ -8,6 +8,36 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-24 — the contract document catches up with the contract (phase 12 of 12, the plan closes)
+
+**Changed:** `docs/refactor/21-api-compat.md`, `docs/refactor/99-progress.md`, umbrella `CLAUDE.md`,
+`botmaker-studio/CLAUDE.md`, `botmaker-studio/CHANGELOG.md`, both `ROADMAP.md`s. No code.
+
+**Done**
+
+- **`21-api-compat.md` was describing a five-rule gate and a single-valued pointer.** §3 now carries all
+  twelve `ApiPointersTest` rules with rule 4's relaxation stated as what it is — *the split's back edge, not a
+  loophole* — plus two subsections for the gates that landed in phases 7 and 8: `api-surface.txt` (the
+  deprecation window, enforced by reading the previous release out of a **file this repository already has**
+  rather than a published jar, which is what the deleted japicmp gate could not do offline) and
+  `ApiPointerProcessor` (the per-element rules as javac errors, in a source root that never reaches the jar).
+- **§2 said two things that had stopped being true.** *"Skipping the deprecation window is discouraged, not
+  refused"* — it is refused again, by a different mechanism, and the paragraph now says which and why the
+  escape hatch names elements one at a time. And `@since` was described as a Javadoc tag on members added
+  from 1.2.0; it is the `api.meta` annotation, required on **every** new element, written once and never
+  edited.
+- **§4 gained the split and the three annotations that can only be written during a deprecation window** —
+  `note()` and `behaviourChanged()` on *both* ends (with the precedence rule: the old jar's note wins, because
+  it is the author speaking on the element the bot actually calls), `@Since`, the optional arity on a
+  `@Replaces` entry, and `whens()`. `Mouse.scroll(int)` is recorded as the case that revealed the gap and
+  **not** as something this plan deprecated.
+- **§5 gained three subsections and lost a stale bullet.** §5.2 the split per call site and the positional
+  site key; §5.3 the scaffold end to end; §5.4 `@Palette` and the two questions it deliberately does not
+  merge. The bullet arguing that scaffolding must be *refused* rather than regenerated is now the record of
+  why that was true and what changed: re-rendering old-SDK text is still useless, re-rendering it and then
+  repairing it through the pointers is not.
+- The `api` package references throughout moved to `api.meta`, where the annotations have lived since 1.1.0.
+
 ## 2026-08-24 — `@Scaffolding` is checked against the repository it is a claim about (phase 9 of 12)
 
 **Changed:** `src/test/java/com/botmaker/sdk/api/ApiPointersTest.java` (rule 12), new committed
