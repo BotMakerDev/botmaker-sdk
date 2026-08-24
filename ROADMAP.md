@@ -8,6 +8,34 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-24 — `@Scaffolding` is checked against the repository it is a claim about (phase 9 of 12)
+
+**Changed:** `src/test/java/com/botmaker/sdk/api/ApiPointersTest.java` (rule 12), new committed
+`scaffolding-surface.txt` at the module root, `CLAUDE.md`.
+
+**Done**
+
+- **Rule 12: the `@Scaffolding` set must equal what Studio's generators actually emit.** The annotation says
+  *Studio writes this element into the files it generates* — a fact that lives in Studio's text blocks, not
+  here — so it has always been a second copy, and nothing kept the two in step. Both drifts were silent and
+  both were harmful: an element that stopped being generated kept its annotation and went on refusing
+  upgrades for a reason that had ceased to be true, and one a new generator started writing carried none, so
+  rule 9 never asked its author for a survivor and the upgrade broke a generated file mid-apply.
+- **The comparison goes through a committed file, because neither side can read the other.** Studio compiles
+  against the SDK and never the reverse, and comparing the annotations with themselves proves nothing. So
+  `botmaker-studio`'s new `ScaffoldSurfaceTest` — which holds the truth, parsing the generators' real output
+  with JDT and asserting its own declaration matches — writes `scaffolding-surface.txt` here, and rule 12
+  reads it back, naming the difference in **both** directions. Regenerate with
+  `mvn -pl botmaker-studio test -Dtest=ScaffoldSurfaceTest -Dbotmaker.scaffold.writeSurface=true`.
+- **A line is `fqn`, or `fqn#member(params)` with the *declared* parameter count.** Not the number of
+  arguments a generator passes: `ImageTemplateGroup.of()` reaches a varargs parameter with none, and this end
+  reads `MethodInfo.getParameterInfo()` and has no call site to count. Studio resolves each of its sites to
+  the declaration before writing, which is what lets two vocabularies compare at all.
+- The set is **29 elements**, not the 28 the previous phase's prose claimed — the scan of the real generators
+  found one more than the hand count did, which is the whole argument for the rule.
+
+---
+
 ## 2026-08-24 — the per-element pointer rules move to javac (phase 8 of 12)
 
 **Changed:** `src/apt/java/com/botmaker/sdk/apt/ApiPointerProcessor.java` (new, a second source root),

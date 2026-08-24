@@ -241,10 +241,25 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
     that never mentioned it. Generated files are regenerated, not migrated, and a defaulted value inside one
     is a broken feature rather than a repair; Studio's only answer is to refuse the upgrade (and the Activity
     Flow edit) until Studio itself is updated. Rule 9 therefore refuses a `@Deprecated` `@Scaffolding` element
-    with an **empty** `@ReplacedBy`. 28 elements carry it — the seed and regenerated generators' whole SDK
+    with an **empty** `@ReplacedBy`. 29 elements carry it — the seed and regenerated generators' whole SDK
     contact surface, including the `Activities` variable helpers' `ImageTemplate`/`Precision`/`Key`/
     `MouseButton`/`Direction`/`Point`/`Rect`/`Size`. Nothing in this module reads the annotation; the
     dependency still runs one way, and it is here because this is where the rename gets typed.
+
+    **It is a claim about another repository, so it is checked through a file** (2026-08-24). The annotated
+    set is a second copy of what Studio's generator text blocks actually name, and until rule 12 nothing kept
+    the two in step: a member that stopped being generated kept its annotation and went on blocking upgrades
+    for a reason that had stopped being true, and one a new generator started writing carried none, so rule 9
+    never asked for its survivor. Neither side can read the other — Studio compiles against the SDK, never the
+    reverse — and comparing the annotations with themselves proves nothing, so **`scaffolding-surface.txt`**
+    sits committed at this module's root: `botmaker-studio`'s `ScaffoldSurfaceTest` holds the truth (it parses
+    the generators' real output with JDT and asserts its own `ScaffoldSurface` declaration matches) and writes
+    the file; rule 12 reads it back and names the difference in both directions. A line is `fqn` for a type and
+    `fqn#member(params)` otherwise, the count being the **declared** parameter count — Studio resolves each of
+    its call sites to that number before writing, because this end has no call site to count and a varargs
+    member reached with no arguments still declares one parameter. Regenerate with
+    `mvn -pl botmaker-studio test -Dtest=ScaffoldSurfaceTest -Dbotmaker.scaffold.writeSurface=true`; a scaffold
+    change is one commit in each repository, as it always was.
   - **`@Palette`** (2026-08-23) — *Studio offers this in its block palette*. **Hiding is not deprecating:** an
     unannotated method stays public, supported and migrated like any other; it is simply not proposed. That
     distinction is the whole point — Studio's statement menu enumerates every public static method of every
