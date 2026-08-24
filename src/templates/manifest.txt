@@ -1,0 +1,42 @@
+# BotMaker scaffold templates — manifest
+#
+# Studio generates a bot's scaffold by extracting these files from the SDK jar it is pinned to and filling
+# in the tokens. The SDK owns the frame (the imports, the class shape, the walk, the config reader); Studio
+# owns only what is true about one project. Neither side holds a copy of the other's half.
+#
+# ---------------------------------------------------------------------------------------------------------
+# Tokens are fenced comments with a compiling default between them:
+#
+#     private static final int MAX_STEPS = /*<STUDIO:MAX_STEPS>*/ 1000 /*</STUDIO:MAX_STEPS>*/;
+#
+# To fill one, replace everything from the opening fence to the closing fence, inclusive. To ignore one,
+# do nothing — the default stands and the file still compiles. That is the whole compatibility rule: a
+# NEWER SDK may add tokens an older Studio has never heard of, and an older Studio simply leaves them at
+# their defaults. A Studio that needs a token this manifest does not list refuses, naming it.
+#
+# The defaults are not placeholders. Together they form one small bot that compiles inside the SDK's own
+# build, so every call Studio will write into a generated file is compiled and checked here first — the
+# check `ScaffoldTemplatesTest` runs, rather than a JDT re-parse of Studio's text blocks.
+#
+# ---------------------------------------------------------------------------------------------------------
+# Records, one per line:
+#
+#   format   <n>                                     this file's shape; bumped only when the columns change
+#   package  <fqn>                                   the templates' own package, which Studio rewrites
+#   template <ROLE> <KIND> <path> <target> <tokens>  one template; `-` for no tokens
+#
+# KIND is SEED (written once at creation, the user's thereafter) or REGENERATED (rewritten on every model
+# change, never the user's). `target` is the file name in the bot, with ${CLASS} the project's main class
+# and ${ACTIVITY} an activity's name.
+# ---------------------------------------------------------------------------------------------------------
+
+format 1
+package com.botmaker.sdk.templates
+
+template ENTRY_POINT       SEED        com/botmaker/sdk/templates/BotMain.java                 ${CLASS}.java              -
+template GO_HOME           SEED        com/botmaker/sdk/templates/GoHome.java                  GoHome.java                -
+template POPUPS            SEED        com/botmaker/sdk/templates/Popups.java                  Popups.java                -
+template ACTIVITY_STUB     SEED        com/botmaker/sdk/templates/activities/ActivityStub.java activities/${ACTIVITY}.java OUTCOMES,ENABLED
+template ACTIVITIES        REGENERATED com/botmaker/sdk/templates/Activities.java              Activities.java            IMPORTS,FIELDS,INITS
+template ACTIVITY_REGISTRY REGENERATED com/botmaker/sdk/templates/ActivityRegistry.java        ActivityRegistry.java      ACTIVITY_IMPORT,SINGLETONS,ALL
+template FLOW_DRIVER       REGENERATED com/botmaker/sdk/templates/FlowDriver.java              FlowDriver.java            ACTIVITY_IMPORT,FLOW,MAX_STEPS,STEP_DELAY_MS

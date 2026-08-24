@@ -8,6 +8,60 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-24 — the SDK owns the scaffold: an injection API and compiling templates (phases 1–3 of 7)
+
+**Changed:** new `api/flow/` (`FlowGraph`, `PopupCheck`, `Recovery`) + `internal/flow/FlowWalker`; new
+`api/config/Wire` + `internal/config/ConfigStore`; new source root `src/templates/java` and
+`src/templates/manifest.txt`, packed into the jar as `botmaker-templates/`; new `FlowWalkerTest`,
+`WireTest`, `ConfigStoreTest`, `ScaffoldTemplatesTest`; `pom.xml` gains a third compiler execution and a
+`copy-resources`; `ApiPointersTest` rule 12 deleted; `api-surface.txt` regenerated.
+
+**Done:**
+
+- **The scaffold Studio generates now lives here, as Java the compiler reads.** It was text blocks inside
+  `botmaker-studio`. A text block cannot be asked what it names, so "which SDK members does Studio write
+  into generated files?" was answered by a 484-line JDT visitor over the generators' output, a hand-kept
+  declaration, and a committed `scaffolding-surface.txt` ferried between two repositories that cannot read
+  each other. `src/templates/java` holds the seven files instead — entry point, `GoHome`, `Popups`,
+  `ActivityRegistry`, `Activities`, `FlowDriver`, the activity stub — and the build compiles them, so
+  renaming `Watchdog#checkpoint` breaks *this* build on the line that calls it.
+- **The defaults are a working one-activity bot, not placeholders.** That is what makes the compile mean
+  something: every call Studio will ever inject is compiled here first.
+- **Tokens are fenced comments** — `/*<STUDIO:MAX_STEPS>*/ 1000 /*</STUDIO:MAX_STEPS>*/`. Fill = replace
+  fence to fence. **Ignore = do nothing, and the default stands**, which is the entire forward-compatibility
+  rule: a newer SDK may add tokens an older Studio has never heard of.
+- **Templates ship as text and never as classes.** Pass 3 of the compiler writes to
+  `target/template-classes`, the same trick `src/apt/java` uses — so no bot finds a
+  `com.botmaker.sdk.templates.Activities` on its classpath beside its own. Verified against the built jar:
+  90 classes, none of them a template's.
+- **Logic moved out of generated text.** `FlowWalker` is the walk loop, the step budget, the give-up message
+  and the after-not-before delay — all of which used to be emitted as source, and none of which was testable;
+  it now has 13 shape tests (branch, join, loop, unwired outcome, disabled fall-through, empty flow,
+  give-up). `Wire` is one reader per stored type and `ConfigStore` the Jackson loader, replacing 13
+  `*_HELPER` parser bodies held as Java inside Java strings. That fixed a real defect: the `1h30m` grammar
+  existed twice, in Studio and in a text block, with no test able to compare them.
+- **The injection API is static-call-shaped, deliberately.** `ScaffoldRepair` can mechanically repair a type
+  that moved and a static call whose member moved, and nothing else — every call after the first in a fluent
+  chain has an instance receiver whose type its parser cannot know. So `FlowGraph.of/node/route`, never a
+  builder. `node` stays generic in the activity's outcome enum, so a route may only be built from *that*
+  activity's constants; the old generated `switch` had that guarantee and it was not worth trading.
+- **`ApiPointersTest` rule 12 is deleted, and `ScaffoldTemplatesTest` is what replaces it.** `@Scaffolding`
+  is no longer a claim about another repository, so it no longer needs a file to be compared through: the
+  templates are here, and the test reads their **constant pools** for every `com.botmaker.sdk.*` member they
+  reach, failing on any that is not annotated. Verified by removing `@Scaffolding` from `Recovery` and
+  watching it name `Recovery#NONE — called from FlowDriver.class`.
+- **One direction only, for now.** The templates may not call an unannotated member; an annotated member no
+  template calls is not yet an error, because Studio's old generators are still emitting the previous
+  scaffold. The reverse rule lands with their deletion.
+
+**Deferred / next (this plan's remaining phases, all in `botmaker-studio`):** `TemplateStore` extract-and-fill
+and the deletion of the text blocks; `ScaffoldScan`'s deletion and `ScaffoldSurfaceTest` rewritten as an
+in-test `javac` run over assembled output; `MIN_SDK_VERSION`/`SDK_FALLBACK_VERSION` → 1.1.0 with the
+post-bump regeneration hook; then the docs. `scaffolding-surface.txt` still sits in this module's root and
+is now read by nothing — it goes with `ScaffoldScan`.
+
+---
+
 ## 2026-08-24 — the contract document catches up with the contract (phase 12 of 12, the plan closes)
 
 **Changed:** `docs/refactor/21-api-compat.md`, `docs/refactor/99-progress.md`, umbrella `CLAUDE.md`,

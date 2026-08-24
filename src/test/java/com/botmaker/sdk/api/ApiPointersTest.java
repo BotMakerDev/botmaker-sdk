@@ -15,10 +15,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -61,9 +58,13 @@ import static org.junit.jupiter.api.Assertions.fail;
  * its sentence at whichever end asserts it, and a deprecated {@link Scaffolding} element names a real survivor
  * because generated code cannot take a default. Rule 10 covers {@link Palette}: curation is per type, so
  * annotating methods inside a type that is not itself annotated is a no-op nobody would notice. Rule 11 covers
- * the split — a {@code @ReplacedBy} naming several candidates has to say when each one applies. Rule 12 is the
- * only one that reads a file: {@code @Scaffolding} is a claim about what <em>Studio</em> generates, so the two
- * copies are compared through a committed {@code scaffolding-surface.txt} that Studio's own test writes.
+ * the split — a {@code @ReplacedBy} naming several candidates has to say when each one applies.
+ *
+ * <p>There was a rule 12, and it is gone: {@code @Scaffolding} used to be reconciled against a committed
+ * {@code scaffolding-surface.txt} that {@code botmaker-studio}'s own test wrote, because the annotation was a
+ * claim about a repository this one cannot see. It is no longer a claim about another repository. The scaffold
+ * lives here now, in {@code src/templates/java}, and {@code ScaffoldTemplatesTest} asserts the templates call
+ * nothing that is not annotated — one build, no file, no second copy to drift.
  *
  * <h2>A pointer is a set, not a value</h2>
  *
@@ -516,73 +517,12 @@ class ApiPointersTest {
                 overloads are offered — or remove these:""");
     }
 
-    /**
-     * 12 — the {@code @Scaffolding} set is exactly what Studio's generators emit.
-     *
-     * <p>{@code @Scaffolding} is a claim about a repository this one cannot see: it says <em>Studio writes
-     * this element into the files it generates</em>, and the dependency runs the other way — Studio compiles
-     * against the SDK, never the reverse. So the annotation is a second copy of a fact that lives in Studio's
-     * text blocks, and until this rule existed nothing kept the two in step. A member that stopped being
-     * generated kept its annotation and went on blocking upgrades for a reason that had ceased to be true; a
-     * member a new generator started writing carried none, so rule 9 never asked its author for a survivor and
-     * the upgrade broke a generated file mid-apply.
-     *
-     * <p>Neither side can read the other, and comparing the annotations with themselves proves nothing — so
-     * the expectation is a file. {@code botmaker-studio}'s {@code ScaffoldSurfaceTest} holds the truth (it
-     * parses the generators' actual output with JDT and asserts its own declaration matches), and writes it to
-     * {@code botmaker-sdk/scaffolding-surface.txt}. This rule reads that file back. A change to the scaffold
-     * is therefore one commit touching both repositories, which is what it always was — the file just makes
-     * the second half fail loudly instead of silently.
-     *
-     * <p>A line is {@code fqn} for a type and {@code fqn#member(params)} for a method or constructor, the
-     * count being the <b>declared</b> parameter count — what {@link MethodInfo#getParameterInfo()} yields
-     * here, and what a varargs member has regardless of how few arguments a generator passes it. Studio
-     * resolves each of its call sites to that number before writing the file, precisely because this end has
-     * no call site to count.
-     */
-    @Test
-    void theScaffoldingSetMatchesStudiosDeclaration() {
-        List<String> expected = scaffoldingSurfaceFile();
-        List<String> annotated = new ArrayList<>();
-        for (Element e : elements) {
-            if (!e.scaffolding()) continue;
-            annotated.add(e.params() >= 0 ? e.ref() + "(" + e.params() + ")" : e.ref());
-        }
-        annotated.sort(String::compareTo);
-
-        List<String> bad = new ArrayList<>();
-        for (String line : annotated) {
-            if (!expected.contains(line)) bad.add("@Scaffolding but no generator emits it: " + line);
-        }
-        for (String line : expected) {
-            if (!annotated.contains(line)) bad.add("emitted by a generator but not @Scaffolding: " + line);
-        }
-        assertEmpty(bad, """
-                @Scaffolding disagrees with botmaker-studio's ScaffoldSurface. The two are copies of one
-                fact — which SDK elements Studio writes into generated files — and this file is how they are
-                compared across two repositories that cannot read each other. Add or remove the annotation
-                here, or (if the generator really changed) update ScaffoldSurface in Studio and regenerate:
-                mvn -pl botmaker-studio test -Dtest=ScaffoldSurfaceTest -Dbotmaker.scaffold.writeSurface=true""");
-    }
-
-    /**
-     * The committed expectation, one line per element. Unlike Studio's side — which skips the comparison in a
-     * standalone checkout where no sibling SDK exists — a missing file here is a failure: it lives in this
-     * repository, so it is either present or somebody deleted it.
-     */
-    private static List<String> scaffoldingSurfaceFile() {
-        Path file = Path.of("scaffolding-surface.txt");
-        if (!Files.exists(file)) {
-            fail("scaffolding-surface.txt is missing from the module root. It is committed here and written by "
-                    + "botmaker-studio: mvn -pl botmaker-studio test -Dtest=ScaffoldSurfaceTest "
-                    + "-Dbotmaker.scaffold.writeSurface=true");
-        }
-        try {
-            return Files.readAllLines(file).stream().map(String::trim).filter(l -> !l.isEmpty()).toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException("cannot read " + file.toAbsolutePath(), e);
-        }
-    }
+    // 12 — the @Scaffolding set matches Studio's declaration — is deleted (2026-08-24). It compared the
+    // annotations against a committed scaffolding-surface.txt that botmaker-studio's ScaffoldSurfaceTest
+    // wrote, because @Scaffolding was a claim about text blocks in a repository this one cannot see. The
+    // scaffold is no longer over there: src/templates/java holds it as compiling Java, and
+    // ScaffoldTemplatesTest checks the annotation against what those templates actually call. One build,
+    // one copy of the fact, no cross-repository file to keep in step.
 
     /** Sanity: the scan found the API at all, so a silently empty classpath cannot pass every rule above. */
     @Test

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.flow;
 
 import com.botmaker.sdk.api.bot.Activity;
+import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.meta.Since;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 
@@ -51,6 +52,7 @@ import java.util.Map;
  * an unwired outcome <em>is</em> the stop — or when the node it led to is not in the graph. Cycles are legal,
  * that being how a bot repeats, which is why {@link #walk} takes a step budget.
  */
+@Scaffolding
 @Since("1.1.0")
 public final class FlowGraph {
 

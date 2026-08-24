@@ -187,10 +187,76 @@
                             </compilerArgs>
                         </configuration>
                     </execution>
+
+                    <!-- Pass 3 (compile-templates, at process-classes) compiles src/templates/java: the
+                         scaffold files Studio writes into a generated bot, kept here as valid Java rather
+                         than as text blocks in Studio.
+
+                         This is the whole point of the arrangement. Every SDK call a generated file will
+                         ever contain is written down once, in a file the SDK's own compiler reads, so
+                         renaming Watchdog#checkpoint breaks THIS build rather than somebody's project. It
+                         has to run after the main compile because it calls the API it is checked against.
+
+                         Output goes to target/template-classes, never target/classes: the templates are
+                         shipped as TEXT (see the resources plugin below), and a bot must not find a class
+                         called com.botmaker.sdk.templates.Activities on its classpath beside its own. Same
+                         trick, same reason, as pass 1. -->
+                    <execution>
+                        <id>compile-templates</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <compileSourceRoots>
+                                <compileSourceRoot>${project.basedir}/src/templates/java</compileSourceRoot>
+                            </compileSourceRoots>
+                            <outputDirectory>${project.build.directory}/template-classes</outputDirectory>
+                            <proc>none</proc>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
 
-            <!-- Resources Plugin: put this module's CHANGELOG.md inside the jar, as
+            <!-- Resources Plugin, execution 1: the scaffold templates, as text, under botmaker-templates/.
+
+                 Studio extracts these from the SDK jar it is pinned to and fills in the /*<STUDIO:…>*/
+                 tokens. Shipping the SOURCE (rather than generating from the compiled classes) is what
+                 makes an older Studio work against a newer SDK: a token it has never heard of is one it
+                 leaves alone, and the compiling default between the fences stands.
+
+                 manifest.txt rides along from the parent directory — it is not Java and must not be in the
+                 compile source root, but it belongs beside what it describes. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>scaffold-templates</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/botmaker-templates</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/src/templates/java</directory>
+                                </resource>
+                                <resource>
+                                    <directory>${project.basedir}/src/templates</directory>
+                                    <includes>
+                                        <include>manifest.txt</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Antrun: put this module's CHANGELOG.md inside the jar, as
                  META-INF/botmaker/whats-new.md.
 
                  Studio's Project > Upgrade SDK... leads with what a release GIVES you, before it lists
