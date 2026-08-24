@@ -57,8 +57,13 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 **Deferred / next (this plan's remaining phases, all in `botmaker-studio`):** `TemplateStore` extract-and-fill
 and the deletion of the text blocks; `ScaffoldScan`'s deletion and `ScaffoldSurfaceTest` rewritten as an
 in-test `javac` run over assembled output; `MIN_SDK_VERSION`/`SDK_FALLBACK_VERSION` → 1.1.0 with the
-post-bump regeneration hook; then the docs. `scaffolding-surface.txt` still sits in this module's root and
-is now read by nothing — it goes with `ScaffoldScan`.
+post-bump regeneration hook; then the docs.
+
+**2026-08-24, phase 5:** `scaffolding-surface.txt` is **deleted**, together with `botmaker-studio`'s
+`ScaffoldScan` that wrote it. Nothing in this module read it after rule 12 went, and nothing over there
+compares against it now: Studio compiles four whole generated projects against the real jar instead. The
+cross-repo channel is gone in both directions — `@Scaffolding` is checked here, against these templates'
+constant pools, and that is the only place it is checked.
 
 ---
 
