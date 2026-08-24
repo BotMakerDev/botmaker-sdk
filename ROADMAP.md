@@ -8,6 +8,59 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-24 — the deprecation window becomes a gate, and it is a committed file (phase 7 of 12)
+
+**Changed:** `api-surface.txt` (new, generated, 733 lines), `src/test/java/com/botmaker/sdk/api/ApiSurfaceTest.java`
+(new), umbrella `release.sh` (`check_api_surface`, `refresh_api_surface`, `--allow-removal`).
+
+**Done**
+
+- **`api-surface.txt` is the previous release's public `api.*` surface, committed**, and `ApiSurfaceTest`
+  diffs this build against it. One rule carries the phase: an element in the file and gone from the build
+  must have said `[deprecated]` **in the file** — which means the previous *jar* carried `@Deprecated` and,
+  by `ApiPointersTest` rule 1, a `@ReplacedBy` beside it. A removal is therefore announced one full release
+  ahead or it does not happen.
+- **Why a file, when the pointer gate needs no old jar.** `ApiPointersTest` verifies a link the author
+  *declared*, and both ends of a declared link are in one build; that is what a deprecation window is for.
+  This gate asks the one question no build can ask about itself — **what was here before?** — because a
+  deletion leaves nothing behind to be scanned. So the previous answer is written down. No network, no
+  resolved artifact, and the diff is reviewable like any other file.
+- **It is not the japicmp gate that was deleted** (`docs/refactor/21-api-compat.md` §3). That one enforced
+  *coverage*: every break had to ship a way across it. An uncovered break is now a supported outcome
+  (default value + `@NeedsReview`), and this gate does not care whether anything replaces the element, only
+  that the going was announced. Nor does it size the version bump — that remains a human judgement.
+- **Two more rules, both about `@Since`, both about a fact that expires.** An element in both surfaces keeps
+  the exact version it had — including *not having one* — because back-filling asserts something about a
+  release nobody can re-check; and an element absent from the file carries one, since the commit that adds
+  it is the last moment its introduction version is knowable rather than archaeology. The pre-1.1.0 surface
+  has none and the first generated file records that faithfully: 733 lines, zero `since=`.
+- **Parameters are erased types, not the arity the plan specified.** An arity disambiguates a name a human
+  wrote (which is what a `@Replaces` entry needs); here it is the identity the diff keys on, and this API is
+  full of same-arity overloads — `click(Point)` beside `click(Rect)`. Under an arity key, deleting one of
+  two same-arity overloads is a line that never changes and the window rule never fires. Longer lines, a key
+  that is actually unique; a collision now throws rather than silently dropping an element from the surface.
+- **Regenerating is refused while a rule is broken**, and that is what makes the rules a gate. Writing first
+  would leave the removed element out of the file, so the failing run would be followed by a passing one —
+  two commands and the window is gone, silently. `-Dbotmaker.api.writeSurface=true` reads the committed
+  snapshot *before* overwriting and writes nothing unless the three rules hold.
+- **The escape hatch is element by element and expires by itself.**
+  `--allow-removal 'com.botmaker.sdk.api.X#y'` (repeatable) reaches the test as
+  `-Dbotmaker.api.allowUndeprecatedRemoval`. A major is allowed to break things outright and a rule with no
+  exit is a rule people delete — but an entry that matches nothing is itself a failure, so a stale exemption
+  cannot sit in a release script quietly permitting the next removal spelled that way.
+- **`release.sh` runs it in the decide pass** (`check_api_surface`, beside `check_api_pointers`, before any
+  tag is pushed) and **re-records the file in the SDK's own release commit** (`refresh_api_surface`, just
+  before `commit_tag_push`) — the same reason `.deps.env` is written there: what this release shipped is
+  what the next one is diffed against, and a tag should be self-describing.
+
+**Deferred / next**
+
+- Phase 8 moves the *per-element* pointer rules to an annotation processor so they fail at `javac` with a
+  file and line. The surface file is the load-bearing half of the enforcement decision; that phase is
+  ergonomics, and its own fallback is to stay in the test.
+
+---
+
 ## 2026-08-24 — a release says what it gives you, and the jar carries the answer (phase 5 of 12)
 
 **Changed:** `CHANGELOG.md` (new), `pom.xml` (the `whats-new` antrun execution), umbrella `release.sh`

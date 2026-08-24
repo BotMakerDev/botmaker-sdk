@@ -176,6 +176,31 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   two or more candidates needs a non-blank `whens()` for each, since a menu of bare member names is not a
   choice anybody can make, and a blank target may not be mixed in with real ones.
 
+  **`api-surface.txt` is the second gate, and it exists for the one question the first cannot ask.**
+  `ApiPointersTest` checks a link the author *declared*, and both ends of a declared link are in one build.
+  A **deletion** declares nothing and leaves nothing behind to scan — so what was here before is written
+  down: a committed, generated file at the module root, one sorted line per public `api.*` element
+  (`type#member(paramTypes):returnType [deprecated] [since=…]`), holding the **previous release's** surface.
+  `ApiSurfaceTest` diffs this build against it, offline, with three rules: an element that left must have
+  carried `[deprecated]` in the file (that is the window — announced one full release ahead, so a bot on
+  that release got a compiler warning and Studio got a `@ReplacedBy`); an element present in both keeps the
+  exact `@Since` it had, absence included, because back-filling asserts something about a release nobody can
+  re-check; and an element absent from the file carries one, since the commit that adds it is the last
+  moment that value is a fact. Parameters are **erased types rather than an arity** — an arity is what a
+  `@Replaces` entry needs to disambiguate a name a human wrote, but here it is the diff's identity, and
+  `click(Point)` beside `click(Rect)` would share a key and hide a removal.
+
+  Regenerate with `mvn -pl botmaker-sdk test -Dtest=ApiSurfaceTest -Dbotmaker.api.writeSurface=true`. **The
+  write is refused while a rule is broken**, deliberately: writing first would drop the removed element from
+  the file, so a failing run would be followed by a passing one and the window would be gone in two commands.
+  A genuine break in a major is named element by element — `release.sh --allow-removal 'com.…X#y'`, reaching
+  the test as `-Dbotmaker.api.allowUndeprecatedRemoval` — and an exemption matching nothing fails too, so it
+  cannot outlive the release it was written for. `release.sh` runs the gate in the decide pass
+  (`check_api_surface`) and **re-records the file in the SDK's release commit** (`refresh_api_surface`):
+  what this release shipped is what the next one is diffed against. Like the pointer gate, it is **not** the
+  japicmp coverage gate that was deleted — an uncovered break is still a supported outcome, and nothing here
+  sizes the version bump.
+
   **Three more annotations sit beside the pointer pair, all `@Retention(CLASS)`, all read from the jar by the
   same scan** (2026-08-23). Each records something that is cheap while both ends of a move still exist and
   impossible afterwards:

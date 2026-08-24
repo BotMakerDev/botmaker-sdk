@@ -44,6 +44,10 @@ repairs the imports on open.
   before.
 - **`@Scaffolding`** marks the members Studio writes into generated files, so a release that moves one says so
   before you commit to the upgrade instead of failing half-way through it.
+- **The deprecation promise is now enforced, not just written down.** From this release the build refuses to
+  delete anything from `api.*` that the previous release did not already mark `@Deprecated` — so a member you
+  call cannot vanish between two versions without one release in which your compiler warned you about it
+  first. (For maintainers: a committed `api-surface.txt` and `ApiSurfaceTest`.)
 - The method audit (`docs/refactor/22-api-audit.md`) removed the type leaks and duplicated fields it found.
 
 ## [1.0.26] — 2026-08-22
