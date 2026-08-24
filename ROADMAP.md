@@ -8,6 +8,31 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-24 — a release says what it gives you, and the jar carries the answer (phase 5 of 12)
+
+**Changed:** `CHANGELOG.md` (new), `pom.xml` (the `whats-new` antrun execution), umbrella `release.sh`
+(`changelog_section`, `check_changelog`, `publish_release`).
+
+**Done**
+
+- **`CHANGELOG.md`, a few bullets per released version**, seeded from the tags' own commits rather than
+  from the ROADMAP — the ROADMAP is the engineering log (why, what was rejected, what it cost) and is far
+  too detailed to be release notes. Same-day re-tags are recorded as what they were ("re-tagged so JitPack
+  rebuilt it"), because a changelog that invents content for a mechanical tag teaches its reader to skim.
+- **The whole file ships in the jar** as `META-INF/botmaker/whats-new.md`. Whole, not the section being
+  upgraded to: a bot may jump several releases at once, so the jar has to answer every span ending at its
+  own version. That is what lets Studio's upgrade dialog lead with what the release *gives* you, offline,
+  out of a jar it already downloaded to diff — no GitHub API, no release notes, no network (phase 6).
+- **antrun, not `maven-resources-plugin`.** The file has to be *renamed*: the entry name is a contract
+  with Studio's reader and must not follow whatever the file is called in the repo, and `copy-resources`
+  has no `fileMappers` on that goal. `failonerror=false`, so a tree with no changelog still builds — which
+  is what every jar built from an older tag is.
+- **`release.sh` refuses an SDK release with no section for the version being cut** (`check_changelog`,
+  decide pass, no network and no mvn), and now publishes a real GitHub Release for the SDK with that
+  section as its body — until now an SDK tag was a bare ref that only warmed JitPack.
+
+---
+
 ## 2026-08-24 — a pointer becomes a set: the split (phase 3 of 12, the half that was missing)
 
 **Changed:** `api/meta/ReplacedBy.java` (`value()` widened to `String[]`, new `whens()`),

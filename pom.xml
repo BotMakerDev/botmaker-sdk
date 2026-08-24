@@ -142,6 +142,48 @@
                 </configuration>
             </plugin>
 
+            <!-- Resources Plugin: put this module's CHANGELOG.md inside the jar, as
+                 META-INF/botmaker/whats-new.md.
+
+                 Studio's Project > Upgrade SDK... leads with what a release GIVES you, before it lists
+                 what it costs. It reads that out of the target jar it has already downloaded to diff, so
+                 the answer is offline and needs no GitHub API, no release notes and no network at all.
+
+                 The WHOLE file, not the section being upgraded to: a bot may jump several releases at
+                 once, so the jar has to be able to answer every span ending at its own version. A jar
+                 built from a tree with no changelog simply has no entry, and Studio falls back to the API
+                 diff it showed before — the standing rule that every new reader degrades.
+
+                 A copy rather than <resource> on the module root: the root is not a resource directory
+                 and making it one would sweep the pom, the LICENSE and .deps.env into the jar too. And
+                 antrun rather than maven-resources-plugin because the file has to be RENAMED — the entry
+                 name is a contract with Studio's reader and must not follow whatever the file is called
+                 in the repo — which copy-resources cannot do (it has no fileMappers on that goal).
+
+                 tolerant of a missing source: `failonerror=false` keeps a tree with no changelog building,
+                 which is what a jar built from an older tag is. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>whats-new</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <copy file="${project.basedir}/CHANGELOG.md"
+                                      tofile="${project.build.outputDirectory}/META-INF/botmaker/whats-new.md"
+                                      failonerror="false" overwrite="true"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Jar Plugin: stamp the manifest with Implementation-* (pom version/vendor) and a Build-Time
                  so a running bot / Studio's editor can report exactly which SDK build was loaded. The pom
                  version is cosmetic (0.0.0-SNAPSHOT for local dev; JitPack overrides it with the tag), so
