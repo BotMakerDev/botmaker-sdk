@@ -104,6 +104,27 @@ com.botmaker.sdk.api.capture.Window#targetWindow():com.botmaker.shared.capture.G
 com.botmaker.sdk.api.capture.Window#title():java.lang.String
 com.botmaker.sdk.api.capture.Window#toString():java.lang.String
 com.botmaker.sdk.api.capture.Window#width():int
+com.botmaker.sdk.api.config.Wire:class [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#IMAGE_PREFIX:java.lang.String [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#area(java.lang.String):com.botmaker.sdk.api.geometry.Rect [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#color(java.lang.String):java.awt.Color [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#date(java.lang.String):java.time.LocalDate [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#decimal(java.lang.String):double [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#direction(java.lang.String):com.botmaker.sdk.api.geometry.Direction [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#duration(java.lang.String):java.time.Duration [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#flag(java.lang.String):boolean [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#key(java.lang.String):com.botmaker.sdk.api.interaction.Key [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#letter(java.lang.String):char [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#many(java.lang.String,java.util.function.Function):java.util.List [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#mouseButton(java.lang.String):com.botmaker.sdk.api.interaction.MouseButton [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#one(java.lang.String):java.lang.String [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#point(java.lang.String):com.botmaker.sdk.api.geometry.Point [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#precision(java.lang.String):com.botmaker.sdk.api.vision.Precision [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#size(java.lang.String):com.botmaker.sdk.api.geometry.Size [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#template(java.lang.String):com.botmaker.sdk.api.vision.ImageTemplate [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#text(java.lang.String):java.lang.String [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#time(java.lang.String):java.time.LocalTime [since=1.1.0]
+com.botmaker.sdk.api.config.Wire#whole(java.lang.String):int [since=1.1.0]
 com.botmaker.sdk.api.emulator.Emulator:class
 com.botmaker.sdk.api.emulator.Emulator#back():void
 com.botmaker.sdk.api.emulator.Emulator#capture():java.awt.image.BufferedImage

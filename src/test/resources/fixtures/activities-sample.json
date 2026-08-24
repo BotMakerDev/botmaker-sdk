@@ -1,0 +1,12 @@
+{
+  "activities": [
+    { "name": "MINING", "enabled": "true" },
+    { "name": "SMELTING", "enabled": "false" },
+    { "name": "FISHING" }
+  ],
+  "variables": [
+    { "name": "REST", "value": ["1h30m"] },
+    { "name": "HOTKEYS", "value": ["a", "escape", "not-a-key"] },
+    { "name": "EMPTY", "value": [] }
+  ]
+}
