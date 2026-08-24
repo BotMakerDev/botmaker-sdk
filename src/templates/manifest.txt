@@ -14,6 +14,10 @@
 # NEWER SDK may add tokens an older Studio has never heard of, and an older Studio simply leaves them at
 # their defaults. A Studio that needs a token this manifest does not list refuses, naming it.
 #
+# Either way the fences themselves are dropped on the way out: what a bot's source carries is the value or
+# the default, never the marker. So a template is valid Java here AND the file it produces is clean — the
+# machinery is this repository's, not the user's.
+#
 # The defaults are not placeholders. Together they form one small bot that compiles inside the SDK's own
 # build, so every call Studio will write into a generated file is compiled and checked here first — the
 # check `ScaffoldTemplatesTest` runs, rather than a JDT re-parse of Studio's text blocks.
