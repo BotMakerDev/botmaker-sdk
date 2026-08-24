@@ -128,7 +128,27 @@
 
     <build>
         <plugins>
-            <!-- Maven Compiler Plugin -->
+            <!-- Maven Compiler Plugin — TWO passes, deliberately.
+
+                 Pass 1 (compile-processor, at process-sources) compiles src/apt/java, which holds
+                 ApiPointerProcessor: the three per-element pointer rules as javac errors. It must be built
+                 before the API it checks, and it must not be built BY itself, hence -proc:none.
+
+                 Pass 2 is the ordinary main compile, told to run that processor over src/main/java. The
+                 processor is named explicitly (annotationProcessors) rather than discovered through
+                 META-INF/services, so nothing else on the classpath can quietly join the compile.
+
+                 Pass 1's output goes to target/apt-classes, NOT target/classes, and reaches pass 2 only as
+                 -processorpath. That is one line of config instead of a maven-jar-plugin <excludes>, and it
+                 is a stronger guarantee than an exclude: the processor classes are never in the jar's
+                 source directory at all, so no packaging change can start shipping them by accident.
+                 annotationProcessorPaths cannot express this — it takes artifact coordinates, not a
+                 directory of a module's own making.
+
+                 The processor is ergonomics, not the gate. ApiPointersTest checks the same three rules (plus
+                 the cross-cutting ones a per-element processor cannot express) and is what CI and release.sh
+                 read. If this two-pass setup ever proves fragile on JitPack, delete both executions and the
+                 src/apt tree; nothing downstream depends on them. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -140,6 +160,34 @@
                          instead of arg0/arg1. -->
                     <parameters>true</parameters>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>compile-processor</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <compileSourceRoots>
+                                <compileSourceRoot>${project.basedir}/src/apt/java</compileSourceRoot>
+                            </compileSourceRoots>
+                            <outputDirectory>${project.build.directory}/apt-classes</outputDirectory>
+                            <proc>none</proc>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>default-compile</id>
+                        <configuration>
+                            <annotationProcessors>
+                                <annotationProcessor>com.botmaker.sdk.apt.ApiPointerProcessor</annotationProcessor>
+                            </annotationProcessors>
+                            <compilerArgs>
+                                <arg>-processorpath</arg>
+                                <arg>${project.build.directory}/apt-classes</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
 
             <!-- Resources Plugin: put this module's CHANGELOG.md inside the jar, as

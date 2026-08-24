@@ -8,6 +8,49 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-24 — the per-element pointer rules move to javac (phase 8 of 12)
+
+**Changed:** `src/apt/java/com/botmaker/sdk/apt/ApiPointerProcessor.java` (new, a second source root),
+`pom.xml` (a two-pass `maven-compiler-plugin`).
+
+**Done**
+
+- **Three of `ApiPointersTest`'s rules now also run as `javac` errors**, on the element and on the annotation:
+  a `@Deprecated` public `api.*` element carries a `@ReplacedBy`; every target it names resolves; every
+  target carries the matching `@Replaces` back-edge. The author sees them red in the IDE, on the line, while
+  the annotation is still being typed — which is the moment the answer is actually known. A surefire failure
+  names a class and a rule; this names a line.
+- **The other rules stay in the test, and could not move.** A processor sees elements one at a time and never
+  the surface at once: rule 4 (no *undeclared* double claim) is a question about every `@Replaces` in the
+  API, and rules 6–7 need `-Dbotmaker.api.maxVersion`, which only the release caller can supply. The test
+  remains the gate CI and `release.sh` read, so one mistake now fails the build twice — deliberately — and
+  **where the two disagree the test is right**.
+- **The build is two passes and the processor never enters the jar.** A `compile` execution at
+  `process-sources` builds `src/apt/java` with `-proc:none` (it must exist before the API it checks, and must
+  not be run over itself) into **`target/apt-classes`**, and the main compile names it explicitly via
+  `annotationProcessors` + `-processorpath`. That is a deviation from the plan's `maven-jar-plugin
+  <excludes>` and a stronger guarantee than one: the classes are never in the packaged directory, so no
+  future packaging change can start shipping them. `annotationProcessorPaths` cannot express it — it takes
+  artifact coordinates, not a directory this build just produced. Verified: `com/botmaker/sdk/apt/` appears
+  in neither the jar nor the sources jar.
+- **It reads mirrors, not classes.** Being compiled first, the processor cannot reference
+  `com.botmaker.sdk.api.meta.ReplacedBy` at all; annotations are matched by FQN string and read out of
+  `AnnotationMirror`s by hand. That is not a workaround for the build order — it is what keeps the dependency
+  one-way. Explicit values only, so `@ReplacedBy` with no `value` stays distinguishable from an omitted
+  annotation, which is rule 1's whole subject.
+- **Verified by a throwaway probe source**, since the API today contains no pointers at all (nothing is
+  deprecated yet, so the processor is a pure gate): each of the three rules failed the compile on its own
+  line and column, `@ReplacedBy` with no value passed silently, and a complete pointer pair compiled clean.
+  Full suite 235 tests, 0 failures.
+- **The stated fallback stands**: if the two-pass setup proves fragile on JitPack, delete both executions and
+  `src/apt` — nothing downstream depends on them. The surface file (phase 7) and `ApiPointersTest` are the
+  load-bearing halves; this phase is ergonomics.
+
+**Deferred / next:** phase 9 — Studio declares `ScaffoldSurface`, the SDK-side half being a committed
+`scaffolding-surface.txt` and a matching `@Scaffolding` rule in `ApiPointersTest`.
+
+---
+
 ## 2026-08-24 — the deprecation window becomes a gate, and it is a committed file (phase 7 of 12)
 
 **Changed:** `api-surface.txt` (new, generated, 733 lines), `src/test/java/com/botmaker/sdk/api/ApiSurfaceTest.java`

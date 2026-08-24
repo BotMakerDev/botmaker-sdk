@@ -201,6 +201,26 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   japicmp coverage gate that was deleted — an uncovered break is still a supported outcome, and nothing here
   sizes the version bump.
 
+  **`ApiPointerProcessor` is the same rules again, at the line rather than at the class** (2026-08-24). Three
+  of `ApiPointersTest`'s rules — a deprecated element carries a pointer, each target it names exists, each
+  target points back — are decidable **from one element**, so they also run as `javac` errors during the main
+  compile: red in the IDE, on the annotation, while it is still being typed. The other rules cannot follow.
+  A processor sees elements one at a time and never the surface at once, and rule 4 (no *undeclared* double
+  claim) is a question about every `@Replaces` in the API, while rules 6–7 need the version only the release
+  caller knows. So the test stays the gate — it is what CI and `release.sh` read, and **if the two ever
+  disagree the test is right** — and this is ergonomics: one mistake fails the build twice, on purpose.
+
+  It lives in a **second source root, `src/apt/java`**, compiled by its own `maven-compiler-plugin` execution
+  at `process-sources` with `-proc:none` (it must exist before the API it checks, and must not be run over
+  itself). Its output goes to `target/apt-classes` — never `target/classes` — and reaches the main compile
+  only as `-processorpath`, which is why no `maven-jar-plugin` `<excludes>` is needed to keep it out of the
+  jar: the classes are never in the packaged directory at all. `annotationProcessorPaths` cannot express this
+  (it takes artifact coordinates, not a directory this build just made). Because it is compiled first, the
+  processor **cannot reference `ReplacedBy.class`**; it matches annotations by FQN string and reads
+  `AnnotationMirror`s by hand, which is what keeps the dependency one-way. If the two-pass build ever proves
+  fragile on JitPack, delete both executions and `src/apt` — nothing downstream depends on them, and the
+  surface file plus the test are the load-bearing halves.
+
   **Three more annotations sit beside the pointer pair, all `@Retention(CLASS)`, all read from the jar by the
   same scan** (2026-08-23). Each records something that is cheap while both ends of a move still exist and
   impossible afterwards:
