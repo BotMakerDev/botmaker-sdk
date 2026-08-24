@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.1.0] — 2026-08-24
 
 The 1.1.0 contract release. **This is the last window in which `api.*` moves freely** — from 1.1.0 the SDK is
 under real semver and nothing is removed without a deprecation release naming its replacement
@@ -42,8 +42,27 @@ repairs the imports on open.
   supported and callable — it is simply not proposed in Studio's palette. 18 facades and 10 value types are
   curated; a jar with no `Palette` class at all is treated as uncurated and offers everything, exactly as
   before.
-- **`@Scaffolding`** marks the members Studio writes into generated files, so a release that moves one says so
-  before you commit to the upgrade instead of failing half-way through it.
+- **The files BotMaker generates for you now come out of this jar.** The entry point, `GoHome`, `Popups`,
+  `ActivityRegistry`, `Activities`, `FlowDriver` and the activity stub ship inside the SDK as templates;
+  Studio fills in what is true about *your* project and nothing else. What you get from that: the frame of
+  every generated file is compiled and tested by the SDK's own build, and a Studio older than your SDK still
+  writes files that compile, because anything it does not recognise stays at the SDK's own default.
+- **Your Activity Flow is a table, not a generated `switch`.** `api.flow.FlowGraph` (with `PopupCheck` and
+  `Recovery`) holds the graph, and the walk itself — the loop, the step budget and its give-up message, the
+  watchdog tick, the delay between steps — is the SDK's, so it is the same in every bot and it is tested:
+  branch, join, loop back, an outcome left unwired, a disabled activity falling through, an empty flow.
+  `FlowDriver` keeps `MAX_STEPS` and `STEP_DELAY_MS` as your two knobs.
+- **Your stored parameters are read by the SDK.** `api.config.Wire` is one reader per storable type and the
+  loader behind it is compiled code, replacing ~150 lines of parser bodies that used to be generated into
+  every `Activities` class as text. Every reader is total — an unreadable value falls back to a default, so a
+  bot never fails to start because of its own configuration file. **The `1h30m` grammar now exists once**: it
+  used to be written twice, once in the editor and once as generated text, with nothing able to compare them.
+- **`@Scaffolding`** marks the members those templates use, so a release that moves one says so before you
+  commit to the upgrade instead of failing half-way through it.
+- **BotMaker Studio requires this version or newer** from its next release, for the generated files only: an
+  older bot still opens, builds and runs, but its Activity Flow cannot be saved until *Project ▸ Upgrade SDK…*
+  moves it here. The upgrade re-renders `FlowDriver` and `Activities` in the new shape and leaves everything
+  you wrote yourself untouched.
 - **The deprecation promise is now enforced, not just written down.** From this release the build refuses to
   delete anything from `api.*` that the previous release did not already mark `@Deprecated` — so a member you
   call cannot vanish between two versions without one release in which your compiler warned you about it

@@ -59,6 +59,18 @@ and the deletion of the text blocks; `ScaffoldScan`'s deletion and `ScaffoldSurf
 in-test `javac` run over assembled output; `MIN_SDK_VERSION`/`SDK_FALLBACK_VERSION` → 1.1.0 with the
 post-bump regeneration hook; then the docs.
 
+**2026-08-24, phase 7 (the plan closes):** `CHANGELOG.md`'s `## [Unreleased]` becomes **`## [1.1.0] —
+2026-08-24`**, which is what `release.sh`'s `check_changelog` was holding the release on, and gains four
+bullets in a bot author's terms: the generated files come out of this jar, the Activity Flow is a table with
+the walk behind it, stored parameters are read by compiled code with **one** `1h30m` grammar, and Studio
+requires 1.1.0 or newer to *write* a generated file (an older bot still opens, builds and runs). The whole
+file ships in the jar as `META-INF/botmaker/whats-new.md`, so that is also what Studio's upgrade dialog leads
+with. `docs/refactor/21-api-compat.md` §5.3 is rewritten end to end — three layers, the token protocol, the
+static-call shape constraint, the three checks that replaced five mechanisms, and the floor — and the §6
+paragraph that **rejected** a reference bot compiled by the SDK's own build now records why that objection
+was overruled rather than being quietly deleted. `ApiPointersTest` is documented as ten rules plus the
+release-time one, with rule 12's deletion recorded in place.
+
 **2026-08-24, phase 5:** `scaffolding-surface.txt` is **deleted**, together with `botmaker-studio`'s
 `ScaffoldScan` that wrote it. Nothing in this module read it after rule 12 went, and nothing over there
 compares against it now: Studio compiles four whole generated projects against the real jar instead. The
