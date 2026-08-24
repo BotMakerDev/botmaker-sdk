@@ -155,6 +155,37 @@ com.botmaker.sdk.api.emulator.Emulators#named(java.lang.String):com.botmaker.sdk
 com.botmaker.sdk.api.emulator.Emulators#stop(java.lang.String):boolean
 com.botmaker.sdk.api.emulator.Emulators#use():com.botmaker.sdk.api.emulator.Emulator
 com.botmaker.sdk.api.emulator.Emulators#use(java.lang.String):com.botmaker.sdk.api.emulator.Emulator
+com.botmaker.sdk.api.flow.FlowGraph:class [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph#node(java.lang.String,com.botmaker.sdk.api.bot.Activity,com.botmaker.sdk.api.flow.PopupCheck,com.botmaker.sdk.api.flow.Recovery,java.lang.String,com.botmaker.sdk.api.flow.FlowGraph$Route[]):com.botmaker.sdk.api.flow.FlowGraph$Node [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph#nodeNamed(java.lang.String):com.botmaker.sdk.api.flow.FlowGraph$Node [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph#of(java.lang.String,com.botmaker.sdk.api.flow.FlowGraph$Node[]):com.botmaker.sdk.api.flow.FlowGraph [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph#route(java.lang.Enum,java.lang.String):com.botmaker.sdk.api.flow.FlowGraph$Route [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph#start():java.lang.String [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph#walk(com.botmaker.sdk.api.flow.FlowGraph,int,int,java.lang.Runnable):void [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Node:class [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Node#activity():com.botmaker.sdk.api.bot.Activity [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Node#name():java.lang.String [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Node#popupCheck():com.botmaker.sdk.api.flow.PopupCheck [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Node#recovery():com.botmaker.sdk.api.flow.Recovery [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Node#target(java.lang.Enum):java.lang.String [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Node#whenDisabled():java.lang.String [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Route:record [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Route#<init>(java.lang.Enum,java.lang.String):void [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Route#equals(java.lang.Object):boolean [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Route#hashCode():int [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Route#outcome():java.lang.Enum [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Route#to():java.lang.String [since=1.1.0]
+com.botmaker.sdk.api.flow.FlowGraph$Route#toString():java.lang.String [since=1.1.0]
+com.botmaker.sdk.api.flow.PopupCheck:enum [since=1.1.0]
+com.botmaker.sdk.api.flow.PopupCheck#OFF:com.botmaker.sdk.api.flow.PopupCheck [since=1.1.0]
+com.botmaker.sdk.api.flow.PopupCheck#ON:com.botmaker.sdk.api.flow.PopupCheck [since=1.1.0]
+com.botmaker.sdk.api.flow.PopupCheck#valueOf(java.lang.String):com.botmaker.sdk.api.flow.PopupCheck [since=1.1.0]
+com.botmaker.sdk.api.flow.PopupCheck#values():com.botmaker.sdk.api.flow.PopupCheck[] [since=1.1.0]
+com.botmaker.sdk.api.flow.Recovery:enum [since=1.1.0]
+com.botmaker.sdk.api.flow.Recovery#GO_HOME:com.botmaker.sdk.api.flow.Recovery [since=1.1.0]
+com.botmaker.sdk.api.flow.Recovery#NONE:com.botmaker.sdk.api.flow.Recovery [since=1.1.0]
+com.botmaker.sdk.api.flow.Recovery#valueOf(java.lang.String):com.botmaker.sdk.api.flow.Recovery [since=1.1.0]
+com.botmaker.sdk.api.flow.Recovery#values():com.botmaker.sdk.api.flow.Recovery[] [since=1.1.0]
 com.botmaker.sdk.api.geometry.Direction:enum
 com.botmaker.sdk.api.geometry.Direction#EAST:com.botmaker.sdk.api.geometry.Direction
 com.botmaker.sdk.api.geometry.Direction#NORTH:com.botmaker.sdk.api.geometry.Direction

@@ -234,6 +234,10 @@ class ApiSurfaceTest {
      * <p>Absent from the committed surface means "not in the last release", which is exactly the definition
      * of new; and the commit that adds the element is the last moment its introduction version is a fact
      * rather than an archaeology problem.
+     *
+     * <p>A member with no {@link Since} of its own takes its declaring type's — see {@link #inherited}. That
+     * is what makes the rule satisfiable for an {@code enum}, whose {@code values()} and {@code valueOf} no
+     * author can annotate.
      */
     @Test
     void everyNewElementSaysWhenItArrived() {
@@ -368,23 +372,41 @@ class ApiSurfaceTest {
         Map<String, Entry> out = new TreeMap<>();
         for (ClassInfo ci : scan.getAllClasses()) {
             if (!ci.isPublic()) continue;
-            put(out, new Entry(ci.getName(), kindOf(ci),
-                    ci.hasAnnotation(DEPRECATED), since(ci.getAnnotationInfo(SINCE))));
+            String declared = since(ci.getAnnotationInfo(SINCE));
+            put(out, new Entry(ci.getName(), kindOf(ci), ci.hasAnnotation(DEPRECATED), declared));
 
             for (MethodInfo mi : ci.getDeclaredMethodAndConstructorInfo()) {
                 if (!mi.isPublic() || mi.isSynthetic() || mi.isBridge()) continue;
                 put(out, new Entry(ci.getName() + "#" + mi.getName() + params(mi),
                         mi.getTypeDescriptor().getResultType().toString(),
-                        mi.hasAnnotation(DEPRECATED), since(mi.getAnnotationInfo(SINCE))));
+                        mi.hasAnnotation(DEPRECATED), inherited(since(mi.getAnnotationInfo(SINCE)), declared)));
             }
             for (FieldInfo fi : ci.getDeclaredFieldInfo()) {
                 if (!fi.isPublic() || fi.isSynthetic()) continue;
                 put(out, new Entry(ci.getName() + "#" + fi.getName(),
                         fi.getTypeDescriptor().toString(),
-                        fi.hasAnnotation(DEPRECATED), since(fi.getAnnotationInfo(SINCE))));
+                        fi.hasAnnotation(DEPRECATED), inherited(since(fi.getAnnotationInfo(SINCE)), declared)));
             }
         }
         return out;
+    }
+
+    /**
+     * A member's own {@link Since}, or its type's when it has none.
+     *
+     * <p>Rule 3 asks a new element when it arrived, and there are members no author can answer for: an
+     * {@code enum}'s {@code values()} and {@code valueOf(String)} are written by javac and cannot be
+     * annotated, so the first enum added to the API would fail a gate with no way to satisfy it. Falling back
+     * to the declaring type is the truthful answer anyway — a member declared on a type that arrived in
+     * {@code 1.1.0} arrived in {@code 1.1.0} — and it spares every member of a new type an annotation that
+     * would only repeat the one above it.
+     *
+     * <p>It cannot launder a back-fill past rule 2, which is what makes it safe: every type that shipped
+     * before this gate existed carries no {@link Since} at all, so what its members inherit is {@code null} —
+     * exactly what the committed file already records for them.
+     */
+    private static String inherited(String own, String declaringType) {
+        return own != null ? own : declaringType;
     }
 
     /**
