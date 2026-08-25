@@ -40,6 +40,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   they told Studio which members to offer in its menus and which it wrote into generated files. Until the SDK
   serves the palette itself, Studio's menus simply offer everything public. The four pointer annotations
   (`@ReplacedBy`, `@Replaces`, `@Since`) are untouched.
+- **The SDK now owns `activities.json`.** New package `com.botmaker.sdk.api.authoring`: your project's
+  activities, variables, flow and presets are read and written here, against one schema with one owner,
+  instead of by whichever editor happened to open the file. **Nothing in your bot changes and nothing in your
+  project file changes** — the format is the same one you already have, including the two spellings it has
+  carried over its life, both of which still load. What this buys you arrives next: the generator that writes
+  your project's Java lives beside the API that Java calls, and is checked against it in the same build.
+  Every entry point takes the SDK version your bot pins as its first argument, so an editor bundling a newer
+  SDK than yours generates for *your* version or says plainly that it cannot.
 
 ## [1.1.0] — 2026-08-24
 
