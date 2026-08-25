@@ -23,15 +23,19 @@ import java.util.Properties;
  *
  * <h2>All of it, or none of it</h2>
  *
- * <p>Every byte the SDK owns — the pom, the source files, {@code activities.json}, the project properties and
- * the placeholder image — is built in memory before the first directory exists. Anything that can refuse
- * (a name that is not a package, a model the generator cannot render, a target that already holds a project)
- * refuses while there is nothing to clean up. A half-created project is worse than no project: the editor
- * lists it, opening it fails in a different place each time, and the user has to find and delete it by hand.
+ * <p>Every byte the SDK owns — the source files, {@code activities.json}, the project properties and the
+ * placeholder image — is built in memory before the first directory exists, and so is every byte the
+ * <em>caller</em> hands in. Anything that can refuse (a name that is not a package, a model the generator
+ * cannot render, a target that already holds a project) refuses while there is nothing to clean up. A
+ * half-created project is worse than no project: the editor lists it, opening it fails in a different place
+ * each time, and the user has to find and delete it by hand.
  *
- * <p>The one thing deliberately <em>not</em> written here is the editor's own {@code settings.json}: no bot
- * reads it, it records which template the user picked and which windows they capture, and an SDK writing it
- * would be an SDK with an opinion about an editor it has never seen. Its caller seeds it afterwards.
+ * <p>Two things are deliberately <em>not</em> the SDK's here, for the same reason by two different routes.
+ * The editor's own {@code settings.json} is not written at all: no bot reads it, and an SDK writing it would
+ * be an SDK with an opinion about an editor it has never seen. {@code pom.xml} <em>is</em> written, but its
+ * text comes in through {@code callerFiles} — it is the file that declares which SDK and which other plugins
+ * the project has, and the SDK is one plugin among them. It gets committed here only so that "all of it or
+ * none of it" still means the whole project.
  */
 public final class ProjectWriter {
 
@@ -42,9 +46,10 @@ public final class ProjectWriter {
      *
      * @param schemaVersion the migration stamp {@code activities.json} carries — the caller's ledger, for the
      *                      same reason {@link Authoring#writeModel} takes it rather than deriving it
+     * @param callerFiles   the caller's own files, project-relative, committed in the same pass
      */
-    public static void create(SdkVersion version, ProjectSpec spec, Path projectDir, int schemaVersion)
-            throws IOException {
+    public static void create(SdkVersion version, ProjectSpec spec, Path projectDir, int schemaVersion,
+                              Map<String, String> callerFiles) throws IOException {
         requireName(spec.projectName(), "project name");
         requireName(spec.entryClassName(), "entry class name");
         if (spec.packageName().isBlank()) {
@@ -61,7 +66,6 @@ public final class ProjectWriter {
         List<String> images = List.of(TemplateNames.DEFAULT_TEMPLATE_NAME);
 
         Map<String, String> files = new LinkedHashMap<>();
-        files.put("pom.xml", PomWriter.pom(spec, version));
         files.putAll(SourceEmitter.sources(spec, model, images));
         if (spec.kind() == ProjectSpec.Kind.GAME_BOT) {
             files.put("src/main/resources/" + ProjectModel.FILE_NAME,
@@ -72,6 +76,17 @@ public final class ProjectWriter {
             files.put("src/main/resources/" + ProjectProperties.FILE_NAME, properties);
         }
         byte[] placeholder = placeholderPng();
+
+        // The caller's files last, and only where they collide with nothing. Whole-file ownership: two
+        // authors of one file is the mistake the scaffold contract made and was deleted for, so a collision
+        // is an error here and never a merge.
+        for (Map.Entry<String, String> file : callerFiles.entrySet()) {
+            if (files.containsKey(file.getKey())) {
+                throw new IllegalArgumentException(
+                        "The SDK already writes " + file.getKey() + "; a caller cannot also write it.");
+            }
+            files.put(file.getKey(), file.getValue());
+        }
 
         // ---- commit ----------------------------------------------------------------------------------
         for (String dir : List.of("src/main/java", "src/main/resources", "src/test/java",
@@ -90,16 +105,6 @@ public final class ProjectWriter {
     /** The paths of every {@code .java} file this spec's project is created with, project-relative. */
     public static List<String> generatedFileNames(ProjectSpec spec) {
         return List.copyOf(SourceEmitter.sources(spec, ProjectModel.empty(), List.of()).keySet());
-    }
-
-    /** @see PomWriter#repositories() */
-    public static Map<String, String> repositories() {
-        return PomWriter.repositories();
-    }
-
-    /** @see PomWriter#isDefault(String, String) */
-    public static boolean isDefaultDependency(String groupId, String artifactId) {
-        return PomWriter.isDefault(groupId, artifactId);
     }
 
     /**

@@ -8,7 +8,36 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-26 — the pom goes back to Studio (a one-day reversal)
+
+**Changed:** `pom.xml` (`maven-model` removed), `api/authoring/Authoring` (`pomXml`, `defaultRepositories`,
+`isDefaultDependency`, `SDK_GROUP_ID`, `SDK_ARTIFACT_ID` all removed; `createProject` gains `callerFiles`),
+`internal/authoring/ProjectWriter`, test `internal/authoring/ProjectCreateTest`. Deleted:
+`internal/authoring/PomWriter`.
+
+**Done:**
+
+- **The SDK no longer writes `pom.xml`.** Recorded as a reversal, not edited away: the entry below shipped
+  the opposite decision the day before. The argument that moved it here was that a pom is bot-facing and
+  every line in it is there *because of* the SDK. True, and not enough. The pom is not a file *about* the
+  SDK, it is the file that declares **which** SDK — and the maintainer's framing is that **the SDK is
+  Studio's default plugin**, not Studio. A second plugin would be invisible to the SDK, so a pom it wrote
+  would silently omit that plugin's dependency, with nothing to notice it. Only the thing that knows the
+  whole plugin set can write the manifest of that set.
+- **`createProject` takes `callerFiles`** — a `Map<String, String>` of project-relative paths the caller
+  composed, committed in the **same all-or-none pass**. That is how both properties survive at once: Studio
+  authors the pom, and a failed creation still leaves nothing behind. Writing it before would trip the
+  "there is already a project here" guard; writing it after would put a source tree with no build file on
+  disk, which is the half-created state the rule exists to prevent.
+- **A caller file colliding with a generated one is refused**, never merged. Whole-file ownership keyed by
+  path — two authors of one file is precisely what the scaffold contract was deleted for.
+- **`maven-model` is off the SDK again**, and the default dependency/repository sets are back in
+  `MavenService`, beside the "is this a user library?" predicate that has to be the same list.
+
 ## 2026-08-26 — the SDK creates the project (inversion, phase 3)
+
+*Superseded in part, the same day, by the entry above: the pom is Studio's again, `PomWriter` is gone, and
+`createProject` takes the caller's files. Everything else below stands.*
 
 **Changed:** `pom.xml` (`org.apache.maven:maven-model`, `<optional>true</optional>`), `api/authoring/Authoring`
 (`createProject`, `pomXml`, `defaultRepositories`, `isDefaultDependency`, `SDK_GROUP_ID`/`SDK_ARTIFACT_ID`),

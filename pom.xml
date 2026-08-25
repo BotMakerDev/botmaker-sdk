@@ -88,18 +88,11 @@
             <version>2.17.0</version>
         </dependency>
 
-        <!-- The Maven Model API, used by api.authoring to *write* a generated bot's pom.xml as an object
-             graph rather than as an XML string. <optional>true</optional> is load-bearing: a bot never reads
-             its own pom at run time, so this must not become a transitive dependency of every generated
-             project. The editor that calls Authoring.createProject already has it on its own classpath.
-             (Note for a future move to Maven Central: `optional` is honoured there too, but the flatten
-             plugin's `oss` mode must keep it — check the published pom, not the local one.) -->
-        <dependency>
-            <groupId>org.apache.maven</groupId>
-            <artifactId>maven-model</artifactId>
-            <version>3.9.9</version>
-            <optional>true</optional>
-        </dependency>
+        <!-- There is deliberately no maven-model here (2026-08-26, a one-day reversal). The SDK does not
+             write a generated bot's pom.xml: the pom is what *names* the SDK, and — the maintainer's
+             framing — the SDK is only the default plugin of the editor. A plugin cannot enumerate its
+             siblings, so a pom it wrote would silently omit every other plugin's dependency. The editor
+             composes it; see Authoring.createProject's `callerFiles`. -->
 
         <!-- The Android-emulator transport (dadb) lives in botmaker-shared now, so it arrives transitively
              via the shared dependency above — the SDK's api.emulator facade compiles against

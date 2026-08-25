@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.authoring;
 
 import com.botmaker.sdk.api.meta.Since;
-import com.botmaker.sdk.internal.authoring.PomWriter;
 import com.botmaker.sdk.internal.authoring.ProjectWriter;
 import com.botmaker.sdk.internal.authoring.SourceEmitter;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -50,16 +49,17 @@ public final class Authoring {
     /** The field carrying the schema stamp, always written first. */
     public static final String SCHEMA_FIELD = "schemaVersion";
 
-    /**
-     * The Maven coordinate a generated project pins the SDK at.
-     *
-     * <p>Here rather than in the editor because the SDK is the only thing that knows what it publishes
-     * itself as — an editor with its own copy is an editor that keeps resolving the old coordinate the day
-     * this one changes.
-     */
-    public static final String SDK_GROUP_ID = PomWriter.SDK_GROUP_ID;
-    /** @see #SDK_GROUP_ID */
-    public static final String SDK_ARTIFACT_ID = PomWriter.SDK_ARTIFACT_ID;
+    // There is no SDK_GROUP_ID / SDK_ARTIFACT_ID here, and no pom writer — deliberately, and as a reversal
+    // of the decision this class shipped with one day earlier (2026-08-26).
+    //
+    // The argument for putting them here was that the SDK is the only thing that knows what it publishes
+    // itself as. True, and not enough: the pom is not a file *about* the SDK, it is the file that *declares
+    // which* SDK — and, in the maintainer's framing, the SDK is the editor's *default plugin*, not the
+    // editor. A second plugin would be invisible to it, so a pom the SDK wrote would be missing that
+    // plugin's dependency with nobody to notice. Only the thing that knows the whole plugin set can compose
+    // that file, and that is the editor.
+    //
+    // Creation still writes it in one pass: see createProject's `callerFiles`.
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT)
@@ -145,43 +145,38 @@ public final class Authoring {
     /**
      * Creates a whole bot project at {@code projectDir} — every file the SDK owns, or none of them.
      *
-     * <p>What that set is: {@code pom.xml}, the four {@code src/} directories, every generated {@code .java},
+     * <p>What that set is: the four {@code src/} directories, every generated {@code .java},
      * {@code activities.json} (a game bot's; an empty project has no model to store),
      * {@code botmaker-project.properties} carrying the reference resolution, and the placeholder image
-     * template. It is the SDK's because every one of those files is <em>about</em> the SDK: which version the
-     * bot compiles against, what its sources call, and what shape the data it stores is in. An editor holding
-     * its own copy of that list is an editor deciding what an SDK it did not write requires.
+     * template. It is the SDK's because every one of those files is <em>about</em> the SDK: what its sources
+     * call, and what shape the data it stores is in.
      *
-     * <p>What it deliberately is <b>not</b>: where projects live, whether the name is one the user may use,
-     * the editor's own {@code settings.json}, and version control. Those are the editor's, and it does them
-     * around this call.
+     * <p>What it deliberately is <b>not</b>: {@code pom.xml}, where projects live, whether the name is one
+     * the user may use, the editor's own {@code settings.json}, and version control. Those are the editor's.
+     * The pom is the interesting one of the four, and the reason for {@code callerFiles} below: it is the
+     * file that <em>declares which</em> SDK — and which other plugins — the project has, and the SDK is only
+     * one plugin among however many the editor loaded. It cannot enumerate its siblings, so it must not be
+     * the author of the file that lists them.
      *
      * <p><b>Everything is rendered before anything is committed</b>, and an existing {@code pom.xml} at the
      * target is refused first. So a refusal never leaves a half-created project for someone to find and
      * delete by hand — the rule the editor's own creator enforced before this moved here, preserved exactly.
      *
+     * @param callerFiles files the <em>caller</em> composed, keyed by project-relative path, committed in
+     *                    this same all-or-none pass. {@code pom.xml} is the one that matters: handing it in
+     *                    here rather than writing it before or after is what keeps both properties at once —
+     *                    the editor authors the pom, and creation is still all of it or none of it. Keys
+     *                    colliding with a file the SDK owns are refused; whole-file ownership, never a merge.
      * @param schemaVersion the stamp {@code activities.json} carries — the caller's ledger, for the same
      *                      reason {@link #writeModel} takes it rather than deriving it
      * @throws IOException              if the target already holds a project, or a file cannot be written
-     * @throws IllegalArgumentException if the spec is missing a name, a package or an entry class
+     * @throws IllegalArgumentException if the spec is missing a name, a package or an entry class, or a
+     *                                  caller file claims a path the SDK writes
      */
     public static void createProject(SdkVersion version, ProjectSpec spec, Path projectDir,
-                                     int schemaVersion) throws IOException {
+                                     int schemaVersion, Map<String, String> callerFiles) throws IOException {
         requireVersion(version);
-        ProjectWriter.create(version, spec, projectDir, schemaVersion);
-    }
-
-    /**
-     * The project's {@code pom.xml} as text, without writing anything.
-     *
-     * <p>Creation writes this itself; this exists for the one other caller that legitimately needs the pom
-     * alone — an editor <em>restoring</em> a build file somebody deleted out of an otherwise intact project,
-     * where {@link #createProject} would refuse (correctly: the project is there) and re-creating around it
-     * would overwrite the user's code.
-     */
-    public static String pomXml(SdkVersion version, ProjectSpec spec) {
-        requireVersion(version);
-        return PomWriter.pom(spec, version);
+        ProjectWriter.create(version, spec, projectDir, schemaVersion, callerFiles);
     }
 
     /**
@@ -194,26 +189,6 @@ public final class Authoring {
     public static List<String> generatedFileNames(SdkVersion version, ProjectSpec spec) {
         requireVersion(version);
         return ProjectWriter.generatedFileNames(spec);
-    }
-
-    /**
-     * The repositories a generated project's {@code pom.xml} declares, {@code id -> url}, in the order they
-     * are tried — the same list an editor needs when it resolves that project's classpath itself, which it
-     * must not re-derive from the pom it happens to find on disk.
-     */
-    public static Map<String, String> defaultRepositories(SdkVersion version) {
-        requireVersion(version);
-        return ProjectWriter.repositories();
-    }
-
-    /**
-     * Whether {@code groupId:artifactId} is one of the dependencies every generated project is born with —
-     * which is how an editor tells a library the <em>user</em> added from one it did not, and so which ones
-     * it may offer to remove.
-     */
-    public static boolean isDefaultDependency(SdkVersion version, String groupId, String artifactId) {
-        requireVersion(version);
-        return ProjectWriter.isDefaultDependency(groupId, artifactId);
     }
 
     // ---- generation -------------------------------------------------------------------------------------
