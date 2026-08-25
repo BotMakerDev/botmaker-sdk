@@ -8,6 +8,67 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-25 — the generator, and the death of `Wire` (inversion, phase 2)
+
+**Changed:** `api/config/Wire.java`, `internal/config/ConfigStore.java`, `WireTest`, `ConfigStoreTest` and two
+JSON fixtures **deleted**. New: `api/authoring/WireText.java` (the 17 readers, plus the one writer),
+`api/authoring/TemplateNames.java`, `internal/authoring/LiteralWriter.java`,
+`internal/authoring/SourceEmitter.java`; `Authoring` gains `sources`, `regenerate` and `activityStub`. New
+tests `internal/authoring/ScaffoldEmitTest` (6) and `api/authoring/WireTextTest` (22).
+
+**Done:**
+
+- **The SDK generates the bot's Java.** `Authoring.sources` returns every file a project is made of, keyed by
+  its path relative to the project root; `Authoring.regenerate` returns the five rewritten on every save
+  (`Activities`, `Parameters`, `Templates`, `ActivityRegistry`, `FlowDriver`); `activityStub` returns one
+  SEED file. Nothing is written to disk — the caller commits the map, which is what makes an all-or-none
+  write possible.
+- **A value is a literal now, not a parser call.** `public static final java.time.Duration REST =
+  java.time.Duration.ofMillis(5400000L);` where the old scaffold said `Wire.duration(Wire.one("REST"))`.
+  The objection that had blocked this — "then a re-run needs a re-build" — turned out to be false: every Run
+  recompiles the project before launching it, so the re-build was always happening. With it goes the reason
+  for `ConfigStore`, for shipping `activities.json` as a classpath resource, and for `Wire` itself.
+- **`LiteralWriter` writes the *parsed* value, never the text** — `new java.awt.Color(51, 102, 255)`, not
+  `Color.decode("#3366FF")`; `java.time.LocalDate.of(2026, 8, 25)`, not `LocalDate.parse("…")`. A generated
+  file therefore holds no expression that can throw at class initialisation: a bot cannot fail to start
+  because of its own configuration. JDK types are written fully qualified (an import that does not exist
+  cannot be forgotten); SDK types by simple name, with the import set computed — which is what makes an
+  `api.*` rename break *this* build rather than a bot's.
+- **`Activities`' flags are emitted without `final`, and that is load-bearing.** Now that the initialiser is
+  a literal, `public static final boolean Mining = false;` *is* a JLS §4.12.4 constant variable, javac folds
+  it, and a user's `while (Activities.Mining) { … }` becomes an *unreachable statement* — a compile error
+  caused by unticking a box. `ScaffoldEmitTest` proves it by compiling exactly that loop against a flag
+  stored `false`, rather than asserting it in prose. `Parameters` stays `final`: a folded value can never
+  make a statement unreachable.
+- **`WireText` is where the parsers landed, not where they died.** The editor has to read `"1h30m"` too, so
+  deleting the grammar with `Wire` would have recreated it in Studio. One grammar, one implementation — and
+  the generator converts *once*, at generation time, which is the whole argument for baking the value in.
+  Studio's `DurationWire.format` came the other way for the same reason: reading and writing one grammar in
+  two repositories is how they drift, so `WireText.spellDuration` is now the only writer.
+- **`ScaffoldEmitTest` is `ScaffoldCompileTest`'s guarantee, moved to where it means something.** It emits a
+  corpus — bare, one activity, a branching/cyclic flow with an orphan, and every `ValueType` scalar *and*
+  list with blank, unparseable and quote/newline/`*/`-carrying values — and javacs it against **this build's
+  own `target/classes`**, `-Xlint:all`, warnings failing the test. Over in Studio the same test compiled
+  against a resolved SDK *jar*, which is a weaker question and one that went stale with the jar.
+- **`Wire` was public `api.*` and `@Since("1.1.0")`, so this is an undeprecated removal**, taken on the
+  maintainer's explicit waiver (2026-08-25): no published bot consumes the SDK yet and the upgrade path is
+  itself under construction.
+
+**Deferred / next:**
+
+- **Inversion Phase 3** — `Authoring.createProject`, with `maven-model` as `<optional>true</optional>` and
+  `MavenService.DEFAULT_DEPENDENCIES`/`DEFAULT_REPOSITORIES` moving here.
+- **Inversion Phase 4** — Studio calls `regenerate`, which clears the four costs phase 0b took on. Six
+  Studio tests are red until it lands; that count is unchanged by this phase.
+- **The pickers, and with them the last of Studio's wire knowledge.** `VariableWire`'s coercion (clamping,
+  option pruning, retype resets) stays in the editor *only* because a widget has nowhere else to put it. Once
+  the SDK ships the per-type pickers, `ValueEditors` and `VariableWire` go together and Studio holds no
+  stored-value grammar at all. The **Activity Flow canvas deliberately does not follow them**: a picker's
+  option list is version-dependent vocabulary, a canvas's drag behaviour is not, and everything about the
+  flow that *is* version-dependent (the model, reachability, the emitted driver) is already here.
+
+---
+
 ## 2026-08-25 — demolition, part 2: the templates, the surface file (inversion, phase 0b)
 
 **Changed:** `src/templates/java/**` **deleted in full** — nine files, 407 lines, including

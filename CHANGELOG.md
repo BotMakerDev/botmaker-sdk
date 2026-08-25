@@ -19,6 +19,19 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Your parameters are real values now, not text read at startup.** `Parameters.REST` used to be
+  `Wire.duration(Wire.one("REST"))` — the bot opened `activities.json` when it launched and parsed `"1h30m"`
+  out of it. It now says `java.time.Duration.ofMillis(5400000L)`, written when the file was generated. Your
+  bot starts faster, cannot fail to start because a value in that file is malformed, and reads like something
+  a person wrote. **`Wire` and the runtime config store are deleted**; `activities.json` is still your
+  project's data, but nothing reads it while the bot runs.
+- **One thing to know if you edit generated files by hand:** changing a value inside `Parameters.java` now
+  lasts exactly until the next save. It always said "do not edit"; the difference is that a *value* is one of
+  the things it means. Change it in Project ▸ Parameters, which also keeps the file beside it in step.
+- **Your activity switches are no longer `final`.** `public static boolean Mining` rather than
+  `public static final boolean Mining`. This is what stops `while (Activities.Mining) { … }` from becoming an
+  "unreachable statement" compile error in *your* code when you untick that activity — a folded constant
+  `false` makes the loop body dead. As a side effect you may now assign to one at run time; nothing objects.
 - **Your project's values move to their own file.** `Activities` used to hold two unrelated things under one
   name — an activity's on/off switch and every value you configured — so `Activities.restDelay` sat beside
   `Activities.Mining` with nothing to tell them apart. The switches stay in `Activities`; the values are now

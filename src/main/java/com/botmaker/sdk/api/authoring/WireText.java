@@ -1,4 +1,4 @@
-package com.botmaker.sdk.api.config;
+package com.botmaker.sdk.api.authoring;
 
 import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;
@@ -9,122 +9,85 @@ import com.botmaker.sdk.api.interaction.MouseButton;
 import com.botmaker.sdk.api.meta.Since;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.Precision;
-import com.botmaker.sdk.internal.config.ConfigStore;
 
 import java.awt.Color;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
-import java.util.function.Function;
 
 /**
- * What a stored parameter's text means. One reader per type, and the file it reads from.
+ * What a stored value's text means. One reader per {@link ValueType}, and the grammar every one of them is
+ * written in.
  *
- * <h2>Why this exists</h2>
+ * <h2>Why this exists at all, when the value is now baked into the source</h2>
  *
- * <p>Every value the Parameters screen stores is <b>text</b> — see
- * {@link com.botmaker.sdk.internal.config.ConfigStore} for why — so something has to turn {@code "1h30m"}
- * back into a {@link Duration} at startup. Studio used to write that something into the generated
- * {@code Activities} class: seventeen parser bodies, held as Java source inside Java strings, emitted only
- * for the types a project happened to use. They were untestable by construction, and the duration one was a
- * hand-kept copy of the editor's own parser with a comment asking the next reader to diff the two by eye.
+ * <p>{@link VariableModel#value()} is text — one shape on disk, one reader, one writer. Something still has
+ * to turn {@code "1h30m"} into a {@link Duration}; what changed in this release is <em>when</em>. It used to
+ * happen inside the running bot, through a generated field that called a parser at startup; it happens here
+ * now, at generation time, and the emitter writes the answer as {@code java.time.Duration.ofMillis(5400000L)}.
+ * The maintainer's objection to the old arrangement is the whole of the reasoning: if a reader knows how to
+ * turn the text into a value, the generator can do that once instead of every bot doing it on every launch.
  *
- * <p>They are compiled methods now, and the editor calls the same ones. There is one grammar per type
- * because there is one implementation per type.
+ * <p>So this class is the parsers' home, not their grave. It is public because the <em>editor</em> needs the
+ * same answers — a Parameters dialog showing a duration field has to read {@code "1h30m"} too — and one
+ * grammar per type means one implementation per type, called from both sides. That is the settlement the old
+ * {@code Wire} reached after the parsers had been Java-source-inside-Java-strings, and it survives the class.
  *
  * <h2>Every reader is total</h2>
  *
  * <p>Nothing here throws and nothing returns {@code null}. A number that will not parse, a choice that is no
- * longer offered, a duration in a unit nobody knows: each answers the type's default. <b>A bot never fails to
- * start because of its own configuration file.</b> That is also why {@link #precision} clamps — its record's
- * constructor rejects a negative tolerance, and a stored value must never be able to reach it.
+ * longer offered, a duration in a unit nobody knows: each answers the type's default. That mattered when a
+ * bot read its own configuration at startup ("a bot never fails to start because of its own file") and it
+ * matters for a different reason now: <b>a project must still open, and still generate, when its file says
+ * something impossible.</b> A refusal here would be a project nobody can repair through the editor.
  *
- * <h2>The shape of the calls</h2>
- *
- * <p>Everything is a {@code static} call on this type, for the reason {@link com.botmaker.sdk.api.flow.FlowGraph}
- * gives at length: Studio can mechanically repair a generated file across an SDK rename only for a moved type
- * and a moved static member. A generated field reads
- *
- * <pre>{@code
- * public static final Duration REST = Wire.duration(Wire.one("REST"));
- * public static final List<Key> HOTKEYS = Wire.many("HOTKEYS", Wire::key);
- * }</pre>
- *
- * <p>{@link #many} takes the very method reference the single-valued form would have called, so an item of a
- * list is read exactly the way a lone value is.
+ * <p>It is also why {@link #precision} clamps — {@link Precision}'s constructor rejects a negative tolerance,
+ * and a hand-edited file must never be able to reach it.
  */
-@Since("1.1.0")
-public final class Wire {
+@Since("1.2.0")
+public final class WireText {
 
     /**
-     * Where a bot's image templates sit, relative to the project root. Studio's {@code TemplateConstants}
-     * names the same directory — it is the one that puts the files there.
+     * Where a bot's image templates sit, relative to the project root. The editor's own template manager puts
+     * the files there; this is the half of that agreement the generator needs, so that an
+     * {@link ValueType#IMAGE_TEMPLATE} value spelled {@code "ore"} in the file becomes
+     * {@code new ImageTemplate("src/main/resources/images/ore.png")} in source.
      */
-    @Since("1.1.0")
     public static final String IMAGE_PREFIX = "src/main/resources/images/";
 
     private static final long SECOND = 1000L;
     private static final long MINUTE = 60 * SECOND;
     private static final long HOUR = 60 * MINUTE;
 
-    private Wire() {}
-
-    // ---- the file -------------------------------------------------------------------------------------
-
-    /** The text stored for {@code name}, or {@code ""} when the file has nothing to say about it. */
-    @Since("1.1.0")
-    public static String one(String name) {
-        return ConfigStore.one(name);
-    }
-
-    /**
-     * Every item stored for {@code name}, each read by {@code of} — the same reader a single value of that
-     * type goes through.
-     */
-    @Since("1.1.0")
-    public static <T> List<T> many(String name, Function<String, T> of) {
-        List<T> out = new ArrayList<>();
-        for (String item : ConfigStore.all(name)) out.add(of.apply(item));
-        return List.copyOf(out);
-    }
-
-    // ---- one reader per type --------------------------------------------------------------------------
+    private WireText() {}
 
     /** Text, exactly as stored — not trimmed, because a trailing space may be the point. */
-    @Since("1.1.0")
     public static String text(String stored) {
         return stored == null ? "" : stored;
     }
 
     /** A tick box. Anything that is not {@code "true"} is false. */
-    @Since("1.1.0")
     public static boolean flag(String stored) {
         return Boolean.parseBoolean(trim(stored));
     }
 
     /** A whole number, rounded from what was stored so a hand-edited {@code "3.0"} still reads as 3. */
-    @Since("1.1.0")
     public static int whole(String stored) {
         return (int) Math.rint(number(stored, 0));
     }
 
     /** A decimal number; 0.0 when unreadable. */
-    @Since("1.1.0")
     public static double decimal(String stored) {
         return number(stored, 0);
     }
 
     /** The first character, or {@code 'a'} when nothing was stored. */
-    @Since("1.1.0")
     public static char letter(String stored) {
         return stored == null || stored.isEmpty() ? 'a' : stored.charAt(0);
     }
 
     /** An ISO date ({@code 2026-08-24}); 2000-01-01 when unreadable. */
-    @Since("1.1.0")
     public static LocalDate date(String stored) {
         try {
             return LocalDate.parse(trim(stored));
@@ -134,7 +97,6 @@ public final class Wire {
     }
 
     /** An ISO time of day ({@code 07:30}); midnight when unreadable. */
-    @Since("1.1.0")
     public static LocalTime time(String stored) {
         try {
             return LocalTime.parse(trim(stored));
@@ -151,11 +113,9 @@ public final class Wire {
      * {@link Duration#ZERO}: an unknown unit, a unit with no number in front of it, or a count so large it is
      * certainly a typo (a bot delay is not measured in weeks).
      *
-     * <p>Studio spells the same value back out with its {@code DurationWire.format}, which emits one
-     * canonical form — so a typed {@code "90 s"} is stored as {@code "1m30s"} and a diff never churns on
-     * spacing. Reading is here; only the spelling is Studio's.
+     * <p>{@link #spellDuration} writes the same value back out in one canonical form, so a typed {@code "90 s"}
+     * is stored as {@code "1m30s"} and a diff never churns on spacing.
      */
-    @Since("1.1.0")
     public static Duration duration(String stored) {
         String s = trim(stored).toLowerCase(Locale.ROOT).replace(" ", "");
         long total = 0;
@@ -195,8 +155,36 @@ public final class Wire {
         return Duration.ofMillis(sawAny ? total : 0L);
     }
 
+    /**
+     * {@code millis} in the one canonical spelling {@link #duration} reads back: the non-zero components in
+     * descending order, and {@code 0s} for nothing and for anything negative.
+     *
+     * <p>The only writer in this class, and it is here because reading and writing one grammar in two
+     * repositories is how they drift. It lived in the editor (as {@code DurationWire.format}) while the
+     * editor was the only thing that ever wrote a stored value; the generator reads them now, and a stored
+     * duration has to mean the same thing to both.
+     *
+     * <p>Durations are stored as text rather than as a number because the unit is the part a reader needs:
+     * {@code 90000} in a file says nothing, and whoever wrote it had "a minute and a half" in mind.
+     */
+    public static String spellDuration(long millis) {
+        if (millis <= 0) return "0s";
+        StringBuilder out = new StringBuilder();
+        long left = millis;
+        left = spellUnit(out, left, HOUR, "h");
+        left = spellUnit(out, left, MINUTE, "m");
+        left = spellUnit(out, left, SECOND, "s");
+        if (left > 0) out.append(left).append("ms");
+        return out.toString();
+    }
+
+    private static long spellUnit(StringBuilder out, long left, long unit, String suffix) {
+        long count = left / unit;
+        if (count > 0) out.append(count).append(suffix);
+        return left % unit;
+    }
+
     /** A colour as {@code #RRGGBB}; white when unreadable. */
-    @Since("1.1.0")
     public static Color color(String stored) {
         try {
             return Color.decode(trim(stored));
@@ -206,25 +194,26 @@ public final class Wire {
     }
 
     /** The image template of that name, from the project's own {@code images/} directory. */
-    @Since("1.1.0")
     public static ImageTemplate template(String stored) {
-        return new ImageTemplate(IMAGE_PREFIX + trim(stored) + ".png");
+        return new ImageTemplate(templatePath(stored));
+    }
+
+    /** The project-relative path an {@link ValueType#IMAGE_TEMPLATE} value names. */
+    public static String templatePath(String stored) {
+        return IMAGE_PREFIX + trim(stored) + ".png";
     }
 
     /** A key; the enum's first constant when the name is not one it has. */
-    @Since("1.1.0")
     public static Key key(String stored) {
         return constant(Key.class, stored, Key.values()[0]);
     }
 
     /** A mouse button; the enum's first constant when the name is not one it has. */
-    @Since("1.1.0")
     public static MouseButton mouseButton(String stored) {
         return constant(MouseButton.class, stored, MouseButton.values()[0]);
     }
 
     /** A direction; the enum's first constant when the name is not one it has. */
-    @Since("1.1.0")
     public static Direction direction(String stored) {
         return constant(Direction.class, stored, Direction.values()[0]);
     }
@@ -234,9 +223,8 @@ public final class Wire {
      *
      * <p>Not {@link #constant} despite looking like the enums above: {@link Precision} is a record. Each
      * component is clamped to what its constructor accepts, which is what keeps a hand-edited file from
-     * throwing before the bot's first line runs.
+     * throwing before anything can report where the bad value is.
      */
-    @Since("1.1.0")
     public static Precision precision(String stored) {
         String[] parts = trim(stored).split(",");
         double deltaE = parts.length > 0 ? number(parts[0], 12.0) : 12.0;
@@ -245,27 +233,24 @@ public final class Wire {
     }
 
     /** A point, stored as {@code x,y}. A missing or unreadable component is 0. */
-    @Since("1.1.0")
     public static Point point(String stored) {
         int[] n = ints(stored, 2);
         return new Point(n[0], n[1]);
     }
 
     /** A size, stored as {@code width,height}. A missing or unreadable component is 0. */
-    @Since("1.1.0")
     public static Size size(String stored) {
         int[] n = ints(stored, 2);
         return new Size(n[0], n[1]);
     }
 
     /** A rectangle, stored as {@code x,y,width,height}. A missing or unreadable component is 0. */
-    @Since("1.1.0")
     public static Rect area(String stored) {
         int[] n = ints(stored, 4);
         return new Rect(n[0], n[1], n[2], n[3]);
     }
 
-    // ---- shared parsing -------------------------------------------------------------------------------
+    // ---- shared parsing ---------------------------------------------------------------------------------
 
     private static <E extends Enum<E>> E constant(Class<E> type, String stored, E fallback) {
         try {
@@ -276,7 +261,7 @@ public final class Wire {
     }
 
     /** {@code count} comma-separated whole numbers; anything missing or unreadable is 0. */
-    private static int[] ints(String stored, int count) {
+    static int[] ints(String stored, int count) {
         int[] out = new int[count];
         String[] parts = trim(stored).split(",");
         for (int i = 0; i < count && i < parts.length; i++) {
@@ -285,7 +270,7 @@ public final class Wire {
         return out;
     }
 
-    private static double number(String stored, double fallback) {
+    static double number(String stored, double fallback) {
         try {
             double parsed = Double.parseDouble(trim(stored));
             return Double.isFinite(parsed) ? parsed : fallback;

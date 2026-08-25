@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.authoring;
 
 import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.sdk.internal.authoring.SourceEmitter;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,9 +11,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
 /**
- * The one entry point an editor uses to read, write and — from the next phase — generate a bot project.
+ * The one entry point an editor uses to read, write and generate a bot project.
  *
  * <h2>The version comes first, always</h2>
  *
@@ -108,6 +111,58 @@ public final class Authoring {
         stamped.put(SCHEMA_FIELD, schemaVersion);
         stamped.setAll(body);
         MAPPER.writeValue(resourcesDir.resolve(ProjectModel.FILE_NAME).toFile(), stamped);
+    }
+
+    // ---- generation -------------------------------------------------------------------------------------
+
+    /**
+     * Every {@code .java} file this project is made of, keyed by its path relative to the project root.
+     *
+     * <p>The whole set, which is what <b>creating</b> a project needs: the entry point, {@code GoHome},
+     * {@code Popups}, an editable stub per activity, and the five regenerated files
+     * {@link #regenerate} also emits. An {@link ProjectSpec.Kind#EMPTY} project has none of them — its entry
+     * point is the user's from the first character — so the map comes back empty.
+     *
+     * <p>Nothing is written to disk here. The caller gets the whole set in memory and commits it, which is
+     * what lets a creation that cannot produce every file it owns produce none of them.
+     *
+     * @param imageBaseNames the file names (no extension) of the project's image templates, which the
+     *                       generated {@code Templates} class is built from — the one input that is not in
+     *                       the model, because it lives in the images folder rather than in the file
+     */
+    public static Map<String, String> sources(SdkVersion version, ProjectSpec spec, ProjectModel model,
+                                              List<String> imageBaseNames) {
+        requireVersion(version);
+        return SourceEmitter.sources(spec, model, imageBaseNames);
+    }
+
+    /**
+     * The subset rewritten wholesale whenever the project's model changes — {@code Activities},
+     * {@code Parameters}, {@code Templates}, {@code ActivityRegistry} and {@code FlowDriver}.
+     *
+     * <p><b>Hand edits inside these files are lost.</b> That was already true, and it now includes editing a
+     * <em>value</em>: {@code Parameters} holds literals rather than a parser call, so a duration changed in
+     * the Java rather than in the dialog survives exactly until the next save. Each file says so in its own
+     * javadoc.
+     */
+    public static Map<String, String> regenerate(SdkVersion version, ProjectSpec spec, ProjectModel model,
+                                                 List<String> imageBaseNames) {
+        requireVersion(version);
+        return SourceEmitter.regenerated(spec, model, imageBaseNames);
+    }
+
+    /**
+     * One activity's editable stub, keyed by path like the rest — for an activity that has just been added,
+     * or one whose file has gone missing.
+     *
+     * <p>A SEED file: emitted here in the shape it starts in, and the user's from that moment. Keeping an
+     * existing stub's {@code Outcome} enum in step with the canvas is a surgical edit of a file the user
+     * owns, and belongs to the editor rather than here.
+     */
+    public static Map<String, String> activityStub(SdkVersion version, ProjectSpec spec,
+                                                   ActivityModel activity) {
+        requireVersion(version);
+        return SourceEmitter.activityStub(spec, activity);
     }
 
     private static void requireVersion(SdkVersion version) {
