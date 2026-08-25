@@ -17,6 +17,19 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+- **Your project's values move to their own file.** `Activities` used to hold two unrelated things under one
+  name — an activity's on/off switch and every value you configured — so `Activities.restDelay` sat beside
+  `Activities.Mining` with nothing to tell them apart. The switches stay in `Activities`; the values are now
+  `Parameters`. **You do not have to do anything:** Studio splits the two files and repoints every
+  `Activities.<value>` in your own code the first time it opens the project, taking a Project History snapshot
+  first. Nothing is marked for review, because nothing changed except the name in front of the dot.
+- **Studio and the SDK now agree about the shape of a generated file, not just its names.** Each scaffold
+  template declares itself (`@Template`) and each hole in it carries a generation number, checked when the
+  file is written. The effect for you: a Studio too old for the SDK your bot pins says so, by name, instead of
+  writing code that does not compile into a file you did not author.
+
 ## [1.1.0] — 2026-08-24
 
 The 1.1.0 contract release. **This is the last window in which `api.*` moves freely** — from 1.1.0 the SDK is

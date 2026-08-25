@@ -8,6 +8,31 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-25 — `Parameters.java`, and the first hole whose generation moves
+
+**Changed:** new `src/templates/java/.../Parameters.java` (`@Template(id = "PARAMETERS", kind = REGENERATED,
+holes = {"IMPORTS:1", "FIELDS:1", "INITS:1"})`); `Activities.java` reduced to the enable flags, its holes now
+`{"FIELDS:2", "INITS:2"}`. The generated `manifest.txt` follows from both.
+
+**Done:**
+
+- **Two files where there was one.** `Activities` held an activity's on/off tick and the delay it waits for
+  side by side in one flat namespace, spelled identically, with nothing in the name saying which was which —
+  while the two are governed differently at every level above the field. The flags stay in `Activities`;
+  every configured value the bot reads is now `Parameters`.
+- **The first real `:1 → :2` bump**, and the case the generation number was added for one commit earlier:
+  `Activities`' `FIELDS`/`INITS` still declare the same holes and still take fields and static initialisers —
+  only the *contents* changed shape. Every member survives, so `@ReplacedBy`/`@Replaces` has nothing to say,
+  and the number is the only thing that distinguishes them. An older Studio, which can produce only `:1`, now
+  refuses by name instead of writing values into a frame that no longer holds them.
+- It also proves the per-hole design end to end: `FIELDS:1` and `FIELDS:2` belong to **two different
+  templates** and no call site branches on it — `TemplateStore.render` takes the number from the template it
+  is filling.
+- **Owed at release:** this is the first SDK to carry `PARAMETERS`, so Studio's `MIN_SDK_VERSION` and
+  `SDK_FALLBACK_VERSION` move to its version together. See `docs/refactor/23-scaffold-contract.md` §11.
+
+---
+
 ## 2026-08-25 — a template declares itself, and the manifest is generated from that declaration
 
 **Changed:** new `templates/Template.java` (`@Template(id, kind, target, holes)`, `Kind` an enum) and
