@@ -25,11 +25,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Parameters`. **You do not have to do anything:** Studio splits the two files and repoints every
   `Activities.<value>` in your own code the first time it opens the project, taking a Project History snapshot
   first. Nothing is marked for review, because nothing changed except the name in front of the dot.
-- **The scaffold's two-author negotiation is gone.** Each template still declares itself (`@Template`) and
-  still ships with the SDK, but the per-hole generation numbers, the surface ledgers and the pre-write refusal
-  that existed to keep Studio and the SDK in step have been removed. They were the price of a file the two
-  repositories co-authored; the SDK is becoming the generator, so there is nothing left to negotiate. Nothing
-  in your bot changes.
+- **The scaffold's two-author negotiation is gone.** The per-hole generation numbers, the surface ledgers and
+  the pre-write refusal that existed to keep Studio and the SDK in step have been removed. They were the price
+  of a file the two repositories co-authored; the SDK is becoming the generator, so there is nothing left to
+  negotiate. Nothing in your bot changes.
+- **The scaffold templates no longer ship in the jar.** `botmaker-templates/` and its `manifest.txt` are gone,
+  along with the `@Template` annotation. They were the text Studio filled in to write your `Activities.java`,
+  `Parameters.java`, `FlowDriver.java` and `ActivityRegistry.java`; that job moves into this SDK, where the
+  files can be checked against the API they call in the same build. **Nothing in an existing bot changes** —
+  the generated files already in your project are ordinary Java and keep compiling, running and being edited
+  by hand. What is temporarily unavailable is Studio *rewriting* them: until the SDK ships its own generator,
+  **New Project and Save Activity Flow are refused**, by name, with the reason.
 - **`@Palette` and `@Scaffolding` are removed from `api.meta`.** Neither was ever something a bot wrote down —
   they told Studio which members to offer in its menus and which it wrote into generated files. Until the SDK
   serves the palette itself, Studio's menus simply offer everything public. The four pointer annotations

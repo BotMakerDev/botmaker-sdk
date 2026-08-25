@@ -176,30 +176,25 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   two or more candidates needs a non-blank `whens()` for each, since a menu of bare member names is not a
   choice anybody can make, and a blank target may not be mixed in with real ones.
 
-  **`api-surface.txt` is the second gate, and it exists for the one question the first cannot ask.**
-  `ApiPointersTest` checks a link the author *declared*, and both ends of a declared link are in one build.
-  A **deletion** declares nothing and leaves nothing behind to scan — so what was here before is written
-  down: a committed, generated file at the module root, one sorted line per public `api.*` element
-  (`type#member(paramTypes):returnType [deprecated] [since=…]`), holding the **previous release's** surface.
-  `ApiSurfaceTest` diffs this build against it, offline, with three rules: an element that left must have
-  carried `[deprecated]` in the file (that is the window — announced one full release ahead, so a bot on
-  that release got a compiler warning and Studio got a `@ReplacedBy`); an element present in both keeps the
-  exact `@Since` it had, absence included, because back-filling asserts something about a release nobody can
-  re-check; and an element absent from the file carries one, since the commit that adds it is the last
-  moment that value is a fact. Parameters are **erased types rather than an arity** — an arity is what a
-  `@Replaces` entry needs to disambiguate a name a human wrote, but here it is the diff's identity, and
-  `click(Point)` beside `click(Rect)` would share a key and hide a removal.
+  **`api-surface.txt` was the second gate, and it was deleted on 2026-08-25 — a deliberate reversal of the
+  decision recorded here the day before, and the second one this month.** It was a committed, generated file
+  at the module root holding the *previous* release's public `api.*` surface, one sorted line per element
+  (`type#member(paramTypes):returnType [deprecated] [since=…]`), which `ApiSurfaceTest` diffed this build
+  against: an element that left had to have carried `[deprecated]` (the announced window), an element in both
+  kept the exact `@Since` it had, and a new element had to carry one. It went with `ApiSurfaceTest`,
+  `release.sh`'s `check_api_surface` / `refresh_api_surface` and `--allow-removal`
+  (`-Dbotmaker.api.allowUndeprecatedRemoval`).
 
-  Regenerate with `mvn -pl botmaker-sdk test -Dtest=ApiSurfaceTest -Dbotmaker.api.writeSurface=true`. **The
-  write is refused while a rule is broken**, deliberately: writing first would drop the removed element from
-  the file, so a failing run would be followed by a passing one and the window would be gone in two commands.
-  A genuine break in a major is named element by element — `release.sh --allow-removal 'com.…X#y'`, reaching
-  the test as `-Dbotmaker.api.allowUndeprecatedRemoval` — and an exemption matching nothing fails too, so it
-  cannot outlive the release it was written for. `release.sh` runs the gate in the decide pass
-  (`check_api_surface`) and **re-records the file in the SDK's release commit** (`refresh_api_surface`):
-  what this release shipped is what the next one is diffed against. Like the pointer gate, it is **not** the
-  japicmp coverage gate that was deleted — an uncovered break is still a supported outcome, and nothing here
-  sizes the version bump.
+  Why: it was a **second, hand-maintained record of what the SDK offers**, kept in a text file beside the
+  code, and the inversion is about to build the real one — an explicit per-version catalog in
+  `api.authoring`, written in code, keyed by `SdkVersion`, which answers *what did 1.2 offer* rather than
+  only *what did the last build offer*. Two records of the same fact is exactly the shape this teardown
+  keeps removing. The catalog subsumes the gate, and until it exists the window is a **convention** again:
+  `@Deprecated(since, forRemoval = true)` one full minor ahead, with a pointer, still the rule — nothing
+  mechanically refuses an undeprecated removal.
+
+  **What survives is the pointer machinery**, which is the half that carries a rename: `@ReplacedBy`,
+  `@Replaces`, `ApiPointersTest` and `ApiPointerProcessor`, all unchanged.
 
   **`ApiPointerProcessor` is the same rules again, at the line rather than at the class** (2026-08-24). Three
   of `ApiPointersTest`'s rules — a deprecated element carries a pointer, each target it names exists, each
@@ -259,8 +254,26 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
     (*"Curated for the palette: …"*); the per-member verdicts lived only in the annotations and are gone.
 
   Both were public `api.meta` types removed after 1.1.0 shipped, i.e. an undeprecated removal, taken
-  deliberately via `release.sh --allow-removal` with `api-surface.txt` regenerated in the same commit. Neither
-  was a name a bot could write down.
+  deliberately via `release.sh --allow-removal` with `api-surface.txt` regenerated in the same commit — the
+  last use of a switch and a file that were themselves deleted hours later (above). Neither was a name a bot
+  could write down.
+
+## The scaffold templates are gone (2026-08-25)
+
+`src/templates/java` — nine files the SDK compiled and shipped as *text* under `botmaker-templates/` for
+Studio to fill — is **deleted**, with `@Template`, `apt/TemplateProcessor`, the generated `manifest.txt` and
+`ScaffoldTemplatesTest`. The pom is back to two compiler passes: `compile-processor` (`src/apt/java` →
+`target/apt-classes`, `-proc:none`) and the main compile that runs `ApiPointerProcessor`. Passes 3 and 4 went
+together — pass 4 existed only to undo pass 3's `projectArtifact.setFile(target/template-classes)`.
+
+This is the second half of the same reversal: the templates existed so **two repositories could co-author one
+file**, the SDK owning its frame and Studio splicing the fences. The inversion removes the second author —
+the SDK becomes the generator outright (`api.authoring`, inversion Phase 2) — so a text-and-fences protocol
+between them has nothing left to mediate.
+
+**The interim cost is real and is the point:** with nothing to fill, **Studio cannot generate a project or
+save an Activity Flow** until Phase 2 lands. Both paths refuse by name. Do not re-add a template as a way
+around that; the emitters belong in this module.
 
   The API contains:
   - `api.vision` — `ImageFinder` (find + `exists` + the lambda control-flow `whileExists`/`ifExists`

@@ -8,6 +8,43 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-25 — demolition, part 2: the templates, the surface file (inversion, phase 0b)
+
+**Changed:** `src/templates/java/**` **deleted in full** — nine files, 407 lines, including
+`templates/meta/Template.java` itself; `apt/TemplateProcessor.java` (288) deleted;
+`src/test/.../templates/ScaffoldTemplatesTest.java` (261) deleted; `api-surface.txt` (66 KB) and
+`src/test/.../api/ApiSurfaceTest.java` deleted; `pom.xml` loses compiler passes 3 (`compile-templates`) and 4
+(`restore-artifact-directory`) and both explanatory comment blocks. Nothing writes
+`target/classes/botmaker-templates/` any more and no `manifest.txt` ships. **`src/apt/` survives** —
+`ApiPointerProcessor` lives there and pass 1 is untouched.
+
+**Done:**
+
+- **The templates go because the second author goes.** They existed so the SDK and Studio could co-author one
+  generated file through a text-and-fences protocol. The inversion makes the SDK the generator outright, so
+  there is no counterparty left to negotiate with. Phase 0 kept them for one more phase; that half-measure was
+  judged not worth carrying.
+- **`api-surface.txt` goes because the real record is about to be built.** It was a hand-maintained second
+  copy of *what the SDK offers*, in a text file. `api.authoring`'s per-version catalog (inversion Phase 6)
+  answers the strictly larger question — *what did 1.2 offer* — in code. Until it lands, the deprecation
+  window is a convention, not a gate: `@Deprecated(since, forRemoval = true)` one full minor ahead with a
+  pointer is still the rule, and nothing mechanically refuses an undeprecated removal.
+- **The pointer machinery is untouched** — `@ReplacedBy`, `@Replaces`, `ApiPointersTest` (10 tests, still
+  green) and `ApiPointerProcessor`. Only the surface *diff* went.
+- **Known interim cost:** Studio cannot create a project or save an Activity Flow until inversion Phase 2
+  puts the emitters in this module. Both paths refuse by name. This is deliberate.
+
+**Deferred / next:**
+
+- **Inversion Phase 2** — `Authoring.scaffold(SdkVersion, ScaffoldModel)` returning whole files, with
+  `ScaffoldEmitTest` compiling a corpus against the reactor's own `target/classes`. This is what re-enables
+  Studio's generation.
+- **The `Wire` redesign** — the reason for the whole teardown. `Wire.duration(Wire.one("REST"))` buries the
+  parameter name inside the type while `Wire.many("HOTKEYS", Wire::key)` spells it the other way round; one
+  class does both locating and parsing; the storable type set is written out eight times across two repos.
+
+---
+
 ## 2026-08-25 — demolition: the scaffold contract apparatus is removed (inversion, phase 0)
 
 **Changed:** `api/meta/Palette.java` and `api/meta/Scaffolding.java` **deleted** with all 435 use sites across
