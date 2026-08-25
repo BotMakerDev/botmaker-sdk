@@ -8,6 +8,32 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-26 — the SDK creates the project (inversion, phase 3)
+
+**Changed:** `pom.xml` (`org.apache.maven:maven-model`, `<optional>true</optional>`), `api/authoring/Authoring`
+(`createProject`, `pomXml`, `defaultRepositories`, `isDefaultDependency`, `SDK_GROUP_ID`/`SDK_ARTIFACT_ID`),
+`api/authoring/TemplateNames`, `internal/authoring/SourceEmitter`. New:
+`internal/authoring/PomWriter`, `internal/authoring/ProjectWriter`, test
+`internal/authoring/ProjectCreateTest`.
+
+**Done:**
+
+- **`Authoring.createProject(SdkVersion, ProjectSpec, Path, int schemaVersion)` writes a whole project.** The
+  `pom.xml` (Maven Model API + `MavenXpp3Writer`, no XML string templating), the four `src/` directories, every
+  `.java`, `activities.json`, `botmaker-project.properties` and the placeholder PNG — **rendered in memory
+  first and committed only then**, so a refusal never leaves a half-created directory tree behind. That is
+  `ProjectCreator`'s old rule, moved rather than re-invented.
+- **`maven-model` is `<optional>true</optional>`.** It is not transitive, so a generated bot's classpath is
+  unchanged; Studio, which already has Maven Resolver, resolves the classes for its own call.
+- **The default dependency and repository sets are the SDK's** — a bot's pom is bot-facing, so
+  `MavenService.DEFAULT_DEPENDENCIES` / `DEFAULT_REPOSITORIES` moved here. `Authoring.isDefaultDependency`
+  is what lets Studio still tell a *user* library from a default one when reading a pom back.
+- **The schema stamp is an argument, not a derivation.** `activities.json` is the SDK's file, but the
+  migration ledger is still Studio's, so `createProject` takes the version number to stamp. Deriving it in
+  two places would be two answers to one question.
+
+---
+
 ## 2026-08-25 — the generator, and the death of `Wire` (inversion, phase 2)
 
 **Changed:** `api/config/Wire.java`, `internal/config/ConfigStore.java`, `WireTest`, `ConfigStoreTest` and two

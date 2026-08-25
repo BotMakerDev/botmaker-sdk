@@ -60,14 +60,19 @@ public final class SourceEmitter {
     /**
      * Every file the project is created with, keyed by its path relative to the project root.
      *
-     * <p>An {@link ProjectSpec.Kind#EMPTY} project gets nothing: no activities, no parameters, no flow, and
-     * therefore no generated Java at all — the entry point of an empty project is the user's from the first
-     * character.
+     * <p>An {@link ProjectSpec.Kind#EMPTY} project gets two files and no more: a {@code main} that prints a
+     * greeting, and {@code Templates} — which is not about activities at all, only about the images folder,
+     * and has to exist from the start so the first vision block a user drops names a constant that resolves.
+     * Everything after that is the user's from the first character: no activities, no parameters, no flow.
      */
     public static Map<String, String> sources(ProjectSpec spec, ProjectModel model,
                                               List<String> imageBaseNames) {
         Map<String, String> out = new LinkedHashMap<>();
-        if (spec.kind() != ProjectSpec.Kind.GAME_BOT) return out;
+        if (spec.kind() != ProjectSpec.Kind.GAME_BOT) {
+            out.put(path(spec, spec.entryClassName()), emptyEntryPoint(spec));
+            out.put(path(spec, TemplateNames.CLASS_NAME), templates(spec, imageBaseNames));
+            return out;
+        }
 
         out.put(path(spec, spec.entryClassName()), entryPoint(spec));
         out.put(path(spec, "GoHome"), goHome(spec));
@@ -400,6 +405,25 @@ public final class SourceEmitter {
     }
 
     // ---- the files that are written once ----------------------------------------------------------------
+
+    /**
+     * An empty project's entry point: a {@code main} that prints a greeting and nothing else. SEED.
+     *
+     * <p>It is here rather than in the editor for one reason — it names {@code BotMaker.print}, an SDK
+     * element, so the version that knows whether that spelling exists is the version generating it. That it
+     * is only four lines does not change which repository owns them.
+     */
+    static String emptyEntryPoint(ProjectSpec spec) {
+        return header(spec) + """
+                import com.botmaker.sdk.api.util.BotMaker;
+
+                public class %s {
+                    public static void main(String[] args) {
+                        BotMaker.print("Hello from %s!");
+                    }
+                }
+                """.formatted(spec.entryClassName(), spec.entryClassName());
+    }
 
     /** The bot's entry point. SEED — written when the project is created, and never again. */
     static String entryPoint(ProjectSpec spec) {

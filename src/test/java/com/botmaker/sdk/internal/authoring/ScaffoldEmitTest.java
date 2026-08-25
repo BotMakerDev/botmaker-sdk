@@ -155,15 +155,24 @@ class ScaffoldEmitTest {
     }
 
     /**
-     * An empty project gets no generated Java at all — no {@code Parameters}, no flow driver, nothing whose
-     * ownership anyone has to wonder about.
+     * An empty project gets exactly two files, and never regenerates.
+     *
+     * <p>A hello-world entry point, because a project with no {@code .java} at all is one the editor cannot
+     * open — it has no main source file to show; and {@code Templates}, because the images folder exists from
+     * the first moment and the first vision block dropped into that entry point has to name a constant that
+     * resolves. Neither is a <em>model</em> file: an empty project has no activities and no parameters, which
+     * is why {@code regenerate} still answers nothing however much is passed to it.
      */
     @Test
-    void anEmptyProjectGetsNothing() {
+    void anEmptyProjectGetsAnEntryPointAndTemplatesAndNothingElse(@TempDir Path dir) throws IOException {
         ProjectSpec empty = new ProjectSpec("MyBot", "com.mybot", "MyBot", ProjectSpec.Kind.EMPTY, "1.2.0",
                 new Size(0, 0));
-        assertTrue(Authoring.sources(V, empty, oneActivity(), List.of()).isEmpty());
+        Map<String, String> sources = Authoring.sources(V, empty, oneActivity(), List.of("ore"));
+        assertEquals(List.of("src/main/java/com/mybot/MyBot.java",
+                        "src/main/java/com/mybot/Templates.java"),
+                List.copyOf(sources.keySet()));
         assertTrue(Authoring.regenerate(V, empty, oneActivity(), List.of()).isEmpty());
+        compile(dir, sources);
     }
 
     /**

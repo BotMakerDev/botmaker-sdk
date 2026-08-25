@@ -35,7 +35,37 @@ public final class TemplateNames {
     /** The generated class's simple name, in the project's base package next to {@code Parameters}. */
     public static final String CLASS_NAME = "Templates";
 
+    /**
+     * The placeholder template every project is created with, so a freshly dropped vision block points at a
+     * file that is really there instead of at one the user has not captured yet.
+     */
+    public static final String DEFAULT_TEMPLATE_NAME = "default_template";
+
+    /** The placeholder's file name, {@code default_template.png}. */
+    public static final String DEFAULT_TEMPLATE_FILE = DEFAULT_TEMPLATE_NAME + ".png";
+
     private TemplateNames() {}
+
+    /**
+     * The placeholder's pixels: a 32px teal/white checker, generated rather than shipped as an asset.
+     *
+     * <p>It is here, beside the names, because two questions need the same answer and must not each hold
+     * their own copy of the pattern: <em>what does a new project's placeholder look like</em> (creation) and
+     * <em>is this file still the untouched placeholder</em> (an editor deciding whether to put it in an
+     * export). A second checker written elsewhere would answer the second question wrongly the day anyone
+     * adjusted the first.
+     */
+    public static java.awt.image.BufferedImage defaultTemplateImage() {
+        int size = 32;
+        java.awt.image.BufferedImage img =
+                new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                img.setRGB(x, y, ((x / 8) + (y / 8)) % 2 == 0 ? 0xFF1ABC9C : 0xFFECF0F1);
+            }
+        }
+        return img;
+    }
 
     /**
      * The constant naming the template called {@code baseName}, or {@code null} when that name cannot be one
