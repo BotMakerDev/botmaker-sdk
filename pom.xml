@@ -212,49 +212,69 @@
                                 <compileSourceRoot>${project.basedir}/src/templates/java</compileSourceRoot>
                             </compileSourceRoots>
                             <outputDirectory>${project.build.directory}/template-classes</outputDirectory>
+                            <!-- TemplateProcessor (from pass 1's output, same as pass 2's) reads @Template
+                                 off each template, checks it against the fences actually in the file, and
+                                 WRITES what ships: the template text with the annotation taken back out,
+                                 plus the generated manifest.txt. The manifest is not hand-written any more —
+                                 one source of truth, and it is compiled. -->
+                            <annotationProcessors>
+                                <annotationProcessor>com.botmaker.sdk.apt.TemplateProcessor</annotationProcessor>
+                            </annotationProcessors>
+                            <compilerArgs>
+                                <arg>-processorpath</arg>
+                                <arg>${project.build.directory}/apt-classes</arg>
+                                <arg>-Abotmaker.templates.src=${project.basedir}/src/templates/java</arg>
+                                <arg>-Abotmaker.templates.out=${project.build.outputDirectory}/botmaker-templates</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
+
+                    <!-- Pass 4 exists only to undo something pass 3 does behind our backs.
+
+                         maven-compiler-plugin's CompilerMojo ends every `compile` execution with
+                         `projectArtifact.setFile(outputDirectory)` — unconditionally, whatever the execution's
+                         id. So the LAST compile execution decides what the artifact points at, and inside one
+                         reactor build that file is exactly what downstream modules get on their classpath:
+                         Studio was being handed target/template-classes, a directory holding seven scaffold
+                         classes and not one line of the SDK's api. It never showed up in `mvn install` (the jar
+                         plugin re-points the artifact at the jar during package) and never module-scoped (Studio
+                         resolves the SDK from ~/.m2 there) — only in `mvn -pl botmaker-studio -am test`, which
+                         is precisely how release.sh's check_scaffold_studio gate runs.
+
+                         So: one more compile, over the main sources again, pointed back at target/classes. It
+                         compiles nothing (everything is up to date by now); what it does is run that one line
+                         with the right value. -proc:none because pass 2 has already run the processor. -->
+                    <execution>
+                        <id>restore-artifact-directory</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <compileSourceRoots>
+                                <compileSourceRoot>${project.basedir}/src/main/java</compileSourceRoot>
+                            </compileSourceRoots>
+                            <outputDirectory>${project.build.outputDirectory}</outputDirectory>
                             <proc>none</proc>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
 
-            <!-- Resources Plugin, execution 1: the scaffold templates, as text, under botmaker-templates/.
+            <!-- The scaffold templates ship as TEXT under botmaker-templates/, and TemplateProcessor (pass 3
+                 above) is what puts them there — not a resources copy.
 
-                 Studio extracts these from the SDK jar it is pinned to and fills in the /*<STUDIO:…>*/
-                 tokens. Shipping the SOURCE (rather than generating from the compiled classes) is what
-                 makes an older Studio work against a newer SDK: a token it has never heard of is one it
-                 leaves alone, and the compiling default between the fences stands.
+                 Shipping the SOURCE rather than generating from the compiled classes is what makes an older
+                 Studio work against a newer SDK: a hole it has never heard of is one it leaves alone, and the
+                 compiling default between the fences stands. But a verbatim copy would also ship the
+                 @Template annotation, and from there into a generated bot, which does not compile. Studio
+                 could strip it — except that every Studio ALREADY IN THE FIELD could not, so the annotation
+                 would land in real projects. The processor writes the text out with the annotation and its
+                 import removed, so what ships is exactly the plain Java that always shipped.
 
-                 manifest.txt rides along from the parent directory — it is not Java and must not be in the
-                 compile source root, but it belongs beside what it describes. -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-resources-plugin</artifactId>
-                <version>3.3.1</version>
-                <executions>
-                    <execution>
-                        <id>scaffold-templates</id>
-                        <phase>process-resources</phase>
-                        <goals>
-                            <goal>copy-resources</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.outputDirectory}/botmaker-templates</outputDirectory>
-                            <resources>
-                                <resource>
-                                    <directory>${project.basedir}/src/templates/java</directory>
-                                </resource>
-                                <resource>
-                                    <directory>${project.basedir}/src/templates</directory>
-                                    <includes>
-                                        <include>manifest.txt</include>
-                                    </includes>
-                                </resource>
-                            </resources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
+                 manifest.txt is generated in the same pass, from those same annotations. It used to be a
+                 hand-written file beside the templates — a second place to be right, whose disagreements were
+                 invisible until a project was generated. -->
 
             <!-- Antrun: put this module's CHANGELOG.md inside the jar, as
                  META-INF/botmaker/whats-new.md.

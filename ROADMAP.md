@@ -8,6 +8,34 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-25 — a template declares itself, and the manifest is generated from that declaration
+
+**Changed:** new `templates/Template.java` (`@Template(id, kind, target, holes)`, `Kind` an enum) and
+`src/apt/java/.../TemplateProcessor.java`; every template's fences gain a generation
+(`/*<STUDIO:FLOW:1>*/`); `src/templates/manifest.txt` **deleted** — it is generated into
+`botmaker-templates/` at `format 2`; `pom.xml` loses the `copy-resources` (the processor writes the text) and
+gains a fourth compile pass; `ScaffoldTemplatesTest` narrowed.
+
+**Done:**
+
+- **The declaration is compiled, not transcribed.** `id` / `kind` / `target` / `holes` sat in a hand-written
+  `manifest.txt` beside the templates, where nothing could check them against the files. They are an
+  annotation on the template class now — javac enforces `Kind`, and `TemplateProcessor` fails the build on any
+  fence↔`holes` disagreement: a fence not declared, a declared hole with no fence, an unpaired fence, a hole
+  named twice. The manifest is then *written* by the processor, so it cannot drift from what ships.
+- **A hole is `NAME:generation`** — the version of its *shape*, so an SDK that reshapes what a fill must
+  contain (`FlowGraph.of(String, Node…)` → `of(Node, Node…)`) is caught by an older Studio instead of writing
+  its old arrangement into the new frame. Every hole is `:1` today; nothing generated changes.
+- **A fourth, no-op compile pass** (`restore-artifact-directory`) puts the reactor artifact back at
+  `target/classes`. `maven-compiler-plugin` ends every `compile` execution with
+  `projectArtifact.setFile(outputDirectory)`, so the templates pass was handing every downstream *reactor*
+  module `target/template-classes` — seven scaffold classes and no api at all. Invisible to `mvn install` and
+  to a module-scoped build; it broke `mvn -pl botmaker-studio -am` outright.
+- **`release.sh check_scaffold_sdk`** runs `ScaffoldTemplatesTest` on every `--sdk` release — offline, and
+  the first release gate this half of the scaffold has had.
+
+---
+
 ## 2026-08-24 — the SDK owns the scaffold: an injection API and compiling templates (phases 1–3 of 7)
 
 **Changed:** new `api/flow/` (`FlowGraph`, `PopupCheck`, `Recovery`) + `internal/flow/FlowWalker`; new

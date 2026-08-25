@@ -1,6 +1,7 @@
 package com.botmaker.sdk.templates;
 
 import com.botmaker.sdk.api.bot.Activity;
+import com.botmaker.sdk.templates.meta.Template;
 
 /**
  * Navigate back to a known-good "home" screen. Called by the supervisor before it relaunches the game during
@@ -15,6 +16,7 @@ import com.botmaker.sdk.api.bot.Activity;
  *
  * <p>SEED — Studio writes it once, when the project is created, and never again.
  */
+@Template(id = "GO_HOME", kind = Template.Kind.SEED, target = "GoHome.java")
 public class GoHome extends Activity<GoHome.Outcome> {
 
     /** The one instance; referenced by the entry point and FlowDriver. Constructing it registers "GoHome". */

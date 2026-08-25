@@ -1,9 +1,10 @@
 package com.botmaker.sdk.templates;
 
 import com.botmaker.sdk.api.bot.Activity;
-/*<STUDIO:ACTIVITY_IMPORT>*/
+import com.botmaker.sdk.templates.meta.Template;
+/*<STUDIO:ACTIVITY_IMPORT:1>*/
 import com.botmaker.sdk.templates.activities.*;
-/*</STUDIO:ACTIVITY_IMPORT>*/
+/*</STUDIO:ACTIVITY_IMPORT:1>*/
 
 import java.util.List;
 
@@ -19,16 +20,18 @@ import java.util.List;
  *
  * <p>REGENERATED — rewritten from this template on every change to the flow.
  */
+@Template(id = "ACTIVITY_REGISTRY", kind = Template.Kind.REGENERATED, target = "ActivityRegistry.java",
+        holes = {"ACTIVITY_IMPORT:1", "SINGLETONS:1", "ALL:1"})
 public final class ActivityRegistry {
 
-    /*<STUDIO:SINGLETONS>*/
+    /*<STUDIO:SINGLETONS:1>*/
     public static final ActivityStub EXAMPLE = new ActivityStub();
-    /*</STUDIO:SINGLETONS>*/
+    /*</STUDIO:SINGLETONS:1>*/
 
     public static final List<Activity<?>> ALL = List.of(
-            /*<STUDIO:ALL>*/
+            /*<STUDIO:ALL:1>*/
             EXAMPLE
-            /*</STUDIO:ALL>*/);
+            /*</STUDIO:ALL:1>*/);
 
     private ActivityRegistry() {}
 }

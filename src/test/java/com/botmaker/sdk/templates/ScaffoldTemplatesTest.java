@@ -88,8 +88,12 @@ class ScaffoldTemplatesTest {
     /** Where the templates ship: this directory inside the jar, alongside its manifest. */
     private static final String TEMPLATE_ROOT = "botmaker-templates";
 
-    private static final Pattern OPEN = Pattern.compile("/\\*<STUDIO:([A-Z_]+)>\\*/");
-    private static final Pattern CLOSE = Pattern.compile("/\\*</STUDIO:([A-Z_]+)>\\*/");
+    /** A fence, name and generation together: {@code /*<STUDIO:FLOW:1>*}{@code /} captures {@code FLOW:1}. */
+    private static final Pattern OPEN = Pattern.compile("/\\*<STUDIO:([A-Z_]+:\\d+)>\\*/");
+    private static final Pattern CLOSE = Pattern.compile("/\\*</STUDIO:([A-Z_]+:\\d+)>\\*/");
+
+    /** A fence that forgot its generation — matched only so the failure can name it rather than ignore it. */
+    private static final Pattern UNGENERATIONED = Pattern.compile("/\\*</?STUDIO:([A-Z_]+)>\\*/");
 
     /** One {@code template} record of the manifest. */
     private record Template(String role, String kind, String path, String target, List<String> tokens) {}
@@ -156,7 +160,8 @@ class ScaffoldTemplatesTest {
         }
 
         assertEmpty(bad, "the templates and their manifest disagree",
-                "Edit botmaker-sdk/src/templates/manifest.txt to match the files beside it.");
+                "The manifest is generated from the @Template annotations — fix the annotation on the "
+                        + "template, not a text file.");
     }
 
     // ------------------------------------------------------------------
@@ -189,11 +194,26 @@ class ScaffoldTemplatesTest {
             for (String token : new TreeSet<>(closes)) {
                 if (!opens.contains(token)) bad.add(t.path() + ": " + token + " closes without opening");
             }
+            for (String token : new TreeSet<>(all(UNGENERATIONED, source))) {
+                bad.add(t.path() + " is fenced for " + token + " with no generation. Studio matches a hole "
+                        + "on name AND generation, exactly, so a fence without one is a hole nothing can "
+                        + "fill — write /*<STUDIO:" + token + ":1>*/ … /*</STUDIO:" + token + ":1>*/");
+            }
+            // What ships must be plain Java. @Template lives in the SOURCE and is taken back out on the way
+            // into the jar, because a Studio already in the field cannot strip what it has never heard of —
+            // it would write the annotation straight into somebody's bot.
+            if (source.contains("@Template") || source.contains("templates.meta")) {
+                bad.add(t.path() + " still carries its @Template declaration in the text that ships. "
+                        + "TemplateProcessor strips it; that it is here means the strip missed this file, "
+                        + "and every bot generated from it would fail to compile.");
+            }
         }
         assertEmpty(bad, "a template's fences do not match its manifest record",
                 """
-                A token is an opening fence, a default that compiles, and a closing fence:
-                    private static final int MAX_STEPS = /*<STUDIO:MAX_STEPS>*/ 1000 /*</STUDIO:MAX_STEPS>*/;""");
+                A hole is an opening fence, a default that compiles, and a closing fence, with the
+                generation of that hole's shape in both:
+                    private static final int MAX_STEPS = /*<STUDIO:MAX_STEPS:1>*/ 1000 /*</STUDIO:MAX_STEPS:1>*/;
+                and declared on the class as @Template(holes = {"MAX_STEPS:1", …}).""");
     }
 
     // ------------------------------------------------------------------
@@ -256,8 +276,9 @@ class ScaffoldTemplatesTest {
     private static List<Template> manifest() {
         Path file = classes.resolve(TEMPLATE_ROOT).resolve("manifest.txt");
         if (!Files.isRegularFile(file)) {
-            fail("no " + file + " — the templates are not being copied into the jar. See the "
-                    + "scaffold-templates execution of maven-resources-plugin in botmaker-sdk/pom.xml.");
+            fail("no " + file + " — the templates are not reaching the jar. It is generated from the "
+                    + "@Template annotations by com.botmaker.sdk.apt.TemplateProcessor, which the "
+                    + "compile-templates execution in botmaker-sdk/pom.xml runs.");
         }
         List<Template> out = new ArrayList<>();
         for (String raw : read(file).lines().toList()) {
@@ -266,8 +287,8 @@ class ScaffoldTemplatesTest {
             String[] c = line.split("\\s+");
             switch (c[0]) {
                 case "format" -> {
-                    if (!"1".equals(c[1])) {
-                        fail("manifest format " + c[1] + " is newer than this test, which reads format 1");
+                    if (!"2".equals(c[1])) {
+                        fail("manifest format " + c[1] + " is not what this test reads (2)");
                     }
                 }
                 case "package" -> declaredPackage = c[1];

@@ -3,9 +3,10 @@ package com.botmaker.sdk.templates;
 import com.botmaker.sdk.api.flow.FlowGraph;
 import com.botmaker.sdk.api.flow.PopupCheck;
 import com.botmaker.sdk.api.flow.Recovery;
-/*<STUDIO:ACTIVITY_IMPORT>*/
+import com.botmaker.sdk.templates.meta.Template;
+/*<STUDIO:ACTIVITY_IMPORT:1>*/
 import com.botmaker.sdk.templates.activities.*;
-/*</STUDIO:ACTIVITY_IMPORT>*/
+/*</STUDIO:ACTIVITY_IMPORT:1>*/
 
 /**
  * Walks the Activity Flow drawn in BotMaker Studio. GENERATED — do not edit by hand; manage via
@@ -17,6 +18,8 @@ import com.botmaker.sdk.templates.activities.*;
  * <p>REGENERATED — rewritten from this template on every change to the flow. It holds the table and the two
  * numbers below and nothing else; the walk itself lives in the SDK, where it compiles once and is tested.
  */
+@Template(id = "FLOW_DRIVER", kind = Template.Kind.REGENERATED, target = "FlowDriver.java",
+        holes = {"ACTIVITY_IMPORT:1", "FLOW:1", "MAX_STEPS:1", "STEP_DELAY_MS:1"})
 public final class FlowDriver {
 
     /**
@@ -24,7 +27,7 @@ public final class FlowDriver {
      * a bot repeats — so this is what separates &quot;farming all night&quot; from a cycle with no way out.
      * Change it in Project &rarr; Activity Flow.
      */
-    private static final int MAX_STEPS = /*<STUDIO:MAX_STEPS>*/ 1000 /*</STUDIO:MAX_STEPS>*/;
+    private static final int MAX_STEPS = /*<STUDIO:MAX_STEPS:1>*/ 1000 /*</STUDIO:MAX_STEPS:1>*/;
 
     /**
      * How long to pause between two activities, in milliseconds. A flow may loop, so an activity that
@@ -32,15 +35,15 @@ public final class FlowDriver {
      * gap in which to stop the bot. This is that gap. 0 disables it. Change it in
      * Project &rarr; Activity Flow.
      */
-    private static final int STEP_DELAY_MS = /*<STUDIO:STEP_DELAY_MS>*/ 0 /*</STUDIO:STEP_DELAY_MS>*/;
+    private static final int STEP_DELAY_MS = /*<STUDIO:STEP_DELAY_MS:1>*/ 0 /*</STUDIO:STEP_DELAY_MS:1>*/;
 
     /** The flow, as drawn: which activity each node runs, and where each outcome it can report leads. */
     private static final FlowGraph FLOW = FlowGraph.of(
-            /*<STUDIO:FLOW>*/
+            /*<STUDIO:FLOW:1>*/
             "Example",
             FlowGraph.node("Example", ActivityRegistry.EXAMPLE, PopupCheck.ON, Recovery.NONE, null,
                     FlowGraph.route(ActivityStub.Outcome.NEXT, "Example"))
-            /*</STUDIO:FLOW>*/);
+            /*</STUDIO:FLOW:1>*/);
 
     public static void run() {
         FlowGraph.walk(FLOW, MAX_STEPS, STEP_DELAY_MS, GoHome.INSTANCE::execute);

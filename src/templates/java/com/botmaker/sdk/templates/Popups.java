@@ -3,6 +3,7 @@ package com.botmaker.sdk.templates;
 import com.botmaker.sdk.api.bot.Activity;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
+import com.botmaker.sdk.templates.meta.Template;
 
 /**
  * Dismiss whatever the game has interrupted us with. BotMaker runs this before every vision step (see the
@@ -29,6 +30,7 @@ import com.botmaker.sdk.api.vision.ImageTemplateGroup;
  *
  * <p>SEED — Studio writes it once, when the project is created, and never again.
  */
+@Template(id = "POPUPS", kind = Template.Kind.SEED, target = "Popups.java")
 public class Popups extends Activity<Popups.Outcome> {
 
     /** The one instance; the entry point installs it as the popup guard. */

@@ -2,6 +2,7 @@ package com.botmaker.sdk.templates;
 
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.api.bot.PopupGuard;
+import com.botmaker.sdk.templates.meta.Template;
 
 /**
  * The bot's entry point. Studio renames the class after the project and rewrites the package; nothing else
@@ -10,6 +11,7 @@ import com.botmaker.sdk.api.bot.PopupGuard;
  * <p>SEED — Studio writes it once, when the project is created, and never again. Everything below is the
  * user's from that moment on.
  */
+@Template(id = "ENTRY_POINT", kind = Template.Kind.SEED, target = "${CLASS}.java")
 public class BotMain {
 
     public static void main(String[] args) {
