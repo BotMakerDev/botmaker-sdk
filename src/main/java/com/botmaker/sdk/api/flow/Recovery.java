@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.flow;
 
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.meta.Since;
 
 /**
@@ -13,7 +12,6 @@ import com.botmaker.sdk.api.meta.Since;
  * <p>Whatever "home" means is the bot's own: the walker is handed the project's {@code goHome} step, the same
  * one {@link com.botmaker.sdk.api.bot.Bot#start(Runnable, Runnable)} recovers with.
  */
-@Scaffolding
 @Since("1.1.0")
 public enum Recovery {
 

@@ -25,10 +25,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Parameters`. **You do not have to do anything:** Studio splits the two files and repoints every
   `Activities.<value>` in your own code the first time it opens the project, taking a Project History snapshot
   first. Nothing is marked for review, because nothing changed except the name in front of the dot.
-- **Studio and the SDK now agree about the shape of a generated file, not just its names.** Each scaffold
-  template declares itself (`@Template`) and each hole in it carries a generation number, checked when the
-  file is written. The effect for you: a Studio too old for the SDK your bot pins says so, by name, instead of
-  writing code that does not compile into a file you did not author.
+- **The scaffold's two-author negotiation is gone.** Each template still declares itself (`@Template`) and
+  still ships with the SDK, but the per-hole generation numbers, the surface ledgers and the pre-write refusal
+  that existed to keep Studio and the SDK in step have been removed. They were the price of a file the two
+  repositories co-authored; the SDK is becoming the generator, so there is nothing left to negotiate. Nothing
+  in your bot changes.
+- **`@Palette` and `@Scaffolding` are removed from `api.meta`.** Neither was ever something a bot wrote down —
+  they told Studio which members to offer in its menus and which it wrote into generated files. Until the SDK
+  serves the palette itself, Studio's menus simply offer everything public. The four pointer annotations
+  (`@ReplacedBy`, `@Replaces`, `@Since`) are untouched.
 
 ## [1.1.0] — 2026-08-24
 

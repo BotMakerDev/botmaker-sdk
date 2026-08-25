@@ -5,7 +5,6 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.shared.opencv.ColorMatcher;
 import com.botmaker.shared.opencv.RawColorMatch;
 
@@ -44,14 +43,13 @@ import java.util.List;
  * }
  * }</pre>
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): everything here is offered. The rule that trims
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): everything here is offered. The rule that trims
  * {@link ImageFinder} — hide the parameter whose question a property already answers — has no purchase here,
  * because a {@link Color} is a JDK type and cannot carry a tolerance the way {@link ImageTemplate#threshold()}
  * does. {@link Precision} is where that tolerance lives, it is a palette type with its own picker, and it
  * varies per colour rather than per bot. Annotating the class is still worth doing: it fixes the verdict, and
  * a method added here later is hidden until someone decides otherwise.
  */
-@Palette
 public class Pixel {
 
     // ---------------------------------------------------------------------
@@ -59,13 +57,11 @@ public class Pixel {
     // ---------------------------------------------------------------------
 
     /** The colour at absolute screen point ({@code x},{@code y}), or {@code null} if unreadable. */
-    @Palette
     public static Color colorAt(int x, int y) {
         return colorAt(x, y, Source.current());
     }
 
     /** The colour at {@code p} (absolute screen coordinates), or {@code null} if unreadable. */
-    @Palette
     public static Color colorAt(Point p) {
         return colorAt(p.x(), p.y(), Source.current());
     }
@@ -74,7 +70,6 @@ public class Pixel {
      * The colour at absolute screen point ({@code x},{@code y}) as seen through {@code source}, or
      * {@code null} if the point lies outside the source or the capture failed.
      */
-    @Palette
     public static Color colorAt(int x, int y, CaptureSource source) {
         BufferedImage img = source.capture();
         if (img == null) return null;
@@ -93,7 +88,6 @@ public class Pixel {
      * Whether the pixel at ({@code x},{@code y}) is within {@code precision}'s tolerance (ΔE) of
      * {@code target}. Reads only {@link Precision#deltaE()} — one pixel has no blob to measure.
      */
-    @Palette
     public static boolean matchesAt(int x, int y, Color target, Precision precision) {
         return matchesAt(x, y, target, Source.current(), precision);
     }
@@ -103,14 +97,12 @@ public class Pixel {
      * {@code target}. Reads only {@link Precision#deltaE()}; {@code minArea} and {@code minCount} describe a
      * cluster search and there is no cluster here, so setting them changes nothing.
      */
-    @Palette
     public static boolean matchesAt(int x, int y, Color target, CaptureSource source, Precision precision) {
         Color actual = colorAt(x, y, source);
         return actual != null && ColorMatcher.deltaE(actual, target) <= precision.deltaE();
     }
 
     /** The CIELAB ΔE distance between two colours — the metric {@link Precision#deltaE()} is measured in. */
-    @Palette
     public static double distance(Color a, Color b) {
         return ColorMatcher.deltaE(a, b);
     }
@@ -120,19 +112,16 @@ public class Pixel {
     // ---------------------------------------------------------------------
 
     /** Finds {@code target} anywhere on the current source, at {@link Precision#DEFAULT}. */
-    @Palette
     public static boolean find(Color target) {
         return find(target, Source.current(), Precision.DEFAULT);
     }
 
     /** Finds {@code target} anywhere on the current source, at {@code precision}. */
-    @Palette
     public static boolean find(Color target, Precision precision) {
         return find(target, Source.current(), precision);
     }
 
     /** Finds {@code target} within {@code source} (use {@code source.region(...)} to narrow the area). */
-    @Palette
     public static boolean find(Color target, CaptureSource source) {
         return find(target, source, Precision.DEFAULT);
     }
@@ -141,7 +130,6 @@ public class Pixel {
      * Finds {@code target} within {@code source} at {@code precision} — all three of its knobs apply. The
      * best (largest) cluster is stored in {@link Vision#lastColorMatch()}.
      */
-    @Palette
     public static boolean find(Color target, CaptureSource source, Precision precision) {
         ColorMatch result = findInternal(target, source, precision);
         Vision.setLastColorMatch(result);
@@ -154,7 +142,6 @@ public class Pixel {
      *
      * @return how many clusters matched
      */
-    @Palette
     public static int findAll(Color target, CaptureSource source, Precision precision) {
         List<ColorMatch> all = findAllInternal(target, source, precision);
         Vision.setLastColorMatchList(all);
@@ -162,7 +149,6 @@ public class Pixel {
     }
 
     /** {@link #findAll(Color, CaptureSource, Precision)} against the current source. */
-    @Palette
     public static int findAll(Color target, Precision precision) {
         return findAll(target, Source.current(), precision);
     }
@@ -174,7 +160,6 @@ public class Pixel {
      * <p>Reads only {@code precision}'s {@link Precision#minArea()} and {@link Precision#minCount()}: the
      * band <em>is</em> the colour test here, so there is no target colour for a ΔE tolerance to measure from.
      */
-    @Palette
     public static boolean findInRange(Color low, Color high, CaptureSource source, Precision precision) {
         Rect region = source.subRegion();
         BufferedImage img = source.capture();
@@ -190,7 +175,6 @@ public class Pixel {
     }
 
     /** {@link #findInRange(Color, Color, CaptureSource, Precision)} against the current source. */
-    @Palette
     public static boolean findInRange(Color low, Color high) {
         return findInRange(low, high, Source.current(), Precision.DEFAULT);
     }
@@ -208,7 +192,6 @@ public class Pixel {
      * {@code minArea} has nothing to filter — and {@code minCount} would be a second way to express a
      * question this already answers as a fraction.
      */
-    @Palette
     public static double coverage(Color target, CaptureSource source, Precision precision) {
         BufferedImage img = source.capture();
         if (img == null) return 0.0;
@@ -216,7 +199,6 @@ public class Pixel {
     }
 
     /** {@link #coverage(Color, CaptureSource, Precision)} against the current source. */
-    @Palette
     public static double coverage(Color target, Precision precision) {
         return coverage(target, Source.current(), precision);
     }
@@ -230,7 +212,6 @@ public class Pixel {
      *
      * @return true if it appeared; the match is in {@link Vision#lastColorMatch()}
      */
-    @Palette
     public static boolean waitFor(Color target, CaptureSource source, Precision precision, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
@@ -246,13 +227,11 @@ public class Pixel {
     }
 
     /** {@link #waitFor(Color, CaptureSource, Precision, long)} against the current source. */
-    @Palette
     public static boolean waitFor(Color target, Precision precision, long timeoutMs) {
         return waitFor(target, Source.current(), precision, timeoutMs);
     }
 
     /** Polls until {@code target} is <em>gone</em> from {@code source}, or {@code timeoutMs} elapses. */
-    @Palette
     public static boolean waitForGone(Color target, CaptureSource source, Precision precision, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {

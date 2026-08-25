@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.launch.Target;
-import com.botmaker.sdk.api.meta.Palette;
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.util.Debug;
 
 import java.util.function.Consumer;
@@ -27,7 +25,7 @@ import java.util.function.Consumer;
  * generated loop once every activity is disabled. {@code stop()} unwinds the supervise loop cleanly and
  * {@code supervise} returns, rather than treating it as a crash to recover from.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): one of the three is offered, and it is the
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): one of the three is offered, and it is the
  * smallest offered fraction in the sweep. {@link #stop()} is offered — it is exactly the statement an
  * activity that has finished its work writes, from anywhere in the call stack. <b>Neither {@link #start}
  * overload is</b>, because {@code start} is not a statement in a bot: it <em>is</em> the bot. It is written
@@ -41,7 +39,6 @@ import java.util.function.Consumer;
  * not merely the first one, it is the only one that can exist. Both stay public: the entry point Studio
  * generates calls one of them, and a hand-written bot needs to.
  */
-@Palette
 public final class Bot {
 
     private Bot() {}
@@ -57,8 +54,6 @@ public final class Bot {
      * finished its work, or a helper deep in the call stack. {@link #supervise} catches this and returns
      * instead of recovering. This is the deliberate "we're done" exit, as opposed to a crash.
      */
-    @Palette
-    @Scaffolding   // the generated FlowDriver ends every run with it
     public static void stop() {
         throw new BotStoppedException();
     }
@@ -81,7 +76,6 @@ public final class Bot {
      * @param body   the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param goHome navigate from wherever the bot is back to a safe/home screen
      */
-    @Scaffolding   // the game-bot scaffold's entry point: Bot.start(FlowDriver::run, GoHome.INSTANCE::execute)
     public static void start(Runnable body, Runnable goHome) {
         supervise(body, goHome, Bot::launchConfiguredTarget);
     }

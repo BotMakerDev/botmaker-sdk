@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.util;
 
-import com.botmaker.sdk.api.meta.Palette;
-
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 
@@ -20,7 +18,7 @@ import java.time.format.DateTimeFormatter;
  *   <li>{@code Time.format("yyyy-MM-dd HH:mm:ss")} - Format current time</li>
  * </ul>
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}). The duplication here is not an overload family but a
+ * <p><b>Curated for the palette</b> (see {@code @Palette}). The duplication here is not an overload family but a
  * parallel <em>vocabulary</em>: {@code hourUtc}, {@code minuteUtc}, {@code secondUtc}, {@code millisecondUtc}
  * and {@code formatUtc} each ask exactly what their local twin asks, in the zone
  * {@link #setDefaultTimeZone(String)} already sets. Those five are hidden. {@link #nowUtc()} and
@@ -35,7 +33,6 @@ import java.time.format.DateTimeFormatter;
  * a resolution no screen automation reads; {@link #currentTimeMillis()} stays, being the half of a pair
  * {@link #elapsedMillis(long)} teaches. Everything hidden is still public and still supported.
  */
-@Palette
 public final class Time {
 
     /** Default timezone used when no explicit timezone is specified. */
@@ -50,7 +47,6 @@ public final class Time {
      *
      * @return the current date and time in the system default timezone
      */
-    @Palette
     public static LocalDateTime now() {
         return LocalDateTime.now(defaultTimeZone);
     }
@@ -60,7 +56,6 @@ public final class Time {
      *
      * @return the current date in the system default timezone
      */
-    @Palette
     public static LocalDate today() {
         return LocalDate.now(defaultTimeZone);
     }
@@ -70,7 +65,6 @@ public final class Time {
      *
      * @return the current time in the system default timezone
      */
-    @Palette
     public static LocalTime currentTime() {
         return LocalTime.now(defaultTimeZone);
     }
@@ -82,7 +76,6 @@ public final class Time {
      *
      * @return the current hour in the system default timezone
      */
-    @Palette
     public static int hour() {
         return currentTime().getHour();
     }
@@ -92,7 +85,6 @@ public final class Time {
      *
      * @return the current minute in the system default timezone
      */
-    @Palette
     public static int minute() {
         return currentTime().getMinute();
     }
@@ -102,7 +94,6 @@ public final class Time {
      *
      * @return the current second in the system default timezone
      */
-    @Palette
     public static int second() {
         return currentTime().getSecond();
     }
@@ -112,7 +103,6 @@ public final class Time {
      *
      * @return the current millisecond in the system default timezone
      */
-    @Palette
     public static int millisecond() {
         return currentTime().getNano() / 1_000_000;
     }
@@ -124,7 +114,6 @@ public final class Time {
      *
      * @return the current day of the month in the system default timezone
      */
-    @Palette
     public static int dayOfMonth() {
         return today().getDayOfMonth();
     }
@@ -138,7 +127,6 @@ public final class Time {
      *
      * @return the current month in the system default timezone
      */
-    @Palette
     public static Month month() {
         return today().getMonth();
     }
@@ -148,7 +136,6 @@ public final class Time {
      *
      * @return the current year in the system default timezone
      */
-    @Palette
     public static int year() {
         return today().getYear();
     }
@@ -158,7 +145,6 @@ public final class Time {
      *
      * @return the current day of the week in the system default timezone
      */
-    @Palette
     public static DayOfWeek dayOfWeek() {
         return today().getDayOfWeek();
     }
@@ -170,7 +156,6 @@ public final class Time {
      *
      * @return the current date and time in UTC
      */
-    @Palette
     public static LocalDateTime nowUtc() {
         return LocalDateTime.now(ZoneId.of("UTC"));
     }
@@ -230,7 +215,6 @@ public final class Time {
      * @return the current date and time in the specified timezone
      * @throws IllegalArgumentException if the zone ID is not recognized
      */
-    @Palette
     public static LocalDateTime now(String zoneId) {
         return LocalDateTime.now(ZoneId.of(zoneId));
     }
@@ -261,7 +245,6 @@ public final class Time {
      *
      * @param zoneId the timezone ID (e.g., "America/New_York")
      */
-    @Palette
     public static void setDefaultTimeZone(String zoneId) {
         setDefaultTimeZone(ZoneId.of(zoneId));
     }
@@ -275,7 +258,6 @@ public final class Time {
      * @return the formatted current date and time string
      * @throws IllegalArgumentException if the pattern is invalid
      */
-    @Palette
     public static String format(String pattern) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
         return now().format(formatter);
@@ -301,7 +283,6 @@ public final class Time {
      * @param startTime the start time in milliseconds (typically from System.currentTimeMillis())
      * @return the number of milliseconds elapsed
      */
-    @Palette
     public static long elapsedMillis(long startTime) {
         return System.currentTimeMillis() - startTime;
     }
@@ -312,7 +293,6 @@ public final class Time {
      * @param startTime the start time in milliseconds (typically from System.currentTimeMillis())
      * @return the number of seconds elapsed
      */
-    @Palette
     public static long elapsedSeconds(long startTime) {
         return (System.currentTimeMillis() - startTime) / 1000;
     }
@@ -338,7 +318,6 @@ public final class Time {
      * @return true when now is inside the window
      * @throws IllegalArgumentException if either bound is null
      */
-    @Palette
     public static boolean isBetween(LocalTime start, LocalTime end) {
         return isWithin(currentTime(), start, end);
     }
@@ -352,7 +331,6 @@ public final class Time {
      * @return true when now is inside the window
      * @throws IllegalArgumentException if either bound is null
      */
-    @Palette
     public static boolean isBetweenUtc(LocalTime start, LocalTime end) {
         return isWithin(LocalTime.now(ZoneId.of("UTC")), start, end);
     }
@@ -376,7 +354,6 @@ public final class Time {
      * @param days the days to test against; none given ⇒ false
      * @return true when today is one of them
      */
-    @Palette
     public static boolean isDay(DayOfWeek... days) {
         if (days == null) return false;
         DayOfWeek todayIs = dayOfWeek();
@@ -393,7 +370,6 @@ public final class Time {
      * @param months the months to test against; none given ⇒ false
      * @return true when this month is one of them
      */
-    @Palette
     public static boolean isMonth(Month... months) {
         if (months == null) return false;
         Month thisMonth = month();
@@ -411,7 +387,6 @@ public final class Time {
      *
      * @return current time in milliseconds since epoch
      */
-    @Palette
     public static long currentTimeMillis() {
         return System.currentTimeMillis();
     }

@@ -3,7 +3,6 @@ package com.botmaker.sdk.api.vision;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.meta.Palette;
 import java.util.Random;
 
 /**
@@ -11,7 +10,7 @@ import java.util.Random;
  * ready to hand to {@code Mouse}. A not-found result is a real object rather than {@code null}, with
  * {@link #isFound()} false and every point accessor returning {@code null}.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): all thirteen are offered, which is
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): all thirteen are offered, which is
  * {@link com.botmaker.sdk.api.geometry.Rect}'s verdict for a reason worth restating, because phase 3.10 had
  * skipped this type on the opposite one. It was left uncurated then on the grounds that a result is
  * <em>received</em> rather than called — true of the statement menu, which is the only surface curation
@@ -24,7 +23,6 @@ import java.util.Random;
  * clicking the exact centre of the same button a thousand times is the most legible signature a bot can leave,
  * and this is the method that exists to not do that.
  */
-@Palette
 public class MatchResult {
 
     private static final Random RANDOM = new Random();
@@ -68,23 +66,19 @@ public class MatchResult {
         return new MatchResult(bestScore);
     }
 
-    @Palette
     public boolean isFound() {
         return found;
     }
 
-    @Palette
     public double confidence() {
         return confidence;
     }
 
-    @Palette
     public Point center() {
         // The centre pixel — the midpoint rounded, since a click lands on a whole pixel.
         return found ? new Point(location.x() + width / 2, location.y() + height / 2) : null;
     }
 
-    @Palette
     public Point randomClickPoint() {
         if (!found) return null;
 
@@ -97,48 +91,39 @@ public class MatchResult {
         );
     }
 
-    @Palette
     public Point topLeft() {
         return found ? location : null;
     }
 
-    @Palette
     public Point topRight() {
         return found ? new Point(location.x() + width, location.y()) : null;
     }
 
-    @Palette
     public Point bottomLeft() {
         return found ? new Point(location.x(), location.y() + height) : null;
     }
 
-    @Palette
     public Point bottomRight() {
         return found ? new Point(location.x() + width, location.y() + height) : null;
     }
 
-    @Palette
     public Point pointWithOffset(int offsetX, int offsetY) {
         if (!found) return null;
         return new Point(location.x() + offsetX, location.y() + offsetY);
     }
 
-    @Palette
     public Rect rect() {
         return found ? new Rect(location, new Size(width, height)) : null;
     }
 
-    @Palette
     public int width() {
         return width;
     }
 
-    @Palette
     public int height() {
         return height;
     }
 
-    @Palette
     public String templateId() {
         return templateId;
     }

@@ -1,9 +1,7 @@
 package com.botmaker.sdk.api;
 
-import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.meta.ReplacedBy;
 import com.botmaker.sdk.api.meta.Replaces;
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.meta.Since;
 import io.github.classgraph.AnnotationInfo;
 import io.github.classgraph.ClassGraph;
@@ -53,18 +51,16 @@ import static org.junit.jupiter.api.Assertions.fail;
  * <h2>What is checked</h2>
  *
  * <p>Rules 1–5 are the pointer pair: a deprecated element says what to use instead, every target exists, every
- * back-edge is written, no entry is claimed twice <em>undeclared</em>, every entry parses. Rules 7–9 cover the
- * three annotations added beside them — {@link Since} is well-formed, a {@code behaviourChanged} move carries
- * its sentence at whichever end asserts it, and a deprecated {@link Scaffolding} element names a real survivor
- * because generated code cannot take a default. Rule 10 covers {@link Palette}: curation is per type, so
- * annotating methods inside a type that is not itself annotated is a no-op nobody would notice. Rule 11 covers
- * the split — a {@code @ReplacedBy} naming several candidates has to say when each one applies.
+ * back-edge is written, no entry is claimed twice <em>undeclared</em>, every entry parses. Rules 7–8 cover the
+ * two annotations added beside them — {@link Since} is well-formed, and a {@code behaviourChanged} move
+ * carries its sentence at whichever end asserts it. Rule 11 covers the split — a {@code @ReplacedBy} naming
+ * several candidates has to say when each one applies.
  *
- * <p>There was a rule 12, and it is gone: {@code @Scaffolding} used to be reconciled against a committed
- * {@code scaffolding-surface.txt} that {@code botmaker-studio}'s own test wrote, because the annotation was a
- * claim about a repository this one cannot see. It is no longer a claim about another repository. The scaffold
- * lives here now, in {@code src/templates/java}, and {@code ScaffoldTemplatesTest} asserts the templates call
- * nothing that is not annotated — one build, no file, no second copy to drift.
+ * <p>Rules 9, 10 and 12 are gone (2026-08-25), with the two annotations they read. Rule 12 compared
+ * {@code @Scaffolding} against a file {@code botmaker-studio} wrote; rule 9 refused a deprecated
+ * {@code @Scaffolding} element with no survivor; rule 10 refused a half-curated {@code @Palette} type. Both
+ * annotations were deleted when the scaffold negotiation between the two repositories was — the SDK becomes
+ * the generator, so there is nothing left for either to assert about the other.
  *
  * <h2>A pointer is a set, not a value</h2>
  *
@@ -84,8 +80,6 @@ class ApiPointersTest {
     private static final String REPLACED_BY = ReplacedBy.class.getName();
     private static final String REPLACES = Replaces.class.getName();
     private static final String SINCE = Since.class.getName();
-    private static final String SCAFFOLDING = Scaffolding.class.getName();
-    private static final String PALETTE = Palette.class.getName();
     private static final String DEPRECATED = Deprecated.class.getName();
 
     /** Major.minor.patch, with an optional pre-release/build tail. No leading {@code v} — tags carry it, entries don't. */
@@ -109,8 +103,8 @@ class ApiPointersTest {
      * {@code ""} is the annotation's default and javac does not emit defaults.
      *
      * <p>{@code deprecated} is per <em>element</em> and not per ref: overloads share a ref, and deprecating
-     * one of them says nothing about the others. So are {@code since} and {@code scaffolding}: one overload
-     * may be older, or written by a generator, while its siblings are not.
+     * one of them says nothing about the others. So is {@code since}: one overload may be older than its
+     * siblings.
      *
      * <p>{@code since} is {@code null} when the element carries no {@link Since} — which the whole
      * pre-1.1.0 surface deliberately does not, so absence is never an error here.
@@ -128,7 +122,7 @@ class ApiPointersTest {
     private record Element(String ref, String kind, boolean deprecated,
                            List<String> replacedBy, List<String> whens, String note, boolean behaviourChanged,
                            List<String> replaces, String replacesNote, boolean replacesBehaviourChanged,
-                           String since, boolean scaffolding, boolean palette, int params) {
+                           String since, int params) {
 
         /** The targets that actually name something — a blank entry is the "nothing takes my place" form. */
         List<String> targets() {
@@ -460,69 +454,11 @@ class ApiPointersTest {
                 "nothing takes my place"; it means nothing beside a candidate that does:""");
     }
 
-    /**
-     * 9 — scaffolding is never deprecated into a dead end.
-     *
-     * <p>An empty {@code @ReplacedBy} is a supported answer everywhere else: Studio substitutes a default
-     * value at each call site and marks the enclosing function for review, and the bot compiles. Generated
-     * files cannot take that repair — they hold no user code to review, and a defaulted value inside one is a
-     * broken feature rather than a repair — so Studio's only remaining answer is to refuse the upgrade, and
-     * the edit, until Studio itself is updated. Declaring the dead end here is declaring that; the gate makes
-     * the author say what takes over instead.
-     */
-    @Test
-    void deprecatedScaffoldingNamesItsReplacement() {
-        List<String> bad = new ArrayList<>();
-        for (Element e : deprecated()) {
-            if (!e.scaffolding()) continue;
-            if (e.targets().isEmpty()) bad.add(e.kind() + " " + e.ref());
-        }
-        assertEmpty(bad, """
-                A @Deprecated @Scaffolding element with no replacement. Studio writes this element into the
-                files it generates, which are regenerated rather than migrated — so "nothing takes my place"
-                is not a repair here, it is a refusal to upgrade or to edit the Activity Flow. Name the
-                survivor, or drop @Scaffolding once no generator emits it:""");
-    }
-
-    /**
-     * 10 — a curated method lives in a curated type.
-     *
-     * <p>{@link Palette} is read strictly, but only per <em>type</em>: a facade that does not carry it is
-     * uncurated, and Studio offers every one of its public static methods exactly as it did before the
-     * annotation existed. That is deliberate — it is what lets the sweep proceed one facade at a time — but it
-     * makes one mistake completely silent. Annotating a handful of overloads inside a facade whose type
-     * declaration was never annotated hides nothing and shows nothing: the menu is unchanged, and the author
-     * who wrote twelve {@code @Palette}s is looking at all fifty-four methods wondering why.
-     *
-     * <p>So the half-finished state is the error, not the unstarted one. A type with no {@code @Palette}
-     * anywhere is fine; a type whose methods carry it while the type does not is a facade someone began
-     * curating and did not finish.
-     */
-    @Test
-    void curatedMethodsLiveInACuratedType() {
-        Set<String> curatedTypes = new LinkedHashSet<>();
-        for (Element e : elements) {
-            if ("type".equals(e.kind()) && e.palette()) curatedTypes.add(e.ref());
-        }
-        List<String> bad = new ArrayList<>();
-        for (Element e : elements) {
-            if (!e.palette() || "type".equals(e.kind())) continue;
-            String owner = e.ref().substring(0, e.ref().indexOf('#'));
-            if (!curatedTypes.contains(owner)) bad.add(e.kind() + " " + e.ref());
-        }
-        assertEmpty(bad, """
-                @Palette on a method whose declaring type is not @Palette. An uncurated type offers every
-                public static method it has, so these annotations change nothing and no menu will reflect
-                them. Annotate the type to switch it into strict mode — at which point ONLY the annotated
-                overloads are offered — or remove these:""");
-    }
-
-    // 12 — the @Scaffolding set matches Studio's declaration — is deleted (2026-08-24). It compared the
-    // annotations against a committed scaffolding-surface.txt that botmaker-studio's ScaffoldSurfaceTest
-    // wrote, because @Scaffolding was a claim about text blocks in a repository this one cannot see. The
-    // scaffold is no longer over there: src/templates/java holds it as compiling Java, and
-    // ScaffoldTemplatesTest checks the annotation against what those templates actually call. One build,
-    // one copy of the fact, no cross-repository file to keep in step.
+    // Rules 9, 10 and 12 are deleted (2026-08-25), with the two annotations they read. 12 compared
+    // @Scaffolding against a committed scaffolding-surface.txt that botmaker-studio's own test wrote; 9
+    // refused a deprecated @Scaffolding element with no survivor; 10 refused a type whose methods carried
+    // @Palette while the type did not. Both annotations existed to let two repositories agree about files
+    // they co-authored. The SDK becomes the generator instead, so there is no agreement left to check.
 
     /** Sanity: the scan found the API at all, so a silently empty classpath cannot pass every rule above. */
     @Test
@@ -556,8 +492,7 @@ class ApiPointersTest {
             add(new Element(ci.getName(), "type", ci.hasAnnotation(DEPRECATED),
                     pointer(typePointer), whens(typePointer), note(typePointer), behaviourChanged(typePointer),
                     entries(typeClaims), note(typeClaims), behaviourChanged(typeClaims),
-                    since(ci.getAnnotationInfo(SINCE)), ci.hasAnnotation(SCAFFOLDING),
-                    ci.hasAnnotation(PALETTE), -1));
+                    since(ci.getAnnotationInfo(SINCE)), -1));
 
             for (MethodInfo mi : ci.getDeclaredMethodAndConstructorInfo()) {
                 if (!mi.isPublic() || mi.isSynthetic() || mi.isBridge()) continue;
@@ -568,8 +503,7 @@ class ApiPointersTest {
                         mi.hasAnnotation(DEPRECATED),
                         pointer(p), whens(p), note(p), behaviourChanged(p),
                         entries(c), note(c), behaviourChanged(c),
-                        since(mi.getAnnotationInfo(SINCE)), mi.hasAnnotation(SCAFFOLDING),
-                        mi.hasAnnotation(PALETTE), mi.getParameterInfo().length));
+                        since(mi.getAnnotationInfo(SINCE)), mi.getParameterInfo().length));
             }
             for (FieldInfo fi : ci.getDeclaredFieldInfo()) {
                 if (!fi.isPublic() || fi.isSynthetic()) continue;
@@ -579,8 +513,7 @@ class ApiPointersTest {
                         fi.hasAnnotation(DEPRECATED),
                         pointer(p), whens(p), note(p), behaviourChanged(p),
                         entries(c), note(c), behaviourChanged(c),
-                        since(fi.getAnnotationInfo(SINCE)), fi.hasAnnotation(SCAFFOLDING),
-                        false, -1)); // @Palette does not target fields — a constant is never a menu entry.
+                        since(fi.getAnnotationInfo(SINCE)), -1));
             }
         }
     }

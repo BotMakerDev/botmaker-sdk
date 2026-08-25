@@ -460,7 +460,6 @@ com.botmaker.sdk.api.launch.Target#set(java.lang.String):void
 com.botmaker.sdk.api.launch.Target#start():void
 com.botmaker.sdk.api.launch.Target#startIfNotRunning():void
 com.botmaker.sdk.api.launch.Target#waitForLaunch(long):boolean
-com.botmaker.sdk.api.meta.Palette:@interface
 com.botmaker.sdk.api.meta.ReplacedBy:@interface
 com.botmaker.sdk.api.meta.ReplacedBy#behaviourChanged():boolean
 com.botmaker.sdk.api.meta.ReplacedBy#note():java.lang.String
@@ -470,7 +469,6 @@ com.botmaker.sdk.api.meta.Replaces:@interface
 com.botmaker.sdk.api.meta.Replaces#behaviourChanged():boolean
 com.botmaker.sdk.api.meta.Replaces#note():java.lang.String
 com.botmaker.sdk.api.meta.Replaces#value():java.lang.String[]
-com.botmaker.sdk.api.meta.Scaffolding:@interface
 com.botmaker.sdk.api.meta.Since:@interface
 com.botmaker.sdk.api.meta.Since#value():java.lang.String
 com.botmaker.sdk.api.util.BotMaker:class

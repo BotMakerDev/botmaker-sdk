@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.flow;
 
 import com.botmaker.sdk.api.bot.PopupGuard;
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.meta.Since;
 
 /**
@@ -15,7 +14,6 @@ import com.botmaker.sdk.api.meta.Since;
  * {@link PopupGuard#enabled(boolean)} is process-global: a node that said nothing would inherit whatever the
  * node before it left set.
  */
-@Scaffolding
 @Since("1.1.0")
 public enum PopupCheck {
 

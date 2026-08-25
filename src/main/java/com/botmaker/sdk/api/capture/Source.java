@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.capture;
 
-import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.SessionSource;
@@ -22,11 +21,10 @@ import com.botmaker.session.DesktopSession;
  * <p>Methods that <em>do</em> take an explicit {@link CaptureSource} always use that argument and
  * ignore this global; the global only fills in the no-source overloads.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): both are offered. A two-method facade has nothing
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): both are offered. A two-method facade has nothing
  * to trim, and the pair is the read and the write of one property — which is the shape the rest of this sweep
  * hides <em>arguments</em> in favour of, not one it hides.
  */
-@Palette
 public final class Source {
 
     private static volatile CaptureSource current;
@@ -47,7 +45,6 @@ public final class Source {
      * pinned a source, this is the session's owned window (a {@link SessionSource}); otherwise it initialises
      * lazily to the project default (or the whole {@link Desktop} when none is configured). Never {@code null}.
      */
-    @Palette
     public static CaptureSource current() {
         if (!pinned) {
             DesktopSession session = ActiveSession.get();
@@ -77,7 +74,6 @@ public final class Source {
      * is running. Passing {@code null} clears the pin: the source reverts to the active session's window if one
      * is running, else the project default (or the {@link Desktop}).
      */
-    @Palette
     public static void set(CaptureSource source) {
         if (source == null) {
             pinned = false;

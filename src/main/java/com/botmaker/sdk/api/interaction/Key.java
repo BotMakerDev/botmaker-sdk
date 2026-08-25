@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.sdk.api.meta.Palette;
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.sun.jna.Platform;
 
 /**
@@ -12,7 +10,7 @@ import com.sun.jna.Platform;
  * <p>Letter keys map to the physical key (lowercase keysym on Linux, VK letter on Windows); use
  * {@link Keyboard#type(String)} when you need shifted/uppercase characters produced for you.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): <b>no methods offered</b> — the only one there is,
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): <b>no methods offered</b> — the only one there is,
  * {@link #nativeCode()}, is the platform translation this enum exists to spare a bot from doing, so a menu
  * entry handing back {@code 0xFFBE} would be an invitation to write exactly the hard-coded key code the class
  * javadoc above promises it never has to. The <em>constants</em> are unaffected and remain the whole point:
@@ -22,8 +20,6 @@ import com.sun.jna.Platform;
  * {@code Direction} and {@code StartMode}, which needed no annotation: those two have no methods to hide.
  */
 // Scaffolding for the same reason as Direction: the generated Activities holds one per key variable.
-@Scaffolding
-@Palette
 public enum Key {
     // Letters (Linux lowercase keysym == ASCII 'a'..'z'; Windows VK 'A'..'Z')
     A(0x61, 0x41), B(0x62, 0x42), C(0x63, 0x43), D(0x64, 0x44), E(0x65, 0x45),

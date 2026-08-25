@@ -3,7 +3,6 @@ package com.botmaker.sdk.api.vision;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.meta.Palette;
 
 import java.awt.Color;
 
@@ -16,7 +15,7 @@ import java.awt.Color;
  * <p>All coordinates are <b>absolute screen coordinates</b> (the search's capture-source origin is already
  * applied), so they can be handed straight to {@code Mouse}.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): all nine are offered, the same verdict and the same
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): all nine are offered, the same verdict and the same
  * reason as {@link MatchResult} — a result type has no rival spellings, only different questions about one
  * finding. {@link #color()} is the only member whose type comes from outside the SDK, and it is offered rather
  * than hidden because {@code java.awt.Color} is precisely the type Studio's own colour picker reads and
@@ -24,7 +23,6 @@ import java.awt.Color;
  * user can name and store. That is the fillable/holdable rule pointing the other way from the usual, and it is
  * why the rule is stated in terms of what the editor can do rather than which package a type came from.
  */
-@Palette
 public class ColorMatch {
 
     private final Point location;      // top-left of the cluster's bounding box, absolute
@@ -63,25 +61,21 @@ public class ColorMatch {
         return new ColorMatch();
     }
 
-    @Palette
     public boolean isFound() {
         return found;
     }
 
     /** The colour this search was looking for, or {@code null} if not found. */
-    @Palette
     public Color color() {
         return color;
     }
 
     /** Number of matched pixels in this cluster — the quantity {@code Precision.minArea} gates on. */
-    @Palette
     public int pixelCount() {
         return pixelCount;
     }
 
     /** Fraction (0..1) of the searched region covered by matching pixels. */
-    @Palette
     public double coverage() {
         return coverage;
     }
@@ -90,31 +84,26 @@ public class ColorMatch {
      * The cluster's centre of mass — a better click target than the bbox centre for a non-rectangular blob
      * (an L-shape's bbox centre can lie entirely outside the shape). {@code null} if not found.
      */
-    @Palette
     public Point center() {
         // Point is immutable, so the defensive copy this used to make is no longer needed.
         return found ? centroid : null;
     }
 
     /** Top-left of the cluster's bounding box, or {@code null} if not found. */
-    @Palette
     public Point topLeft() {
         return found ? location : null;
     }
 
     /** The cluster's bounding box, or {@code null} if not found. */
-    @Palette
     public Rect bounds() {
         if (!found) return null;
         return new Rect(location, new Size(width, height));
     }
 
-    @Palette
     public int width() {
         return width;
     }
 
-    @Palette
     public int height() {
         return height;
     }

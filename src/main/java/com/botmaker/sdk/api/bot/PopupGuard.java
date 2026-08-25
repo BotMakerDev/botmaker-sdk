@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.sdk.api.meta.Palette;
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
 
@@ -41,7 +39,7 @@ import com.botmaker.sdk.internal.trace.Trace;
  *
  * <p>Process-global, like {@link BotSettings} — a bot has one screen and one guard.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): three of the five are offered — {@link #check()},
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): three of the five are offered — {@link #check()},
  * {@link #enabled(boolean)} and {@link #isEnabled()}, which are the vocabulary of a bot <em>using</em> the
  * guard. {@link #install(Runnable)} and {@link #uninstall()} are not: they are the wiring, written once by the
  * generated entry point ({@code PopupGuard.install(Popups.INSTANCE::execute)}), and a second {@code install}
@@ -58,7 +56,6 @@ import com.botmaker.sdk.internal.trace.Trace;
  * no way to be switched off at all. The rule applies where the alternative exists and is suspended where it
  * does not — the same discipline {@code Time}'s two surviving {@code *Utc} methods record.
  */
-@Palette
 public final class PopupGuard {
 
     private PopupGuard() {}
@@ -76,7 +73,6 @@ public final class PopupGuard {
      * Installs the project's popup check. Called once from the generated entry point with the project's
      * {@code Popups} activity; a second call replaces the first.
      */
-    @Scaffolding   // the game-bot scaffold's entry point: PopupGuard.install(Popups.INSTANCE::execute)
     public static void install(Runnable check) {
         handler = check;
     }
@@ -92,14 +88,11 @@ public final class PopupGuard {
      * activity that is <em>itself</em> working through a popup-shaped screen must not have it dismissed
      * underneath it.
      */
-    @Palette
-    @Scaffolding   // emitted per activity by the generated FlowDriver, as the paragraph above says
     public static void enabled(boolean on) {
         enabled = on;
     }
 
     /** Whether a check is installed and currently switched on. */
-    @Palette
     public static boolean isEnabled() {
         return enabled && handler != null;
     }
@@ -112,7 +105,6 @@ public final class PopupGuard {
      * <p>Exceptions propagate: a check that throws {@link BotStuckException} must reach the supervisor, and one
      * that throws anything else is a bug worth surfacing rather than a silent no-op before every find.
      */
-    @Palette
     public static void check() {
         Runnable current = handler;
         if (current == null || !enabled || Boolean.TRUE.equals(running.get())) return;

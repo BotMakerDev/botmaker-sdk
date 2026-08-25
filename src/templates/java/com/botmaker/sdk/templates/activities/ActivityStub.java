@@ -13,8 +13,7 @@ import com.botmaker.sdk.templates.meta.Template;
  * <p>SEED — Studio writes it once, when the activity is created, and never again. The one exception is
  * {@link Outcome}, which Project &rarr; Activity Flow keeps in step with what the canvas can route on.
  */
-@Template(id = "ACTIVITY_STUB", kind = Template.Kind.SEED, target = "activities/${ACTIVITY}.java",
-        holes = {"OUTCOMES:1", "ENABLED:1"})
+@Template(id = "ACTIVITY_STUB", kind = Template.Kind.SEED, target = "activities/${ACTIVITY}.java")
 public class ActivityStub extends Activity<ActivityStub.Outcome> {
 
     /**
@@ -22,11 +21,11 @@ public class ActivityStub extends Activity<ActivityStub.Outcome> {
      * the Studio decides where each one goes — so this says what happened here, never where to go next.
      * GENERATED from Project &rarr; Activity Flow; edit it there, not here.
      */
-    public enum Outcome { /*<STUDIO:OUTCOMES:1>*/ NEXT /*</STUDIO:OUTCOMES:1>*/ }
+    public enum Outcome { /*<STUDIO:OUTCOMES>*/ NEXT /*</STUDIO:OUTCOMES>*/ }
 
     @Override
     public boolean isEnabled() {
-        return /*<STUDIO:ENABLED:1>*/ Activities.EXAMPLE /*</STUDIO:ENABLED:1>*/;
+        return /*<STUDIO:ENABLED>*/ Activities.EXAMPLE /*</STUDIO:ENABLED>*/;
     }
 
     @Override

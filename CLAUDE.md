@@ -111,7 +111,7 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 
 - **`com.botmaker.sdk.api.*`** is the API generated bots compile against, and every class in it sits in a
   sub-package that says what it is: `api.geometry` (`Point`, `Rect`, `Size`, `Direction`), `api.meta` (the
-  four pointer annotations plus `Palette`), `api.bot`, `api.capture`, `api.emulator`, `api.interaction`, `api.launch`,
+  three pointer annotations), `api.bot`, `api.capture`, `api.emulator`, `api.interaction`, `api.launch`,
   `api.util` (`Time`, `BotMaker`, `Debug`), `api.vision`. **The `api` root holds no classes** — it was a
   junk drawer of annotations, geometry and five facades until 1.1.0, and a name landing there again means
   somebody skipped the question above. It is under a **compatibility convention** — real semver, and a removal announced by one full minor marked
@@ -237,36 +237,30 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
     never will: the value is unrecoverable after the fact, and a guessed one asserts something false about a
     release the user cannot check. Rule 7 checks only the shape (and, at release time, that it is not dated
     ahead of the version being cut) — **absence is never an error**.
-  - **`@Scaffolding`** — *Studio writes this element into the files it generates*, so renaming it breaks bots
-    that never mentioned it. Generated files are regenerated, not migrated, and a defaulted value inside one
-    is a broken feature rather than a repair; Studio's only answer is to refuse the upgrade (and the Activity
-    Flow edit) until Studio itself is updated. Rule 9 therefore refuses a `@Deprecated` `@Scaffolding` element
-    with an **empty** `@ReplacedBy`. 29 elements carry it — the seed and regenerated generators' whole SDK
-    contact surface, including the `Activities` variable helpers' `ImageTemplate`/`Precision`/`Key`/
-    `MouseButton`/`Direction`/`Point`/`Rect`/`Size`. Nothing in this module reads the annotation; the
-    dependency still runs one way, and it is here because this is where the rename gets typed.
+  **Two more lived here and were deleted on 2026-08-25 — `@Scaffolding` and `@Palette`.** Both existed to let
+  **two repositories agree about something neither could read in the other**, and the maintainer's decision is
+  to remove the disagreement rather than manage it: the SDK becomes the generator and the palette, so there is
+  no second author left to inform. Worth knowing they existed, because both left visible holes:
 
-    **It stopped being a claim about another repository on 2026-08-24, and the file it was checked through is
-    gone.** For two days the annotated set was reconciled against a committed `scaffolding-surface.txt` at
-    this module's root, written by `botmaker-studio`'s `ScaffoldSurfaceTest` (which JDT-parsed the generators'
-    text blocks) and read back by `ApiPointersTest` rule 12 — the only way two repositories that cannot read
-    each other could compare a set. The scaffold lives **here** now, in `src/templates/java`, so
-    `ScaffoldTemplatesTest` reads the templates' own constant pools and fails this build on any
-    `com.botmaker.sdk.*` member they reach that is not annotated. Rule 12, the file and `ScaffoldScan` were
-    all deleted; a scaffold change is one commit in this repository.
-  - **`@Palette`** (2026-08-23) — *Studio offers this in its block palette*. **Hiding is not deprecating:** an
-    unannotated method stays public, supported and migrated like any other; it is simply not proposed. That
-    distinction is the whole point — Studio's statement menu enumerates every public static method of every
-    facade, so before this annotation a method could only leave the menu by leaving the API, which is the wall
-    the method audit kept hitting (`docs/refactor/22-api-audit.md` §3, §5). It is **strict** (nothing offered
-    without it, so a new method's default is *not offered*) and **per overload** (the surface's size is mostly
-    the with/without-`CaptureSource`, with/without-threshold pattern, which a per-name switch could not
-    touch). A **type** without it is uncurated and offers everything, which is what lets the sweep run one
-    facade at a time; rule 10 makes the half-done state — annotated methods in an unannotated type — the
-    error, since it changes nothing and shows nothing. Studio tells an SDK that predates curation from one
-    curated to nothing by looking for **this annotation class itself** in the index it already builds of
-    `com.botmaker.sdk.api`; no version comparison exists. Unlike the others this lever keeps working after
-    1.1.0 — adding an annotation is never a break.
+  - **`@Scaffolding`** said *Studio writes this element into the files it generates*, so renaming it broke
+    bots that never mentioned it. `ApiPointersTest` rule 9 refused a `@Deprecated` `@Scaffolding` element with
+    an empty `@ReplacedBy`, and `ScaffoldTemplatesTest` read the templates' own constant pools to require the
+    annotation on every `com.botmaker.sdk.*` member they reached. (It had been reconciled through a committed
+    `scaffolding-surface.txt` written by Studio's own test, until the scaffold moved into
+    `src/templates/java` on 2026-08-24 and made the file unnecessary — the same argument, one step further
+    along, is why the annotation itself is gone.) Both rules went with it.
+  - **`@Palette`** said *Studio offers this in its block palette* — a strict, per-overload whitelist, where
+    **hiding was not deprecating**: an unannotated method stayed public, supported and under contract, simply
+    not proposed. It was the answer to the wall the method audit kept hitting
+    (`docs/refactor/22-api-audit.md` §3, §5), where a method could only leave the menu by leaving the API.
+    Deleting it **widens Studio's menus** — `SdkSurfaceService` treats a jar with no `Palette` class as
+    uncurated and offers everything public — until the SDK serves the palette itself. That is a known interim
+    cost, not a regression. The maintainer's per-facade curation *prose* survives in each facade's Javadoc
+    (*"Curated for the palette: …"*); the per-member verdicts lived only in the annotations and are gone.
+
+  Both were public `api.meta` types removed after 1.1.0 shipped, i.e. an undeprecated removal, taken
+  deliberately via `release.sh --allow-removal` with `api-surface.txt` regenerated in the same commit. Neither
+  was a name a bot could write down.
 
   The API contains:
   - `api.vision` — `ImageFinder` (find + `exists` + the lambda control-flow `whileExists`/`ifExists`

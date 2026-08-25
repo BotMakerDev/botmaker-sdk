@@ -2,7 +2,6 @@ package com.botmaker.sdk.api.interaction;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.Surface;
@@ -16,7 +15,7 @@ import com.botmaker.session.PointerPolicy;
 /**
  * Real pointer input — clicks, moves, drags and the wheel.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): fifteen of the sixteen are offered. The one hidden is
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): fifteen of the sixteen are offered. The one hidden is
  * {@link #scroll(int)}, and the reason was already written down before this sweep existed — its own javadoc ends
  * <em>"Prefer the clearer {@link #scrollUp(int)} / {@link #scrollDown(int)}"</em>. Until now the menu offered all
  * three as equals and quietly contradicted that sentence; the annotation is what makes the author's preference
@@ -29,7 +28,6 @@ import com.botmaker.session.PointerPolicy;
  * {@code durationMs} has no property home, unlike {@code ImageClicker}'s {@code delayMs}, so both drag shapes
  * stay.
  */
-@Palette
 public class Mouse {
 
     /**
@@ -61,14 +59,12 @@ public class Mouse {
      * clicks used to do nothing in-game; the cost is that the pointer visibly moves (and, on {@code :0}, comes
      * back), and that the click lands on whatever is <em>topmost</em> at that coordinate.
      */
-    @Palette
     public static void click(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] click " + p);
         PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.LEFT.code());
     }
 
-    @Palette
     public static void click(int x, int y) {
         click(new Point(x, y));
     }
@@ -78,7 +74,6 @@ public class Mouse {
      * — a fixed point inside a window (or a monitor / region), independent of where that surface currently
      * sits on the desktop. Equivalent to clicking {@code source.origin() + (x, y)} in absolute coordinates.
      */
-    @Palette
     public static void click(CaptureSource source, int x, int y) {
         if (source == null) return;
         Point o = source.origin();
@@ -89,7 +84,6 @@ public class Mouse {
     // --- Movement ---
 
     /** Move the cursor to an absolute screen coordinate. */
-    @Palette
     public static void move(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] move " + p);
@@ -97,7 +91,6 @@ public class Mouse {
     }
 
     /** Move the cursor to absolute screen coordinates {@code (x, y)}. */
-    @Palette
     public static void move(int x, int y) {
         Debug.log("[Mouse] move " + x + "," + y);
         controller().mouseMove(x, y);
@@ -106,34 +99,29 @@ public class Mouse {
     // --- Button actions ---
 
     /** Hold a mouse button down at the current cursor position. */
-    @Palette
     public static void down(MouseButton button) {
         Debug.log("[Mouse] " + button + " down");
         controller().mouseButton(button.code(), true);
     }
 
     /** Move to {@code p}, then hold {@code button} down there. */
-    @Palette
     public static void down(MouseButton button, Point p) {
         if (p != null) move(p);
         down(button);
     }
 
     /** Release a held mouse button. */
-    @Palette
     public static void up(MouseButton button) {
         Debug.log("[Mouse] " + button + " up");
         controller().mouseButton(button.code(), false);
     }
 
-    @Palette
     public static void rightClick(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] rightClick " + p);
         PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.RIGHT.code());
     }
 
-    @Palette
     public static void middleClick(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] middleClick " + p);
@@ -145,7 +133,6 @@ public class Mouse {
      * the target before restoring — restoring between them would register as two separate clicks rather than
      * a double-click.
      */
-    @Palette
     public static void doubleClick(Point p) {
         if (p == null) return;
         Debug.log("[Mouse] doubleClick " + p);
@@ -180,7 +167,6 @@ public class Mouse {
     }
 
     /** Press-and-hold at {@code start}, move straight to {@code end}, then release (an instant drag). */
-    @Palette
     public static void drag(Point start, Point end) {
         drag(start, end, 0);
     }
@@ -190,7 +176,6 @@ public class Mouse {
      * release. A non-zero duration interpolates the move in small steps so games that track drag
      * velocity (map panning, slingshots, drawing) see a smooth gesture instead of a teleport.
      */
-    @Palette
     public static void drag(Point start, Point end, long durationMs) {
         Debug.log("[Mouse] drag " + start + " -> " + end + " over " + durationMs + "ms");
         // Read the origin before the gesture; the cursor must stay with the drag until the button is
@@ -239,14 +224,12 @@ public class Mouse {
     }
 
     /** Scroll up / away from you by {@code notches} (always a positive amount). */
-    @Palette
     public static void scrollUp(int notches) {
         Debug.log("[Mouse] scrollUp " + notches);
         controller().scroll(Math.abs(notches));
     }
 
     /** Scroll down / toward you by {@code notches} (always a positive amount). */
-    @Palette
     public static void scrollDown(int notches) {
         Debug.log("[Mouse] scrollDown " + notches);
         controller().scroll(-Math.abs(notches));

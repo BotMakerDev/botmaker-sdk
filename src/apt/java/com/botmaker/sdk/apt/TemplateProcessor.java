@@ -18,39 +18,24 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Reads {@code @Template} off the scaffold templates, checks it against the fences actually in the file, and
- * writes the two things Studio consumes: the template text, with the annotation taken back out, and the
- * generated {@code manifest.txt}.
+ * Reads {@code @Template} off the scaffold templates and writes the two things Studio consumes: the template
+ * text, with the annotation taken back out, and the generated {@code manifest.txt}.
  *
  * <h2>Why a processor and not a test</h2>
  *
- * <p>The manifest used to be hand-written, and a hand-written manifest is a second place to be right. Every
- * disagreement it could hold — a template nobody listed, a hole renamed in the Java and not in the text, a
- * role misspelled — was invisible until a project was generated. Generated from the annotations there is one
- * source of truth, it is compiled, and the disagreements that remain are the ones this class reports as
- * {@code javac} errors on the template itself, at the moment it is being typed.
+ * <p>The manifest used to be hand-written, and a hand-written manifest is a second place to be right: a
+ * template could be added and never listed, or a role misspelled, and none of it was visible until a project
+ * was generated. Generated from the annotations there is one source of truth and it is compiled.
  *
- * <p>{@code ScaffoldTemplatesTest} still runs, and still asserts over what actually shipped. The division is
- * the same as {@link ApiPointerProcessor}'s: the processor is ergonomics and the test is the gate. Where they
- * overlap the build fails twice for one mistake, deliberately.
+ * <h2>It reads the source file off disk</h2>
  *
- * <h2>It reads the source file off disk, because a fence is a comment</h2>
- *
- * <p>{@link #holes()} is an annotation and javac hands it over; the fences are comments and javac has thrown
- * them away long before a processor runs. So the source is read back from
- * {@code -Abotmaker.templates.src}, by the path the type's own qualified name implies. That is also what makes
- * the <em>write</em> half possible: what ships is text, not the compiled class, so the shipped file has to come
- * from the same place.
+ * <p>What ships is text, not the compiled class, so the shipped file has to come from the source — read back
+ * from {@code -Abotmaker.templates.src}, by the path the type's own qualified name implies.
  *
  * <h2>Why it writes the templates too</h2>
  *
@@ -82,23 +67,13 @@ public final class TemplateProcessor extends AbstractProcessor {
     static final String OUT_OPTION = "botmaker.templates.out";
 
     /** The manifest shape this writes. Bumped when the columns change — Studio refuses a format it cannot read. */
-    private static final int FORMAT = 2;
-
-    /** An opening fence: {@code /*<STUDIO:FLOW:1>*}{@code /}. The name is upper snake, the generation an int. */
-    private static final Pattern OPEN = Pattern.compile("/\\*<STUDIO:([A-Z_]+):(\\d+)>\\*/");
-
-    /** A closing fence. */
-    private static final Pattern CLOSE = Pattern.compile("/\\*</STUDIO:([A-Z_]+):(\\d+)>\\*/");
-
-    /** Any fence at all, including one that forgot its generation — reported rather than ignored. */
-    private static final Pattern ANY_FENCE = Pattern.compile("/\\*</?STUDIO:([A-Z_]+)(?::(\\d+))?>\\*/");
+    private static final int FORMAT = 3;
 
     /** The import this processor adds nothing to and takes back out on the way to the jar. */
     private static final String META_IMPORT = "import com.botmaker.sdk.templates.meta.Template;";
 
     /** One template, as its annotation declares it. Sorted by id so the manifest is byte-stable. */
-    private record Declared(String id, String kind, String path, String target, List<String> holes,
-                            String source) {}
+    private record Declared(String id, String kind, String path, String target, String source) {}
 
     private final Map<String, Declared> declared = new TreeMap<>();
     private String templatePackage = "";
@@ -142,12 +117,9 @@ public final class TemplateProcessor extends AbstractProcessor {
         String id = string(mirror, "id");
         String kind = enumConstant(mirror, "kind");
         String target = string(mirror, "target");
-        List<String> holes = strings(mirror, "holes");
         if (id == null || kind == null || target == null) return;   // javac has already said what is missing
 
-        if (!checkHoles(type, mirror, source, holes)) return;
-
-        Declared previous = declared.putIfAbsent(id, new Declared(id, kind, relative, target, holes, source));
+        Declared previous = declared.putIfAbsent(id, new Declared(id, kind, relative, target, source));
         if (previous != null) {
             error(type, "two templates both declare id \"" + id + "\" (" + previous.path() + " and "
                     + relative + "). Studio asks for a template by that name, so it has to name one file.");
@@ -158,61 +130,6 @@ public final class TemplateProcessor extends AbstractProcessor {
         // The declared package is the templates' ROOT package, which Studio rewrites to the bot's own. A
         // template in a sub-package (activities/) must not narrow it, so the shortest one wins.
         if (templatePackage.isEmpty() || pkg.length() < templatePackage.length()) templatePackage = pkg;
-    }
-
-    /**
-     * The one rule this class exists for: what the annotation says and what the file is fenced for must be the
-     * same set, generation included.
-     *
-     * @return whether the template is sound enough to put in the manifest
-     */
-    private boolean checkHoles(TypeElement type, AnnotationMirror mirror, String source, List<String> holes) {
-        List<String> problems = new ArrayList<>();
-
-        Set<String> names = new LinkedHashSet<>();
-        for (String hole : holes) {
-            if (!hole.matches("[A-Z_]+:\\d+")) {
-                problems.add("holes = \"" + hole + "\" is not NAME:generation");
-                continue;
-            }
-            if (!names.add(hole)) problems.add("holes declares \"" + hole + "\" twice");
-        }
-
-        Set<String> opens = keys(OPEN, source);
-        Set<String> closes = keys(CLOSE, source);
-        for (String fence : keys(ANY_FENCE, source)) {
-            if (!fence.contains(":")) {
-                problems.add("the fence for " + fence + " carries no generation — write /*<STUDIO:" + fence
-                        + ":1>*/ … /*</STUDIO:" + fence + ":1>*/, and declare it as \"" + fence + ":1\"");
-            }
-        }
-        for (String open : opens) {
-            if (!closes.contains(open)) problems.add(open + " is opened and never closed");
-            if (!names.contains(open)) {
-                problems.add(open + " is fenced in the file but not in holes — add \"" + open + "\", or "
-                        + "remove the fences");
-            }
-        }
-        for (String close : closes) {
-            if (!opens.contains(close)) problems.add(close + " is closed and never opened");
-        }
-        for (String name : names) {
-            if (!opens.contains(name)) {
-                problems.add(name + " is declared in holes but nothing in the file is fenced for it. A hole "
-                        + "Studio is told about and cannot find is a fragment silently dropped, which is the "
-                        + "one outcome the generation number exists to prevent");
-            }
-        }
-
-        for (String problem : problems) error(type, mirror, problem);
-        return problems.isEmpty();
-    }
-
-    private static Set<String> keys(Pattern pattern, String source) {
-        Set<String> out = new LinkedHashSet<>();
-        Matcher m = pattern.matcher(source);
-        while (m.find()) out.add(m.group(2) == null ? m.group(1) : m.group(1) + ":" + m.group(2));
-        return out;
     }
 
     // ------------------------------------------------------------------
@@ -241,9 +158,9 @@ public final class TemplateProcessor extends AbstractProcessor {
      * else touched.
      *
      * <p>The annotation is matched from {@code @Template} to the parenthesis that closes it, counting depth,
-     * because {@code holes = {…}} puts commas and braces inside it and a line-based cut would stop in the
-     * middle of one. Everything else about the file — the javadoc, the blank lines, the fences — is left
-     * exactly as written, since this text is what a bot's own source is made from.
+     * so a member whose value contains parentheses cannot stop the cut in the middle of one. Everything else
+     * about the file — the javadoc, the blank lines, the fences — is left exactly as written, since this text
+     * is what a bot's own source is made from.
      */
     static String strip(String source) {
         String withoutImport = source.lines()
@@ -278,20 +195,13 @@ public final class TemplateProcessor extends AbstractProcessor {
                 # the other's half.
                 #
                 # ---------------------------------------------------------------------------------------------
-                # A hole is a pair of fenced comments with a compiling default between them, and the number in
-                # the fence is the generation of THAT hole's shape:
+                # A hole is a pair of fenced comments with a compiling default between them:
                 #
-                #     private static final int MAX_STEPS = /*<STUDIO:MAX_STEPS:1>*/ 1000 /*</STUDIO:MAX_STEPS:1>*/;
+                #     private static final int MAX_STEPS = /*<STUDIO:MAX_STEPS>*/ 1000 /*</STUDIO:MAX_STEPS>*/;
                 #
                 # To fill one, replace everything from the opening fence to the closing fence, inclusive. To
-                # ignore one, do nothing — the default stands and the file still compiles. That is the whole
-                # compatibility rule in the additive direction: a NEWER SDK may add holes an older Studio has
-                # never heard of, and an older Studio leaves them at their defaults.
-                #
-                # The generation covers the direction that is NOT additive. A hole whose shape changed keeps its
-                # name and takes the next number, so a Studio that can only produce the old arrangement finds no
-                # exact match and refuses BY NAME instead of writing last year's text into this year's frame.
-                # The match is exact: never a range, never a nearest-older fallback.
+                # ignore one, do nothing — the default stands and the file still compiles. A NEWER SDK may add
+                # holes an older Studio has never heard of, and an older Studio leaves them at their defaults.
                 #
                 # Either way the fences themselves are dropped on the way out: what a bot's source carries is the
                 # value or the default, never the marker.
@@ -303,13 +213,13 @@ public final class TemplateProcessor extends AbstractProcessor {
                 # ---------------------------------------------------------------------------------------------
                 # Records, one per line:
                 #
-                #   format   <n>                                    this file's shape; bumped when columns change
-                #   package  <fqn>                                  the templates' own package, which Studio rewrites
-                #   template <ROLE> <KIND> <path> <target> <holes>  one template; `-` for no holes
+                #   format   <n>                             this file's shape; bumped when columns change
+                #   package  <fqn>                           the templates' own package, which Studio rewrites
+                #   template <ROLE> <KIND> <path> <target>   one template
                 #
                 # KIND is SEED (written once at creation, the user's thereafter) or REGENERATED (rewritten on
                 # every model change, never the user's). `target` is the file name in the bot, with ${CLASS} the
-                # project's main class and ${ACTIVITY} an activity's name. Each hole is NAME:generation.
+                # project's main class and ${ACTIVITY} an activity's name.
                 # ---------------------------------------------------------------------------------------------
 
                 """);
@@ -318,13 +228,11 @@ public final class TemplateProcessor extends AbstractProcessor {
         int idWidth = declared.keySet().stream().mapToInt(String::length).max().orElse(1);
         int kindWidth = declared.values().stream().mapToInt(t -> t.kind().length()).max().orElse(1);
         int pathWidth = declared.values().stream().mapToInt(t -> t.path().length()).max().orElse(1);
-        int targetWidth = declared.values().stream().mapToInt(t -> t.target().length()).max().orElse(1);
         for (Declared t : declared.values()) {
             sb.append("template ").append(pad(t.id(), idWidth)).append(' ')
                     .append(pad(t.kind(), kindWidth)).append(' ')
                     .append(pad(t.path(), pathWidth)).append(' ')
-                    .append(pad(t.target(), targetWidth)).append(' ')
-                    .append(t.holes().isEmpty() ? "-" : String.join(",", t.holes()))
+                    .append(t.target().strip())
                     .append('\n');
         }
         return sb.toString();
@@ -358,16 +266,7 @@ public final class TemplateProcessor extends AbstractProcessor {
         return value instanceof VariableElement v ? v.getSimpleName().toString() : null;
     }
 
-    @SuppressWarnings("unchecked")
-    private List<String> strings(AnnotationMirror mirror, String member) {
-        Object value = value(mirror, member);
-        if (!(value instanceof List<?> list)) return List.of();
-        List<String> out = new ArrayList<>();
-        for (AnnotationValue av : (List<AnnotationValue>) list) out.add(av.getValue().toString());
-        return out;
-    }
-
-    /** Explicit values and defaults alike — unlike the pointer rules, an omitted {@code holes} is just none. */
+    /** Explicit values and defaults alike. */
     private Object value(AnnotationMirror mirror, String member) {
         if (mirror == null) return null;
         Map<? extends ExecutableElement, ? extends AnnotationValue> values =

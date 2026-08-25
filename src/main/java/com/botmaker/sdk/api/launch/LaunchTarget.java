@@ -3,7 +3,6 @@ package com.botmaker.sdk.api.launch;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
@@ -32,7 +31,7 @@ import com.botmaker.shared.launch.Launcher;
  * switchable hierarchy a bot's generated code names, and the one running-detection layer shared cannot see —
  * the ambient {@link Source#current() capture source}'s own window.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): five of eight, and they are the five a bot actually
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): five of eight, and they are the five a bot actually
  * does to a target — {@link #start()}, {@link #startIfNotRunning()}, {@link #restart()}, {@link #isRunning()}
  * and {@link #spec()}, the last being how a target names itself in a log or a comparison.
  *
@@ -45,14 +44,12 @@ import com.botmaker.shared.launch.Launcher;
  * picker — {@code LaunchTargetArgPicker} writes {@code LaunchTarget.parse("…")} into bot source with a spec it
  * built itself — and a picker is not a menu, so hiding the method costs the picker nothing.
  */
-@Palette
 public sealed interface LaunchTarget {
 
     /** The parsed spec this target wraps — the value {@code shared.launch} operates on. */
     LaunchSpec launchSpec();
 
     /** Brings the target up (launches the game/app). Best-effort — logs rather than throwing on failure. */
-    @Palette
     default void start() {
         Launcher.startQuietly(launchSpec());
     }
@@ -61,7 +58,6 @@ public sealed interface LaunchTarget {
      * Brings the target up only if it isn't already running — the cold-start path, so a game the user already
      * opened by hand isn't relaunched.
      */
-    @Palette
     default void startIfNotRunning() {
         if (isRunning()) {
             return;
@@ -83,7 +79,6 @@ public sealed interface LaunchTarget {
      * the desktop or a monitor, {@link CaptureSource#hasWindowIdentity()} is false, so the answer was an
      * unconditional "not running" and every Steam/Epic/Heroic/Faugus target relaunched on every run.
      */
-    @Palette
     default boolean isRunning() {
         LaunchSpec spec = launchSpec();
         if (targetWindowOpen(spec.spec())) {
@@ -119,13 +114,11 @@ public sealed interface LaunchTarget {
     }
 
     /** Restarts the target from a clean state — force-stopping it first for the variants that can be stopped. */
-    @Palette
     default void restart() {
         Launcher.restart(launchSpec());
     }
 
     /** The canonical {@code launch.target} string this target round-trips to. */
-    @Palette
     default String spec() {
         return launchSpec().spec();
     }

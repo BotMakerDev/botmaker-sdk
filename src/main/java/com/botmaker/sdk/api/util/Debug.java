@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.util;
 
-import com.botmaker.sdk.api.meta.Palette;
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.Diag;
 
@@ -27,7 +25,7 @@ import com.botmaker.shared.Diag;
  * {@code shared} can't depend on the SDK, yet its window/capture/input code prints diagnostics of its own —
  * keeping the state in the lower module is what makes this <em>one</em> switch rather than two that drift.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): six of the seven are offered. The one hidden is
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): six of the seven are offered. The one hidden is
  * {@link #set(boolean)}, and it is the third instance of a shape this sweep keeps finding — a method whose
  * {@code boolean} argument selects between two behaviours that <em>already have their own names</em>. It is
  * {@code Mouse.scroll(int)} again with a flag instead of a sign: {@link #enable()} and {@link #disable()} say
@@ -40,7 +38,6 @@ import com.botmaker.shared.Diag;
  * {@code Throwable} is produced by the {@code catch} clause the call sits in, so the variable picker fills it
  * from scope — and this overload's own javadoc is the reason to prefer it over {@code t.printStackTrace()}.
  */
-@Palette
 public final class Debug {
 
     private Debug() {}
@@ -52,19 +49,16 @@ public final class Debug {
     }
 
     /** Whether debug output is currently on. All SDK diagnostic prints consult this. */
-    @Palette
     public static boolean isEnabled() {
         return Diag.isEnabled();
     }
 
     /** Turns debug output on for the rest of the run. */
-    @Palette
     public static void enable() {
         Diag.set(true);
     }
 
     /** Turns debug output off for the rest of the run (a quiet production run). */
-    @Palette
     public static void disable() {
         Diag.set(false);
     }
@@ -75,14 +69,11 @@ public final class Debug {
     }
 
     /** Prints {@code message} to stdout when debugging is on; a no-op when off. */
-    @Palette
     public static void log(String message) {
         Diag.log(message);
     }
 
     /** Prints {@code message} to stderr when debugging is on; a no-op when off. */
-    @Palette
-    @Scaffolding   // the generated FlowDriver's "gave up after N steps" line
     public static void error(String message) {
         Diag.error(message);
     }
@@ -91,7 +82,6 @@ public final class Debug {
      * Prints {@code message} then {@code t}'s stack trace to stderr, when debugging is on. Use this instead of
      * {@code t.printStackTrace()}, which would print on a quiet run.
      */
-    @Palette
     public static void error(String message, Throwable t) {
         Diag.error(message, t);
     }

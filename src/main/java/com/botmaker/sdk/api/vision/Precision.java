@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.meta.Palette;
-import com.botmaker.sdk.api.meta.Scaffolding;
 
 /**
  * How exacting a {@link Pixel} search should be — every knob that decides whether something counts as a match,
@@ -57,8 +55,6 @@ import com.botmaker.sdk.api.meta.Scaffolding;
 // Curated for the palette: both `of` factories and all four fluent builders are offered. This is the type
 // Pixel's tolerance lives in (see the note on Pixel), so hiding any of it would put that tolerance out of the
 // editor's reach entirely. `toString` is an Object override and never a menu entry.
-@Scaffolding
-@Palette
 public record Precision(double deltaE, int minArea, int minCount) {
 
     /** The area floor the named constants start from: filters out stray anti-aliased pixels. */
@@ -73,7 +69,6 @@ public record Precision(double deltaE, int minArea, int minCount) {
     /** The whole colour family — "some kind of red" (ΔE ≈ 25). */
     public static final Precision LOOSE = new Precision(25.0, DEFAULT_MIN_AREA, 0);
 
-    @Scaffolding   // the generated Activities' precision(String) helper calls the canonical constructor
     public Precision {
         if (Double.isNaN(deltaE) || deltaE < 0) {
             throw new IllegalArgumentException("tolerance must be a ΔE distance ≥ 0, got: " + deltaE);
@@ -93,19 +88,16 @@ public record Precision(double deltaE, int minArea, int minCount) {
      * @throws IllegalArgumentException if {@code deltaE} is negative or NaN. A bot that asks for a nonsense
      *         threshold should say so at the call rather than quietly match everything or nothing
      */
-    @Palette
     public static Precision of(double deltaE) {
         return new Precision(deltaE, DEFAULT_MIN_AREA, 0);
     }
 
     /** All three knobs at once, when none of the anchors is the starting point you want. */
-    @Palette
     public static Precision of(double deltaE, int minArea, int minCount) {
         return new Precision(deltaE, minArea, minCount);
     }
 
     /** This precision at a different colour tolerance. */
-    @Palette
     public Precision tolerance(double deltaE) {
         return new Precision(deltaE, minArea, minCount);
     }
@@ -116,7 +108,6 @@ public record Precision(double deltaE, int minArea, int minCount) {
      * @throws IllegalArgumentException if {@code minArea} is below 1 — zero or negative would ask for a
      *         cluster of nothing, which the cluster search has no way to honour
      */
-    @Palette
     public Precision minArea(int minArea) {
         return new Precision(deltaE, minArea, minCount);
     }
@@ -125,13 +116,11 @@ public record Precision(double deltaE, int minArea, int minCount) {
      * This precision requiring {@code minCount} matching pixels in total, however they clump. Pair it with
      * {@link #minArea(int)} of 1 to ask purely "is there enough of this colour", ignoring blob size.
      */
-    @Palette
     public Precision minCount(int minCount) {
         return new Precision(deltaE, minArea, minCount);
     }
 
     /** The side of the square, and roughly the diameter of the circle, {@link #minArea()} covers — for previews. */
-    @Palette
     public double equivalentSide() {
         return Math.sqrt(minArea);
     }

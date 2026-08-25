@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.launch;
 import com.botmaker.sdk.api.bot.BotSettings;
-import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 
@@ -20,7 +19,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * that hasn't picked a game yet simply doesn't launch anything. Override at runtime with
  * {@link #set(LaunchTarget)}.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): seven of the nine are offered — every verb is, and
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): seven of the nine are offered — every verb is, and
  * the two hidden members are the two that deal in a {@link LaunchTarget} the editor cannot put anywhere.
  * {@link #current()} hands back one, and a launch target is not a declarable variable type in Studio (it is
  * chosen through the launch dialog), so a menu entry producing one is the {@code Window.capture()} case again:
@@ -37,7 +36,6 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * the editor can produce</b>, and on this one method that is the typed form. {@code set(String)} stays public
  * for a bot computing its target from a config value.
  */
-@Palette
 public final class Target {
 
     private static volatile LaunchTarget current;
@@ -71,7 +69,6 @@ public final class Target {
     }
 
     /** Overrides the current target with an already-parsed one. */
-    @Palette
     public static void set(LaunchTarget target) {
         current = target;
         initialised = true;
@@ -81,7 +78,6 @@ public final class Target {
      * Launches the current target. No-op when none is configured — a bot that hasn't chosen a game yet won't
      * fail to start; it just has nothing to launch.
      */
-    @Palette
     public static void start() {
         LaunchTarget t = current();
         if (t == null) {
@@ -101,7 +97,6 @@ public final class Target {
      * game the user already opened by hand on a first run (see {@link LaunchTarget#startIfNotRunning()}). No-op
      * when no target is configured.
      */
-    @Palette
     public static void startIfNotRunning() {
         LaunchTarget t = current();
         if (t == null) {
@@ -120,14 +115,12 @@ public final class Target {
      * Whether the current target is up right now (see {@link LaunchTarget#isRunning()} for the layers it asks).
      * {@code false} when no target is configured — there is nothing that could be running.
      */
-    @Palette
     public static boolean isRunning() {
         LaunchTarget t = current();
         return t != null && t.isRunning();
     }
 
     /** Restarts the current target from a clean state (see {@link LaunchTarget#restart()}). No-op when none. */
-    @Palette
     public static void restart() {
         LaunchTarget t = current();
         if (t != null) {
@@ -141,7 +134,6 @@ public final class Target {
      *
      * @return true if the target's window appeared within the timeout, false if it timed out
      */
-    @Palette
     public static boolean launchAndWait() {
         LaunchTarget t = current();
         if (t == null) {
@@ -164,7 +156,6 @@ public final class Target {
      * @param timeoutMillis the maximum time to wait, in milliseconds
      * @return true if the target's window appeared within the timeout, false if it timed out
      */
-    @Palette
     public static boolean waitForLaunch(long timeoutMillis) {
         LaunchTarget t = current();
         if (t == null) {

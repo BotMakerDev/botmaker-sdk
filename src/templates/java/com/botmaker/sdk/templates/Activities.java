@@ -12,8 +12,7 @@ import com.botmaker.sdk.templates.meta.Template;
  * <p><b>Flags only, since the file split.</b> This class used to hold the project's configured values as
  * well, in one flat namespace with the flags; they live in {@link Parameters} now, and that class says why.
  * What is left here is exactly one {@code boolean} per activity the project defines, which is what a stub's
- * {@code isEnabled()} reads — so the two holes below carry <b>generation 2</b>: same names, same syntax, and
- * a different set of things belongs between the fences.
+ * {@code isEnabled()} reads.
  *
  * <p><b>Blank final, assigned in the static block — never an inline initializer.</b>
  * {@code public static final boolean MINING = true;} would make the field a JLS §4.12.4 <em>constant
@@ -26,19 +25,18 @@ import com.botmaker.sdk.templates.meta.Template;
  * itself is {@link Wire}'s, in the SDK: this file says what this project stores, never how a stored string
  * becomes a {@code Duration}.
  */
-@Template(id = "ACTIVITIES", kind = Template.Kind.REGENERATED, target = "Activities.java",
-        holes = {"FIELDS:2", "INITS:2"})
+@Template(id = "ACTIVITIES", kind = Template.Kind.REGENERATED, target = "Activities.java")
 public final class Activities {
 
-    /*<STUDIO:FIELDS:2>*/
+    /*<STUDIO:FIELDS>*/
     /** Whether the example activity runs. One field per activity. */
     public static final boolean EXAMPLE;
-    /*</STUDIO:FIELDS:2>*/
+    /*</STUDIO:FIELDS>*/
 
     static {
-        /*<STUDIO:INITS:2>*/
+        /*<STUDIO:INITS>*/
         EXAMPLE = Wire.flag(Wire.one("EXAMPLE"));
-        /*</STUDIO:INITS:2>*/
+        /*</STUDIO:INITS>*/
     }
 
     private Activities() {}

@@ -6,7 +6,6 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.interaction.Key;
 import com.botmaker.sdk.api.interaction.MouseButton;
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.meta.Since;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.Precision;
@@ -57,7 +56,6 @@ import java.util.function.Function;
  * <p>{@link #many} takes the very method reference the single-valued form would have called, so an item of a
  * list is read exactly the way a lone value is.
  */
-@Scaffolding
 @Since("1.1.0")
 public final class Wire {
 

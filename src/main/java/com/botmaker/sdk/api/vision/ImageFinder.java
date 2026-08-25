@@ -5,8 +5,6 @@ import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.meta.Palette;
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.MatchEvent;
@@ -36,14 +34,13 @@ import java.util.stream.Collectors;
  * ({@link #whileFind}, {@link #untilFind}, {@link #ifFind}) — each is one capture that hands the matched
  * {@link MatchResult} to your action.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}). Every operation here is offered, but of each
+ * <p><b>Curated for the palette</b> (see {@code @Palette}). Every operation here is offered, but of each
  * matcher's four shapes only two are: the plain form and the {@code CaptureSource} form. The overloads taking
  * a bare {@code double confidence} are hidden — still public, still supported, still callable by hand — because
  * a per-call threshold is the second answer to a question {@link ImageTemplate#threshold()} already answers,
  * and the image picker sets that one. The {@code *Compare} families keep all four, since their {@code double}
  * is a comparison <em>margin</em> with no other home.
  */
-@Palette
 public class ImageFinder {
 
     // --- find (single template) ---
@@ -60,7 +57,6 @@ public class ImageFinder {
      * @see #find(ImageTemplate, CaptureSource)
      * @see #find(ImageTemplate, CaptureSource, double)
      */
-    @Palette
     public static boolean find(ImageTemplate template) {
         return find(template, Source.current(), BotSettings.confidence());
     }
@@ -89,7 +85,6 @@ public class ImageFinder {
      * @param source   the capture source (window, monitor, or desktop region) to search within
      * @return true if the template was found, false otherwise
      */
-    @Palette
     public static boolean find(ImageTemplate template, CaptureSource source) {
         return find(template, source, BotSettings.confidence());
     }
@@ -246,7 +241,6 @@ public class ImageFinder {
      * @see #findAny(CaptureSource, ImageTemplate...)
      * @see #findAny(CaptureSource, double, ImageTemplate...)
      */
-    @Palette
     public static boolean findAny(ImageTemplate... templates) {
         return findAny(Source.current(), BotSettings.confidence(), templates);
     }
@@ -275,7 +269,6 @@ public class ImageFinder {
      * @param templates the image templates to search for, in priority order
      * @return true if any template was found, false otherwise
      */
-    @Palette
     public static boolean findAny(CaptureSource source, ImageTemplate... templates) {
         return findAny(source, BotSettings.confidence(), templates);
     }
@@ -319,7 +312,6 @@ public class ImageFinder {
      * @see #findAny(ImageTemplateGroup, CaptureSource)
      * @see #findAny(ImageTemplateGroup, CaptureSource, double)
      */
-    @Palette
     public static boolean findAny(ImageTemplateGroup group) {
         return findAny(Source.current(), BotSettings.confidence(), group.toArray());
     }
@@ -348,7 +340,6 @@ public class ImageFinder {
      * @param source the capture source to search within
      * @return true if any template in the group was found, false otherwise
      */
-    @Palette
     public static boolean findAny(ImageTemplateGroup group, CaptureSource source) {
         return findAny(source, BotSettings.confidence(), group.toArray());
     }
@@ -384,7 +375,6 @@ public class ImageFinder {
      * @see #findBest(ImageTemplateGroup, CaptureSource)
      * @see #findBest(ImageTemplateGroup, CaptureSource, double)
      */
-    @Palette
     public static boolean findBest(ImageTemplateGroup group) {
         return findBest(group, Source.current(), BotSettings.confidence());
     }
@@ -413,7 +403,6 @@ public class ImageFinder {
      * @param source the capture source to search within
      * @return true if any template in the group was found, false otherwise
      */
-    @Palette
     public static boolean findBest(ImageTemplateGroup group, CaptureSource source) {
         return findBest(group, source, BotSettings.confidence());
     }
@@ -459,7 +448,6 @@ public class ImageFinder {
      * @param bad  the group of bad templates that must NOT out-score the good templates
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
-    @Palette
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
         MatchResult result = compare(good.templates(), bad.templates(), Source.current(),
                 BotSettings.confidence(), BotSettings.compareMargin());
@@ -479,7 +467,6 @@ public class ImageFinder {
      * @param margin the minimum score difference required for a match
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
-    @Palette
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
         MatchResult result = compare(good.templates(), bad.templates(), Source.current(),
                 BotSettings.confidence(), margin);
@@ -499,7 +486,6 @@ public class ImageFinder {
      * @param source the capture source to search within
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
-    @Palette
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         MatchResult result = compare(good.templates(), bad.templates(), source,
                 BotSettings.confidence(), BotSettings.compareMargin());
@@ -520,7 +506,6 @@ public class ImageFinder {
      * @param margin the minimum score difference required for a match
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
-    @Palette
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                           double margin) {
         PopupGuard.check();
@@ -543,7 +528,6 @@ public class ImageFinder {
      * @param bad  the group of bad templates that must NOT out-score the good template
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
-    @Palette
     public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
         return findAnyCompare(good, bad, Source.current(), BotSettings.compareMargin());
     }
@@ -559,7 +543,6 @@ public class ImageFinder {
      * @param margin the minimum score difference required for a match
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
-    @Palette
     public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
         return findAnyCompare(good, bad, Source.current(), margin);
     }
@@ -575,7 +558,6 @@ public class ImageFinder {
      * @param source the capture source to search within
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
-    @Palette
     public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         return findAnyCompare(good, bad, source, BotSettings.compareMargin());
     }
@@ -592,7 +574,6 @@ public class ImageFinder {
      * @param margin the minimum score difference required for a match
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
-    @Palette
     public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                          double margin) {
         PopupGuard.check();
@@ -614,7 +595,6 @@ public class ImageFinder {
      * @param bad  the group of bad templates that must NOT out-score a good match
      * @return the number of winning good matches found
      */
-    @Palette
     public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
         return findAllCompare(good, bad, Source.current(), BotSettings.compareMargin());
     }
@@ -630,7 +610,6 @@ public class ImageFinder {
      * @param margin the minimum score difference required for a match
      * @return the number of winning good matches found
      */
-    @Palette
     public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
         return findAllCompare(good, bad, Source.current(), margin);
     }
@@ -646,7 +625,6 @@ public class ImageFinder {
      * @param source the capture source to search within
      * @return the number of winning good matches found
      */
-    @Palette
     public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         return findAllCompare(good, bad, source, BotSettings.compareMargin());
     }
@@ -663,7 +641,6 @@ public class ImageFinder {
      * @param margin the minimum score difference required for a match
      * @return the number of winning good matches found
      */
-    @Palette
     public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                      double margin) {
         PopupGuard.check();
@@ -834,7 +811,6 @@ public class ImageFinder {
      * @param template the image template to search for
      * @return the number of matches found
      */
-    @Palette
     public static int findAll(ImageTemplate template) {
         return findAll(template, Source.current(), BotSettings.confidence());
     }
@@ -863,7 +839,6 @@ public class ImageFinder {
      * @param source   the capture source to search within
      * @return the number of matches found
      */
-    @Palette
     public static int findAll(ImageTemplate template, CaptureSource source) {
         return findAll(template, source, BotSettings.confidence());
     }
@@ -955,7 +930,6 @@ public class ImageFinder {
      * @param group the template group to search for
      * @return the total number of matches found across all templates in the group
      */
-    @Palette
     public static int findAll(ImageTemplateGroup group) {
         return findAll(group, Source.current(), BotSettings.confidence());
     }
@@ -984,7 +958,6 @@ public class ImageFinder {
      * @param source the capture source to search within
      * @return the total number of matches found across all templates in the group
      */
-    @Palette
     public static int findAll(ImageTemplateGroup group, CaptureSource source) {
         return findAll(group, source, BotSettings.confidence());
     }
@@ -1077,7 +1050,6 @@ public class ImageFinder {
      * @param action   the action to run with the match result
      * @return true if the template was found and the action was run, false otherwise
      */
-    @Palette
     public static boolean ifFind(ImageTemplate template, Consumer<MatchResult> action) {
         return ifFind(template, Source.current(), action);
     }
@@ -1091,7 +1063,6 @@ public class ImageFinder {
      * @param action   the action to run with the match result
      * @return true if the template was found and the action was run, false otherwise
      */
-    @Palette
     public static boolean ifFind(ImageTemplate template, CaptureSource source, Consumer<MatchResult> action) {
         PopupGuard.check();
         MatchResult result = findInternal(template, source, BotSettings.confidence());
@@ -1109,7 +1080,6 @@ public class ImageFinder {
      * @param template the image template to search for
      * @param action   the action to run with each match result
      */
-    @Palette
     public static void whileFind(ImageTemplate template, Consumer<MatchResult> action) {
         whileFind(template, Source.current(), action);
     }
@@ -1121,7 +1091,6 @@ public class ImageFinder {
      * @param source   the capture source to search within
      * @param action   the action to run with each match result
      */
-    @Palette
     public static void whileFind(ImageTemplate template, CaptureSource source, Consumer<MatchResult> action) {
         PopupGuard.check();
         MatchResult result;
@@ -1138,7 +1107,6 @@ public class ImageFinder {
      * @param template the image template to search for
      * @param action   the action to run
      */
-    @Palette
     public static void untilFind(ImageTemplate template, Runnable action) {
         untilFind(template, Source.current(), action);
     }
@@ -1150,7 +1118,6 @@ public class ImageFinder {
      * @param source   the capture source to search within
      * @param action   the action to run
      */
-    @Palette
     public static void untilFind(ImageTemplate template, CaptureSource source, Runnable action) {
         while (!find(template, source)) {
             action.run();
@@ -1175,7 +1142,6 @@ public class ImageFinder {
      * @param action the action to run with the frame's matches
      * @return true if any template was found and the action was run, false otherwise
      */
-    @Palette
     public static boolean ifFindAny(ImageTemplateGroup group, Consumer<Matches> action) {
         return ifFindAny(group, Source.current(), action);
     }
@@ -1189,7 +1155,6 @@ public class ImageFinder {
      * @param action the action to run with the frame's matches
      * @return true if any template was found and the action was run, false otherwise
      */
-    @Palette
     public static boolean ifFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         PopupGuard.check();
         Vision.Frame frame = findFrame(group, source, BotSettings.confidence());
@@ -1208,7 +1173,6 @@ public class ImageFinder {
      * @param action the action to run with the frame's matches
      * @return true if all templates were found and the action was run, false otherwise
      */
-    @Palette
     public static boolean ifFindAll(ImageTemplateGroup group, Consumer<Matches> action) {
         return ifFindAll(group, Source.current(), action);
     }
@@ -1222,7 +1186,6 @@ public class ImageFinder {
      * @param action the action to run with the frame's matches
      * @return true if all templates were found and the action was run, false otherwise
      */
-    @Palette
     public static boolean ifFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         if (group.isEmpty()) return false;   // "all of nothing" is vacuously true; an empty group matches nothing
         PopupGuard.check();
@@ -1242,8 +1205,6 @@ public class ImageFinder {
      * @param group  the template group to search for
      * @param action the action to run with each frame's matches
      */
-    @Scaffolding   // the game-bot scaffold's Popups.run() is this loop over an initially empty group
-    @Palette
     public static void whileFindAny(ImageTemplateGroup group, Consumer<Matches> action) {
         whileFindAny(group, Source.current(), action);
     }
@@ -1256,7 +1217,6 @@ public class ImageFinder {
      * @param source the capture source to search within
      * @param action the action to run with each frame's matches
      */
-    @Palette
     public static void whileFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         PopupGuard.check();
         Vision.Frame frame;
@@ -1273,7 +1233,6 @@ public class ImageFinder {
      * @param group  the template group to search for
      * @param action the action to run with each frame's matches
      */
-    @Palette
     public static void whileFindAll(ImageTemplateGroup group, Consumer<Matches> action) {
         whileFindAll(group, Source.current(), action);
     }
@@ -1286,7 +1245,6 @@ public class ImageFinder {
      * @param source the capture source to search within
      * @param action the action to run with each frame's matches
      */
-    @Palette
     public static void whileFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         if (group.isEmpty()) return;   // vacuous hasAll would spin this loop forever on an empty group
         PopupGuard.check();
@@ -1303,7 +1261,6 @@ public class ImageFinder {
      * @param group  the template group to search for
      * @param action the action to run
      */
-    @Palette
     public static void untilFindAny(ImageTemplateGroup group, Runnable action) {
         untilFindAny(group, Source.current(), action);
     }
@@ -1315,7 +1272,6 @@ public class ImageFinder {
      * @param source the capture source to search within
      * @param action the action to run
      */
-    @Palette
     public static void untilFindAny(ImageTemplateGroup group, CaptureSource source, Runnable action) {
         if (group.isEmpty()) return;   // nothing can ever appear, so this would run action forever
         while (!findAny(group, source)) {
@@ -1329,7 +1285,6 @@ public class ImageFinder {
      * @param group  the template group to search for
      * @param action the action to run
      */
-    @Palette
     public static void untilFindAll(ImageTemplateGroup group, Runnable action) {
         untilFindAll(group, Source.current(), action);
     }
@@ -1341,7 +1296,6 @@ public class ImageFinder {
      * @param source the capture source to search within
      * @param action the action to run
      */
-    @Palette
     public static void untilFindAll(ImageTemplateGroup group, CaptureSource source, Runnable action) {
         if (group.isEmpty()) return;   // allMatch over nothing is vacuously true; keep it "matches nothing"
         while (!group.templates().stream().allMatch(t -> find(t, source))) {

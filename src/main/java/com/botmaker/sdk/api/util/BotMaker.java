@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.util;
 
-import com.botmaker.sdk.api.meta.Palette;
-import com.botmaker.sdk.api.meta.Scaffolding;
 
 import java.util.Scanner;
 
@@ -12,12 +10,11 @@ import java.util.Scanner;
  * {@link Scanner} or {@code System.out} directly — the visual Print / Read blocks compile down
  * to {@code BotMaker.print(...)} and {@code BotMaker.readX()} calls.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): all five are offered. The four {@code readX}
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): all five are offered. The four {@code readX}
  * methods look like an overload family and are not one — they differ in <em>return</em> type, not in
  * arguments, so no one of them can stand in for another and there is no spelling to prefer. This is the
  * {@code Keyboard} shape: a closed set of operations with nothing duplicated.
  */
-@Palette
 public class BotMaker {
 
     /** Lazily created so simply referencing print() does not open stdin. */
@@ -41,35 +38,29 @@ public class BotMaker {
     }
 
     /** Prints {@code value} followed by a newline. */
-    @Palette
-    @Scaffolding   // the "Empty" project scaffold's whole main body
     public static void print(Object value) {
         System.out.println(value);
     }
 
     /** Reads a full line of text from standard input. */
-    @Palette
     public static String readLine() {
         signalInputExpected("line");
         return scanner().nextLine();
     }
 
     /** Reads the next integer from standard input. */
-    @Palette
     public static int readInt() {
         signalInputExpected("int");
         return scanner().nextInt();
     }
 
     /** Reads the next double from standard input. */
-    @Palette
     public static double readDouble() {
         signalInputExpected("double");
         return scanner().nextDouble();
     }
 
     /** Reads the next boolean from standard input. */
-    @Palette
     public static boolean readBoolean() {
         signalInputExpected("boolean");
         return scanner().nextBoolean();

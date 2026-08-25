@@ -2,7 +2,6 @@ package com.botmaker.sdk.api.capture;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.capture.WindowBacked;
 import com.botmaker.shared.capture.GenericWindow;
@@ -25,7 +24,7 @@ import java.util.Optional;
  *
  * <p>The underlying native handle is kept opaque; obtain a {@code Window} via the static factories.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): twelve of the fourteen are offered — the three
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): twelve of the fourteen are offered — the three
  * factories and every accessor and interaction a bot writes against a window it is holding. The two hidden
  * are {@link #capture()} and {@link #targetWindow()}, and they are hidden by the same mechanical rule that
  * hid {@code Time.getDefaultTimeZone()}: <b>a return value the palette has nowhere to put</b>. Their types —
@@ -35,7 +34,6 @@ import java.util.Optional;
  * by the vision layer rather than by a bot: the sentence above about passing a {@code Window} straight into
  * {@code ImageFinder.find} <em>is</em> how a bot uses them.
  */
-@Palette
 public class Window implements CaptureSource, WindowBacked {
 
     private final GenericWindow handle;
@@ -51,7 +49,6 @@ public class Window implements CaptureSource, WindowBacked {
     // --- Factories ---
 
     /** The window that currently has focus, or empty if none could be resolved. */
-    @Palette
     public static Optional<Window> foreground() {
         GenericWindow gw = controller().getForegroundWindow();
         Debug.log("[Window] foreground -> " + (gw == null ? "none" : gw.getTitle()));
@@ -59,7 +56,6 @@ public class Window implements CaptureSource, WindowBacked {
     }
 
     /** Every top-level window the window manager reports (titled + viewable). */
-    @Palette
     public static List<Window> all() {
         List<Window> windows = new ArrayList<>();
         for (GenericWindow gw : controller().getAllWindows()) {
@@ -77,7 +73,6 @@ public class Window implements CaptureSource, WindowBacked {
      * wiki tab or launcher entry named after the game), and dynamic title suffixes (score, level,
      * document name, …) are tolerated — while the shortest, largest matching window wins ties.
      */
-    @Palette
     public static Optional<Window> find(String titleSubstring) {
         if (titleSubstring == null) {
             return Optional.empty();
@@ -96,7 +91,6 @@ public class Window implements CaptureSource, WindowBacked {
         return controller().captureWindow(handle);
     }
 
-    @Palette
     @Override
     public Point origin() {
         Rectangle r = handle.getRect();
@@ -110,25 +104,21 @@ public class Window implements CaptureSource, WindowBacked {
 
     // --- Accessors ---
 
-    @Palette
     public String title() {
         String t = handle.getTitle();
         return t == null ? "" : t;
     }
 
     /** Absolute screen bounds of the window. */
-    @Palette
     public Rect bounds() {
         Rectangle r = handle.getRect();
         return new Rect(r.x, r.y, r.width, r.height);
     }
 
-    @Palette
     public int width() {
         return handle.getRect().width;
     }
 
-    @Palette
     public int height() {
         return handle.getRect().height;
     }
@@ -136,21 +126,18 @@ public class Window implements CaptureSource, WindowBacked {
     // --- Interaction ---
 
     /** Click at coordinates relative to this window's top-left (converted to absolute internally). */
-    @Palette
     public void click(int relativeX, int relativeY) {
         Debug.log("[Window] click " + relativeX + "," + relativeY + " in " + title());
         controller().postLeftClick(handle, relativeX, relativeY);
     }
 
     /** Bring this window to the foreground and give it input focus. */
-    @Palette
     public void focus() {
         Debug.log("[Window] focus " + title());
         controller().focusWindow(handle);
     }
 
     /** Move this window's top-left corner to the given absolute screen coordinate. */
-    @Palette
     public void move(int x, int y) {
         Debug.log("[Window] move " + title() + " -> " + x + "," + y);
         controller().moveWindow(handle, x, y);
@@ -160,7 +147,6 @@ public class Window implements CaptureSource, WindowBacked {
      * Resize this window. Useful to force a game into the exact resolution its templates were
      * cropped at, since template matching breaks when the window is a different size.
      */
-    @Palette
     public void resize(int width, int height) {
         Debug.log("[Window] resize " + title() + " -> " + width + "x" + height);
         controller().resizeWindow(handle, width, height);

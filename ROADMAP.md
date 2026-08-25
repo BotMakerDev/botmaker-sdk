@@ -8,6 +8,48 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-25 — demolition: the scaffold contract apparatus is removed (inversion, phase 0)
+
+**Changed:** `api/meta/Palette.java` and `api/meta/Scaffolding.java` **deleted** with all 435 use sites across
+38 files; `templates/meta/Template.java` loses `holes()`; all 13 fences in `src/templates/java/**` lose their
+generation (`/*<STUDIO:FIELDS:2>*/` → `/*<STUDIO:FIELDS>*/`); `apt/TemplateProcessor` loses `checkHoles` and
+the fence↔`holes` reconciliation, and the manifest drops its `holes` column (**format 2 → 3**);
+`ApiPointersTest` loses rules 9 and 10; `ScaffoldTemplatesTest` loses the constant-pool rule and everything
+only it used; `api-surface.txt` regenerated.
+
+**Done:**
+
+- **The apparatus existed to make two repositories agree about a file they co-author.** Studio rendered the
+  fragments, the SDK shipped the frame, and a negotiated protocol — fenced holes, per-hole generation numbers,
+  a generated manifest, a committed ledger on each side, two `release.sh` gates, and Studio's
+  `ScaffoldCheck` → `ScaffoldRepair` → refuse — kept them from disagreeing. The decision is to **remove the
+  disagreement rather than manage it**: the SDK becomes the generator, so there is no scaffold on Studio's
+  side at all. This is phase 0 of that inversion, done first and on its own so the `Wire`/parameter redesign
+  that follows lands on a small surface.
+- **What survives:** the templates themselves, `@Template(id, kind, target)`, the generated manifest, and the
+  fences — reduced to a plain `name → text` fill. `TemplateStore` still reads them for one more phase.
+- **`@Scaffolding` went with the rule that read it.** It was a claim about which SDK members Studio wrote into
+  generated files; with one author there is no second party to warn. `ScaffoldTemplatesTest` keeps the two
+  rules that are still about *this* repository (the manifest matches what ships; every fence is one matched
+  pair) and drops the third, which scanned the templates' constant pools to enforce the annotation.
+- **`@Palette` went with the blast radius the maintainer chose.** It was a strict per-overload whitelist for
+  Studio's block menus. Deleting it widens those menus — `SdkSurfaceService` treats a jar with no `Palette`
+  class as uncurated — until the SDK serves the palette itself in a later phase. The maintainer's per-facade
+  curation *prose* is preserved in each facade's Javadoc; the per-member verdicts lived only in the 400
+  annotations and are lost.
+- **Both are public `api.meta` types removed after 1.1.0 shipped**, so this is an undeprecated removal, taken
+  deliberately: `release.sh --allow-removal com.botmaker.sdk.api.meta.Palette,…Scaffolding`, with
+  `api-surface.txt` regenerated in the same commit. Neither was a type a bot could write down.
+- **Manifest format 2 → 3, not 1 → 2 as the plan assumed** — it was already at 2 when the plan was written.
+  An older Studio refuses a format it cannot read, which is the correct answer for a new SDK under an old
+  Studio.
+- **The pom's pass 4 (`restore-artifact-directory`) is kept**, against the plan, which held it existed only to
+  undo pass 3 for a departing gate. It undoes `maven-compiler-plugin` re-pointing the project artifact at the
+  last `compile` execution's output; pass 3 is not going anywhere this phase, so without it an ordinary
+  `mvn -pl botmaker-studio -am test` hands Studio `target/template-classes`.
+
+---
+
 ## 2026-08-25 — `Parameters.java`, and the first hole whose generation moves
 
 **Changed:** new `src/templates/java/.../Parameters.java` (`@Template(id = "PARAMETERS", kind = REGENERATED,

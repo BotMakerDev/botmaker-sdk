@@ -1,6 +1,4 @@
 package com.botmaker.sdk.api.bot;
-import com.botmaker.sdk.api.meta.Palette;
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
 
@@ -36,7 +34,7 @@ import java.util.Map;
  * Studio "disable activity ▾" block emits ({@code Activity.disable("Mining")}). The instance
  * {@link #disable()} / {@link #enable()} still work for an activity acting on itself.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}), and it is the first type in the sweep whose
+ * <p><b>Curated for the palette</b> (see {@code @Palette}), and it is the first type in the sweep whose
  * <em>instance</em> methods needed deciding too: {@code @Palette} gates a type, and Studio's ⚙ overload picker
  * consults the curation for a call on a variable just as it does for a static one. Six are offered — the
  * static {@link #disable(String)} / {@link #enable(String)}, and the instance {@link #name()},
@@ -57,8 +55,6 @@ import java.util.Map;
  */
 // Every activity stub extends it, the generated ActivityRegistry holds a List<Activity<?>> of them, and
 // GoHome/Popups are two more subclasses the scaffold writes. Renaming this type is a Studio release.
-@Scaffolding
-@Palette
 public abstract class Activity<O extends Enum<O>> {
 
     /**
@@ -105,13 +101,11 @@ public abstract class Activity<O extends Enum<O>> {
      * never crashes a running bot. This is the general "stop doing X" primitive, including one activity
      * disabling another.
      */
-    @Palette
     public static void disable(String name) {
         setEnabled(name, false);
     }
 
     /** Turns the named activity on for the rest of the run. Unknown name → a warning and no-op. */
-    @Palette
     public static void enable(String name) {
         setEnabled(name, true);
     }
@@ -133,7 +127,6 @@ public abstract class Activity<O extends Enum<O>> {
     }
 
     /** Human-readable name (used for logging / the activity registry). */
-    @Palette
     public String name() {
         return name;
     }
@@ -144,7 +137,6 @@ public abstract class Activity<O extends Enum<O>> {
      * starting point; a running bot can override it with {@link #setEnabled}. The macro loop does not call
      * this directly — it consults {@link #active()}, which layers any runtime override on top.
      */
-    @Scaffolding   // every generated stub overrides it, wired to that activity's Activities flag
     public abstract boolean isEnabled();
 
     /**
@@ -152,8 +144,6 @@ public abstract class Activity<O extends Enum<O>> {
      * {@link #setEnabled} if one has been set, otherwise the configured {@link #isEnabled()} default. This is
      * what lets a mid-run {@link #disable()} actually stop the activity from running on the next pass.
      */
-    @Palette
-    @Scaffolding   // the generated FlowDriver's per-activity "is it on" branch
     public final boolean active() {
         return enabledOverride != null ? enabledOverride : isEnabled();
     }
@@ -168,13 +158,11 @@ public abstract class Activity<O extends Enum<O>> {
     }
 
     /** Enables this activity for the rest of the run — shorthand for {@code setEnabled(true)}. */
-    @Palette
     public void enable() {
         setEnabled(true);
     }
 
     /** Disables this activity for the rest of the run — shorthand for {@code setEnabled(false)}. */
-    @Palette
     public void disable() {
         setEnabled(false);
     }
@@ -188,7 +176,6 @@ public abstract class Activity<O extends Enum<O>> {
      * {@code return Outcome.DEFAULT;}, so an activity that has nothing special to report needs no thought at
      * all — the default outcome follows the card's plain output wire.
      */
-    @Scaffolding   // every generated stub overrides it — it is the one method the user is asked to fill in
     public abstract O run();
 
     /** Overridable no-op: called before {@link #run()} (e.g. navigate to the activity's screen). */
@@ -207,7 +194,6 @@ public abstract class Activity<O extends Enum<O>> {
      * recover — a stuck activity produces no outcome, because the flow isn't what decides where to go next in
      * that case; the supervisor is.
      */
-    @Scaffolding   // the generated FlowDriver switches on it; GoHome/Popups are installed as INSTANCE::execute
     public final O execute() {
         // The activity and its outcome are the coarsest unit of "what is the bot doing", so this one line is
         // what makes a debug console read as a story rather than as vision events. It is also the only place

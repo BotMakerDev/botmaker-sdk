@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.sdk.api.meta.Palette;
-import com.botmaker.sdk.api.meta.Scaffolding;
 import com.botmaker.sdk.internal.vision.TemplateMetadata;
 import com.botmaker.shared.opencv.OpenCvNative;
 import org.opencv.core.Mat;
@@ -20,7 +18,7 @@ import java.nio.file.Paths;
  * {@code Template} wrapper; that indirection has been collapsed now that OpenCV loads reliably via
  * {@link OpenCvNative}.)
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): six of the eight public methods are offered — the
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): six of the eight public methods are offered — the
  * four that describe the template ({@link #id()}, {@link #filePath()}, {@link #threshold()}, {@link #width()},
  * {@link #height()}) and the one that tunes it ({@link #setThreshold(double)}). {@link #unload()} and
  * {@link #close()} are hidden as the pair they are: they are memory management for a {@code Mat} the bot
@@ -30,8 +28,6 @@ import java.nio.file.Paths;
  * {@code AutoCloseable} is implemented for the matchers' own try-with-resources, not for a bot to call.
  */
 // The generated Activities declares one per image-template variable, and builds it from the stored path.
-@Scaffolding
-@Palette
 public class ImageTemplate implements AutoCloseable {
 
     static { OpenCvNative.ensureLoaded(); }
@@ -47,7 +43,6 @@ public class ImageTemplate implements AutoCloseable {
      * Constructor using file path.
      * @param filePath Path to the image (e.g. "images/accept_button.png")
      */
-    @Scaffolding   // the generated Activities' template(String) helper
     public ImageTemplate(String filePath) {
         if (filePath == null || filePath.isBlank()) {
             throw new IllegalArgumentException("File path cannot be empty");
@@ -69,22 +64,18 @@ public class ImageTemplate implements AutoCloseable {
         this.threshold = threshold;
     }
 
-    @Palette
     public String id() {
         return id;
     }
 
-    @Palette
     public String filePath() {
         return filePath;
     }
 
-    @Palette
     public double threshold() {
         return threshold;
     }
 
-    @Palette
     public void setThreshold(double threshold) {
         this.threshold = threshold;
     }
@@ -128,12 +119,10 @@ public class ImageTemplate implements AutoCloseable {
         return TemplateMetadata.authoredSize(filePath);
     }
 
-    @Palette
     public int width() {
         return getMat().cols();
     }
 
-    @Palette
     public int height() {
         return getMat().rows();
     }

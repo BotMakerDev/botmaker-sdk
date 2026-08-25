@@ -6,7 +6,6 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.interaction.Wait;
-import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.ClickEvent;
@@ -24,7 +23,7 @@ import java.util.List;
  * Every method in this class also updates {@link Vision} for the current thread,
  * enabling access to the most recent match via {@link Vision#lastMatch()}.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}), by the same rule as {@link ImageFinder}: every
+ * <p><b>Curated for the palette</b> (see {@code @Palette}), by the same rule as {@link ImageFinder}: every
  * operation is offered, and of each matcher's four shapes only the plain form and the {@code CaptureSource}
  * form are. The overloads taking a bare {@code double confidence} are hidden — still public, still supported —
  * because {@link ImageTemplate#threshold()} already answers that question and the image picker sets it. The
@@ -32,7 +31,6 @@ import java.util.List;
  * twice over: its {@code delayMs} has a home in {@link BotSettings#foundDelay()}. The {@code *Compare}
  * families keep every shape, their {@code double} being a comparison <em>margin</em> nothing else holds.
  */
-@Palette
 public class ImageClicker {
 
     // --- click (single template) ---
@@ -49,7 +47,6 @@ public class ImageClicker {
      * @see #click(ImageTemplate, CaptureSource)
      * @see #click(ImageTemplate, CaptureSource, double)
      */
-    @Palette
     public static boolean click(ImageTemplate template) {
         return click(template, Source.current(), BotSettings.confidence(), BotSettings.foundDelay());
     }
@@ -78,7 +75,6 @@ public class ImageClicker {
      * @param source   the capture source (window, monitor, or desktop region) to search within
      * @return true if the template was found and clicked, false otherwise
      */
-    @Palette
     public static boolean click(ImageTemplate template, CaptureSource source) {
         return click(template, source, BotSettings.confidence(), BotSettings.foundDelay());
     }
@@ -133,7 +129,6 @@ public class ImageClicker {
      * @param result the match to click
      * @return true if the match was found and clicked, false if it was a miss
      */
-    @Palette
     public static boolean click(MatchResult result) {
         return click(result, Source.current());
     }
@@ -146,7 +141,6 @@ public class ImageClicker {
      * @param source the capture source to click through
      * @return true if the match was found and clicked, false if it was a miss
      */
-    @Palette
     public static boolean click(MatchResult result, CaptureSource source) {
         if (result == null) return false;
         Vision.setLastMatch(result);
@@ -191,7 +185,6 @@ public class ImageClicker {
      *
      * @return true if the frame had a match and it was clicked, false otherwise
      */
-    @Palette
     public static boolean clickLast() {
         Vision.Frame frame = Vision.currentFrame();
         return frame != null && clickResult(frame.source(), frame.matches().best());
@@ -207,7 +200,6 @@ public class ImageClicker {
      *
      * @return how many matches were clicked (0 outside a frame, or if the frame was empty)
      */
-    @Palette
     public static int clickEachLast() {
         Vision.Frame frame = Vision.currentFrame();
         return frame == null ? 0 : clickEach(frame, frame.matches().all());
@@ -224,7 +216,6 @@ public class ImageClicker {
      * @param templates the templates to act on; the frame's own order is kept, not this argument's
      * @return how many matches were clicked
      */
-    @Palette
     public static int clickEachLast(ImageTemplate... templates) {
         Vision.Frame frame = Vision.currentFrame();
         if (frame == null || templates == null) return 0;
@@ -246,7 +237,6 @@ public class ImageClicker {
      *
      * @return how many matches were clicked (0 outside a frame, or if the frame was empty)
      */
-    @Palette
     public static int clickAllLast() {
         Vision.Frame frame = Vision.currentFrame();
         if (frame == null) return 0;
@@ -260,7 +250,6 @@ public class ImageClicker {
      * @param templates the templates to act on
      * @return how many matches were clicked
      */
-    @Palette
     public static int clickAllLast(ImageTemplate... templates) {
         Vision.Frame frame = Vision.currentFrame();
         if (frame == null || templates == null) return 0;
@@ -328,7 +317,6 @@ public class ImageClicker {
      * @param templates the image templates to search for, in priority order
      * @return true if any template was found and clicked, false otherwise
      */
-    @Palette
     public static boolean clickAny(ImageTemplate... templates) {
         return clickAny(Source.current(), BotSettings.confidence(), templates);
     }
@@ -357,7 +345,6 @@ public class ImageClicker {
      * @param templates the image templates to search for, in priority order
      * @return true if any template was found and clicked, false otherwise
      */
-    @Palette
     public static boolean clickAny(CaptureSource source, ImageTemplate... templates) {
         return clickAny(source, BotSettings.confidence(), templates);
     }
@@ -394,7 +381,6 @@ public class ImageClicker {
      * @param group the template group to search for
      * @return true if any template in the group was found and clicked, false otherwise
      */
-    @Palette
     public static boolean clickAny(ImageTemplateGroup group) {
         return clickAny(Source.current(), BotSettings.confidence(), group.toArray());
     }
@@ -423,7 +409,6 @@ public class ImageClicker {
      * @param source the capture source to search within
      * @return true if any template in the group was found and clicked, false otherwise
      */
-    @Palette
     public static boolean clickAny(ImageTemplateGroup group, CaptureSource source) {
         return clickAny(source, BotSettings.confidence(), group.toArray());
     }
@@ -461,7 +446,6 @@ public class ImageClicker {
      * @param group the template group to search for
      * @return true if any template in the group was found and clicked, false otherwise
      */
-    @Palette
     public static boolean clickBest(ImageTemplateGroup group) {
         PopupGuard.check();
         CaptureSource source = Source.current();
@@ -498,7 +482,6 @@ public class ImageClicker {
      * @param source the capture source to search within
      * @return true if any template in the group was found and clicked, false otherwise
      */
-    @Palette
     public static boolean clickBest(ImageTemplateGroup group, CaptureSource source) {
         PopupGuard.check();
         MatchResult result = findBestInternal(group, source, BotSettings.confidence());
@@ -537,7 +520,6 @@ public class ImageClicker {
      * @param bad  the group of bad templates that must NOT out-score the good templates
      * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
      */
-    @Palette
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
         PopupGuard.check();
         CaptureSource source = Source.current();
@@ -559,7 +541,6 @@ public class ImageClicker {
      * @param margin the minimum score difference required for a match
      * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
      */
-    @Palette
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
         PopupGuard.check();
         CaptureSource source = Source.current();
@@ -581,7 +562,6 @@ public class ImageClicker {
      * @param source the capture source to search within
      * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
      */
-    @Palette
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         PopupGuard.check();
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
@@ -603,7 +583,6 @@ public class ImageClicker {
      * @param margin the minimum score difference required for a match
      * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
      */
-    @Palette
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                           double margin) {
         PopupGuard.check();
@@ -629,7 +608,6 @@ public class ImageClicker {
      * @param bad  the group of bad templates that must NOT out-score the good templates
      * @return true if a good template was found, beat all bad templates, and was clicked, false otherwise
      */
-    @Palette
     public static boolean clickAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
         return clickAnyCompare(good, bad, Source.current(), BotSettings.compareMargin());
     }
@@ -642,7 +620,6 @@ public class ImageClicker {
      * @param source the capture source to search within
      * @return true if a good template was found, beat all bad templates, and was clicked, false otherwise
      */
-    @Palette
     public static boolean clickAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         return clickAnyCompare(good, bad, source, BotSettings.compareMargin());
     }
@@ -657,7 +634,6 @@ public class ImageClicker {
      * @param margin the minimum score difference the good must beat the bad by
      * @return true if a good template was found, beat all bad templates, and was clicked, false otherwise
      */
-    @Palette
     public static boolean clickAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                           double margin) {
         PopupGuard.check();
@@ -680,7 +656,6 @@ public class ImageClicker {
      * @param bad  the group of bad templates that must NOT out-score the good templates
      * @return the number of winning locations clicked
      */
-    @Palette
     public static int clickAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
         return clickAllCompare(good, bad, Source.current(), BotSettings.compareMargin());
     }
@@ -693,7 +668,6 @@ public class ImageClicker {
      * @param source the capture source to search within
      * @return the number of winning locations clicked
      */
-    @Palette
     public static int clickAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         return clickAllCompare(good, bad, source, BotSettings.compareMargin());
     }
@@ -708,7 +682,6 @@ public class ImageClicker {
      * @param margin the minimum score difference the good must beat the bad by
      * @return the number of winning locations clicked
      */
-    @Palette
     public static int clickAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                       double margin) {
         PopupGuard.check();
@@ -738,7 +711,6 @@ public class ImageClicker {
      * @param template the image template to search for and click
      * @return the number of instances clicked
      */
-    @Palette
     public static int clickAll(ImageTemplate template) {
         return clickAll(template, Source.current(), BotSettings.confidence());
     }
@@ -767,7 +739,6 @@ public class ImageClicker {
      * @param source   the capture source to search within
      * @return the number of instances clicked
      */
-    @Palette
     public static int clickAll(ImageTemplate template, CaptureSource source) {
         return clickAll(template, source, BotSettings.confidence());
     }
@@ -810,7 +781,6 @@ public class ImageClicker {
      * @param group the template group to search for and click
      * @return the total number of instances clicked across all templates in the group
      */
-    @Palette
     public static int clickAll(ImageTemplateGroup group) {
         return clickAll(group, Source.current(), BotSettings.confidence());
     }
@@ -839,7 +809,6 @@ public class ImageClicker {
      * @param source the capture source to search within
      * @return the total number of instances clicked across all templates in the group
      */
-    @Palette
     public static int clickAll(ImageTemplateGroup group, CaptureSource source) {
         return clickAll(group, source, BotSettings.confidence());
     }

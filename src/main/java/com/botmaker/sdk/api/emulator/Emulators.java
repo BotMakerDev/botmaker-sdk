@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.emulator;
 
-import com.botmaker.sdk.api.meta.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.AdbEndpoint;
@@ -24,7 +23,7 @@ import java.util.Optional;
  * emu.use();                          // point the whole bot at it (Source.set)
  * }</pre>
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}): four of the nine are offered, and this facade is
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): four of the nine are offered, and this facade is
  * where the sweep's return-value rule finally bites hard enough to be worth stating as a rule.
  *
  * <p><b>A call whose only product is a handle the editor cannot hold is not a menu entry.</b> Neither
@@ -49,7 +48,6 @@ import java.util.Optional;
  * member menu it can never open. If Studio ever makes {@code Emulator} declarable, {@code first} and
  * {@code named} earn their annotation that day — an addition, which stays free for the SDK's whole life.
  */
-@Palette
 public final class Emulators {
 
     private Emulators() {}
@@ -90,7 +88,6 @@ public final class Emulators {
      * instance or the product exposes no launch command. Poll {@link EmulatorRef#running()} / retry
      * {@link #named(String)} for readiness afterwards.
      */
-    @Palette
     public static boolean launch(String name) {
         boolean dispatched = findInstance(name).map(EmulatorLauncher::launch).orElse(false);
         Debug.log("[Emulator] launch '" + name + "' -> " + (dispatched ? "dispatched" : "no such instance"));
@@ -101,7 +98,6 @@ public final class Emulators {
      * Stops the configured instance named {@code name} via its product's console tool. Returns whether a stop
      * was dispatched; {@code false} if there's no such instance or the product exposes no stop command.
      */
-    @Palette
     public static boolean stop(String name) {
         boolean dispatched = findInstance(name).map(EmulatorLauncher::stop).orElse(false);
         Debug.log("[Emulator] stop '" + name + "' -> " + (dispatched ? "dispatched" : "no such instance"));
@@ -157,7 +153,6 @@ public final class Emulators {
      *
      * @throws IllegalStateException if no emulator is currently running
      */
-    @Palette
     public static Emulator use() {
         Emulator emu = first();
         emu.use();
@@ -171,7 +166,6 @@ public final class Emulators {
      * @throws IllegalArgumentException if {@code name} is null/blank
      * @throws IllegalStateException    if no running instance with that name is found
      */
-    @Palette
     public static Emulator use(String name) {
         Emulator emu = named(name);
         emu.use();

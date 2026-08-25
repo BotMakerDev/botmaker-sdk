@@ -8,7 +8,6 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.interaction.Mouse;
 import com.botmaker.sdk.api.interaction.Wait;
-import com.botmaker.sdk.api.meta.Palette;
 
 /**
  * Poll for a template to appear / disappear. Every method mirrors {@link ImageFinder}: a whole-desktop
@@ -18,12 +17,11 @@ import com.botmaker.sdk.api.meta.Palette;
  * Every method in this class also updates {@link Vision#setLastMatch(MatchResult)} for the current thread,
  * enabling access to the most recent match via {@link Vision#lastMatch()}.
  *
- * <p><b>Curated for the palette</b> (see {@link Palette}) by {@link ImageFinder}'s rule: each of the three
+ * <p><b>Curated for the palette</b> (see {@code @Palette}) by {@link ImageFinder}'s rule: each of the three
  * operations offers the plain and the {@code CaptureSource} form, and hides the one that also takes a bare
  * {@code double confidence} — {@link ImageTemplate#threshold()} is where that belongs. The timeout stays a
  * parameter in every offered shape: it is the question these methods exist to ask.
  */
-@Palette
 public class ImageWaiter {
 
     // --- waitFor ---
@@ -42,7 +40,6 @@ public class ImageWaiter {
      * @see #waitFor(ImageTemplate, CaptureSource, int)
      * @see #waitFor(ImageTemplate, CaptureSource, int, double)
      */
-    @Palette
     public static boolean waitFor(ImageTemplate template, int timeoutSeconds) {
         return waitFor(template, Source.current(), timeoutSeconds, BotSettings.confidence());
     }
@@ -73,7 +70,6 @@ public class ImageWaiter {
      * @param timeoutSeconds  maximum time to wait, in seconds
      * @return true if the template was found within timeout, false if the timeout elapsed
      */
-    @Palette
     public static boolean waitFor(ImageTemplate template, CaptureSource source, int timeoutSeconds) {
         return waitFor(template, source, timeoutSeconds, BotSettings.confidence());
     }
@@ -130,7 +126,6 @@ public class ImageWaiter {
      * @see #waitUntilGone(ImageTemplate, CaptureSource, int)
      * @see #waitUntilGone(ImageTemplate, CaptureSource, int, double)
      */
-    @Palette
     public static boolean waitUntilGone(ImageTemplate template, int timeoutSeconds) {
         return waitUntilGone(template, Source.current(), timeoutSeconds, BotSettings.confidence());
     }
@@ -161,7 +156,6 @@ public class ImageWaiter {
      * @param timeoutSeconds  maximum time to wait, in seconds
      * @return true if the template disappeared within the timeout, false if the timeout elapsed
      */
-    @Palette
     public static boolean waitUntilGone(ImageTemplate template, CaptureSource source, int timeoutSeconds) {
         return waitUntilGone(template, source, timeoutSeconds, BotSettings.confidence());
     }
@@ -217,7 +211,6 @@ public class ImageWaiter {
      * @see #waitAndClick(ImageTemplate, CaptureSource, int)
      * @see #waitAndClick(ImageTemplate, CaptureSource, int, double)
      */
-    @Palette
     public static boolean waitAndClick(ImageTemplate template, int timeoutSeconds) {
         return waitAndClick(template, Source.current(), timeoutSeconds, BotSettings.confidence());
     }
@@ -248,7 +241,6 @@ public class ImageWaiter {
      * @param timeoutSeconds  maximum time to wait, in seconds
      * @return true if the template was found and clicked within the timeout, false otherwise
      */
-    @Palette
     public static boolean waitAndClick(ImageTemplate template, CaptureSource source, int timeoutSeconds) {
         return waitAndClick(template, source, timeoutSeconds, BotSettings.confidence());
     }
