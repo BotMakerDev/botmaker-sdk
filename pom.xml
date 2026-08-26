@@ -34,6 +34,30 @@
         <!-- botmaker-studio-api version: the Studio plugin contract. Same 0.0.0-SNAPSHOT contract again.
              This one moves far more slowly than the other two on purpose — see the dependency below. -->
         <botmaker.studioapi.version>0.0.0-SNAPSHOT</botmaker.studioapi.version>
+
+        <!--
+          The OCR stack's three versions move TOGETHER. Tess4J pins a lept4j, and lept4j's generated
+          bindings target one exact Leptonica release; the JavaCPP natives below must be that release
+          and the Tesseract that Tess4J was built against.
+
+          tess4j 5.19.0 -> lept4j 1.24.0 -> Leptonica 1.87.0 (its Windows DLL is libleptonica1870.dll)
+                        -> Tesseract 5.5.x            (its Windows DLL is libtesseract552.dll)
+
+          Getting this wrong does NOT fail the build. It fails at the first OcrEngine.recognize() call,
+          in a user's bot, as an undefined-symbol UnsatisfiedLinkError out of Leptonica1's static
+          initialiser (measured: Leptonica 1.85.0 under lept4j 1.24.0 dies on pixFindBaselinesGen).
+          OcrEngineNativeTest is the guard — it calls getWords(), the only path that reaches these
+          bindings. When bumping Tess4J, read the new lept4j's bundled DLL name to find the Leptonica
+          version to match, and check that org.bytedeco publishes it.
+
+          This block and everything it pins moved here from botmaker-shared/pom.xml in SDK 1.2.0, with
+          com.botmaker.shared.ocr -> com.botmaker.sdk.{api.vision,internal.ocr}. It is reproduced
+          VERBATIM on purpose: the failure it describes is a user's, at runtime, and nothing in any
+          build would have caught the paraphrase.
+        -->
+        <tess4j.version>5.19.0</tess4j.version>
+        <bytedeco.tesseract.version>5.5.3-1.5.14</bytedeco.tesseract.version>
+        <bytedeco.leptonica.version>1.87.0-1.5.14</bytedeco.leptonica.version>
     </properties>
 
     <repositories>
@@ -87,6 +111,17 @@
             <groupId>org.openpnp</groupId>
             <artifactId>opencv</artifactId>
             <version>4.9.0-0</version>
+        </dependency>
+
+        <!-- Tess4J: the JNA wrapper over Tesseract, behind internal.ocr.OcrEngine and the api.vision.Text
+             facade. It bundles the Windows natives; the Linux ones are staged into this jar by <build>
+             below. It lived in botmaker-shared until SDK 1.2.0, where it made every consumer of shared —
+             Studio and botmaker-session included — resolve an OCR engine none of them ever called. Pulls
+             JNA, already present below. See the version-pinning note in <properties>. -->
+        <dependency>
+            <groupId>net.sourceforge.tess4j</groupId>
+            <artifactId>tess4j</artifactId>
+            <version>${tess4j.version}</version>
         </dependency>
 
         <!-- JNA (native Windows/Linux window + input control) -->
@@ -206,6 +241,7 @@
                         <configuration>
                             <annotationProcessors>
                                 <annotationProcessor>com.botmaker.sdk.apt.ApiPointerProcessor</annotationProcessor>
+                                <annotationProcessor>com.botmaker.sdk.apt.PaletteCatalogProcessor</annotationProcessor>
                             </annotationProcessors>
                             <compilerArgs>
                                 <arg>-processorpath</arg>
@@ -216,7 +252,78 @@
                 </executions>
             </plugin>
 
-            <!-- Antrun: put this module's CHANGELOG.md inside the jar, as
+            <!--
+              Stage the Linux OCR natives into the jar, under JNA's Platform.RESOURCE_PREFIX for this
+              platform (linux-x86-64). Tess4J's LoadLibs static initialiser extracts every classpath
+              resource under that prefix to a temp dir and prepends it to jna.library.path — the same
+              mechanism that already makes Windows self-contained through win32-x86-64/. So this needs
+              no Java code: put the files on the classpath and Tess4J finds them.
+
+              WHY WE SHIP THEM AT ALL: Tess4J publishes Windows DLLs only. On Linux it dlopen()s the
+              system libtesseract, so OCR failed with UnsatisfiedLinkError anywhere it wasn't installed —
+              the AppImage, the tarball and every generated bot, none of which have a package manager to
+              declare a dependency to.
+
+              WHY THE JAVACPP PRESETS: Fedora's libtesseract links libcurl, so its ldd closure is 46
+              libraries / 29 MB (openssl, krb5, ldap, sasl, ssh — none of which OCR uses). The bytedeco
+              build needs only libleptonica.so.6, libstdc++, libm, libgcc_s and libc, with the image
+              codecs statically linked in, and carries RUNPATH $ORIGIN/ so tesseract finds leptonica
+              beside itself. Two files, 9.4 MB, no other system library beyond what a JVM already needs.
+
+              THE TWO FILENAMES ARE LOAD-BEARING, both established by testing:
+                - Tesseract is renamed to the UNVERSIONED libtesseract.so. Left as libtesseract.so.5.5,
+                  JNA's lookup skipped it and loaded the system /usr/lib64 copy instead, which silently
+                  defeats the whole point on any machine that has one.
+                - Leptonica KEEPS libleptonica.so.6, because that is the literal NEEDED string inside
+                  libtesseract.so. Adding an unversioned copy alongside it makes the process map
+                  leptonica twice.
+
+              The bytedeco jars also carry headers and .a files (~2 MB); the includes below drop them.
+
+              This moved here from botmaker-shared/pom.xml in SDK 1.2.0, unchanged apart from living
+              beside the code it serves. The staging half is the maven-antrun execution below.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>unpack-linux-ocr-natives</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.bytedeco</groupId>
+                                    <artifactId>tesseract</artifactId>
+                                    <version>${bytedeco.tesseract.version}</version>
+                                    <classifier>linux-x86_64</classifier>
+                                    <includes>**/libtesseract.so.*</includes>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.bytedeco</groupId>
+                                    <artifactId>leptonica</artifactId>
+                                    <version>${bytedeco.leptonica.version}</version>
+                                    <classifier>linux-x86_64</classifier>
+                                    <includes>**/libleptonica.so.*</includes>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${project.build.directory}/native-stage</outputDirectory>
+                            <overWriteReleases>false</overWriteReleases>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Antrun: TWO executions, unrelated to each other beyond sharing a plugin. `whats-new`
+                 copies the changelog into the jar; `stage-linux-ocr-natives` finishes the OCR native
+                 staging the dependency plugin above started. They are one <plugin> because Maven takes a
+                 single declaration per plugin per pom, not because they belong together.
+
+                 whats-new: put this module's CHANGELOG.md inside the jar, as
                  META-INF/botmaker/whats-new.md.
 
                  Studio's Project > Upgrade SDK... leads with what a release GIVES you, before it lists
@@ -252,6 +359,30 @@
                                 <copy file="${project.basedir}/CHANGELOG.md"
                                       tofile="${project.build.outputDirectory}/META-INF/botmaker/whats-new.md"
                                       failonerror="false" overwrite="true"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>stage-linux-ocr-natives</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <property name="ocr.natives.dir"
+                                          value="${project.build.outputDirectory}/linux-x86-64"/>
+                                <mkdir dir="${ocr.natives.dir}"/>
+                                <!-- Flattened and renamed: see the filename note above. -->
+                                <copy todir="${ocr.natives.dir}" flatten="true" failonerror="true">
+                                    <fileset dir="${project.build.directory}/native-stage"
+                                             includes="**/libtesseract.so.*"/>
+                                    <mapper type="merge" to="libtesseract.so"/>
+                                </copy>
+                                <copy todir="${ocr.natives.dir}" flatten="true" failonerror="true">
+                                    <fileset dir="${project.build.directory}/native-stage"
+                                             includes="**/libleptonica.so.*"/>
+                                </copy>
                             </target>
                         </configuration>
                     </execution>

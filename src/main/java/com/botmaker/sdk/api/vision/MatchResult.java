@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
@@ -23,6 +24,7 @@ import java.util.Random;
  * clicking the exact centre of the same button a thousand times is the most legible signature a bot can leave,
  * and this is the method that exists to not do that.
  */
+@Facade(category = "vision", categoryLabel = "Vision", role = "VALUE", order = 98)
 public class MatchResult {
 
     private static final Random RANDOM = new Random();

@@ -1,6 +1,8 @@
 package com.botmaker.sdk.api.util;
 
 
+import com.botmaker.plugin.api.palette.Facade;
+
 import java.util.Scanner;
 
 /**
@@ -15,6 +17,7 @@ import java.util.Scanner;
  * arguments, so no one of them can stand in for another and there is no spelling to prefer. This is the
  * {@code Keyboard} shape: a closed set of operations with nothing duplicated.
  */
+@Facade(category = "util", categoryLabel = "Utilities", role = "VALUE", order = 80)
 public class BotMaker {
 
     /** Lazily created so simply referencing print() does not open stdin. */

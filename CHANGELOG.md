@@ -19,6 +19,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **OCR tuning is part of the SDK's API now.** `OcrOptions`, `OcrLanguage` and `TextResult` moved out of
+  `botmaker-shared` into `com.botmaker.sdk.api.vision`, so the options you pass to `Text.read`, `Text.find`
+  and friends are versioned like everything else you write down — and covered by the same
+  `@ReplacedBy`/`@Replaces` machinery if they ever change spelling. **Update your imports**: any
+  `import com.botmaker.shared.ocr.OcrOptions;` (or `OcrLanguage`/`TextResult`) becomes
+  `com.botmaker.sdk.api.vision.…`. Studio repoints them for you on open; a bot built by hand needs the edit.
+  Nothing else about OCR changed — same engine, same tuning knobs, same bundled languages.
+- `TextResult.bounds()` is now an `api.geometry.Rect` instead of a `java.awt.Rectangle`, so it matches every
+  other box the SDK hands you: `.x()`, `.y()`, `.width()`, `.height()` rather than public fields.
 - **The block palette is the SDK's answer now, per version.** The SDK ships a catalog of what it offers
   Studio's menus — which types, in which order, under which icon, and which of their members — one per
   released version. A bot pinned to an older SDK gets *that* version's menus from a newer Studio, instead of

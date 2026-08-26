@@ -1,5 +1,8 @@
 package com.botmaker.sdk.api.interaction;
 
+import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.NotInPalette;
+
 
 /**
  * Mouse buttons for the richer {@link Mouse} actions (down/up/drag).
@@ -19,6 +22,7 @@ package com.botmaker.sdk.api.interaction;
  * untouched and are the entire surface a bot wants.
  */
 // Scaffolding for the same reason as Direction: the generated Activities holds one per mouse-button variable.
+@Facade(category = "interaction", categoryLabel = "Interaction", role = "VALUE", order = 92)
 public enum MouseButton {
     LEFT(1), MIDDLE(2), RIGHT(3),
     /** The thumb button that goes back — the browser's Back, and what most games bind to a side button. */
@@ -33,6 +37,7 @@ public enum MouseButton {
     }
 
     /** Native button number (1=left, 2=middle, 3=right, 8=back, 9=forward) understood by the controllers. */
+    @NotInPalette("the native button number is the detail this enum exists to name; a bot picks a constant")
     public int code() {
         return code;
     }

@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.plugin.api.palette.Facade;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -43,6 +45,7 @@ import java.util.Map;
  * lambda parameter of {@code ifFindAny}/{@code whileFindAny} — and the questions it answers are asked through
  * that value, not through a static facade submenu.
  */
+@Facade(category = "vision", categoryLabel = "Vision", role = "VALUE", order = 97)
 public final class Matches {
 
     private static final Matches NONE = new Matches(Collections.emptyMap());

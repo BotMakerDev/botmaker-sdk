@@ -104,8 +104,12 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   see it break. `ImageTemplate.getMat()` (`org.opencv.core.Mat`) is package-private for this reason, and
   `targetWindow()` (shared's `GenericWindow`) left `CaptureSource`/`Window` for
   **`internal.capture.WindowBacked`**, which `Window`, `NamedWindow`, `SessionSource` and `RegionSource`
-  implement and `Keyboard` reaches via `WindowBacked.of(source)`. One leak is knowingly still open —
-  `Text`'s `shared.ocr.OcrOptions` overloads, which are a real feature with no `api`-owned replacement yet.
+  implement and `Keyboard` reaches via `WindowBacked.of(source)`. **The last knowingly-open leak closed in
+  1.2.0**: `Text`'s nine `shared.ocr.OcrOptions` overloads were a real feature with no `api`-owned
+  replacement, so rather than remove them the whole of `com.botmaker.shared.ocr` moved *here* — `OcrOptions`,
+  `OcrLanguage` and `TextResult` into `api.vision` under contract, `OcrEngine`/`OcrNative`/`OcrPreprocessor`
+  into `internal.ocr` where a bot can only receive their results. shared had exactly one consumer of that
+  package (this facade), so the move cost nothing and dissolved the leak instead of working around it.
   **`docs/refactor/22-api-audit.md` is the record** of that audit: every verdict, the near-misses and why they
   were near-misses, and the additions it deliberately deferred.
 
@@ -300,6 +304,13 @@ around that; the emitters belong in this module.
     already-shared telemetry wire (`shared.ipc.TelemetryClient`). Moving it would move the SDK types with it.
   - `internal/config/ProjectDefaults` — a thin typed accessor mapping shared's `ProjectProperties` (which owns
     the file, the key names and the parsing) onto `CaptureSource`/`Size`.
+  - `internal/ocr/{OcrEngine,OcrNative,OcrPreprocessor}` — the Tesseract stack behind `api.vision.Text`,
+    moved here from `com.botmaker.shared.ocr` in 1.2.0. It is internal because a bot only ever *receives*
+    a `TextResult`; it never names the engine. `OcrNative` extracts the bundled `tessdata` and delegates the
+    OpenCV load to shared's `OpenCvNative.ensureLoaded()`. **The Tess4J / lept4j / bytedeco pins move
+    together** — a mismatch throws an undefined-symbol `UnsatisfiedLinkError` on the `getWords` path only, at
+    a bot's runtime and never at build time. `pom.xml`'s property block has the version table and
+    `OcrEngineNativeTest` is the only guard; read both before bumping anything in that stack.
   (The manual harnesses that were also left behind here — `internal/Main`, `capture/CaptureTest`,
   `capture/ImageDisplay`, `capture/linux/LinuxControllerTest`, `opencv/OpencvTest` — have since been
   deleted; they were dev tools nothing referenced.)

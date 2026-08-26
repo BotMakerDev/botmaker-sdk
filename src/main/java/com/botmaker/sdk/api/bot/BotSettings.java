@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.util.Debug;
@@ -31,6 +32,7 @@ import com.botmaker.shared.config.ProjectProperties;
  * justification false in the only place the user can act on it: the editor would have taken the per-call knob
  * away and then not shown the knob that replaced it.
  */
+@Facade(category = "bot", categoryLabel = "Bot", icon = "⚙", order = 30)
 public final class BotSettings {
 
     /** Pause after a successful match, in ms — long enough for a game's animation to settle. */

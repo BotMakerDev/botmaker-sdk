@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.vision;
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.util.Debug;
 
 import com.botmaker.sdk.api.geometry.Point;
@@ -50,6 +51,7 @@ import java.util.List;
  * varies per colour rather than per bot. Annotating the class is still worth doing: it fixes the verdict, and
  * a method added here later is hidden until someone decides otherwise.
  */
+@Facade(category = "vision", categoryLabel = "Vision", icon = "🎨", order = 23)
 public class Pixel {
 
     // ---------------------------------------------------------------------

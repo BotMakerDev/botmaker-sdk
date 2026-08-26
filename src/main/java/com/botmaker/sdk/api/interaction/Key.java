@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
+import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.NotInPalette;
 import com.sun.jna.Platform;
 
 /**
@@ -20,6 +22,7 @@ import com.sun.jna.Platform;
  * {@code Direction} and {@code StartMode}, which needed no annotation: those two have no methods to hide.
  */
 // Scaffolding for the same reason as Direction: the generated Activities holds one per key variable.
+@Facade(category = "interaction", categoryLabel = "Interaction", role = "VALUE", order = 91)
 public enum Key {
     // Letters (Linux lowercase keysym == ASCII 'a'..'z'; Windows VK 'A'..'Z')
     A(0x61, 0x41), B(0x62, 0x42), C(0x63, 0x43), D(0x64, 0x44), E(0x65, 0x45),
@@ -56,6 +59,8 @@ public enum Key {
     }
 
     /** The key code to feed the native controller on the current OS. */
+    @NotInPalette("the platform translation this enum exists to spare a bot from doing; a menu offering it "
+            + "invites a bot to reason about key codes, which is exactly what Key removes")
     public int nativeCode() {
         return Platform.isWindows() ? windowsVk : linuxKeySym;
     }

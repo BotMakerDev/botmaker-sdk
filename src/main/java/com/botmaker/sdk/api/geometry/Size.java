@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.geometry;
 
+import com.botmaker.plugin.api.palette.Facade;
+
 
 /**
  * A width and height in pixels.
@@ -16,6 +18,7 @@ package com.botmaker.sdk.api.geometry;
  * @param height pixels down
  */
 // The generated Activities declares one per size variable, rebuilt from the two stored numbers.
+@Facade(category = "geometry", categoryLabel = "Geometry", role = "VALUE", order = 83)
 public record Size(int width, int height) {
 
     /** {@code 0 × 0} — what a value-typed variable defaults to before it is set. */

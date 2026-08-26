@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -36,6 +37,7 @@ import com.botmaker.session.DesktopSession;
  * {@code ImageFinder}'s rule keeps — five operations, each in the plain form and the {@link CaptureSource} form
  * — with no third variant carrying a value a property already holds, so there is nothing here to trim.
  */
+@Facade(category = "interaction", categoryLabel = "Interaction", icon = "⌨", order = 11)
 public class Keyboard {
 
     /**

@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.geometry;
 
+import com.botmaker.plugin.api.palette.Facade;
+
 
 /**
  * A screen coordinate, in pixels, absolute unless a method says otherwise.
@@ -21,6 +23,7 @@ package com.botmaker.sdk.api.geometry;
  * @param y pixels from the top of the coordinate space
  */
 // The generated Activities declares one per point variable, rebuilt from the two stored numbers.
+@Facade(category = "geometry", categoryLabel = "Geometry", role = "VALUE", order = 81)
 public record Point(int x, int y) {
 
     /** The origin, {@code (0, 0)} — what a value-typed variable defaults to before it is set. */

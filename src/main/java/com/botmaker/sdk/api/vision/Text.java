@@ -5,11 +5,8 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.shared.ocr.OcrEngine;
-import com.botmaker.shared.ocr.OcrOptions;
-import com.botmaker.shared.ocr.TextResult;
+import com.botmaker.sdk.internal.ocr.OcrEngine;
 
-import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +21,10 @@ import java.util.regex.Pattern;
  * in <b>absolute screen coordinates</b>; the full result is parked in {@link Vision} so the
  * boolean-returning calls stay readable; and no-source overloads use {@link Source#current()}.
  *
- * <p>The heavy lifting lives in {@code botmaker-shared}'s {@link OcrEngine} (OpenCV preprocessing +
- * Tesseract), so Studio can reuse it later without depending on the SDK. Tune recognition — languages,
- * page-segmentation mode, upscale, binarize, char whitelist — with an {@link OcrOptions} overload; the
- * default reads whole {@link TextResult.Level#LINE lines} of English so multi-word phrases match.
+ * <p>The heavy lifting lives in {@link OcrEngine} (OpenCV preprocessing + Tesseract). Tune recognition —
+ * languages, page-segmentation mode, upscale, binarize, char whitelist — with an {@link OcrOptions}
+ * overload; the default reads whole {@link TextResult.Level#LINE lines} of English so multi-word phrases
+ * match.
  *
  * <pre>{@code
  * // Wait for a "Play" button's label, then click it.
@@ -42,12 +39,18 @@ import java.util.regex.Pattern;
  * String amount = Text.read(gold, digits);
  * }</pre>
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): every operation is offered, but none of the
- * {@link OcrOptions} overloads are. That is not a judgement on tuning — it is that {@code OcrOptions} lives in
- * {@code botmaker-shared} rather than in {@code api}, so Studio has no picker, no import and no declarable
- * type for it; an offered {@code read(source, opts)} would hand the user a block whose second argument they
- * could not fill. Tuned OCR is written by hand, which is where {@code OcrOptions.defaults().withUpscale(…)}
- * has to be written anyway. The methods stay public and supported.
+ * <p><b>Nothing here is hidden from the palette, and that is new in 1.2.0.</b> The paragraph that stood here
+ * explained why none of the {@link OcrOptions} overloads were offered: {@code OcrOptions} lived in
+ * {@code botmaker-shared} rather than in {@code api}, so Studio had no picker, no import and no declarable
+ * type for it, and an offered {@code read(source, opts)} would have handed the user a block whose second
+ * argument they could not fill. It was recorded as a known leak — an unversioned type reachable from a
+ * versioned facade — rather than a design.
+ *
+ * <p>Two things closed it. {@code OcrOptions}, {@link OcrLanguage} and {@link TextResult} moved into
+ * {@code api.vision} under the SDK's own contract, so they are ordinary versioned surface. And the palette's
+ * unit of curation became the member <em>name</em> rather than the overload, so {@code read} is one menu
+ * entry whose other shapes sit behind it — there was no longer a way to hide nine overloads without hiding
+ * the nine operations they belong to. The second change is what made the first urgent.
  */
 public final class Text {
 
@@ -270,11 +273,8 @@ public final class Text {
             Point origin = source.origin();
             List<TextMatch> out = new ArrayList<>(raw.size());
             for (TextResult r : raw) {
-                Rectangle b = r.bounds();
-                Rect abs = new Rect(
-                        b.x + origin.x(),   // b is a java.awt.Rectangle — fields, not accessors
-                        b.y + origin.y(),
-                        b.width, b.height);
+                Rect b = r.bounds();
+                Rect abs = new Rect(b.x() + origin.x(), b.y() + origin.y(), b.width(), b.height());
                 out.add(new TextMatch(r.text(), abs, r.confidence()));
             }
             return out;

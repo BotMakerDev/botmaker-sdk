@@ -8,6 +8,46 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-26 — the OCR stack moves in, and the last api leak closes (plugin platform, phase 8b)
+
+**Done**
+
+- **`com.botmaker.shared.ocr` is now the SDK's**, split by the `api` boundary rule: `OcrOptions`,
+  `OcrLanguage` and `TextResult` are `com.botmaker.sdk.api.vision` (`@Since("1.2.0")`) — versioned surface a
+  bot writes down by hand — while `OcrEngine`, `OcrNative` and `OcrPreprocessor` are
+  `com.botmaker.sdk.internal.ocr`, which a bot can only ever receive results from and the palette therefore
+  never offers.
+- **The last knowingly-open leak of the 1.1.0 audit is closed.** `Text`'s nine `shared.ocr.OcrOptions`
+  overloads put a freely-breakable, unversioned shared type in a bot's hands; `docs/refactor/22-api-audit.md`
+  deferred them because removing a working feature (PSM, upscale, binarize, char whitelist) is a regression.
+  Moving the type under contract dissolves the problem rather than working around it. `Text` lost its three
+  `shared.ocr` imports and the javadoc paragraph now records the leak as closed.
+- **It was also a prerequisite for phase 8.** Palette curation is now per member *name*, not per overload, so
+  those nine shapes could no longer be hidden one at a time and hiding `read`/`find`/`findAll`/`waitFor`
+  whole would be absurd. They are now ordinary submenu entries of a versioned SDK type, needing no
+  `@NotInPalette` at all — which is what lets the name-level rule stand unqualified.
+- **Two net simplifications came free.** `TextResult.bounds()` is an `api.geometry.Rect` rather than a
+  `java.awt.Rectangle` (converted once, at the Tess4J boundary), and `OcrPreprocessor.bufferedImageToMat`
+  delegates to `OpencvManager` instead of forking it — the fork's rationale was a module boundary that no
+  longer exists.
+- **`pom.xml` gained the whole OCR stack**: the tess4j dependency, the three version properties
+  (`tess4j` 5.19.0, `bytedeco.tesseract` 5.5.3-1.5.14, `bytedeco.leptonica` 1.87.0-1.5.14), and both Linux
+  native-staging passes — `maven-dependency-plugin` unpacks the JavaCPP presets to `target/native-stage`,
+  the antrun `stage-linux-ocr-natives` execution copies them into `linux-x86-64/` (JNA's `RESOURCE_PREFIX`)
+  as the unversioned `libtesseract.so` and the versioned `libleptonica.so.6`. Both filenames are
+  load-bearing. The version-pinning comment came across **verbatim**: a mismatch fails at a user's first
+  `recognize()`, not at build time, and `OcrEngineNativeTest` is the only guard.
+- `tessdata/` (four `tessdata_fast` files, ~10.5 MB) and the three OCR tests moved with the code; all nine
+  test methods pass in their new home, `OcrEngineNativeTest` included — it reaches `getWords()` and confirms
+  no `/usr` native was mapped.
+
+**Deferred / next**
+
+- Studio still resolves tess4j transitively, because it still depends on the SDK at compile scope. That
+  disappears when Studio drops the SDK (phase 15), and only then is the app-image size win real.
+
+---
+
 ## 2026-08-26 — the per-version palette catalog, and the SDK as plugin #1 (plugin platform, phase 6)
 
 **Changed:** new `internal/plugin/catalog/{V1_1_0,V1_2_0,Catalogs}`, new `plugin/SdkPlugin`, new test

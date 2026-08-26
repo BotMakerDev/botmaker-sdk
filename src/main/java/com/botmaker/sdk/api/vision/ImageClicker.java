@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -31,6 +32,7 @@ import java.util.List;
  * twice over: its {@code delayMs} has a home in {@link BotSettings#foundDelay()}. The {@code *Compare}
  * families keep every shape, their {@code double} being a comparison <em>margin</em> nothing else holds.
  */
+@Facade(category = "vision", categoryLabel = "Vision", icon = "👆", order = 21)
 public class ImageClicker {
 
     // --- click (single template) ---

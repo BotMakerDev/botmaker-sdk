@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.geometry;
 
+import com.botmaker.plugin.api.palette.Facade;
+
 
 /**
  * A rectangular region in pixels — a capture region, a match's bounds, a window's frame.
@@ -27,6 +29,7 @@ package com.botmaker.sdk.api.geometry;
  * @param height pixels down
  */
 // The generated Activities declares one per area variable, rebuilt from the four stored numbers.
+@Facade(category = "geometry", categoryLabel = "Geometry", role = "VALUE", order = 82)
 public record Rect(int x, int y, int width, int height) {
 
     /** An empty region at the origin — what a value-typed variable defaults to before it is set. */

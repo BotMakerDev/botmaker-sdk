@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 
@@ -20,6 +21,7 @@ import com.botmaker.sdk.api.geometry.Rect;
  * that makes {@link Text} the only thing able to mint one, and because {@link #center()} and {@link #topLeft()}
  * are derived from {@link #bounds()} rather than stored beside it.
  */
+@Facade(category = "vision", categoryLabel = "Vision", role = "VALUE", order = 100)
 public class TextMatch {
 
     private final String text;
