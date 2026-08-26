@@ -2,8 +2,7 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
-import com.botmaker.sdk.api.authoring.SdkVersion;
-import com.botmaker.sdk.internal.plugin.catalog.Catalogs;
+import com.botmaker.sdk.internal.plugin.catalog.Catalog;
 
 /**
  * The BotMaker SDK, as a Studio plugin.
@@ -15,12 +14,22 @@ import com.botmaker.sdk.internal.plugin.catalog.Catalogs;
  * own pom declares the dependency — never a wider API. One implementor proves little about a contract; an
  * implementor that cannot cheat proves rather more.
  *
- * <h2>Why the version is an argument</h2>
+ * <h2>Why the version is still an argument, though this plugin ignores it</h2>
  *
- * <p>{@link #catalog(String)} takes the version <em>the bot pins</em>, not this jar's. A bot compiles
- * against the SDK it names in its pom, which may be older than the one the editor bundles, so the palette
- * has to answer for that jar. This is the same rule {@code Authoring} enforces by taking an
- * {@link SdkVersion} first — stated here as a parameter for the same reason.
+ * <p>{@link #catalog(String)} takes the version <em>the bot pins</em>, not this jar's, and until 2026-08-26
+ * the SDK answered it from a per-version class. It no longer does: there is one catalog, generated from the
+ * annotations on the facades in <em>this</em> build, and the pin is not consulted.
+ *
+ * <p>The rule it used to serve is unchanged, and is met somewhere better. What an older pin may be offered
+ * is this catalog <b>intersected with the bot's own resolved jar</b>, which {@code SdkSurfaceService}
+ * already computes from bytecode — so a member this build added is still absent from an older bot, because
+ * that bot's jar does not contain it. A frozen class per version could only restate, by hand, what the jar
+ * already says; and it had to be edited whenever a member was deleted, which made it untruthful about the
+ * past exactly when it mattered.
+ *
+ * <p>The parameter stays on the contract regardless. It is not the SDK's to remove — another plugin may
+ * ship per-version curation and needs somewhere to read the pin from — and a surface that narrows to fit
+ * its only implementor is the back door this class exists to refuse.
  *
  * <h2>Where this class may live, and where it may not</h2>
  *
@@ -34,6 +43,12 @@ public final class SdkPlugin implements StudioPlugin {
     /** The stable identifier the host files this plugin's contributions under. */
     public static final String ID = "com.botmaker.sdk";
 
+    /**
+     * Built once. Every entry resolves a {@code Method} reflectively, which is worth doing exactly once in
+     * the editor and never at all on a bot's classpath, where this class is not loaded.
+     */
+    private static final PaletteCatalog CATALOG = Catalog.build();
+
     @Override
     public String id() {
         return ID;
@@ -45,18 +60,15 @@ public final class SdkPlugin implements StudioPlugin {
     }
 
     /**
-     * The palette for the SDK version {@code pinnedVersion} names.
+     * This build's palette, whatever {@code pinnedVersion} says — see the class comment for why the
+     * parameter survives an implementation that does not read it.
      *
-     * <p>Total, and empty on anything unrecognised — a pin this jar has never heard of (a bot newer than the
-     * editor), a malformed pin, or a version released before catalogs existed. Empty means <em>uncurated</em>
-     * and the host widens rather than empties; see {@link Catalogs}.
-     *
-     * <p>A blank, absent or {@code -SNAPSHOT} pin is <em>this very jar</em>, not an unknown version — the
-     * rule {@link SdkVersion#ofPin} exists to state, and the reason a dev-run editor gets a curated palette
-     * rather than an empty one.
+     * <p>Total: every pin, including a malformed one, a blank one and one naming a version newer than this
+     * jar, gets the same answer. Nothing here can be empty, so nothing here can widen the host's menus by
+     * accident; narrowing to a pin is {@code SdkSurfaceService}'s intersection against the bot's own jar.
      */
     @Override
     public PaletteCatalog catalog(String pinnedVersion) {
-        return SdkVersion.ofPin(pinnedVersion).map(Catalogs::forVersion).orElse(PaletteCatalog.empty());
+        return CATALOG;
     }
 }

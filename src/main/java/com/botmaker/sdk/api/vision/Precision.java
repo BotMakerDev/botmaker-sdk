@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.plugin.api.palette.Facade;
+
 
 /**
  * How exacting a {@link Pixel} search should be — every knob that decides whether something counts as a match,
@@ -55,6 +57,7 @@ package com.botmaker.sdk.api.vision;
 // Curated for the palette: both `of` factories and all four fluent builders are offered. This is the type
 // Pixel's tolerance lives in (see the note on Pixel), so hiding any of it would put that tolerance out of the
 // editor's reach entirely. `toString` is an Object override and never a menu entry.
+@Facade(category = "vision", categoryLabel = "Vision", role = "VALUE", order = 99)
 public record Precision(double deltaE, int minArea, int minCount) {
 
     /** The area floor the named constants start from: filters out stray anti-aliased pixels. */

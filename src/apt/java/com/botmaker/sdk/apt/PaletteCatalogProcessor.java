@@ -68,6 +68,14 @@ import java.util.TreeMap;
  * facades in this round and emit a catalog missing the rest. It declines to emit at all when it collected
  * none, which covers the common case; beyond that the guard is that Maven recompiles the whole module
  * whenever anything in it changed. Build with {@code clean} if a catalog ever looks short.
+ *
+ * <h2>Which round it writes in</h2>
+ *
+ * <p>The first round that carries any facade, and deliberately <b>not</b> the final one. A file created
+ * after {@code processingOver()} is written to disk and then never compiled, so the failure looks like a
+ * missing package in {@code SdkPlugin} with a perfectly good {@code Catalog.java} sitting in
+ * {@code target/generated-sources}. Every facade is in {@code src/main/java} and so arrives in the first
+ * round together; the {@code emitted} flag is what keeps the later rounds from writing again.
  */
 @SupportedAnnotationTypes({
         PaletteCatalogProcessor.FACADE,
@@ -112,7 +120,11 @@ public final class PaletteCatalogProcessor extends AbstractProcessor {
                 }
             }
         }
-        if (roundEnv.processingOver()) {
+        // Emitted from a processing round, never from the final one. A file created after
+        // processingOver() is written to disk and then *not compiled* — javac says as much in a warning
+        // that is easy to miss, and the symptom is a "package does not exist" on the import in SdkPlugin
+        // with the generated file sitting in target/generated-sources looking correct.
+        if (!roundEnv.processingOver() && !facades.isEmpty()) {
             checkNames();
             emit();
         }
@@ -201,23 +213,21 @@ public final class PaletteCatalogProcessor extends AbstractProcessor {
                     + "offers in the first place");
             return;
         }
-        if (PALETTE_LABEL.equals(annotationName) && mirror(element, NOT_IN_PALETTE) != null) {
-            error(element, mirror, "@PaletteLabel names a menu entry that @NotInPalette removes");
-        }
-        if (PALETTE_DEFAULT.equals(annotationName) && mirror(element, NOT_IN_PALETTE) != null) {
-            error(element, mirror, "@PaletteDefault leads a menu entry that @NotInPalette removes — "
-                    + "@NotInPalette hides the whole name, overloads included");
-        }
+        // Curating a name @NotInPalette hides is checked in checkName, not here: @NotInPalette hides the
+        // whole name, so the mark and the contradiction it creates need not sit on the same overload, and
+        // one message for both cases beats two for one of them.
     }
 
     /**
-     * The three checks that are questions about a <em>name</em> rather than about one element, and so can
-     * only be asked once every element has been seen.
+     * The checks that are questions about a <em>name</em> rather than about one element, and so can only be
+     * asked once every element has been seen.
      *
-     * <p>All three exist because the palette's unit is the name: a name's overloads share one menu entry, so
-     * they share its heading, they have exactly one lead, and they are hidden together or not at all. Each
+     * <p>They exist because the palette's unit is the name: a name's overloads share one menu entry, so they
+     * share its heading, they have exactly one lead, and they are hidden together or not at all. Each
      * duplicate mark is refused rather than resolved, since a second mark can only restate the first (noise
-     * that will drift) or contradict it (a silent winner nobody chose).
+     * that will drift) or contradict it (a silent winner nobody chose). The last pair is the contradiction
+     * that <em>cannot</em> be seen one element at a time — a lead or a heading on one overload of a name
+     * another overload hides.
      */
     private void checkNames() {
         for (Facade facade : facades) {
@@ -264,6 +274,19 @@ public final class PaletteCatalogProcessor extends AbstractProcessor {
                 }
                 hidden = method;
             }
+        }
+        if (hidden == null) {
+            return;
+        }
+        if (lead != null) {
+            error(lead, mirror(lead, PALETTE_DEFAULT), "@PaletteDefault leads a menu entry that "
+                    + "@NotInPalette removes — @NotInPalette hides the whole name " + name + ", overloads "
+                    + "included, so there is no entry left to lead");
+        }
+        if (labelled != null) {
+            error(labelled, mirror(labelled, PALETTE_LABEL), "@PaletteLabel names a menu entry that "
+                    + "@NotInPalette removes — @NotInPalette hides the whole name " + name + ", overloads "
+                    + "included");
         }
     }
 

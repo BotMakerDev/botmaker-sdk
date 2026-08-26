@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.vision.MatchResult;
@@ -28,6 +29,7 @@ import com.botmaker.sdk.internal.observe.MatchEvent;
  * beside the name it delegates to: a user choosing between two entries that do the identical thing is
  * choosing nothing. It stays public, and the supervisor goes on calling it.
  */
+@Facade(category = "bot", categoryLabel = "Bot", icon = "🐕", role = "HIDDEN", order = 34)
 public final class Watchdog {
 
     private Watchdog() {}

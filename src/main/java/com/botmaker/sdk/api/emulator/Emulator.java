@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.emulator;
 
+import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.NotInPalette;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
@@ -32,6 +34,7 @@ import java.util.List;
  * {@link #back}, {@link #home}, {@link #text}, {@link #key}, {@link #startApp}). Obtain instances from
  * {@link Emulators}. Not thread-safe for concurrent capture on one connection.
  */
+@Facade(category = "emulator", categoryLabel = "Emulator", role = "VALUE", order = 88)
 public final class Emulator implements CaptureSource {
 
     // Common Android key codes for the two verbs bots reach for most.
@@ -49,6 +52,8 @@ public final class Emulator implements CaptureSource {
     // --- CaptureSource: makes the emulator a first-class vision target ---
 
     @Override
+    @NotInPalette("the CaptureSource half of this type; hidden there and hidden here, since an override "
+            + "carries none of the interface's annotations")
     public java.awt.image.BufferedImage capture() {
         return device.screencap();
     }

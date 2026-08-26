@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.util;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.Diag;
 
@@ -38,6 +39,7 @@ import com.botmaker.shared.Diag;
  * {@code Throwable} is produced by the {@code catch} clause the call sits in, so the variable picker fills it
  * from scope — and this overload's own javadoc is the reason to prefer it over {@code t.printStackTrace()}.
  */
+@Facade(category = "util", categoryLabel = "Utilities", icon = "🐞", role = "HIDDEN", order = 31)
 public final class Debug {
 
     private Debug() {}

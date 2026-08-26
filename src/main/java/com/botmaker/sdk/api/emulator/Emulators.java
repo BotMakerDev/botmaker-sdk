@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.AdbEndpoint;
@@ -48,6 +49,7 @@ import java.util.Optional;
  * member menu it can never open. If Studio ever makes {@code Emulator} declarable, {@code first} and
  * {@code named} earn their annotation that day — an addition, which stays free for the SDK's whole life.
  */
+@Facade(category = "emulator", categoryLabel = "Emulator", icon = "📱", order = 50)
 public final class Emulators {
 
     private Emulators() {}

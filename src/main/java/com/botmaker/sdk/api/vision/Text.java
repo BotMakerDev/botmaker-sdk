@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.vision;
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.util.Debug;
 
 import com.botmaker.sdk.api.geometry.Point;
@@ -52,6 +53,7 @@ import java.util.regex.Pattern;
  * entry whose other shapes sit behind it — there was no longer a way to hide nine overloads without hiding
  * the nine operations they belong to. The second change is what made the first urgent.
  */
+@Facade(category = "vision", categoryLabel = "Vision", icon = "🔤", order = 24)
 public final class Text {
 
     /**

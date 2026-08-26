@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.util;
 
+import com.botmaker.plugin.api.palette.Facade;
+
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 
@@ -33,6 +35,7 @@ import java.time.format.DateTimeFormatter;
  * a resolution no screen automation reads; {@link #currentTimeMillis()} stays, being the half of a pair
  * {@link #elapsedMillis(long)} teaches. Everything hidden is still public and still supported.
  */
+@Facade(category = "util", categoryLabel = "Utilities", order = 70)
 public final class Time {
 
     /** Default timezone used when no explicit timezone is specified. */

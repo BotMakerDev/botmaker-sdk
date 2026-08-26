@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.launch;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -44,6 +45,7 @@ import com.botmaker.shared.launch.LaunchSpec;
  * {@link CaptureSource} tests a window, by process name tests the OS; the {@code *IfNotRunning} and
  * {@code launchAndWait} shapes each combine two operations a bot would otherwise write out.
  */
+@Facade(category = "launch", categoryLabel = "Launch", icon = "🎮", order = 40)
 public class Game {
 
     private Game() {}

@@ -8,6 +8,46 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-26 — the catalog stops being written by hand (plugin platform, phase 8)
+
+**Changed:** deleted `internal/plugin/catalog/{Catalogs,V1_1_0,V1_2_0}`; new
+`src/apt/java/…/apt/PaletteCatalogProcessor` generating `internal/plugin/catalog/Catalog`; `@Facade` on all
+24 facades and `@NotInPalette` on 13 members; `SdkPlugin` repointed; `ApiCatalogTest` rewritten. Umbrella:
+`release.sh` (`check_catalog_freeze` and `--allow-removal` **deleted**), `docs/refactor/24-plugin-platform.md`
+§6, new `docs/refactor/25-compatibility.md`. Studio: `SdkSurfacePaletteTest`.
+
+**Done**
+
+- **Curation is now an annotation on the member being curated**, and the catalog is generated from it. The
+  four annotations live in `botmaker-studio-api` (`com.botmaker.plugin.api.palette`), with all-`String`
+  elements — an annotation element's type has to resolve where the annotation is *applied*, so a contract
+  annotation can never take an SDK-defined enum constant.
+- **Opt-out, not opt-in.** `CatalogBuilder.addAll()` offers every public declared method; only the exceptions
+  are marked. The 620 hand-written lines had the default the wrong way round: a method *added* to a facade
+  stayed invisible until somebody typed a line about it — the same staleness `SdkType` was deleted for.
+  Thirteen `@NotInPalette` marks replace the whole of the old exclusion list, each carrying its reason.
+- **The unit of curation is the member *name*.** One entry per name, lead shape plus submenu; hiding an
+  overload alone is not expressible and no longer needs to be (phase 8b dissolved the one case that wanted
+  it). `@PaletteDefault` is needed exactly once in the SDK — `Wait.seconds(double)`.
+- **The per-version catalogs are gone, hours after landing.** `SdkPlugin.catalog(pin)` ignores its argument;
+  the parameter stays on the contract because another plugin may use it. Narrowing to a pin is
+  `SdkSurfaceService`'s intersection against the bot's *own resolved jar*, read from bytecode — which a
+  hand-frozen class could only restate, and had to be edited on every deletion, making it untruthful about
+  the past precisely when that was the question. Accepted: a pre-1.1.0 pin narrows from everything-offered to
+  this curation ∩ its jar, and label/order edits are retroactive.
+- **`check_catalog_freeze` and `--allow-removal` went with them** — they read the forced edit to a frozen file
+  as the signal of a removal, and there is no longer a file to force. Nothing in `release.sh` refuses a
+  removal now, deprecated or not; `check_api_pointers` is untouched.
+- **Trap worth the line:** an annotation processor must emit from a processing round, **never** the final one.
+  A file created after `processingOver()` is written to disk and then not compiled, and it presents as
+  `package … does not exist` with a perfectly good generated file on disk.
+
+**Deferred / next:** phases 9–15 of the plugin platform — the `DISABLED` outcome, the value vocabulary moving
+to the contract, parameters and slot editors as plugin surfaces, and Studio dropping `botmaker-sdk` to test
+scope.
+
+---
+
 ## 2026-08-26 — the OCR stack moves in, and the last api leak closes (plugin platform, phase 8b)
 
 **Done**

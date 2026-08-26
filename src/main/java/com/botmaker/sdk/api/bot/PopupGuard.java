@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
 
@@ -56,6 +57,7 @@ import com.botmaker.sdk.internal.trace.Trace;
  * no way to be switched off at all. The rule applies where the alternative exists and is suspended where it
  * does not — the same discipline {@code Time}'s two surviving {@code *Utc} methods record.
  */
+@Facade(category = "bot", categoryLabel = "Bot", role = "HIDDEN", order = 35)
 public final class PopupGuard {
 
     private PopupGuard() {}

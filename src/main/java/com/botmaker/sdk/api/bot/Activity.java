@@ -1,4 +1,6 @@
 package com.botmaker.sdk.api.bot;
+import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.NotInPalette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
 
@@ -55,6 +57,7 @@ import java.util.Map;
  */
 // Every activity stub extends it, the generated ActivityRegistry holds a List<Activity<?>> of them, and
 // GoHome/Popups are two more subclasses the scaffold writes. Renaming this type is a Studio release.
+@Facade(category = "bot", categoryLabel = "Bot", icon = "◎", order = 36)
 public abstract class Activity<O extends Enum<O>> {
 
     /**
@@ -176,6 +179,8 @@ public abstract class Activity<O extends Enum<O>> {
      * {@code return Outcome.DEFAULT;}, so an activity that has nothing special to report needs no thought at
      * all — the default outcome follows the card's plain output wire.
      */
+    @NotInPalette("the method a generated activity overrides, not one a bot body calls; the flow driver "
+            + "invokes it through execute()")
     public abstract O run();
 
     /** Overridable no-op: called before {@link #run()} (e.g. navigate to the activity's screen). */
@@ -194,6 +199,8 @@ public abstract class Activity<O extends Enum<O>> {
      * recover — a stuck activity produces no outcome, because the flow isn't what decides where to go next in
      * that case; the supervisor is.
      */
+    @NotInPalette("the generated FlowDriver's own call; an activity that runs another one from inside its "
+            + "body is a flow edge drawn in the wrong place")
     public final O execute() {
         // The activity and its outcome are the coarsest unit of "what is the bot doing", so this one line is
         // what makes a debug console read as a story rather than as vision events. It is also the only place

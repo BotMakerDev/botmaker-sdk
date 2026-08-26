@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.capture;
 
+import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.NotInPalette;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.capture.Desktop;
@@ -40,9 +42,12 @@ import java.awt.image.BufferedImage;
  * and the supported bot path is {@code Emulators.use()} followed by plain {@code Mouse}. An override point is
  * not a menu entry; that is the same verdict {@code Emulators} reached from the other direction.
  */
+@Facade(category = "capture", categoryLabel = "Capture", role = "VALUE", order = 86)
 public interface CaptureSource {
 
     /** Pixels of this source. May return {@code null} if the capture failed. */
+    @NotInPalette("raw pixels are what Vision, Pixel and Text consume on the bot's behalf; a bot holding a "
+            + "BufferedImage has left the API and has nothing in it to call")
     BufferedImage capture();
 
     /**
@@ -71,6 +76,7 @@ public interface CaptureSource {
      * <p>Used by {@link com.botmaker.sdk.api.launch.LaunchTarget#startIfNotRunning()} to decide whether the
      * ambient source can answer "already running", or whether it must fall back to a process-name probe.
      */
+    @NotInPalette("how the launch stack decides whether a source can be focused; not a question a bot asks")
     default boolean hasWindowIdentity() {
         return false;
     }
@@ -149,6 +155,7 @@ public interface CaptureSource {
      * The underlying whole-surface source (a {@link Window} or the screen) this source draws from, unwrapping
      * any {@link #region(Rect)} narrowing. Defaults to {@code this}; only region sub-sources override it.
      */
+    @NotInPalette("the other half of region()'s bookkeeping — see subRegion()")
     default CaptureSource base() {
         return this;
     }
@@ -157,6 +164,8 @@ public interface CaptureSource {
      * The searched rectangle within {@link #base()} (in that surface's pixel space), or {@code null} when
      * this source captures the whole surface. Only region sub-sources return a non-null value.
      */
+    @NotInPalette("how a region source reports the crop it applies, so coordinates can be shifted back; a "
+            + "bot names the region it wants with region(), it does not read one back")
     default Rect subRegion() {
         return null;
     }
