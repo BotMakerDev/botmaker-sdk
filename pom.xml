@@ -31,6 +31,9 @@
              in the committed pom, injected at build time by CI for a released tag, resolved into the
              published pom by flatten. -->
         <botmaker.session.version>0.0.0-SNAPSHOT</botmaker.session.version>
+        <!-- botmaker-studio-api version: the Studio plugin contract. Same 0.0.0-SNAPSHOT contract again.
+             This one moves far more slowly than the other two on purpose — see the dependency below. -->
+        <botmaker.studioapi.version>0.0.0-SNAPSHOT</botmaker.studioapi.version>
     </properties>
 
     <repositories>
@@ -60,6 +63,23 @@
             <groupId>com.github.LiQiyeDev</groupId>
             <artifactId>botmaker-session</artifactId>
             <version>${botmaker.session.version}</version>
+        </dependency>
+
+        <!-- The Studio plugin contract. This SDK is Studio's plugin #1 — a privileged default plugin, but a
+             plugin: it contributes its own palette catalog and its own value-slot editors through this
+             contract rather than through a back door. See ../docs/refactor/24-plugin-platform.md.
+
+             <optional>true</optional> is what keeps it off a generated bot's classpath. A bot compiles
+             against api.* and never names a plugin type; the classes in this jar that DO implement the
+             contract (under internal.plugin) are simply never linked in a bot's JVM, exactly as an SLF4J
+             binding is never linked by code that only calls the logger. Nothing under com.botmaker.sdk.api
+             may reference a com.botmaker.plugin.api type — that is what makes the optional dependency safe
+             rather than a NoClassDefFoundError waiting for its first caller. -->
+        <dependency>
+            <groupId>com.github.LiQiyeDev</groupId>
+            <artifactId>botmaker-studio-api</artifactId>
+            <version>${botmaker.studioapi.version}</version>
+            <optional>true</optional>
         </dependency>
 
         <!-- JavaCV / OpenCV (native bindings used for image matching) -->

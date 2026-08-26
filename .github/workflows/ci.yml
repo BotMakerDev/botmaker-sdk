@@ -31,6 +31,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The Studio plugin contract. This SDK is Studio's plugin #1 and compiles against it (an OPTIONAL
+      # dependency, so it never reaches a bot's classpath — but the build still needs it present).
+      - name: Check out botmaker-studio-api
+        uses: actions/checkout@v4
+        with:
+          repository: LiQiyeDev/botmaker-studio-api
+          path: .deps/botmaker-studio-api
+
       - name: Check out botmaker-shared
         uses: actions/checkout@v4
         with:
@@ -49,8 +57,9 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Install botmaker-shared and botmaker-session (0.0.0-SNAPSHOT)
+      - name: Install botmaker-studio-api, botmaker-shared and botmaker-session (0.0.0-SNAPSHOT)
         run: |
+          mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
           mvn -B -f .deps/botmaker-shared/pom.xml install -DskipTests
           mvn -B -f .deps/botmaker-session/pom.xml install -DskipTests
 

@@ -14,6 +14,11 @@ install:
   # property (a stale -D only affected the build); with flatten they would be silently BAKED INTO the
   # published pom, pointing every consumer of a hand-cut tag at a long-dead shared. Failing the build with
   # a readable message is strictly better than publishing that.
+  #
+  # STUDIO_API_TAG is the plugin contract (com.botmaker.plugin.api). This SDK is Studio's plugin #1, and its
+  # internal.plugin classes implement that contract — an OPTIONAL dependency, so it never reaches a bot's
+  # classpath, but the build still has to compile against it. Required here for the same reason as the other
+  # two: flatten bakes whatever is injected into the published pom.
   - . ./.deps.env
-  - '[ -n "${SHARED_TAG:-}" ] && [ -n "${SESSION_TAG:-}" ] || { echo "ERROR: .deps.env must pin SHARED_TAG and SESSION_TAG. Cut releases with the umbrella release.sh, which writes it into the release commit." >&2; exit 1; }'
-  - mvn install -DskipTests -Dmaven.javadoc.skip=true -B -Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG
+  - '[ -n "${SHARED_TAG:-}" ] && [ -n "${SESSION_TAG:-}" ] && [ -n "${STUDIO_API_TAG:-}" ] || { echo "ERROR: .deps.env must pin SHARED_TAG, SESSION_TAG and STUDIO_API_TAG. Cut releases with the umbrella release.sh, which writes it into the release commit." >&2; exit 1; }'
+  - mvn install -DskipTests -Dmaven.javadoc.skip=true -B -Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG -Dbotmaker.studioapi.version=$STUDIO_API_TAG
