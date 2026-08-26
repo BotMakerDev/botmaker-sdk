@@ -170,4 +170,27 @@ class ProjectModelBehaviourTest {
         assertFalse(ActivityModel.create("Mining", "dig").enabled());
         assertTrue(ActivityModel.of("Mining").enabled());
     }
+
+    /**
+     * The enum list and the port list differ in exactly one place, and the two methods exist so they can:
+     * {@code DISABLED} is a port the flow wires from, never a constant {@code run()} could return.
+     */
+    @Test
+    void disabledIsAPortButNotAnOutcome() {
+        ActivityModel mining = ActivityModel.of("Mining").withOutcomes(List.of("BAG_FULL"));
+
+        assertEquals(List.of("NEXT", "BAG_FULL"), mining.allOutcomes());
+        assertEquals(List.of("NEXT", "BAG_FULL", "DISABLED"), mining.flowPorts(),
+                "DISABLED comes last — every other port is a way the activity finished");
+    }
+
+    /** A file naming an outcome the activity already has must not emit it twice, whichever one it names. */
+    @Test
+    void anImplicitOutcomeDeclaredInTheFileIsNotDuplicated() {
+        ActivityModel mining = ActivityModel.of("Mining")
+                .withOutcomes(List.of("NEXT", "DISABLED", "BAG_FULL"));
+
+        assertEquals(List.of("NEXT", "BAG_FULL"), mining.allOutcomes());
+        assertEquals(List.of("NEXT", "BAG_FULL", "DISABLED"), mining.flowPorts());
+    }
 }

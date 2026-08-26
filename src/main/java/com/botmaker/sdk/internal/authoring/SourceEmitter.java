@@ -379,14 +379,20 @@ public final class SourceEmitter {
      */
     private static String driverNode(ActivityModel a, FlowModel flow) {
         // A disabled activity isn't skipped out of the flow — the flow still passes through it, it just
-        // doesn't do anything, so it follows the wire it would have taken with nothing to report.
-        FlowEdgeModel fallthrough = edgeFor(flow, a.name(), FlowEdgeModel.NEXT_OUTCOME);
+        // doesn't do anything, so it follows its own DISABLED wire. That wire used to be inferred from NEXT,
+        // which meant the destination was invisible in the editor and could not be chosen; a project drawn
+        // before DISABLED existed has none, so switching an activity off now ends the run where it used to
+        // carry on. Deliberate, and not migrated: guessing NEXT was the wrong answer often enough that
+        // preserving it would preserve the bug.
+        FlowEdgeModel whenDisabled = edgeFor(flow, a.name(), FlowEdgeModel.DISABLED_OUTCOME);
         StringBuilder out = new StringBuilder(NODE_INDENT)
                 .append("FlowGraph.node(").append(LiteralWriter.quote(a.name())).append(", ")
                 .append("ActivityRegistry.").append(constantName(a.name()))
                 .append(", PopupCheck.").append(a.popupCheck() ? "ON" : "OFF")
                 .append(", Recovery.").append(a.goHome() ? "GO_HOME" : "NONE")
-                .append(", ").append(fallthrough == null ? "null" : LiteralWriter.quote(fallthrough.to()));
+                .append(", ").append(whenDisabled == null ? "null" : LiteralWriter.quote(whenDisabled.to()));
+        // allOutcomes(), not flowPorts(): DISABLED is the argument above, never a route. Emitting it here too
+        // would be a second mechanism for one thing, and Outcome has no such constant to name it with.
         for (String outcome : a.allOutcomes()) {
             FlowEdgeModel wire = edgeFor(flow, a.name(), outcome);
             if (wire == null) continue;   // nothing drawn for it: an unrouted outcome ends the run

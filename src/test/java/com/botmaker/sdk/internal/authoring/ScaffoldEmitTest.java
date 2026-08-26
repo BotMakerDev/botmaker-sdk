@@ -79,12 +79,16 @@ class ScaffoldEmitTest {
         return ProjectModel.of(List.of(activity("Mining")), List.of());
     }
 
-    /** A branch, a loop back to the start, an unrouted outcome that ends the run, and an orphan. */
+    /**
+     * A branch, a loop back to the start, an unrouted outcome that ends the run, and an orphan — plus a
+     * {@code DISABLED} wire on Mining and none on Selling, which is the pair the emitter must tell apart.
+     */
     private static ProjectModel wired() {
         FlowModel flow = new FlowModel(
                 List.of(node("Mining"), node("Selling"), node("Lonely")),
                 List.of(new FlowEdgeModel("Mining", "Selling", "BAG_FULL"),
                         new FlowEdgeModel("Mining", "Mining", "NEXT"),
+                        new FlowEdgeModel("Mining", "Selling", FlowEdgeModel.DISABLED_OUTCOME),
                         new FlowEdgeModel("Selling", "Mining", "NEXT"),
                         new FlowEdgeModel("Mining", "Nowhere", "STALE")),
                 "Mining", 50, 0);
@@ -252,6 +256,40 @@ class ScaffoldEmitTest {
         assertTrue(sources.containsKey("src/main/java/com/mybot/activities/Lonely.java"));
         assertTrue(sources.get("src/main/java/com/mybot/Activities.java").contains("boolean Lonely"));
         assertFalse(sources.get("src/main/java/com/mybot/ActivityRegistry.java").contains("LONELY"));
+    }
+
+    /**
+     * A disabled activity follows its own {@code DISABLED} wire, not the one it would have taken with nothing
+     * to report — and an activity with no {@code DISABLED} wire ends the run rather than falling through.
+     *
+     * <p>That second half is the behaviour change: before this outcome existed the destination was inferred
+     * from {@code NEXT}, so it could not be seen in the editor and could not be chosen. Selling here wires
+     * {@code NEXT} to Mining and nothing else, and its {@code whenDisabled} slot must be {@code null}.
+     */
+    @Test
+    void aDisabledActivityFollowsItsOwnWire() {
+        String driver = Authoring.sources(V, spec(), wired(), List.of())
+                .get("src/main/java/com/mybot/FlowDriver.java");
+
+        assertTrue(driver.contains("""
+                FlowGraph.node("Mining", ActivityRegistry.MINING, PopupCheck.ON, Recovery.GO_HOME, "Selling\""""),
+                "Mining's DISABLED wire leads to Selling, so that is its whenDisabled — even though its NEXT "
+                        + "loops back to itself:\n" + driver);
+        assertTrue(driver.contains("""
+                FlowGraph.node("Selling", ActivityRegistry.SELLING, PopupCheck.OFF, Recovery.NONE, null"""),
+                "Selling has no DISABLED wire, so switching it off ends the run — its NEXT is not a "
+                        + "fallback:\n" + driver);
+    }
+
+    /** DISABLED is a port, never an {@code Outcome} constant: an activity that did not run reported nothing. */
+    @Test
+    void disabledIsNeitherAnEnumConstantNorARoute() {
+        Map<String, String> sources = Authoring.sources(V, spec(), wired(), List.of());
+
+        assertFalse(sources.get("src/main/java/com/mybot/activities/Mining.java").contains("DISABLED"),
+                "the Outcome enum must not gain a constant no run() could ever return");
+        assertFalse(sources.get("src/main/java/com/mybot/FlowDriver.java").contains("Outcome.DISABLED"),
+                "whenDisabled is the one mechanism; a route beside it would be a second");
     }
 
     // ---- compiling --------------------------------------------------------------------------------------

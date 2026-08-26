@@ -31,6 +31,23 @@ public record FlowEdgeModel(String from, String to, String outcome) {
      */
     public static final String NEXT_OUTCOME = "NEXT";
 
+    /**
+     * The second outcome every activity has without declaring it — "this activity is switched off, go here
+     * instead". A disabled activity is not skipped <em>out of</em> the flow: the flow still passes through it
+     * and takes this wire, and an unwired {@code DISABLED} ends the run.
+     *
+     * <p>It is <b>not</b> a constant of the generated {@code Outcome} enum, which is why
+     * {@link ActivityModel#allOutcomes()} does not list it and {@link ActivityModel#flowPorts()} does. An
+     * activity can never <em>report</em> being disabled — it did not run. It reaches the generated code as
+     * {@code FlowGraph.node}'s {@code whenDisabled} argument, one slot per node, so there is exactly one
+     * mechanism rather than a route that duplicates it.
+     *
+     * <p>Stored under its own name and not blank: blank already means {@link #NEXT_OUTCOME}, and a project
+     * written before this outcome existed has no {@code DISABLED} wire at all — which is the whole of the
+     * behaviour change, and is deliberate.
+     */
+    public static final String DISABLED_OUTCOME = "DISABLED";
+
     public FlowEdgeModel {
         if (from == null) from = "";
         if (to == null) to = "";

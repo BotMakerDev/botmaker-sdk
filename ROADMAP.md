@@ -8,6 +8,42 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-26 — a disabled activity gets its own wire (plugin platform, phase 9)
+
+**Changed:** `api/authoring/FlowEdgeModel` (new `DISABLED_OUTCOME`), `api/authoring/ActivityModel` (new
+`flowPorts()`; `allOutcomes()` now filters `DISABLED`), `internal/authoring/SourceEmitter` (`whenDisabled` is
+read from the `DISABLED` wire, not inferred from `NEXT`), `ScaffoldEmitTest`, `ProjectModelBehaviourTest`.
+Studio: `FlowEdge`, `ActivityDefinition`, `ActivityDraft`, `FlowCanvas`, `FlowNames`, `NewActivityDialog`,
+`ActivityFlowDialog`, `blocks.css`.
+
+**Done**
+
+- **`DISABLED` is now an outcome the flow is wired from**, beside the implicit `NEXT`. It was always a slot in
+  the generated code — `FlowGraph.node`'s `whenDisabled`, checked by `FlowWalker` before the popup guard and
+  before `GO_HOME` — but nothing ever wrote to it deliberately: the emitter inferred it from the activity's
+  `NEXT` wire, so where a switched-off activity sent the run was invisible in the editor and impossible to
+  choose. `FlowGraph` and `FlowWalker` are **unchanged**; the mechanism existed end to end already.
+- **A port, never an `Outcome` constant** — which is why `allOutcomes()` and `flowPorts()` are two methods.
+  An activity can't *report* being switched off, because it didn't run, so a `DISABLED` enum constant would be
+  one nothing could ever return and a route beside `whenDisabled` would be a second mechanism for one thing.
+  `allOutcomes()` stays the enum list and filters `DISABLED` out defensively; `flowPorts()` appends it last,
+  and is what the canvas draws ports from **and** prunes wires against. Pruning against the enum list instead
+  would have deleted every `DISABLED` wire the moment it was drawn.
+- **No migration, and this is a behaviour change.** An existing project has no `DISABLED` wire, so switching an
+  activity off now *ends the run* where it used to carry on to the `NEXT` target. Deliberate: guessing `NEXT`
+  was the wrong answer often enough that preserving it would preserve the bug. The flow dialog says so —
+  "stops the run if switched off: …" naming every activity the flow continues past whose `DISABLED` is
+  unwired. Leaf nodes are excluded: they end the run either way, so reporting them would flood every project.
+- `DISABLED` is a reserved outcome name in both the live check (`FlowNames.outcomeProblem`) and the save-time
+  one (`ActivityFlowDialog.validate`), and `NewActivityDialog` shows it as a fixed last row for the same
+  reason `NEXT` is a fixed first one — hiding it would grow a port the dialog never mentioned.
+
+**Deferred / next:** phases 10–15 of the plugin-platform plan — the value vocabulary moving to the contract
+and opening (10), parameters as a plugin surface (11), the slot editors (12), the toolbar (13), emission as a
+contract surface (14), and Studio dropping its compile-scope dependency on the SDK (15).
+
+---
+
 ## 2026-08-26 — the catalog stops being written by hand (plugin platform, phase 8)
 
 **Changed:** deleted `internal/plugin/catalog/{Catalogs,V1_1_0,V1_2_0}`; new

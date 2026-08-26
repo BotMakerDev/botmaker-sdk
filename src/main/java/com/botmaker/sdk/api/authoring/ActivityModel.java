@@ -15,6 +15,11 @@ import java.util.stream.Stream;
  * the first constant of the activity's {@code Outcome} enum and is what a wire with no outcome names. That
  * is why {@link #allOutcomes()} leads with it rather than appending it.
  *
+ * <p>There is a second undeclared outcome, {@link FlowEdgeModel#DISABLED_OUTCOME}, and it is deliberately
+ * <em>not</em> in that list: it is a port the flow can be wired from, not a constant the activity can report.
+ * {@link #flowPorts()} is the list that includes it, and the two methods exist separately so the generated
+ * enum and the editor's ports can differ in the one place they must.
+ *
  * <p>{@link #goHome()} and {@link #popupCheck()} are boxed because absent and {@code false} are different
  * answers: a file written before the field existed must take the project's default, not a silent "no". Both
  * default to {@code true} when absent, which is what every project written before them behaved as.
@@ -93,10 +98,31 @@ public record ActivityModel(String name, boolean enabled, String description, Li
         return new ActivityModel(name, enabled, description, outcomes, goHome, newPopupCheck);
     }
 
-    /** The implicit outcome first, then the declared ones — the order the {@code Outcome} enum is emitted in. */
+    /**
+     * The implicit outcome first, then the declared ones — the order the {@code Outcome} enum is emitted in.
+     *
+     * <p>{@link FlowEdgeModel#DISABLED_OUTCOME} is filtered out for the same reason
+     * {@link FlowEdgeModel#NEXT_OUTCOME} is de-duplicated: both are outcomes every activity has already, so a
+     * file that declares one must not emit it twice. Only {@code NEXT} is then re-added, because only
+     * {@code NEXT} is an enum constant.
+     */
     @JsonIgnore
     public List<String> allOutcomes() {
-        return Stream.concat(Stream.of(FlowEdgeModel.NEXT_OUTCOME),
-                outcomes.stream().filter(o -> !FlowEdgeModel.NEXT_OUTCOME.equals(o))).toList();
+        return Stream.concat(Stream.of(FlowEdgeModel.NEXT_OUTCOME), outcomes.stream()
+                .filter(o -> !FlowEdgeModel.NEXT_OUTCOME.equals(o))
+                .filter(o -> !FlowEdgeModel.DISABLED_OUTCOME.equals(o))).toList();
+    }
+
+    /**
+     * Every port the flow can be wired from: {@link #allOutcomes()}, then
+     * {@link FlowEdgeModel#DISABLED_OUTCOME} last.
+     *
+     * <p>Last rather than first because it is the exceptional one — every other port is a way the activity
+     * <em>finished</em>, and this is the one for it never having run. It is the single source of the card's
+     * output ports, so the ports and the wires an editor is allowed to keep cannot drift.
+     */
+    @JsonIgnore
+    public List<String> flowPorts() {
+        return Stream.concat(allOutcomes().stream(), Stream.of(FlowEdgeModel.DISABLED_OUTCOME)).toList();
     }
 }
