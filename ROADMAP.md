@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-26 — `Templates` gets its own entry point (inversion, phase 4)
+
+**Changed:** `api/authoring/Authoring` (`templates`), `internal/authoring/SourceEmitter` (`templatesFile`).
+
+**Done:**
+
+- **`Authoring.templates(version, spec, imageBaseNames)`** — the generated `Templates` class alone, rather
+  than as a slice of `regenerate`. It is the one generated file that says nothing about the model: it is a
+  function of the images folder, an `EMPTY` project has one too, and it is rewritten on every capture,
+  rename and delete. Folding it into `regenerate` would rewrite four files that did not change every time a
+  user names a screenshot, which is noise in the diff the user actually reads.
+- Nothing else in the SDK moved: phase 4 is Studio reconnecting its five refusing call sites to the
+  generator that landed in phase 2, and the only thing it turned out to need that was not already public was
+  this.
+
 ## 2026-08-26 — the pom goes back to Studio (a one-day reversal)
 
 **Changed:** `pom.xml` (`maven-model` removed), `api/authoring/Authoring` (`pomXml`, `defaultRepositories`,

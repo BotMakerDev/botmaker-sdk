@@ -96,6 +96,18 @@ public final class SourceEmitter {
         return out;
     }
 
+    /**
+     * The {@code Templates} class alone, as a single-entry map — for <b>either</b> kind of project.
+     *
+     * <p>It is separate from {@link #regenerated} because it is the one generated file that is not derived
+     * from the model at all: it is a function of the images folder, it exists in an {@link
+     * ProjectSpec.Kind#EMPTY} project too, and it is rewritten on every capture, rename and delete — moments
+     * at which nothing about the activities has changed and rewriting the flow would be noise.
+     */
+    public static Map<String, String> templatesFile(ProjectSpec spec, List<String> imageBaseNames) {
+        return Map.of(path(spec, TemplateNames.CLASS_NAME), templates(spec, imageBaseNames));
+    }
+
     /** One activity's editable stub, as a single-entry map so a caller commits it like any other file. */
     public static Map<String, String> activityStub(ProjectSpec spec, ActivityModel activity) {
         return Map.of(SRC + packagePath(spec) + "/activities/" + activity.name() + ".java",

@@ -230,6 +230,21 @@ public final class Authoring {
     }
 
     /**
+     * The generated {@code Templates} class alone — the constants naming this project's image files.
+     *
+     * <p>Its own entry point rather than a slice of {@link #regenerate}, because it is the one generated file
+     * that says nothing about the model: it is a function of the images folder, an
+     * {@link ProjectSpec.Kind#EMPTY} project has one too (so the first vision block a user drops names a
+     * constant that resolves), and it is rewritten on every capture, rename and delete — moments at which
+     * rewriting the flow driver would be pure noise in the user's diff.
+     */
+    public static Map<String, String> templates(SdkVersion version, ProjectSpec spec,
+                                                List<String> imageBaseNames) {
+        requireVersion(version);
+        return SourceEmitter.templatesFile(spec, imageBaseNames);
+    }
+
+    /**
      * One activity's editable stub, keyed by path like the rest — for an activity that has just been added,
      * or one whose file has gone missing.
      *
