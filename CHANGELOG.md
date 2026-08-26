@@ -19,6 +19,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The block palette is the SDK's answer now, per version.** The SDK ships a catalog of what it offers
+  Studio's menus — which types, in which order, under which icon, and which of their members — one per
+  released version. A bot pinned to an older SDK gets *that* version's menus from a newer Studio, instead of
+  the newest SDK's. Nothing changes in your bot's code, and nothing new is on its classpath: the catalog is
+  served to the editor, never called by a bot.
+- Practically, this restores the curation that `@Palette` used to carry and that was lost when the annotation
+  was deleted — the menus have been offering every public method of every facade since then, and go back to
+  offering the ones worth offering once Studio reads the catalog.
+
 - **Your parameters are real values now, not text read at startup.** `Parameters.REST` used to be
   `Wire.duration(Wire.one("REST"))` — the bot opened `activities.json` when it launched and parsed `"1h30m"`
   out of it. It now says `java.time.Duration.ofMillis(5400000L)`, written when the file was generated. Your

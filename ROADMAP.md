@@ -8,6 +8,37 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-26 — the per-version palette catalog, and the SDK as plugin #1 (plugin platform, phase 6)
+
+**Changed:** new `internal/plugin/catalog/{V1_1_0,V1_2_0,Catalogs}`, new `plugin/SdkPlugin`, new test
+`internal/plugin/catalog/ApiCatalogTest`. Umbrella: `release.sh` (`check_catalog_freeze`,
+`--allow-removal`), `docs/refactor/24-plugin-platform.md` §6, `CLAUDE.md`.
+
+**Done:**
+
+- **One catalog class per released `SdkVersion`**, each written as the previous one plus deltas, served by
+  `SdkPlugin.catalog(pinnedVersion)` — so a bot pinned to an older SDK gets *that* version's palette out of a
+  newer Studio. `Authoring` gains nothing: a catalog is a plugin contribution, not an authoring one.
+- **`V1_1_0` is the deleted `@Palette` curation, reconstructed** — sourced from `21b4825^`, ~380 members over
+  38 facades, in `SdkType`'s exact menu order, as method references. `V1_2_0` returns it unchanged, which is a
+  **finding**: 1.2.0's whole addition is `api.authoring`, and a bot never calls that.
+- **`SdkPlugin` is an ordinary `StudioPlugin` with no back door** — no second interface, no package-private
+  hook. Under `com.botmaker.sdk.plugin`, never `api.*`, which is the invariant that keeps the contract's
+  `<optional>true</optional>` safe on a bot's classpath.
+- **A witness cannot exclude `add(M0)`.** JLS 15.12.2.1: a non-generic method stays applicable when explicit
+  type arguments are supplied, so any overload set containing a no-arg or varargs member is ambiguous under
+  `.<X>add(…)`. Nineteen entries are therefore written as a **cast** — `.add((M1<Key[]>) Keyboard::combo)`.
+  Recorded in `V1_1_0`'s class comment and in the platform doc; it will bite again.
+- **The removal gate is back, over the catalog rather than beside it.** A frozen catalog compiles only while
+  every member it names exists, so deleting one forces an edit to that file — the edit *is* the signal, and
+  `release.sh check_catalog_freeze` refuses it unless `--allow-removal V1_1_0` names it. Nothing generated,
+  nothing to refresh; this is what `api-surface.txt` was rebuilt as.
+- **The `M5` cap's one casualty today:** `Emulator.swipe(int,int,int,int,long)` is arity-6 with its receiver
+  and cannot be named. Left uncatalogued deliberately — the answer, if ever, is `M6` in the contract.
+
+**Deferred / next:** Studio still reads `palette/SdkType`, so the menus stay uncurated until phase 7 wires
+`SdkSurfaceService` onto the served catalog.
+
 ## 2026-08-26 — `Templates` gets its own entry point (inversion, phase 4)
 
 **Changed:** `api/authoring/Authoring` (`templates`), `internal/authoring/SourceEmitter` (`templatesFile`).
