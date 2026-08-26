@@ -1,6 +1,5 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
 
 /**
  * The one checked exception {@link Authoring} throws: this jar cannot author for the version it was asked
@@ -20,7 +19,6 @@ import com.botmaker.sdk.api.meta.Since;
  * <p>It is <b>not</b> the exception for a malformed file or a missing directory. Those are
  * {@link java.io.IOException} and stay that way: the caller can retry them, and a user can fix them.
  */
-@Since("1.2.0")
 public class AuthoringUnsupported extends Exception {
 
     private static final long serialVersionUID = 1L;

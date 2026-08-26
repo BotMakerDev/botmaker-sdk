@@ -1,6 +1,5 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
@@ -16,7 +15,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * @param to      target activity name — the one that runs next
  * @param outcome the source outcome this wire is for; blank ⇒ {@link #NEXT_OUTCOME}
  */
-@Since("1.2.0")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record FlowEdgeModel(String from, String to, String outcome) {
 

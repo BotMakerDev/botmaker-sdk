@@ -1,6 +1,5 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,9 +25,8 @@ import java.util.Optional;
  * <p>The constants are in release order, so {@link #latest()} is the last one and comparison is
  * {@link Enum#compareTo ordinal} comparison. The wire string is the plain semver with <b>no leading
  * {@code v}</b> — the git tag carries the {@code v}; nothing inside the API does, matching
- * {@link Since} and {@link com.botmaker.sdk.api.meta.Replaces}.
+ * {@link com.botmaker.sdk.api.meta.Since} and {@link com.botmaker.sdk.api.meta.Replaces}.
  */
-@Since("1.2.0")
 public enum SdkVersion {
 
     /** The version the API-compatibility contract began at, and the first this enum records. */

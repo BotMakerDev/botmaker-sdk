@@ -1,19 +1,19 @@
 package com.botmaker.sdk.internal.authoring;
 
-import com.botmaker.sdk.api.authoring.ActivityModel;
-import com.botmaker.sdk.api.authoring.Authoring;
-import com.botmaker.sdk.api.authoring.FlowEdgeModel;
-import com.botmaker.sdk.api.authoring.FlowModel;
-import com.botmaker.sdk.api.authoring.FlowNodeModel;
-import com.botmaker.sdk.api.authoring.ProjectModel;
-import com.botmaker.sdk.api.authoring.ProjectSpec;
-import com.botmaker.sdk.api.authoring.Range;
-import com.botmaker.sdk.api.authoring.SdkVersion;
-import com.botmaker.sdk.api.authoring.ValueChoice;
-import com.botmaker.sdk.api.authoring.ValueShape;
-import com.botmaker.sdk.api.authoring.ValueType;
-import com.botmaker.sdk.api.authoring.VariableModel;
-import com.botmaker.sdk.api.authoring.Visibility;
+import com.botmaker.plugin.api.value.Range;
+import com.botmaker.plugin.api.value.ValueChoice;
+import com.botmaker.plugin.api.value.ValueShape;
+import com.botmaker.plugin.api.value.ValueType;
+import com.botmaker.plugin.api.value.Visibility;
+import com.botmaker.sdk.authoring.ActivityModel;
+import com.botmaker.sdk.authoring.Authoring;
+import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.sdk.authoring.FlowModel;
+import com.botmaker.sdk.authoring.FlowNodeModel;
+import com.botmaker.sdk.authoring.ProjectModel;
+import com.botmaker.sdk.authoring.ProjectSpec;
+import com.botmaker.sdk.authoring.SdkVersion;
+import com.botmaker.sdk.authoring.VariableModel;
 import com.botmaker.sdk.api.geometry.Size;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -106,42 +106,59 @@ class ScaffoldEmitTest {
      */
     private static ProjectModel everyType() {
         List<VariableModel> variables = new ArrayList<>();
-        for (ValueType type : ValueType.all()) {
-            variables.add(new VariableModel("scalar" + type.name(), ValueChoice.of(type),
+        for (ValueType type : SdkValueTypes.CATALOG.types()) {
+            String id = type.id();
+            variables.add(new VariableModel("scalar" + id, ValueChoice.of(type),
                     List.of(sample(type)), "a \"quoted\" one */ with a fence", "", Visibility.PUBLIC,
                     List.of(), Range.NONE));
-            variables.add(VariableModel.of("blank" + type.name(), ValueChoice.of(type), List.of()));
-            variables.add(VariableModel.of("junk" + type.name(), ValueChoice.of(type),
-                    List.of("not a " + type.name())));
-            variables.add(VariableModel.of("list" + type.name(),
+            variables.add(VariableModel.of("blank" + id, ValueChoice.of(type), List.of()));
+            variables.add(VariableModel.of("junk" + id, ValueChoice.of(type), List.of("not a " + id)));
+            variables.add(VariableModel.of("list" + id,
                     new ValueChoice(type, ValueShape.OPEN_LIST), List.of(sample(type), sample(type))));
-            variables.add(VariableModel.of("empty" + type.name(),
+            variables.add(VariableModel.of("empty" + id,
                     new ValueChoice(type, ValueShape.OPEN_LIST), List.of()));
         }
         return ProjectModel.of(List.of(activity("Mining")), variables);
     }
 
-    /** One plausible stored value per type, in the wire spelling the editor writes. */
+    /**
+     * One plausible stored value per type, in the wire spelling the editor writes.
+     *
+     * <p>A map keyed by id rather than a {@code switch}, because the vocabulary is open and a {@code switch}
+     * over it could never be exhaustive again. {@link #everySdkTypeHasASample} is what keeps it complete: the
+     * compiler used to refuse a missing arm, and that job moves to a test the moment the set stops being an
+     * enum. A type with no sample would otherwise silently be exercised with the empty string.
+     */
     private static String sample(ValueType type) {
-        return switch (type) {
-            case TEXT -> "a \"quoted\"\ttab\\slash";
-            case YES_NO -> "true";
-            case WHOLE_NUMBER -> "3";
-            case DECIMAL_NUMBER -> "0.75";
-            case CHARACTER -> "'";
-            case COLOR -> "#3366FF";
-            case DATE -> "2026-08-25";
-            case TIME_OF_DAY -> "07:30:15";
-            case DURATION -> "1h30m";
-            case IMAGE_TEMPLATE -> "ore";
-            case PRECISION -> "12.5,4,2";
-            case POINT -> "3,4";
-            case RECT -> "1,2,3,4";
-            case SIZE -> "800,600";
-            case DIRECTION -> "SOUTH";
-            case KEY -> "SPACE";
-            case MOUSE_BUTTON -> "LEFT";
-        };
+        return SAMPLES.get(type.id());
+    }
+
+    private static final Map<String, String> SAMPLES = Map.ofEntries(
+            Map.entry("TEXT", "a \"quoted\"\ttab\\slash"),
+            Map.entry("YES_NO", "true"),
+            Map.entry("WHOLE_NUMBER", "3"),
+            Map.entry("DECIMAL_NUMBER", "0.75"),
+            Map.entry("CHARACTER", "'"),
+            Map.entry("COLOR", "#3366FF"),
+            Map.entry("DATE", "2026-08-25"),
+            Map.entry("TIME_OF_DAY", "07:30:15"),
+            Map.entry("DURATION", "1h30m"),
+            Map.entry("IMAGE_TEMPLATE", "ore"),
+            Map.entry("PRECISION", "12.5,4,2"),
+            Map.entry("POINT", "3,4"),
+            Map.entry("RECT", "1,2,3,4"),
+            Map.entry("SIZE", "800,600"),
+            Map.entry("DIRECTION", "SOUTH"),
+            Map.entry("KEY", "SPACE"),
+            Map.entry("MOUSE_BUTTON", "LEFT"));
+
+    /** The exhaustiveness javac used to give the {@code switch} this map replaced. */
+    @Test
+    void everySdkTypeHasASample() {
+        for (ValueType type : SdkValueTypes.CATALOG.types()) {
+            assertTrue(SAMPLES.containsKey(type.id()),
+                    () -> "no sample value for " + type.id() + " — the corpus would not exercise it");
+        }
     }
 
     // ---- the guarantee ----------------------------------------------------------------------------------
@@ -216,8 +233,9 @@ class ScaffoldEmitTest {
     @Test
     void aValueIsBakedIntoTheSourceRatherThanParsedAtStartup() {
         ProjectModel model = ProjectModel.of(List.of(), List.of(
-                VariableModel.of("REST", ValueChoice.of(ValueType.DURATION), List.of("1h30m")),
-                VariableModel.of("HOTKEYS", ValueChoice.listOf(ValueType.KEY), List.of("SPACE", "ESCAPE"))));
+                VariableModel.of("REST", ValueChoice.of(SdkValueTypes.DURATION), List.of("1h30m")),
+                VariableModel.of("HOTKEYS", ValueChoice.listOf(SdkValueTypes.KEY),
+                        List.of("SPACE", "ESCAPE"))));
 
         String parameters = Authoring.regenerate(V, spec(), model, List.of())
                 .get("src/main/java/com/mybot/Parameters.java");

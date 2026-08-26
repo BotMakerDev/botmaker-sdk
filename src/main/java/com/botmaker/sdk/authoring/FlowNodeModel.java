@@ -1,6 +1,5 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
@@ -19,7 +18,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * @param x        canvas x of the node's top-left, in unscaled canvas coordinates
  * @param y        canvas y of the node's top-left, in unscaled canvas coordinates
  */
-@Since("1.2.0")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record FlowNodeModel(String activity, double x, double y) {
 

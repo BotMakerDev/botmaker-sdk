@@ -1,6 +1,5 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -19,7 +18,6 @@ import java.util.Optional;
  * @param maxSteps    the budget of node transitions per run; {@code <= 0} ⇒ {@link #DEFAULT_MAX_STEPS}
  * @param stepDelayMs the pause between two activities; {@code < 0} ⇒ the default, {@code 0} ⇒ no pause
  */
-@Since("1.2.0")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record FlowModel(List<FlowNodeModel> nodes, List<FlowEdgeModel> edges, String start, int maxSteps,
                         int stepDelayMs) {

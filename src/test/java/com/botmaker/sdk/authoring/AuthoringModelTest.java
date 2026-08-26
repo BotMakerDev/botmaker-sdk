@@ -1,5 +1,12 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
+import com.botmaker.plugin.api.value.Range;
+import com.botmaker.plugin.api.value.ValueCatalog;
+import com.botmaker.plugin.api.value.ValueChoice;
+import com.botmaker.plugin.api.value.ValueShape;
+import com.botmaker.plugin.api.value.ValueType;
+import com.botmaker.plugin.api.value.Visibility;
+import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AuthoringModelTest {
 
     private static final SdkVersion V = SdkVersion.latest();
+    private static final ValueCatalog CATALOG = Authoring.valueTypes(V);
 
     @Test
     void anAbsentFileIsAnEmptyModelRatherThanAnError(@TempDir Path dir) throws IOException {
@@ -41,10 +49,10 @@ class AuthoringModelTest {
     void aModelRoundTripsWithItsStamp(@TempDir Path dir) throws IOException {
         ProjectModel written = new ProjectModel(
                 List.of(new ActivityModel("Mining", true, "dig", List.of("FULL"), null, Boolean.FALSE)),
-                List.of(new VariableModel("REST", ValueChoice.of(ValueType.DURATION), List.of("90s"),
+                List.of(new VariableModel("REST", ValueChoice.of(SdkValueTypes.DURATION), List.of("90s"),
                                 "How long to rest", "Mining", Visibility.PUBLIC, List.of(),
                                 new Range("30s", null)),
-                        new VariableModel("HOTKEYS", ValueChoice.listOf(ValueType.KEY),
+                        new VariableModel("HOTKEYS", ValueChoice.listOf(SdkValueTypes.KEY),
                                 List.of("SPACE", "ESCAPE"), "", "", Visibility.EDITOR_ONLY, List.of(),
                                 Range.NONE)),
                 new FlowModel(List.of(new FlowNodeModel("Mining", 12, 34)),
@@ -86,16 +94,16 @@ class AuthoringModelTest {
     /** The pseudo-type that predates the shape axis: {@code CHOICE} was text out of a written-down set. */
     @Test
     void theLegacyChoicePseudoTypeLoadsAsTextOutOfASet() {
-        ValueChoice c = ValueChoice.fromWire("CHOICE", null, Boolean.FALSE);
-        assertEquals(ValueType.TEXT, c.type());
+        ValueChoice c = ValueChoice.fromWire(CATALOG, "CHOICE", null, Boolean.FALSE);
+        assertEquals(SdkValueTypes.TEXT, c.type());
         assertEquals(ValueShape.ONE_OF, c.shape());
     }
 
     /** The boolean that predates the shape axis: {@code list:true} was both list shapes at once. */
     @Test
     void theLegacyListBooleanBecomesAListShape() {
-        assertEquals(ValueShape.ANY_OF, ValueChoice.fromWire("TEXT", null, Boolean.TRUE).shape());
-        assertEquals(ValueShape.ONE, ValueChoice.fromWire("TEXT", null, Boolean.FALSE).shape());
+        assertEquals(ValueShape.ANY_OF, ValueChoice.fromWire(CATALOG, "TEXT", null, Boolean.TRUE).shape());
+        assertEquals(ValueShape.ONE, ValueChoice.fromWire(CATALOG, "TEXT", null, Boolean.FALSE).shape());
     }
 
     /**
@@ -104,29 +112,64 @@ class AuthoringModelTest {
      */
     @Test
     void aStoredAnyOfWithNoSetBehindItReadsAsAnOpenList() {
-        ValueChoice anyOfText = new ValueChoice(ValueType.TEXT, ValueShape.ANY_OF);
+        ValueChoice anyOfText = new ValueChoice(SdkValueTypes.TEXT, ValueShape.ANY_OF);
         assertEquals(ValueShape.OPEN_LIST, VariableModel.listShapeOf(anyOfText, List.of()).shape());
         assertEquals(ValueShape.ANY_OF, VariableModel.listShapeOf(anyOfText, List.of("a")).shape());
 
         // A closed set is its own set of options — nobody has to write them down.
-        ValueChoice anyOfKey = new ValueChoice(ValueType.KEY, ValueShape.ANY_OF);
+        ValueChoice anyOfKey = new ValueChoice(SdkValueTypes.KEY, ValueShape.ANY_OF);
         assertEquals(ValueShape.ANY_OF, VariableModel.listShapeOf(anyOfKey, List.of()).shape());
     }
 
     @Test
     void everyParseIsTotal() {
-        assertEquals(ValueType.TEXT, ValueType.fromWire("A_TYPE_A_NEWER_SDK_INVENTED"));
-        assertEquals(ValueType.TEXT, ValueType.fromWire(null));
         assertEquals(ValueShape.ONE, ValueShape.fromWire("SOME_NEW_SHAPE"));
         assertEquals(Visibility.EDITOR_ONLY, Visibility.fromId("something-else"));
         assertEquals(Visibility.EDITOR_ONLY, Visibility.fromId(null));
     }
 
+    /**
+     * Total, but no longer by pretending: an id nothing registered used to read as {@code TEXT}, which was a
+     * defensible answer for a closed set of seventeen and is the wrong one for an open vocabulary. A file
+     * naming {@code discord.Channel} is not a file whose author meant text — it is a file whose plugin is not
+     * installed, and quietly retyping it is how a user's value is destroyed by a missing jar.
+     */
+    @Test
+    void anIdNothingRegisteredIsUnknownRatherThanText() {
+        ValueType invented = CATALOG.type("A_TYPE_SOME_PLUGIN_OWNS");
+        assertFalse(invented.known());
+        assertEquals("A_TYPE_SOME_PLUGIN_OWNS", invented.id(), "and it keeps the id, so a save round-trips");
+        assertFalse(CATALOG.knows("A_TYPE_SOME_PLUGIN_OWNS"));
+        assertTrue(CATALOG.initializer(ValueChoice.of(invented), List.of("whatever")).isEmpty(),
+                "an unknown type declines to emit rather than guessing a literal");
+
+        // Null is the one case that is still text: it is an absent field, not a name nobody claimed.
+        assertEquals(SdkValueTypes.TEXT, CATALOG.type(null));
+    }
+
+    /** The unknown value survives the round trip, which is the whole of the guarantee. */
+    @Test
+    void aValueOfAnUnknownTypeIsStillThereAfterASave(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve(ProjectModel.FILE_NAME), """
+                {"variables":[{"name":"CHANNEL",
+                               "type":{"type":"discord.Channel","shape":"ONE"},
+                               "value":["#general"]}]}""");
+
+        ProjectModel read = Authoring.readModel(V, dir);
+        VariableModel v = read.variables().getFirst();
+        assertEquals("discord.Channel", v.type().type().id());
+        assertEquals(List.of("#general"), v.value());
+
+        Authoring.writeModel(V, dir, read, 1);
+        assertEquals(read, Authoring.readModel(V, dir));
+        assertTrue(Files.readString(dir.resolve(ProjectModel.FILE_NAME)).contains("discord.Channel"));
+    }
+
     /** "One of yes and no" is a boolean, said twice and worse — the shape is corrected, not stored. */
     @Test
     void aClosedSetCannotCarryAnAuthorWrittenSubset() {
-        assertEquals(ValueShape.ONE, new ValueChoice(ValueType.YES_NO, ValueShape.ONE_OF).shape());
-        assertEquals(ValueShape.ONE_OF, new ValueChoice(ValueType.TEXT, ValueShape.ONE_OF).shape());
+        assertEquals(ValueShape.ONE, new ValueChoice(SdkValueTypes.YES_NO, ValueShape.ONE_OF).shape());
+        assertEquals(ValueShape.ONE_OF, new ValueChoice(SdkValueTypes.TEXT, ValueShape.ONE_OF).shape());
     }
 
     @Test
@@ -160,9 +203,10 @@ class AuthoringModelTest {
     /** The emitter's spellings — qualified where a fixed import block could otherwise forget them. */
     @Test
     void theSourceSpellingsAreTheOnesTheGeneratorWrites() {
-        assertEquals("java.time.Duration", ValueChoice.of(ValueType.DURATION).sourceName());
-        assertEquals("java.util.List<Key>", ValueChoice.listOf(ValueType.KEY).sourceName());
-        assertEquals("int", ValueChoice.of(ValueType.WHOLE_NUMBER).sourceName());
-        assertEquals("java.util.List<Integer>", ValueChoice.listOf(ValueType.WHOLE_NUMBER).sourceName());
+        assertEquals("java.time.Duration", ValueChoice.of(SdkValueTypes.DURATION).sourceName());
+        assertEquals("java.util.List<Key>", ValueChoice.listOf(SdkValueTypes.KEY).sourceName());
+        assertEquals("int", ValueChoice.of(SdkValueTypes.WHOLE_NUMBER).sourceName());
+        assertEquals("java.util.List<Integer>",
+                ValueChoice.listOf(SdkValueTypes.WHOLE_NUMBER).sourceName());
     }
 }

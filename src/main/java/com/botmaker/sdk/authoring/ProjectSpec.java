@@ -1,7 +1,6 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.meta.Since;
 
 /**
  * What a caller must decide before a project can be created — the arguments to
@@ -19,7 +18,6 @@ import com.botmaker.sdk.api.meta.Since;
  * @param referenceSize    the resolution captures are authored against, or {@code null} to leave it unset
  *                         and let the first capture seed it
  */
-@Since("1.2.0")
 public record ProjectSpec(String projectName, String packageName, String entryClassName, Kind kind,
                           String sdkPin, Size referenceSize) {
 

@@ -1,6 +1,10 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.plugin.api.value.Range;
+import com.botmaker.plugin.api.value.ValueChoice;
+import com.botmaker.plugin.api.value.ValueShape;
+import com.botmaker.plugin.api.value.Visibility;
+import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -34,14 +38,13 @@ import java.util.List;
  * @param options     the declared set of values, for a shape that {@link ValueChoice#hasOptions has one}
  * @param bounds      the declared range, for a bounded number
  */
-@Since("1.2.0")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record VariableModel(String name, ValueChoice type, List<String> value, String description,
                             String tag, Visibility visibility, List<String> options, Range bounds) {
 
     public VariableModel {
         if (name == null) name = "";
-        if (type == null) type = ValueChoice.of(ValueType.TEXT);
+        if (type == null) type = ValueChoice.of(SdkValueTypes.TEXT);
         value = value == null ? List.of() : List.copyOf(value);
         if (description == null) description = "";
         if (tag == null) tag = "";

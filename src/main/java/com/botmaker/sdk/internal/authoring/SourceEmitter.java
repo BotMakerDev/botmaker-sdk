@@ -1,13 +1,14 @@
 package com.botmaker.sdk.internal.authoring;
 
-import com.botmaker.sdk.api.authoring.ActivityModel;
-import com.botmaker.sdk.api.authoring.FlowEdgeModel;
-import com.botmaker.sdk.api.authoring.FlowModel;
-import com.botmaker.sdk.api.authoring.ProjectModel;
-import com.botmaker.sdk.api.authoring.ProjectSpec;
-import com.botmaker.sdk.api.authoring.TemplateNames;
-import com.botmaker.sdk.api.authoring.ValueChoice;
-import com.botmaker.sdk.api.authoring.VariableModel;
+import com.botmaker.plugin.api.value.ValueCatalog;
+import com.botmaker.plugin.api.value.ValueChoice;
+import com.botmaker.sdk.authoring.ActivityModel;
+import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.sdk.authoring.FlowModel;
+import com.botmaker.sdk.authoring.ProjectModel;
+import com.botmaker.sdk.authoring.ProjectSpec;
+import com.botmaker.sdk.authoring.TemplateNames;
+import com.botmaker.sdk.authoring.VariableModel;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -48,6 +49,16 @@ import java.util.Set;
 public final class SourceEmitter {
 
     private static final String SRC = "src/main/java/";
+
+    /**
+     * The vocabulary this emitter can write literals for — the SDK's own, and deliberately not a merged one.
+     *
+     * <p>The SDK writes the files the SDK owns, so the types it can put in them are the types it registered.
+     * A variable of a type some other plugin owns is that plugin's to emit, into its own file; here it is
+     * simply left out, with a comment saying why. Threading a host-merged catalog in would be the SDK
+     * generating another plugin's fields, which is the back door the platform exists to close.
+     */
+    private static final ValueCatalog CATALOG = SdkValueTypes.CATALOG;
 
     /** The indent a node sits at inside {@code FlowGraph.of(…)}, and its routes one level further in. */
     private static final String NODE_INDENT = " ".repeat(12);
@@ -172,7 +183,7 @@ public final class SourceEmitter {
             out.append('\n');
             appendDoc(out, flag.description());
             out.append("    public static boolean ").append(flag.name()).append(" = ")
-                    .append(LiteralWriter.initializer(flag.type(), flag.value())).append(";\n");
+                    .append(LiteralWriter.initializer(CATALOG, flag.type(), flag.value())).append(";\n");
         }
         return out.append("\n    private Activities() {}\n}\n").toString();
     }
@@ -189,7 +200,7 @@ public final class SourceEmitter {
      */
     static String parameters(ProjectSpec spec, ProjectModel model) {
         StringBuilder out = new StringBuilder(header(spec));
-        Set<String> imports = LiteralWriter.imports(
+        Set<String> imports = LiteralWriter.imports(CATALOG,
                 model.variables().stream().map(VariableModel::type).toList());
         for (String fqn : imports) out.append("import ").append(fqn).append(";\n");
         if (!imports.isEmpty()) out.append('\n');
@@ -209,9 +220,19 @@ public final class SourceEmitter {
                 """);
         for (VariableModel v : model.variables()) {
             out.append('\n');
+            // A type nothing registered has no source name and no literal, so there is no field to write.
+            // Saying so in the file is the whole of the handling: the value itself is untouched in
+            // activities.json and comes back the moment the plugin that owns the type does.
+            if (!LiteralWriter.canEmit(CATALOG, v.type())) {
+                out.append("    // ").append(v.name()).append(": no plugin provides the type '")
+                        .append(v.type().type().id())
+                        .append("', so no field is generated. Its value is kept in activities.json.\n");
+                continue;
+            }
             appendDoc(out, v.description());
             out.append("    public static final ").append(v.type().sourceName()).append(' ').append(v.name())
-                    .append(" = ").append(LiteralWriter.initializer(v.type(), v.value())).append(";\n");
+                    .append(" = ").append(LiteralWriter.initializer(CATALOG, v.type(), v.value()))
+                    .append(";\n");
         }
         return out.append("\n    private Parameters() {}\n}\n").toString();
     }

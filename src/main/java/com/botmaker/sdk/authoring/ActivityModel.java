@@ -1,6 +1,9 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.plugin.api.value.Range;
+import com.botmaker.plugin.api.value.ValueChoice;
+import com.botmaker.plugin.api.value.Visibility;
+import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
@@ -31,7 +34,6 @@ import java.util.stream.Stream;
  * @param goHome      whether the driver returns home before entering it
  * @param popupCheck  whether the driver dismisses popups before entering it
  */
-@Since("1.2.0")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ActivityModel(String name, boolean enabled, String description, List<String> outcomes,
                             Boolean goHome, Boolean popupCheck) {
@@ -71,7 +73,7 @@ public record ActivityModel(String name, boolean enabled, String description, Li
      */
     @JsonIgnore
     public VariableModel enabledVariable() {
-        return new VariableModel(name, ValueChoice.of(ValueType.YES_NO),
+        return new VariableModel(name, ValueChoice.of(SdkValueTypes.YES_NO),
                 List.of(Boolean.toString(enabled)), description, name, Visibility.EDITOR_ONLY,
                 List.of(), Range.NONE);
     }

@@ -1,6 +1,5 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
@@ -35,7 +34,6 @@ import java.util.List;
  * @param goHomeByDefault whether a newly added activity starts with {@link ActivityModel#goHome()} ticked;
  *                        boxed for the same reason as that field — absent must mean {@code true}
  */
-@Since("1.2.0")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ProjectModel(List<ActivityModel> activities, List<VariableModel> variables, FlowModel flow,
                            List<PresetModel> presets, Boolean goHomeByDefault) {

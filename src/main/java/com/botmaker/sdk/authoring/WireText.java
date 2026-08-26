@@ -1,4 +1,4 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
 import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;
@@ -6,7 +6,6 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.interaction.Key;
 import com.botmaker.sdk.api.interaction.MouseButton;
-import com.botmaker.sdk.api.meta.Since;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.Precision;
 
@@ -45,7 +44,6 @@ import java.util.Locale;
  * <p>It is also why {@link #precision} clamps — {@link Precision}'s constructor rejects a negative tolerance,
  * and a hand-edited file must never be able to reach it.
  */
-@Since("1.2.0")
 public final class WireText {
 
     /**

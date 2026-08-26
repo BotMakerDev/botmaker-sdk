@@ -1,6 +1,5 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
 
 import java.util.Locale;
 
@@ -29,7 +28,6 @@ import java.util.Locale;
  * names instead would reintroduce exactly the side table this avoids — {@code Gold-Ore} and {@code Gold_Ore}
  * both want {@code GOLD_ORE}, so one gets a suffix and the constant stops saying which file it means.
  */
-@Since("1.2.0")
 public final class TemplateNames {
 
     /** The generated class's simple name, in the project's base package next to {@code Parameters}. */

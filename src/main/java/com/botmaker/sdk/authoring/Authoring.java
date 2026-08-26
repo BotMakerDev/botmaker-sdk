@@ -1,8 +1,10 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.sdk.internal.authoring.ProjectWriter;
+import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.authoring.SourceEmitter;
+import com.botmaker.sdk.internal.authoring.ValueJson;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,7 +45,6 @@ import java.util.Map;
  * shape: the ledger moves here when the generator does, and until it has, a stamp derived in two places
  * would be two answers to one question.
  */
-@Since("1.2.0")
 public final class Authoring {
 
     /** The field carrying the schema stamp, always written first. */
@@ -63,9 +64,27 @@ public final class Authoring {
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT)
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .registerModule(ValueJson.module(SdkValueTypes.CATALOG));
 
     private Authoring() {
+    }
+
+    /**
+     * The value types this SDK contributes to a project's vocabulary.
+     *
+     * <p>The SDK's own registrations and nothing else — an editor loading plugins
+     * {@linkplain ValueCatalog#merge merges} this with theirs and holds the result. It is offered rather than
+     * assumed for the reason the whole platform exists: the SDK is the editor's default plugin, and a plugin
+     * that got to define the vocabulary outright would be the back door every other one is denied.
+     *
+     * <p>Version-first like everything else here, and the argument is not yet consulted — for the same reason
+     * {@code catalog(pin)} on the palette side is not. Narrowing to what an older pin actually shipped is a
+     * question the bot's own jar answers, not one a frozen list beside the code can answer truthfully.
+     */
+    public static ValueCatalog valueTypes(SdkVersion version) {
+        requireVersion(version);
+        return SdkValueTypes.CATALOG;
     }
 
     /**

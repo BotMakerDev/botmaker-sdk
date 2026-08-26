@@ -1,4 +1,4 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
 import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;

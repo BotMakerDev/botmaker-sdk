@@ -1,6 +1,5 @@
-package com.botmaker.sdk.api.authoring;
+package com.botmaker.sdk.authoring;
 
-import com.botmaker.sdk.api.meta.Since;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.List;
@@ -18,7 +17,6 @@ import java.util.List;
  * @param name              the preset's display name
  * @param enabledActivities the activity names this preset turns on; all others are turned off
  */
-@Since("1.2.0")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PresetModel(String name, List<String> enabledActivities) {
 

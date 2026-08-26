@@ -8,6 +8,71 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-27 — the value vocabulary leaves the SDK and opens (plugin platform, phase 10a)
+
+**Changed:** `api/authoring/**` → **`sdk/authoring/**`** (13 main + 3 test files, one package move);
+`api/authoring/{ValueType,ValueShape,ValueChoice,Visibility,Range}` **deleted**;
+`internal/authoring/SdkValueTypes` and `internal/authoring/ValueJson` **new**;
+`internal/authoring/LiteralWriter` rewritten (157 lines → a lookup); `internal/authoring/SourceEmitter`,
+`internal/authoring/ProjectWriter`, `sdk/authoring/Authoring` (a `valueTypes(SdkVersion)` entry point, and
+the mapper registers the value module); eleven `@Since` removals; `AuthoringModelTest`,
+`ProjectModelBehaviourTest`, `ScaffoldEmitTest`, `ProjectCreateTest`.
+
+**Done**
+
+- **The vocabulary moved to `com.botmaker.plugin.api.value` in `botmaker-studio-api`** — `ValueType`,
+  `ValueShape`, `ValueChoice`, `Visibility`, `Range`, `ValueCodec` and `ValueCatalog`. A variable's type is
+  now a question the *contract* answers, so a plugin can have a variable of a type it owns without the SDK
+  granting it one.
+- **`ValueType` is no longer an enum, and its identity is the persisted `id()`.** A closed enum is exactly
+  right for one plugin and wrong for two: a Discord plugin wanting a `Channel` variable would need a constant
+  added to the SDK's enum — the back door the platform exists to close. Never compare by object identity: two
+  plugin classloaders make that meaningless, and the id is what a file holds anyway.
+- **`ValueType.unknown(id)` is what makes an open vocabulary safe.** An id nothing registered keeps its raw
+  `List<String>`, renders read-only, and **declines to emit** (`SourceEmitter` writes a comment naming the
+  missing type in place of the field). It was an unreachable state while the set was closed and it is the
+  ordinary state of a project opened without one of its plugins; the alternatives — refusing the file, or
+  reading it as text — destroy a user's value because a jar is missing.
+  **An absent id is still text**: `null`/blank is a field older than the vocabulary, not a name nobody claimed.
+- **`api.authoring` became `sdk.authoring`, and that is what keeps the `api.*` invariant literal.** Nothing
+  under `com.botmaker.sdk.api` may reference a `com.botmaker.plugin.api` type — and these records name
+  `ValueType` in their components. The plan proposed amending the invariant; moving the package instead keeps
+  it unamended, and it costs nothing: a bot never writes `ProjectModel` down, so the package never belonged in
+  `api.*`. The eleven `@Since` annotations went with the move — it is no longer API surface.
+  `ApiPointersTest` is unaffected (it scans `.acceptPackages("com.botmaker.sdk.api")`).
+- **`ValueCodec<T>` is per *item*, not per value** — `parse(String)`/`store(T)`/`literal(T)`, deliberately not
+  the plan's `parse(List<String>)`. Shape is composed above it by `ValueCatalog.initializer`, so one codec
+  serves `ONE`, `ONE_OF`, `ANY_OF` and `OPEN_LIST` without knowing they exist. `T` never crosses to the host:
+  only ever `literal(parse(wire))` behind a wildcard capture, so Studio never loads a plugin's value class.
+- **`LiteralWriter`'s seventeen-arm `switch` is a catalog lookup**, as is `isClosedSet`. Neither was ever
+  really exhaustive — javac only thought so because the set was closed for as long as there was one plugin.
+- **`SdkValueTypes` registers the SDK's seventeen types through the same builder any plugin uses.** No
+  privileged path, and the ids are the old enum constant names, so every project ever written keeps its
+  meaning.
+- **`ValueJson` supplies Jackson, in the SDK, because the contract carries no annotations.**
+  `botmaker-studio-api` has one dependency (`javafx-controls`, `provided`) and adding a JSON library to it
+  would tie the contract to that library's compatibility rate and impose it on every plugin. So the contract
+  declares the wire *form* — an id out, a total factory back — and whoever owns the file supplies the parser.
+  `Range` is hand-serialized because `isEmpty()` reads as a getter and Jackson would otherwise write an
+  `"empty"` member into every stored bound.
+- **Contract records are frozen, and `ValueType`/`ValueCatalog.Entry` are final classes with builders** for
+  the reason `docs/refactor/25-compatibility.md` trap #2 records: adding a component to a public record
+  changes its canonical constructor descriptor, which is `NoSuchMethodError` in every already-compiled plugin.
+- **`ValueCatalog.merge` is left-biased and never throws** — deliberately unlike whole-file generation, where
+  a collision is a hard error before a byte is written. There, refusing costs a regenerate; here it costs
+  every project that has a plugin installed.
+- **`SourceEmitter` holds the SDK's *own* catalog, not a merged one.** The SDK writes the files the SDK owns;
+  another plugin's typed variable is that plugin's to emit into its own file.
+
+**Deferred / next**
+
+- **Phase 10b:** Studio's `palette/BotType` (32 files) and `project/activity/VariableWire` (16 files) are
+  deleted and `ActivityVariable` retypes onto the contract vocabulary — the ~94-file switchover. Studio keeps
+  a *narrowed* list for the block editor's declarable types, which is the second thing `BotType` is: an
+  `Initializer` seed table with a `NOTHING`/void entry that is not a storable value at all.
+
+---
+
 ## 2026-08-26 — a disabled activity gets its own wire (plugin platform, phase 9)
 
 **Changed:** `api/authoring/FlowEdgeModel` (new `DISABLED_OUTCOME`), `api/authoring/ActivityModel` (new
