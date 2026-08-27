@@ -40,6 +40,14 @@
              processor path at compile time and on nobody's classpath ever. It therefore does not appear in
              the flattened pom at all, and a consumer of this jar never resolves it. -->
         <botmaker.pluginprocessor.version>0.0.0-SNAPSHOT</botmaker.pluginprocessor.version>
+        <!-- botmaker-plugin-toolkit version: the widgets this module's slot editors are built from. Same
+             0.0.0-SNAPSHOT contract as the three above, and the same flatten reason — it IS in
+             <dependencies>, so the published pom must carry a resolvable version. Optional there, exactly
+             like the contract: a bot never links an editor. -->
+        <botmaker.plugintoolkit.version>0.0.0-SNAPSHOT</botmaker.plugintoolkit.version>
+        <!-- JavaFX, for the slot editors only. Held in one place because the two artifacts must move
+             together — javafx-controls is compiled against one exact javafx-graphics. -->
+        <javafx.version>21</javafx.version>
 
         <!--
           The OCR stack's three versions move TOGETHER. Tess4J pins a lept4j, and lept4j's generated
@@ -109,6 +117,35 @@
             <groupId>com.github.LiQiyeDev</groupId>
             <artifactId>botmaker-studio-api</artifactId>
             <version>${botmaker.studioapi.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- The plugin widget toolkit, and JavaFX under it: what internal.plugin.editors is built from.
+
+             All three are <optional>true</optional> for exactly the reason the contract above is. A bot
+             compiles against api.* and never names an editor; the editor classes are in this jar and are
+             simply never linked in a bot's JVM. A generated bot must NOT drag JavaFX onto its classpath —
+             it is a headless program, and on a machine with no JavaFX distribution for its platform the
+             resolve would fail outright.
+
+             The toolkit is the plugin's own dependency and never the host's: botmaker-studio must not list
+             it, or two plugins can no longer hold two versions of it. See ../CLAUDE.md. -->
+        <dependency>
+            <groupId>com.github.LiQiyeDev</groupId>
+            <artifactId>botmaker-plugin-toolkit</artifactId>
+            <version>${botmaker.plugintoolkit.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
             <optional>true</optional>
         </dependency>
 

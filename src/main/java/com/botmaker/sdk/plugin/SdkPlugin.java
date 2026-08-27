@@ -1,12 +1,14 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.ParameterGroup;
+import com.botmaker.plugin.api.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.authoring.SourceEmitter;
 import com.botmaker.sdk.internal.plugin.catalog.Catalog;
+import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 
 import java.util.List;
 
@@ -76,6 +78,23 @@ public final class SdkPlugin implements StudioPlugin {
     @Override
     public PaletteCatalog catalog(String pinnedVersion) {
         return CATALOG;
+    }
+
+    /**
+     * The editors for this plugin's own types — a region dragged on screen instead of
+     * {@code new Rect(12, 40, 300, 80)}, and the rest of {@link SdkEditors}.
+     *
+     * <p>They were the host's until 2026-08-27, which was the last place Studio still had to know what an SDK
+     * type looked like. They are reached exactly as a third-party plugin's would be: the host asks every
+     * plugin in turn, after its own editors and before its JDK fallbacks. Nothing here is privileged.
+     *
+     * <p>The classes behind this list touch JavaFX and the plugin widget toolkit, both
+     * {@code <optional>true</optional>} in this module's pom, so they are in the jar and never linked on a
+     * bot's classpath — the same arrangement that makes the contract dependency safe.
+     */
+    @Override
+    public List<SlotEditor> slotEditors() {
+        return SdkEditors.ALL;
     }
 
     /**

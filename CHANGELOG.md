@@ -19,6 +19,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The SDK now ships the editors for its own types.** The controls that stand in for a typed-out expression
+  — drag a region on screen rather than write `new Rect(12, 40, 300, 80)` — used to live in Studio, which
+  meant Studio had to know what an SDK type looked like. They are ordinary plugin contributions now
+  (`com.botmaker.sdk.internal.plugin.editors`), reached exactly as any other plugin's would be. **Nothing
+  changes for a bot**: the editors are `<optional>` dependencies alongside JavaFX and the widget toolkit, so
+  they are in the jar and never linked on a bot's classpath — a bot is a headless program and must not resolve
+  JavaFX. **Rect, Point and Size have moved** in this release; the other ten follow in the next.
+- **What you read on a collapsed picker is unchanged, including the awkward cases** — a half-written
+  `new Point(10)` still reads `10, 0`, a slot holding `bounds` still shows `bounds` rather than claiming
+  `0, 0`, and a `long` literal keeps its value. Those were pinned by a Studio test and are pinned by an SDK
+  one now.
 - **OCR tuning is part of the SDK's API now.** `OcrOptions`, `OcrLanguage` and `TextResult` moved out of
   `botmaker-shared` into `com.botmaker.sdk.api.vision`, so the options you pass to `Text.read`, `Text.find`
   and friends are versioned like everything else you write down — and covered by the same

@@ -8,6 +8,57 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-27 — the SDK ships the editors for its own types (plugin platform, phase 12a)
+
+**Done**
+
+- **`com.botmaker.sdk.internal.plugin.editors`**, and the pom that lets it exist:
+  `botmaker-plugin-toolkit`, `javafx-controls` and `javafx-graphics`, all `<optional>true</optional>` for the
+  same reason the contract is — a bot is a **headless** program, and resolving JavaFX for it would fail on a
+  machine with no JavaFX distribution for its platform. `PLUGIN_TOOLKIT_TAG` joins `.deps.env`, `jitpack.yml`
+  and `release.sh`, and cutting the toolkit now forces an SDK release.
+- **`Slots`** — the read/write bridge, and the class the rest of the package is built on.
+- **`GeometryEditors`** — `Rect`, `Point`, `Size`. Studio's three pickers are deleted.
+- **`SdkEditors.ALL`**, returned from `SdkPlugin.slotEditors()`. Reached exactly as a third-party plugin's
+  would be: the host asks every plugin in turn, after its own editors and before its JDK/enum fallbacks.
+- **`GeometryLabelTest`** (10) — Studio's `CoordinatePickerLabelTest`, inherited assertion for assertion.
+
+**Why `Slots` is one class and not a method on each editor.** The host edits a value in two places and they
+*spell* it differently: a slot in a bot's source holds one string that happens to be Java
+(`new Rect(12, 40, 300, 80)`), a row of the Parameters window holds four strings. `ValueContext.asSlot()` is
+the question that separates them, and it is asked here and nowhere else — so an editor is written once and
+appears in both, which is the whole thing the contract's `ValueContext`/`SlotContext` split was for.
+
+**Reading source text instead of an AST changed one thing, and the test is where it shows.** The old picker
+held a JDT `ClassInstanceCreation` and could simply *ask* whether the node was a constructor. The contract
+hands over a `String` and no syntax tree (its rule 3), so the same question is asked of the text —
+`raw.startsWith("new ")` — and `Slots.arguments` is a brace-and-quote-aware split rather than a parser. Two
+consequences worth not rediscovering:
+
+- **A missing argument still reads as zero and a non-constructor still shows verbatim.** `new Point(10)` is
+  `10, 0` (what a freshly inserted block looks like before the user picks); `bounds` is `bounds`, because
+  rewriting somebody's `target.center()` into `0, 0` is a lie about what the bot does. The first draft of
+  `holdsNumbers` required *n* arguments and got the first of those wrong.
+- **Java literals are read leniently, and that leniency lives in `Slots`, not the toolkit.** `100L` is 100 and
+  `1_000` is 1000, because these come out of source where a person wrote them. The toolkit's `Values` reads a
+  project file's stored strings, where a value is already plain — putting the leniency there would be widening
+  a parser to fit one caller.
+
+**What is deliberately *not* here.** The type being constructed is never checked: which editor a slot gets was
+decided from its declared type one layer up, so the read is positional and a second check would be dead code.
+That is inherited behaviour, pinned by the test, not an oversight.
+
+**Deferred / next — phase 12b, the remaining ten.** Precision, LaunchTarget, CaptureSource/Window,
+ImageTemplate, ImageTemplateGroup, Duration, Emulator, Game (Steam/Epic), LaunchOption, BotSettings, with
+their dialogs (`GameLibraryPickerDialog`, `EmulatorPickerDialog`, `TemplateGallery` — SDK-private, not
+toolkit widgets: a widget with one consumer belongs to that consumer). The contract they need landed in 12a,
+so this is a repeat of the slice above rather than a design problem — but it is ~2,500 lines.
+
+**One decision 12b owes rather than assumes:** `DurationFields` serves *both* the block editor's wait picker
+and `ValueEditors`' `DURATION` row. Moving it here means Studio's own `DURATION` arm goes and this plugin's
+editor serves that row through the hook. Right end state, and a visible change to the Parameters window, so it
+belongs in a turn that can be tested.
+
 ## 2026-08-27 — a variable belongs to a plugin's section (plugin platform, phase 11)
 
 **Done**
