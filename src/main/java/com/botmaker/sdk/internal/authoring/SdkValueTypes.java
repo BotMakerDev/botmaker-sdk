@@ -10,11 +10,14 @@ import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.interaction.Key;
 import com.botmaker.sdk.api.interaction.MouseButton;
 import com.botmaker.sdk.api.vision.Precision;
+import com.botmaker.sdk.authoring.TemplateNames;
 import com.botmaker.sdk.authoring.WireText;
 
 import java.awt.Color;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 
 /**
@@ -70,10 +73,10 @@ public final class SdkValueTypes {
             .label("Yes / no").source("boolean").boxed("Boolean").primitive().closedSet().build();
 
     public static final ValueType WHOLE_NUMBER = ValueType.of("WHOLE_NUMBER")
-            .label("Whole number").source("int").boxed("Integer").primitive().build();
+            .label("Whole number").source("int").boxed("Integer").primitive().bounded().build();
 
     public static final ValueType DECIMAL_NUMBER = ValueType.of("DECIMAL_NUMBER")
-            .label("Decimal number").source("double").boxed("Double").primitive().build();
+            .label("Decimal number").source("double").boxed("Double").primitive().bounded().build();
 
     public static final ValueType CHARACTER = ValueType.of("CHARACTER")
             .label("Character").source("char").boxed("Character").primitive().build();
@@ -119,7 +122,11 @@ public final class SdkValueTypes {
             .add(DURATION, codec(WireText::duration,
                     d -> WireText.spellDuration(d.toMillis()),
                     d -> "java.time.Duration.ofMillis(" + d.toMillis() + "L)"))
-            .add(IMAGE_TEMPLATE, codec(SdkValueTypes::trim, s -> s, SdkValueTypes::templateLiteral))
+            // The one codec whose default is a choice rather than a fallback: a fresh image variable points
+            // at the placeholder every project ships, for the same reason a fresh `new ImageTemplate(...)`
+            // block does — an empty chip is a value the bot cannot run on.
+            .add(IMAGE_TEMPLATE, seeded(codec(SdkValueTypes::trim, s -> s, SdkValueTypes::templateLiteral),
+                    TemplateNames.DEFAULT_TEMPLATE_NAME))
             .add(PRECISION, codec(WireText::precision, SdkValueTypes::spellPrecision,
                     SdkValueTypes::precisionLiteral))
             .add(POINT, codec(WireText::point, p -> p.x() + "," + p.y(),
@@ -179,10 +186,24 @@ public final class SdkValueTypes {
     // ---- plumbing -------------------------------------------------------------------------------------
 
     /** An SDK type: written by simple name, imported, and named by the class so a rename breaks this build. */
+    /**
+     * An SDK type, written by its simple name with an import arranged.
+     *
+     * <p>A closed set also declares its own values, read off the enum rather than written down — an enum's
+     * constants are never curated (they are the type's whole value set), so there is nothing here for a
+     * hand-kept list to add beyond a second place to forget one.
+     */
     private static ValueType sdk(String id, String label, Class<?> type, boolean closedSet) {
         ValueType.Builder b = ValueType.of(id).label(label)
                 .source(type.getSimpleName()).importing(type.getName());
-        return (closedSet ? b.closedSet() : b).build();
+        return (closedSet ? b.closedSet().options(constantNames(type)) : b).build();
+    }
+
+    /** The constant names of an enum in declaration order; empty for anything that is not one. */
+    private static List<String> constantNames(Class<?> type) {
+        Object[] constants = type.getEnumConstants();
+        if (constants == null) return List.of();
+        return Arrays.stream(constants).map(c -> ((Enum<?>) c).name()).toList();
     }
 
     private static <T> ValueCodec<T> codec(Function<String, T> parse, Function<T, String> store,
@@ -206,6 +227,31 @@ public final class SdkValueTypes {
     }
 
     /** An enum constant, stored and written by its own name. Total because {@code parse} already is. */
+    /** {@code codec} with a different seed for a freshly created value; everything else is unchanged. */
+    private static <T> ValueCodec<T> seeded(ValueCodec<T> codec, String defaultWire) {
+        return new ValueCodec<>() {
+            @Override
+            public T parse(String wire) {
+                return codec.parse(wire);
+            }
+
+            @Override
+            public String store(T value) {
+                return codec.store(value);
+            }
+
+            @Override
+            public String literal(T value) {
+                return codec.literal(value);
+            }
+
+            @Override
+            public String defaultWire() {
+                return defaultWire;
+            }
+        };
+    }
+
     private static <E extends Enum<E>> ValueCodec<E> enumCodec(Function<String, E> parse, String simpleName) {
         return codec(parse, Enum::name, e -> simpleName + "." + e.name());
     }

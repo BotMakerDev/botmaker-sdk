@@ -182,10 +182,19 @@ public final class WireText {
         return left % unit;
     }
 
-    /** A colour as {@code #RRGGBB}; white when unreadable. */
+    /**
+     * A colour as {@code #RRGGBB}; white when unreadable.
+     *
+     * <p>The hash is optional, because a person typing a colour into a field routinely leaves it off and
+     * {@link Color#decode} treats a bare {@code 1a2b3c} as a decimal number rather than as hex — which is
+     * not a rejection the user can see the reason for. Six hex digits with nothing in front of them can
+     * only have been meant one way.
+     */
     public static Color color(String stored) {
+        String text = trim(stored);
+        if (text.matches("[0-9a-fA-F]{6}")) text = "#" + text;
         try {
-            return Color.decode(trim(stored));
+            return Color.decode(text);
         } catch (RuntimeException e) {
             return Color.WHITE;
         }

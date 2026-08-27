@@ -2,6 +2,8 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
+import com.botmaker.plugin.api.value.ValueCatalog;
+import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.plugin.catalog.Catalog;
 
 /**
@@ -70,5 +72,18 @@ public final class SdkPlugin implements StudioPlugin {
     @Override
     public PaletteCatalog catalog(String pinnedVersion) {
         return CATALOG;
+    }
+
+    /**
+     * The seventeen types a project variable could hold before there was a registry to hold them in.
+     *
+     * <p>They are registered through the same builder any plugin uses, and their ids are the constant names
+     * of the enum they used to be, so every project ever written keeps its meaning. That is the whole test
+     * of the surface: the vocabulary that was hard-coded into the host is now contributed by a plugin, and
+     * it had to give up nothing to become contributable.
+     */
+    @Override
+    public ValueCatalog valueTypes() {
+        return SdkValueTypes.CATALOG;
     }
 }
