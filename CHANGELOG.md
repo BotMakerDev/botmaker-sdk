@@ -25,7 +25,19 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   (`com.botmaker.sdk.internal.plugin.editors`), reached exactly as any other plugin's would be. **Nothing
   changes for a bot**: the editors are `<optional>` dependencies alongside JavaFX and the widget toolkit, so
   they are in the jar and never linked on a bot's classpath — a bot is a headless program and must not resolve
-  JavaFX. **Rect, Point and Size have moved** in this release; the other ten follow in the next.
+  JavaFX. **Eight have moved** in this release: `Rect`, `Point` and `Size`; the Steam and Epic launch ids,
+  the program path and the launch options of a `Game.launch…` call; the bounded `BotSettings` setters; and the
+  wait length. The rest follow in the next.
+- **The wait editor is now the same control in both places you meet one.** The Parameters window and a block
+  in your bot's source used to have separate duration editors that had to be kept saying the same thing;
+  there is one now, and it draws as four boxes in the window and as a pill that opens them on a block. What it
+  writes is unchanged — the shortest form that says what you chose (`Duration.ofSeconds(2)`, not
+  `ofMillis(2000)`), and an untouched value comes back exactly as it was written, so opening the editor and
+  pressing OK never rewrites your source.
+- **The launch and settings editors only appear where they mean something.** A Steam app id, a program path
+  and a launch flag are all `String`, so these are chosen by the *call* they sit in rather than by their type
+  — which is why they are offered on a `Game.launchSteam(…)` argument and not on every text field in the
+  Parameters window.
 - **What you read on a collapsed picker is unchanged, including the awkward cases** — a half-written
   `new Point(10)` still reads `10, 0`, a slot holding `bounds` still shows `bounds` rather than claiming
   `0, 0`, and a `long` literal keeps its value. Those were pinned by a Studio test and are pinned by an SDK

@@ -4,6 +4,8 @@ import com.botmaker.plugin.api.SlotEditor;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.shared.game.EpicLibraryScanner;
+import com.botmaker.shared.game.SteamLibraryScanner;
 
 import java.util.List;
 
@@ -26,7 +28,26 @@ public final class SdkEditors {
 
     /** Built once and shared: an editor holds no state, the value lives in the context it is handed. */
     public static final List<SlotEditor> ALL = List.of(
+            // Chosen by the call, and therefore first: every one of these is a String, and the type-based
+            // editors below would not claim them — but a plugin loaded before this one might, and a narrower
+            // match belongs ahead of a wider one regardless of who is currently holding the wider one.
+            SlotEditor.of(CallSites.STEAM_APP_ID,
+                    ctx -> LaunchEditors.game(ctx, SteamLibraryScanner::new)),
+            SlotEditor.of(CallSites.EPIC_APP_NAME,
+                    ctx -> LaunchEditors.game(ctx, EpicLibraryScanner::new)),
+            SlotEditor.of(CallSites.LAUNCH_PROGRAM, LaunchEditors::program),
+            SlotEditor.of(CallSites.LAUNCH_OPTION, LaunchEditors::option),
+            SlotEditor.of(CallSites.BOT_SETTING, SettingsEditors::setting),
+
+            // Chosen by the type, and so drawn in the Parameters window as well as on a block.
             SlotEditor.of(ctx -> ctx.type().is(Rect.class), GeometryEditors::rect),
             SlotEditor.of(ctx -> ctx.type().is(Point.class), GeometryEditors::point),
-            SlotEditor.of(ctx -> ctx.type().is(Size.class), GeometryEditors::size));
+            SlotEditor.of(ctx -> ctx.type().is(Size.class), GeometryEditors::size),
+            // A wait length: the unit is invisible in a bare number, and this is the type that carries the
+            // random range the humanized wait needs. Both spellings are accepted, and that is not belt and
+            // braces — the Parameters window knows this type by the fully-qualified name its vocabulary
+            // records, while a slot in source often knows it only as "Duration", because java.time is not in
+            // the bot's own type index and so never resolves to a package.
+            SlotEditor.of(ctx -> ctx.type().isNamed("java.time.Duration") || ctx.type().isNamed("Duration"),
+                    DurationEditor::duration));
 }
