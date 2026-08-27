@@ -66,45 +66,61 @@ public final class SdkValueTypes {
 
     // ---- the types ------------------------------------------------------------------------------------
 
+    /**
+     * The headings a picker files these under. Free strings by contract — a second plugin groups its own
+     * types without a constant being granted to it — so they are named once here rather than spelled at
+     * seventeen call sites, where a typo would silently split a group in two.
+     */
+    private static final String BASICS = "Basics";
+    private static final String WHEN = "Date & time";
+    private static final String VISION = "Vision";
+    private static final String GEOMETRY = "Geometry";
+    private static final String INPUT = "Input";
+
     public static final ValueType TEXT = ValueType.of(ValueCatalog.TEXT_ID)
-            .label("Text").source("String").build();
+            .label("Text").group(BASICS).source("String").build();
 
     public static final ValueType YES_NO = ValueType.of("YES_NO")
-            .label("Yes / no").source("boolean").boxed("Boolean").primitive().closedSet().build();
+            .label("Yes / no").group(BASICS)
+            .source("boolean").boxed("Boolean").primitive().closedSet().build();
 
     public static final ValueType WHOLE_NUMBER = ValueType.of("WHOLE_NUMBER")
-            .label("Whole number").source("int").boxed("Integer").primitive().bounded().build();
+            .label("Whole number").group(BASICS)
+            .source("int").boxed("Integer").primitive().bounded().build();
 
     public static final ValueType DECIMAL_NUMBER = ValueType.of("DECIMAL_NUMBER")
-            .label("Decimal number").source("double").boxed("Double").primitive().bounded().build();
+            .label("Decimal number").group(BASICS)
+            .source("double").boxed("Double").primitive().bounded().build();
 
     public static final ValueType CHARACTER = ValueType.of("CHARACTER")
-            .label("Character").source("char").boxed("Character").primitive().build();
+            .label("Character").group(BASICS)
+            .source("char").boxed("Character").primitive().build();
 
     public static final ValueType COLOR = ValueType.of("COLOR")
-            .label("Colour").source("java.awt.Color").build();
+            .label("Colour").group(BASICS).source("java.awt.Color").build();
 
     public static final ValueType DATE = ValueType.of("DATE")
-            .label("Date").source("java.time.LocalDate").build();
+            .label("Date").group(WHEN).source("java.time.LocalDate").build();
 
     public static final ValueType TIME_OF_DAY = ValueType.of("TIME_OF_DAY")
-            .label("Time of day").source("java.time.LocalTime").build();
+            .label("Time of day").group(WHEN).source("java.time.LocalTime").build();
 
     public static final ValueType DURATION = ValueType.of("DURATION")
-            .label("Duration").source("java.time.Duration").build();
+            .label("Duration").group(WHEN).source("java.time.Duration").build();
 
-    public static final ValueType IMAGE_TEMPLATE = sdk("IMAGE_TEMPLATE", "Image template",
+    public static final ValueType IMAGE_TEMPLATE = sdk("IMAGE_TEMPLATE", "Image template", VISION,
             com.botmaker.sdk.api.vision.ImageTemplate.class, false);
 
-    public static final ValueType PRECISION = sdk("PRECISION", "Precision", Precision.class, false);
+    public static final ValueType PRECISION = sdk("PRECISION", "Precision", VISION, Precision.class, false);
 
-    public static final ValueType POINT = sdk("POINT", "Point", Point.class, false);
-    public static final ValueType RECT = sdk("RECT", "Rectangle", Rect.class, false);
-    public static final ValueType SIZE = sdk("SIZE", "Size", Size.class, false);
-    public static final ValueType DIRECTION = sdk("DIRECTION", "Direction", Direction.class, true);
+    public static final ValueType POINT = sdk("POINT", "Point", GEOMETRY, Point.class, false);
+    public static final ValueType RECT = sdk("RECT", "Rectangle", GEOMETRY, Rect.class, false);
+    public static final ValueType SIZE = sdk("SIZE", "Size", GEOMETRY, Size.class, false);
+    public static final ValueType DIRECTION = sdk("DIRECTION", "Direction", GEOMETRY, Direction.class, true);
 
-    public static final ValueType KEY = sdk("KEY", "Key", Key.class, true);
-    public static final ValueType MOUSE_BUTTON = sdk("MOUSE_BUTTON", "Mouse button", MouseButton.class, true);
+    public static final ValueType KEY = sdk("KEY", "Key", INPUT, Key.class, true);
+    public static final ValueType MOUSE_BUTTON = sdk("MOUSE_BUTTON", "Mouse button", INPUT,
+            MouseButton.class, true);
 
     /**
      * The SDK's vocabulary, in the order a menu should offer it: the literals a bot mostly counts, flags and
@@ -193,8 +209,8 @@ public final class SdkValueTypes {
      * constants are never curated (they are the type's whole value set), so there is nothing here for a
      * hand-kept list to add beyond a second place to forget one.
      */
-    private static ValueType sdk(String id, String label, Class<?> type, boolean closedSet) {
-        ValueType.Builder b = ValueType.of(id).label(label)
+    private static ValueType sdk(String id, String label, String group, Class<?> type, boolean closedSet) {
+        ValueType.Builder b = ValueType.of(id).label(label).group(group)
                 .source(type.getSimpleName()).importing(type.getName());
         return (closedSet ? b.closedSet().options(constantNames(type)) : b).build();
     }

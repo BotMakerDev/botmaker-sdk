@@ -8,6 +8,16 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-27 — the seventeen types carry their own picker heading (plugin platform, phase 10b)
+
+**Done**
+
+- Every `SdkValueTypes` registration now names a `group(…)`: *Basics*, *Date & time*, *Vision*, *Geometry*,
+  *Input*. The headings were Studio's `BotType.Group` enum, which no second plugin could ever be added to;
+  they are the contract's free `String` now (`ValueType.group()`), named once as five private constants here
+  rather than spelled at seventeen call sites, where a typo would silently split a group in two.
+- Nothing about the wire changed — a group is a menu heading, never persisted.
+
 ## 2026-08-27 — the SDK declares itself a service (plugin platform, phase 15a)
 
 **Done**
