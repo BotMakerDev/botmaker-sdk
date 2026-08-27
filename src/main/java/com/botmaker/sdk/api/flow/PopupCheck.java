@@ -2,7 +2,7 @@ package com.botmaker.sdk.api.flow;
 
 import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.bot.PopupGuard;
-import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.plugin.api.meta.Since;
 
 /**
  * Whether the {@link PopupGuard} runs while one node's activity does.

@@ -8,6 +8,43 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-27 — the pointer vocabulary leaves the SDK, carried by itself (plugin platform, phase 8c.4)
+
+**Changed:** `@ReplacedBy`, `@Replaces` and `@Since` moved from `com.botmaker.sdk.api.meta` to
+**`com.botmaker.plugin.api.meta`** in `botmaker-studio-api`, joining `@Internal`. They describe how any
+library keeps faith with the code that calls it — compatibility trap #8 was that a second plugin renaming its
+own types had no equivalent, only the SDK's copy — and `PluginSurfaceProcessor` already checks them for any
+plugin, matching by FQN string.
+
+- **The SDK's three survive one minor as shims**: `@Deprecated(since = "1.2.0", forRemoval = true)` plus
+  `@ReplacedBy` at the new FQN with a `note()` telling the author to change the import, keeping
+  `@Facade(role = "VALUE")` so the 8c.3 completeness gate still passes. So **the pointer pair's first use is
+  its own move**, which is the fairest test it could have had. In `ReplacedBy.java` the annotation use has to
+  be spelled fully qualified — the simple name there resolves to the type being declared.
+- **Six one-line import repoints** in the SDK (`api.vision.{OcrLanguage,TextResult,OcrOptions}`,
+  `api.flow.{PopupCheck,FlowGraph,Recovery}`); every other `@Since` in the module is on an `api.*` element
+  that already imported it by simple name.
+- **`ApiPointersTest` resolves targets against `com.botmaker.sdk.api` ∪ `com.botmaker.plugin.api`**, scanning
+  both modules' `target/classes`. A carve-out exempting contract targets from rules 2/3 would have had to be
+  removed again later; a wider universe is simply the truth. Rules 1, 4–9 were checked against the widened
+  scan and are unaffected.
+- **`first(…)` filters with `directOnly()`, and that is the one real cost of expressing the move in the
+  vocabulary itself.** ClassGraph folds meta-annotations into a class's annotation list, and these three
+  annotations now annotate each other — so the contract `@Since`'s own `@Replaces` read as being carried by
+  every element that merely *uses* `@Since`: twenty-odd bogus double claims, one of them contested with the
+  real one. A redirect is a statement about the element it is written on; nothing here ever wanted an
+  inherited one. The processor never had the problem — `javax.lang.model` gives direct annotations only.
+- **Studio reads three spellings** (`SdkApiModel`): the contract's, `com.botmaker.sdk.api.meta.*`, and the
+  pre-1.1.0 `com.botmaker.sdk.api.*`, through the `either(…)` helper that already existed for the second.
+
+**Known gap:** `SdkFixtures.jarOf` roots every fixture package under `com.botmaker.sdk.api`, so a
+`com.botmaker.plugin.api.meta` fixture cannot be expressed without changing the builder. The contract
+spelling is therefore uncovered in Studio's tests while the two older ones stay covered; `either(…)` is
+spelling-agnostic, so what is untested is the constant, not the mechanism. Teach `jarOf` absolute packages
+when something else needs it.
+
+---
+
 ## 2026-08-27 — the processor leaves, and every class says whether it is surface (plugin platform, phase 8c)
 
 **Changed:** `src/apt/java/**` **deleted** (`ApiPointerProcessor`, `PaletteCatalogProcessor`) — both now live

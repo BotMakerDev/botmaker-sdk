@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.flow;
 
 import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.plugin.api.meta.Since;
 
 /**
  * What to do before a node's activity runs, to be sure it starts from a screen it recognises.

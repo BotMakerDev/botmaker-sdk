@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.plugin.api.meta.Since;
 
 /**
  * Immutable OCR tuning knobs. Start from {@link #defaults()} and derive variants with the {@code with*}

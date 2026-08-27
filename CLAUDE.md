@@ -138,7 +138,8 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 
 - **`com.botmaker.sdk.api.*`** is the API generated bots compile against, and every class in it sits in a
   sub-package that says what it is: `api.geometry` (`Point`, `Rect`, `Size`, `Direction`), `api.meta` (the
-  three pointer annotations), `api.bot`, `api.capture`, `api.emulator`, `api.interaction`, `api.launch`,
+  three pointer annotations — **deprecated shims since 1.2.0**; the vocabulary itself is
+  `com.botmaker.plugin.api.meta` now, see below), `api.bot`, `api.capture`, `api.emulator`, `api.interaction`, `api.launch`,
   `api.util` (`Time`, `BotMaker`, `Debug`), `api.vision`. **The `api` root holds no classes** — it was a
   junk drawer of annotations, geometry and five facades until 1.1.0, and a name landing there again means
   somebody skipped the question above. It is under a **compatibility convention** — real semver, and a removal announced by one full minor marked
@@ -245,7 +246,28 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   The property that made the two-pass build necessary survives as the module's own rule: the processor
   **depends on nothing, not even `botmaker-studio-api`**, matching annotations by FQN string and reading
   `AnnotationMirror`s by hand. That is what lets it run over a plugin built against a different contract
-  version, and it is why it can check the SDK's own `api.meta` annotations without a cycle.
+  version, and it is why it can check the SDK's own pointer annotations without a cycle.
+
+  **The vocabulary itself left this module in 1.2.0 (phase 8c.4).** `@ReplacedBy`, `@Replaces` and `@Since`
+  are `com.botmaker.plugin.api.meta` now, beside `@Internal`: they describe how any library keeps faith with
+  the code that calls it, and a second plugin renaming its own types wants the same machinery rather than a
+  copy of it. What is left in `com.botmaker.sdk.api.meta` is three `@Deprecated(since = "1.2.0",
+  forRemoval = true)` shims carrying `@ReplacedBy` at the new FQNs — **the pointer pair's first use is its
+  own move**, which is the fairest test it could have had. Everything else is unchanged: same grammar, same
+  nine `ApiPointersTest` rules, same `release.sh check_api_pointers`. Three things worth knowing:
+
+  - **A pointer may cross modules**, and rule 2 resolves against `com.botmaker.sdk.api` ∪
+    `com.botmaker.plugin.api` for exactly that reason — a carve-out exempting contract targets would have
+    had to be removed again later, where a wider universe is simply the truth.
+  - **The `@version` on a `@Replaces` entry is the *old* module's** — `…sdk.api.meta.Since@1.2.0` is the last
+    SDK release the old spelling existed in, not a contract version. It is a statement about the spelling
+    being retired, and the retiring module is the one that dates it.
+  - **`ApiPointersTest.first(…)` filters with `directOnly()`, and that is load-bearing rather than tidy.**
+    ClassGraph folds meta-annotations into a class's annotation list, and these three annotations now
+    annotate *each other* — so without the filter every element that merely *uses* `@Since` reads as carrying
+    the `@Replaces` that `@Since`'s own declaration carries. A redirect is a statement about the element it
+    is written on; nothing here ever wanted an inherited one. (`javax.lang.model` gives the processor direct
+    annotations only, so the processor never had the problem.)
 
   **Three more annotations sit beside the pointer pair, all `@Retention(CLASS)`, all read from the jar by the
   same scan** (2026-08-23). Each records something that is cheap while both ends of a move still exist and

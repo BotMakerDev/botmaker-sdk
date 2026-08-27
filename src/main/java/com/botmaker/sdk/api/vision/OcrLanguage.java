@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.plugin.api.meta.Since;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;

@@ -2,7 +2,7 @@ package com.botmaker.sdk.api.flow;
 
 import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.bot.Activity;
-import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.plugin.api.meta.Since;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 
 import java.util.LinkedHashMap;

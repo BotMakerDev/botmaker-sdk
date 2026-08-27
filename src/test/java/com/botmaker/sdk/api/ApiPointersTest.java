@@ -1,9 +1,10 @@
 package com.botmaker.sdk.api;
 
-import com.botmaker.sdk.api.meta.ReplacedBy;
-import com.botmaker.sdk.api.meta.Replaces;
-import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.plugin.api.meta.ReplacedBy;
+import com.botmaker.plugin.api.meta.Replaces;
+import com.botmaker.plugin.api.meta.Since;
 import io.github.classgraph.AnnotationInfo;
+import io.github.classgraph.AnnotationInfoList;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.FieldInfo;
@@ -77,9 +78,32 @@ import static org.junit.jupiter.api.Assertions.fail;
 class ApiPointersTest {
 
     private static final String API_PACKAGE = "com.botmaker.sdk.api";
-    private static final String REPLACED_BY = ReplacedBy.class.getName();
-    private static final String REPLACES = Replaces.class.getName();
-    private static final String SINCE = Since.class.getName();
+
+    /**
+     * The plugin contract, scanned beside {@code api.*} because a pointer may cross into it.
+     *
+     * <p>A redirect's two ends do not have to live in one module: a type moving from this plugin into the
+     * contract is an ordinary rename with a longer name, and the compatibility vocabulary's own move
+     * ({@code sdk.api.meta} → {@code plugin.api.meta}, 2026-08-27) is written exactly that way. Rules 2 and 3
+     * resolve a target and read its back-edge, so the target has to be in the scan or every such pointer
+     * reads as unresolvable. The contract's own elements are then subject to the rules incidentally, which is
+     * correct rather than merely tolerable — it is versioned surface a bot can name.
+     */
+    private static final String CONTRACT_PACKAGE = "com.botmaker.plugin.api";
+
+    /**
+     * The pointer vocabulary, read under both spellings for the length of its move.
+     *
+     * <p>{@code com.botmaker.plugin.api.meta} is where it now lives and {@code com.botmaker.sdk.api.meta} is
+     * the deprecated spelling, kept for one minor. An element may carry either, and — since a window is
+     * exactly the state where both exist — the element a pointer names may carry the other.
+     */
+    private static final List<String> REPLACED_BY =
+            List.of(ReplacedBy.class.getName(), "com.botmaker.sdk.api.meta.ReplacedBy");
+    private static final List<String> REPLACES =
+            List.of(Replaces.class.getName(), "com.botmaker.sdk.api.meta.Replaces");
+    private static final List<String> SINCE =
+            List.of(Since.class.getName(), "com.botmaker.sdk.api.meta.Since");
     private static final String DEPRECATED = Deprecated.class.getName();
 
     /** Major.minor.patch, with an optional pre-release/build tail. No leading {@code v} — tags carry it, entries don't. */
@@ -137,8 +161,8 @@ class ApiPointersTest {
                 // Exactly this module's main output, nothing else. The test sources live in the same
                 // package, so scanning the plain classpath would mix target/test-classes into the API
                 // surface and let a test fixture fail — or accidentally satisfy — a rule below.
-                .overrideClasspath(mainClasses())
-                .acceptPackages(API_PACKAGE)
+                .overrideClasspath(mainClasses(), contractClasses())
+                .acceptPackages(API_PACKAGE, CONTRACT_PACKAGE)
                 .enableClassInfo()
                 .enableMethodInfo()
                 .enableFieldInfo()
@@ -474,11 +498,19 @@ class ApiPointersTest {
 
     /** Where this module's compiled API actually lives — asked of a class that is unambiguously part of it. */
     private static String mainClasses() {
+        return codeSourceOf(com.botmaker.sdk.api.flow.FlowGraph.class, "the compiled api.* output");
+    }
+
+    /** The contract jar, so that a pointer crossing into {@code com.botmaker.plugin.api} resolves. */
+    private static String contractClasses() {
+        return codeSourceOf(ReplacedBy.class, "the botmaker-studio-api artifact");
+    }
+
+    private static String codeSourceOf(Class<?> anchor, String what) {
         try {
-            return Path.of(ReplacedBy.class.getProtectionDomain().getCodeSource().getLocation().toURI())
-                    .toString();
+            return Path.of(anchor.getProtectionDomain().getCodeSource().getLocation().toURI()).toString();
         } catch (URISyntaxException e) {
-            throw new IllegalStateException("cannot locate the compiled api.* output", e);
+            throw new IllegalStateException("cannot locate " + what, e);
         }
     }
 
@@ -487,35 +519,58 @@ class ApiPointersTest {
         byRef = new LinkedHashMap<>();
         for (ClassInfo ci : scan.getAllClasses()) {
             if (!ci.isPublic()) continue;
-            AnnotationInfo typePointer = ci.getAnnotationInfo(REPLACED_BY);
-            AnnotationInfo typeClaims = ci.getAnnotationInfo(REPLACES);
+            AnnotationInfoList onType = ci.getAnnotationInfo();
+            AnnotationInfo typePointer = first(onType, REPLACED_BY);
+            AnnotationInfo typeClaims = first(onType, REPLACES);
             add(new Element(ci.getName(), "type", ci.hasAnnotation(DEPRECATED),
                     pointer(typePointer), whens(typePointer), note(typePointer), behaviourChanged(typePointer),
                     entries(typeClaims), note(typeClaims), behaviourChanged(typeClaims),
-                    since(ci.getAnnotationInfo(SINCE)), -1));
+                    since(first(onType, SINCE)), -1));
 
             for (MethodInfo mi : ci.getDeclaredMethodAndConstructorInfo()) {
                 if (!mi.isPublic() || mi.isSynthetic() || mi.isBridge()) continue;
-                AnnotationInfo p = mi.getAnnotationInfo(REPLACED_BY);
-                AnnotationInfo c = mi.getAnnotationInfo(REPLACES);
+                AnnotationInfoList on = mi.getAnnotationInfo();
+                AnnotationInfo p = first(on, REPLACED_BY);
+                AnnotationInfo c = first(on, REPLACES);
                 add(new Element(ci.getName() + "#" + mi.getName(),
                         mi.isConstructor() ? "constructor" : "method",
                         mi.hasAnnotation(DEPRECATED),
                         pointer(p), whens(p), note(p), behaviourChanged(p),
                         entries(c), note(c), behaviourChanged(c),
-                        since(mi.getAnnotationInfo(SINCE)), mi.getParameterInfo().length));
+                        since(first(on, SINCE)), mi.getParameterInfo().length));
             }
             for (FieldInfo fi : ci.getDeclaredFieldInfo()) {
                 if (!fi.isPublic() || fi.isSynthetic()) continue;
-                AnnotationInfo p = fi.getAnnotationInfo(REPLACED_BY);
-                AnnotationInfo c = fi.getAnnotationInfo(REPLACES);
+                AnnotationInfoList on = fi.getAnnotationInfo();
+                AnnotationInfo p = first(on, REPLACED_BY);
+                AnnotationInfo c = first(on, REPLACES);
                 add(new Element(ci.getName() + "#" + fi.getName(), "field",
                         fi.hasAnnotation(DEPRECATED),
                         pointer(p), whens(p), note(p), behaviourChanged(p),
                         entries(c), note(c), behaviourChanged(c),
-                        since(fi.getAnnotationInfo(SINCE)), -1));
+                        since(first(on, SINCE)), -1));
             }
         }
+    }
+
+    /**
+     * The first accepted spelling that is <em>directly</em> present — see {@link #REPLACED_BY}.
+     *
+     * <p>{@code directOnly()} is load-bearing rather than tidy. ClassGraph folds meta-annotations into a
+     * class's annotation list, and these three annotations now annotate <em>each other</em>: the contract's
+     * {@code @Since} carries {@code @Replaces("…sdk.api.meta.Since@1.2.0")}, so without this filter every
+     * element in the API that merely <em>uses</em> {@code @Since} reads as claiming that entry — twenty-odd
+     * bogus double claims, and one of them contested with the real one. Nothing here has ever wanted an
+     * inherited or meta-annotated pointer: a redirect is a statement about the element it is written on.
+     */
+    private static AnnotationInfo first(AnnotationInfoList on, List<String> names) {
+        if (on == null) return null;
+        AnnotationInfoList direct = on.directOnly();
+        for (String name : names) {
+            AnnotationInfo found = direct.get(name);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private static void add(Element e) {

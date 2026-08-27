@@ -26,6 +26,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `import com.botmaker.shared.ocr.OcrOptions;` (or `OcrLanguage`/`TextResult`) becomes
   `com.botmaker.sdk.api.vision.…`. Studio repoints them for you on open; a bot built by hand needs the edit.
   Nothing else about OCR changed — same engine, same tuning knobs, same bundled languages.
+- **`@Since`, `@ReplacedBy` and `@Replaces` moved to the plugin contract**, from
+  `com.botmaker.sdk.api.meta` to `com.botmaker.plugin.api.meta`. They describe how *any* library keeps faith
+  with the code that calls it, not something particular to this SDK, and the same annotation processor now
+  checks them for any plugin. **If your bot writes `@Since` down** — most do not — change the import to
+  `com.botmaker.plugin.api.meta.Since`; the old spellings still work for this whole minor, marked deprecated
+  and pointing at the new ones, so Studio's *Modernise…* will do it for you. Nothing about what they mean
+  changed, and this is the first rename the pointer pair has carried for itself.
 - `TextResult.bounds()` is now an `api.geometry.Rect` instead of a `java.awt.Rectangle`, so it matches every
   other box the SDK hands you: `.x()`, `.y()`, `.width()`, `.height()` rather than public fields.
 - **The block palette is the SDK's answer now.** The SDK ships a catalog of what it offers Studio's menus —

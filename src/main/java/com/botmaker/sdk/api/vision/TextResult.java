@@ -2,7 +2,7 @@ package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.meta.Since;
+import com.botmaker.plugin.api.meta.Since;
 
 /**
  * One recognized piece of text from an OCR pass. Immutable.
