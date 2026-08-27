@@ -1,0 +1,5 @@
+# The SDK is Studio's plugin #1, and it says so the same way any other plugin would.
+#
+# Naming an interface whose dependency is <optional> is safe: ServiceLoader resolves this file only when
+# something asks for com.botmaker.plugin.api.StudioPlugin, and nothing on a bot's classpath ever does.
+com.botmaker.sdk.plugin.SdkPlugin

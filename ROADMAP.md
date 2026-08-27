@@ -8,6 +8,24 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-27 — the SDK declares itself a service (plugin platform, phase 15a)
+
+**Done**
+
+- `src/main/resources/META-INF/services/com.botmaker.plugin.api.StudioPlugin` names `SdkPlugin`. Studio no
+  longer writes `new SdkPlugin()`: it discovers plugins with `ServiceLoader` over a `URLClassLoader` built
+  from the project's own resolved artifacts, so a bot pinned to an older SDK is answered by the plugin
+  inside *that* jar. The SDK reaches the list exactly as a third-party plugin would — it is Studio's plugin
+  #1 and gets no back door.
+- Naming an interface whose dependency is `<optional>` is safe: `ServiceLoader` resolves the file only when
+  something asks for `com.botmaker.plugin.api.StudioPlugin`, and nothing on a bot's classpath ever does.
+- `SdkValueTypes` registers the seventeen value types through the contract's `ValueCatalog` builder, and
+  `WireText.color` accepts a colour with no leading `#` — `Color.decode` reads a bare `1a2b3c` as a decimal
+  number, which is not a rejection a user can see the reason for, and the editor's own parser had always
+  allowed it. One visible default moves with the codec: a PRECISION value's minArea seeds 1 rather than 4,
+  because `WireText.precision` clamps to what the record accepts. The plugin that owns the type owns the
+  number, which is the point of the vocabulary moving.
+
 ## 2026-08-27 — the pointer vocabulary leaves the SDK, carried by itself (plugin platform, phase 8c.4)
 
 **Changed:** `@ReplacedBy`, `@Replaces` and `@Since` moved from `com.botmaker.sdk.api.meta` to
