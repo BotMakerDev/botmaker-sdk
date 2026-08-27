@@ -1,5 +1,5 @@
 package com.botmaker.sdk.api.vision;
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
 
 import com.botmaker.sdk.api.bot.BotSettings;
@@ -23,7 +23,7 @@ import com.botmaker.sdk.api.interaction.Wait;
  * {@code double confidence} — {@link ImageTemplate#threshold()} is where that belongs. The timeout stays a
  * parameter in every offered shape: it is the question these methods exist to ask.
  */
-@Facade(category = "vision", categoryLabel = "Vision", icon = "⏳", order = 22)
+@Palette(category = "vision", categoryLabel = "Vision", icon = "⏳", order = 22)
 public class ImageWaiter {
 
     // --- waitFor ---

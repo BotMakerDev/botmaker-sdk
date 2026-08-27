@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.meta.Internal;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.util.Debug;
@@ -30,7 +30,7 @@ import com.botmaker.session.PointerPolicy;
  * {@code durationMs} has no property home, unlike {@code ImageClicker}'s {@code delayMs}, so both drag shapes
  * stay.
  */
-@Facade(category = "interaction", categoryLabel = "Interaction", icon = "🖱", order = 10)
+@Palette(category = "interaction", categoryLabel = "Interaction", icon = "🖱", order = 10)
 public class Mouse {
 
     /**
@@ -221,7 +221,7 @@ public class Mouse {
      * Scroll the wheel by {@code notches}. Positive scrolls up / away from you, negative scrolls
      * down / toward you. Prefer the clearer {@link #scrollUp(int)} / {@link #scrollDown(int)}.
      */
-    @Internal("a signed notches is the ambiguity scrollUp/scrollDown remove; this method's own javadoc "
+    @Hidden("a signed notches is the ambiguity scrollUp/scrollDown remove; this method's own javadoc "
             + "already prefers them, and the menu offering all three as equals contradicted it")
     public static void scroll(int notches) {
         Debug.log("[Mouse] scroll " + notches);

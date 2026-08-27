@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
@@ -24,7 +25,8 @@ import java.awt.Color;
  * user can name and store. That is the fillable/holdable rule pointing the other way from the usual, and it is
  * why the rule is stated in terms of what the editor can do rather than which package a type came from.
  */
-@Facade(category = "vision", categoryLabel = "Vision", role = "VALUE", order = 94)
+@Palette(category = "vision", categoryLabel = "Vision", order = 94)
+@Hidden("a value type: what a colour search hands back, never inserted from a menu")
 public class ColorMatch {
 
     private final Point location;      // top-left of the cluster's bounding box, absolute

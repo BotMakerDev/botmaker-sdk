@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.bot;
-import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.meta.Internal;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
 
@@ -57,7 +57,7 @@ import java.util.Map;
  */
 // Every activity stub extends it, the generated ActivityRegistry holds a List<Activity<?>> of them, and
 // GoHome/Popups are two more subclasses the scaffold writes. Renaming this type is a Studio release.
-@Facade(category = "bot", categoryLabel = "Bot", icon = "◎", order = 36)
+@Palette(category = "bot", categoryLabel = "Bot", icon = "◎", order = 36)
 public abstract class Activity<O extends Enum<O>> {
 
     /**
@@ -179,7 +179,7 @@ public abstract class Activity<O extends Enum<O>> {
      * {@code return Outcome.DEFAULT;}, so an activity that has nothing special to report needs no thought at
      * all — the default outcome follows the card's plain output wire.
      */
-    @Internal("the method a generated activity overrides, not one a bot body calls; the flow driver "
+    @Hidden("the method a generated activity overrides, not one a bot body calls; the flow driver "
             + "invokes it through execute()")
     public abstract O run();
 
@@ -199,7 +199,7 @@ public abstract class Activity<O extends Enum<O>> {
      * recover — a stuck activity produces no outcome, because the flow isn't what decides where to go next in
      * that case; the supervisor is.
      */
-    @Internal("the generated FlowDriver's own call; an activity that runs another one from inside its "
+    @Hidden("the generated FlowDriver's own call; an activity that runs another one from inside its "
             + "body is a flow edge drawn in the wrong place")
     public final O execute() {
         // The activity and its outcome are the coarsest unit of "what is the bot doing", so this one line is

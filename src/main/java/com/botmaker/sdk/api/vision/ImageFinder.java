@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -42,7 +42,7 @@ import java.util.stream.Collectors;
  * and the image picker sets that one. The {@code *Compare} families keep all four, since their {@code double}
  * is a comparison <em>margin</em> with no other home.
  */
-@Facade(category = "vision", categoryLabel = "Vision", icon = "🔍", order = 20)
+@Palette(category = "vision", categoryLabel = "Vision", icon = "🔍", order = 20)
 public class ImageFinder {
 
     // --- find (single template) ---

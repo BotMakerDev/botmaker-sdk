@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 
 
 /**
@@ -57,7 +58,8 @@ import com.botmaker.plugin.api.palette.Facade;
 // Curated for the palette: both `of` factories and all four fluent builders are offered. This is the type
 // Pixel's tolerance lives in (see the note on Pixel), so hiding any of it would put that tolerance out of the
 // editor's reach entirely. `toString` is an Object override and never a menu entry.
-@Facade(category = "vision", categoryLabel = "Vision", role = "VALUE", order = 99)
+@Palette(category = "vision", categoryLabel = "Vision", order = 99)
+@Hidden("a value type: an enum constant a bot picks, never a menu entry of its own")
 public record Precision(double deltaE, int minArea, int minCount) {
 
     /** The area floor the named constants start from: filters out stray anti-aliased pixels. */

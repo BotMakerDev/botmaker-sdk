@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.capture;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.SessionSource;
@@ -26,7 +26,7 @@ import com.botmaker.session.DesktopSession;
  * to trim, and the pair is the read and the write of one property — which is the shape the rest of this sweep
  * hides <em>arguments</em> in favour of, not one it hides.
  */
-@Facade(category = "capture", categoryLabel = "Capture", icon = "🎯", order = 60)
+@Palette(category = "capture", categoryLabel = "Capture", icon = "🎯", order = 60)
 public final class Source {
 
     private static volatile CaptureSource current;

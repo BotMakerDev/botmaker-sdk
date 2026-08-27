@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.flow;
 
-import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.meta.Since;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 
 /**
  * What to do before a node's activity runs, to be sure it starts from a screen it recognises.
@@ -13,8 +13,8 @@ import com.botmaker.plugin.api.meta.Since;
  * <p>Whatever "home" means is the bot's own: the walker is handed the project's {@code goHome} step, the same
  * one {@link com.botmaker.sdk.api.bot.Bot#start(Runnable, Runnable)} recovers with.
  */
-@Since("1.1.0")
-@Facade(category = "flow", categoryLabel = "Flow", role = "VALUE", order = 106)
+@Palette(category = "flow", categoryLabel = "Flow", order = 106)
+@Hidden("a value type: an enum constant the generated flow driver writes, never a menu entry of its own")
 public enum Recovery {
 
     /** Run the activity from wherever the previous one left off. */

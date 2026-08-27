@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.emulator;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
@@ -14,7 +15,8 @@ import com.botmaker.shared.emulator.PlatformId;
  * launching it. Query {@link #running()} for liveness, {@link #launch()}/{@link #stop()} to control it, and
  * {@link #connect()} to open an {@link Emulator} once it's up.
  */
-@Facade(category = "emulator", categoryLabel = "Emulator", role = "VALUE", order = 89)
+@Palette(category = "emulator", categoryLabel = "Emulator", order = 89)
+@Hidden("a value type: Emulators hands one back, a bot does not build one from a menu")
 public final class EmulatorRef {
 
     private final EmulatorInstance instance;

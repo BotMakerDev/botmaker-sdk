@@ -1,7 +1,8 @@
 package com.botmaker.sdk.api.meta;
 
 import com.botmaker.plugin.api.meta.ReplacedBy;
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -12,21 +13,22 @@ import java.lang.annotation.Target;
 /**
  * Written on the surviving element: <em>these older spellings became this</em>.
  *
- * @deprecated moved to {@link com.botmaker.plugin.api.meta.Replaces}, where the whole documentation now
- * lives — the entry grammar, the optional arity and the declared-split rule. The compatibility vocabulary
- * belongs to the plugin contract rather than to one plugin: a second plugin renaming its own types needs the
- * same machinery, and it cannot be made to depend on {@code botmaker-sdk} to get it. Nothing about the
- * annotation itself changed, and both spellings are read for the length of this deprecation window, by the
- * processor, by the release gate and by Studio.
+ * @deprecated nothing takes its place. It first moved to {@code com.botmaker.plugin.api.meta.Replaces}; that
+ * type is gone too. The back edge existed because a bot skipping the deprecation release could not see a
+ * forward pointer on an element that had since been deleted — and under the never-delete rule on
+ * {@code com.botmaker.sdk.api.**} the deprecated element is still there, still carrying its own
+ * {@code @ReplacedBy}, so the forward pointer alone answers every upgrade including a skipped one. Delete the
+ * annotation and the import; keep the {@code @ReplacedBy} on the old element instead.
  */
 @Deprecated(since = "1.2.0", forRemoval = true)
-@ReplacedBy(value = "com.botmaker.plugin.api.meta.Replaces",
-        note = "The compatibility vocabulary moved to the plugin contract. Change the import to "
-                + "com.botmaker.plugin.api.meta.Replaces; nothing else about it changed.")
+@ReplacedBy(value = {},
+        note = "Nothing takes its place. Under never-delete the old element survives carrying its own "
+                + "@ReplacedBy, so the forward pointer alone answers the upgrade.")
 @Documented
 @Retention(RetentionPolicy.CLASS)
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD, ElementType.CONSTRUCTOR})
-@Facade(category = "meta", categoryLabel = "Metadata", role = "VALUE", order = 109)
+@Palette(category = "meta", categoryLabel = "Metadata", order = 109)
+@Hidden("an annotation: written in source, never inserted as a call")
 public @interface Replaces {
 
     /** The older spellings this element took over, each {@code fqn[#member][(arity)]@<version>}. */

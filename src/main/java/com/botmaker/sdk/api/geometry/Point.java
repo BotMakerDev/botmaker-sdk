@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.geometry;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 
 
 /**
@@ -23,7 +24,8 @@ import com.botmaker.plugin.api.palette.Facade;
  * @param y pixels from the top of the coordinate space
  */
 // The generated Activities declares one per point variable, rebuilt from the two stored numbers.
-@Facade(category = "geometry", categoryLabel = "Geometry", role = "VALUE", order = 81)
+@Palette(category = "geometry", categoryLabel = "Geometry", order = 81)
+@Hidden("a value type: written by the geometry slot editor, not inserted from a menu")
 public record Point(int x, int y) {
 
     /** The origin, {@code (0, 0)} — what a value-typed variable defaults to before it is set. */

@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.meta.Internal;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.internal.vision.TemplateMetadata;
 import com.botmaker.shared.opencv.OpenCvNative;
 import org.opencv.core.Mat;
@@ -30,7 +30,8 @@ import java.nio.file.Paths;
  * {@code AutoCloseable} is implemented for the matchers' own try-with-resources, not for a bot to call.
  */
 // The generated Activities declares one per image-template variable, and builds it from the stored path.
-@Facade(category = "vision", categoryLabel = "Vision", role = "VALUE", order = 95)
+@Palette(category = "vision", categoryLabel = "Vision", order = 95)
+@Hidden("a value type: the generated templates class builds them, a bot holds and passes them on")
 public class ImageTemplate implements AutoCloseable {
 
     static { OpenCvNative.ensureLoaded(); }
@@ -134,7 +135,7 @@ public class ImageTemplate implements AutoCloseable {
      * Releases the underlying image memory. Safe to call repeatedly; the Mat is reloaded on the
      * next {@link #getMat()}.
      */
-    @Internal("memory management the runtime does on its own; a bot that unloads a template mid-run "
+    @Hidden("memory management the runtime does on its own; a bot that unloads a template mid-run "
             + "pays a reload on the next find and gains nothing")
     public void unload() {
         if (mat != null) {
@@ -144,7 +145,7 @@ public class ImageTemplate implements AutoCloseable {
     }
 
     @Override
-    @Internal("the AutoCloseable half of unload(), and hidden for the same reason")
+    @Hidden("the AutoCloseable half of unload(), and hidden for the same reason")
     public void close() {
         unload();
     }

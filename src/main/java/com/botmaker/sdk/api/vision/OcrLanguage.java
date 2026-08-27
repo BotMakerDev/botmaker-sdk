@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.meta.Since;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -22,8 +22,8 @@ import java.util.stream.Collectors;
  * a bot may legitimately name a language it installed system-wide. Build the common cases with
  * {@link #spec(OcrLanguage...)}.
  */
-@Since("1.2.0")
-@Facade(category = "vision", categoryLabel = "Vision", role = "VALUE", order = 102)
+@Palette(category = "vision", categoryLabel = "Vision", order = 102)
+@Hidden("a value type: an enum constant a bot picks, never a menu entry of its own")
 public enum OcrLanguage {
 
     ENGLISH("eng", "English"),

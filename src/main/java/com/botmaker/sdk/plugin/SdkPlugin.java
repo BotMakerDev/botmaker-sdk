@@ -7,7 +7,6 @@ import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.authoring.SourceEmitter;
-import com.botmaker.sdk.internal.plugin.catalog.Catalog;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 
 import java.util.List;
@@ -25,8 +24,8 @@ import java.util.List;
  * <h2>Why the version is still an argument, though this plugin ignores it</h2>
  *
  * <p>{@link #catalog(String)} takes the version <em>the bot pins</em>, not this jar's, and until 2026-08-26
- * the SDK answered it from a per-version class. It no longer does: there is one catalog, generated from the
- * annotations on the facades in <em>this</em> build, and the pin is not consulted.
+ * the SDK answered it from a per-version class. It no longer does: there is one catalog, reflected off the
+ * facades in <em>this</em> build, and the pin is not consulted.
  *
  * <p>The rule it used to serve is unchanged, and is met somewhere better. What an older pin may be offered
  * is this catalog <b>intersected with the bot's own resolved jar</b>, which {@code SdkSurfaceService}
@@ -52,10 +51,68 @@ public final class SdkPlugin implements StudioPlugin {
     public static final String ID = "com.botmaker.sdk";
 
     /**
-     * Built once. Every entry resolves a {@code Method} reflectively, which is worth doing exactly once in
-     * the editor and never at all on a bot's classpath, where this class is not loaded.
+     * Built once, by reflection over the facades named here. Every member is <em>discovered</em> rather than
+     * named — {@code @Hidden}, {@code @PaletteDefault} and {@code @PaletteLabel} travel with the member they
+     * annotate — so nothing in this list can go stale except a class that no longer exists, and that is a
+     * javac error because these are class literals. Reflection runs exactly once in the editor and never at
+     * all on a bot's classpath, where this class is not loaded.
+     *
+     * <p>The order here is the order the menus fall back to when two facades share a {@code @Palette} order;
+     * {@code PaletteCatalog.of} sorts by that order first, so this list is documentation rather than policy.
      */
-    private static final PaletteCatalog CATALOG = Catalog.build();
+    private static final PaletteCatalog CATALOG = PaletteCatalog.of(
+            com.botmaker.sdk.api.interaction.Mouse.class,
+            com.botmaker.sdk.api.interaction.Keyboard.class,
+            com.botmaker.sdk.api.interaction.Wait.class,
+            com.botmaker.sdk.api.vision.ImageFinder.class,
+            com.botmaker.sdk.api.vision.ImageClicker.class,
+            com.botmaker.sdk.api.vision.ImageWaiter.class,
+            com.botmaker.sdk.api.vision.Pixel.class,
+            com.botmaker.sdk.api.vision.Text.class,
+            com.botmaker.sdk.api.vision.Vision.class,
+            com.botmaker.sdk.api.bot.BotSettings.class,
+            com.botmaker.sdk.api.util.Debug.class,
+            com.botmaker.sdk.api.bot.Session.class,
+            com.botmaker.sdk.api.bot.Bot.class,
+            com.botmaker.sdk.api.bot.Watchdog.class,
+            com.botmaker.sdk.api.bot.PopupGuard.class,
+            com.botmaker.sdk.api.bot.Activity.class,
+            com.botmaker.sdk.api.launch.Game.class,
+            com.botmaker.sdk.api.launch.Target.class,
+            com.botmaker.sdk.api.emulator.Emulators.class,
+            com.botmaker.sdk.api.capture.Source.class,
+            com.botmaker.sdk.api.capture.Window.class,
+            com.botmaker.sdk.api.util.Time.class,
+            com.botmaker.sdk.api.util.BotMaker.class,
+            com.botmaker.sdk.api.geometry.Point.class,
+            com.botmaker.sdk.api.geometry.Rect.class,
+            com.botmaker.sdk.api.geometry.Size.class,
+            com.botmaker.sdk.api.bot.BotStuckException.class,
+            com.botmaker.sdk.api.bot.StartMode.class,
+            com.botmaker.sdk.api.capture.CaptureSource.class,
+            com.botmaker.sdk.api.geometry.Direction.class,
+            com.botmaker.sdk.api.emulator.Emulator.class,
+            com.botmaker.sdk.api.emulator.EmulatorRef.class,
+            com.botmaker.sdk.api.emulator.EmulatorSource.class,
+            com.botmaker.sdk.api.interaction.Key.class,
+            com.botmaker.sdk.api.interaction.MouseButton.class,
+            com.botmaker.sdk.api.launch.LaunchTarget.class,
+            com.botmaker.sdk.api.vision.ColorMatch.class,
+            com.botmaker.sdk.api.vision.ImageTemplate.class,
+            com.botmaker.sdk.api.vision.ImageTemplateGroup.class,
+            com.botmaker.sdk.api.vision.Matches.class,
+            com.botmaker.sdk.api.vision.MatchResult.class,
+            com.botmaker.sdk.api.vision.Precision.class,
+            com.botmaker.sdk.api.vision.TextMatch.class,
+            com.botmaker.sdk.api.vision.OcrOptions.class,
+            com.botmaker.sdk.api.vision.OcrLanguage.class,
+            com.botmaker.sdk.api.vision.TextResult.class,
+            com.botmaker.sdk.api.flow.FlowGraph.class,
+            com.botmaker.sdk.api.flow.PopupCheck.class,
+            com.botmaker.sdk.api.flow.Recovery.class,
+            com.botmaker.sdk.api.meta.Since.class,
+            com.botmaker.sdk.api.meta.ReplacedBy.class,
+            com.botmaker.sdk.api.meta.Replaces.class);
 
     @Override
     public String id() {

@@ -99,27 +99,37 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   stops offering it. (Until phase 7 the mirror was Studio's hand-written `palette/SdkType` enum; it is
   deleted, and the SDK now *serves* the answer instead of Studio keeping a copy.)
 
-- **Every class this module compiles says which side of that line it is on, and javac refuses one that does
-  not** (2026-08-27, plugin-platform phase 8c). `com.botmaker.plugin.api.meta.@Internal` is the mark, and it
-  claims more than the old `@NotInPalette` did: **not versioned surface** — freely breakable, owed no
-  `@Since`, owed no pointer on removal. It targets **packages**, so eleven `package-info.java` files say it
-  once per package rather than once per class, and `com.botmaker.sdk.internal.**` finally *says* what its
-  name has always implied. Three rules, all javac errors from `PluginSurfaceProcessor`, all switched on by
-  `-Abotmaker.surface=com.botmaker.sdk` in this pom:
-  - a class under that root that is neither `@Facade` nor `@Internal` is refused **by name** (an unmarked
-    *method* defaults to offered; an unmarked *class* used to default to nothing at all, which was the
-    silent outcome). A class may override its package with `@Facade`; nested and anonymous classes inherit
-    from their enclosing type;
-  - `@Internal` **and** `@Facade` on one type is refused — offering a member inserts its name into a bot's
-    source, which is exactly what makes the type surface. To be recognised without being proposed use
-    `@Facade(role = "HIDDEN")`; if a bot legitimately calls it but the type is plumbing, the type is
-    **misfiled** and moves (`shared.ocr` and `api.authoring` are the precedents);
-  - `@PaletteLabel`/`@PaletteDefault` on a member of a non-`@Facade` type is refused: it curates an entry
-    that does not exist.
+- **The class-classification rule was retracted on 2026-08-27, hours after it landed, with the processor that
+  enforced it.** What stood here described `@Internal` as *not versioned surface*, marked once per package by
+  eleven `package-info.java` files, and three javac errors from `PluginSurfaceProcessor` switched on by
+  `-Abotmaker.surface=com.botmaker.sdk`. All of it is gone: the twelve `package-info.java` files, the
+  `-A` options, `<annotationProcessorPaths>`, and `botmaker-plugin-processor` itself. The reasons are worth
+  keeping, because each is a decision and not a cleanup:
 
-  The one cost, recorded rather than argued away: `@Internal` welds *not-surface* to *not-offered*. A type
-  that is versioned but should not be proposed — `api.flow`, `api.meta` — takes `@Facade(role = "VALUE")`
-  instead, which is honest (they are import targets) and is why six facades are catalogued with no members.
+  - **All sixteen real `@Internal` sites were methods of `@Facade` classes** — not one was on a type. So the
+    annotation's entire actual job was *hide this member from the palette*, which is what `@NotInPalette` had
+    been before phase 8c widened it. The widening bought a rule nobody used and cost the weld below.
+  - **The weld is dissolved rather than paid for.** `@Internal` made *not-surface* and *not-offered* one bit,
+    so a type that is versioned but should not be proposed had to take `@Facade(role = "VALUE")`. Two
+    annotations now say two things: **`@Palette` = catalogued** (the recognition set — imports, "does `Point`
+    mean ours or `java.awt`'s"), **`@Hidden` on the type = not offered in an insert menu**. `FacadeRole`'s
+    third state was read by nothing; `FacadeEntry.role` is a `boolean offered`.
+  - **The catalog is reflected, not generated.** `SdkPlugin` calls
+    `PaletteCatalog.of(Mouse.class, …)` — 52 class literals — and members are **discovered**. The generator's
+    one defended property was *a catalog naming a renamed member does not compile*; nothing names a member any
+    more, so nothing can go stale, and the class list stays javac-checked because it is class literals. What
+    the processor also cost was unpayable by anyone outside this repo: a third-party pom omitting
+    `<annotationProcessorPaths>` got no catalog and no diagnostic.
+
+  The switch was verified by diffing the last generated `Catalog.java` against the reflected catalog: **same
+  52 facades, same order, same member names, and every `.order(…)` prefix reproduced** — because
+  `PaletteCatalog` reads the class file's own `methods` table for declaration order (`SourceOrder`), which is
+  the one thing reflection alone cannot supply. Every failure path there falls back to alphabetical, so the
+  worst case is a cosmetic menu order and never a project that will not open.
+
+  One deliberate narrowing: **constructors are not catalogued.** Reflecting them put an `<init>` entry under
+  seven offered static facades whose public constructor exists only because nobody wrote a private one, and a
+  palette entry inserts a *call*. `MemberId` keeps its constructor support for a plugin that wants one.
 
 - **A second rule, from the 1.1.0 method audit: no `api` signature may name a type the SDK does not version.**
   `botmaker-shared` and OpenCV are *freely breakable* by design while `api.*` is under contract, so a public
@@ -156,25 +166,38 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   behaved differently, so the declarations had to be checkable. What it costs is stated plainly in
   `release.sh`: nothing now refuses a breaking change released as a patch, and nothing sizes the bump.
 
-  **What carries a rename is a pointer written at both ends — `@ReplacedBy` and `@Replaces`** (2026-08-23;
-  they replaced `@ApiId` and `META-INF/botmaker/migrations.json`, both deleted). A jar diff sees
-  `ImageClicker#click` go and `IClicker#tap` arrive and cannot see that one became the other; read as a
-  removal, that is hundreds of calls replaced by default values in someone's bot. So the SDK says it, at
-  both ends, because a bot being upgraded holds only two jars:
+  **japicmp is back, in one line: `com.botmaker.sdk.api.**` never removes anything** (2026-08-27). That
+  reverses the paragraph above, and the reversal is legitimate for a reason worth stating rather than
+  asserting. The 2026-08-22 gate died because **CI cannot tell an intended break from an accident, since it
+  cannot see the version** — a statement about a *conditional* rule, where a major release may legitimately
+  remove. Never-delete is **unconditional**: there is no legitimate removal, so there is nothing to
+  distinguish, and the objection evaporates. Hence no ignore list, no exemption annotation and no verdict
+  file — an escape hatch is what killed the last one. It is bound to `verify`, scoped to `api.**` so
+  `internal.**` stays freely breakable, and its baseline is `botmaker.japicmp.baseline` in the pom: **v1.2.0,
+  the release the rule begins at**, because v1.1.0 → now already removed `api.config.Wire`, `@Palette`,
+  `@Scaffolding` and `Text`'s nine shared-`OcrOptions` overloads, every one a recorded decision taken while
+  `api.*` was still freely breakable.
 
-  - **`@ReplacedBy`** on the deprecated element, read out of the bot's **own** jar — the bot still spells the
-    element the old way, so that is where the forward pointer has to be. Each target is `fqn`, `fqn#member`
-    or `fqn#<init>`, no arity (it sits on one overload). **An empty value is an explicit "nothing takes my
-    place"**, not an omission — which is why it is *required* on every deprecated public element.
-  - **`@Replaces`** on the survivor, read out of the **target** jar — each entry
-    `fqn[#member][(arity)]@<version>`, the version being the **last release the old spelling existed in**.
-    This is the only place the answer survives once the deprecated element is finally deleted. Entries
-    accumulate and are never pruned. It carries **`note()` and `behaviourChanged()` too**, duplicating the
-    forward end's, because the two are read out of different jars and only one survives: a bot upgrading
-    *through* the deprecation release reads the forward pair, a bot that skipped it has only this one. The
-    forward note wins where both exist; the flag is a logical OR. The **arity is optional and exists only
-    here** — the forward end sits on one overload already, while this end may name an overload that is
-    already deleted and so has nothing left to count.
+  The accepted cost, stated plainly: **`com.botmaker.sdk.api` only ever grows.** That is the trade, and it is
+  the same policy the JDK runs.
+
+  **What carries a rename is `@ReplacedBy`, written on the deprecated element** (2026-08-23; it replaced
+  `@ApiId` and `META-INF/botmaker/migrations.json`, both deleted). A jar diff sees `ImageClicker#click` go and
+  `IClicker#tap` arrive and cannot see that one became the other; read as a removal, that is hundreds of calls
+  replaced by default values in someone's bot. It is read out of the bot's **own** jar — the bot still spells
+  the element the old way, so that is where the forward pointer has to be. Each target is `fqn`, `fqn#member`
+  or `fqn#<init>`, no arity (it sits on one overload). **An empty value is an explicit "nothing takes my
+  place"**, not an omission — which is why it is *required* on every deprecated public element.
+
+  **`@Replaces` — the back edge, written on the survivor — was deleted on 2026-08-27, and japicmp is what
+  makes that safe.** It existed for one case: Studio holds only two jars at upgrade, the bot's pin and the
+  target, so a bot on 1.0 jumping to 3.0 could not see a pointer added in 2.0 on an element 3.0 deleted, and
+  the answer had to survive on the survivor. **Under never-delete the target jar still carries the deprecated
+  element and its own `@ReplacedBy`**, so the forward pointer alone answers every upgrade including a skipped
+  one. A rename is now: add the new name, deprecate the old, keep both, point one at the other. `@Since` went
+  the same day, for the reason this repo applies to every gate — *the question a check answers must not
+  already be answered by bytecode*, and the release an element first shipped in is answerable from the jar the
+  bot resolves.
 
   **`@ReplacedBy.value()` is a `String[]`, and that is the split.** One old member can become two, and
   *which* one a given call meant is a property of **that call**, not of the member — `Mouse.scroll(int)`,
@@ -183,26 +206,22 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   plus a parallel **`whens()`** carrying one sentence per candidate (*"when notches is positive"*), and
   Studio puts the choice to the user once per call site. `@ReplacedBy("…#tap")` is unchanged in source and
   in bytecode — a single value is already a one-element array — so the ordinary one-target pointer is the
-  degenerate case of all of it. On the back edge a split surfaces as **two survivors claiming one
-  `name@version`**, which is legal exactly when the claimed element's own `@ReplacedBy` names precisely
-  those two; that is checkable inside one build, and it is the only place a split still exists once the old
-  member is deleted.
+  degenerate case of all of it.
 
-  Either half alone resolves one hop; **composed, they resolve a chain** — `a`→`b` in 2.0 and `b`→`c` in 3.0
-  land a bot still spelling it `a` on `c`, with the 2.0 jar never fetched. Write both halves **in the release
-  that makes the change**, while both ends are still compilable: that is what lets the gate below verify the
-  link from a single build. A pointer is an ordinary annotation — correct a wrong one in a later release.
+  **Pointers compose into a chain** — `a`→`b` in 2.0 and `b`→`c` in 3.0 land a bot still spelling it `a` on
+  `c`, with the 2.0 jar never fetched, because never-delete keeps `a` and its pointer in the 3.0 jar. Write
+  the pointer **in the release that makes the change**, while both ends are compilable: that is what lets the
+  gate below verify the link from a single build. A pointer is an ordinary annotation — correct a wrong one in
+  a later release.
 
   **`ApiPointersTest` is the gate, and it is not the one that was deleted.** One offline ClassGraph scan of
-  `target/classes`, run by CI on every build and by `release.sh check_api_pointers`. Five rules, each wrong
-  at every version: every deprecated `api.*` element carries a pointer; **every** target resolves; **every**
-  target carries the matching back-edge; no two survivors claim the same `name@version` *without the claimed
-  element declaring them as a split*; every entry is well-formed, arity included. Rule 6 is opt-in —
-  `-Dbotmaker.api.maxVersion` — because only the release caller knows the version being cut. **It is not a
-  coverage rule**: an uncovered break is a supported outcome (default value plus review mark), and these
-  five only ask that a link somebody *did* declare is complete. Rule 11 is the split's own: a pointer naming
-  two or more candidates needs a non-blank `whens()` for each, since a menu of bare member names is not a
-  choice anybody can make, and a blank target may not be mixed in with real ones.
+  `target/classes` plus the contract's, run by CI on every build and by `release.sh check_api_pointers`.
+  **Four rules** since the back edge went (2026-08-27), each wrong at every version: every deprecated element
+  carries a pointer (1); **every** target resolves (2); a `behaviourChanged` move carries its sentence (8); a
+  split says when each candidate applies (11). Rules 3–7 read `@Replaces` or `@Since` and went with them —
+  with them went `-Dbotmaker.api.maxVersion`, so nothing here is version-aware any more. **It is not a
+  coverage rule**: an uncovered break is a supported outcome (default value plus review mark), and these four
+  only ask that a link somebody *did* declare is complete.
 
   **`api-surface.txt` was the second gate, and it was deleted on 2026-08-25 — a deliberate reversal of the
   decision recorded here the day before, and the second one this month.** It was a committed, generated file
@@ -221,57 +240,34 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   `@Deprecated(since, forRemoval = true)` one full minor ahead, with a pointer, still the rule — nothing
   mechanically refuses an undeprecated removal.
 
-  **What survives is the pointer machinery**, which is the half that carries a rename: `@ReplacedBy`,
-  `@Replaces`, `ApiPointersTest` and `ApiPointerProcessor`, all unchanged.
+  **What survives is `@ReplacedBy` and `ApiPointersTest`.** `ApiPointerProcessor` — the same rules again as
+  javac errors, red in the IDE while the annotation is being typed — moved into `botmaker-plugin-processor` on
+  2026-08-27 (phase 8c) and was **deleted with that module the same day**, when the catalog stopped being
+  generated and the processor had nothing left to do that a test does not do. The ergonomic loss is real and
+  accepted: a bad pointer is now a red test rather than a red line. The test was always the authority — *if
+  the two ever disagreed the test was right* — so nothing that decided anything went with it.
 
-  **`ApiPointerProcessor` is the same rules again, at the line rather than at the class** (2026-08-24). Three
-  of `ApiPointersTest`'s rules — a deprecated element carries a pointer, each target it names exists, each
-  target points back — are decidable **from one element**, so they also run as `javac` errors during the main
-  compile: red in the IDE, on the annotation, while it is still being typed. The other rules cannot follow.
-  A processor sees elements one at a time and never the surface at once, and rule 4 (no *undeclared* double
-  claim) is a question about every `@Replaces` in the API, while rules 6–7 need the version only the release
-  caller knows. So the test stays the gate — it is what CI and `release.sh` read, and **if the two ever
-  disagree the test is right** — and this is ergonomics: one mistake fails the build twice, on purpose.
-
-  **It does not live in this module any more (2026-08-27, plugin-platform phase 8c).** It was a second source
-  root, `src/apt/java`, compiled by its own `maven-compiler-plugin` execution at `process-sources` with
-  `-proc:none` into `target/apt-classes` and handed to the main compile as an explicit `-processorpath` —
-  because `annotationProcessorPaths` takes **artifact coordinates**, not a directory this build just made.
-  It is now an artifact coordinate: **`botmaker-plugin-processor`**, a sibling module, merged with
-  `PaletteCatalogProcessor` into one `PluginSurfaceProcessor` making one pass over the surface. So
-  `src/apt/java`, `target/apt-classes`, the `compile-processor` execution and the `-proc:none` argument are
-  all deleted, and the SDK's pom names the processor in `<annotationProcessorPaths>` — never in
-  `<dependencies>`, so it reaches no runtime classpath and no flattened pom.
-
-  The property that made the two-pass build necessary survives as the module's own rule: the processor
-  **depends on nothing, not even `botmaker-studio-api`**, matching annotations by FQN string and reading
-  `AnnotationMirror`s by hand. That is what lets it run over a plugin built against a different contract
-  version, and it is why it can check the SDK's own pointer annotations without a cycle.
-
-  **The vocabulary itself left this module in 1.2.0 (phase 8c.4).** `@ReplacedBy`, `@Replaces` and `@Since`
-  are `com.botmaker.plugin.api.meta` now, beside `@Internal`: they describe how any library keeps faith with
-  the code that calls it, and a second plugin renaming its own types wants the same machinery rather than a
-  copy of it. What is left in `com.botmaker.sdk.api.meta` is three `@Deprecated(since = "1.2.0",
-  forRemoval = true)` shims carrying `@ReplacedBy` at the new FQNs — **the pointer pair's first use is its
-  own move**, which is the fairest test it could have had. Everything else is unchanged: same grammar, same
-  nine `ApiPointersTest` rules, same `release.sh check_api_pointers`. Three things worth knowing:
+  **The vocabulary itself left this module in 1.2.0 (phase 8c.4).** `@ReplacedBy` is
+  `com.botmaker.plugin.api.meta` now: it describes how any library keeps faith with the code that calls it,
+  and a second plugin renaming its own types wants the same machinery rather than a copy of it. What is left
+  in `com.botmaker.sdk.api.meta` is three `@Deprecated(since = "1.2.0", forRemoval = true)` shims —
+  **the pointer's first use was its own move**, which is the fairest test it could have had. Under
+  never-delete those shims stay in the jar rather than being removed after a window; `Since` and `Replaces`
+  now carry `@ReplacedBy({})`, "nothing takes my place", because their contract-side targets are gone too.
+  Two things worth knowing:
 
   - **A pointer may cross modules**, and rule 2 resolves against `com.botmaker.sdk.api` ∪
     `com.botmaker.plugin.api` for exactly that reason — a carve-out exempting contract targets would have
     had to be removed again later, where a wider universe is simply the truth.
-  - **The `@version` on a `@Replaces` entry is the *old* module's** — `…sdk.api.meta.Since@1.2.0` is the last
-    SDK release the old spelling existed in, not a contract version. It is a statement about the spelling
-    being retired, and the retiring module is the one that dates it.
   - **`ApiPointersTest.first(…)` filters with `directOnly()`, and that is load-bearing rather than tidy.**
-    ClassGraph folds meta-annotations into a class's annotation list, and these three annotations now
-    annotate *each other* — so without the filter every element that merely *uses* `@Since` reads as carrying
-    the `@Replaces` that `@Since`'s own declaration carries. A redirect is a statement about the element it
-    is written on; nothing here ever wanted an inherited one. (`javax.lang.model` gives the processor direct
-    annotations only, so the processor never had the problem.)
+    ClassGraph folds meta-annotations into a class's annotation list, and these annotations annotate *each
+    other* — so without the filter every element that merely *uses* one reads as carrying whatever that
+    annotation's own declaration carries. A redirect is a statement about the element it is written on;
+    nothing here ever wanted an inherited one.
 
-  **Three more annotations sit beside the pointer pair, all `@Retention(CLASS)`, all read from the jar by the
-  same scan** (2026-08-23). Each records something that is cheap while both ends of a move still exist and
-  impossible afterwards:
+  **Two elements sit on the pointer itself**, `@Retention(CLASS)`, read from the jar by the same scan
+  (2026-08-23). Each records something that is cheap while both ends of a move still exist and impossible
+  afterwards:
 
   - **`@ReplacedBy(note = "…")`** — the author's own sentence, shown to the user **verbatim**. The pointer
     says *what*; nothing else can say *why*. (It is what `migrations.json`'s deleted `summary` used to be.)
@@ -280,11 +276,11 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
     different meaning" is exactly a silent, successful rename, and the bot compiles and misbehaves. Setting it
     forces a review mark on every redirected site, with the note as its text — hence rule 8: `true` with a
     blank `note` is refused, since a mark that says nothing costs a hand review and answers nothing.
-  - **`@Since("1.2.0")`** — the release an element first shipped in, so the upgrade dialog can group additions
-    by version instead of one flat alphabetical diff. **The pre-1.1.0 surface deliberately carries none** and
-    never will: the value is unrecoverable after the fact, and a guessed one asserts something false about a
-    release the user cannot check. Rule 7 checks only the shape (and, at release time, that it is not dated
-    ahead of the version being cut) — **absence is never an error**.
+
+  **`@Since` was the third and was deleted on 2026-08-27**, with rule 7. It recorded the release an element
+  first shipped in, so the upgrade dialog could group additions by version — and that is answerable from the
+  bot's own resolved jar, which is the test this repository applies to every gate. Twenty sites carried it;
+  the pre-1.1.0 surface deliberately never did.
   **Two more lived here and were deleted on 2026-08-25 — `@Scaffolding` and `@Palette`.** Both existed to let
   **two repositories agree about something neither could read in the other**, and the maintainer's decision is
   to remove the disagreement rather than manage it: the SDK becomes the generator and the palette, so there is
@@ -318,8 +314,9 @@ Studio to fill — is **deleted**, with `@Template`, `apt/TemplateProcessor`, th
 `ScaffoldTemplatesTest`. The pom went back to two compiler passes: `compile-processor` (`src/apt/java` →
 `target/apt-classes`, `-proc:none`) and the main compile that runs `ApiPointerProcessor`. Passes 3 and 4 went
 together — pass 4 existed only to undo pass 3's `projectArtifact.setFile(target/template-classes)`.
-(**Phase 8c took the remaining two down to one**: the processor is `botmaker-plugin-processor` now, an
-`<annotationProcessorPaths>` entry, and there is one compile.)
+(**Phase 8c took the remaining two down to one**: the processor became `botmaker-plugin-processor`, an
+`<annotationProcessorPaths>` entry. **The annotation rework then took it to none** — that module is deleted,
+the catalog is reflected by `PaletteCatalog.of(...)` and this pom runs `<proc>none</proc>`.)
 
 This is the second half of the same reversal: the templates existed so **two repositories could co-author one
 file**, the SDK owning its frame and Studio splicing the fences. The inversion removes the second author —

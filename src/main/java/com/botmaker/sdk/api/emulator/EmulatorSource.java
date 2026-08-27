@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.emulator;
 
-import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.meta.Internal;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 
@@ -19,7 +19,8 @@ import java.util.Optional;
  * visible yet" and retries, and a later capture connects once the instance has booted. A dropped connection
  * re-resolves on the next call.
  */
-@Facade(category = "emulator", categoryLabel = "Emulator", role = "VALUE", order = 90)
+@Palette(category = "emulator", categoryLabel = "Emulator", order = 90)
+@Hidden("a value type: an emulator's capture source, handed back rather than built from a menu")
 public final class EmulatorSource implements CaptureSource {
 
     private final String instanceName;
@@ -37,7 +38,7 @@ public final class EmulatorSource implements CaptureSource {
     }
 
     @Override
-    @Internal("the CaptureSource half of this type; hidden there and hidden here, since an override "
+    @Hidden("the CaptureSource half of this type; hidden there and hidden here, since an override "
             + "carries none of the interface's annotations")
     public BufferedImage capture() {
         Emulator emu = resolve();

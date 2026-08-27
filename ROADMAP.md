@@ -8,6 +8,51 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-27 — reflection replaces the processor, japicmp replaces the back edge
+
+**Done**
+
+- **The annotation set narrowed to five, and two bits replaced three.** `@Facade` → **`@Palette`** (no `role`
+  element), `@Internal` → **`@Hidden`** (palette-only again, and moved from `meta` to `palette`). A type is
+  *catalogued* (`@Palette`) and either *offered* or not (`@Hidden`); `FacadeRole`'s third state was read by
+  nothing, and `FacadeEntry.role` is now `boolean offered`. 52 `@Facade` sites and 16 `@Internal` sites
+  rewritten; **all sixteen were methods**, which is what made the phase-8c widening ("not versioned surface")
+  unnecessary.
+- **The catalog is reflected, not generated.** `SdkPlugin.CATALOG = PaletteCatalog.of(Mouse.class, …)` — 52
+  class literals. `botmaker-plugin-processor`, `<annotationProcessorPaths>`, `-Abotmaker.surface`,
+  `-Abotmaker.catalog` and the generated `internal/plugin/catalog/Catalog.java` are all gone, and the pom
+  compiles with `<proc>none</proc>`.
+- **Verified by diff, not by assertion.** The last generated `Catalog.java` was dumped before the switch and
+  compared against the reflected catalog: **same 52 facades, same order, same member names, every `.order(…)`
+  prefix reproduced, no problems reported**. Declaration order survives because `PaletteCatalog` reads the
+  class file's own `methods` table (`SourceOrder`); every failure path there falls back to alphabetical.
+- **Constructors backed out.** Reflecting them added an `<init>` entry to seven *offered* static facades
+  (Mouse, Keyboard, Wait, ImageFinder, ImageClicker, ImageWaiter, Pixel) whose public constructor exists only
+  because nobody wrote a private one — a menu row that inserts a call cannot render one. `MemberId` keeps its
+  constructor support for a plugin that wants it.
+- **`PaletteCatalog.of` degrades, never throws.** A facade whose members cannot be read (`LinkageError` from
+  an optional dependency the host did not resolve) is reported into `problems()` and offered with no members.
+  Found by actually hitting it: `getDeclaredMethods()` on `api.capture.Source` throws
+  `NoClassDefFoundError: com/botmaker/session/DesktopSession` when session is off the classpath.
+- **`@Replaces` and `@Since` deleted; 12 `package-info.java` deleted; 20 `@Since` sites stripped.**
+  `ApiPointersTest` is four rules now (1, 2, 8, 11) and is no longer version-aware —
+  `-Dbotmaker.api.maxVersion` reads nothing. `ApiCatalogTest` moved to `com.botmaker.sdk.plugin` and asserts
+  `problems()` is empty. `com.botmaker.sdk.api.meta.{Since,Replaces}` stay as `@ReplacedBy({})` shims: they
+  are released public `api.*` types, so never-delete applies to them — its first real exercise.
+- **japicmp, `verify` phase, scoped to `com.botmaker.sdk.api.**`, refusing `METHOD_REMOVED` /
+  `CLASS_REMOVED` / `FIELD_REMOVED`.** No ignore list, no exemption annotation, no verdict file. Baseline is
+  `botmaker.japicmp.baseline` = **v1.2.0**, the release never-delete begins at, not the current newest tag:
+  pointed at v1.1.0 it correctly failed on `api.config.Wire`, `@Palette`, `@Scaffolding` and `Text`'s nine
+  shared-`OcrOptions` overloads — every one a deliberate pre-policy removal. That failure is also the
+  gate-seen-to-fail check. Offline builds pass `-Dbotmaker.japicmp.skip=true`.
+
+**Why japicmp is legitimate now when it was not in August:** `21-api-compat.md` §3 names the blocker as *CI
+cannot tell an intended break from an accident, because it cannot see the version* — a statement about a
+**conditional** rule. Never-delete is unconditional, so there is no legitimate removal to distinguish. The
+cost, stated plainly: `com.botmaker.sdk.api` only ever grows.
+
+---
+
 ## 2026-08-27 — the SDK ships the editors for its own types (plugin platform, phase 12a)
 
 **Done**

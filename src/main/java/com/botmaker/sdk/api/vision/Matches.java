@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,7 +46,8 @@ import java.util.Map;
  * lambda parameter of {@code ifFindAny}/{@code whileFindAny} — and the questions it answers are asked through
  * that value, not through a static facade submenu.
  */
-@Facade(category = "vision", categoryLabel = "Vision", role = "VALUE", order = 97)
+@Palette(category = "vision", categoryLabel = "Vision", order = 97)
+@Hidden("a value type: the finder hands one to a callback, a bot does not build one from a menu")
 public final class Matches {
 
     private static final Matches NONE = new Matches(Collections.emptyMap());

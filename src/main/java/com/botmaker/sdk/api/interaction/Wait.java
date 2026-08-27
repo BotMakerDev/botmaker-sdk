@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.util.Debug;
 
@@ -44,7 +44,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * records that this is precisely why the Wait block inserts the {@code Duration} form. A JDK type with a
  * picker is fillable; an SDK type without one would not be.
  */
-@Facade(category = "interaction", categoryLabel = "Interaction", icon = "⏱", order = 12)
+@Palette(category = "interaction", categoryLabel = "Interaction", icon = "⏱", order = 12)
 public class Wait {
 
     /**

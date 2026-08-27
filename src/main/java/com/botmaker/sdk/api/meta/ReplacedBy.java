@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.meta;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -29,7 +30,8 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RetentionPolicy.CLASS)
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD, ElementType.CONSTRUCTOR})
-@Facade(category = "meta", categoryLabel = "Metadata", role = "VALUE", order = 108)
+@Palette(category = "meta", categoryLabel = "Metadata", order = 108)
+@Hidden("an annotation: written in source, never inserted as a call")
 public @interface ReplacedBy {
 
     /**

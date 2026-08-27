@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.capture;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.util.Debug;
@@ -35,7 +36,9 @@ import java.util.Optional;
  * by the vision layer rather than by a bot: the sentence above about passing a {@code Window} straight into
  * {@code ImageFinder.find} <em>is</em> how a bot uses them.
  */
-@Facade(category = "capture", categoryLabel = "Capture", icon = "🪟", role = "HIDDEN", order = 61)
+@Palette(category = "capture", categoryLabel = "Capture", icon = "🪟", order = 61)
+@Hidden("kept out of the insert menus — a bot receives a Window from Source or a picker; its members stay "
+        + "catalogued so the name resolves")
 public class Window implements CaptureSource, WindowBacked {
 
     private final GenericWindow handle;

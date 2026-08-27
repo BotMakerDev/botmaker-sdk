@@ -1,8 +1,8 @@
 package com.botmaker.sdk.api.flow;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.Activity;
-import com.botmaker.plugin.api.meta.Since;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 
 import java.util.LinkedHashMap;
@@ -52,8 +52,8 @@ import java.util.Map;
  * an unwired outcome <em>is</em> the stop — or when the node it led to is not in the graph. Cycles are legal,
  * that being how a bot repeats, which is why {@link #walk} takes a step budget.
  */
-@Since("1.1.0")
-@Facade(category = "flow", categoryLabel = "Flow", role = "VALUE", order = 104)
+@Palette(category = "flow", categoryLabel = "Flow", order = 104)
+@Hidden("a value type: the generated flow driver builds one, a bot body does not")
 public final class FlowGraph {
 
     private final String start;
@@ -72,7 +72,6 @@ public final class FlowGraph {
      * @throws IllegalArgumentException if two nodes share a name — the name is the identity routes are
      *                                  written against, so a duplicate would silently make one unreachable
      */
-    @Since("1.1.0")
     public static FlowGraph of(String start, Node... nodes) {
         Map<String, Node> byName = new LinkedHashMap<>();
         for (Node node : nodes) {
@@ -99,7 +98,6 @@ public final class FlowGraph {
      * @throws IllegalArgumentException if two routes name the same outcome
      */
     @SafeVarargs
-    @Since("1.1.0")
     public static <O extends Enum<O>> Node node(String name, Activity<O> activity, PopupCheck popupCheck,
                                                 Recovery recovery, String whenDisabled, Route<O>... routes) {
         Map<String, String> targets = new LinkedHashMap<>();
@@ -118,7 +116,6 @@ public final class FlowGraph {
      * @param outcome a constant of the node's activity's own outcome enum
      * @param to      the node to go to next, or {@code null} to end the run there
      */
-    @Since("1.1.0")
     public static <O extends Enum<O>> Route<O> route(O outcome, String to) {
         return new Route<>(outcome, to);
     }
@@ -136,19 +133,16 @@ public final class FlowGraph {
      * @param goHome       the bot's own "get back to a known screen" step, run for a
      *                     {@link Recovery#GO_HOME} node
      */
-    @Since("1.1.0")
     public static void walk(FlowGraph graph, int maxSteps, int stepDelayMs, Runnable goHome) {
         FlowWalker.walk(graph, maxSteps, stepDelayMs, goHome);
     }
 
     /** The node a run begins at, or {@code null} for an empty flow. */
-    @Since("1.1.0")
     public String start() {
         return start;
     }
 
     /** The node by that name, or {@code null} — which ends the run, the same as an unwired outcome. */
-    @Since("1.1.0")
     public Node nodeNamed(String name) {
         return name == null ? null : nodes.get(name);
     }
@@ -159,7 +153,6 @@ public final class FlowGraph {
      * <p>A record rather than a pair of arguments on {@link #node} because a node has as many of these as its
      * activity has outcomes, and they have to be readable one per line in a generated file.
      */
-    @Since("1.1.0")
     public record Route<O extends Enum<O>>(O outcome, String to) {}
 
     /**
@@ -170,7 +163,6 @@ public final class FlowGraph {
      * asks an outcome for its {@linkplain Enum#name() name}, and a node table that stayed generic could not
      * be a plain array.
      */
-    @Since("1.1.0")
     public static final class Node {
 
         private final String name;
@@ -191,31 +183,26 @@ public final class FlowGraph {
         }
 
         /** The node's name — what {@code start} and every route's {@code to} refer to. */
-        @Since("1.1.0")
         public String name() {
             return name;
         }
 
         /** The activity this node runs. */
-        @Since("1.1.0")
         public Activity<?> activity() {
             return activity;
         }
 
         /** Whether the popup guard runs while it does. */
-        @Since("1.1.0")
         public PopupCheck popupCheck() {
             return popupCheck;
         }
 
         /** What to do before it runs. */
-        @Since("1.1.0")
         public Recovery recovery() {
             return recovery;
         }
 
         /** Where a run goes when this node's activity is switched off; {@code null} ends the run. */
-        @Since("1.1.0")
         public String whenDisabled() {
             return whenDisabled;
         }
@@ -224,7 +211,6 @@ public final class FlowGraph {
          * The node {@code outcome} leads to, or {@code null} when nothing was wired to it — which is how a
          * run ends.
          */
-        @Since("1.1.0")
         public String target(Enum<?> outcome) {
             return outcome == null ? null : targets.get(outcome.name());
         }

@@ -1,5 +1,5 @@
 package com.botmaker.sdk.api.launch;
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -37,7 +37,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * the editor can produce</b>, and on this one method that is the typed form. {@code set(String)} stays public
  * for a bot computing its target from a config value.
  */
-@Facade(category = "launch", categoryLabel = "Launch", icon = "🚀", order = 41)
+@Palette(category = "launch", categoryLabel = "Launch", icon = "🚀", order = 41)
 public final class Target {
 
     private static volatile LaunchTarget current;

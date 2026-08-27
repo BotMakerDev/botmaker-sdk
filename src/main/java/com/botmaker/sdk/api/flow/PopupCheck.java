@@ -1,8 +1,8 @@
 package com.botmaker.sdk.api.flow;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.PopupGuard;
-import com.botmaker.plugin.api.meta.Since;
 
 /**
  * Whether the {@link PopupGuard} runs while one node's activity does.
@@ -15,8 +15,8 @@ import com.botmaker.plugin.api.meta.Since;
  * {@link PopupGuard#enabled(boolean)} is process-global: a node that said nothing would inherit whatever the
  * node before it left set.
  */
-@Since("1.1.0")
-@Facade(category = "flow", categoryLabel = "Flow", role = "VALUE", order = 105)
+@Palette(category = "flow", categoryLabel = "Flow", order = 105)
+@Hidden("a value type: an enum constant the generated flow driver writes, never a menu entry of its own")
 public enum PopupCheck {
 
     /** Check for popups between this node's steps — the default for a new activity. */

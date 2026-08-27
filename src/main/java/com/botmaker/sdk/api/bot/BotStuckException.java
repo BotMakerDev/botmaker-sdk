@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 
 /**
  * Thrown when the {@link Watchdog} decides the bot is stuck — the screen has not advanced for
@@ -11,7 +12,8 @@ import com.botmaker.plugin.api.palette.Facade;
  * cluttering signatures. {@link Bot#supervise} catches it and runs the recovery hook
  * (typically {@code goHome()} then {@code startGame()}) before restarting the bot loop.
  */
-@Facade(category = "bot", categoryLabel = "Bot", role = "VALUE", order = 84)
+@Palette(category = "bot", categoryLabel = "Bot", order = 84)
+@Hidden("a value type: a bot catches it, it is never inserted from a menu")
 public class BotStuckException extends RuntimeException {
 
     public BotStuckException(String message) {

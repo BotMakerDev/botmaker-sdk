@@ -1,8 +1,6 @@
 package com.botmaker.sdk.api;
 
 import com.botmaker.plugin.api.meta.ReplacedBy;
-import com.botmaker.plugin.api.meta.Replaces;
-import com.botmaker.plugin.api.meta.Since;
 import io.github.classgraph.AnnotationInfo;
 import io.github.classgraph.AnnotationInfoList;
 import io.github.classgraph.ClassGraph;
@@ -18,62 +16,45 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * The pointer gate: {@link ReplacedBy} and {@link Replaces} are checked against <em>this</em> build, so a
- * redirect that Studio could not follow fails here rather than at a bot's upgrade.
+ * The pointer gate: {@link ReplacedBy} is checked against <em>this</em> build, so a redirect Studio could not
+ * follow fails here rather than at a bot's upgrade.
  *
  * <h2>Why this can be checked at all, with no old jar</h2>
  *
- * <p>A deprecation window puts <b>both ends in the same build</b> — that is what the window is for. The
- * deprecated member is still compilable, and the survivor that takes it over is right there beside it. So the
- * back-edge ({@code @Replaces}) is written and verified while the thing it names still exists, and by the time
- * the member is actually deleted a release later, the entry is already proven. Nothing here fetches, resolves
- * or diffs a previously published artifact: the whole check is one scan of {@code target/classes}, offline.
+ * <p>Nothing here fetches, resolves or diffs a previously published artifact: the whole check is one scan of
+ * {@code target/classes} plus the contract's, offline. A pointer is written on an element that is still
+ * compilable, naming an element that is also still compilable, so both ends are in the build being checked.
  *
- * <h2>This is not the gate that was deleted</h2>
+ * <h2>There is no back edge any more, and japicmp is why</h2>
  *
- * <p>{@code docs/refactor/21-api-compat.md} §3 records a japicmp gate that was built and removed. It enforced
- * <b>coverage</b> — every break had to ship a way across it — and it went because an uncovered break is now a
- * <em>supported outcome</em>: Studio substitutes a default value of the old return type and marks the enclosing
- * function {@code @NeedsReview}. No coverage rule comes back here, and no version-bump rule either. These
- * checks ask only that something somebody <em>did</em> declare is complete and internally consistent — they
- * are wrong at every version, which is why CI needs no version awareness to run them.
+ * <p>{@code @Replaces} — the claim written on the survivor — was deleted on 2026-08-27 with the annotation
+ * processor, and rules 3, 4, 5 and 6 went with it. It existed for one case: a bot on 1.0 jumping straight to
+ * 3.0 cannot see a pointer that was added in 2.0 on an element 3.0 deleted, so the answer had to survive on
+ * the survivor. Under the <b>never-delete</b> rule now enforced by japicmp over
+ * {@code com.botmaker.sdk.api.**}, the target jar still carries the deprecated element <em>and</em> its own
+ * {@code @ReplacedBy}, so the forward pointer alone answers every upgrade including a skipped one, and
+ * pointers compose into a chain ({@code a}→{@code b} in 2.0, {@code b}→{@code c} in 3.0 lands a bot still
+ * spelling it {@code a} on {@code c}). The accepted cost is stated plainly in the pom: {@code api} only ever
+ * grows.
  *
- * <h2>What is checked</h2>
+ * <p>{@code @Since} went the same day, and rule 7 with it. What it recorded — the release an element first
+ * shipped in — is answerable from the jar the bot actually resolves, which is the gate-deletion test this
+ * repository applies to every check: the question a gate answers must not already be answered by bytecode.
  *
- * <p>Rules 1–5 are the pointer pair: a deprecated element says what to use instead, every target exists, every
- * back-edge is written, no entry is claimed twice <em>undeclared</em>, every entry parses. Rules 7–8 cover the
- * two annotations added beside them — {@link Since} is well-formed, and a {@code behaviourChanged} move
- * carries its sentence at whichever end asserts it. Rule 11 covers the split — a {@code @ReplacedBy} naming
- * several candidates has to say when each one applies.
+ * <p>Rules 9, 10 and 12 were deleted earlier (2026-08-25) with {@code @Scaffolding} and {@code @Palette}.
  *
- * <p>Rules 9, 10 and 12 are gone (2026-08-25), with the two annotations they read. Rule 12 compared
- * {@code @Scaffolding} against a file {@code botmaker-studio} wrote; rule 9 refused a deprecated
- * {@code @Scaffolding} element with no survivor; rule 10 refused a half-curated {@code @Palette} type. Both
- * annotations were deleted when the scaffold negotiation between the two repositories was — the SDK becomes
- * the generator, so there is nothing left for either to assert about the other.
+ * <h2>What is left</h2>
  *
- * <h2>A pointer is a set, not a value</h2>
- *
- * <p>{@link ReplacedBy#value()} is a {@code String[]}, so rules 2, 3 and 9 run <b>per candidate</b> and rule 4
- * is no longer flat: two survivors claiming one old spelling is precisely what a split looks like from the
- * back edge, and it is legal exactly when the old element declares those two. The ordinary one-target pointer
- * is the degenerate case of all of it and is checked exactly as it was.
- *
- * <p>The version-aware checks are the exception, and they are opt-in: {@code release.sh} passes
- * {@code -Dbotmaker.api.maxVersion=<the version being cut>} so that neither a {@code @Replaces} entry (rule 6)
- * nor a {@code @Since} (rule 7) can claim an era that has not been released yet. Only the release caller knows
- * that number, so unset means unchecked.
+ * <p>Four rules, each wrong at every version, which is why CI needs no version awareness to run them: a
+ * deprecated element says what to use instead (1), every target it names is here (2), a behaviour change is
+ * announced in words (8), and a split says when each candidate applies (11).
  */
 class ApiPointersTest {
 
@@ -84,69 +65,38 @@ class ApiPointersTest {
      *
      * <p>A redirect's two ends do not have to live in one module: a type moving from this plugin into the
      * contract is an ordinary rename with a longer name, and the compatibility vocabulary's own move
-     * ({@code sdk.api.meta} → {@code plugin.api.meta}, 2026-08-27) is written exactly that way. Rules 2 and 3
-     * resolve a target and read its back-edge, so the target has to be in the scan or every such pointer
-     * reads as unresolvable. The contract's own elements are then subject to the rules incidentally, which is
-     * correct rather than merely tolerable — it is versioned surface a bot can name.
+     * ({@code sdk.api.meta} → {@code plugin.api.meta}, 2026-08-27) is written exactly that way. Rule 2
+     * resolves a target, so the target has to be in the scan or every such pointer reads as unresolvable.
      */
     private static final String CONTRACT_PACKAGE = "com.botmaker.plugin.api";
 
     /**
-     * The pointer vocabulary, read under both spellings for the length of its move.
+     * The pointer annotation, read under both spellings for the length of its move.
      *
-     * <p>{@code com.botmaker.plugin.api.meta} is where it now lives and {@code com.botmaker.sdk.api.meta} is
-     * the deprecated spelling, kept for one minor. An element may carry either, and — since a window is
-     * exactly the state where both exist — the element a pointer names may carry the other.
+     * <p>{@code com.botmaker.plugin.api.meta} is where it now lives; {@code com.botmaker.sdk.api.meta} is the
+     * deprecated spelling, which under never-delete stays in the jar rather than being removed after a
+     * window. An element may carry either.
      */
     private static final List<String> REPLACED_BY =
             List.of(ReplacedBy.class.getName(), "com.botmaker.sdk.api.meta.ReplacedBy");
-    private static final List<String> REPLACES =
-            List.of(Replaces.class.getName(), "com.botmaker.sdk.api.meta.Replaces");
-    private static final List<String> SINCE =
-            List.of(Since.class.getName(), "com.botmaker.sdk.api.meta.Since");
     private static final String DEPRECATED = Deprecated.class.getName();
-
-    /** Major.minor.patch, with an optional pre-release/build tail. No leading {@code v} — tags carry it, entries don't. */
-    private static final Pattern SEMVER = Pattern.compile("\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.\\-]+)?");
-
-    /** The version this release is cutting, when run from {@code release.sh}; empty otherwise. */
-    private static final String MAX_VERSION = System.getProperty("botmaker.api.maxVersion", "").trim();
 
     private static ScanResult scan;
 
-    /** Every public element of {@code api.*}, in declaration order, keyed for the messages below. */
+    /** Every public element of the scanned packages, in declaration order. */
     private static List<Element> elements;
-    /** ref -> the elements sharing it. Overloads share a ref: the annotations carry no arity by design. */
+    /** ref -> the elements sharing it. Overloads share a ref: the annotation carries no arity by design. */
     private static Map<String, List<Element>> byRef;
 
     /**
-     * One annotatable API element — a type, a method, a constructor or a field — reduced to what the gate
-     * reads. {@code replacedBy} is {@code null} when the annotation is absent and {@code ""} when it is
-     * present with no target (the explicit "nothing takes its place"); the difference is the whole point of
-     * check 1, and the empty case reaches us as a <em>missing</em> value element in the class file, since
-     * {@code ""} is the annotation's default and javac does not emit defaults.
-     *
-     * <p>{@code deprecated} is per <em>element</em> and not per ref: overloads share a ref, and deprecating
-     * one of them says nothing about the others. So is {@code since}: one overload may be older than its
-     * siblings.
-     *
-     * <p>{@code since} is {@code null} when the element carries no {@link Since} — which the whole
-     * pre-1.1.0 surface deliberately does not, so absence is never an error here.
-     */
-    /**
-     * One public {@code api.*} element as the rules see it.
+     * One public element as the rules see it.
      *
      * <p>{@code replacedBy} is {@code null} when the annotation is absent and a (possibly empty) list when it
-     * is present — the distinction rule 1 rests on. {@code note}/{@code behaviourChanged} come from
-     * {@code @ReplacedBy} and {@code replacesNote}/{@code replacesBehaviourChanged} from {@code @Replaces};
-     * they are kept apart because the two are read out of different jars and a rule that checks one is not
-     * checking the other. {@code params} is the parameter count of a method or constructor and {@code -1} for
-     * a type or field — it is what lets rule 5 verify an entry's optional arity.
+     * is present — the distinction rule 1 rests on.
      */
     private record Element(String ref, String kind, boolean deprecated,
-                           List<String> replacedBy, List<String> whens, String note, boolean behaviourChanged,
-                           List<String> replaces, String replacesNote, boolean replacesBehaviourChanged,
-                           String since, int params) {
+                           List<String> replacedBy, List<String> whens, String note,
+                           boolean behaviourChanged) {
 
         /** The targets that actually name something — a blank entry is the "nothing takes my place" form. */
         List<String> targets() {
@@ -158,8 +108,8 @@ class ApiPointersTest {
     @BeforeAll
     static void scanBuild() {
         scan = new ClassGraph()
-                // Exactly this module's main output, nothing else. The test sources live in the same
-                // package, so scanning the plain classpath would mix target/test-classes into the API
+                // Exactly this module's main output plus the contract, nothing else. The test sources live in
+                // the same package, so scanning the plain classpath would mix target/test-classes into the API
                 // surface and let a test fixture fail — or accidentally satisfy — a rule below.
                 .overrideClasspath(mainClasses(), contractClasses())
                 .acceptPackages(API_PACKAGE, CONTRACT_PACKAGE)
@@ -203,6 +153,9 @@ class ApiPointersTest {
      * 2 — a pointer that names something names something that is here. <b>Per candidate</b>: a split is
      * only as good as its weakest target, and one unresolvable candidate in a menu of two is a menu entry
      * that cannot be chosen.
+     *
+     * <p>Under never-delete this rule is stronger than it looks: the target cannot later vanish, so a pointer
+     * that resolves in the build that introduced it resolves in every build after it.
      */
     @Test
     void everyPointerTargetResolves() {
@@ -210,7 +163,7 @@ class ApiPointersTest {
         for (Element e : deprecated()) {
             for (String target : e.targets()) {
                 if (target.indexOf('@') >= 0) {
-                    bad.add(e.ref() + " -> " + target + "  (a @ReplacedBy target carries no @version; only @Replaces entries do)");
+                    bad.add(e.ref() + " -> " + target + "  (a @ReplacedBy target carries no @version)");
                 } else if (!byRef.containsKey(target)) {
                     bad.add(e.ref() + " -> " + target + "  (no such type/member in this build)");
                 }
@@ -222,212 +175,25 @@ class ApiPointersTest {
     }
 
     /**
-     * 3 — the back-edge exists. This is the rule that makes the old jar unnecessary.
-     *
-     * <p>{@code @ReplacedBy} lives on the element that is about to disappear, so it is readable only from a
-     * jar that still has it — the bot's own, older one. Once the member is deleted, {@code @Replaces} on the
-     * survivor is the only surviving record, and it has to have been written while both ends were here.
-     */
-    @Test
-    void everyPointerHasItsBackEdge() {
-        List<String> bad = new ArrayList<>();
-        for (Element e : deprecated()) {
-            for (String target : e.targets()) {
-                if (!byRef.containsKey(target)) continue; // check 2 owns this
-                boolean claimed = byRef.get(target).stream()
-                        .flatMap(t -> t.replaces().stream())
-                        .map(ApiPointersTest::nameOf)
-                        .anyMatch(e.ref()::equals);
-                if (!claimed) bad.add(target + " does not @Replaces " + e.ref());
-            }
-        }
-        assertEmpty(bad, """
-                A @ReplacedBy with no matching @Replaces on the other end. Add @Replaces("<old>@<version>") to
-                the target, naming the version this deprecation ships in. The forward pointer is readable only
-                while the deprecated element still exists; the back-edge is what a bot upgrading past its
-                deletion reads instead:""");
-    }
-
-    /**
-     * 4 — one old spelling, at one era, belongs to one survivor <em>unless the old element says otherwise</em>.
-     *
-     * <p>This rule used to be flat: two claims on one {@code name@version} was an error, full stop. That
-     * refused the one shape the back edge exists to carry. A <b>split</b> — {@code @ReplacedBy} naming two
-     * targets — <em>is</em> two survivors claiming one old spelling, and once the old member is finally
-     * deleted the pair of claims is the only place the split still exists. Refusing it would mean a split
-     * readable during the deprecation window and unreadable forever after.
-     *
-     * <p>So a double claim is legal exactly when the claimed element is still in this build and its own
-     * {@code @ReplacedBy} lists <b>precisely</b> those claimants — no more, no fewer. That is checkable here,
-     * while both ends are compilable, which is the whole design of this gate. Every other double claim is
-     * still an error: Studio reads an undeclared contested entry as unpaired, so it silently loses the
-     * redirect for both claimants.
-     */
-    @Test
-    void noEntryIsClaimedTwice() {
-        Map<String, Set<String>> claimants = new TreeMap<>();
-        for (Element e : elements) {
-            for (String entry : e.replaces()) {
-                claimants.computeIfAbsent(entry, k -> new LinkedHashSet<>()).add(e.ref());
-            }
-        }
-        List<String> bad = new ArrayList<>();
-        claimants.forEach((entry, refs) -> {
-            if (refs.size() <= 1) return;
-            List<Element> old = byRef.get(nameOf(entry));
-            Set<String> declared = new LinkedHashSet<>();
-            if (old != null) old.forEach(o -> declared.addAll(o.targets()));
-            if (declared.equals(refs)) return; // a declared split — the back edge of the fan-out
-            bad.add(entry + " claimed by " + String.join(" and ", refs)
-                    + (old == null ? "  (and " + nameOf(entry) + " is not in this build to declare the split)"
-                                   : "  (whose @ReplacedBy names " + (declared.isEmpty() ? "nothing" : String.join(" and ", declared)) + ")"));
-        });
-        assertEmpty(bad, """
-                Two different elements @Replaces the same name@version without that element declaring the
-                split. A double claim is legal only when the claimed element's own @ReplacedBy lists exactly
-                those claimants; otherwise Studio treats the entry as contested, which is unpaired (default
-                value + review mark). Declare the split at the other end, keep one claim, or move one to a
-                different version:""");
-    }
-
-    /**
-     * 5 — every entry parses, carries a real version, and does not quietly shadow something that still works.
-     *
-     * <p>The last clause is the interesting one: an entry naming a <em>live</em> element is fine during a
-     * deprecation window — the old member is still here, that is the window — but only if that member is
-     * actually deprecated and pointing back. An entry naming a healthy, undeprecated element is a claim to
-     * take over something nobody is giving up.
-     *
-     * <p>The optional <b>arity</b> — {@code fqn#member(2)@1.2.0} — is checked the same way and only while it
-     * can be: it exists precisely for the case where the overload it names is already deleted, and then there
-     * is nothing to compare it against. While the old member <em>is</em> still in this build, an arity that
-     * matches none of its overloads is a typo the gate can see, so it does.
-     */
-    @Test
-    void everyEntryIsWellFormed() {
-        List<String> bad = new ArrayList<>();
-        for (Element e : elements) {
-            for (String entry : e.replaces()) {
-                int at = entry.lastIndexOf('@');
-                if (at <= 0 || at == entry.length() - 1) {
-                    bad.add(e.ref() + ": \"" + entry + "\" — expected <fqn[#member][(arity)]>@<version>");
-                    continue;
-                }
-                String version = entry.substring(at + 1);
-                if (!SEMVER.matcher(version).matches()) {
-                    bad.add(e.ref() + ": \"" + entry + "\" — \"" + version + "\" is not a semver");
-                }
-                String name = nameOf(entry);
-                int arity = arityOf(entry);
-                if (arity == BAD_ARITY) {
-                    bad.add(e.ref() + ": \"" + entry + "\" — the arity between the parentheses is not a number");
-                    continue;
-                }
-                List<Element> live = byRef.get(name);
-                if (live == null) continue;
-                boolean handedOver = live.stream()
-                        .anyMatch(l -> l.deprecated() && l.targets().contains(e.ref()));
-                if (!handedOver) {
-                    bad.add(e.ref() + ": \"" + entry + "\" names " + name + ", which is still live and is "
-                            + "not @Deprecated + @ReplacedBy(\"" + e.ref() + "\")");
-                }
-                if (arity >= 0 && live.stream().noneMatch(l -> l.params() == arity)) {
-                    bad.add(e.ref() + ": \"" + entry + "\" names arity " + arity + ", which " + name
-                            + " has no overload of in this build");
-                }
-            }
-        }
-        assertEmpty(bad, """
-                A malformed or over-reaching @Replaces entry. Every entry is <fqn[#member][(arity)]>@<version>,
-                where the version is the last release that spelling existed in; an entry may name an element of
-                this build only while that element is the deprecated one pointing back at the claimant, and an
-                arity written while that element is still here must match one of its overloads:""");
-    }
-
-    /**
-     * 6 — release-time only: no entry claims an era that has not shipped.
-     *
-     * <p>Skipped unless {@code -Dbotmaker.api.maxVersion} is set, which only {@code release.sh}'s decide pass
-     * does. An entry dated ahead of the release being cut resolves for nobody: Studio consults an entry only
-     * when the bot's pinned version is at or below it, and no bot can pin a version that does not exist.
-     */
-    @Test
-    void noEntryIsDatedAfterTheReleaseBeingCut() {
-        if (MAX_VERSION.isEmpty()) return;
-        List<String> bad = new ArrayList<>();
-        for (Element e : elements) {
-            for (String entry : e.replaces()) {
-                int at = entry.lastIndexOf('@');
-                if (at <= 0) continue; // check 5 owns the parse
-                String version = entry.substring(at + 1);
-                if (SEMVER.matcher(version).matches() && compare(version, MAX_VERSION) > 0) {
-                    bad.add(e.ref() + ": \"" + entry + "\" is dated after " + MAX_VERSION);
-                }
-            }
-        }
-        assertEmpty(bad, "A @Replaces entry names a version newer than the " + MAX_VERSION
-                + " being released. No bot can pin it, so Studio would never consult the entry:");
-    }
-
-    /**
-     * 7 — every {@code @Since} is a semver, and at release time none is dated after the version being cut.
-     *
-     * <p>Only the shape is checkable here, and deliberately: <b>absence is not an error</b>. The surface that
-     * predates the contract carries no {@code @Since} and never will, because the value is a fact about a
-     * release nobody recorded — see {@link Since}. What can be wrong is a value that is present and untrue in
-     * a way a machine can see: a {@code v} prefix, a two-segment version, or (during a release) a version
-     * that has not shipped, which would make the dialog announce an element as "new in" a release the user's
-     * jar cannot contain.
-     */
-    @Test
-    void everySinceIsWellFormedAndNotInTheFuture() {
-        List<String> bad = new ArrayList<>();
-        for (Element e : elements) {
-            String since = e.since();
-            if (since == null) continue;
-            if (!SEMVER.matcher(since).matches()) {
-                bad.add(e.ref() + ": @Since(\"" + since + "\") is not a semver (no leading v, three segments)");
-            } else if (!MAX_VERSION.isEmpty() && compare(since, MAX_VERSION) > 0) {
-                bad.add(e.ref() + ": @Since(\"" + since + "\") is dated after the " + MAX_VERSION + " being released");
-            }
-        }
-        assertEmpty(bad, """
-                A malformed or future-dated @Since. The value is major.minor.patch with no leading "v" — the
-                git tag carries that, nothing inside the API does — and it names the release the element first
-                shipped in, which can never be one that has not been cut:""");
-    }
-
-    /**
      * 8 — a behaviour change is announced in words, not only as a flag.
      *
      * <p>{@code behaviourChanged = true} exists to force a review mark onto call sites Studio would otherwise
      * redirect silently, because the shapes match and only the meaning moved. A mark with no sentence tells
      * the user their bot now does something different and nothing about what — which is strictly worse than
      * the silent redirect it replaced, since it costs them a hand review that answers nothing.
-     *
-     * <p><b>Both ends carry the flag and the note</b>, because the two are read out of different jars and only
-     * one of them survives the deletion of the deprecated element. So both are checked, separately: a
-     * {@code @Replaces(behaviourChanged = true)} with a blank {@code @Replaces} note is exactly as useless to
-     * the bot that arrives late as the forward version is to the bot that arrives on time, and the forward
-     * note cannot rescue it — that jar is gone by then.
      */
     @Test
     void aBehaviourChangeCarriesItsSentence() {
         List<String> bad = new ArrayList<>();
         for (Element e : elements) {
             if (e.behaviourChanged() && e.note().isBlank()) {
-                bad.add(e.kind() + " " + e.ref() + " (@ReplacedBy)");
-            }
-            if (e.replacesBehaviourChanged() && e.replacesNote().isBlank()) {
-                bad.add(e.kind() + " " + e.ref() + " (@Replaces)");
+                bad.add(e.kind() + " " + e.ref());
             }
         }
         assertEmpty(bad, """
-                behaviourChanged = true with no note, on the annotation named in brackets. The flag makes
-                Studio mark every redirected call site for review even where the shape did not move; the note
-                is the only thing that tells the user what to look for. Each end needs its own — they are read
-                from different jars and the forward one does not outlive the element it sits on. Add
-                note = "…", in the second person, a sentence or two:""");
+                behaviourChanged = true with no note. The flag makes Studio mark every redirected call site for
+                review even where the shape did not move; the note is the only thing that tells the user what
+                to look for. Add note = "…", in the second person, a sentence or two:""");
     }
 
     /**
@@ -436,8 +202,7 @@ class ApiPointersTest {
      * <p>{@link ReplacedBy#whens()} is a sentence per candidate, in {@code value()}'s order. Empty is the
      * normal state of an ordinary one-target pointer and stays legal. What is refused is a <b>split</b> — two
      * or more candidates — whose {@code whens()} is missing or partly blank, because the dialog then asks
-     * someone to pick between two method names on no information at all. The names say what each candidate is
-     * called; only this says <em>when</em> it is the right one, which is the entire question being asked.
+     * someone to pick between two method names on no information at all.
      *
      * <p>A mismatched length is refused for both arities: a {@code whens()} that is present but not exactly
      * {@code value()}'s length has lost its correspondence, and the pairing is positional.
@@ -478,17 +243,11 @@ class ApiPointersTest {
                 "nothing takes my place"; it means nothing beside a candidate that does:""");
     }
 
-    // Rules 9, 10 and 12 are deleted (2026-08-25), with the two annotations they read. 12 compared
-    // @Scaffolding against a committed scaffolding-surface.txt that botmaker-studio's own test wrote; 9
-    // refused a deprecated @Scaffolding element with no survivor; 10 refused a type whose methods carried
-    // @Palette while the type did not. Both annotations existed to let two repositories agree about files
-    // they co-authored. The SDK becomes the generator instead, so there is no agreement left to check.
-
     /** Sanity: the scan found the API at all, so a silently empty classpath cannot pass every rule above. */
     @Test
     void theScanSawTheApi() {
         assertTrue(elements.size() > 50,
-                "scanned only " + elements.size() + " public api.* elements — target/classes is probably not "
+                "scanned only " + elements.size() + " public elements — target/classes is probably not "
                         + "on the test classpath, which would make every rule above vacuously true");
     }
 
@@ -519,54 +278,42 @@ class ApiPointersTest {
         byRef = new LinkedHashMap<>();
         for (ClassInfo ci : scan.getAllClasses()) {
             if (!ci.isPublic()) continue;
-            AnnotationInfoList onType = ci.getAnnotationInfo();
-            AnnotationInfo typePointer = first(onType, REPLACED_BY);
-            AnnotationInfo typeClaims = first(onType, REPLACES);
+            AnnotationInfo typePointer = first(ci.getAnnotationInfo());
             add(new Element(ci.getName(), "type", ci.hasAnnotation(DEPRECATED),
-                    pointer(typePointer), whens(typePointer), note(typePointer), behaviourChanged(typePointer),
-                    entries(typeClaims), note(typeClaims), behaviourChanged(typeClaims),
-                    since(first(onType, SINCE)), -1));
+                    pointer(typePointer), whens(typePointer), note(typePointer),
+                    behaviourChanged(typePointer)));
 
             for (MethodInfo mi : ci.getDeclaredMethodAndConstructorInfo()) {
                 if (!mi.isPublic() || mi.isSynthetic() || mi.isBridge()) continue;
-                AnnotationInfoList on = mi.getAnnotationInfo();
-                AnnotationInfo p = first(on, REPLACED_BY);
-                AnnotationInfo c = first(on, REPLACES);
+                AnnotationInfo p = first(mi.getAnnotationInfo());
                 add(new Element(ci.getName() + "#" + mi.getName(),
                         mi.isConstructor() ? "constructor" : "method",
                         mi.hasAnnotation(DEPRECATED),
-                        pointer(p), whens(p), note(p), behaviourChanged(p),
-                        entries(c), note(c), behaviourChanged(c),
-                        since(first(on, SINCE)), mi.getParameterInfo().length));
+                        pointer(p), whens(p), note(p), behaviourChanged(p)));
             }
             for (FieldInfo fi : ci.getDeclaredFieldInfo()) {
                 if (!fi.isPublic() || fi.isSynthetic()) continue;
-                AnnotationInfoList on = fi.getAnnotationInfo();
-                AnnotationInfo p = first(on, REPLACED_BY);
-                AnnotationInfo c = first(on, REPLACES);
+                AnnotationInfo p = first(fi.getAnnotationInfo());
                 add(new Element(ci.getName() + "#" + fi.getName(), "field",
                         fi.hasAnnotation(DEPRECATED),
-                        pointer(p), whens(p), note(p), behaviourChanged(p),
-                        entries(c), note(c), behaviourChanged(c),
-                        since(first(on, SINCE)), -1));
+                        pointer(p), whens(p), note(p), behaviourChanged(p)));
             }
         }
     }
 
     /**
-     * The first accepted spelling that is <em>directly</em> present — see {@link #REPLACED_BY}.
+     * The first accepted spelling of {@code @ReplacedBy} that is <em>directly</em> present.
      *
      * <p>{@code directOnly()} is load-bearing rather than tidy. ClassGraph folds meta-annotations into a
-     * class's annotation list, and these three annotations now annotate <em>each other</em>: the contract's
-     * {@code @Since} carries {@code @Replaces("…sdk.api.meta.Since@1.2.0")}, so without this filter every
-     * element in the API that merely <em>uses</em> {@code @Since} reads as claiming that entry — twenty-odd
-     * bogus double claims, and one of them contested with the real one. Nothing here has ever wanted an
-     * inherited or meta-annotated pointer: a redirect is a statement about the element it is written on.
+     * class's annotation list, and the pointer annotations annotate <em>each other</em> — so without this
+     * filter every element that merely uses one reads as carrying whatever that annotation's own declaration
+     * carries. A redirect is a statement about the element it is written on; nothing here ever wanted an
+     * inherited one.
      */
-    private static AnnotationInfo first(AnnotationInfoList on, List<String> names) {
+    private static AnnotationInfo first(AnnotationInfoList on) {
         if (on == null) return null;
         AnnotationInfoList direct = on.directOnly();
-        for (String name : names) {
+        for (String name : REPLACED_BY) {
             AnnotationInfo found = direct.get(name);
             if (found != null) return found;
         }
@@ -580,11 +327,7 @@ class ApiPointersTest {
 
     /**
      * The {@code @ReplacedBy} targets, in declared preference order: {@code null} when the annotation is
-     * absent, an empty list when it is present with no value. That distinction is rule 1's whole subject — an
-     * omission and a deliberate dead end have to be told apart — so unlike {@link #note} this one keeps it.
-     *
-     * <p>The value is an array as of the split widening, and a single-target {@code @ReplacedBy("…")} reaches
-     * the bytecode as a one-element array, so both forms arrive here identically.
+     * absent, an empty list when it is present with no value. That distinction is rule 1's whole subject.
      */
     private static List<String> pointer(AnnotationInfo ai) {
         return ai == null ? null : strings(ai, "value");
@@ -608,39 +351,18 @@ class ApiPointersTest {
         return out;
     }
 
-    /**
-     * The author's sentence on a {@code @ReplacedBy} <em>or</em> a {@code @Replaces} — both declare
-     * {@code note()}, and for the same purpose at opposite ends of the move. {@code ""} both when the
-     * annotation is absent and when it carries no note: the two are the same thing to every rule below, since
-     * there is nothing to check about a sentence nobody wrote.
-     */
+    /** The author's sentence; {@code ""} both when the annotation is absent and when it carries no note. */
     private static String note(AnnotationInfo ai) {
         if (ai == null) return "";
         Object v = ai.getParameterValues(true).getValue("note");
         return v == null ? "" : v.toString().trim();
     }
 
-    /** The {@code behaviourChanged} flag on either annotation; false when absent, as the default is. */
+    /** The {@code behaviourChanged} flag; false when absent, as the default is. */
     private static boolean behaviourChanged(AnnotationInfo ai) {
         if (ai == null) return false;
         Object v = ai.getParameterValues(true).getValue("behaviourChanged");
         return v instanceof Boolean b && b;
-    }
-
-    /**
-     * The {@code @Since} value, or {@code null} when the element carries none. {@link Since} declares no
-     * default, so a present annotation always has a value; {@code null} means absent, which is the normal
-     * state of the whole pre-contract surface.
-     */
-    private static String since(AnnotationInfo ai) {
-        if (ai == null) return null;
-        Object v = ai.getParameterValues(true).getValue("value");
-        return v == null ? "" : v.toString().trim();
-    }
-
-    /** The {@code @Replaces} entries, in declaration order; empty when the annotation is absent. */
-    private static List<String> entries(AnnotationInfo ai) {
-        return ai == null ? List.of() : strings(ai, "value");
     }
 
     // ------------------------------------------------------------------
@@ -649,51 +371,6 @@ class ApiPointersTest {
 
     private static List<Element> deprecated() {
         return elements.stream().filter(Element::deprecated).toList();
-    }
-
-    /**
-     * The name half of a {@code name[(arity)]@version} entry — the version <em>and</em> the optional arity
-     * stripped, so it can be looked up in {@link #byRef}, which keys on the bare {@code fqn[#member]}.
-     */
-    private static String nameOf(String entry) {
-        int at = entry.lastIndexOf('@');
-        String name = at <= 0 ? entry : entry.substring(0, at);
-        int open = name.lastIndexOf('(');
-        return open <= 0 || !name.endsWith(")") ? name : name.substring(0, open);
-    }
-
-    /** {@link #arityOf} for an entry that carries no arity — the ordinary case, and not an error. */
-    private static final int NO_ARITY = -1;
-    /** {@link #arityOf} for parentheses holding something that is not a number. Rule 5 reports it. */
-    private static final int BAD_ARITY = -2;
-
-    /**
-     * The optional parameter count in a {@code fqn#member(2)@1.2.0} entry. It exists because this end may
-     * name an overload that no longer exists to be counted — see {@link Replaces} — so it is written by hand
-     * and therefore worth parsing strictly.
-     */
-    private static int arityOf(String entry) {
-        int at = entry.lastIndexOf('@');
-        String name = at <= 0 ? entry : entry.substring(0, at);
-        int open = name.lastIndexOf('(');
-        if (open <= 0 || !name.endsWith(")")) return NO_ARITY;
-        try {
-            return Integer.parseInt(name.substring(open + 1, name.length() - 1).trim());
-        } catch (NumberFormatException e) {
-            return BAD_ARITY;
-        }
-    }
-
-    /** Numeric-segment comparison; a pre-release tail is ignored, which is close enough to order releases. */
-    private static int compare(String a, String b) {
-        String[] x = a.split("[-+]")[0].split("\\.");
-        String[] y = b.split("[-+]")[0].split("\\.");
-        for (int i = 0; i < Math.max(x.length, y.length); i++) {
-            int xi = i < x.length ? Integer.parseInt(x[i]) : 0;
-            int yi = i < y.length ? Integer.parseInt(y[i]) : 0;
-            if (xi != yi) return Integer.compare(xi, yi);
-        }
-        return 0;
     }
 
     /**

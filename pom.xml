@@ -34,17 +34,28 @@
         <!-- botmaker-studio-api version: the Studio plugin contract. Same 0.0.0-SNAPSHOT contract again.
              This one moves far more slowly than the other two on purpose — see the dependency below. -->
         <botmaker.studioapi.version>0.0.0-SNAPSHOT</botmaker.studioapi.version>
-        <!-- botmaker-plugin-processor version: the annotation processor that writes this module's palette
-             catalog and enforces the surface rules. Same 0.0.0-SNAPSHOT contract, with one difference worth
-             knowing — it is named in <annotationProcessorPaths>, never in <dependencies>, so it is on the
-             processor path at compile time and on nobody's classpath ever. It therefore does not appear in
-             the flattened pom at all, and a consumer of this jar never resolves it. -->
-        <botmaker.pluginprocessor.version>0.0.0-SNAPSHOT</botmaker.pluginprocessor.version>
         <!-- botmaker-plugin-toolkit version: the widgets this module's slot editors are built from. Same
              0.0.0-SNAPSHOT contract as the three above, and the same flatten reason — it IS in
              <dependencies>, so the published pom must carry a resolvable version. Optional there, exactly
              like the contract: a bot never links an editor. -->
         <botmaker.plugintoolkit.version>0.0.0-SNAPSHOT</botmaker.plugintoolkit.version>
+        <!-- The published tag japicmp compares this build against. Bump it in the release commit, beside the
+             CHANGELOG section, so it is always the LAST release — the gate then asks "did this build remove
+             anything the previous one offered?", which is the whole of the never-delete rule.
+
+             It is v1.2.0, the release never-delete BEGINS at, and not the currently-newest tag v1.1.0. The
+             rule is not retroactive and cannot be: v1.1.0 → now already removed api.config.Wire, @Palette,
+             @Scaffolding and Text's nine shared-OcrOptions overloads, every one of them a deliberate decision
+             recorded in CLAUDE.md and taken while api.* was still freely breakable. Pointing the baseline at
+             v1.1.0 would demand they all come back. Until v1.2.0 is tagged the baseline does not resolve, and
+             ignoreMissingOldVersion below reports that rather than failing a build for a reason nobody can
+             act on — so the gate arms itself the moment the release it guards from exists.
+
+             It is resolved from JitPack, so an OFFLINE build that has never fetched it must pass
+             -Dbotmaker.japicmp.skip=true. The gate is otherwise unconditional: under never-delete there is
+             no legitimate removal, and so nothing to allow. -->
+        <botmaker.japicmp.baseline>v1.2.0</botmaker.japicmp.baseline>
+        <botmaker.japicmp.skip>false</botmaker.japicmp.skip>
         <!-- JavaFX, for the slot editors only. Held in one place because the two artifacts must move
              together — javafx-controls is compiled against one exact javafx-graphics. -->
         <javafx.version>21</javafx.version>
@@ -232,24 +243,22 @@
 
     <build>
         <plugins>
-            <!-- Maven Compiler Plugin — ONE pass, since 2026-08-27.
+            <!-- Maven Compiler Plugin — no annotation processor at all, since 2026-08-27.
 
-                 It used to be two. src/apt/java held ApiPointerProcessor and PaletteCatalogProcessor, and a
-                 compile-processor execution at process-sources built them into target/apt-classes with
-                 -proc:none so the main compile could name them on a -processorpath. The comment that stood
-                 here said why annotationProcessorPaths could not express it: "it takes artifact coordinates,
-                 not a directory of a module's own making".
+                 There were two passes, then one, and now none. src/apt/java held ApiPointerProcessor and
+                 PaletteCatalogProcessor; both moved into botmaker-plugin-processor as one
+                 PluginSurfaceProcessor named here in <annotationProcessorPaths>; and then the catalog stopped
+                 being generated. SdkPlugin builds it with PaletteCatalog.of(...) instead, reflecting the
+                 facades at load time.
 
-                 So the processor became an artifact. Both classes now live in botmaker-plugin-processor as
-                 one PluginSurfaceProcessor, because a second plugin wanting a catalog would otherwise have
-                 had to re-derive 680 lines of build machinery — a back door the plugin platform exists to
-                 close, hidden in the one place nobody looks, since a processor is build machinery rather
-                 than a type.
+                 The property the generator was defended on — "a catalog naming a renamed member does not
+                 compile" — does not need saving, because members are now DISCOVERED rather than named:
+                 @Hidden, @PaletteDefault and @PaletteLabel travel with the member they annotate, so there is
+                 nothing left to go stale. What stays javac-checked is the class list, which is written as
+                 class literals in SdkPlugin.
 
-                 annotationProcessorPaths (not <dependencies>) is what keeps it off the compile classpath:
-                 nothing in src/main/java may name a processor class, and nothing does. The two -A options
-                 are the whole of this module's configuration of it — where to write the catalog, and which
-                 package roots it is answering for. -->
+                 It also cost something a third-party plugin could not pay: a pom that omitted this block got
+                 no catalog and nothing said why. Reflection needs no build configuration to be right. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -260,37 +269,85 @@
                          SDK jar via ClassGraph to label call arguments (e.g. findCompare(good, bad))
                          instead of arg0/arg1. -->
                     <parameters>true</parameters>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>com.github.LiQiyeDev</groupId>
-                            <artifactId>botmaker-plugin-processor</artifactId>
-                            <version>${botmaker.pluginprocessor.version}</version>
-                        </path>
-                    </annotationProcessorPaths>
-                    <compilerArgs>
-                        <!-- Where the generated palette catalog lands. Without it the processor derives a
-                             package from the facades' common prefix and says so in a NOTE; naming it is
-                             better, because SdkPlugin imports it. -->
-                        <arg>-Abotmaker.catalog=com.botmaker.sdk.internal.plugin.catalog.Catalog</arg>
-                        <!-- The roots this module answers for. Every top-level class under them must carry
-                             @Facade or @Internal, directly or by package-info, and the pointer rules read
-                             the same set. Absent, both checks are simply off. -->
-                        <arg>-Abotmaker.surface=com.botmaker.sdk</arg>
-                    </compilerArgs>
+                    <proc>none</proc>
                 </configuration>
+            </plugin>
+
+            <!-- japicmp — com.botmaker.sdk.api.** never removes anything.
+
+                 This is what makes dropping @Replaces safe. The back edge existed because Studio holds only
+                 two jars at upgrade time — the bot's pin and the target — so a bot on 1.0 jumping to 3.0
+                 could not see a pointer added in 2.0 on an element deleted in 3.0. Under never-delete the
+                 target jar still carries the deprecated element AND its own @ReplacedBy, so the forward
+                 pointer alone answers every upgrade including a skipped one. A rename is: add the new name,
+                 deprecate the old, keep both, point one at the other.
+
+                 The 2026-08-22 gate died because CI could not tell an intended break from an accident — it
+                 cannot see the version, and the SDK was allowed to break in a major. This rule is
+                 UNCONDITIONAL, so that objection does not apply: there is no legitimate removal to
+                 distinguish. Hence no ignore list, no exemption annotation and no verdict file — the escape
+                 hatch is what killed the last one. No postAnalysisScript either: its bundled Groovy cannot
+                 read Java 26 class files.
+
+                 Scoped to api.** on purpose. internal.** stays freely breakable, as it must. -->
+            <plugin>
+                <groupId>com.github.siom79.japicmp</groupId>
+                <artifactId>japicmp-maven-plugin</artifactId>
+                <version>0.23.1</version>
                 <executions>
                     <execution>
-                        <!-- No processing over src/test/java. A test lives in the package it tests, so
-                             every one of them is "under com.botmaker.sdk" and the completeness gate would
-                             demand each be classified as surface or plumbing — a question that does not
-                             apply: a test is neither, and it ships in no jar. Turning the processor off is
-                             the honest answer, and it is also faster. -->
-                        <id>default-testCompile</id>
-                        <configuration>
-                            <proc>none</proc>
-                        </configuration>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>cmp</goal>
+                        </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <oldVersion>
+                        <dependency>
+                            <groupId>com.github.LiQiyeDev</groupId>
+                            <artifactId>botmaker-sdk</artifactId>
+                            <version>${botmaker.japicmp.baseline}</version>
+                            <type>jar</type>
+                        </dependency>
+                    </oldVersion>
+                    <parameter>
+                        <onlyModified>true</onlyModified>
+                        <!-- The baseline is the release never-delete begins at, which until it is tagged does
+                             not exist; a baseline that cannot be fetched reports rather than failing a build
+                             for a reason the author cannot act on. See the property comment. -->
+                        <ignoreMissingOldVersion>true</ignoreMissingOldVersion>
+                        <includes>
+                            <include>com.botmaker.sdk.api</include>
+                        </includes>
+                        <breakBuildBasedOnSemanticVersioning>false</breakBuildBasedOnSemanticVersioning>
+                        <!-- Binary/source incompatibility in general is NOT the rule — only removal is, and
+                             the override block below is what makes exactly that fatal. -->
+                        <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
+                        <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>
+                        <includeSynthetic>false</includeSynthetic>
+                        <ignoreMissingClasses>true</ignoreMissingClasses>
+                        <!-- The whole rule: nothing under api.** is ever removed. -->
+                        <overrideCompatibilityChangeParameters>
+                            <overrideCompatibilityChangeParameter>
+                                <compatibilityChange>METHOD_REMOVED</compatibilityChange>
+                                <binaryCompatible>false</binaryCompatible>
+                                <sourceCompatible>false</sourceCompatible>
+                            </overrideCompatibilityChangeParameter>
+                            <overrideCompatibilityChangeParameter>
+                                <compatibilityChange>CLASS_REMOVED</compatibilityChange>
+                                <binaryCompatible>false</binaryCompatible>
+                                <sourceCompatible>false</sourceCompatible>
+                            </overrideCompatibilityChangeParameter>
+                            <overrideCompatibilityChangeParameter>
+                                <compatibilityChange>FIELD_REMOVED</compatibilityChange>
+                                <binaryCompatible>false</binaryCompatible>
+                                <sourceCompatible>false</sourceCompatible>
+                            </overrideCompatibilityChangeParameter>
+                        </overrideCompatibilityChangeParameters>
+                    </parameter>
+                    <skip>${botmaker.japicmp.skip}</skip>
+                </configuration>
             </plugin>
 
             <!--

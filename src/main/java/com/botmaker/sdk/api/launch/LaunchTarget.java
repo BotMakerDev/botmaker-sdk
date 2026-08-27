@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.launch;
 
-import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.meta.Internal;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -46,11 +46,12 @@ import com.botmaker.shared.launch.Launcher;
  * picker — {@code LaunchTargetArgPicker} writes {@code LaunchTarget.parse("…")} into bot source with a spec it
  * built itself — and a picker is not a menu, so hiding the method costs the picker nothing.
  */
-@Facade(category = "launch", categoryLabel = "Launch", role = "VALUE", order = 93)
+@Palette(category = "launch", categoryLabel = "Launch", order = 93)
+@Hidden("a value type: Game and Target hand one back, a bot does not build one from a menu")
 public sealed interface LaunchTarget {
 
     /** The parsed spec this target wraps — the value {@code shared.launch} operates on. */
-    @Internal("names a botmaker-shared type, which an api signature must never put in a bot's hands; "
+    @Hidden("names a botmaker-shared type, which an api signature must never put in a bot's hands; "
             + "spec() is the same answer as a String")
     LaunchSpec launchSpec();
 
@@ -98,7 +99,7 @@ public sealed interface LaunchTarget {
      * launch identity ({@code AppId=570}, an Epic/Heroic {@code AppName}, an executable's file name).
      * {@code null} when the variant has no such token and answers {@link #isRunning()} another way.
      */
-    @Internal("what isRunning() matches on internally; a bot asks isRunning(), not what it looked for")
+    @Hidden("what isRunning() matches on internally; a bot asks isRunning(), not what it looked for")
     default String runningToken() {
         return launchSpec().runningToken();
     }

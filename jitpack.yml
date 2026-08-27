@@ -20,15 +20,13 @@ install:
   # classpath, but the build still has to compile against it. Required here for the same reason as the other
   # two: flatten bakes whatever is injected into the published pom.
   #
-  # PLUGIN_PROCESSOR_TAG is the annotation processor that writes this module's palette catalog and enforces
-  # its surface rules. It is named in <annotationProcessorPaths>, not <dependencies>, so it never reaches a
-  # consumer's classpath and flatten never sees it — but the BUILD cannot run without it, and an unresolved
-  # ${botmaker.pluginprocessor.version} fails the compile rather than quietly skipping the processor. Hence
-  # required, like the other three.
+  # There is no PLUGIN_PROCESSOR_TAG any more: the palette catalog is reflected at load time by
+  # PaletteCatalog.of(...) in SdkPlugin, so this module compiles with no annotation processor at all.
+  #
   # PLUGIN_TOOLKIT_TAG is the widget kit the slot editors under internal.plugin.editors are built from. It
   # IS an ordinary <dependencies> entry (optional, so it never reaches a bot), which means flatten bakes it
   # into the published pom — so it is required for the same reason SHARED_TAG is, and a stale one would be
   # published rather than merely used.
   - . ./.deps.env
-  - '[ -n "${SHARED_TAG:-}" ] && [ -n "${SESSION_TAG:-}" ] && [ -n "${STUDIO_API_TAG:-}" ] && [ -n "${PLUGIN_PROCESSOR_TAG:-}" ] && [ -n "${PLUGIN_TOOLKIT_TAG:-}" ] || { echo "ERROR: .deps.env must pin SHARED_TAG, SESSION_TAG, STUDIO_API_TAG, PLUGIN_PROCESSOR_TAG and PLUGIN_TOOLKIT_TAG. Cut releases with the umbrella release.sh, which writes it into the release commit." >&2; exit 1; }'
-  - mvn install -DskipTests -Dmaven.javadoc.skip=true -B -Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG -Dbotmaker.studioapi.version=$STUDIO_API_TAG -Dbotmaker.pluginprocessor.version=$PLUGIN_PROCESSOR_TAG -Dbotmaker.plugintoolkit.version=$PLUGIN_TOOLKIT_TAG
+  - '[ -n "${SHARED_TAG:-}" ] && [ -n "${SESSION_TAG:-}" ] && [ -n "${STUDIO_API_TAG:-}" ] && [ -n "${PLUGIN_TOOLKIT_TAG:-}" ] || { echo "ERROR: .deps.env must pin SHARED_TAG, SESSION_TAG, STUDIO_API_TAG and PLUGIN_TOOLKIT_TAG. Cut releases with the umbrella release.sh, which writes it into the release commit." >&2; exit 1; }'
+  - mvn install -DskipTests -Dmaven.javadoc.skip=true -B -Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG -Dbotmaker.studioapi.version=$STUDIO_API_TAG -Dbotmaker.plugintoolkit.version=$PLUGIN_TOOLKIT_TAG

@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.meta.Internal;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 
 
 /**
@@ -22,7 +22,8 @@ import com.botmaker.plugin.api.meta.Internal;
  * untouched and are the entire surface a bot wants.
  */
 // Scaffolding for the same reason as Direction: the generated Activities holds one per mouse-button variable.
-@Facade(category = "interaction", categoryLabel = "Interaction", role = "VALUE", order = 92)
+@Palette(category = "interaction", categoryLabel = "Interaction", order = 92)
+@Hidden("a value type: an enum constant a bot picks, never a menu entry of its own")
 public enum MouseButton {
     LEFT(1), MIDDLE(2), RIGHT(3),
     /** The thumb button that goes back — the browser's Back, and what most games bind to a side button. */
@@ -37,7 +38,7 @@ public enum MouseButton {
     }
 
     /** Native button number (1=left, 2=middle, 3=right, 8=back, 9=forward) understood by the controllers. */
-    @Internal("the native button number is the detail this enum exists to name; a bot picks a constant")
+    @Hidden("the native button number is the detail this enum exists to name; a bot picks a constant")
     public int code() {
         return code;
     }

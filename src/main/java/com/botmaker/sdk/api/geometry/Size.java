@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.geometry;
 
-import com.botmaker.plugin.api.palette.Facade;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.palette.Palette;
 
 
 /**
@@ -18,7 +19,8 @@ import com.botmaker.plugin.api.palette.Facade;
  * @param height pixels down
  */
 // The generated Activities declares one per size variable, rebuilt from the two stored numbers.
-@Facade(category = "geometry", categoryLabel = "Geometry", role = "VALUE", order = 83)
+@Palette(category = "geometry", categoryLabel = "Geometry", order = 83)
+@Hidden("a value type: written by the geometry slot editor, not inserted from a menu")
 public record Size(int width, int height) {
 
     /** {@code 0 × 0} — what a value-typed variable defaults to before it is set. */
