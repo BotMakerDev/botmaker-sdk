@@ -75,7 +75,7 @@ public record ActivityModel(String name, boolean enabled, String description, Li
     public VariableModel enabledVariable() {
         return new VariableModel(name, ValueChoice.of(SdkValueTypes.YES_NO),
                 List.of(Boolean.toString(enabled)), description, name, Visibility.EDITOR_ONLY,
-                List.of(), Range.NONE);
+                List.of(), Range.NONE, com.botmaker.plugin.api.ParameterGroup.DEFAULT_ID);
     }
 
     // ---- copies -----------------------------------------------------------------------------------------

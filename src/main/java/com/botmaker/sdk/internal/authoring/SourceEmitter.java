@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.authoring;
 
+import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.api.value.ValueChoice;
 import com.botmaker.sdk.authoring.ActivityModel;
@@ -60,6 +61,16 @@ public final class SourceEmitter {
      */
     private static final ValueCatalog CATALOG = SdkValueTypes.CATALOG;
 
+    /**
+     * The one parameter group the SDK owns, and so the one parameters file it writes.
+     *
+     * <p>Its id is {@link ParameterGroup#DEFAULT_ID} — blank — which is what makes every project written
+     * before groups existed read back as this plugin's without a migration. Another plugin's group generates
+     * another file, written by that plugin; the SDK emitting it would be writing a file it does not own.
+     */
+    public static final ParameterGroup SDK_PARAMETERS =
+            new ParameterGroup(ParameterGroup.DEFAULT_ID, "Parameters", "Parameters");
+
     /** The indent a node sits at inside {@code FlowGraph.of(…)}, and its routes one level further in. */
     private static final String NODE_INDENT = " ".repeat(12);
     private static final String ROUTE_INDENT = " ".repeat(20);
@@ -100,7 +111,7 @@ public final class SourceEmitter {
         if (spec.kind() != ProjectSpec.Kind.GAME_BOT) return out;
 
         out.put(path(spec, "Activities"), activities(spec, model));
-        out.put(path(spec, "Parameters"), parameters(spec, model));
+        out.put(path(spec, SDK_PARAMETERS.className()), parameters(spec, model, SDK_PARAMETERS));
         out.put(path(spec, TemplateNames.CLASS_NAME), templates(spec, imageBaseNames));
         out.put(path(spec, "ActivityRegistry"), registry(spec, model));
         out.put(path(spec, "FlowDriver"), flowDriver(spec, model));
@@ -189,19 +200,26 @@ public final class SourceEmitter {
     }
 
     /**
-     * The generated {@code Parameters} class: one {@code public static final} field per project variable, of
-     * the variable's own type, holding the value as a plain Java literal.
+     * The generated parameters class for one {@link ParameterGroup}: one {@code public static final} field
+     * per variable filed under it, of the variable's own type, holding the value as a plain Java literal.
      *
      * <p><b>Its own file, and not {@link #activities}.</b> The two were once one class holding one flat
      * namespace, in which an activity's on/off tick and the delay it waits for were spelled the same way and
      * neither name said which was which — while they are governed differently at every level above the field:
      * a flag is written by the Activity Flow and read by an activity, a value is the user's and is what the
      * Runner offers.
+     *
+     * <p><b>And one file per group, since 1.2.0.</b> A group is owned by exactly one plugin and generates
+     * exactly one file, which is the whole-file-ownership rule applied to parameters: the SDK emits
+     * {@link #SDK_PARAMETERS} and nobody else's, because standing in for another plugin's
+     * {@code DiscordParameters} would be writing a file it does not own. That ownership is also what lets
+     * two plugins each offer a {@code timeout} — they are fields of two classes.
      */
-    static String parameters(ProjectSpec spec, ProjectModel model) {
+    static String parameters(ProjectSpec spec, ProjectModel model, ParameterGroup group) {
+        List<VariableModel> mine = model.variablesIn(group.id());
         StringBuilder out = new StringBuilder(header(spec));
         Set<String> imports = LiteralWriter.imports(CATALOG,
-                model.variables().stream().map(VariableModel::type).toList());
+                mine.stream().map(VariableModel::type).toList());
         for (String fqn : imports) out.append("import ").append(fqn).append(";\n");
         if (!imports.isEmpty()) out.append('\n');
         out.append("""
@@ -216,9 +234,9 @@ public final class SourceEmitter {
                  *
                  * <p>REGENERATED — rewritten whenever the project's parameters change.
                  */
-                public final class Parameters {
-                """);
-        for (VariableModel v : model.variables()) {
+                public final class %s {
+                """.formatted(group.className()));
+        for (VariableModel v : mine) {
             out.append('\n');
             // A type nothing registered has no source name and no literal, so there is no field to write.
             // Saying so in the file is the whole of the handling: the value itself is untouched in
@@ -234,7 +252,7 @@ public final class SourceEmitter {
                     .append(" = ").append(LiteralWriter.initializer(CATALOG, v.type(), v.value()))
                     .append(";\n");
         }
-        return out.append("\n    private Parameters() {}\n}\n").toString();
+        return out.append("\n    private ").append(group.className()).append("() {}\n}\n").toString();
     }
 
     /**

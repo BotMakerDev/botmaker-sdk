@@ -1,5 +1,6 @@
 package com.botmaker.sdk.authoring;
 
+import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.api.value.ValueChoice;
@@ -51,10 +52,10 @@ class AuthoringModelTest {
                 List.of(new ActivityModel("Mining", true, "dig", List.of("FULL"), null, Boolean.FALSE)),
                 List.of(new VariableModel("REST", ValueChoice.of(SdkValueTypes.DURATION), List.of("90s"),
                                 "How long to rest", "Mining", Visibility.PUBLIC, List.of(),
-                                new Range("30s", null)),
+                                new Range("30s", null), ParameterGroup.DEFAULT_ID),
                         new VariableModel("HOTKEYS", ValueChoice.listOf(SdkValueTypes.KEY),
                                 List.of("SPACE", "ESCAPE"), "", "", Visibility.EDITOR_ONLY, List.of(),
-                                Range.NONE)),
+                                Range.NONE, ParameterGroup.DEFAULT_ID)),
                 new FlowModel(List.of(new FlowNodeModel("Mining", 12, 34)),
                         List.of(new FlowEdgeModel("Mining", "Mining", "FULL")),
                         "Mining", 500, 0),

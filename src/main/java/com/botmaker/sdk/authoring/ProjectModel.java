@@ -161,26 +161,57 @@ public record ProjectModel(List<ActivityModel> activities, List<VariableModel> v
     }
 
     /**
-     * Whether {@code name} is already taken, ignoring {@code except} (the element being renamed, or null).
+     * The variables filed under one {@link com.botmaker.plugin.api.ParameterGroup}, in declaration order.
      *
-     * <p><b>One namespace, one check</b> — still one, now that the fields are declared on two classes. The
-     * original reason was javac's: both became fields of {@code Activities}, so an activity called
-     * {@code Mining} and a variable called {@code Mining} were one field declared twice. Split across
-     * {@code Activities} and {@code Parameters} that particular collision compiles, and the check stays,
-     * because a second reason took over: which class a <em>name</em> is a field of has no answer when the
-     * name belongs to both, and the qualifier an editor writes into source would be a coin toss.
+     * <p>Which plugin owns a variable is what decides which generated class it becomes a field of, so this
+     * is the partition the emitter walks: one call per group, one file per call. A blank {@code groupId} is
+     * the default plugin's, which is every variable in every project written before groups existed.
+     */
+    @JsonIgnore
+    public List<VariableModel> variablesIn(String groupId) {
+        return variables.stream().filter(v -> v.isIn(groupId)).toList();
+    }
+
+    /** The groups this project actually has variables in, in the order they first appear in the file. */
+    @JsonIgnore
+    public List<String> variableGroups() {
+        return variables.stream().map(VariableModel::group).distinct().toList();
+    }
+
+    /**
+     * Whether {@code name} is already taken in the default group, ignoring {@code except} (the element being
+     * renamed, or null).
+     */
+    public boolean nameClash(String name, String except) {
+        return nameClash(name, except, com.botmaker.plugin.api.ParameterGroup.DEFAULT_ID);
+    }
+
+    /**
+     * Whether {@code name} is already taken within {@code groupId}, ignoring {@code except} (the element
+     * being renamed, or null).
+     *
+     * <p><b>The namespace is the group, since 1.2.0.</b> It was the whole project: both activities and
+     * variables became fields of one class, so an activity called {@code Mining} and a variable called
+     * {@code Mining} were one field declared twice. Splitting them across {@code Activities} and
+     * {@code Parameters} made that particular collision legal, and the check stayed for a second reason —
+     * which class a bare <em>name</em> qualifies to has no answer when the name belongs to both.
+     *
+     * <p>Both reasons hold only inside one group. A group's variables are fields of <em>that group's</em>
+     * generated class, so two plugins may each offer a {@code timeout} without either of them being a field
+     * declared twice or a name whose qualifier is a coin toss. Activities are checked in every group,
+     * because the activity stubs are the host's and there is only one set of them.
      *
      * <p>Case-insensitive, because the generated stubs are named after activities and a case-insensitive
      * filesystem cannot tell {@code Mining.java} from {@code mining.java}.
      */
-    public boolean nameClash(String name, String except) {
+    public boolean nameClash(String name, String except, String groupId) {
         if (name == null || name.isBlank()) return false;
         String candidate = name.trim().toLowerCase(java.util.Locale.ROOT);
         if (except != null && candidate.equals(except.trim().toLowerCase(java.util.Locale.ROOT))) return false;
         for (ActivityModel a : activities) {
             if (a.name().toLowerCase(java.util.Locale.ROOT).equals(candidate)) return true;
         }
-        for (VariableModel v : variables) {
+        for (VariableModel v : variablesIn(groupId)) {
             if (v.name().toLowerCase(java.util.Locale.ROOT).equals(candidate)) return true;
         }
         return false;

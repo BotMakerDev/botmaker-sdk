@@ -1,5 +1,6 @@
 package com.botmaker.sdk.authoring;
 
+import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueChoice;
 import com.botmaker.plugin.api.value.Visibility;
@@ -102,6 +103,31 @@ class ProjectModelBehaviourTest {
         assertFalse(model.nameClash("  mining ", "Mining"));
     }
 
+    /** Two plugins may each offer a {@code timeout}: they are fields of two classes, not one declared twice. */
+    @Test
+    void theNamespaceIsTheGroup() {
+        VariableModel mine = VariableModel.of("Timeout", ValueChoice.of(SdkValueTypes.DURATION), List.of("5s"));
+        ProjectModel model = ProjectModel.of(List.of(activity("Mining")),
+                List.of(mine, mine.withName("Timeout").withGroup("discord")));
+
+        assertTrue(model.nameClash("Timeout", null), "the default group's own name is taken");
+        assertFalse(model.nameClash("Timeout", null, "steam"), "a third plugin's namespace is empty");
+        assertTrue(model.nameClash("Mining", null, "discord"), "the activity stubs are the host's, in every group");
+        assertEquals(List.of("Timeout"), model.variablesIn("discord").stream().map(VariableModel::name).toList());
+        assertEquals(List.of("", "discord"), model.variableGroups());
+    }
+
+    /** An absent group is the default plugin's, which is what makes every pre-1.2.0 project read back whole. */
+    @Test
+    void aVariableWithNoGroupIsTheDefaultPluginS() {
+        VariableModel v = VariableModel.of("Rest", ValueChoice.of(SdkValueTypes.DURATION), List.of("90s"));
+
+        assertEquals("", v.group());
+        assertTrue(v.isIn(""));
+        assertTrue(v.isIn(null), "a null group id reads as the default, like a blank one");
+        assertFalse(v.isIn("discord"));
+    }
+
     @Test
     void aBlankNameIsNeverAClash() {
         assertFalse(ProjectModel.of(List.of(activity("Mining")), List.of()).nameClash("  ", null));
@@ -158,7 +184,8 @@ class ProjectModelBehaviourTest {
     @Test
     void aCopyChangesOneThingAndCarriesTheRest() {
         VariableModel original = new VariableModel("Rest", ValueChoice.of(SdkValueTypes.WHOLE_NUMBER),
-                List.of("5"), "how long", "Mining", Visibility.PUBLIC, List.of(), new Range("0", "10"));
+                List.of("5"), "how long", "Mining", Visibility.PUBLIC, List.of(), new Range("0", "10"),
+                ParameterGroup.DEFAULT_ID);
 
         VariableModel renamed = original.withName("Pause");
 

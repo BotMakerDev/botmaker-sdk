@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.authoring;
 
+import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueChoice;
 import com.botmaker.plugin.api.value.ValueShape;
@@ -110,7 +111,7 @@ class ScaffoldEmitTest {
             String id = type.id();
             variables.add(new VariableModel("scalar" + id, ValueChoice.of(type),
                     List.of(sample(type)), "a \"quoted\" one */ with a fence", "", Visibility.PUBLIC,
-                    List.of(), Range.NONE));
+                    List.of(), Range.NONE, ParameterGroup.DEFAULT_ID));
             variables.add(VariableModel.of("blank" + id, ValueChoice.of(type), List.of()));
             variables.add(VariableModel.of("junk" + id, ValueChoice.of(type), List.of("not a " + id)));
             variables.add(VariableModel.of("list" + id,

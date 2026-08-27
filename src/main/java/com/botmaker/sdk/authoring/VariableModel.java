@@ -1,5 +1,6 @@
 package com.botmaker.sdk.authoring;
 
+import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueChoice;
 import com.botmaker.plugin.api.value.ValueShape;
@@ -37,10 +38,16 @@ import java.util.List;
  * @param visibility  whether the bot's user is offered this at all
  * @param options     the declared set of values, for a shape that {@link ValueChoice#hasOptions has one}
  * @param bounds      the declared range, for a bounded number
+ * @param group       the {@link com.botmaker.plugin.api.ParameterGroup} this is filed under — which plugin
+ *                    owns it, and so which generated class it becomes a field of. Blank is the default
+ *                    plugin's, which is what makes every project written before groups existed read back
+ *                    correctly. Unlike {@link #tag()}, this <em>is</em> a scope: names are unique within a
+ *                    group, not across the project.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record VariableModel(String name, ValueChoice type, List<String> value, String description,
-                            String tag, Visibility visibility, List<String> options, Range bounds) {
+                            String tag, Visibility visibility, List<String> options, Range bounds,
+                            String group) {
 
     public VariableModel {
         if (name == null) name = "";
@@ -51,6 +58,7 @@ public record VariableModel(String name, ValueChoice type, List<String> value, S
         if (visibility == null) visibility = Visibility.PUBLIC;
         options = options == null ? List.of() : List.copyOf(options);
         if (bounds == null) bounds = Range.NONE;
+        group = group == null ? "" : group.trim();
     }
 
     /** The heading a variable with no tag is listed under. Not a real tag: nothing declares it. */
@@ -58,7 +66,8 @@ public record VariableModel(String name, ValueChoice type, List<String> value, S
 
     /** A variable of {@code type} holding {@code value}, with nothing else declared. */
     public static VariableModel of(String name, ValueChoice type, List<String> value) {
-        return new VariableModel(name, type, value, "", "", Visibility.PUBLIC, List.of(), Range.NONE);
+        return new VariableModel(name, type, value, "", "", Visibility.PUBLIC, List.of(), Range.NONE,
+                ParameterGroup.DEFAULT_ID);
     }
 
     /** The single value, for the types that have exactly one; the first item of a list. */
@@ -93,11 +102,11 @@ public record VariableModel(String name, ValueChoice type, List<String> value, S
     // because both need the coercion rules, and those belong to the editor rather than to the file.
 
     public VariableModel withName(String newName) {
-        return new VariableModel(newName, type, value, description, tag, visibility, options, bounds);
+        return new VariableModel(newName, type, value, description, tag, visibility, options, bounds, group);
     }
 
     public VariableModel withValue(List<String> newValue) {
-        return new VariableModel(name, type, newValue, description, tag, visibility, options, bounds);
+        return new VariableModel(name, type, newValue, description, tag, visibility, options, bounds, group);
     }
 
     /** Convenience for the single-valued types, which is most of them. */
@@ -106,19 +115,30 @@ public record VariableModel(String name, ValueChoice type, List<String> value, S
     }
 
     public VariableModel withDescription(String newDescription) {
-        return new VariableModel(name, type, value, newDescription, tag, visibility, options, bounds);
+        return new VariableModel(name, type, value, newDescription, tag, visibility, options, bounds, group);
     }
 
     public VariableModel withTag(String newTag) {
-        return new VariableModel(name, type, value, description, newTag, visibility, options, bounds);
+        return new VariableModel(name, type, value, description, newTag, visibility, options, bounds, group);
     }
 
     public VariableModel withVisibility(Visibility newVisibility) {
-        return new VariableModel(name, type, value, description, tag, newVisibility, options, bounds);
+        return new VariableModel(name, type, value, description, tag, newVisibility, options, bounds, group);
     }
 
     public VariableModel withBounds(Range newBounds) {
-        return new VariableModel(name, type, value, description, tag, visibility, options, newBounds);
+        return new VariableModel(name, type, value, description, tag, visibility, options, newBounds, group);
+    }
+
+    /** Files this variable under another {@link ParameterGroup} — which plugin owns it, and so which class. */
+    public VariableModel withGroup(String newGroup) {
+        return new VariableModel(name, type, value, description, tag, visibility, options, bounds, newGroup);
+    }
+
+    /** True when this variable belongs to {@code groupId}, reading a blank group as the default plugin's. */
+    @JsonIgnore
+    public boolean isIn(String groupId) {
+        return group.equals(groupId == null ? ParameterGroup.DEFAULT_ID : groupId.trim());
     }
 
     /**
@@ -141,9 +161,10 @@ public record VariableModel(String name, ValueChoice type, List<String> value, S
                                   @JsonProperty("tag") String tag,
                                   @JsonProperty("visibility") Visibility visibility,
                                   @JsonProperty("options") List<String> options,
-                                  @JsonProperty("bounds") Range bounds) {
+                                  @JsonProperty("bounds") Range bounds,
+                                  @JsonProperty("group") String group) {
         return new VariableModel(name, listShapeOf(type, options), value, description, tag, visibility,
-                options, bounds);
+                options, bounds, group);
     }
 
     /** {@link #fromWire}'s rule, alone so it can be read — and tested — without a file. */

@@ -1,10 +1,14 @@
 package com.botmaker.sdk.plugin;
 
+import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
+import com.botmaker.sdk.internal.authoring.SourceEmitter;
 import com.botmaker.sdk.internal.plugin.catalog.Catalog;
+
+import java.util.List;
 
 /**
  * The BotMaker SDK, as a Studio plugin.
@@ -85,5 +89,20 @@ public final class SdkPlugin implements StudioPlugin {
     @Override
     public ValueCatalog valueTypes() {
         return SdkValueTypes.CATALOG;
+    }
+
+    /**
+     * One section, {@code Parameters} — the class every bot has always had, now declared rather than assumed.
+     *
+     * <p>Its id is blank ({@link ParameterGroup#DEFAULT_ID}), which is the whole of the migration: a variable
+     * in a project written before groups existed carries no group, reads back as blank, and is therefore this
+     * plugin's. A second plugin declares {@code ParameterGroup.of("discord", "DiscordParameters")} and gets
+     * its own section, its own file and its own namespace.
+     *
+     * <p>Total in the pin, like {@link #catalog(String)}: the class has existed in every SDK there has been.
+     */
+    @Override
+    public List<ParameterGroup> parameters(String pinnedVersion) {
+        return List.of(SourceEmitter.SDK_PARAMETERS);
     }
 }

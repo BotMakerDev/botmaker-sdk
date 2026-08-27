@@ -8,6 +8,28 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-27 — a variable belongs to a plugin's section (plugin platform, phase 11)
+
+**Done**
+
+- `VariableModel` gains a ninth component, `group` — which `ParameterGroup` the variable is filed under, and
+  so which generated class it becomes a field of. Blank is the default plugin's (this SDK's `Parameters`),
+  which is every variable in every project ever written: the partition needs no migration because the absent
+  field already means the right thing. `withGroup` and `isIn(groupId)` come with it; `fromWire` reads
+  `"group"` off the JSON.
+- `ProjectModel.variablesIn(groupId)` and `variableGroups()` are the partition, and **`nameClash` takes a
+  group**: `nameClash(name, except, groupId)` checks all the activities (the stubs are the host's, one set
+  for the whole project) but only that group's variables. The two-argument form is the default group's and is
+  what every existing caller keeps. Two plugins may now both offer a `timeout`.
+- `SourceEmitter.parameters` takes a `ParameterGroup` and emits **one file per group** — the class name, the
+  variables and the imports all come from the group. `SDK_PARAMETERS` is this plugin's, and `regenerated`
+  emits that one and no other: standing in for another plugin's `DiscordParameters.java` would be writing a
+  file the SDK does not own. Phase 14 is where a second plugin gets to write its own.
+- `SdkPlugin.parameters(pin)` returns that single group, so the SDK declares its section the same way any
+  plugin would rather than being the section the host assumes.
+- `ProjectModelBehaviourTest` gains the two rules: the namespace is the group, and a variable with no group
+  is the default plugin's.
+
 ## 2026-08-27 — the seventeen types carry their own picker heading (plugin platform, phase 10b)
 
 **Done**
