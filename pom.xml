@@ -34,6 +34,12 @@
         <!-- botmaker-studio-api version: the Studio plugin contract. Same 0.0.0-SNAPSHOT contract again.
              This one moves far more slowly than the other two on purpose — see the dependency below. -->
         <botmaker.studioapi.version>0.0.0-SNAPSHOT</botmaker.studioapi.version>
+        <!-- botmaker-plugin-processor version: the annotation processor that writes this module's palette
+             catalog and enforces the surface rules. Same 0.0.0-SNAPSHOT contract, with one difference worth
+             knowing — it is named in <annotationProcessorPaths>, never in <dependencies>, so it is on the
+             processor path at compile time and on nobody's classpath ever. It therefore does not appear in
+             the flattened pom at all, and a consumer of this jar never resolves it. -->
+        <botmaker.pluginprocessor.version>0.0.0-SNAPSHOT</botmaker.pluginprocessor.version>
 
         <!--
           The OCR stack's three versions move TOGETHER. Tess4J pins a lept4j, and lept4j's generated
@@ -189,27 +195,24 @@
 
     <build>
         <plugins>
-            <!-- Maven Compiler Plugin — TWO passes, deliberately.
+            <!-- Maven Compiler Plugin — ONE pass, since 2026-08-27.
 
-                 Pass 1 (compile-processor, at process-sources) compiles src/apt/java, which holds
-                 ApiPointerProcessor: the three per-element pointer rules as javac errors. It must be built
-                 before the API it checks, and it must not be built BY itself, hence -proc:none.
+                 It used to be two. src/apt/java held ApiPointerProcessor and PaletteCatalogProcessor, and a
+                 compile-processor execution at process-sources built them into target/apt-classes with
+                 -proc:none so the main compile could name them on a -processorpath. The comment that stood
+                 here said why annotationProcessorPaths could not express it: "it takes artifact coordinates,
+                 not a directory of a module's own making".
 
-                 Pass 2 is the ordinary main compile, told to run that processor over src/main/java. The
-                 processor is named explicitly (annotationProcessors) rather than discovered through
-                 META-INF/services, so nothing else on the classpath can quietly join the compile.
+                 So the processor became an artifact. Both classes now live in botmaker-plugin-processor as
+                 one PluginSurfaceProcessor, because a second plugin wanting a catalog would otherwise have
+                 had to re-derive 680 lines of build machinery — a back door the plugin platform exists to
+                 close, hidden in the one place nobody looks, since a processor is build machinery rather
+                 than a type.
 
-                 Pass 1's output goes to target/apt-classes, NOT target/classes, and reaches pass 2 only as
-                 -processorpath. That is one line of config instead of a maven-jar-plugin <excludes>, and it
-                 is a stronger guarantee than an exclude: the processor classes are never in the jar's
-                 source directory at all, so no packaging change can start shipping them by accident.
-                 annotationProcessorPaths cannot express this — it takes artifact coordinates, not a
-                 directory of a module's own making.
-
-                 The processor is ergonomics, not the gate. ApiPointersTest checks the same three rules (plus
-                 the cross-cutting ones a per-element processor cannot express) and is what CI and release.sh
-                 read. If this two-pass setup ever proves fragile on JitPack, delete both executions and the
-                 src/apt tree; nothing downstream depends on them. -->
+                 annotationProcessorPaths (not <dependencies>) is what keeps it off the compile classpath:
+                 nothing in src/main/java may name a processor class, and nothing does. The two -A options
+                 are the whole of this module's configuration of it — where to write the catalog, and which
+                 package roots it is answering for. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -220,33 +223,34 @@
                          SDK jar via ClassGraph to label call arguments (e.g. findCompare(good, bad))
                          instead of arg0/arg1. -->
                     <parameters>true</parameters>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>com.github.LiQiyeDev</groupId>
+                            <artifactId>botmaker-plugin-processor</artifactId>
+                            <version>${botmaker.pluginprocessor.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <compilerArgs>
+                        <!-- Where the generated palette catalog lands. Without it the processor derives a
+                             package from the facades' common prefix and says so in a NOTE; naming it is
+                             better, because SdkPlugin imports it. -->
+                        <arg>-Abotmaker.catalog=com.botmaker.sdk.internal.plugin.catalog.Catalog</arg>
+                        <!-- The roots this module answers for. Every top-level class under them must carry
+                             @Facade or @Internal, directly or by package-info, and the pointer rules read
+                             the same set. Absent, both checks are simply off. -->
+                        <arg>-Abotmaker.surface=com.botmaker.sdk</arg>
+                    </compilerArgs>
                 </configuration>
                 <executions>
                     <execution>
-                        <id>compile-processor</id>
-                        <phase>process-sources</phase>
-                        <goals>
-                            <goal>compile</goal>
-                        </goals>
+                        <!-- No processing over src/test/java. A test lives in the package it tests, so
+                             every one of them is "under com.botmaker.sdk" and the completeness gate would
+                             demand each be classified as surface or plumbing — a question that does not
+                             apply: a test is neither, and it ships in no jar. Turning the processor off is
+                             the honest answer, and it is also faster. -->
+                        <id>default-testCompile</id>
                         <configuration>
-                            <compileSourceRoots>
-                                <compileSourceRoot>${project.basedir}/src/apt/java</compileSourceRoot>
-                            </compileSourceRoots>
-                            <outputDirectory>${project.build.directory}/apt-classes</outputDirectory>
                             <proc>none</proc>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>default-compile</id>
-                        <configuration>
-                            <annotationProcessors>
-                                <annotationProcessor>com.botmaker.sdk.apt.ApiPointerProcessor</annotationProcessor>
-                                <annotationProcessor>com.botmaker.sdk.apt.PaletteCatalogProcessor</annotationProcessor>
-                            </annotationProcessors>
-                            <compilerArgs>
-                                <arg>-processorpath</arg>
-                                <arg>${project.build.directory}/apt-classes</arg>
-                            </compilerArgs>
                         </configuration>
                     </execution>
                 </executions>

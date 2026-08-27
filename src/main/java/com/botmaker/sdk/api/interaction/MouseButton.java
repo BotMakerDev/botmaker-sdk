@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
 import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.palette.NotInPalette;
+import com.botmaker.plugin.api.meta.Internal;
 
 
 /**
@@ -37,7 +37,7 @@ public enum MouseButton {
     }
 
     /** Native button number (1=left, 2=middle, 3=right, 8=back, 9=forward) understood by the controllers. */
-    @NotInPalette("the native button number is the detail this enum exists to name; a bot picks a constant")
+    @Internal("the native button number is the detail this enum exists to name; a bot picks a constant")
     public int code() {
         return code;
     }

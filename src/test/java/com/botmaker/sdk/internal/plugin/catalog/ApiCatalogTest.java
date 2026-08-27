@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.catalog.FacadeEntry;
 import com.botmaker.plugin.api.catalog.MemberEntry;
 import com.botmaker.plugin.api.catalog.MemberId;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
+import com.botmaker.plugin.api.meta.Internal;
 import com.botmaker.sdk.plugin.SdkPlugin;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * exists and is really public, that it is filed under its own declaring class, that nothing is offered
  * twice, and that nothing outside {@code com.botmaker.sdk.api} — nothing a bot can write down — reached
  * the palette.
+ *
+ * <p>It also holds the runtime half of the rule {@code PluginSurfaceProcessor} makes a javac error: nothing
+ * {@code @Internal} is offered, by its own mark or by its package's. The processor sees source, this sees the
+ * built jar — which is where a generated {@code addAll()} actually decides, and where an annotation the
+ * processor never saw (a member inherited, a package-info added late) would show up.
  *
  * <p>There is no per-version monotonicity check any more, because there are no per-version catalogs: what
  * an older pin may be offered is this catalog intersected with that bot's own resolved jar, which
@@ -72,6 +78,23 @@ class ApiCatalogTest {
             assertTrue(facade.qualifiedName().startsWith(API_PACKAGE),
                     facade.qualifiedName() + " is not under " + API_PACKAGE
                             + "; a bot cannot write that name down, so it cannot be offered");
+        }
+    }
+
+    @Test
+    @DisplayName("nothing @Internal reached the palette")
+    void nothingInternalIsOffered() {
+        for (FacadeEntry facade : catalog().facades()) {
+            Class<?> type = facade.type();
+            assertTrue(type.getAnnotation(Internal.class) == null,
+                    facade.qualifiedName() + " carries both @Facade and @Internal");
+            assertTrue(type.getPackage() == null || type.getPackage().getAnnotation(Internal.class) == null,
+                    facade.qualifiedName() + " is in an @Internal package and does not override it");
+            for (MemberEntry member : facade.members()) {
+                Method resolved = resolve(member.id());
+                assertTrue(resolved == null || resolved.getAnnotation(Internal.class) == null,
+                        member.id() + " is @Internal and was offered anyway");
+            }
         }
     }
 

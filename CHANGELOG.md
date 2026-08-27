@@ -28,11 +28,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   Nothing else about OCR changed — same engine, same tuning knobs, same bundled languages.
 - `TextResult.bounds()` is now an `api.geometry.Rect` instead of a `java.awt.Rectangle`, so it matches every
   other box the SDK hands you: `.x()`, `.y()`, `.width()`, `.height()` rather than public fields.
-- **The block palette is the SDK's answer now, per version.** The SDK ships a catalog of what it offers
-  Studio's menus — which types, in which order, under which icon, and which of their members — one per
-  released version. A bot pinned to an older SDK gets *that* version's menus from a newer Studio, instead of
-  the newest SDK's. Nothing changes in your bot's code, and nothing new is on its classpath: the catalog is
-  served to the editor, never called by a bot.
+- **The block palette is the SDK's answer now.** The SDK ships a catalog of what it offers Studio's menus —
+  which types, in which order, under which icon, and which of their members. A bot pinned to an older SDK is
+  offered that catalog narrowed to what *its own* jar actually contains, so a newer Studio never proposes a
+  method your pinned SDK does not have. Nothing changes in your bot's code, and nothing new is on its
+  classpath: the catalog is served to the editor, never called by a bot.
 - Practically, this restores the curation that `@Palette` used to carry and that was lost when the annotation
   was deleted — the menus have been offering every public method of every facade since then, and go back to
   offering the ones worth offering once Studio reads the catalog.

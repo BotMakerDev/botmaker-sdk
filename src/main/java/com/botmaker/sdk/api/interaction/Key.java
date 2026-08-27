@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
 import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.palette.NotInPalette;
+import com.botmaker.plugin.api.meta.Internal;
 import com.sun.jna.Platform;
 
 /**
@@ -59,7 +59,7 @@ public enum Key {
     }
 
     /** The key code to feed the native controller on the current OS. */
-    @NotInPalette("the platform translation this enum exists to spare a bot from doing; a menu offering it "
+    @Internal("the platform translation this enum exists to spare a bot from doing; a menu offering it "
             + "invites a bot to reason about key codes, which is exactly what Key removes")
     public int nativeCode() {
         return Platform.isWindows() ? windowsVk : linuxKeySym;

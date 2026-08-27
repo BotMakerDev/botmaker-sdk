@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.meta;
 
+import com.botmaker.plugin.api.palette.Facade;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -76,6 +78,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RetentionPolicy.CLASS)
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD, ElementType.CONSTRUCTOR})
+@Facade(category = "meta", categoryLabel = "Metadata", role = "VALUE", order = 108)
 public @interface ReplacedBy {
 
     /**

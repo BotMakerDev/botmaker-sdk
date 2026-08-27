@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.flow;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.meta.Since;
 
@@ -15,6 +16,7 @@ import com.botmaker.sdk.api.meta.Since;
  * node before it left set.
  */
 @Since("1.1.0")
+@Facade(category = "flow", categoryLabel = "Flow", role = "VALUE", order = 105)
 public enum PopupCheck {
 
     /** Check for popups between this node's steps — the default for a new activity. */

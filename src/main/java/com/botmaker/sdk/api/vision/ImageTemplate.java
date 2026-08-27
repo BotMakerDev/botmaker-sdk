@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.palette.NotInPalette;
+import com.botmaker.plugin.api.meta.Internal;
 import com.botmaker.sdk.internal.vision.TemplateMetadata;
 import com.botmaker.shared.opencv.OpenCvNative;
 import org.opencv.core.Mat;
@@ -134,7 +134,7 @@ public class ImageTemplate implements AutoCloseable {
      * Releases the underlying image memory. Safe to call repeatedly; the Mat is reloaded on the
      * next {@link #getMat()}.
      */
-    @NotInPalette("memory management the runtime does on its own; a bot that unloads a template mid-run "
+    @Internal("memory management the runtime does on its own; a bot that unloads a template mid-run "
             + "pays a reload on the next find and gains nothing")
     public void unload() {
         if (mat != null) {
@@ -144,7 +144,7 @@ public class ImageTemplate implements AutoCloseable {
     }
 
     @Override
-    @NotInPalette("the AutoCloseable half of unload(), and hidden for the same reason")
+    @Internal("the AutoCloseable half of unload(), and hidden for the same reason")
     public void close() {
         unload();
     }

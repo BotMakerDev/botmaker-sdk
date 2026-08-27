@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.flow;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.meta.Since;
 
 /**
@@ -13,6 +14,7 @@ import com.botmaker.sdk.api.meta.Since;
  * one {@link com.botmaker.sdk.api.bot.Bot#start(Runnable, Runnable)} recovers with.
  */
 @Since("1.1.0")
+@Facade(category = "flow", categoryLabel = "Flow", role = "VALUE", order = 106)
 public enum Recovery {
 
     /** Run the activity from wherever the previous one left off. */

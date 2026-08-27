@@ -8,6 +8,63 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-27 — the processor leaves, and every class says whether it is surface (plugin platform, phase 8c)
+
+**Changed:** `src/apt/java/**` **deleted** (`ApiPointerProcessor`, `PaletteCatalogProcessor`) — both now live
+in the new sibling module **`botmaker-plugin-processor`**, merged into one `PluginSurfaceProcessor`;
+`pom.xml` loses the two-pass build (`compile-processor`, `target/apt-classes`, `-proc:none`,
+`<annotationProcessors>`) and gains one `<annotationProcessorPaths>` entry plus `-Abotmaker.surface` and
+`-Abotmaker.catalog`; `jitpack.yml` requires `PLUGIN_PROCESSOR_TAG`; eleven new `package-info.java`;
+`@Facade(role = "VALUE")` on six types that are import targets rather than menus (`FlowGraph`, `PopupCheck`,
+`Recovery`, and the three `api.meta` annotations); `@NotInPalette` → `@Internal` across `api.*`;
+`ApiCatalogTest` gains the runtime half of the `@Internal` rule; `CHANGELOG.md`, `CLAUDE.md`. Umbrella:
+`release.sh` (`--plugin-processor`, `PLUGIN_PROCESSOR_TAG`), `pom.xml` (reactor order), `.gitmodules`,
+`CLAUDE.md`. studio-api: `plugin/api/meta/Internal`, `palette/NotInPalette` deleted. Studio:
+`util/MethodSignature`, `suggestions/ProjectAnalyzer` (erase type variables in the signature key).
+
+**Done**
+
+- **The generator is the contract's, not the SDK's.** A second plugin wanting a catalog would have had to
+  re-derive 434 lines of `PaletteCatalogProcessor` — the back door this plan exists to close, in the one
+  place nobody looks, because a processor is build machinery rather than a type.
+  `annotationProcessorPaths` **takes artifact coordinates, not a source tree**, which is the whole reason the
+  SDK compiled `src/apt/java` in a first pass with `-proc:none`. Once the processor is a coordinate, the
+  two-pass build is deleted outright.
+- **The processor depends on nothing — not even `botmaker-studio-api`.** It matches annotations by fully
+  qualified *name* out of `AnnotationMirror`s and never resolves a `Class<?>`, which is what lets it run over
+  a plugin built against a different contract version, and what lets it check the SDK's own `api.meta`
+  annotations without a cycle. The catalog's output FQN is an option (`-Abotmaker.catalog`), not a constant.
+- **`@NotInPalette` became `com.botmaker.plugin.api.meta.@Internal`, and the meaning widened on purpose.**
+  `@NotInPalette` said only *the menus should not suggest this*; `@Internal` says **not versioned surface** —
+  freely breakable, owed no `@Since`, owed no pointer on removal. That is what `internal.**` has always
+  meant, said in a way a second plugin can reproduce without adopting our package names. It targets packages,
+  so eleven `package-info.java` say it once per package rather than once per class.
+- **Every class under the declared root is classified, and javac refuses one that is not** — the completeness
+  gate the maintainer asked for, opt-in per module via `-Abotmaker.surface` so a plugin that only wants a
+  catalog is not made to classify anything. It closes the silent outcome phase 8 half-closed: an unmarked
+  *method* defaults to offered, but an unmarked *class* defaulted to nothing at all.
+- **`@Internal` and `@Facade` on one type is a compile error**, and the reason is the repo's own boundary
+  rule — *can a bot write the name down?* A palette entry inserts a call into a bot's source, so offering a
+  member **is** making a bot write the name down, which makes the type surface. `@Facade(role = "HIDDEN")` is
+  how a type is recognised without being proposed; a type a bot legitimately calls but which is plumbing is
+  **misfiled** and moves (`shared.ocr` in 8b, `api.authoring` in 10a are the precedents).
+- **The cost, recorded rather than argued away:** `@Internal` welds *not-surface* to *not-offered*. Six types
+  that are versioned but should not be proposed — `FlowGraph`, `PopupCheck`, `Recovery` and the three
+  `api.meta` annotations — take `@Facade(role = "VALUE")` instead, which is honest (they are import targets)
+  and is why they are catalogued with no members.
+- **A generic method is keyed by its *erased* descriptor now, in all three vocabularies.**
+  `FlowGraph.<O extends Enum<O>> route(O, String)` had a generic signature reading `O,String`, which no
+  `MemberId` can ever produce — a descriptor can only say `Enum`. `MethodSignature` and `ProjectAnalyzer`
+  read `getTypeDescriptor()` rather than `getTypeSignatureOrTypeDescriptor()`, which is also the better key:
+  `O` is a letter that means nothing to a slot editor and changes if the SDK renames it.
+
+**Deferred / next:** **8c.4** — `@ReplacedBy`, `@Replaces` and `@Since` move from `com.botmaker.sdk.api.meta`
+to `com.botmaker.plugin.api.meta` under a one-minor `@Deprecated(forRemoval = true)` + `@ReplacedBy` window
+(the pointer machinery covering its own move). The processor already accepts both spellings, so the move is
+the deprecation window and nothing else.
+
+---
+
 ## 2026-08-27 — the value vocabulary leaves the SDK and opens (plugin platform, phase 10a)
 
 **Changed:** `api/authoring/**` → **`sdk/authoring/**`** (13 main + 3 test files, one package move);

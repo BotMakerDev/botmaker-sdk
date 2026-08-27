@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.flow;
 
+import com.botmaker.plugin.api.palette.Facade;
 import com.botmaker.sdk.api.bot.Activity;
 import com.botmaker.sdk.api.meta.Since;
 import com.botmaker.sdk.internal.flow.FlowWalker;
@@ -52,6 +53,7 @@ import java.util.Map;
  * that being how a bot repeats, which is why {@link #walk} takes a step budget.
  */
 @Since("1.1.0")
+@Facade(category = "flow", categoryLabel = "Flow", role = "VALUE", order = 104)
 public final class FlowGraph {
 
     private final String start;

@@ -94,9 +94,32 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   `CaptureSource.desktop()/monitor()/window()` and `Source.current()` — all of which declare the *interface*
   as their return type — and the whole observation stack (`Bots`, `BotObserver`, `Surface`, `ClickEvent`,
   `MatchEvent`, `SwipeEvent`), whose only consumer was ever `internal.observe.IpcObserver`. `Screen` was
-  deleted outright: no callers, and not even a `CaptureSource`. **Studio's `palette/SdkType` is the mirror**
-  of this decision, not a second one — a class that leaves `api` leaves that enum, which is how the palette
-  stops offering it.
+  deleted outright: no callers, and not even a `CaptureSource`. **The generated catalog is the mirror** of
+  this decision, not a second one — a class that leaves `api` leaves the catalog, which is how the palette
+  stops offering it. (Until phase 7 the mirror was Studio's hand-written `palette/SdkType` enum; it is
+  deleted, and the SDK now *serves* the answer instead of Studio keeping a copy.)
+
+- **Every class this module compiles says which side of that line it is on, and javac refuses one that does
+  not** (2026-08-27, plugin-platform phase 8c). `com.botmaker.plugin.api.meta.@Internal` is the mark, and it
+  claims more than the old `@NotInPalette` did: **not versioned surface** — freely breakable, owed no
+  `@Since`, owed no pointer on removal. It targets **packages**, so eleven `package-info.java` files say it
+  once per package rather than once per class, and `com.botmaker.sdk.internal.**` finally *says* what its
+  name has always implied. Three rules, all javac errors from `PluginSurfaceProcessor`, all switched on by
+  `-Abotmaker.surface=com.botmaker.sdk` in this pom:
+  - a class under that root that is neither `@Facade` nor `@Internal` is refused **by name** (an unmarked
+    *method* defaults to offered; an unmarked *class* used to default to nothing at all, which was the
+    silent outcome). A class may override its package with `@Facade`; nested and anonymous classes inherit
+    from their enclosing type;
+  - `@Internal` **and** `@Facade` on one type is refused — offering a member inserts its name into a bot's
+    source, which is exactly what makes the type surface. To be recognised without being proposed use
+    `@Facade(role = "HIDDEN")`; if a bot legitimately calls it but the type is plumbing, the type is
+    **misfiled** and moves (`shared.ocr` and `api.authoring` are the precedents);
+  - `@PaletteLabel`/`@PaletteDefault` on a member of a non-`@Facade` type is refused: it curates an entry
+    that does not exist.
+
+  The one cost, recorded rather than argued away: `@Internal` welds *not-surface* to *not-offered*. A type
+  that is versioned but should not be proposed — `api.flow`, `api.meta` — takes `@Facade(role = "VALUE")`
+  instead, which is honest (they are import targets) and is why six facades are catalogued with no members.
 
 - **A second rule, from the 1.1.0 method audit: no `api` signature may name a type the SDK does not version.**
   `botmaker-shared` and OpenCV are *freely breakable* by design while `api.*` is under contract, so a public
@@ -209,16 +232,20 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   caller knows. So the test stays the gate — it is what CI and `release.sh` read, and **if the two ever
   disagree the test is right** — and this is ergonomics: one mistake fails the build twice, on purpose.
 
-  It lives in a **second source root, `src/apt/java`**, compiled by its own `maven-compiler-plugin` execution
-  at `process-sources` with `-proc:none` (it must exist before the API it checks, and must not be run over
-  itself). Its output goes to `target/apt-classes` — never `target/classes` — and reaches the main compile
-  only as `-processorpath`, which is why no `maven-jar-plugin` `<excludes>` is needed to keep it out of the
-  jar: the classes are never in the packaged directory at all. `annotationProcessorPaths` cannot express this
-  (it takes artifact coordinates, not a directory this build just made). Because it is compiled first, the
-  processor **cannot reference `ReplacedBy.class`**; it matches annotations by FQN string and reads
-  `AnnotationMirror`s by hand, which is what keeps the dependency one-way. If the two-pass build ever proves
-  fragile on JitPack, delete both executions and `src/apt` — nothing downstream depends on them, and the
-  surface file plus the test are the load-bearing halves.
+  **It does not live in this module any more (2026-08-27, plugin-platform phase 8c).** It was a second source
+  root, `src/apt/java`, compiled by its own `maven-compiler-plugin` execution at `process-sources` with
+  `-proc:none` into `target/apt-classes` and handed to the main compile as an explicit `-processorpath` —
+  because `annotationProcessorPaths` takes **artifact coordinates**, not a directory this build just made.
+  It is now an artifact coordinate: **`botmaker-plugin-processor`**, a sibling module, merged with
+  `PaletteCatalogProcessor` into one `PluginSurfaceProcessor` making one pass over the surface. So
+  `src/apt/java`, `target/apt-classes`, the `compile-processor` execution and the `-proc:none` argument are
+  all deleted, and the SDK's pom names the processor in `<annotationProcessorPaths>` — never in
+  `<dependencies>`, so it reaches no runtime classpath and no flattened pom.
+
+  The property that made the two-pass build necessary survives as the module's own rule: the processor
+  **depends on nothing, not even `botmaker-studio-api`**, matching annotations by FQN string and reading
+  `AnnotationMirror`s by hand. That is what lets it run over a plugin built against a different contract
+  version, and it is why it can check the SDK's own `api.meta` annotations without a cycle.
 
   **Three more annotations sit beside the pointer pair, all `@Retention(CLASS)`, all read from the jar by the
   same scan** (2026-08-23). Each records something that is cheap while both ends of a move still exist and
@@ -266,9 +293,11 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 
 `src/templates/java` — nine files the SDK compiled and shipped as *text* under `botmaker-templates/` for
 Studio to fill — is **deleted**, with `@Template`, `apt/TemplateProcessor`, the generated `manifest.txt` and
-`ScaffoldTemplatesTest`. The pom is back to two compiler passes: `compile-processor` (`src/apt/java` →
+`ScaffoldTemplatesTest`. The pom went back to two compiler passes: `compile-processor` (`src/apt/java` →
 `target/apt-classes`, `-proc:none`) and the main compile that runs `ApiPointerProcessor`. Passes 3 and 4 went
 together — pass 4 existed only to undo pass 3's `projectArtifact.setFile(target/template-classes)`.
+(**Phase 8c took the remaining two down to one**: the processor is `botmaker-plugin-processor` now, an
+`<annotationProcessorPaths>` entry, and there is one compile.)
 
 This is the second half of the same reversal: the templates existed so **two repositories could co-author one
 file**, the SDK owning its frame and Studio splicing the fences. The inversion removes the second author —

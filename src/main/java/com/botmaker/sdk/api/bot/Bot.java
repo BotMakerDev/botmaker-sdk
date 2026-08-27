@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.bot;
 import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.palette.NotInPalette;
+import com.botmaker.plugin.api.meta.Internal;
 import com.botmaker.sdk.api.launch.Target;
 import com.botmaker.sdk.api.util.Debug;
 
@@ -79,7 +79,7 @@ public final class Bot {
      * @param body   the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param goHome navigate from wherever the bot is back to a safe/home screen
      */
-    @NotInPalette("the entry point the generated Main already calls; a second start() inside an activity "
+    @Internal("the entry point the generated Main already calls; a second start() inside an activity "
             + "body would nest one supervised run inside another")
     public static void start(Runnable body, Runnable goHome) {
         supervise(body, goHome, Bot::launchConfiguredTarget);

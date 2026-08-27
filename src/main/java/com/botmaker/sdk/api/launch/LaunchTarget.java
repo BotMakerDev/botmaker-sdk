@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.launch;
 
 import com.botmaker.plugin.api.palette.Facade;
-import com.botmaker.plugin.api.palette.NotInPalette;
+import com.botmaker.plugin.api.meta.Internal;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -50,7 +50,7 @@ import com.botmaker.shared.launch.Launcher;
 public sealed interface LaunchTarget {
 
     /** The parsed spec this target wraps — the value {@code shared.launch} operates on. */
-    @NotInPalette("names a botmaker-shared type, which an api signature must never put in a bot's hands; "
+    @Internal("names a botmaker-shared type, which an api signature must never put in a bot's hands; "
             + "spec() is the same answer as a String")
     LaunchSpec launchSpec();
 
@@ -98,7 +98,7 @@ public sealed interface LaunchTarget {
      * launch identity ({@code AppId=570}, an Epic/Heroic {@code AppName}, an executable's file name).
      * {@code null} when the variant has no such token and answers {@link #isRunning()} another way.
      */
-    @NotInPalette("what isRunning() matches on internally; a bot asks isRunning(), not what it looked for")
+    @Internal("what isRunning() matches on internally; a bot asks isRunning(), not what it looked for")
     default String runningToken() {
         return launchSpec().runningToken();
     }
