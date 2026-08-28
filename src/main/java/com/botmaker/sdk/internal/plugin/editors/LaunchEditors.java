@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
 import com.botmaker.plugin.api.ValueContext;
-import com.botmaker.plugin.toolkit.Fields;
+import com.botmaker.plugin.toolkit.Editors;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Slots;
@@ -10,7 +10,6 @@ import com.botmaker.shared.game.GameLibraryProvider;
 import com.botmaker.shared.game.InstalledGame;
 import javafx.application.Platform;
 import javafx.scene.Node;
-import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 
 import java.nio.file.Path;
@@ -118,51 +117,17 @@ final class LaunchEditors {
     /**
      * The program a launch call runs — the OS file chooser, or a typed path.
      *
-     * <p>Typed matters as much as browsed: a launch target is frequently a command that is not a file on this
-     * machine at all, and a chooser alone would make those unsayable. Browsing goes through
-     * {@link Modals#program}, which is where the "a native dialog blocks its thread" trap is answered once for
-     * every plugin rather than once per editor.
+     * <p>The whole of it is {@link Editors#program}, which moved to the toolkit on 2026-08-28 because
+     * nothing in it named a game, a store or the SDK: browsing for an executable is a shape, and the only
+     * SDK knowledge left here is <em>which argument of which call</em> gets this editor, which is
+     * {@link CallSites#LAUNCH_PROGRAM}.
      *
-     * <p>The label is the file's own name and not the whole path: a slot on a block is a few centimetres wide,
-     * and {@code C:\Program Files (x86)\…\game.exe} elided in the middle says less than {@code game.exe}.
+     * <p>The prompt is the one thing worth stating from here. Typed matters as much as browsed: a launch
+     * target is frequently a command that is not a file on this machine at all, and a chooser alone would
+     * make those unsayable.
      */
     static Node program(ValueContext ctx) {
-        String current = Slots.stringLiteral(Slots.raw(ctx));
-        javafx.scene.control.MenuButton pill = Pills.bare(fileLabel(current));
-        Pills.onOpen(pill, () -> List.of(
-                Pills.item("Browse for program…", () -> Modals.program(ctx, parentOf(
-                        Slots.stringLiteral(Slots.raw(ctx))), path -> {
-                    Slots.writeText(ctx, path.toString());
-                    pill.setText(fileLabel(path.toString()));
-                })),
-                Pills.separator(),
-                Pills.item("Enter path…", () -> {
-                    String now = Slots.stringLiteral(Slots.raw(ctx));
-                    TextField field = Fields.committing(now == null ? "" : now, "Path or command", null);
-                    field.setPrefColumnCount(40);
-                    Modals.form(ctx, "Program path", field, () -> {
-                        String typed = field.getText() == null ? "" : field.getText().trim();
-                        if (typed.isEmpty()) return;
-                        Slots.writeText(ctx, typed);
-                        pill.setText(fileLabel(typed));
-                    });
-                })));
-        return pill;
-    }
-
-    /** The folder a path sits in, for the chooser to open on; null when there is no usable path yet. */
-    private static Path parentOf(String path) {
-        try {
-            return path == null || path.isBlank() ? null : Path.of(path).getParent();
-        } catch (RuntimeException e) {
-            return null;
-        }
-    }
-
-    private static String fileLabel(String path) {
-        if (path == null || path.isBlank()) return "Choose program…";
-        int slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
-        return slash >= 0 && slash < path.length() - 1 ? path.substring(slash + 1) : path;
+        return Editors.program(ctx, "Path or command");
     }
 
     /**
@@ -170,13 +135,11 @@ final class LaunchEditors {
      *
      * <p>A plain field, and deliberately so — a flag is whatever that program accepts, and nothing here could
      * offer a list of them. What the prompt does is stop it reading as a second program to run, which is the
-     * only thing about this slot a person gets wrong.
+     * only thing about this slot a person gets wrong, and it is the reason this method still exists over
+     * {@link Editors#textSlot}: the example in the prompt is the SDK's knowledge of what its own launch call
+     * is passed.
      */
     static Node option(ValueContext ctx) {
-        String current = Slots.stringLiteral(Slots.raw(ctx));
-        TextField field = Fields.committing(current == null ? "" : current,
-                "launch option (e.g. --fullscreen)", typed -> Slots.writeText(ctx, typed));
-        field.setPrefColumnCount(14);
-        return field;
+        return Editors.textSlot(ctx, "launch option (e.g. --fullscreen)", 14);
     }
 }

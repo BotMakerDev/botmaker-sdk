@@ -8,6 +8,29 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-28 — five editors become three tables and two prompts
+
+Part F, phase C. The SDK's plugin half keeps shrinking to *what only the SDK knows*, and this is the
+clearest instance of it so far: two files lost every widget they had and kept every fact.
+
+**Done**
+
+- **`GeometryEditors` is three `Editors.TupleSpec` constants** (145 → 72 lines). The pill, the screen
+  picker, the typed dialog and the not-a-number fallback are `Editors.tuplePill` in the toolkit; what stays
+  is that a `Rect` is `x, y, width, height` and reads `10, 20  640×480`, that a `Point` is picked under a
+  magnifier and a `Size` is *measured* — a region dragged with its origin thrown away. `holdsNumbers` and
+  `isNumber` went to `Slots.holdsNumbers`.
+- **`GeometryLabelTest` is unchanged**, all ten cases, still calling `rectLabel`/`pointLabel` — which
+  are now one-line delegations to `Editors.tupleLabel` through the spec. That is the point of keeping them:
+  the labels are what a user reads off a collapsed pill, and the move must not quietly change one.
+- **`LaunchEditors.program()` and `option()` are two lines each**, over `Editors.program` and
+  `Editors.textSlot`. `game()` is untouched — it names Steam and Epic, walks a library through
+  `botmaker-shared`, resolves cover art off the FX thread, and is the half that could never move.
+- **They survive as methods rather than being deleted, because the prompts are SDK knowledge.** *"Path or
+  command"* says a launch target need not be a file on this machine; *"launch option (e.g. `--fullscreen`)"*
+  stops the slot reading as a second program to run. Both are sentences about what a launch call is passed,
+  which is exactly what the toolkit may not say.
+
 ## 2026-08-28 — `LiteralWriter`'s escaping is total, and stays here on purpose
 
 Part F, phase B. `quote`/`quoteChar` escaped the backslash, the quote, `\n`, `\r` and `\t` and stopped, so a
