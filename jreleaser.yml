@@ -1,0 +1,69 @@
+# JReleaser — what ONE release of this repository looks like.
+#
+# The split with the umbrella's release.sh is the whole design:
+#
+#   * release.sh knows the CONSTELLATION — which of the eight repositories changed, what each one's next
+#     version is, the order the tags go out in, and which upstream ref each downstream pins. Nothing in
+#     JReleaser can express that: its unit of work is one repository, one version, one release. The
+#     .deps.env this release commit carries, and the SDK_FALLBACK_VERSION bump a --sdk release makes in
+#     Studio, are written by release.sh for the same reason.
+#   * this file knows what a release IS — the tag, the GitHub Release, and the notes on it.
+#
+# WHERE THIS RUNS: this repository's own CI, on a version tag, and nowhere else —
+# .github/workflows/ci.yml, the `release` job, through jreleaser/release-action. NOT from the umbrella
+# working copy, and that is measured rather than preferred (2026-08-28): in a submodule checkout `.git` is a
+# FILE (`gitdir: ../.git/modules/<mod>`) and JReleaser's JGit reports "repository not found", while
+# `--git-root-search` gets past it only by resolving the UMBRELLA repository — which would attach this
+# release to the wrong repo. jreleaser-maven-plugin is not used either: it ignores this file entirely (its
+# model comes from an XML block in the pom) and takes the version from <version>, which here is the cosmetic
+# 0.0.0-SNAPSHOT JitPack overrides.
+#
+# THE VERSION ARRIVES AS JRELEASER_PROJECT_VERSION, set by the workflow from the tag that triggered it.
+#
+# NOTHING HERE TOUCHES AN ORDINARY BUILD: this pom is untouched, which is exactly the property
+# `mvn -pl botmaker-sdk -am install` depends on before every Studio dev-run.
+
+project:
+  name: botmaker-sdk
+  description: The library BotMaker bots compile against, and Studio's plugin #1.
+  longDescription: |
+    Everything a generated bot writes down — mouse, keyboard, vision, activities, launch targets — plus the
+    generator that emits a project's Java from its stored model. It is also an ordinary implementation of
+    the Studio plugin contract with no back door: it contributes its own palette, its own slot editors and
+    its own value types exactly as a third-party plugin does.
+  authors:
+    - LiQiyeDev
+  license: CC0-1.0
+  copyright: LiQiyeDev
+  inceptionYear: '2026'
+  links:
+    homepage: https://github.com/LiQiyeDev/botmaker-sdk
+  languages:
+    java:
+      groupId: com.github.LiQiyeDev
+      artifactId: botmaker-sdk
+      version: '21'
+
+release:
+  github:
+    owner: LiQiyeDev
+    name: botmaker-sdk
+    tagName: 'v{{projectVersion}}'
+    releaseName: 'v{{projectVersion}}'
+    # release.sh created and pushed the tag, and that push is what started the workflow running this —
+    # so there is nothing left to tag. Keeping the tag on the umbrella's side is deliberate: the tag is
+    # what orders a cross-module release and triggers every downstream CI job, and that ordering is the
+    # one thing JReleaser has no way to express.
+    skipTag: true
+    # A pushed tag cannot be edited and a published release should not be silently replaced.
+    overwrite: false
+    update:
+      enabled: false
+    # The CHANGELOG.md section for exactly this version, written here by the workflow's `notes` step
+    # through tools/changelog-section.sh — the SAME script the umbrella's release.sh calls to gate the
+    # release (check_changelog). This module is the one where CHANGELOG.md has a THIRD reader: the whole
+    # file ships inside the jar as META-INF/botmaker/whats-new.md, and Studio's upgrade dialog leads with
+    # it. One extractor for the gate and the notes; the jar carries the unextracted original, because a bot
+    # may jump several releases at once and must be able to answer every span ending at its own version.
+    changelog:
+      external: target/jreleaser-changelog.md

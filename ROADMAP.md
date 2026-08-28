@@ -8,6 +8,32 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-28 — the GitHub Release is published from here, by JReleaser
+
+**Done**
+
+- **`jreleaser.yml` and a `release` job in `ci.yml`.** A `v*` tag now publishes this module's GitHub
+  Release from its own CI, with the `## [x.y.z]` section of `CHANGELOG.md` as the body. It used to be a
+  `gh release create` inside the umbrella's `release.sh`, which keeps everything JReleaser cannot express:
+  which modules are cut, at what versions, in what order, this module's `.deps.env`, Studio's
+  `SDK_FALLBACK_VERSION` bump, and the tag itself.
+- **`tools/changelog-section.sh`** — the extractor, moved out of `release.sh` into this repository. This is
+  the module where `CHANGELOG.md` has a **third** reader: the whole file ships in the jar as
+  `META-INF/botmaker/whats-new.md` and Studio's upgrade dialog leads with it. One extractor for the gate
+  and the notes; the jar keeps carrying the unextracted original, because a bot may jump several releases
+  at once and must be able to answer every span ending at its own version.
+- **Two findings worth keeping, because each reads as a configuration mistake until you hit it.** JReleaser
+  **cannot open a submodule**: here `.git` is a `gitdir:` FILE and its JGit reports *repository not found*,
+  while `--git-root-search` gets past that only by resolving the **umbrella** repository. Hence CI, where a
+  checkout is standalone. And `jreleaser-maven-plugin` is not a way round it: it ignores `jreleaser.yml`
+  entirely and takes the version from `<version>`, which here is the cosmetic `0.0.0-SNAPSHOT` JitPack
+  overrides. The version arrives as `JRELEASER_PROJECT_VERSION`, read off the tag.
+- **Nothing in the build changed** — no Maven plugin, no lifecycle binding, no pom edit. That is the
+  property `mvn -pl botmaker-sdk -am install` depends on before every Studio dev-run, and it was the
+  constraint the whole change was held to: seeing a local change must never require cutting a release.
+
+---
+
 ## 2026-08-27 — reflection replaces the processor, japicmp replaces the back edge
 
 **Done**
