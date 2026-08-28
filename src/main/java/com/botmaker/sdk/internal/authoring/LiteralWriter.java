@@ -72,21 +72,45 @@ public final class LiteralWriter {
      * {@code emit} package takes, along with the Javadoc escaper and the indenter, and moving it twice would
      * be worse than moving it late. What is legal differs per position, which is why {@link #quoteChar} is
      * separate rather than a parameter.
+     *
+     * <p><b>The toolkit's {@code Source.string} is the same answer, and this is not going to call it</b>
+     * (2026-08-28). The SDK is a library <em>and</em> a plugin, and only its plugin half — {@code plugin/},
+     * {@code internal/plugin/} — may name {@code botmaker-plugin-toolkit}: a plugin's widget kit is resolved
+     * onto that plugin's own classloader, and this class is reached by whatever host is generating a
+     * project. Studio happens to carry a toolkit now; a host that does not would find a library half that
+     * cannot load. So the fifteen lines the two have in common are duplicated deliberately.
      */
     public static String quote(String text) {
-        return '"' + text.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + '"';
+        String s = text == null ? "" : text;
+        StringBuilder out = new StringBuilder(s.length() + 2).append('"');
+        for (int i = 0; i < s.length(); i++) {
+            out.append(escape(s.charAt(i), '"'));
+        }
+        return out.append('"').toString();
     }
 
     /** A Java char literal, quotes included. */
     public static String quoteChar(char c) {
-        return "'" + switch (c) {
-            case '\'' -> "\\'";
+        return "'" + escape(c, '\'') + "'";
+    }
+
+    /**
+     * One character as it may appear inside a literal delimited by {@code quote}.
+     *
+     * <p>Total, which the pair above was not until 2026-08-28: a value is text a person typed or pasted, so
+     * a form feed or a stray control character reaches here as readily as a letter, and one emitted raw is
+     * a generated file that does not compile — reported against a line nobody wrote.
+     */
+    private static String escape(char c, char quote) {
+        if (c == quote) return "\\" + quote;
+        return switch (c) {
             case '\\' -> "\\\\";
             case '\n' -> "\\n";
             case '\r' -> "\\r";
             case '\t' -> "\\t";
-            default -> String.valueOf(c);
-        } + "'";
+            case '\b' -> "\\b";
+            case '\f' -> "\\f";
+            default -> c < 0x20 || c == 0x7f ? String.format("\\u%04x", (int) c) : String.valueOf(c);
+        };
     }
 }

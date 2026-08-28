@@ -8,6 +8,19 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-28 — `LiteralWriter`'s escaping is total, and stays here on purpose
+
+Part F, phase B. `quote`/`quoteChar` escaped the backslash, the quote, `\n`, `\r` and `\t` and stopped, so a
+value carrying a form feed or any other control character — text a person pasted — was emitted raw into a
+generated bot, which then did not compile, against a line nobody wrote. Both go through one `escape(char,
+char)` now: the two `\b`/`\f` cases, and `\uXXXX` for everything below 0x20 and for 0x7f.
+
+**It is not `Source.string`, which is the toolkit's identical answer, and the comment on it says why.** Only
+the SDK's plugin half (`plugin/`, `internal/plugin/`) may name `botmaker-plugin-toolkit`: a plugin's widget
+kit is resolved onto that plugin's own classloader, and `internal/authoring` is library code reached by
+whatever host is generating a project. Studio happens to carry a toolkit now; a host that does not would
+find a library half it cannot load. So the fifteen lines are duplicated deliberately.
+
 ## 2026-08-28 — the plugin code shrinks: five classes lifted into the toolkit
 
 Plugin-ecosystem plan, phase 4. Nothing in `api.*` moved and no behaviour changed; what moved is code that
