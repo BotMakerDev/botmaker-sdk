@@ -1,9 +1,8 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
-import com.botmaker.plugin.api.SlotContext;
-import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.TypeRef;
 import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.toolkit.Slots;
+import com.botmaker.plugin.toolkit.testing.TestContexts;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
@@ -29,33 +28,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @DisplayNameGeneration(ReplaceUnderscores.class)
 class GeometryLabelTest {
 
-    /** A slot holding {@code source}, with nothing else an editor could reach for. */
+    /**
+     * A slot holding {@code source}, with nothing else an editor could reach for.
+     *
+     * <p>Twenty-eight lines of anonymous {@code SlotContext} until 2026-08-28, which is the friction
+     * {@link TestContexts} was lifted into the toolkit to remove: a plugin author writing their first editor
+     * had to write this before they could test anything at all.
+     */
     private static ValueContext slot(String source) {
-        return new SlotContext() {
-            @Override public String currentSource() { return source; }
-
-            @Override public String enclosingClass() { return null; }
-
-            @Override public String enclosingMethod() { return null; }
-
-            @Override public int argIndex() { return -1; }
-
-            @Override public void replaceWith(String javaExpression, String... importsNeeded) {}
-
-            @Override public TypeRef type() {
-                return new TypeRef() {
-                    @Override public String simpleName() { return ""; }
-
-                    @Override public String qualifiedName() { return ""; }
-                };
-            }
-
-            @Override public List<String> value() { return List.of(source); }
-
-            @Override public void set(List<String> value) {}
-
-            @Override public StudioServices services() { return null; }
-        };
+        return TestContexts.typedSlot("", source);
     }
 
     private static String point(String source) {

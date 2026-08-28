@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;
+import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.authoring.SourceEmitter;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
@@ -45,10 +46,14 @@ import java.util.List;
  * invariant is what makes the contract's {@code <optional>true</optional>} scope safe: the class is in the
  * jar and cannot link on a bot's classpath, exactly like an SLF4J binding, and no bot ever reaches it.
  */
-public final class SdkPlugin implements StudioPlugin {
+public final class SdkPlugin extends AbstractStudioPlugin {
 
     /** The stable identifier the host files this plugin's contributions under. */
     public static final String ID = "com.botmaker.sdk";
+
+    public SdkPlugin() {
+        super(ID, "BotMaker SDK");
+    }
 
     /**
      * Built once, by reflection over the facades named here. Every member is <em>discovered</em> rather than
@@ -59,8 +64,14 @@ public final class SdkPlugin implements StudioPlugin {
      *
      * <p>The order here is the order the menus fall back to when two facades share a {@code @Palette} order;
      * {@code PaletteCatalog.of} sorts by that order first, so this list is documentation rather than policy.
+     *
+     * <p>It is a method rather than a {@code static final} field so that the reflection happens the first time
+     * the palette is <em>asked for</em> rather than when {@code ServiceLoader} constructs this class, which
+     * the host does while opening a project. {@link AbstractStudioPlugin} caches the answer.
      */
-    private static final PaletteCatalog CATALOG = PaletteCatalog.of(
+    @Override
+    protected PaletteCatalog buildCatalog() {
+        return PaletteCatalog.of(
             com.botmaker.sdk.api.interaction.Mouse.class,
             com.botmaker.sdk.api.interaction.Keyboard.class,
             com.botmaker.sdk.api.interaction.Wait.class,
@@ -113,28 +124,6 @@ public final class SdkPlugin implements StudioPlugin {
             com.botmaker.sdk.api.meta.Since.class,
             com.botmaker.sdk.api.meta.ReplacedBy.class,
             com.botmaker.sdk.api.meta.Replaces.class);
-
-    @Override
-    public String id() {
-        return ID;
-    }
-
-    @Override
-    public String displayName() {
-        return "BotMaker SDK";
-    }
-
-    /**
-     * This build's palette, whatever {@code pinnedVersion} says — see the class comment for why the
-     * parameter survives an implementation that does not read it.
-     *
-     * <p>Total: every pin, including a malformed one, a blank one and one naming a version newer than this
-     * jar, gets the same answer. Nothing here can be empty, so nothing here can widen the host's menus by
-     * accident; narrowing to a pin is {@code SdkSurfaceService}'s intersection against the bot's own jar.
-     */
-    @Override
-    public PaletteCatalog catalog(String pinnedVersion) {
-        return CATALOG;
     }
 
     /**
@@ -150,7 +139,7 @@ public final class SdkPlugin implements StudioPlugin {
      * bot's classpath — the same arrangement that makes the contract dependency safe.
      */
     @Override
-    public List<SlotEditor> slotEditors() {
+    protected List<SlotEditor> buildSlotEditors() {
         return SdkEditors.ALL;
     }
 
@@ -163,7 +152,7 @@ public final class SdkPlugin implements StudioPlugin {
      * it had to give up nothing to become contributable.
      */
     @Override
-    public ValueCatalog valueTypes() {
+    protected ValueCatalog buildValueTypes() {
         return SdkValueTypes.CATALOG;
     }
 
@@ -178,7 +167,7 @@ public final class SdkPlugin implements StudioPlugin {
      * <p>Total in the pin, like {@link #catalog(String)}: the class has existed in every SDK there has been.
      */
     @Override
-    public List<ParameterGroup> parameters(String pinnedVersion) {
+    protected List<ParameterGroup> buildParameters() {
         return List.of(SourceEmitter.SDK_PARAMETERS);
     }
 }

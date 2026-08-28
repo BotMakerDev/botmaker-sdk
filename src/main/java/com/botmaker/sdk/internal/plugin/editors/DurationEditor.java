@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.ValueContext;
 import com.botmaker.plugin.toolkit.Fields;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
+import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.interaction.Wait;
 import com.botmaker.sdk.authoring.WireText;

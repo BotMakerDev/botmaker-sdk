@@ -1,9 +1,7 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
 import com.botmaker.plugin.api.SlotContext;
-import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.TypeRef;
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.toolkit.testing.TestContexts;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
@@ -33,63 +31,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayNameGeneration(ReplaceUnderscores.class)
 class DurationSourceTest {
 
-    /** A slot holding {@code source}, optionally inside a call this editor may recognise. */
-    private static Slot slot(String source, String owner, String method, String call) {
-        return new Slot(source, owner, method, call);
+    /**
+     * A slot holding {@code source}, optionally inside a call this editor may recognise.
+     *
+     * <p>A hand-rolled {@code SlotContext} of its own until 2026-08-28 — the fifty lines that were the
+     * argument for lifting {@link TestContexts} into the toolkit, since a plugin author testing their first
+     * editor had to write them before they could assert anything.
+     */
+    private static TestContexts.Recording slot(String source, String owner, String method, String call) {
+        return TestContexts.slot(owner, method, 0, source)
+                .withType("java.time.Duration")
+                .withEnclosingSource(call);
     }
 
     /** A bare slot: a duration argument of nothing in particular. */
-    private static Slot bare(String source) {
+    private static TestContexts.Recording bare(String source) {
         return slot(source, null, null, null);
-    }
-
-    /** Records what the editor wrote, and where — the slot, or the call around it. */
-    private static final class Slot implements SlotContext {
-
-        private final String source;
-        private final String owner;
-        private final String method;
-        private final String call;
-
-        String wroteToSlot;
-        String wroteToCall;
-
-        Slot(String source, String owner, String method, String call) {
-            this.source = source;
-            this.owner = owner;
-            this.method = method;
-            this.call = call;
-        }
-
-        @Override public String currentSource() { return source; }
-
-        @Override public String enclosingClass() { return owner; }
-
-        @Override public String enclosingMethod() { return method; }
-
-        @Override public String enclosingSource() { return call; }
-
-        @Override public int argIndex() { return 0; }
-
-        @Override public void replaceWith(String expression, String... imports) { wroteToSlot = expression; }
-
-        @Override public void replaceEnclosingCall(String expression, String... imports) {
-            wroteToCall = expression;
-        }
-
-        @Override public TypeRef type() {
-            return new TypeRef() {
-                @Override public String simpleName() { return "Duration"; }
-
-                @Override public String qualifiedName() { return "java.time.Duration"; }
-            };
-        }
-
-        @Override public List<String> value() { return List.of(source); }
-
-        @Override public void set(List<String> value) {}
-
-        @Override public StudioServices services() { return null; }
     }
 
     // --- what the pill says ---
@@ -129,10 +86,10 @@ class DurationSourceTest {
 
     @Test
     void an_untouched_end_is_written_back_exactly_as_it_was_read() {
-        Slot slot = bare("Duration.ofSeconds(120)");
+        var slot = bare("Duration.ofSeconds(120)");
         DurationEditor.Span span = DurationEditor.span(slot);
         DurationEditor.write(slot, span, span.from(), span.to(), false);
-        assertEquals("Duration.ofSeconds(120)", slot.wroteToSlot,
+        assertEquals("Duration.ofSeconds(120)", slot.replacement(),
                 "opening the editor and pressing OK must not rewrite seconds into minutes");
     }
 
@@ -180,41 +137,43 @@ class DurationSourceTest {
 
     @Test
     void ticking_the_range_rewrites_the_whole_call() {
-        Slot slot = slot("Duration.ofMillis(800)", "Wait", "time", "Wait.time(Duration.ofMillis(800))");
+        var slot = slot("Duration.ofMillis(800)", "Wait", "time", "Wait.time(Duration.ofMillis(800))");
         DurationEditor.write(slot, DurationEditor.span(slot), 800L, 2_000L, true);
-        assertEquals("Wait.between(Duration.ofMillis(800), Duration.ofSeconds(2))", slot.wroteToCall);
-        assertNull(slot.wroteToSlot, "the value in the slot is not what changed");
+        assertEquals("Wait.between(Duration.ofMillis(800), Duration.ofSeconds(2))",
+                slot.enclosingReplacement());
+        assertNull(slot.replacement(), "the value in the slot is not what changed");
     }
 
     @Test
     void an_inverted_range_is_written_the_way_round_it_reads() {
-        Slot slot = slot("Duration.ofSeconds(2)", "Wait", "time", "Wait.time(Duration.ofSeconds(2))");
+        var slot = slot("Duration.ofSeconds(2)", "Wait", "time", "Wait.time(Duration.ofSeconds(2))");
         DurationEditor.write(slot, DurationEditor.span(slot), 2_000L, 800L, true);
-        assertEquals("Wait.between(Duration.ofMillis(800), Duration.ofSeconds(2))", slot.wroteToCall);
+        assertEquals("Wait.between(Duration.ofMillis(800), Duration.ofSeconds(2))",
+                slot.enclosingReplacement());
     }
 
     @Test
     void un_ticking_the_range_shrinks_the_call_back_to_one_argument() {
-        Slot slot = slot("Duration.ofMillis(800)", "Wait", "between",
+        var slot = slot("Duration.ofMillis(800)", "Wait", "between",
                 "Wait.between(Duration.ofMillis(800), Duration.ofSeconds(2))");
         DurationEditor.Span span = DurationEditor.span(slot);
         DurationEditor.write(slot, span, span.from(), span.to(), false);
-        assertEquals("Wait.time(Duration.ofMillis(800))", slot.wroteToCall);
+        assertEquals("Wait.time(Duration.ofMillis(800))", slot.enclosingReplacement());
     }
 
     @Test
     void a_range_whose_ends_are_equal_is_not_a_range() {
-        Slot slot = slot("Duration.ofSeconds(2)", "Wait", "time", "Wait.time(Duration.ofSeconds(2))");
+        var slot = slot("Duration.ofSeconds(2)", "Wait", "time", "Wait.time(Duration.ofSeconds(2))");
         DurationEditor.write(slot, DurationEditor.span(slot), 2_000L, 2_000L, true);
-        assertEquals("Duration.ofSeconds(2)", slot.wroteToSlot);
-        assertNull(slot.wroteToCall);
+        assertEquals("Duration.ofSeconds(2)", slot.replacement());
+        assertNull(slot.enclosingReplacement());
     }
 
     @Test
     void outside_a_wait_there_is_no_call_to_restructure_and_only_the_value_is_written() {
-        Slot slot = bare("Duration.ofSeconds(2)");
+        var slot = bare("Duration.ofSeconds(2)");
         DurationEditor.write(slot, DurationEditor.span(slot), 800L, 2_000L, true);
-        assertEquals("Duration.ofMillis(800)", slot.wroteToSlot);
-        assertNull(slot.wroteToCall);
+        assertEquals("Duration.ofMillis(800)", slot.replacement());
+        assertNull(slot.enclosingReplacement());
     }
 }

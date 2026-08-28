@@ -8,6 +8,44 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-28 — the plugin code shrinks: five classes lifted into the toolkit
+
+Plugin-ecosystem plan, phase 4. Nothing in `api.*` moved and no behaviour changed; what moved is code that
+was in this module by accident of who wrote the first editor rather than because it knew anything about the
+SDK. The acceptance test each time was the toolkit's own rule: *nothing there may name a plugin's
+vocabulary*.
+
+- **`internal/plugin/editors/Slots.java` is deleted** — it is `com.botmaker.plugin.toolkit.Slots` now.
+  `GeometryEditors`, `LaunchEditors`, `DurationEditor` and `SettingsEditors` import it.
+- **`CallSites` went from 99 lines to a table of five constants.** The matching — declining a Parameters row,
+  comparing an argument index, tolerating a qualified or simple class name, the per-overload varargs index —
+  is `toolkit.CallSites`'s. What stayed is the part that is genuinely ours: which class, which method names.
+  `LAUNCH_OPTION`'s three-way switch became a `Map.of("launch", 1, "launchIfNotRunning", 2,
+  "launchAndWait", 3)` passed to `trailingArgumentOf`, and `BOT_SETTING` a `firstArgumentWhere` still asking
+  `SettingsEditors.bounds`.
+- **`SettingsEditors` is now the table and nothing else** (172 → 84 lines). The pill, the modal, the
+  spinner-or-slider division, the clamping and the label are `Editors.boundedPill`/`Editors.flag`. The
+  `Bound` record became the toolkit's `Editors.NumberRange` plus a local `Setting` pairing it with a flag
+  label — one record rather than two tables, because the dispatch must have a single answer to *is this
+  setter claimed*.
+- **`SdkPlugin extends AbstractStudioPlugin`**, and its 52-facade `PaletteCatalog.of(…)` moved from a
+  `static final` field to `buildCatalog()`. That is a real improvement rather than ceremony: a static
+  initialiser runs when `ServiceLoader` constructs the plugin, which the host does while opening a project,
+  so the reflection now happens the first time the palette is actually asked for. `slotEditors`,
+  `valueTypes` and `parameters` became `build…` hooks the same way; `id()`/`displayName()` are constructor
+  arguments.
+- **The two editor tests dropped their hand-rolled stubs** for `toolkit.testing.TestContexts` — 28 lines out
+  of `GeometryLabelTest`, 50 out of `DurationSourceTest`, with `wroteToSlot`/`wroteToCall` becoming
+  `replacement()`/`enclosingReplacement()`. All 354 SDK tests still pass, `ApiCatalogTest` included, which is
+  what confirms the catalog is byte-identical through the new path.
+
+**What deliberately did not move: `SdkValueTypes` still uses its own private `codec(…)`/`seeded(…)`
+helpers rather than the toolkit's new `Codecs`.** `Authoring` reaches `SdkValueTypes.CATALOG` on **Studio's**
+classpath, and Studio must not depend on the toolkit — so a toolkit class named from there is a
+`NoClassDefFoundError` the first time anyone generates a project. This module is a library *and* a plugin,
+and only the plugin half (`plugin/`, `internal/plugin/`) may name the toolkit. Worth keeping in mind before
+the next lift: `internal/authoring` is not plugin code, whatever its shape suggests.
+
 ## 2026-08-28 — the GitHub Release is published from here, by JReleaser
 
 **Done**

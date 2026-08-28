@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.ValueContext;
 import com.botmaker.plugin.toolkit.Fields;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
+import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.plugin.toolkit.Thumbnail;
 import com.botmaker.shared.game.GameLibraryProvider;
 import com.botmaker.shared.game.InstalledGame;

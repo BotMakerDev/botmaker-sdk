@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Internal: the plugin-side code is smaller, and the generic half of it is the toolkit's.** `Slots`, the
+  call-site matching, the bounded-number pill and the editor test stubs moved to
+  `botmaker-plugin-toolkit`; `SdkPlugin` extends its new `AbstractStudioPlugin`, which also makes the
+  52-facade palette reflection lazy rather than running it when `ServiceLoader` constructs the plugin.
+  **Nothing under `com.botmaker.sdk.api` changed** and no behaviour did; a bot resolves nothing new.
+
 - **The SDK now ships the editors for its own types.** The controls that stand in for a typed-out expression
   — drag a region on screen rather than write `new Rect(12, 40, 300, 80)` — used to live in Studio, which
   meant Studio had to know what an SDK type looked like. They are ordinary plugin contributions now
