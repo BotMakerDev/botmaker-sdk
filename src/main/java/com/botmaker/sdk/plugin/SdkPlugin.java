@@ -88,6 +88,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
             com.botmaker.sdk.api.bot.Watchdog.class,
             com.botmaker.sdk.api.bot.PopupGuard.class,
             com.botmaker.sdk.api.bot.Activity.class,
+            com.botmaker.sdk.api.config.Wire.class,
             com.botmaker.sdk.api.launch.Game.class,
             com.botmaker.sdk.api.launch.Target.class,
             com.botmaker.sdk.api.emulator.Emulators.class,

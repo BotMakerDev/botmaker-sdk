@@ -19,6 +19,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Your bot can read its own settings by name — `Wire`.** `Wire.whole("minHealth")`,
+  `Wire.duration("restBetween")`, `Wire.template("healthBar")`, `Wire.enabled("Mining")`: the values you set
+  in the editor, read at run time by the name you gave them, one reader per type. **Nothing has been taken
+  away** — the generated `Parameters` and `Activities` classes still work exactly as before, and this is the
+  first half of letting a later release stop generating them. Two things worth knowing before you use it: a
+  misspelled name is not a compile error (`Wire.whole("minHelath")` compiles and answers `0`), and **nothing
+  here can throw** — a missing file, a missing name and a value that will not parse all fall back, because a
+  bot must never fail to start because of its own configuration file.
+
 - **Internal: the plugin-side code is smaller, and the generic half of it is the toolkit's.** `Slots`, the
   call-site matching, the bounded-number pill and the editor test stubs moved to
   `botmaker-plugin-toolkit`; `SdkPlugin` extends its new `AbstractStudioPlugin`, which also makes the

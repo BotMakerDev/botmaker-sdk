@@ -1,0 +1,65 @@
+{
+  "schemaVersion" : 2,
+  "activities" : [ {
+    "name" : "Mining",
+    "enabled" : true,
+    "description" : "dig",
+    "outcomes" : [ "BAG_FULL", "NO_ORE" ],
+    "goHome" : true,
+    "popupCheck" : true
+  }, {
+    "name" : "Fishing",
+    "enabled" : false,
+    "description" : "",
+    "outcomes" : [ ],
+    "goHome" : false,
+    "popupCheck" : false
+  } ],
+  "variables" : [ {
+    "name" : "minHealth",
+    "type" : { "type" : "WHOLE_NUMBER", "shape" : "ONE", "list" : false, "void" : false },
+    "value" : [ "20" ],
+    "description" : "", "tag" : "", "visibility" : "public", "options" : [ ],
+    "bounds" : { "min" : null, "max" : null }
+  }, {
+    "name" : "greeting",
+    "type" : { "type" : "TEXT", "shape" : "ONE", "list" : false, "void" : false },
+    "value" : [ "hello" ],
+    "description" : "", "tag" : "", "visibility" : "public", "options" : [ ],
+    "bounds" : { "min" : null, "max" : null }
+  }, {
+    "name" : "restBetween",
+    "type" : { "type" : "DURATION", "shape" : "ONE", "list" : false, "void" : false },
+    "value" : [ "1m30s" ],
+    "description" : "", "tag" : "", "visibility" : "public", "options" : [ ],
+    "bounds" : { "min" : null, "max" : null }
+  }, {
+    "name" : "anchor",
+    "type" : { "type" : "POINT", "shape" : "ONE", "list" : false, "void" : false },
+    "value" : [ "10,20" ],
+    "description" : "", "tag" : "", "visibility" : "public", "options" : [ ],
+    "bounds" : { "min" : null, "max" : null }
+  }, {
+    "name" : "unset",
+    "type" : { "type" : "TEXT", "shape" : "ONE", "list" : false, "void" : false },
+    "value" : [ "" ],
+    "description" : "", "tag" : "", "visibility" : "public", "options" : [ ],
+    "bounds" : { "min" : null, "max" : null }
+  }, {
+    "name" : "targets",
+    "type" : { "type" : "TEXT", "shape" : "ANY_OF", "list" : true, "void" : false },
+    "value" : [ "ore", "gem" ],
+    "description" : "", "tag" : "", "visibility" : "public", "options" : [ ],
+    "bounds" : { "min" : null, "max" : null }
+  } ],
+  "flow" : {
+    "nodes" : [ { "activity" : "Mining", "x" : 10.0, "y" : 20.0 } ],
+    "edges" : [ ],
+    "start" : "Mining",
+    "maxSteps" : 1000,
+    "stepDelayMs" : 1000,
+    "empty" : false
+  },
+  "presets" : [ ],
+  "goHomeByDefault" : true
+}

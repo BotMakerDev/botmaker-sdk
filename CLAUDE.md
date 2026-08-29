@@ -307,6 +307,37 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   last use of a switch and a file that were themselves deleted hours later (above). Neither was a name a bot
   could write down.
 
+## `api.config.Wire` — a bot reads its own settings (2026-08-29)
+
+The runtime half of *derived files stop being Java*, and the precondition for deleting `SourceEmitter`. A
+generated `Parameters` class of `public static final` fields exists only to give stored values a name;
+`Wire.whole("minHealth")` gives them the same name and costs one thing, stated plainly: **a misspelled name
+is not a compile error.** Nothing is generated in exchange, and nothing is rewritten under the user.
+
+Three things about it are decisions rather than details.
+
+**It reads a JSON tree, not the authoring records, and it has no choice.** `com.botmaker.sdk.authoring` has
+`ProjectModel`/`VariableModel` for all of this and they are **unloadable in a bot**: `VariableModel` names
+`ValueChoice`, `Range`, `Visibility` and `ParameterGroup` in its own components, and `botmaker-studio-api` is
+`optional` — deliberately off a generated bot's classpath. Loading one in a bot is `NoClassDefFoundError`. So
+`internal/config/ProjectData` walks the tree over field names that are the records' component names.
+
+**What is deliberately not duplicated is the part that would hurt.** Every codec in `SdkValueTypes` parses
+through `WireText`, which imports only `sdk.api.*` and the JDK — so `Wire` delegates to it and the editor and
+the running bot cannot disagree about what `"1m30s"` means. Two readers of one file is a standing risk;
+`ProjectDataTest.readsBackWhatTheEditorWrites` writes with `Authoring.modelJson` and reads with `ProjectData`,
+which is the only honest mitigation. **Add a value type to `SdkValueTypes` and add its reader here.**
+
+**Nothing throws, and that is load-bearing rather than polite.** The old generated class wrote *parsed
+literals* (`new java.awt.Color(255, 0, 0)`, never `Color.decode(…)`) precisely so a bot could not fail at
+class initialisation over its own configuration. Moving to a runtime read is only safe because `WireText` is
+total: a missing file, a missing key and an unparseable value each have a documented fallback. A reader that
+threw would give that guarantee back.
+
+`Wire.enabled(name)` is an **activity's** switch and is a different list from `Wire.flag(name)`, which is a
+yes/no variable. `ProjectData` is `internal` and is what `FlowGraph`'s loader will read; `Wire` is what a bot
+author writes.
+
 ## The scaffold templates are gone (2026-08-25)
 
 `src/templates/java` — nine files the SDK compiled and shipped as *text* under `botmaker-templates/` for
