@@ -110,17 +110,30 @@ class FlowLoadTest {
                 """).start());
     }
 
+    /**
+     * The deliberate reversal of 2026-08-29: an activity with no body used to be dropped, so a wire into it
+     * ended the run. Now it is a node with no runner, and the walk treats that exactly as a disabled
+     * activity — the flow passes through and takes the {@code DISABLED} wire.
+     *
+     * <p>Which is what makes drawing a flow before writing its code an ordinary way to work: every card is
+     * on the canvas, the run walks through them, and the ones with no {@code Activities.define} yet fall
+     * through rather than stopping the bot at the first of them.
+     */
     @Test
-    void anActivityWithNoClassBehindItIsNotANodeAtAll() {
-        // It is in the configuration and not in the source — renamed by hand, or never written. One line on
-        // the console and no node; a wire into it ends the run, which is what an unwired outcome does.
+    void anActivityWithNoBodyIsANodeThatDoesNothing() {
         FlowGraph flow = graph("""
                 { "activities": [ { "name": "Smithing" } ],
-                  "flow": { "nodes": [ { "activity": "Smithing" } ], "start": "Smithing" } }
+                  "flow": { "nodes": [ { "activity": "Smithing" } ],
+                            "edges": [ { "from": "Smithing", "to": "Smithing", "outcome": "DISABLED" } ],
+                            "start": "Smithing" } }
                 """);
 
-        assertNull(flow.nodeNamed("Smithing"));
-        assertNull(flow.start(), "with no node to begin at, the run ends immediately");
+        FlowGraph.Node node = flow.nodeNamed("Smithing");
+        assertEquals("Smithing", flow.start());
+        assertNotNull(node, "it is on the canvas, so it is in the graph");
+        assertNull(node.runner(), "nothing has been written for it");
+        assertNull(node.activity(), "and it is certainly not an Activity subclass");
+        assertEquals("Smithing", node.whenDisabled(), "which is the wire the walk will take");
     }
 
     @Test

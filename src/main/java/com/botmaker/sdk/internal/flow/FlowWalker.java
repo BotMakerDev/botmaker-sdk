@@ -63,13 +63,15 @@ public final class FlowWalker {
         FlowGraph.Node node = graph.nodeNamed(name);
         if (node == null) return null;
         // A disabled activity isn't skipped out of the flow — the flow still passes through it, it just
-        // doesn't do anything, so it follows the wire it would have taken with nothing to report.
-        if (!node.activity().active()) return node.whenDisabled();
+        // doesn't do anything, so it follows the wire it would have taken with nothing to report. An
+        // activity nobody has written a body for takes the same wire, for the same reason: it is on the
+        // canvas and it does nothing.
+        if (node.runner() == null || !node.runner().active()) return node.whenDisabled();
         // Set for every node, not just the ones that opt out: PopupGuard.enabled is process-global, so a node
         // that said nothing would inherit whatever the node before it left it set to.
         PopupGuard.enabled(node.popupCheck() == PopupCheck.ON);
         // After the active() check, not before: there is nothing to go home for if the activity won't run.
         if (node.recovery() == Recovery.GO_HOME && goHome != null) goHome.run();
-        return node.target(node.activity().execute());
+        return node.target(node.runner().execute());
     }
 }

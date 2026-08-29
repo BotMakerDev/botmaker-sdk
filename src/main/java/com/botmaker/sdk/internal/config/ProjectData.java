@@ -67,7 +67,20 @@ public final class ProjectData {
 
     /** Test seam: forget the cached model so the next {@link #current()} reads again. */
     static synchronized void forget() {
-        current = null;
+        use(null);
+    }
+
+    /**
+     * Test seam: make {@code data} the model {@link #current()} answers, or {@code null} to forget it and
+     * read the classpath again.
+     *
+     * <p>Public because the things that read {@code current()} are spread across packages — {@code Wire},
+     * an {@code ActivityContext} checking an outcome name, a defined activity asking whether it is switched
+     * on — and each of those wants to be tested against a model written in the test rather than against a
+     * resource file per case.
+     */
+    public static synchronized void use(ProjectData data) {
+        current = data;
     }
 
     /**

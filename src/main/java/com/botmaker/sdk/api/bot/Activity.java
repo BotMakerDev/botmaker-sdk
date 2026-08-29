@@ -2,10 +2,9 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.internal.bot.ActivityRegistry;
+import com.botmaker.sdk.internal.bot.LegacyActivity;
 import com.botmaker.sdk.internal.trace.Trace;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * One thing the bot can do — a game task like "collect resources" or "do alchemy". A bot author subclasses
@@ -60,16 +59,6 @@ import java.util.Map;
 @Palette(category = "bot", categoryLabel = "Bot", icon = "◎", order = 36)
 public abstract class Activity<O extends Enum<O>> {
 
-    /**
-     * All constructed activities, keyed by {@link #name()} — the lookup behind the static
-     * {@link #disable(String)} / {@link #enable(String)}. Insertion-ordered for predictable iteration; one
-     * instance per activity name (the generated registry builds each subclass once), so last-registered wins.
-     *
-     * <p>The wildcard is deliberate: enabling an activity by name has nothing to do with its outcome type, so
-     * this map deliberately forgets it. Nothing here ever calls {@link #run()}.
-     */
-    private static final Map<String, Activity<?>> REGISTRY = new LinkedHashMap<>();
-
     private final String name;
 
     /**
@@ -94,8 +83,20 @@ public abstract class Activity<O extends Enum<O>> {
         register(this);
     }
 
+    /**
+     * Puts this instance in the one registry, wrapped in what the flow actually asks of an activity.
+     *
+     * <p>The wrapper is why there is one map rather than two. Since 2026-08-29 an activity is usually a
+     * lambda handed to {@link Activities#define}, which is not an {@code Activity} at all — and
+     * {@link #disable(String)} has to find either kind, or a bot mixing the two gets a call that silently
+     * does nothing.
+     *
+     * <p>The outcome is carried across by <b>name</b>, which loses nothing: the walk has only ever asked an
+     * outcome for its {@linkplain Enum#name() name}, and the type parameter did its real work at the call
+     * site, where it made a hand-built {@code FlowGraph.route} checkable against the activity it belongs to.
+     */
     private static void register(Activity<?> activity) {
-        REGISTRY.put(activity.name, activity);
+        ActivityRegistry.register(LegacyActivity.of(activity));
     }
 
     /**
@@ -113,20 +114,14 @@ public abstract class Activity<O extends Enum<O>> {
         setEnabled(name, true);
     }
 
-    /** Sets the named activity's runtime enablement. Unknown name → a warning and no-op. */
+    /**
+     * Sets the named activity's runtime enablement. Unknown name → a warning and no-op.
+     *
+     * <p>It resolves through the one registry, so it reaches an activity written either way — a subclass of
+     * this type, or a lambda handed to {@link Activities#define}.
+     */
     public static void setEnabled(String name, boolean enabled) {
-        Activity<?> activity = REGISTRY.get(name);
-        if (activity == null) {
-            Debug.error("[Activity] setEnabled: no activity named '" + name + "' — known: "
-                    + REGISTRY.keySet() + ". Ignoring.");
-            return;
-        }
-        activity.setEnabled(enabled);
-    }
-
-    /** Test-only: clear the process-global registry between tests. */
-    static void clearRegistry() {
-        REGISTRY.clear();
+        ActivityRegistry.setEnabled(name, enabled);
     }
 
     /** Human-readable name (used for logging / the activity registry). */

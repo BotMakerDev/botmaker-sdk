@@ -8,6 +8,41 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-29 — an activity is a lambda
+
+**Done**
+
+- **`api.bot.Activities`** — `define(String name, Function<ActivityContext, Outcome> body)` and
+  `active(String)`. **`api.bot.ActivityContext`** — `name()`, `outcome(String)`, `done()`, `enable()`,
+  `disable()`. **`api.bot.Outcome`** — a final value type whose identity is a name.
+- **`internal/bot/ActivityRegistry`** — the one name map, holding a `Runner` (name, `active`, `setEnabled`,
+  `execute`). **`internal/bot/LegacyActivity`** — an `Activity` subclass seen as a `Runner`.
+  `Activity`'s own map and `clearRegistry` are gone; `Activity.setEnabled(name, …)` delegates.
+- **`ActivityLoader` inverted**: registry first, then the `<pkg>.activities.<Name>` class by convention as a
+  fallback, then nothing — which is no longer an error.
+- **`FlowGraph.assemble` keeps a node with no runner**, `FlowWalker` treats it as disabled, `Node.runner()`
+  is added and `Node.activity()` / `Node.target(Enum<?>)` are deprecated with `@ReplacedBy`.
+- **`ProjectData.use(ProjectData)`** made public as a test seam.
+- **`ActivitiesTest`** (16) and two rewritten flow cases: `anActivityWithNoBodyIsANodeThatDoesNothing`
+  (`FlowLoadTest`, replacing `…IsNotANodeAtAll`) and `anActivityWithNoBodyFallsThroughItsDisabledWire`
+  (`FlowWalkerTest`, the same thing walked end to end). 395 tests green; japicmp clean.
+
+**Why**
+
+An activity exists in *data* — it is created on the canvas and lives in `activities.json` — but its behaviour
+is code, and nothing writes code into a user's project any more. So the bridge is a call the user writes,
+wherever they like.
+
+Two decisions are worth not re-litigating. **The context is not a convenience**: it exists so
+`ctx.outcome("…")` is a call on a *known receiver type*, which is the only thing that lets the editor draw a
+dropdown of that activity's own outcomes where the name is typed — a body returning a bare `String` is
+indistinguishable from any other string-returning body. And **an unwritten activity is not an error**: it
+takes the `DISABLED` wire, which reverses `assemble` dropping such a node, and is what makes drawing a flow
+ahead of its code an ordinary way to work.
+
+What is given up is the compile check the per-activity `Outcome` enum bought. The picker replaces it, and a
+reported outcome the canvas does not declare gets one console line and then behaves like any unwired outcome.
+
 ## 2026-08-29 — the SDK writes no `.java`, and the seeds go with the emitter
 
 **Done**

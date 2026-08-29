@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.bot.ActivityRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -38,7 +39,7 @@ class DebugTraceTest {
         Debug.enable();
         PopupGuard.uninstall();
         PopupGuard.enabled(true);
-        Activity.clearRegistry();
+        ActivityRegistry.clear();
     }
 
     /** Runs {@code body} with stdout and stderr captured, and returns everything it printed. */

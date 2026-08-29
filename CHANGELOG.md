@@ -19,6 +19,24 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **You write an activity as a call now — `Activities.define`.** An activity is created on the Activity Flow
+  canvas; what it *does* is this, written wherever you like:
+  ```java
+  Activities.define("Mining", ctx -> {
+      if (bagFull()) return ctx.outcome("BAG_FULL");
+      mineOnce();
+      return ctx.done();
+  });
+  ```
+  Both names are dropdowns in the editor, filled from your own canvas. **An activity with no `define` call is
+  not an error** — it behaves exactly like one you switched off and follows its `DISABLED` wire, so you can
+  draw a whole flow before writing any of it. Two things to know: a misspelled outcome is not a compile error
+  (it is reported, and behaves like an outcome you never wired), and renaming an activity on the canvas does
+  not rename the string in your code.
+
+- **Bots with `Activity` subclasses keep working, unchanged.** Both kinds of activity share one registry, so
+  `Activity.disable("Mining")` still finds either.
+
 - **BotMaker writes none of your bot's Java any more.** Not the entry point, not `GoHome`, not `Popups`, not
   an activity's file. A project's structure is yours: the SDK owns the data files your bot reads back at run
   time (`activities.json`, `botmaker-project.properties`, the placeholder image) and nothing else. Existing

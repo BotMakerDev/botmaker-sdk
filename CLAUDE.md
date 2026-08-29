@@ -404,10 +404,46 @@ the emitter. What was wrong is one level up: it made *writing files into a user'
 and the host grew a key ledger, a reconciler and a rename engine to keep owning what it had written. See
 `../botmaker-studio-api/CLAUDE.md`, which records the reversal from the contract's side.
 
-**What replaces the one thing a seed genuinely gave.** An activity's behaviour is
-`Activities.define("Mining", ctx -> …)`, written wherever the user likes. There is no per-activity `Outcome`
-enum and so no compile check on an outcome name; a host **picker** on the argument replaces it, which is a
-contribution surface the contract already has.
+## An activity is a lambda (2026-08-29)
+
+`Activities.define("Mining", ctx -> …)` is what replaces the generated `class Mining extends
+Activity<Mining.Outcome>`. Three new `api.bot` types — `Activities`, `ActivityContext`, `Outcome` — plus
+`internal/bot/{ActivityRegistry,LegacyActivity}`.
+
+**`ActivityContext` exists so the editor has a receiver to hang a picker on.** A body returning a bare
+`String` looks, to Studio, exactly like a body returning any other string; `ctx.outcome("BAG_FULL")` is a
+call on a known type, which is what lets a dropdown of *this activity's* declared outcomes be drawn where the
+name is typed. Having built it for that, it is also the natural home for what a body used to reach through
+`this`: `name()`, `enable()`, `disable()`. The activity **name** is a plain `String` for the reason an
+`ActivityName` wrapper was already refused in Studio — it is resolved through a `String`-keyed registry
+anyway, so a wrapper adds ceremony at a boundary that must be a runtime string; the editor draws a dropdown
+there too, chosen by the call.
+
+**There is one registry, and that is the load-bearing part.** `internal/bot/ActivityRegistry` holds a
+`Runner` — name, `active()`, `setEnabled`, `execute()` — and both kinds of activity land in it:
+`Activities.define` registers a lambda, and `Activity`'s constructor registers itself through
+`LegacyActivity`. Two maps would make `Activity.disable("Mining")` silently miss half a bot's activities,
+which reads to a user as the flow being wrong rather than as a bug. `Runner` deliberately does not carry the
+outcome *type*: the walk has only ever asked an outcome for its name.
+
+**An activity with no body takes its `DISABLED` wire**, and that is a deliberate reversal. `FlowGraph.assemble`
+used to drop such a node, so a wire into it ended the run; it now builds a node with a `null` runner and
+`FlowWalker` treats that exactly as a switched-off activity. That is what makes drawing a flow *before*
+writing its code an ordinary way to work — every card is on the canvas and the run walks through, rather than
+stopping at the first one nobody has written.
+
+**`FlowGraph.Node.activity()` is deprecated, not removed**, and answers `null` for the two cases that were
+impossible when it was written: a lambda-defined activity, and one with no body at all. `Node.runner()`
+answers for all three, and `target(Outcome)` joins the deprecated `target(Enum<?>)`. Never-delete, as ever.
+
+**What is given up: a misspelled outcome is not a compile error.** `ctx.outcome("BAG_FUL")` compiles, is
+reported, matches no wire, and ends the run — the same answer as an outcome the user declared and never
+wired, deliberately. The picker is the replacement for the check, and one console line names the typo when
+the reported outcome is not one the canvas declares.
+
+**`ProjectData.use(ProjectData)` is a public test seam** because the readers of `current()` are spread across
+packages now — `Wire`, an `ActivityContext` checking an outcome name, a defined activity asking whether it is
+switched on — and each wants a model written in the test rather than a resource file per case.
 
 **`ActivityModel.id` survives the seeds that motivated it**, and is worth keeping for the same reason it was
 added: the name is what a rename changes, so anything keying on the name sees a delete plus a create. Nothing

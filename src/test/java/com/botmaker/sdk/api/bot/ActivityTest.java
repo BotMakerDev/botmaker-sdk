@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.sdk.internal.bot.ActivityRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +20,7 @@ class ActivityTest {
     @AfterEach
     void tearDown() {
         // The name registry is process-global; keep tests independent.
-        Activity.clearRegistry();
+        ActivityRegistry.clear();
     }
 
     /** Minimal activity whose configured default is fixed at construction; {@code run()} reports DEFAULT. */

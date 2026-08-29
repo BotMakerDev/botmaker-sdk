@@ -4,7 +4,10 @@ import com.botmaker.plugin.api.meta.ReplacedBy;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.Activity;
+import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.sdk.internal.bot.ActivityRegistry;
+import com.botmaker.sdk.internal.bot.LegacyActivity;
 import com.botmaker.sdk.internal.config.ProjectData;
 import com.botmaker.sdk.internal.flow.ActivityLoader;
 import com.botmaker.sdk.internal.flow.FlowWalker;
@@ -132,14 +135,14 @@ public final class FlowGraph {
      * reachable from anywhere else.
      */
     static FlowGraph assemble(Class<?> anchor, ProjectData data) {
-        Map<String, Activity<?>> activities = ActivityLoader.load(anchor, data.activities());
+        Map<String, ActivityRegistry.Runner> activities = ActivityLoader.load(anchor, data.activities());
         Map<String, Node> byName = new LinkedHashMap<>();
         for (String name : data.placed()) {
-            Activity<?> activity = activities.get(name);
-            // A placed activity with no class behind it is already reported by the loader. It becomes no node
-            // at all rather than a node that cannot run, so a wire into it ends the run — which is what an
-            // unwired outcome does, and the one behaviour here that is already understood.
-            if (activity == null) continue;
+            // A placed activity with no body is still a node, and that is a deliberate reversal: it used to
+            // be dropped, so a wire into it ended the run. An activity nobody has written yet is an activity
+            // that does nothing, which the flow already has a word for — it takes its DISABLED wire, exactly
+            // as one switched off in the editor does, and a flow drawn ahead of its code walks through.
+            ActivityRegistry.Runner activity = activities.get(name);
             Map<String, String> routes = new LinkedHashMap<>(data.routes(name));
             // DISABLED is not an outcome an activity can report — it did not run — so it is one slot on the
             // node rather than a route, exactly as the generated table spelled it.
@@ -207,7 +210,7 @@ public final class FlowGraph {
                         "node \"" + name + "\" routes " + route.outcome().name() + " twice");
             }
         }
-        return new Node(name, activity, popupCheck, recovery, whenDisabled, targets);
+        return new Node(name, LegacyActivity.of(activity), popupCheck, recovery, whenDisabled, targets);
     }
 
     /**
@@ -267,17 +270,20 @@ public final class FlowGraph {
      * it made the routes checkable against the activity they belong to; the walk that follows them only ever
      * asks an outcome for its {@linkplain Enum#name() name}, and a node table that stayed generic could not
      * be a plain array.
+     *
+     * <p><b>The activity may be absent</b>, and that is the node an unwritten activity gets: it is on the
+     * canvas, so the flow passes through it, and with nothing to run it takes {@link #whenDisabled()}.
      */
     public static final class Node {
 
         private final String name;
-        private final Activity<?> activity;
+        private final ActivityRegistry.Runner activity;
         private final PopupCheck popupCheck;
         private final Recovery recovery;
         private final String whenDisabled;
         private final Map<String, String> targets;
 
-        private Node(String name, Activity<?> activity, PopupCheck popupCheck, Recovery recovery,
+        private Node(String name, ActivityRegistry.Runner activity, PopupCheck popupCheck, Recovery recovery,
                      String whenDisabled, Map<String, String> targets) {
             this.name = name;
             this.activity = activity;
@@ -292,9 +298,33 @@ public final class FlowGraph {
             return name;
         }
 
-        /** The activity this node runs. */
-        public Activity<?> activity() {
+        /**
+         * The activity this node runs, or {@code null} when nothing is registered for it.
+         *
+         * <p>Used by the walk to decide whether to run at all, and how: a node with no runner is treated as
+         * a disabled one.
+         */
+        public ActivityRegistry.Runner runner() {
             return activity;
+        }
+
+        /**
+         * The {@link Activity} instance this node runs, or {@code null}.
+         *
+         * <p>{@code null} for the two cases that are ordinary now and were impossible when this was written:
+         * an activity defined as a lambda through {@link com.botmaker.sdk.api.bot.Activities#define}, and one
+         * on the canvas with no body written for it at all. Use {@link #runner()}, which answers for every
+         * kind of activity there is.
+         *
+         * @deprecated an activity is not necessarily an {@link Activity} subclass — see {@link #runner()}.
+         */
+        @Deprecated(since = "1.3.0", forRemoval = false)
+        @ReplacedBy(value = "com.botmaker.sdk.api.flow.FlowGraph$Node#runner", behaviourChanged = true,
+                note = "A node's activity may be a lambda handed to Activities.define, or may not have been "
+                        + "written yet, and neither is an Activity instance. runner() answers for all three; "
+                        + "this one answers null for the two it cannot describe.")
+        public Activity<?> activity() {
+            return activity instanceof LegacyActivity legacy ? legacy.activity() : null;
         }
 
         /** Whether the popup guard runs while it does. */
@@ -316,6 +346,18 @@ public final class FlowGraph {
          * The node {@code outcome} leads to, or {@code null} when nothing was wired to it — which is how a
          * run ends.
          */
+        public String target(Outcome outcome) {
+            return outcome == null ? null : targets.get(outcome.name());
+        }
+
+        /**
+         * The node {@code outcome} leads to, for an outcome reported as an enum constant.
+         *
+         * @deprecated an activity reports an {@link Outcome} now — {@link #target(Outcome)}. This overload
+         *             stays for a hand-built graph whose activities are {@link Activity} subclasses.
+         */
+        @Deprecated(since = "1.3.0", forRemoval = false)
+        @ReplacedBy("com.botmaker.sdk.api.flow.FlowGraph$Node#target")
         public String target(Enum<?> outcome) {
             return outcome == null ? null : targets.get(outcome.name());
         }
