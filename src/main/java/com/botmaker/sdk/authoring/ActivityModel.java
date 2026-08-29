@@ -27,16 +27,32 @@ import java.util.stream.Stream;
  * answers: a file written before the field existed must take the project's default, not a silent "no". Both
  * default to {@code true} when absent, which is what every project written before them behaved as.
  *
+ * <h2>{@link #id()} — what a rename is a rename of</h2>
+ *
+ * <p>The name is what the user types and what the stub class is called, so it is exactly the thing a rename
+ * changes. Anything holding "which file is this activity's" across a rename therefore cannot key on it: a
+ * host reconciling seed files would see one activity vanish and another appear, orphan the stub the user
+ * wrote their {@code run()} body into, and hand them an empty one. The id is the identity that survives
+ * that — never shown, never typed, and never derived from anything the user can edit.
+ *
+ * <p><b>Absent means the name, and nothing migrates a file to fix that.</b> It is what every project written
+ * before this field behaved as, and it is the right default on both counts: it needs no rewrite of anybody's
+ * stored file to add a field they cannot see, and it is <em>stable</em> — a default that invented a fresh
+ * random id on each read would make every open look like a rename. An activity created by an editor that
+ * knows about ids gets a real one, so a rename gains the better behaviour where somebody is actually
+ * working, and degrades to what it always did everywhere else.
+ *
  * @param name        the activity's name; also the stub class's name and its registry key
  * @param enabled     whether the flow may enter it at all
  * @param description a human-readable note; may be empty
  * @param outcomes    the declared outcomes, beyond the implicit one
  * @param goHome      whether the driver returns home before entering it
  * @param popupCheck  whether the driver dismisses popups before entering it
+ * @param id          the stable identity a rename does not change; blank ⇒ {@code name}
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ActivityModel(String name, boolean enabled, String description, List<String> outcomes,
-                            Boolean goHome, Boolean popupCheck) {
+                            Boolean goHome, Boolean popupCheck, String id) {
 
     public ActivityModel {
         if (name == null) name = "";
@@ -44,6 +60,31 @@ public record ActivityModel(String name, boolean enabled, String description, Li
         outcomes = outcomes == null ? List.of() : List.copyOf(outcomes);
         if (goHome == null) goHome = Boolean.TRUE;
         if (popupCheck == null) popupCheck = Boolean.TRUE;
+        if (id == null || id.isBlank()) id = name;
+    }
+
+    /**
+     * The pre-id shape, for a caller building a model in code rather than reading one.
+     *
+     * <p>It takes the name as the id, exactly as the compact constructor does for a file that has none.
+     * Kept as a constructor rather than pushed onto every call site because a test or a fixture has no
+     * opinion about identity, and making it state one would be noise in the ninety per cent of uses where
+     * nothing is ever renamed.
+     */
+    public ActivityModel(String name, boolean enabled, String description, List<String> outcomes,
+                         Boolean goHome, Boolean popupCheck) {
+        this(name, enabled, description, outcomes, goHome, popupCheck, null);
+    }
+
+    /**
+     * A fresh, unguessable id — what an editor stamps onto an activity that has never had one.
+     *
+     * <p>Random rather than derived: an id computed from the name would be the name again, and an id counted
+     * up from the activity's position would move when the list is reordered. 12 hex characters, which is
+     * short enough to read in a diff and far past collision within one project.
+     */
+    public static String newId() {
+        return java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12);
     }
 
     /** An enabled activity with nothing declared beyond its name. */
@@ -81,24 +122,41 @@ public record ActivityModel(String name, boolean enabled, String description, Li
     // ---- copies -----------------------------------------------------------------------------------------
 
     public ActivityModel withEnabled(boolean newEnabled) {
-        return new ActivityModel(name, newEnabled, description, outcomes, goHome, popupCheck);
+        return new ActivityModel(name, newEnabled, description, outcomes, goHome, popupCheck, id);
     }
 
     public ActivityModel withDescription(String newDescription) {
-        return new ActivityModel(name, enabled, newDescription, outcomes, goHome, popupCheck);
+        return new ActivityModel(name, enabled, newDescription, outcomes, goHome, popupCheck, id);
     }
 
     public ActivityModel withOutcomes(List<String> newOutcomes) {
-        return new ActivityModel(name, enabled, description, newOutcomes, goHome, popupCheck);
+        return new ActivityModel(name, enabled, description, newOutcomes, goHome, popupCheck, id);
     }
 
     public ActivityModel withGoHome(boolean newGoHome) {
-        return new ActivityModel(name, enabled, description, outcomes, newGoHome, popupCheck);
+        return new ActivityModel(name, enabled, description, outcomes, newGoHome, popupCheck, id);
     }
 
     public ActivityModel withPopupCheck(boolean newPopupCheck) {
-        return new ActivityModel(name, enabled, description, outcomes, goHome, newPopupCheck);
+        return new ActivityModel(name, enabled, description, outcomes, goHome, newPopupCheck, id);
     }
+
+    /**
+     * The same activity under a new name, keeping its id — which is the whole point of there being one.
+     *
+     * <p>Every other {@code with} copy carries {@code id} through without comment; this is the one where
+     * carrying it is the behaviour rather than the bookkeeping. A host reconciling seed files sees one
+     * activity that changed its name, not one deleted and one created.
+     */
+    public ActivityModel withName(String newName) {
+        return new ActivityModel(newName, enabled, description, outcomes, goHome, popupCheck, id);
+    }
+
+    /** This activity with a fresh id — what an editor stamps on when upgrading a project that has none. */
+    public ActivityModel withNewId() {
+        return new ActivityModel(name, enabled, description, outcomes, goHome, popupCheck, newId());
+    }
+
 
     /**
      * The implicit outcome first, then the declared ones — the order the {@code Outcome} enum is emitted in.

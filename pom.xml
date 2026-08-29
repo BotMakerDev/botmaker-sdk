@@ -242,6 +242,37 @@
     </dependencies>
 
     <build>
+        <!-- The seed sources ship in the jar as resources, beside their own .class files.
+
+             A seed is a real compiling class (com.botmaker.sdk.internal.plugin.seeds), and that is the whole
+             point of the surface: a seed that stops compiling is a red build here, on the day it breaks,
+             rather than a file that fails to compile later in a project whose user did not think they were
+             editing it. But a host writes the seed's TEXT into a project, and bytecode is not text —
+             ScaffoldCatalog.of reads <SimpleName>.java from beside the class file with getResourceAsStream,
+             so the source has to be in the jar too.
+
+             Declaring <resources> at all means re-declaring src/main/resources, which is Maven's default and
+             is switched off the moment this block exists. That is the cost of the declarative form and it is
+             worth paying over a copy task: the mapping is one-to-one and nothing is renamed, which is
+             exactly the case a <resource> is for (contrast the whats-new copy below, which renames and so
+             cannot be one).
+
+             If a seed's source ever fails to reach the jar, nothing breaks loudly: ScaffoldCatalog reports
+             one line in problems() naming the class, and SdkPluginSeedsTest is what turns that into a red
+             build. A misconfigured build is silent otherwise — a plugin that catalogues three seeds and can
+             write none of them. -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>src/main/java/com/botmaker/sdk/internal/plugin/seeds</directory>
+                <targetPath>com/botmaker/sdk/internal/plugin/seeds</targetPath>
+                <includes>
+                    <include>*.java</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <!-- Maven Compiler Plugin — no annotation processor at all, since 2026-08-27.
 

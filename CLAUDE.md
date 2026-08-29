@@ -382,6 +382,52 @@ the activities is `ActivityLoader`'s; only the assembly is here.
 **What is *not* affected: `LiteralWriter`.** It still writes Java, for slot values in a bot's own body
 (`SdkValueTypes`' codecs). Only the files that held a project's data stopped being source.
 
+## The seeds are real classes (2026-08-29)
+
+`internal/plugin/seeds/` holds `GoHome`, `Popups` and `ActivityTemplate` — **compiling classes in this
+module's own build**, carrying `@Scaffold`, `@ClassName`, `@EnumValues` and `@Editable`. `SdkPlugin.scaffold`
+catalogues them as class literals and `SdkPlugin.seedings` says how many of each this project wants.
+
+**The argument for a seed being source rather than a string is that javac checks it.** `ActivityTemplate`
+compiles as written — `enum Outcome { NEXT }` is a working default, not a placeholder — so a seed that breaks
+is a red build here, on the day it breaks, rather than a file that fails to compile in a project whose user
+did not think they were editing it.
+
+**`ActivityTemplate.isEnabled()` is `Wire.enabled(name())` and needs no substitution**, because
+`Activity.name()` is `getClass().getSimpleName()` and the class is what gets renamed. One less hole.
+
+**The pom's `<resources>` block is load-bearing and silent when wrong.** A seed's `.class` proves nothing
+about whether its `.java` reached the jar, and `ScaffoldCatalog.of` reads the source with
+`getResourceAsStream` beside the class file. A misconfigured build catalogues three seeds and can write none
+of them, at the moment a user creates a project; `SdkPluginSeedsTest.everySeedsSourceReachedTheJar` is what
+turns that into a red build. Declaring `<resources>` at all means re-declaring `src/main/resources`, which
+Maven switches off the moment the block exists.
+
+**`ActivityModel.id` exists for one moment: the user renames an activity.** The name is what a rename
+changes, so a host keying seed files on it sees one activity deleted and one created, orphans the stub the
+user wrote their `run()` body into, and hands them an empty one. `Seeding.key` is `"sdk:activity:" + id()`.
+**Absent means the name and nothing migrates** — stable, needs no rewrite of a stored file, and degrades a
+rename in an old project to exactly what it always did. A random default would make every open look like a
+rename.
+
+**Studio's `ActivityDefinition` carries the id too, and that is not duplication for its own sake:** Studio
+writes `activities.json`, so a field its record did not know about would be dropped on the first save. The
+real leak was `ActivityDraft` — the canvas's editable form, where renaming actually happens — which rebuilt
+the definition from its visible fields. It carries the id opaquely now: the one field the editor never reads
+and never writes.
+
+**The entry point is deliberately not a seed.** It was the fourth until this landed. It is the file that
+wires the plugins together — `PopupGuard.install(Popups.INSTANCE::execute)` beside `FlowGraph.run(…)` — and a
+second plugin's own installation belongs in it, which no plugin can write on another's behalf. It is also
+named for the project, which `seedings(pin, projectDir)` cannot know: at creation there is nothing in the
+directory to read. Both point where `pom.xml` already went — only the thing that knows the whole plugin set
+can compose the file that names them all.
+
+**`ScaffoldPlan.of` iterates the catalog, not the seedings map.** A plugin hands over whatever `Map` it
+likes and both `Map.of` and `Map.copyOf` are explicitly unordered, so iterating the map made the planned file
+order a property of one JVM's hashing — the same bug as `ScaffoldCatalog.enums`, found the same way, by a
+test that passed locally and would not have in CI.
+
 ## The scaffold templates are gone (2026-08-25)
 
 `src/templates/java` — nine files the SDK compiled and shipped as *text* under `botmaker-templates/` for
