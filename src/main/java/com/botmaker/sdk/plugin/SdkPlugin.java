@@ -4,26 +4,12 @@ import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
-import com.botmaker.plugin.api.catalog.ScaffoldCatalog;
-import com.botmaker.plugin.api.scaffold.Scaffold;
-import com.botmaker.plugin.api.scaffold.Seeding;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
-import com.botmaker.sdk.authoring.ActivityModel;
-import com.botmaker.sdk.authoring.Authoring;
-import com.botmaker.sdk.authoring.ProjectModel;
-import com.botmaker.sdk.authoring.SdkVersion;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
-import com.botmaker.sdk.internal.authoring.SourceEmitter;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The BotMaker SDK, as a Studio plugin.
@@ -182,104 +168,18 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     @Override
     protected List<ParameterGroup> buildParameters() {
-        return List.of(SourceEmitter.SDK_PARAMETERS);
+        return List.of(SDK_PARAMETERS);
     }
 
     /**
-     * The three files a game bot is made of, as seeds.
+     * The one parameter group this plugin owns.
      *
-     * <p>Real compiling classes in this module, named here as class literals — so a seed that is renamed and
-     * not re-catalogued is a javac error, and a seed whose <em>source</em> failed to reach the jar is one
-     * line in {@code problems()} rather than a silent inability to write it. The pom's {@code <resources>}
-     * block is what puts the source there; {@code SdkPluginSeedsTest} is what makes a mistake in it red.
-     *
-     * <p><b>The entry point is not here, and its absence is the interesting part.</b> It was the fourth seed
-     * until 2026-08-29. It is the file that wires the plugins together —
-     * {@code PopupGuard.install(Popups.INSTANCE::execute)} beside {@code FlowGraph.run(…)} — and a second
-     * plugin's own installation belongs in it too, which no plugin can write on another's behalf. It is also
-     * named for the project, which this plugin has no way to know: {@code seedings} is handed a directory,
-     * and at creation time there is nothing in it to read. Both point the same way, and it is the argument
-     * that already made {@code pom.xml} the host's: only the thing that knows the whole plugin set can
-     * compose the file that names them all.
-     *
-     * <p>Total in the pin, like {@link #catalog(String)}: all three have existed in every SDK that ever
-     * generated a game bot.
+     * <p>It lived on {@code SourceEmitter} until that class was deleted, which was always the wrong home: a
+     * group is not about the generated {@code Parameters} file it once named — that file has not existed
+     * since the derived files became runtime reads — it is how the editor's Parameters dialog decides which
+     * plugin a variable belongs to.
      */
-    @Override
-    public ScaffoldCatalog scaffold(String pinnedVersion) {
-        return SEEDS;
-    }
+    private static final ParameterGroup SDK_PARAMETERS =
+            new ParameterGroup(ParameterGroup.DEFAULT_ID, "Parameters", "Parameters");
 
-    /**
-     * Built once and held, for the reason {@link #buildCatalog()} is lazy: this reads three source files out
-     * of the jar, and the host asks for it while a project is opening.
-     */
-    private static final ScaffoldCatalog SEEDS = ScaffoldCatalog.of(
-            com.botmaker.sdk.internal.plugin.seeds.GoHome.class,
-            com.botmaker.sdk.internal.plugin.seeds.Popups.class,
-            com.botmaker.sdk.internal.plugin.seeds.ActivityTemplate.class);
-
-    /**
-     * How many files this project wants of each, and what goes in them — read from the project's own
-     * {@code activities.json}, which is this plugin's file and nobody else's.
-     *
-     * <p>{@code GoHome} and {@code Popups} are one each and only for a game bot, which is a project whose
-     * model has a flow or an activity in it; an empty project wants neither. The activity template is one per
-     * activity, carrying that activity's outcomes into its {@code Outcome} enum.
-     *
-     * <p><b>The key is the activity's id, never its name.</b> That is the whole reason {@code ActivityModel}
-     * has an id: the name is what a rename changes, so a host keying on it would orphan the stub the user
-     * wrote their {@code run()} body into and hand them an empty one. An activity in a project written
-     * before ids existed reports its name as its id, so a rename there degrades to what it always did rather
-     * than to something worse.
-     *
-     * <p>Best-effort, like every read of a project's own file: an unreadable or absent model means this
-     * project wants no seeds, which is exactly true of a project that has none.
-     */
-    @Override
-    public Map<String, List<Seeding>> seedings(String pinnedVersion, Path projectDir) {
-        ProjectModel model = readModel(pinnedVersion, projectDir);
-        if (model == null || model.activities().isEmpty()) return Map.of();
-
-        Map<String, List<Seeding>> out = new LinkedHashMap<>();
-        out.put(pathOf(com.botmaker.sdk.internal.plugin.seeds.GoHome.class),
-                List.of(new Seeding("sdk:gohome", "GoHome")));
-        out.put(pathOf(com.botmaker.sdk.internal.plugin.seeds.Popups.class),
-                List.of(new Seeding("sdk:popups", "Popups")));
-
-        List<Seeding> activities = new ArrayList<>(model.activities().size());
-        for (ActivityModel activity : model.activities()) {
-            activities.add(new Seeding("sdk:activity:" + activity.id(), activity.name(),
-                    Map.of("outcomes", activity.allOutcomes())));
-        }
-        out.put(pathOf(com.botmaker.sdk.internal.plugin.seeds.ActivityTemplate.class), activities);
-        // unmodifiableMap, not Map.copyOf: the latter is explicitly unordered and would throw away the
-        // LinkedHashMap above. ScaffoldPlan drives off the catalog's order rather than this map's, so
-        // nothing downstream depends on it — but a plugin handing over a map whose order it just discarded
-        // is a trap for the next reader, and the activities list inside it is ordered and does matter.
-        return Collections.unmodifiableMap(out);
-    }
-
-    /**
-     * The unresolved {@code @Scaffold.path()} of one seed — the key {@link #seedings} answers under.
-     *
-     * <p>Read off the annotation rather than written out again as a string, so the two halves of this
-     * contribution cannot drift: a path edited on the seed moves its seedings with it, and a path this
-     * plugin misspelled would be a key no seed claims, which {@code ScaffoldPlan} reports.
-     */
-    private static String pathOf(Class<?> seed) {
-        Scaffold scaffold = seed.getAnnotation(Scaffold.class);
-        return scaffold == null ? "" : scaffold.path().trim();
-    }
-
-    /** The project's stored model, or {@code null} when there is nothing readable to seed from. */
-    private static ProjectModel readModel(String pinnedVersion, Path projectDir) {
-        if (projectDir == null) return null;
-        try {
-            SdkVersion version = SdkVersion.ofPin(pinnedVersion).orElseGet(SdkVersion::latest);
-            return Authoring.readModel(version, projectDir.resolve("src/main/resources"));
-        } catch (IOException | RuntimeException e) {
-            return null;
-        }
-    }
 }

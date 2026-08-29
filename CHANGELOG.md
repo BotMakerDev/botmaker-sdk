@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **BotMaker writes none of your bot's Java any more.** Not the entry point, not `GoHome`, not `Popups`, not
+  an activity's file. A project's structure is yours: the SDK owns the data files your bot reads back at run
+  time (`activities.json`, `botmaker-project.properties`, the placeholder image) and nothing else. Existing
+  projects are untouched — the files you already have keep compiling and are yours to edit, rename or delete.
+
 - **Your bot can read its own settings by name — `Wire`.** `Wire.whole("minHealth")`,
   `Wire.duration("restBetween")`, `Wire.template("healthBar")`, `Wire.enabled("Mining")`: the values you set
   in the editor, read at run time by the name you gave them, one reader per type. **Nothing has been taken

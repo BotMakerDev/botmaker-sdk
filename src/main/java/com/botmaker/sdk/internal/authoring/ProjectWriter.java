@@ -23,19 +23,25 @@ import java.util.Properties;
  *
  * <h2>All of it, or none of it</h2>
  *
- * <p>Every byte the SDK owns — the source files, {@code activities.json}, the project properties and the
- * placeholder image — is built in memory before the first directory exists, and so is every byte the
- * <em>caller</em> hands in. Anything that can refuse (a name that is not a package, a model the generator
- * cannot render, a target that already holds a project) refuses while there is nothing to clean up. A
- * half-created project is worse than no project: the editor lists it, opening it fails in a different place
- * each time, and the user has to find and delete it by hand.
+ * <p>Every byte the SDK owns — {@code activities.json}, the project properties and the placeholder image —
+ * is built in memory before the first directory exists, and so is every byte the <em>caller</em> hands in.
+ * Anything that can refuse (a name that is not a package, a target that already holds a project) refuses
+ * while there is nothing to clean up. A half-created project is worse than no project: the editor lists it,
+ * opening it fails in a different place each time, and the user has to find and delete it by hand.
  *
- * <p>Two things are deliberately <em>not</em> the SDK's here, for the same reason by two different routes.
- * The editor's own {@code settings.json} is not written at all: no bot reads it, and an SDK writing it would
- * be an SDK with an opinion about an editor it has never seen. {@code pom.xml} <em>is</em> written, but its
- * text comes in through {@code callerFiles} — it is the file that declares which SDK and which other plugins
- * the project has, and the SDK is one plugin among them. It gets committed here only so that "all of it or
- * none of it" still means the whole project.
+ * <h2>No {@code .java} at all</h2>
+ *
+ * <p>Since 2026-08-29 the SDK writes no source into a project — not the entry point, not {@code GoHome},
+ * not {@code Popups}, not an activity stub. <b>A project's structure belongs to the user</b>, and a plugin
+ * contributes methods a user calls rather than files a user inherits. So this class owns only the data files
+ * a bot reads back at runtime, and every {@code .java} arrives through {@code callerFiles} from the host,
+ * which is the one thing that knows the whole plugin set.
+ *
+ * <p>That was already true of {@code pom.xml} and for the same reason — it is the file that declares which
+ * SDK and which other plugins the project has, and the SDK is one plugin among them — so what changed is
+ * that the rule stopped having an exception. The editor's own {@code settings.json} is still not written at
+ * all: no bot reads it, and an SDK writing it would be an SDK with an opinion about an editor it has never
+ * seen. Caller files are committed here only so that "all of it or none of it" still means the whole project.
  */
 public final class ProjectWriter {
 
@@ -62,7 +68,6 @@ public final class ProjectWriter {
         // ---- render ----------------------------------------------------------------------------------
         ProjectModel model = ProjectModel.empty();
         Map<String, String> files = new LinkedHashMap<>();
-        files.putAll(SourceEmitter.sources(spec, model));
         if (spec.kind() == ProjectSpec.Kind.GAME_BOT) {
             files.put("src/main/resources/" + ProjectModel.FILE_NAME,
                     Authoring.modelJson(version, model, schemaVersion));
@@ -96,11 +101,6 @@ public final class ProjectWriter {
         }
         Files.write(projectDir.resolve("src/main/resources/images")
                 .resolve(TemplateNames.DEFAULT_TEMPLATE_FILE), placeholder);
-    }
-
-    /** The paths of every {@code .java} file this spec's project is created with, project-relative. */
-    public static List<String> generatedFileNames(ProjectSpec spec) {
-        return List.copyOf(SourceEmitter.sources(spec, ProjectModel.empty()).keySet());
     }
 
     /**

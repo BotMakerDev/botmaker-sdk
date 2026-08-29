@@ -3,7 +3,6 @@ package com.botmaker.sdk.authoring;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.sdk.internal.authoring.ProjectWriter;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
-import com.botmaker.sdk.internal.authoring.SourceEmitter;
 import com.botmaker.sdk.internal.authoring.ValueJson;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -18,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The one entry point an editor uses to read, write and generate a bot project.
+ * The one entry point an editor uses to read, write and create a bot project.
  *
  * <h2>The version comes first, always</h2>
  *
@@ -144,10 +143,10 @@ public final class Authoring {
     /**
      * The same bytes {@link #writeModel} would write, as text.
      *
-     * <p>It is public because <b>creating</b> a project renders every file it owns before committing any of
-     * them, and {@code activities.json} is one of those files: a creation that can produce the JSON but not
-     * the sources must leave nothing behind. A caller that already has a directory to write into should use
-     * {@link #writeModel} instead.
+     * <p>It is public because <b>creating</b> a project renders every file before committing any of them,
+     * and {@code activities.json} is one of those files: a creation that can produce the JSON but not the
+     * caller's own files must leave nothing behind. A caller that already has a directory to write into
+     * should use {@link #writeModel} instead.
      */
     public static String modelJson(SdkVersion version, ProjectModel model, int schemaVersion)
             throws IOException {
@@ -164,18 +163,22 @@ public final class Authoring {
     /**
      * Creates a whole bot project at {@code projectDir} — every file the SDK owns, or none of them.
      *
-     * <p>What that set is: the four {@code src/} directories, every generated {@code .java},
-     * {@code activities.json} (a game bot's; an empty project has no model to store),
-     * {@code botmaker-project.properties} carrying the reference resolution, and the placeholder image
-     * template. It is the SDK's because every one of those files is <em>about</em> the SDK: what its sources
-     * call, and what shape the data it stores is in.
+     * <p>What that set is: the four {@code src/} directories, {@code activities.json} (a game bot's; an empty
+     * project has no model to store), {@code botmaker-project.properties} carrying the reference resolution,
+     * and the placeholder image template. It is the SDK's because every one of those files is <em>about</em>
+     * the SDK: the shape of the data it reads back at run time.
      *
-     * <p>What it deliberately is <b>not</b>: {@code pom.xml}, where projects live, whether the name is one
-     * the user may use, the editor's own {@code settings.json}, and version control. Those are the editor's.
-     * The pom is the interesting one of the four, and the reason for {@code callerFiles} below: it is the
-     * file that <em>declares which</em> SDK — and which other plugins — the project has, and the SDK is only
-     * one plugin among however many the editor loaded. It cannot enumerate its siblings, so it must not be
-     * the author of the file that lists them.
+     * <p><b>No {@code .java} is in that set, and since 2026-08-29 none ever is.</b> A project's structure
+     * belongs to the user, so every source file arrives through {@code callerFiles} — including the entry
+     * point, which was the last one the SDK wrote. That extends an argument the pom had already won: the pom
+     * <em>declares which</em> SDK, and which other plugins, the project has, and the SDK is one plugin among
+     * however many the editor loaded, so it cannot be the author of the file that lists them. The same is
+     * true of the file that <em>installs</em> them, and true in a plainer way of every other file: only the
+     * user should own the shape of their own project.
+     *
+     * <p>What this is deliberately <b>not</b>, beyond the source: where projects live, whether the name is
+     * one the user may use, the editor's own {@code settings.json}, and version control. Those are the
+     * editor's.
      *
      * <p><b>Everything is rendered before anything is committed</b>, and an existing {@code pom.xml} at the
      * target is refused first. So a refusal never leaves a half-created project for someone to find and
@@ -196,60 +199,6 @@ public final class Authoring {
                                      int schemaVersion, Map<String, String> callerFiles) throws IOException {
         requireVersion(version);
         ProjectWriter.create(version, spec, projectDir, schemaVersion, callerFiles);
-    }
-
-    /**
-     * The project-relative path of every {@code .java} file {@link #createProject} writes for this spec.
-     *
-     * <p>This is how an editor knows a generated file has gone missing: the set is not a list somebody
-     * maintained beside the generator, it is <em>the generator's own answer</em>, so a file that stops being
-     * emitted stops being looked for on the same day.
-     */
-    public static List<String> generatedFileNames(SdkVersion version, ProjectSpec spec) {
-        requireVersion(version);
-        return ProjectWriter.generatedFileNames(spec);
-    }
-
-    // ---- generation -------------------------------------------------------------------------------------
-
-    /**
-     * Every {@code .java} file this project is made of, keyed by its path relative to the project root.
-     *
-     * <p>The whole set, which is what <b>creating</b> a project needs — and, since the derived files stopped
-     * being Java, the whole set full stop: the entry point, {@code GoHome}, {@code Popups} and an editable
-     * stub per activity. An {@link ProjectSpec.Kind#EMPTY} project gets only its entry point, which is the
-     * user's from the first character.
-     *
-     * <p><b>There is no longer a subset that is rewritten afterwards.</b> {@code regenerate} and
-     * {@code templates} are gone with the five files they owned — {@code Activities}, {@code Parameters},
-     * {@code Templates}, {@code ActivityRegistry} and {@code FlowDriver} — which are reads now
-     * ({@code Wire.enabled}, {@code Wire.whole}, {@code Wire.image}, {@code FlowGraph.load}) rather than
-     * source. Everything this method returns is written once and belongs to the user afterwards, so a caller
-     * that used to re-render on every model change has nothing to do.
-     *
-     * <p>{@code imageBaseNames} went with them: the one input that was not in the model existed for
-     * {@code Templates} alone, and a picture is named by its file now.
-     *
-     * <p>Nothing is written to disk here. The caller gets the whole set in memory and commits it, which is
-     * what lets a creation that cannot produce every file it owns produce none of them.
-     */
-    public static Map<String, String> sources(SdkVersion version, ProjectSpec spec, ProjectModel model) {
-        requireVersion(version);
-        return SourceEmitter.sources(spec, model);
-    }
-
-    /**
-     * One activity's editable stub, keyed by path like the rest — for an activity that has just been added,
-     * or one whose file has gone missing.
-     *
-     * <p>A SEED file: emitted here in the shape it starts in, and the user's from that moment. Keeping an
-     * existing stub's {@code Outcome} enum in step with the canvas is a surgical edit of a file the user
-     * owns, and belongs to the editor rather than here.
-     */
-    public static Map<String, String> activityStub(SdkVersion version, ProjectSpec spec,
-                                                   ActivityModel activity) {
-        requireVersion(version);
-        return SourceEmitter.activityStub(spec, activity);
     }
 
     private static void requireVersion(SdkVersion version) {

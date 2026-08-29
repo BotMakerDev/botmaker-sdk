@@ -8,6 +8,40 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-29 — the SDK writes no `.java`, and the seeds go with the emitter
+
+**Done**
+
+- **`SourceEmitter` deleted**, with `Authoring.sources`, `.activityStub` and `.generatedFileNames`, and with
+  `ScaffoldEmitTest`. `ProjectWriter.create` still makes a project — `activities.json`, the project
+  properties, the placeholder image, the four `src/` directories — and every `.java` now arrives through
+  `Authoring.createProject`'s `callerFiles`, from the host.
+- **`internal/plugin/seeds/` deleted** (`GoHome`, `Popups`, `ActivityTemplate`), with
+  `SdkPlugin.scaffold`/`seedings`/`pathOf`, `SdkPluginSeedsTest`, and the pom's `<resources>` block that
+  shipped the seed sources into the jar. The block's removal restores Maven's default `src/main/resources`,
+  which declaring `<resources>` at all had switched off.
+- **`SdkPlugin.SDK_PARAMETERS` rehomed** off `SourceEmitter` and made private. A `ParameterGroup` was never
+  about the generated `Parameters` file it once named; it is how the Parameters dialog attributes a variable
+  to a plugin.
+- **`ProjectCreateTest` inverted**: `theSdkWritesNoJava` walks the created project and asserts the only
+  `.java` on disk is the one the caller handed in. The collision test now collides on `activities.json`,
+  since there is no SDK-written source left to collide with.
+
+**Why**
+
+The seeds were one day old and were the better version of the thing being deleted: real compiling classes
+marked with what a host may substitute, so javac checked them and a broken seed was a red build here rather
+than in somebody's project. The flaw is one level up — it made *writing files into a user's project* a plugin
+surface, and the host grew a key ledger, a reconciler and a rename engine to keep owning what it wrote. **A
+project's structure belongs to the user; a plugin contributes methods a user calls.** That is the argument
+`pom.xml` had already won, applied without an exception left: the entry point *installs* the plugins, which
+is the same argument, and every other file is the user's in a plainer way.
+
+An activity's behaviour becomes `Activities.define("Mining", ctx -> …)` (landing next). The one real loss is
+the compile check a per-activity `Outcome` enum bought; a host picker on the argument replaces it.
+`ActivityModel.id` survives the seeds that motivated it — nothing keys on it today, and it costs nothing to
+keep for the next thing that needs to tell a rename from a delete-plus-create.
+
 ## 2026-08-28 — five editors become three tables and two prompts
 
 Part F, phase C. The SDK's plugin half keeps shrinking to *what only the SDK knows*, and this is the

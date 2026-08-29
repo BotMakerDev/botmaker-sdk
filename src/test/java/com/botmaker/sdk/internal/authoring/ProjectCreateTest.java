@@ -24,8 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Creating a project writes the whole file set — or leaves the disk untouched.
  *
- * <p>What is <em>in</em> the generated Java is {@link ScaffoldEmitTest}'s question, and it answers it by
- * compiling the corpus. This file asks the other one: does the set of files a project is made of actually
+ * <p>There is no companion test about what is <em>in</em> the Java, because the SDK writes none: since
+ * 2026-08-29 every {@code .java} in a project arrives through {@code callerFiles}, and what the SDK owns is
+ * the data a bot reads back at run time. So the only questions left are the two here — does the set actually
  * arrive, and does a refusal arrive before any of it does.
  */
 class ProjectCreateTest {
@@ -33,11 +34,14 @@ class ProjectCreateTest {
     private static final SdkVersion V = SdkVersion.latest();
 
     /**
-     * What an editor hands in: the pom is the caller's, because it declares which SDK — and which other
-     * plugins — the project has, and the SDK is only one of them. Its text is nothing to the SDK, so these
-     * tests use the shortest thing that is still a file.
+     * What an editor hands in: the pom, because it declares which SDK — and which other plugins — the
+     * project has, and the SDK is only one of them; and the entry point, because a project's source is the
+     * user's and the SDK writes none of it. Neither text is anything to the SDK, so these tests use the
+     * shortest thing that is still a file.
      */
-    private static final Map<String, String> CALLER_FILES = Map.of("pom.xml", "<project>studio's</project>");
+    private static final Map<String, String> CALLER_FILES = Map.of(
+            "pom.xml", "<project>studio's</project>",
+            "src/main/java/com/mybot/MyBot.java", "package com.mybot; class MyBot {}");
 
     private static ProjectSpec gameBot() {
         return new ProjectSpec("MyBot", "com.mybot", "MyBot", ProjectSpec.Kind.GAME_BOT, "1.2.0",
@@ -51,17 +55,26 @@ class ProjectCreateTest {
 
         for (String expected : List.of("pom.xml", "src/main/java", "src/main/resources", "src/test/java",
                 "src/test/resources", "src/main/java/com/mybot/MyBot.java",
-                "src/main/java/com/mybot/GoHome.java", "src/main/java/com/mybot/Popups.java",
                 "src/main/resources/" + ProjectModel.FILE_NAME,
                 "src/main/resources/" + ProjectProperties.FILE_NAME,
                 "src/main/resources/images/default_template.png")) {
             assertTrue(Files.exists(project.resolve(expected)), expected + " is missing");
         }
+    }
 
-        // Every .java the emitter claims it writes is really on disk — the claim is what the editor uses to
-        // notice one has gone missing, so a claim nothing checks is worse than no claim.
-        for (String file : Authoring.generatedFileNames(V, gameBot())) {
-            assertTrue(Files.exists(project.resolve(file)), file + " was named but not written");
+    /**
+     * The SDK writes no source at all — not the entry point, not {@code GoHome}, not {@code Popups}, not an
+     * activity stub. A project's structure belongs to the user, so the only {@code .java} on disk is the one
+     * the caller handed in.
+     */
+    @Test
+    void theSdkWritesNoJava(@TempDir Path dir) throws IOException {
+        Path project = dir.resolve("MyBot");
+        Authoring.createProject(V, gameBot(), project, 3, CALLER_FILES);
+
+        try (var walk = Files.walk(project)) {
+            assertEquals(List.of(project.resolve("src/main/java/com/mybot/MyBot.java")),
+                    walk.filter(p -> p.toString().endsWith(".java")).sorted().toList());
         }
     }
 
@@ -79,10 +92,10 @@ class ProjectCreateTest {
 
     /** Whole-file ownership. Two authors of one file is the mistake the scaffold contract was deleted for. */
     @Test
-    void aCallerFileCollidingWithAGeneratedOneIsRefused(@TempDir Path dir) {
+    void aCallerFileCollidingWithAnSdkOneIsRefused(@TempDir Path dir) {
         Path project = dir.resolve("MyBot");
         assertThrows(IllegalArgumentException.class, () -> Authoring.createProject(V, gameBot(), project, 3,
-                Map.of("src/main/java/com/mybot/GoHome.java", "// mine now")));
+                Map.of("src/main/resources/" + ProjectModel.FILE_NAME, "{\"mine\":true}")));
         assertFalse(Files.exists(project));
     }
 
@@ -92,7 +105,6 @@ class ProjectCreateTest {
         Authoring.createProject(V, new ProjectSpec("Blank", "com.blank", "Blank",
                 ProjectSpec.Kind.EMPTY, "1.2.0", new Size(0, 0)), project, 3, CALLER_FILES);
         assertFalse(Files.exists(project.resolve("src/main/resources/" + ProjectModel.FILE_NAME)));
-        assertTrue(Files.exists(project.resolve("src/main/java/com/blank/Blank.java")));
     }
 
     /**
