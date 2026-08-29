@@ -1,12 +1,16 @@
 package com.botmaker.sdk.internal.config;
 
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.sdk.authoring.FlowModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A running bot's own {@code activities.json}, read off the classpath.
@@ -194,6 +198,79 @@ public final class ProjectData {
     /** The drawn flow, as the file holds it — read by the flow loader, which owns what it means. */
     public JsonNode flow() {
         return root.path("flow");
+    }
+
+    /**
+     * The activities placed on the canvas, in canvas order.
+     *
+     * <p>Only these are nodes of the graph. An activity declared but never placed is still constructed — it
+     * can be enabled by name from another activity's body — it simply has nowhere to be reached from.
+     */
+    public List<String> placed() {
+        List<String> out = new ArrayList<>();
+        for (JsonNode node : flow().path("nodes")) {
+            String activity = node.path("activity").asText("");
+            // A node naming no activity is the legacy stop card; it is dropped here exactly as the editor's
+            // own walk drops it, rather than becoming a node with nothing to run.
+            if (!activity.isEmpty() && !out.contains(activity)) out.add(activity);
+        }
+        return List.copyOf(out);
+    }
+
+    /**
+     * The node a run begins at, resolved against what is placed: the stored start when it names a placed
+     * activity, else the first placed one, else {@code ""}.
+     *
+     * <p>The fallback is what lets a flow whose start activity was deleted or renamed still run —
+     * {@code FlowModel.resolvedStart} answers the same question for the editor and this is the same rule.
+     */
+    public String start() {
+        List<String> placed = placed();
+        String stored = flow().path("start").asText("");
+        if (placed.contains(stored)) return stored;
+        return placed.isEmpty() ? "" : placed.get(0);
+    }
+
+    /** The budget of hand-offs one run may make; the model's default when unset or nonsensical. */
+    public int maxSteps() {
+        int stored = flow().path("maxSteps").asInt(0);
+        return stored <= 0 ? FlowModel.DEFAULT_MAX_STEPS : stored;
+    }
+
+    /**
+     * The pause between two activities, in milliseconds.
+     *
+     * <p>Absent and {@code 0} are different answers and must stay so: a flow written before the field existed
+     * has no key and wants the default, while an explicit {@code 0} is a user asking for no pause. That is
+     * the same distinction {@code FlowModel}'s boxed JSON creator exists to preserve.
+     */
+    public int stepDelayMs() {
+        JsonNode stored = flow().path("stepDelayMs");
+        if (!stored.isNumber()) return FlowModel.DEFAULT_STEP_DELAY_MS;
+        return Math.max(0, stored.asInt());
+    }
+
+    /**
+     * Where each of one activity's outcomes leads, keyed by outcome name.
+     *
+     * <p>Includes {@link FlowEdgeModel#DISABLED_OUTCOME}, which is not an outcome an activity can report and
+     * is read out separately by the loader. A blank stored outcome is {@link FlowEdgeModel#NEXT_OUTCOME} —
+     * blank-means-implicit is how that constant survived being renamed once already, and reading it any other
+     * way here would undo that.
+     */
+    public Map<String, String> routes(String from) {
+        if (from == null) return Map.of();
+        Map<String, String> out = new LinkedHashMap<>();
+        for (JsonNode edge : flow().path("edges")) {
+            if (!from.equals(edge.path("from").asText(null))) continue;
+            String to = edge.path("to").asText("");
+            if (to.isEmpty()) continue;
+            String outcome = edge.path("outcome").asText("");
+            // First wire wins, matching the editor's rule that (from, outcome) is unique: a second one is a
+            // file somebody hand-edited, and silently preferring the later would move the flow.
+            out.putIfAbsent(outcome.isBlank() ? FlowEdgeModel.NEXT_OUTCOME : outcome, to);
+        }
+        return Map.copyOf(out);
     }
 
     /** Whether this model holds nothing at all. */

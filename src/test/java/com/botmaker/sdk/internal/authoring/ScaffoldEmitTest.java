@@ -1,11 +1,6 @@
 package com.botmaker.sdk.internal.authoring;
 
-import com.botmaker.plugin.api.ParameterGroup;
-import com.botmaker.plugin.api.value.Range;
-import com.botmaker.plugin.api.value.ValueChoice;
-import com.botmaker.plugin.api.value.ValueShape;
-import com.botmaker.plugin.api.value.ValueType;
-import com.botmaker.plugin.api.value.Visibility;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.authoring.ActivityModel;
 import com.botmaker.sdk.authoring.Authoring;
 import com.botmaker.sdk.authoring.FlowEdgeModel;
@@ -14,8 +9,6 @@ import com.botmaker.sdk.authoring.FlowNodeModel;
 import com.botmaker.sdk.authoring.ProjectModel;
 import com.botmaker.sdk.authoring.ProjectSpec;
 import com.botmaker.sdk.authoring.SdkVersion;
-import com.botmaker.sdk.authoring.VariableModel;
-import com.botmaker.sdk.api.geometry.Size;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -46,10 +39,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * whenever the jar did. Here the emitted file and the API it calls are the same build: {@code javac} runs
  * against this reactor's own {@code target/classes}, taken from the test classpath.
  *
- * <p>Nothing here asserts the <em>text</em> of a generated file beyond the few lines that carry a decision
- * (the missing {@code final} on a flag, a literal where a parser call used to be). Compiling it is the
- * assertion; a golden-file comparison would fail on every javadoc edit and prove nothing about the file
- * working.
+ * <h2>What this test lost, and why that is the point</h2>
+ *
+ * <p>It used to carry a corpus of every storable type with awkward values, because the emitter wrote
+ * <em>literals</em> into {@code Parameters} and a quote, a backslash or a comment fence in a user's text
+ * would have produced a file that did not compile. It also held the trap about {@code Activities}' missing
+ * {@code final}, and two assertions about the shape of the generated {@code FlowDriver} table.
+ *
+ * <p>None of those files exist. A project's values, flags, pictures and flow are read at run time now, so
+ * there is no longer any user data anywhere in this output — which means the corpus that mattered has
+ * collapsed to "with activities and without". <b>A generator that cannot be handed unsafe input is the
+ * outcome the whole change was for</b>, and this test getting smaller is what that looks like.
+ *
+ * <p>Nothing here asserts the <em>text</em> of a file beyond the two lines that carry a decision. Compiling
+ * it is the assertion; a golden-file comparison would fail on every javadoc edit and prove nothing about the
+ * file working.
  */
 class ScaffoldEmitTest {
 
@@ -75,14 +79,17 @@ class ScaffoldEmitTest {
         return ProjectModel.empty();
     }
 
-    /** One activity, nothing wired — the flow falls back to declaration order. */
+    /** One activity, nothing wired. */
     private static ProjectModel oneActivity() {
         return ProjectModel.of(List.of(activity("Mining")), List.of());
     }
 
     /**
-     * A branch, a loop back to the start, an unrouted outcome that ends the run, and an orphan — plus a
-     * {@code DISABLED} wire on Mining and none on Selling, which is the pair the emitter must tell apart.
+     * A branch, a loop back to the start, an unrouted outcome that ends the run, and an orphan.
+     *
+     * <p>The wiring no longer reaches the emitted source at all — it is read from {@code activities.json} at
+     * run time — so what this case still checks is that it <em>does not</em>: a stub whose activity has three
+     * outcomes and two wires is the same file as one with none, plus two enum constants.
      */
     private static ProjectModel wired() {
         FlowModel flow = new FlowModel(
@@ -102,213 +109,106 @@ class ScaffoldEmitTest {
     }
 
     /**
-     * Every storable type, scalar and list, with values chosen to be awkward: blank, unparseable, and text
-     * carrying the three characters that would break a literal or a comment.
-     */
-    private static ProjectModel everyType() {
-        List<VariableModel> variables = new ArrayList<>();
-        for (ValueType type : SdkValueTypes.CATALOG.types()) {
-            String id = type.id();
-            variables.add(new VariableModel("scalar" + id, ValueChoice.of(type),
-                    List.of(sample(type)), "a \"quoted\" one */ with a fence", "", Visibility.PUBLIC,
-                    List.of(), Range.NONE, ParameterGroup.DEFAULT_ID));
-            variables.add(VariableModel.of("blank" + id, ValueChoice.of(type), List.of()));
-            variables.add(VariableModel.of("junk" + id, ValueChoice.of(type), List.of("not a " + id)));
-            variables.add(VariableModel.of("list" + id,
-                    new ValueChoice(type, ValueShape.OPEN_LIST), List.of(sample(type), sample(type))));
-            variables.add(VariableModel.of("empty" + id,
-                    new ValueChoice(type, ValueShape.OPEN_LIST), List.of()));
-        }
-        return ProjectModel.of(List.of(activity("Mining")), variables);
-    }
-
-    /**
-     * One plausible stored value per type, in the wire spelling the editor writes.
+     * A name and a description carrying the characters that would end a javadoc comment or a string literal.
      *
-     * <p>A map keyed by id rather than a {@code switch}, because the vocabulary is open and a {@code switch}
-     * over it could never be exhaustive again. {@link #everySdkTypeHasASample} is what keeps it complete: the
-     * compiler used to refuse a missing arm, and that job moves to a test the moment the set stops being an
-     * enum. A type with no sample would otherwise silently be exercised with the empty string.
+     * <p>The description is the last piece of user text that still reaches emitted source — it becomes the
+     * stub's class javadoc — so it is the last thing that can produce a file that does not compile.
      */
-    private static String sample(ValueType type) {
-        return SAMPLES.get(type.id());
-    }
-
-    private static final Map<String, String> SAMPLES = Map.ofEntries(
-            Map.entry("TEXT", "a \"quoted\"\ttab\\slash"),
-            Map.entry("YES_NO", "true"),
-            Map.entry("WHOLE_NUMBER", "3"),
-            Map.entry("DECIMAL_NUMBER", "0.75"),
-            Map.entry("CHARACTER", "'"),
-            Map.entry("COLOR", "#3366FF"),
-            Map.entry("DATE", "2026-08-25"),
-            Map.entry("TIME_OF_DAY", "07:30:15"),
-            Map.entry("DURATION", "1h30m"),
-            Map.entry("IMAGE_TEMPLATE", "ore"),
-            Map.entry("PRECISION", "12.5,4,2"),
-            Map.entry("POINT", "3,4"),
-            Map.entry("RECT", "1,2,3,4"),
-            Map.entry("SIZE", "800,600"),
-            Map.entry("DIRECTION", "SOUTH"),
-            Map.entry("KEY", "SPACE"),
-            Map.entry("MOUSE_BUTTON", "LEFT"));
-
-    /** The exhaustiveness javac used to give the {@code switch} this map replaced. */
-    @Test
-    void everySdkTypeHasASample() {
-        for (ValueType type : SdkValueTypes.CATALOG.types()) {
-            assertTrue(SAMPLES.containsKey(type.id()),
-                    () -> "no sample value for " + type.id() + " — the corpus would not exercise it");
-        }
+    private static ProjectModel awkwardText() {
+        return ProjectModel.of(
+                List.of(activity("Mining").withDescription("a \"quoted\" one */ with a fence \\ and a slash")),
+                List.of());
     }
 
     // ---- the guarantee ----------------------------------------------------------------------------------
 
     @Test
     void everyProjectInTheCorpusCompiles(@TempDir Path dir) throws IOException {
-        List<ProjectModel> corpus = List.of(bare(), oneActivity(), wired(), everyType());
+        List<ProjectModel> corpus = List.of(bare(), oneActivity(), wired(), awkwardText());
         for (int i = 0; i < corpus.size(); i++) {
-            Path root = dir.resolve("case" + i);
-            Map<String, String> sources = Authoring.sources(V, spec(), corpus.get(i),
-                    List.of("ore", "gold_ore", "Mixed-Case"));
+            Map<String, String> sources = Authoring.sources(V, spec(), corpus.get(i));
             assertFalse(sources.isEmpty(), "a game bot with nothing in it still has files");
-            compile(root, sources);
+            compile(dir.resolve("case" + i), sources);
         }
     }
 
     /**
-     * An empty project gets exactly two files, and never regenerates.
+     * An empty project gets exactly one file.
      *
      * <p>A hello-world entry point, because a project with no {@code .java} at all is one the editor cannot
-     * open — it has no main source file to show; and {@code Templates}, because the images folder exists from
-     * the first moment and the first vision block dropped into that entry point has to name a constant that
-     * resolves. Neither is a <em>model</em> file: an empty project has no activities and no parameters, which
-     * is why {@code regenerate} still answers nothing however much is passed to it.
+     * open — it has no main source file to show. It used to get {@code Templates} as well, so that the first
+     * vision block dropped into that entry point named a constant that resolved; a picture is named by its
+     * file now ({@code Wire.image("ore")}), so there is no constant to resolve and nothing to keep in step.
      */
     @Test
-    void anEmptyProjectGetsAnEntryPointAndTemplatesAndNothingElse(@TempDir Path dir) throws IOException {
+    void anEmptyProjectGetsAnEntryPointAndNothingElse(@TempDir Path dir) throws IOException {
         ProjectSpec empty = new ProjectSpec("MyBot", "com.mybot", "MyBot", ProjectSpec.Kind.EMPTY, "1.2.0",
                 new Size(0, 0));
-        Map<String, String> sources = Authoring.sources(V, empty, oneActivity(), List.of("ore"));
+
+        Map<String, String> sources = Authoring.sources(V, empty, oneActivity());
+
+        assertEquals(List.of("src/main/java/com/mybot/MyBot.java"), List.copyOf(sources.keySet()));
+        compile(dir, sources);
+    }
+
+    /** A game bot's whole output: three seeds plus one stub per activity, and nothing derived. */
+    @Test
+    void aGameBotGetsItsSeedsAndOneStubPerActivity() {
         assertEquals(List.of("src/main/java/com/mybot/MyBot.java",
-                        "src/main/java/com/mybot/Templates.java"),
-                List.copyOf(sources.keySet()));
-        assertTrue(Authoring.regenerate(V, empty, oneActivity(), List.of()).isEmpty());
-        compile(dir, sources);
+                        "src/main/java/com/mybot/GoHome.java",
+                        "src/main/java/com/mybot/Popups.java",
+                        "src/main/java/com/mybot/activities/Mining.java",
+                        "src/main/java/com/mybot/activities/Selling.java",
+                        "src/main/java/com/mybot/activities/Lonely.java"),
+                List.copyOf(Authoring.sources(V, spec(), wired()).keySet()));
     }
 
     /**
-     * The trap this whole design walks into if anyone "tidies" the emitter: a {@code static final boolean}
-     * with a constant initialiser is a JLS §4.12.4 constant variable, javac folds it, and a user's
-     * {@code while (Activities.Mining) { … }} becomes an <em>unreachable statement</em> — a compile error
-     * caused by unticking a box. So the flag is emitted without {@code final}, and the proof is a file that
-     * loops on a flag stored as {@code false}.
-     */
-    @Test
-    void aFlagThatIsOffDoesNotMakeTheUsersLoopUnreachable(@TempDir Path dir) throws IOException {
-        ProjectModel model = ProjectModel.of(
-                List.of(activity("Mining").withEnabled(false)), List.of());
-        Map<String, String> sources = new java.util.LinkedHashMap<>(
-                Authoring.sources(V, spec(), model, List.of()));
-
-        assertTrue(sources.get("src/main/java/com/mybot/Activities.java")
-                .contains("public static boolean Mining = false;"), "the flag must not be final");
-
-        sources.put("src/main/java/com/mybot/UserCode.java", """
-                package com.mybot;
-
-                public final class UserCode {
-                    public static void loop() {
-                        while (Activities.Mining) {
-                            Activities.Mining = false;
-                        }
-                    }
-
-                    private UserCode() {}
-                }
-                """);
-        compile(dir, sources);
-    }
-
-    /** A value is a literal in the source, not a string the bot parses when it starts. */
-    @Test
-    void aValueIsBakedIntoTheSourceRatherThanParsedAtStartup() {
-        ProjectModel model = ProjectModel.of(List.of(), List.of(
-                VariableModel.of("REST", ValueChoice.of(SdkValueTypes.DURATION), List.of("1h30m")),
-                VariableModel.of("HOTKEYS", ValueChoice.listOf(SdkValueTypes.KEY),
-                        List.of("SPACE", "ESCAPE"))));
-
-        String parameters = Authoring.regenerate(V, spec(), model, List.of())
-                .get("src/main/java/com/mybot/Parameters.java");
-
-        assertNotNull(parameters);
-        assertTrue(parameters.contains(
-                        "public static final java.time.Duration REST = java.time.Duration.ofMillis(5400000L);"),
-                parameters);
-        assertTrue(parameters.contains(
-                        "public static final java.util.List<Key> HOTKEYS = "
-                                + "java.util.List.of(Key.SPACE, Key.ESCAPE);"),
-                parameters);
-        assertTrue(parameters.contains("import com.botmaker.sdk.api.interaction.Key;"),
-                "an SDK type used in a field has to be imported");
-        assertFalse(parameters.contains("Wire."), "the parser call is gone, and so is Wire");
-    }
-
-    /** Regeneration touches five files and none of the ones a user owns. */
-    @Test
-    void regenerationTouchesOnlyTheFilesItOwns() {
-        Map<String, String> regenerated = Authoring.regenerate(V, spec(), wired(), List.of());
-
-        assertEquals(List.of("src/main/java/com/mybot/Activities.java",
-                        "src/main/java/com/mybot/Parameters.java",
-                        "src/main/java/com/mybot/Templates.java",
-                        "src/main/java/com/mybot/ActivityRegistry.java",
-                        "src/main/java/com/mybot/FlowDriver.java"),
-                List.copyOf(regenerated.keySet()));
-    }
-
-    /** An orphan is not instantiated, and still has a stub and a flag so the project keeps compiling. */
-    @Test
-    void anOrphanKeepsItsStubAndItsFlagButIsNotRegistered() {
-        Map<String, String> sources = Authoring.sources(V, spec(), wired(), List.of());
-
-        assertTrue(sources.containsKey("src/main/java/com/mybot/activities/Lonely.java"));
-        assertTrue(sources.get("src/main/java/com/mybot/Activities.java").contains("boolean Lonely"));
-        assertFalse(sources.get("src/main/java/com/mybot/ActivityRegistry.java").contains("LONELY"));
-    }
-
-    /**
-     * A disabled activity follows its own {@code DISABLED} wire, not the one it would have taken with nothing
-     * to report — and an activity with no {@code DISABLED} wire ends the run rather than falling through.
+     * The activity's tick is read, not compiled in.
      *
-     * <p>That second half is the behaviour change: before this outcome existed the destination was inferred
-     * from {@code NEXT}, so it could not be seen in the editor and could not be chosen. Selling here wires
-     * {@code NEXT} to Mining and nothing else, and its {@code whenDisabled} slot must be {@code null}.
+     * <p>This is the line that replaced the whole {@code Activities} class, and with it the trap that class
+     * carried: {@code public static final boolean MINING = false;} is a JLS §4.12.4 constant variable, javac
+     * folds it into every use site, and a user's own {@code while (Activities.MINING) { … }} then became an
+     * <em>unreachable statement</em> — a compile error caused by unticking a box. A method call cannot fold,
+     * so the trap is gone by construction rather than by remembering to leave off a {@code final}.
      */
     @Test
-    void aDisabledActivityFollowsItsOwnWire() {
-        String driver = Authoring.sources(V, spec(), wired(), List.of())
-                .get("src/main/java/com/mybot/FlowDriver.java");
+    void anActivityReadsItsOwnTickRatherThanAGeneratedField() {
+        String mining = Authoring.sources(V, spec(), wired())
+                .get("src/main/java/com/mybot/activities/Mining.java");
 
-        assertTrue(driver.contains("""
-                FlowGraph.node("Mining", ActivityRegistry.MINING, PopupCheck.ON, Recovery.GO_HOME, "Selling\""""),
-                "Mining's DISABLED wire leads to Selling, so that is its whenDisabled — even though its NEXT "
-                        + "loops back to itself:\n" + driver);
-        assertTrue(driver.contains("""
-                FlowGraph.node("Selling", ActivityRegistry.SELLING, PopupCheck.OFF, Recovery.NONE, null"""),
-                "Selling has no DISABLED wire, so switching it off ends the run — its NEXT is not a "
-                        + "fallback:\n" + driver);
+        assertTrue(mining.contains("return Wire.enabled(\"Mining\");"), mining);
+        assertFalse(mining.contains("Activities"), "there is no generated flags class to import any more");
     }
 
-    /** DISABLED is a port, never an {@code Outcome} constant: an activity that did not run reported nothing. */
+    /**
+     * The entry point hands the loader its own class, and nothing else about the flow.
+     *
+     * <p>{@code MyBot.class} is the only thing in a generated project that says where the project's package
+     * is, which is what lets an activity be found at {@code <package>.activities.<Name>} with no manifest to
+     * keep in step. Everything else the old {@code FlowDriver} held — the start node, the routes, the step
+     * budget, the pause — is in {@code activities.json}.
+     */
     @Test
-    void disabledIsNeitherAnEnumConstantNorARoute() {
-        Map<String, String> sources = Authoring.sources(V, spec(), wired(), List.of());
+    void theEntryPointNamesItselfAndLetsTheSdkReadTheRest() {
+        String main = Authoring.sources(V, spec(), wired()).get("src/main/java/com/mybot/MyBot.java");
 
-        assertFalse(sources.get("src/main/java/com/mybot/activities/Mining.java").contains("DISABLED"),
+        assertTrue(main.contains("FlowGraph.run(MyBot.class, GoHome.INSTANCE::execute)"), main);
+        assertFalse(main.contains("FlowDriver"), "the generated driver is gone");
+    }
+
+    /**
+     * {@code DISABLED} is still not an enum constant.
+     *
+     * <p>An activity can never <em>report</em> being disabled — it did not run — so it is one slot on the
+     * node rather than an outcome, and that was true when the table was generated and stays true now that it
+     * is read. The stub is where it would show up if anyone confused the two.
+     */
+    @Test
+    void disabledIsNeverSomethingAnActivityCanReturn() {
+        assertFalse(Authoring.sources(V, spec(), wired())
+                        .get("src/main/java/com/mybot/activities/Mining.java").contains("DISABLED"),
                 "the Outcome enum must not gain a constant no run() could ever return");
-        assertFalse(sources.get("src/main/java/com/mybot/FlowDriver.java").contains("Outcome.DISABLED"),
-                "whenDisabled is the one mechanism; a route beside it would be a second");
     }
 
     // ---- compiling --------------------------------------------------------------------------------------

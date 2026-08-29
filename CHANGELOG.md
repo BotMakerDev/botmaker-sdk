@@ -28,6 +28,30 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   here can throw** — a missing file, a missing name and a value that will not parse all fall back, because a
   bot must never fail to start because of its own configuration file.
 
+- **BotMaker no longer writes five of your bot's nine files.** `Activities`, `Parameters`, `Templates`,
+  `ActivityRegistry` and `FlowDriver` were rewritten every time you ticked a box, changed a value, captured a
+  picture or moved a wire. None of them is generated any more, because all five said only what your project's
+  own `activities.json` already said. **A new project gets four files: your entry point, `GoHome`, `Popups`,
+  and one class per activity — every one of them yours to edit, none of them ever overwritten.**
+
+- **`FlowGraph.run(YourBot.class, GoHome.INSTANCE::execute)` walks the flow you drew.** It replaces the
+  generated `FlowDriver` and `ActivityRegistry` together: the start node, the wires, the step budget and the
+  pause between activities all come from `activities.json`, and your activities are found beside your entry
+  point at `<your package>.activities.<Name>`. Redrawing the canvas now changes no Java at all.
+  `FlowGraph.of` / `.node` / `.route` are **deprecated but still work** — a bot with a hand-built or an
+  already-generated table keeps running untouched.
+
+- **`Wire.image("ore")` names a picture** — the replacement for `Templates.ORE`. Adding a picture to your
+  project is no longer a source edit.
+
+- **What this costs you, stated plainly.** `Parameters.minHealth` was an `int` field and misspelling it was a
+  compile error; `Wire.whole("minHealth")` answers `0`. The one place you write a name by hand keeps its
+  compiler — `return Outcome.BAG_FULL;` is still checked against an enum the editor maintains for you.
+
+- **An existing bot is not touched.** If your project already has those five files, they stay exactly where
+  they are and go on working. They are ordinary source you own now: nothing rewrites them, and nothing
+  deletes them. Move to `Wire` and `FlowGraph.run` when you feel like it, or never.
+
 - **Internal: the plugin-side code is smaller, and the generic half of it is the toolkit's.** `Slots`, the
   call-site matching, the bounded-number pill and the editor test stubs moved to
   `botmaker-plugin-toolkit`; `SdkPlugin` extends its new `AbstractStudioPlugin`, which also makes the

@@ -156,6 +156,24 @@ public final class Wire {
         return WireText.template(one(name));
     }
 
+    /**
+     * A picture from this project's {@code images/} folder, <b>by its file name</b> —
+     * {@code Wire.image("ore")} is {@code images/ore.png}.
+     *
+     * <p><b>Not the same question as {@link #template(String)}</b>, which reads a <em>variable</em> whose
+     * value happens to be a picture. This one names a file directly, and it is what replaces the generated
+     * {@code Templates} class: {@code Templates.ORE} was one {@code public static final String} per file,
+     * regenerated on every capture, rename and delete.
+     *
+     * <p>What is given up is the same thing given up everywhere else here — {@code Templates.ORE} did not
+     * compile once the file was renamed, and {@code Wire.image("ore")} does. What is bought is that a
+     * project's pictures stop being a compiled artefact of the project at all, so adding one is no longer a
+     * source edit.
+     */
+    public static ImageTemplate image(String baseName) {
+        return WireText.template(baseName == null ? "" : baseName);
+    }
+
     /** A match precision, or the default one. */
     public static Precision precision(String name) {
         return WireText.precision(one(name));

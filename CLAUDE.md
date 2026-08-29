@@ -335,8 +335,52 @@ total: a missing file, a missing key and an unparseable value each have a docume
 threw would give that guarantee back.
 
 `Wire.enabled(name)` is an **activity's** switch and is a different list from `Wire.flag(name)`, which is a
-yes/no variable. `ProjectData` is `internal` and is what `FlowGraph`'s loader will read; `Wire` is what a bot
+yes/no variable. `ProjectData` is `internal` and is what `FlowGraph`'s loader reads; `Wire` is what a bot
 author writes.
+
+## Five generated files became reads (2026-08-29)
+
+`SourceEmitter` wrote nine `.java` files; five of them — `Activities`, `Parameters`, `Templates`,
+`ActivityRegistry`, `FlowDriver` — followed **entirely** from the project's own model and were rewritten on
+every tick, value, capture and wire. All five are deleted, and none was replaced by a different generator.
+`Authoring.regenerate`, `.templates` and the `imageBaseNames` parameter went with them; there is no longer a
+subset of a project that is re-rendered after creation.
+
+**The rule this states is the surface's own: a file whose contents follow from project data is data.** That
+is what makes deleting the emitter possible at all — what is left is four **seeds**, and a seed is a real
+class a plugin ships and compiles in its own build, not a string assembled here.
+
+| Was | Is |
+|---|---|
+| `Activities.MINING` | `Wire.enabled("Mining")` |
+| `Parameters.minHealth` | `Wire.whole("minHealth")` |
+| `Templates.ORE` | `Wire.image("ore")` |
+| `ActivityRegistry.MINING` | `ActivityLoader`, by convention |
+| `FlowDriver.run()` | `FlowGraph.run(Main.class, GoHome.INSTANCE::execute)` |
+
+**`FlowGraph.load/run` route on outcome *names*, and that is the one check given up.** The generated table
+was typed — `node` is generic in the activity's own outcome enum, so a route built from another activity's
+constant did not compile. Read from a file it cannot be. The check that mattered is kept where a human
+actually writes one: `return Outcome.BAG_FULL;` in an activity's body, against an enum the editor maintains.
+A wire in a file the editor wrote was never where the mistakes were. `of`/`node`/`route` are `@Deprecated`
+with `@ReplacedBy` and **not removed** — never-delete is unconditional, and an existing bot's generated table
+goes on working.
+
+**The activity's class is found by convention, and a manifest was refused.** `<the anchor's package>.activities.<Name>`,
+which is where the editor has always written the stub; the anchor is a `Class<?>` so a rename of the class,
+the package, or both changes nothing. A resource manifest listing class names was the obvious alternative and
+is a second statement of a fact the file already carries — written by somebody, kept in step by somebody, and
+wrong the first time it is not. `ActivityLoader` **constructs** every activity the model names, placed or
+not: `Activity`'s constructor registers it by name, which is what makes `Activity.disable("Mining")` resolve,
+and it is the only thing the old registry's `ALL` field was for.
+
+**`assemble` is in `api.flow.FlowGraph` rather than in `internal`**, alone among the flow code, because
+`Node`'s constructor is private and widening it so a loader elsewhere could call it would put the only
+unchecked way to build a node on the public surface. Reading the model is `ProjectData`'s and constructing
+the activities is `ActivityLoader`'s; only the assembly is here.
+
+**What is *not* affected: `LiteralWriter`.** It still writes Java, for slot values in a bot's own body
+(`SdkValueTypes`' codecs). Only the files that held a project's data stopped being source.
 
 ## The scaffold templates are gone (2026-08-25)
 

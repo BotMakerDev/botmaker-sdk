@@ -61,12 +61,8 @@ public final class ProjectWriter {
 
         // ---- render ----------------------------------------------------------------------------------
         ProjectModel model = ProjectModel.empty();
-        // The placeholder is the one image a new project has, so it is the one entry Templates is built
-        // from. Passing the folder's contents would be the same list — there is no folder yet.
-        List<String> images = List.of(TemplateNames.DEFAULT_TEMPLATE_NAME);
-
         Map<String, String> files = new LinkedHashMap<>();
-        files.putAll(SourceEmitter.sources(spec, model, images));
+        files.putAll(SourceEmitter.sources(spec, model));
         if (spec.kind() == ProjectSpec.Kind.GAME_BOT) {
             files.put("src/main/resources/" + ProjectModel.FILE_NAME,
                     Authoring.modelJson(version, model, schemaVersion));
@@ -104,7 +100,7 @@ public final class ProjectWriter {
 
     /** The paths of every {@code .java} file this spec's project is created with, project-relative. */
     public static List<String> generatedFileNames(ProjectSpec spec) {
-        return List.copyOf(SourceEmitter.sources(spec, ProjectModel.empty(), List.of()).keySet());
+        return List.copyOf(SourceEmitter.sources(spec, ProjectModel.empty()).keySet());
     }
 
     /**

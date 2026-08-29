@@ -215,52 +215,27 @@ public final class Authoring {
     /**
      * Every {@code .java} file this project is made of, keyed by its path relative to the project root.
      *
-     * <p>The whole set, which is what <b>creating</b> a project needs: the entry point, {@code GoHome},
-     * {@code Popups}, an editable stub per activity, and the five regenerated files
-     * {@link #regenerate} also emits. An {@link ProjectSpec.Kind#EMPTY} project has none of them — its entry
-     * point is the user's from the first character — so the map comes back empty.
+     * <p>The whole set, which is what <b>creating</b> a project needs — and, since the derived files stopped
+     * being Java, the whole set full stop: the entry point, {@code GoHome}, {@code Popups} and an editable
+     * stub per activity. An {@link ProjectSpec.Kind#EMPTY} project gets only its entry point, which is the
+     * user's from the first character.
+     *
+     * <p><b>There is no longer a subset that is rewritten afterwards.</b> {@code regenerate} and
+     * {@code templates} are gone with the five files they owned — {@code Activities}, {@code Parameters},
+     * {@code Templates}, {@code ActivityRegistry} and {@code FlowDriver} — which are reads now
+     * ({@code Wire.enabled}, {@code Wire.whole}, {@code Wire.image}, {@code FlowGraph.load}) rather than
+     * source. Everything this method returns is written once and belongs to the user afterwards, so a caller
+     * that used to re-render on every model change has nothing to do.
+     *
+     * <p>{@code imageBaseNames} went with them: the one input that was not in the model existed for
+     * {@code Templates} alone, and a picture is named by its file now.
      *
      * <p>Nothing is written to disk here. The caller gets the whole set in memory and commits it, which is
      * what lets a creation that cannot produce every file it owns produce none of them.
-     *
-     * @param imageBaseNames the file names (no extension) of the project's image templates, which the
-     *                       generated {@code Templates} class is built from — the one input that is not in
-     *                       the model, because it lives in the images folder rather than in the file
      */
-    public static Map<String, String> sources(SdkVersion version, ProjectSpec spec, ProjectModel model,
-                                              List<String> imageBaseNames) {
+    public static Map<String, String> sources(SdkVersion version, ProjectSpec spec, ProjectModel model) {
         requireVersion(version);
-        return SourceEmitter.sources(spec, model, imageBaseNames);
-    }
-
-    /**
-     * The subset rewritten wholesale whenever the project's model changes — {@code Activities},
-     * {@code Parameters}, {@code Templates}, {@code ActivityRegistry} and {@code FlowDriver}.
-     *
-     * <p><b>Hand edits inside these files are lost.</b> That was already true, and it now includes editing a
-     * <em>value</em>: {@code Parameters} holds literals rather than a parser call, so a duration changed in
-     * the Java rather than in the dialog survives exactly until the next save. Each file says so in its own
-     * javadoc.
-     */
-    public static Map<String, String> regenerate(SdkVersion version, ProjectSpec spec, ProjectModel model,
-                                                 List<String> imageBaseNames) {
-        requireVersion(version);
-        return SourceEmitter.regenerated(spec, model, imageBaseNames);
-    }
-
-    /**
-     * The generated {@code Templates} class alone — the constants naming this project's image files.
-     *
-     * <p>Its own entry point rather than a slice of {@link #regenerate}, because it is the one generated file
-     * that says nothing about the model: it is a function of the images folder, an
-     * {@link ProjectSpec.Kind#EMPTY} project has one too (so the first vision block a user drops names a
-     * constant that resolves), and it is rewritten on every capture, rename and delete — moments at which
-     * rewriting the flow driver would be pure noise in the user's diff.
-     */
-    public static Map<String, String> templates(SdkVersion version, ProjectSpec spec,
-                                                List<String> imageBaseNames) {
-        requireVersion(version);
-        return SourceEmitter.templatesFile(spec, imageBaseNames);
+        return SourceEmitter.sources(spec, model);
     }
 
     /**

@@ -52,7 +52,6 @@ class ProjectCreateTest {
         for (String expected : List.of("pom.xml", "src/main/java", "src/main/resources", "src/test/java",
                 "src/test/resources", "src/main/java/com/mybot/MyBot.java",
                 "src/main/java/com/mybot/GoHome.java", "src/main/java/com/mybot/Popups.java",
-                "src/main/java/com/mybot/Parameters.java", "src/main/java/com/mybot/Templates.java",
                 "src/main/resources/" + ProjectModel.FILE_NAME,
                 "src/main/resources/" + ProjectProperties.FILE_NAME,
                 "src/main/resources/images/default_template.png")) {
