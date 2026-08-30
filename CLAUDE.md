@@ -455,6 +455,30 @@ where a random default would make every open of an old project look like a renam
 generated `Parameters` file it once named — a `ParameterGroup` is how the editor's Parameters dialog decides
 which plugin a variable belongs to.
 
+## The capture targets are authoring data (2026-08-30)
+
+`authoring/CaptureModel` + `authoring/CaptureTargetModel`, stored as **`capture.json`** beside
+`activities.json` and reached through `Authoring.readCapture`/`writeCapture`/`captureJson`. It is the same
+shape as the model file because it is the same kind of fact — *a file describing the bot, owned by the bot's
+own SDK version* — and it exists because the same list was being stored twice: the editor's `settings.json`
+held the targets a picker offered, `botmaker-project.properties` held the one spec a running bot reads, and
+nothing kept them in step. Both files parse, so the disagreement was silent.
+
+**A target's identity is its spec text**, in shared's `CaptureSourceKind` grammar. Four record shapes would be
+a second grammar to keep in step with the one the bot already reads; the spec is what both sides mean.
+
+**No schema stamp on this file**, deliberately — the migration ledger is the caller's and its one entry point
+is `activities.json`; a second stamp is a second ledger. And **the model normalises rather than trusts**: an
+index naming nothing becomes absent, `defaultTarget()` is total and stands in the first target for a project
+that never chose.
+
+**A bot cannot read this file, and that bounds the move.** `Authoring` names the value vocabulary in
+`botmaker-studio-api`, which is `optional` and deliberately off a bot's classpath — the same trap
+`api.config.Wire` documents. So the running bot still resolves `capture.source` out of the properties file,
+and Studio writes that key **from the default target, in the same pass as the list**: one writer, one
+direction, a cache rather than a second answer. A classpath reader beside `internal/config/ProjectData` is
+what would retire it.
+
 ## The two pickers the lambda was built for (2026-08-30)
 
 `internal/plugin/editors/ActivityEditors` is the other half of the paragraph above: `CallSites.ACTIVITY_NAME`

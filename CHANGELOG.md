@@ -35,6 +35,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   (it is reported, and behaves like an outcome you never wired), and renaming an activity on the canvas does
   not rename the string in your code.
 
+- **Your capture targets are one list now, in `capture.json`.** The screens, windows and emulators you set up
+  as targets were kept in the editor's own settings, while the one your bot actually looks at was kept
+  separately in `botmaker-project.properties` — so the two could drift apart with nothing to tell you. The
+  list is a project file the SDK owns, like `activities.json`, and the default target is what your bot
+  resolves. Existing projects are migrated the first time they are saved; nothing you have set up is lost.
+
 - **Bots with `Activity` subclasses keep working, unchanged.** Both kinds of activity share one registry, so
   `Activity.disable("Mining")` still finds either.
 

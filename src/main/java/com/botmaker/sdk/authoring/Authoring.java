@@ -158,6 +158,43 @@ public final class Authoring {
         return MAPPER.writeValueAsString(stamped);
     }
 
+    // ---- capture ----------------------------------------------------------------------------------------
+
+    /**
+     * Reads {@code capture.json} out of a project's resources directory.
+     *
+     * <p>Missing is {@link CaptureModel#empty()} and not an error, for the same reason a missing
+     * {@code activities.json} is: a project that has never had a capture target set up reads the same as one
+     * whose file was deleted, and in both cases there is nothing declared. A file that exists and cannot be
+     * parsed <b>is</b> thrown.
+     *
+     * <p>No schema stamp, deliberately. The migration ledger is the caller's and its one entry point is
+     * {@code activities.json}; a second stamp on a second file would be a second ledger to keep in step, and
+     * this model has no shape that predates it.
+     */
+    public static CaptureModel readCapture(SdkVersion version, Path resourcesDir) throws IOException {
+        requireVersion(version);
+        Path file = resourcesDir.resolve(CaptureModel.FILE_NAME);
+        if (!Files.exists(file)) return CaptureModel.empty();
+        return MAPPER.readValue(file.toFile(), CaptureModel.class);
+    }
+
+    /** Writes {@code capture.json}; the directory is created if it does not exist. */
+    public static void writeCapture(SdkVersion version, Path resourcesDir, CaptureModel model)
+            throws IOException {
+        Files.createDirectories(resourcesDir);
+        Files.writeString(resourcesDir.resolve(CaptureModel.FILE_NAME), captureJson(version, model));
+    }
+
+    /**
+     * The same bytes {@link #writeCapture} would write, as text — the counterpart of {@link #modelJson}, and
+     * public for the same reason: creation renders every file before committing any of them.
+     */
+    public static String captureJson(SdkVersion version, CaptureModel model) throws IOException {
+        requireVersion(version);
+        return MAPPER.writeValueAsString(model == null ? CaptureModel.empty() : model);
+    }
+
     // ---- creation ---------------------------------------------------------------------------------------
 
     /**

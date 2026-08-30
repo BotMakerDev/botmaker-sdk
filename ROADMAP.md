@@ -8,6 +8,32 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-30 — the capture targets are authoring data
+
+**Done**
+
+- **`authoring/CaptureModel` + `authoring/CaptureTargetModel`, stored as `capture.json`**, read and written
+  by `Authoring.readCapture`/`writeCapture`/`captureJson` — the same shape `activities.json` has, because it
+  is the same kind of fact: a file describing the bot, owned by the bot's own SDK version.
+- **A target's identity is its spec text**, in shared's `CaptureSourceKind` grammar (`desktop`,
+  `monitor:<index>`, `window:<title>`, `emulator:<instance>`). Storing four record shapes instead would be a
+  second grammar to keep in step with the one a running bot already reads, and the editor and the bot
+  disagreeing about which window to look at is the bug this move exists to end.
+- **No schema stamp on this file**, deliberately: the migration ledger is the caller's and its one entry
+  point is `activities.json`. A second stamp is a second ledger.
+- `defaultIndex` is boxed and normalised — an index naming nothing becomes absent rather than being trusted —
+  and `defaultTarget()` is total, standing in the first target for a project that never chose.
+
+**Deferred / next**
+
+- **A bot cannot read `capture.json` itself.** `Authoring` reaches the value vocabulary in
+  `botmaker-studio-api`, which is deliberately off a bot's classpath, so the running bot still resolves
+  `capture.source` out of `botmaker-project.properties` — which Studio now writes from the default target in
+  the same pass. A classpath reader beside `internal/config/ProjectData` is what would retire that
+  projection.
+
+---
+
 ## 2026-08-30 — the two pickers the lambda was built for
 
 **Done**
