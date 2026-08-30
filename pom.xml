@@ -160,6 +160,27 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Javalin: embedded Jetty serving the Remote Pilot's static client, its HTTP routes and its
+             WebSocket on one port (internal/plugin/pilot/PilotServer). Optional, alongside JavaFX and the
+             toolkit and for the same reason: the pilot is a plugin feature with a window, so a headless bot
+             resolves none of it. Arrived here with the pilot itself in 2026-08-30. -->
+        <dependency>
+            <groupId>io.javalin</groupId>
+            <artifactId>javalin</artifactId>
+            <version>6.7.0</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ZXing core: the pilot's pairing URL and APK-download URL as QR codes. Pure Java, core only —
+             the BitMatrix is written straight into a JavaFX WritableImage, so no zxing-javase, no
+             javafx-swing and no AWT image path. Optional, like Javalin above. -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.3</version>
+            <optional>true</optional>
+        </dependency>
+
         <!-- JavaCV / OpenCV (native bindings used for image matching) -->
         <dependency>
             <groupId>org.openpnp</groupId>
@@ -604,5 +625,93 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          `pilot` profile: rebuild the BotPilot web client (Vite + React + TS in the sibling
+          `botmaker-pilot` repository) from source and stage its `dist` as the assets this jar serves.
+
+            mvn -Ppilot package
+
+          The normal build needs no Node: a prebuilt `dist` is committed under src/main/resources/pilot/ and
+          served as-is by internal/plugin/pilot/PilotServer. This profile refreshes those assets from source
+          — it downloads a project-local Node/npm (nothing installed system-wide), runs `npm ci` +
+          `npm run build`, then overwrites target/classes/pilot with the fresh dist (after the default
+          resource copy, so the fresh build wins).
+
+          It arrived here with the pilot on 2026-08-30. The client is served by the module that owns the
+          server, which is this one: the pilot is a plugin's feature, and a plugin ships what its feature
+          needs. Activated by id only, so an ordinary build — including JitPack's — never runs Node.
+        -->
+        <profile>
+            <id>pilot</id>
+            <properties>
+                <pilot.web.dir>${project.basedir}/../botmaker-pilot/web</pilot.web.dir>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.eirslett</groupId>
+                        <artifactId>frontend-maven-plugin</artifactId>
+                        <version>1.15.1</version>
+                        <configuration>
+                            <workingDirectory>${pilot.web.dir}</workingDirectory>
+                            <installDirectory>${project.build.directory}/node</installDirectory>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>install-node-npm</id>
+                                <phase>generate-resources</phase>
+                                <goals><goal>install-node-and-npm</goal></goals>
+                                <configuration>
+                                    <nodeVersion>v24.18.0</nodeVersion>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>npm-ci</id>
+                                <phase>generate-resources</phase>
+                                <goals><goal>npm</goal></goals>
+                                <configuration>
+                                    <arguments>ci</arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>npm-build</id>
+                                <phase>generate-resources</phase>
+                                <goals><goal>npm</goal></goals>
+                                <configuration>
+                                    <arguments>run build</arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Copy the freshly-built dist over the default-copied (committed) pilot assets in
+                         target/classes, so a -Ppilot build serves the current source. -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>copy-pilot-dist</id>
+                                <phase>process-classes</phase>
+                                <goals><goal>copy-resources</goal></goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.outputDirectory}/pilot</outputDirectory>
+                                    <overwrite>true</overwrite>
+                                    <resources>
+                                        <resource>
+                                            <directory>${pilot.web.dir}/dist</directory>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

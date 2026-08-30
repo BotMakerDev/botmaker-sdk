@@ -455,6 +455,34 @@ where a random default would make every open of an old project look like a renam
 generated `Parameters` file it once named — a `ParameterGroup` is how the editor's Parameters dialog decides
 which plugin a variable belongs to.
 
+## The Remote Pilot is this plugin's feature (2026-08-30)
+
+`internal/plugin/pilot/` — the server, the routes, the input path, the video encode, the Tailscale Funnel
+work and every dialog they put on screen, plus the built web client under `src/main/resources/pilot/`. It was
+`botmaker-studio`'s until 2026-08-30 and it was never Studio's *subject*: everything behind it is about what a
+bot sees and does.
+
+**The entry point is a `ToolbarItem`, and that is the whole surface it uses.** `SdkPlugin.toolbarItems()`
+contributes one button; `projectClosing()` releases the bound port and the nested display. A plugin
+contributes no menu items and no panels, so the View-menu entry it used to have is simply gone.
+
+**What a host must supply turned out to be four facts, and the contract already had all four**:
+`resourcesDir` (which project), `status` (a line in the host's status area), `theme` +
+`dialogs().owner()` (looking like the application, and being owned by its window), and `runs` (the bot as a
+process). **Nothing was added to `StudioServices`** — that was the standing condition on the move, and it is
+the test to apply to the next feature that wants to leave: if it needs a new service, the split is wrong.
+
+**`PilotProject` is the seam.** The default capture target comes from `capture.json` through `Authoring`, the
+reference resolution from `botmaker-project.properties` through shared's `ProjectFile`; both read on demand,
+never cached, because a target changed in another window has to take effect in the running stream.
+
+**Telemetry crosses as `TelemetryFrame` bytes** (`Runs.onTelemetry`) and is decoded here with the same shared
+codec the bot encoded it with. That is what keeps `TelemetryEvent`'s vocabulary off the contract, and it is
+the general rule for this boundary: **strings and bytes cross, shapes do not.**
+
+**Javalin and ZXing are `optional`**, like JavaFX and the toolkit and for the same reason — the pilot is a
+plugin feature with a window, so a headless bot resolves neither.
+
 ## The capture targets are authoring data (2026-08-30)
 
 `authoring/CaptureModel` + `authoring/CaptureTargetModel`, stored as **`capture.json`** beside

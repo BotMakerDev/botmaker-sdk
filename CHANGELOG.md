@@ -35,6 +35,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   (it is reported, and behaves like an outcome you never wired), and renaming an activity on the canvas does
   not rename the string in your code.
 
+- **Remote Pilot ships with the SDK now.** The 🎮 Pilot button, the phone pairing, the private-display
+  controls and everything behind them come from the SDK rather than from Studio. For you that changes one
+  thing: a project that does not depend on the BotMaker SDK has no Pilot button. Everything else — the
+  pairing URL, the QR codes, Interact, background mode — works exactly as before, with one cost the first
+  time: the pairing token moved with the feature, so an already-paired phone has to scan the QR code once
+  more.
+
 - **Your capture targets are one list now, in `capture.json`.** The screens, windows and emulators you set up
   as targets were kept in the editor's own settings, while the one your bot actually looks at was kept
   separately in `botmaker-project.properties` — so the two could drift apart with nothing to tell you. The

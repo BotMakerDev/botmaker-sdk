@@ -8,6 +8,39 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-30 — the Remote Pilot is an SDK feature
+
+**Done**
+
+- **`internal/plugin/pilot/`** — 17 files and ~3,400 lines from `botmaker-studio` (`services/pilot/*`,
+  `ui/app/pilot/*`, `QrCodes`), plus the built web client at `src/main/resources/pilot/` and the `pilot`
+  Maven profile that rebuilds it. Javalin and ZXing are new dependencies here, **optional** like JavaFX and
+  the toolkit: a headless bot resolves none of them.
+- **`SdkPlugin.toolbarItems()` contributes one button** and `projectClosing()` releases what it opened. This
+  is the case the toolbar surface was added for — a whole feature behind one button, the host owning the bar
+  and the plugin owning everything the press opens.
+- **What the pilot needs from a host is four facts, and all four were already on the contract**:
+  `resourcesDir`, `status`, `theme`/`dialogs().owner()` and `runs`. It held four editor classes for them and
+  **nothing was added to `StudioServices`**, which was the standing condition on the move.
+- **`PilotProject`** is the seam: the default capture target out of `capture.json` through `Authoring`, the
+  reference resolution out of `botmaker-project.properties` through shared's new `ProjectFile`. Read on
+  demand, never cached — a target changed in another window while the pilot streams must take effect.
+- **Telemetry arrives as `TelemetryFrame` bytes** through `Runs.onTelemetry` and is decoded here, which is
+  what keeps the wire's vocabulary off the contract. A frame that will not decode is dropped, as the wire
+  reader itself drops one.
+- **The pairing token and bind port are the plugin's own** (`PilotPreferences`, a `java.util.prefs` node)
+  rather than the editor's preferences file.
+
+**Deferred / next**
+
+- The pilot's tests moved with it (71 of them, including the golden wire corpus, now
+  `src/test/resources/pilot-wire/`). They needed no rewrite beyond their package: every one of them passes
+  `null` where the project used to be, which is a fair statement of how little of the editor they ever
+  touched. A `PilotProject` over a temp directory would make the default-target arm of
+  `TargetCapture.captureDesktop` testable, and nothing covers it today.
+
+---
+
 ## 2026-08-30 — the capture targets are authoring data
 
 **Done**
