@@ -528,6 +528,40 @@ and Studio writes that key **from the default target, in the same pass as the li
 direction, a cache rather than a second answer. A classpath reader beside `internal/config/ProjectData` is
 what would retire it.
 
+## The colour editor, and the frame it samples (2026-08-30)
+
+`internal/plugin/editors/ColorEditors` plus `internal/plugin/capture/{EditorFrame, ColorSampler, ZoomPan}` —
+the first of the capture-shaped editors to leave Studio, and the one that says how the rest should go.
+
+**One editor replaced two that had drifted.** Studio drew a `java.awt.Color` slot with a swatch and a frozen
+sampler, and a Parameters row with a swatch and a live screen pick: the same value, the same question, two
+widgets, and only one of them could report the ΔE spread that is the whole point of sampling from a real
+frame. Both of Studio's arms are deleted — the `PickerRegistry` entry *and* `ValueEditors`' `COLOR` case —
+because **a type the host answers is a type no plugin is ever offered**, which is the same deletion that let
+`DurationEditor` reach both places.
+
+**`EditorFrame` is the plugin grabbing its own pixels, and that is the shape to copy.** Which project is open
+is the one thing only the host knows (`StudioServices.resourcesDir()`); *which target that project chose* is
+read from this plugin's own `capture.json` through `Authoring`, and the pixels come from `botmaker-shared`,
+which any plugin may depend on. Nothing was added to the contract.
+
+**The contract's `Capture.grabFrame` cannot serve this, and that is why it is scheduled for deletion.** It
+reports a failed or blank grab by *never calling back*, so an editor cannot tell "failed" from "still
+working" and has nothing to say to the person waiting. `EditorFrame.Failure` draws the distinction that
+matters instead — *no target configured* versus *the grab came back blank* — because they send a user to two
+different places, and on a Wayland session the second happens to targets that are configured perfectly well.
+
+**The eyedropper has a fallback, and it is what made this slice possible at all.** With a capture target it
+opens the frozen sampler; without one it falls back to the host's live screen pick (`Capture.sampleColor`),
+after saying so once. That is why this editor never has to send anybody to a dialog before they can answer
+the question in front of them — which matters because the capture-targets dialog is still Studio's.
+
+**`ZoomPan` is in the wrong module on purpose.** It names nothing of the SDK's API — it is a pure gesture, so
+on the shape-versus-table rule it belongs in `botmaker-plugin-toolkit`. It is here because its second caller,
+Studio's `ObjectCaptureSurface`, is still Studio's, and Studio source may not name a toolkit type. Move it
+when that surface follows. `PrecisionArgPicker` reaching `EditorFrame`/`ColorSampler` from Studio is the same
+temporary arrangement and ends in the same step.
+
 ## The two pickers the lambda was built for (2026-08-30)
 
 `internal/plugin/editors/ActivityEditors` is the other half of the paragraph above: `CallSites.ACTIVITY_NAME`

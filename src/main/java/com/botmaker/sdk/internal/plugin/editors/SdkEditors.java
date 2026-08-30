@@ -53,5 +53,10 @@ public final class SdkEditors {
             // records, while a slot in source often knows it only as "Duration", because java.time is not in
             // the bot's own type index and so never resolves to a package.
             SlotEditor.of(ctx -> ctx.type().isNamed("java.time.Duration") || ctx.type().isNamed("Duration"),
-                    DurationEditor::duration));
+                    DurationEditor::duration),
+            // A colour, and both spellings for the same reason as Duration above: the Parameters window knows
+            // this type by the fully-qualified name its vocabulary records, while a slot in source usually
+            // knows it only as "Color" — java.awt is not in a bot's own type index either.
+            SlotEditor.of(ctx -> ctx.type().isNamed("java.awt.Color") || ctx.type().isNamed("Color"),
+                    ColorEditors::color));
 }

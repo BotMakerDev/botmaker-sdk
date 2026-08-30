@@ -8,6 +8,41 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-30 — the colour editor moves, and brings its frame with it
+
+**Done**
+
+- **`internal/plugin/editors/ColorEditors`** — a `java.awt.Color` as a swatch plus an eyedropper, matched by
+  type so it is drawn on a block *and* in the Parameters window. Writes `new java.awt.Color(r, g, b)` into a
+  slot and `#RRGGBB` into a row, through `Slots.write`. Seven tests, no JavaFX toolkit needed.
+- **`internal/plugin/capture/EditorFrame`** — one frozen frame of the project's default capture target, read
+  out of `capture.json` through `Authoring` and grabbed through shared. Reports either a frame or a
+  `Failure` saying which of the two things went wrong, exactly once, on the FX thread.
+- **`internal/plugin/capture/{ColorSampler, ZoomPan}`**, moved from Studio: the loupe, the ΔE spread of the
+  surrounding 5×5, the ctrl-scroll zoom. `ColorSampler` now takes a `StudioServices` for theming, the owning
+  window and the AWT→FX conversion, and a frame rather than fetching one.
+- **Studio deleted `ColorArgPicker`, `ValueEditors.ColorRow` and both of their dispatch arms.** A type the
+  host answers is a type no plugin is ever offered, so removing the arms is what lets this editor be drawn.
+
+**What this slice establishes, since three more follow it.** A plugin's editor grabs its own pixels: the host
+answers *which project is open* and nothing else, the target comes from the plugin's own file, and shared
+does the grabbing. **Nothing was added to `StudioServices`** — the standing condition on every move like
+this.
+
+**Why the contract's `grabFrame` could not be used**, which is the finding worth carrying: it reports a
+failed or blank grab by never invoking its callback, so an editor cannot distinguish failure from a slow
+grab. `EditorFrame.Failure` exists because *no target configured* and *the grab came back blank* send a user
+to two different places, and under Wayland the second happens to perfectly good targets.
+
+**The eyedropper falls back to the host's live screen pick** when the project has no capture target, after
+saying so once — which is more than either editor it replaced offered, and is what let this slice land while
+the capture-targets dialog is still Studio's.
+
+**Two things are deliberately in the wrong place for one more step.** `ZoomPan` names nothing of the SDK's
+API and belongs in the toolkit, but its other caller (`ObjectCaptureSurface`) is Studio's and Studio may not
+name a toolkit type. And `PrecisionArgPicker` reaches `EditorFrame`/`ColorSampler` from Studio. Both end when
+the precision picker moves.
+
 ## 2026-08-30 — one capture-target vocabulary
 
 **Done**
