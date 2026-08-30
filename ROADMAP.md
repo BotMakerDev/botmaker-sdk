@@ -8,6 +8,29 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-30 — the Remote Pilot becomes a plugin of its own
+
+**Done**
+
+- **`plugin/PilotCompanion`** — the 🎮 Pilot button and `projectClosing()` move off `SdkPlugin` onto a
+  `CompanionPlugin`, the contract's second interface, declared in its own
+  `META-INF/services/com.botmaker.plugin.api.CompanionPlugin`. Nothing about the feature changed; what
+  changed is that this jar stops having one class answer two unrelated subjects. `SdkPlugin` no longer
+  imports `RemotePilotUi`, `ToolbarItem`, `ToolbarGroup` or `StudioServices`.
+
+**Why**, in one line: everything else `SdkPlugin` contributes decides what a bot's *source* says — the
+palette, the slot editors, the value types, the parameters — and the pilot decides none of it. It binds a
+port, streams frames to a phone and drives input back, and never reads or writes a line of the project's
+Java. The rule the split states, for the next surface: *if it decides what the user's code says it is a
+`StudioPlugin`, otherwise it is a `CompanionPlugin`, and a surface that seems to want both is two surfaces.*
+
+**One class implementing both was considered and refused.** It is legal — the host de-duplicates by object
+identity, so such a plugin is asked and told once — but javac forces `displayName()`, `toolbarItems()` and
+`projectClosing()` to be written out, because two unrelated interfaces cannot both have their defaults
+inherited. Two classes is what the split actually says.
+
+---
+
 ## 2026-08-30 — the Remote Pilot is an SDK feature
 
 **Done**

@@ -462,9 +462,22 @@ work and every dialog they put on screen, plus the built web client under `src/m
 `botmaker-studio`'s until 2026-08-30 and it was never Studio's *subject*: everything behind it is about what a
 bot sees and does.
 
-**The entry point is a `ToolbarItem`, and that is the whole surface it uses.** `SdkPlugin.toolbarItems()`
-contributes one button; `projectClosing()` releases the bound port and the nested display. A plugin
-contributes no menu items and no panels, so the View-menu entry it used to have is simply gone.
+**The entry point is a `ToolbarItem`, and that is the whole surface it uses.** `toolbarItems()` contributes
+one button; `projectClosing()` releases the bound port and the nested display. A plugin contributes no menu
+items and no panels, so the View-menu entry it used to have is simply gone.
+
+**And since 2026-08-30 it is a plugin of its own — `plugin/PilotCompanion`, a `CompanionPlugin`.** It was
+`SdkPlugin.toolbarItems()`/`projectClosing()` for a day. The move is the contract's own split applied here:
+everything else this jar contributes to Studio decides what a bot's *source* says — the palette, the slot
+editors, the value types, the parameters — and the pilot decides none of it. It is declared in its own
+`META-INF/services/com.botmaker.plugin.api.CompanionPlugin`, found on the same discovery pass, and nothing
+about the feature changed. `SdkPlugin` stops being one class answering two unrelated subjects, and no longer
+imports `RemotePilotUi`, `ToolbarItem` or `StudioServices` at all.
+
+**One class implementing both was considered and is refused** — see `botmaker-studio-api/CLAUDE.md`. javac
+would force `displayName()`, `toolbarItems()` and `projectClosing()` to be written out (two unrelated
+interfaces cannot both have their defaults inherited), and the host would have to de-duplicate by identity
+in two places, which it does anyway for safety. Two classes is simply what the split says.
 
 **What a host must supply turned out to be four facts, and the contract already had all four**:
 `resourcesDir` (which project), `status` (a line in the host's status area), `theme` +
