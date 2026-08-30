@@ -559,8 +559,44 @@ the question in front of them — which matters because the capture-targets dial
 **`ZoomPan` is in the wrong module on purpose.** It names nothing of the SDK's API — it is a pure gesture, so
 on the shape-versus-table rule it belongs in `botmaker-plugin-toolkit`. It is here because its second caller,
 Studio's `ObjectCaptureSurface`, is still Studio's, and Studio source may not name a toolkit type. Move it
-when that surface follows. `PrecisionArgPicker` reaching `EditorFrame`/`ColorSampler` from Studio is the same
-temporary arrangement and ends in the same step.
+when that surface follows, which is the **image-template** slice and not the precision one — the plan lists
+`ObjectCaptureSurface` under precision, and its only caller is `OverlayTemplateCapture`.
+
+## How exact a match has to be, in both places (2026-08-30)
+
+`internal/plugin/editors/PrecisionEditors` is the second picker to arrive, and it retired the other
+temporary the colour slice left behind: nothing in Studio names
+`com.botmaker.sdk.internal.plugin.capture` any more.
+
+**Three numbers that each fail silently, so the editor shows rather than states.** ΔE has no obvious top and
+is not a percentage; `minArea` is an *area* and invites being read as a length; `minCount` is the colour
+present at all, clustered or not, which sounds like the same question as the area and is not. So the slider
+is laid out against the type's own anchors with a strip of swatches at increasing ΔE marking what the current
+tolerance lets through, the area is drawn **to scale** over a 1:1 grid, and *Sample from game* reports what
+these settings would actually find in a frozen frame — how many blobs, how big the largest, and how much of
+the colour is in the frame at all. Without a frame the other two are abstractions.
+
+**The parse is the part that moved, and it is the shape to copy.** Studio read the current value off a JDT
+syntax tree; the contract hands a plugin **source text**, so `settingsOf` walks the expression's *top-level
+dotted segments* and applies each one it recognises — an anchor, `of(…)`, or a `tolerance`/`minArea`/
+`minCount` wither. That is all a wither chain is, so it needs no parser, and it makes a leading package name
+free: `com.botmaker.sdk.api.vision.Precision.LOOSE` is six segments nothing matches followed by one that
+does. Splitting at *top-level* dots is what keeps `Precision.of(12.5)` readable.
+
+**Studio's `PRECISION` row is deleted with the `PickerRegistry` entry**, on the rule the colour slice
+established. It drew the same value as a preset dropdown and three bare fields — the shape a record's
+components suggest — with none of the swatch strip, the blob preview or the frame readout. A Parameters row
+now gets the whole dialog, and `knobsFor(null)` offers it all three knobs, which is the honest answer where
+there is no enclosing call to narrow them.
+
+**What is written stays two spellings of one value.** A slot gets the shortest exact Java form
+(`Precision.TIGHT.minArea(400)`); a row gets `deltaE,minArea,minCount` spelled exactly as `SdkValueTypes`'
+own `PRECISION` codec spells it. The editor and the codec are two writers of one file, and a disagreement
+between them is a value that changes meaning when it is written back.
+
+**No screen-pick fallback here, unlike the colour editor.** What these settings are previewed against has to
+be a frame of the thing the bot will look at; the desktop behind the dialog is not it, so a project with no
+capture target gets the sentence and no preview rather than a preview of something else.
 
 ## The two pickers the lambda was built for (2026-08-30)
 

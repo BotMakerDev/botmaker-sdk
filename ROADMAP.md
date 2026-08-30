@@ -8,6 +8,36 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-30 — the strictness editor moves, and Studio stops naming `internal`
+
+**Done**
+
+- **`internal/plugin/editors/PrecisionEditors`** — the `Precision` editor, matched by type so it is drawn on
+  a block *and* in the Parameters window. The ΔE slider against the type's own anchors with a swatch strip
+  showing what the tolerance lets through, the minimum area drawn to scale over a 1:1 grid, and a readout of
+  what these settings would actually find in a frozen frame of the capture target. Writes the shortest exact
+  Java form into a slot (`Precision.TIGHT.minArea(400)`) and `deltaE,minArea,minCount` into a row — the same
+  spelling `SdkValueTypes`' own `PRECISION` codec writes, because they are two writers of one file.
+- **The parse moved off JDT.** Studio read the current value from a syntax tree; `settingsOf` walks the
+  expression's **top-level dotted segments** and applies each one it recognises. A wither chain is exactly
+  that, so no parsing library is needed, a fully-qualified spelling costs nothing, and `Precision.of(12.5)`
+  stays readable because the split is at top-level dots only. Eleven tests, no JavaFX toolkit needed.
+- **Both of Studio's dispatch arms went**, as with colour: the `PickerRegistry` entry and `ValueEditors`'
+  `PRECISION` case, whose `PrecisionRow` drew the three numbers as a preset dropdown and three bare fields.
+  A Parameters row now gets the whole dialog, with all three knobs — `knobsFor(null)` is the honest answer
+  where there is no enclosing call to narrow them.
+- **Studio names nothing under `com.botmaker.sdk.internal` any more.** The colour slice left
+  `PrecisionArgPicker` reaching `EditorFrame`/`ColorSampler`; that picker is deleted.
+
+**Deferred / next**
+
+- **`ZoomPan` is still in this module and still belongs in `botmaker-plugin-toolkit`.** Its second caller is
+  Studio's `ObjectCaptureSurface`, whose own caller is `OverlayTemplateCapture` — so it moves with the
+  **image-template** slice, not this one. The plan lists `ObjectCaptureSurface` under precision; the code
+  says otherwise, and the code is right.
+
+---
+
 ## 2026-08-30 — the colour editor moves, and brings its frame with it
 
 **Done**
