@@ -8,6 +8,37 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-30 — the picture store moves
+
+**Done**
+
+- **`authoring/{TemplateLibrary, TagCatalog, TemplateManifest}`** — Studio's `services.ImageTemplateLibrary`
+  and its two records, keyed on the resources directory rather than on Studio's `ProjectConfig`. That key is
+  `Authoring`'s idiom and is exactly what `StudioServices.resourcesDir()` hands a plugin, so the pickers that
+  follow reach their own pictures with nothing added to the contract.
+- **`pathFor` stopped needing a project root**: a template is a PNG directly inside
+  `src/main/resources/images` and there is nowhere else for one to be, so the stored path is
+  `WireText.IMAGE_PREFIX` plus the file's own name.
+- **`TagCatalog.of` takes activity names**, not a parsed activities file — the only thing it ever wanted from
+  one. `TagCatalogTest` and `TemplateManifestTest` came along (27 tests).
+- **Studio keeps a delegating `ImageTemplateLibrary`** so its ~90 call sites did not move, and keeps
+  `openActivityTag`, whose question is about the editor's open file rather than about the folder.
+
+**Deferred / next**
+
+- **The pickers, the capture surfaces and the toolbar item.** `TemplateEditors` over `Modals.gallery`,
+  `internal/plugin/capture/{CaptureSurface, ObjectCaptureSurface, MagicWand, BatchTemplateNamingDialog,
+  OverlayTemplateCapture}`, and *Capture Templates* as a `ToolbarItem`. `ZoomPan` reaches
+  `botmaker-plugin-toolkit` with them.
+- **`ResourceManagerDialog` stays in Studio**, and the reason is worth knowing before anyone tries to move
+  it: its rename and delete guards go through `TemplateReferences`, which reads the editor's open buffers
+  (`ProjectState`) and writes `@NeedsReview` through `ReviewMarker`. Rewriting a user's Java is host work.
+- **`ResourcesChangedEvent` has no subscriber** — four publishers, nothing listening, and a javadoc claiming
+  open template pickers refresh on it. So the event bus is not a coupling the capture flow has to solve; it
+  is dead code to delete on the way past.
+
+---
+
 ## 2026-08-30 — the strictness editor moves, and Studio stops naming `internal`
 
 **Done**

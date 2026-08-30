@@ -562,6 +562,39 @@ Studio's `ObjectCaptureSurface`, is still Studio's, and Studio source may not na
 when that surface follows, which is the **image-template** slice and not the precision one — the plan lists
 `ObjectCaptureSurface` under precision, and its only caller is `OverlayTemplateCapture`.
 
+## The project's pictures are this plugin's folder (2026-08-30)
+
+`authoring/TemplateLibrary` — Studio's `services.ImageTemplateLibrary` until this date — with `TagCatalog`
+and `TemplateManifest` beside it. It is the store: the PNGs, their resolution sidecars, the tag manifest, the
+pixel hash that finds duplicates, rename and delete.
+
+**It is here for the reason `capture.json` is.** A *named picture* is `ImageTemplate`'s own concept, so the
+plugin that offers the type owns the folder; the alternative is two readers of one folder, which is the
+drift the capture-target work spent a whole phase deleting. Half of the vocabulary was already here —
+`TemplateNames` holds the file↔constant bijection and the placeholder picture — so what moved is the folder
+half that had been left behind.
+
+**It is keyed on the resources directory**, which is `Authoring`'s idiom and, not by accident, exactly what
+`StudioServices.resourcesDir()` hands a plugin. Studio's `ProjectConfig` was answering three questions here
+(the images folder, the project root to relativize against, the activities file) and every one is derivable
+from that single path — which is why `pathFor` now builds `src/main/resources/images/<name>.png` from
+`WireText.IMAGE_PREFIX` and the file's own name rather than relativizing against a root it no longer has.
+
+**Two things deliberately did not come**, and the line between them is the same one the whole move runs on —
+*a picture folder is the plugin's, an open editor is the host's*:
+
+- **`openActivityTag`** reads which file the editor has open. `TemplateLibrary.declaredTag` is the half that
+  could travel (turn a name into a tag the project actually declares); Studio's façade keeps the half that
+  asks the editor.
+- **`TemplateReferences`** — where in the bot's *source* a picture is used, and how to repoint those uses. It
+  stands on the open buffers (`ProjectState`) and on `ReviewMarker`, and it rewrites a user's Java. That is
+  host work and always will be, so the Resource Manager's rename and delete guards stay in Studio with it.
+
+**`TagCatalog.of` takes activity *names* now**, not a parsed activities file. That is what let it leave: the
+only thing it ever wanted from an `ActivitiesConfig` was `name()` in file order, so asking for that directly
+means each caller reads the file with whichever reader it already has — `Authoring.readModel` here, an
+editor's own parse there.
+
 ## How exact a match has to be, in both places (2026-08-30)
 
 `internal/plugin/editors/PrecisionEditors` is the second picker to arrive, and it retired the other
