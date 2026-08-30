@@ -3,11 +3,15 @@ package com.botmaker.sdk.plugin;
 import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
+import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.ToolbarGroup;
+import com.botmaker.plugin.api.ToolbarItem;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
+import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
 
 import java.util.List;
 
@@ -170,6 +174,54 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     protected List<ParameterGroup> buildParameters() {
         return List.of(SDK_PARAMETERS);
     }
+
+    /**
+     * One button, <b>Pilot</b> — and it is the case the toolbar surface was added for.
+     *
+     * <p>The Remote Pilot is not an editor for a slot: it binds a port, opens a nested {@code :N} display,
+     * streams frames to a phone and drives input back. It was Studio's until 2026-08-30 and it was never
+     * Studio's subject — everything behind this button is about what a <em>bot</em> sees and does, which is
+     * this plugin's subject. What the host keeps is the bar itself: the grouping, the order, the packing and
+     * the overflow, which is exactly why an item is contributed as data rather than as a {@code Node}.
+     *
+     * <p>The UI is built lazily and kept, because it owns the port and the display: a second press must
+     * re-show the pairing dialog rather than rebind and drop an already-paired phone. It is released in
+     * {@link #projectClosing()}.
+     */
+    @Override
+    public List<ToolbarItem> toolbarItems() {
+        return List.of(ToolbarItem.of("pilot", "🎮 Pilot",
+                "Stream what the bot sees to your phone or browser — watch it, start/stop it, "
+                        + "or turn on Interact to click and drag in the game yourself",
+                ToolbarGroup.RUN, 10, context -> pilot(context.services()).open()));
+    }
+
+    /**
+     * Releases the pilot's port and its nested display when the project it was serving is left.
+     *
+     * <p>This plugin instance is reused for the next project, so the field is dropped as well as closed: a
+     * pilot still answering on the old port would be streaming a project nobody has open, and one whose
+     * {@code resourcesDir} points at the previous project would be worse.
+     */
+    @Override
+    public void projectClosing() {
+        RemotePilotUi open = pilot;
+        pilot = null;
+        if (open != null) open.close();
+    }
+
+    private RemotePilotUi pilot(StudioServices services) {
+        if (pilot == null) pilot = new RemotePilotUi(services);
+        return pilot;
+    }
+
+    /**
+     * The pilot for the project currently bound, or {@code null} until its button is first pressed.
+     *
+     * <p>Touched only on the JavaFX thread — a toolbar press and {@code projectClosing()} both arrive there —
+     * so it needs no synchronization.
+     */
+    private RemotePilotUi pilot;
 
     /**
      * The one parameter group this plugin owns.

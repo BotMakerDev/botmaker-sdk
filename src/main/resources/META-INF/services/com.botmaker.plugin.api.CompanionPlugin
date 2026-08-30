@@ -1,8 +1,0 @@
-# The Remote Pilot: a plugin that does something beside the user's code rather than shaping it.
-#
-# Declared separately from com.botmaker.plugin.api.StudioPlugin because they are unrelated interfaces, not
-# because they ship separately — both are in this jar and both are found on the same discovery pass.
-#
-# Naming an interface whose dependency is <optional> is safe: ServiceLoader resolves this file only when
-# something asks for com.botmaker.plugin.api.CompanionPlugin, and nothing on a bot's classpath ever does.
-com.botmaker.sdk.plugin.PilotCompanion

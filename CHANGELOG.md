@@ -19,12 +19,6 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
-- **The Remote Pilot is its own plugin now — `PilotCompanion`.** Nothing changes for you: the same 🎮 Pilot
-  button, in the same place, doing the same thing. What changed is which interface it is declared through.
-  Everything else this jar contributes to Studio decides what your bot's *source* says — the palette, the
-  slot editors, the value types, the parameters — and the pilot decides none of that. It is now a
-  `CompanionPlugin`, the contract's second interface for exactly that kind of feature, and `SdkPlugin` stops
-  being one class answering two unrelated questions.
 - **You write an activity as a call now — `Activities.define`.** An activity is created on the Activity Flow
   canvas; what it *does* is this, written wherever you like:
   ```java

@@ -8,28 +8,33 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
-## 2026-08-30 — the Remote Pilot becomes a plugin of its own
+## 2026-08-30 — the pilot was split onto a second plugin interface, and put back
 
 **Done**
 
-- **`plugin/PilotCompanion`** — the 🎮 Pilot button and `projectClosing()` move off `SdkPlugin` onto a
-  `CompanionPlugin`, the contract's second interface, declared in its own
-  `META-INF/services/com.botmaker.plugin.api.CompanionPlugin`. Nothing about the feature changed; what
-  changed is that this jar stops having one class answer two unrelated subjects. `SdkPlugin` no longer
-  imports `RemotePilotUi`, `ToolbarItem`, `ToolbarGroup` or `StudioServices`.
+- `PilotCompanion` — a `CompanionPlugin` carrying the 🎮 Pilot toolbar item and the `projectClosing()` that
+  releases the port and the nested display — was extracted out of `SdkPlugin`, along with a second
+  `META-INF/services` file. **Reverted the same day**, whole. `SdkPlugin` owns the pilot again, and the
+  services file names `com.botmaker.sdk.plugin.SdkPlugin` and nothing else.
 
-**Why**, in one line: everything else `SdkPlugin` contributes decides what a bot's *source* says — the
-palette, the slot editors, the value types, the parameters — and the pilot decides none of it. It binds a
-port, streams frames to a phone and drives input back, and never reads or writes a line of the project's
-Java. The rule the split states, for the next surface: *if it decides what the user's code says it is a
-`StudioPlugin`, otherwise it is a `CompanionPlugin`, and a surface that seems to want both is two surfaces.*
+**Why it went back.** The split existed to make the pilot runnable in another process, in TypeScript — and
+answering that took a new module, a JSON-RPC dependency, a process supervisor and a wire-record parallel of
+four contract records. The maintainer's call: heavier than the problem, and the problem was not clearly
+stated. **The pilot is an exception attached to this plugin, and that is a deliberate position rather than
+an accident** — see `../botmaker-studio-api/ROADMAP.md` for the full reasoning and what to keep if it is
+ever proposed again.
 
-**One class implementing both was considered and refused.** It is legal — the host de-duplicates by object
-identity, so such a plugin is asked and told once — but javac forces `displayName()`, `toolbarItems()` and
-`projectClosing()` to be written out, because two unrelated interfaces cannot both have their defaults
-inherited. Two classes is what the split actually says.
+**What must stay true, and is what "correctly attached" means here:**
 
----
+- `SdkPlugin` is named in `META-INF/services/com.botmaker.plugin.api.StudioPlugin`, so `ServiceLoader`
+  constructs it and Studio's `PluginHost` finds it.
+- Its `toolbarItems()` returns the 🎮 Pilot item in `ToolbarGroup.RUN` at order 10, built lazily — the
+  `RemotePilotUi` is not constructed until the button is first pressed, because constructing one binds
+  nothing but is still work a project that never opens the pilot should not pay.
+- Its `projectClosing()` nulls and closes that field. This is the member that matters: a pilot still
+  answering on the old port would be streaming a project nobody has open.
+- The `pilot` field is touched only on the JavaFX thread — a toolbar press and `projectClosing()` both
+  arrive there — which is why it needs no synchronisation and must not acquire a background caller.
 
 ## 2026-08-30 — the Remote Pilot is an SDK feature
 
