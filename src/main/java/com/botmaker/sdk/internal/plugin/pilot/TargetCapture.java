@@ -139,11 +139,11 @@ public final class TargetCapture {
         }
         CaptureTargetModel def = safeDefault();
         CaptureSourceKind kind = def == null ? null : def.kind();
-        if (kind == CaptureSourceKind.WINDOW && def.argument() != null) {
-            Capture c = captureWindowTarget(def.argument());
+        if (kind == CaptureSourceKind.WINDOW && def.windowTitle() != null) {
+            Capture c = captureWindowTarget(def.windowTitle());
             if (c != null) return c;
-        } else if (kind == CaptureSourceKind.MONITOR && def.argument() != null) {
-            return captureBounds(screenBounds(monitorIndex(def.argument())));
+        } else if (kind == CaptureSourceKind.MONITOR) {
+            return captureBounds(screenBounds(def.monitorIndex()));
         } else if (kind == CaptureSourceKind.DESKTOP) {
             return captureBounds(virtualBounds());
         }
@@ -306,18 +306,6 @@ public final class TargetCapture {
             return project != null ? project.defaultTarget() : null;
         } catch (Exception e) {
             return null;
-        }
-    }
-
-    /**
-     * A monitor spec's index, or {@code -1} — which {@link #screenBounds} answers {@code null} for, and every
-     * failure here reads as "no frame this tick".
-     */
-    private static int monitorIndex(String argument) {
-        try {
-            return Integer.parseInt(argument.trim());
-        } catch (NumberFormatException notANumber) {
-            return -1;
         }
     }
 

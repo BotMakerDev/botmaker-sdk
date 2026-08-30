@@ -8,6 +8,37 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-30 — one capture-target vocabulary
+
+**Done**
+
+- **`CaptureTargetModel` answers what a record shape used to.** Four factories (`desktop`, `monitor(int)`,
+  `window(String)`, `emulator(String)`), five readers (`is(CaptureSourceKind)`, `isDesktop`, `monitorIndex`,
+  `windowTitle`, `emulatorName`) and two labels (`longLabel`, `shortLabel`, plus null-safe statics — an
+  unset default is the whole desktop). All `@JsonIgnore`, all derived from the spec, nothing stored.
+- **Studio's `project.capture.{CaptureTarget,CaptureTargets,CaptureTargetNames}` are deleted** and ~180
+  references across 20 files retyped onto this model. Studio had four sealed records, an adapter mapping
+  them onto the spec grammar, and a label table; the store was already `capture.json`, so deleting the
+  adapter was the whole change. The editor and the running bot can no longer spell a target differently.
+- **The pilot's private `monitorIndex` is gone** and `PilotRoutes.configuredInstanceName` reads
+  `emulatorName()`. The two spellings had drifted: an index that is not a number read as *monitor 0* in
+  the editor and as *no frame this tick* in the pilot, which is a black stream where the editor shows the
+  primary screen. The model's answer wins in both.
+- **Six new tests** on the accessors, covering the two that matter: an accessor answers only for its own
+  form (a window title read off a monitor target is `null`, not a guess), and an unreadable spec is the
+  whole desktop everywhere rather than an exception.
+
+**Why it is here and not in Studio.** The move it completes is *Studio knows only the contract*, and every
+one of that plan's next steps — the colour picker, the precision picker, the image-template picker — needs
+the project's default capture target. A target's identity is its spec text, which is this module's grammar,
+so the questions asked of a spec belong beside it; a copy in the editor is a second answer that drifts, and
+had already drifted twice.
+
+**What deliberately did not move: the live window id.** Studio's `TargetCapture.WindowRef` is a title plus
+an optional native handle. A persisted handle is meaningless — which is what `window:<title>` says by having
+nowhere to put one — but a gamescope host window cannot be named by title at all, so the caller that
+launched it carries the id for the length of one session.
+
 ## 2026-08-30 — the pilot was split onto a second plugin interface, and put back
 
 **Done**

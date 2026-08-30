@@ -8,7 +8,6 @@ import com.botmaker.shared.emulator.AdbEmulatorSurface;
 import com.botmaker.shared.emulator.EmulatorSurface;
 import com.botmaker.shared.emulator.ScrcpyEmulatorSurface;
 import com.botmaker.sdk.authoring.CaptureTargetModel;
-import com.botmaker.shared.config.CaptureSourceKind;
 
 import java.nio.file.Path;
 import java.util.function.Function;
@@ -164,9 +163,7 @@ public final class PilotRoutes implements AutoCloseable {
         if (fromSource != null) return fromSource;
         try {
             CaptureTargetModel target = project.defaultTarget();
-            if (target != null && target.kind() == CaptureSourceKind.EMULATOR) {
-                return target.argument();
-            }
+            if (target != null) return target.emulatorName();
         } catch (Exception ignored) {
             // The project's files can be mid-save (the pilot can be opened at any moment) — the desktop is
             // the right answer while they cannot be read.

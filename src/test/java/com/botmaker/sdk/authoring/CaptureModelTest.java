@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -81,5 +82,75 @@ class CaptureModelTest {
         assertEquals("window:Diablo IV", target.spec());
         assertEquals("window:Diablo IV", target.describe());
         assertNull(CaptureTargetModel.of(null).kind());
+    }
+
+    @Test
+    void theFactoriesAndTheAccessorsAreTheSameFourForms() {
+        assertEquals("desktop", CaptureTargetModel.desktop().spec());
+        assertEquals("monitor:2", CaptureTargetModel.monitor(2).spec());
+        assertEquals("window:Diablo IV", CaptureTargetModel.window("Diablo IV").spec());
+        assertEquals("emulator:MuMu", CaptureTargetModel.emulator("MuMu").spec());
+
+        assertEquals(2, CaptureTargetModel.monitor(2).monitorIndex());
+        assertEquals("Diablo IV", CaptureTargetModel.window("Diablo IV").windowTitle());
+        assertEquals("MuMu", CaptureTargetModel.emulator("MuMu").emulatorName());
+        assertTrue(CaptureTargetModel.desktop().isDesktop());
+    }
+
+    /**
+     * The accessors answer for the form they belong to and nothing else. Studio dispatched on four record
+     * shapes before 2026-08-30, where a shape could only be one thing; the replacement has to be as narrow,
+     * or a window title read off a monitor target silently captures the wrong surface.
+     */
+    @Test
+    void anAccessorAnswersOnlyForItsOwnForm() {
+        CaptureTargetModel monitor = CaptureTargetModel.monitor(1);
+
+        assertNull(monitor.windowTitle());
+        assertNull(monitor.emulatorName());
+        assertFalse(monitor.isDesktop());
+        assertEquals(0, CaptureTargetModel.window("Diablo IV").monitorIndex());
+    }
+
+    /**
+     * A spec nothing recognises reads as the whole desktop and never throws. It is the ordinary state of a
+     * hand-edited project file, and of one written by a newer Studio that knows a form this one does not.
+     */
+    @Test
+    void anUnreadableSpecIsTheWholeDesktop() {
+        CaptureTargetModel nonsense = CaptureTargetModel.of("something:else");
+
+        assertNull(nonsense.kind());
+        assertTrue(nonsense.isDesktop());
+        assertEquals(0, nonsense.monitorIndex());
+        assertNull(nonsense.windowTitle());
+        assertEquals("Whole desktop", nonsense.shortLabel());
+        // A monitor index that is not a number is the same kind of state and takes the same answer.
+        assertEquals(0, CaptureTargetModel.of("monitor:left").monitorIndex());
+    }
+
+    @Test
+    void theTwoLabelsSayTheSameThingAtTwoLengths() {
+        assertEquals("Screen 3", CaptureTargetModel.monitor(2).longLabel());
+        assertEquals("Screen 3", CaptureTargetModel.monitor(2).shortLabel());
+
+        assertEquals("Window: Diablo IV", CaptureTargetModel.window("Diablo IV").longLabel());
+        assertEquals("Diablo IV", CaptureTargetModel.window("Diablo IV").shortLabel());
+
+        assertEquals("Whole desktop (all monitors)", CaptureTargetModel.desktop().longLabel());
+        assertEquals("Whole desktop", CaptureTargetModel.desktop().shortLabel());
+
+        // An unset default is the whole desktop, which is what every caller has always meant by one.
+        assertEquals("Whole desktop (all monitors)", CaptureTargetModel.longLabelOf(null));
+        assertEquals("Whole desktop", CaptureTargetModel.shortLabelOf(null));
+    }
+
+    @Test
+    void theUsersOwnLabelWinsOverTheDerivedOne() {
+        CaptureTargetModel named = new CaptureTargetModel("window:Diablo IV", "The game");
+
+        assertEquals("The game", named.longLabel());
+        assertEquals("The game", named.shortLabel());
+        assertEquals("Diablo IV", named.windowTitle(), "and naming it changes nothing about what it matches");
     }
 }

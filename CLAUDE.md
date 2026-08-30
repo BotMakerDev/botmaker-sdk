@@ -495,6 +495,27 @@ nothing kept them in step. Both files parse, so the disagreement was silent.
 **A target's identity is its spec text**, in shared's `CaptureSourceKind` grammar. Four record shapes would be
 a second grammar to keep in step with the one the bot already reads; the spec is what both sides mean.
 
+**And since later the same day there is only one vocabulary, because `CaptureTargetModel` answers the
+questions a shape used to.** `desktop()`/`monitor(int)`/`window(String)`/`emulator(String)` build one;
+`is(CaptureSourceKind)`, `isDesktop()`, `monitorIndex()`, `windowTitle()`, `emulatorName()` read one; and
+`longLabel()`/`shortLabel()` name one at the two lengths a UI needs. Studio's
+`project.capture.{CaptureTarget,CaptureTargets,CaptureTargetNames}` — four sealed records, an adapter onto
+this model and a label table — are **deleted**, and so are the pilot's private `monitorIndex` and its
+inline kind checks. That is the point of the accessors being here rather than at each caller: the two
+spellings had already drifted, a monitor index that is not a number reading as *monitor 0* in the editor and
+as *no frame this tick* in the pilot's stream. Every accessor is deliberately narrow — a window title read
+off a monitor target is `null`, not a guess — because the shapes they replace could only ever be one thing,
+and a widened accessor would silently capture the wrong surface.
+
+**A spec nothing recognises is the whole desktop, everywhere.** It was unreachable while the vocabulary was
+four sealed records and is ordinary now: a hand-edited file, or one written by a newer Studio that knows a
+form this one does not. Nothing throws and nothing refuses the project.
+
+**The one thing that stayed out of the model is the live window id**, in Studio's
+`TargetCapture.WindowRef`. A gamescope host window cannot be named by title, so the caller that launched it
+holds its native handle for the length of one session — and a handle is meaningless once persisted, which is
+exactly what `window:<title>` says by having nowhere to put one.
+
 **No schema stamp on this file**, deliberately — the migration ledger is the caller's and its one entry point
 is `activities.json`; a second stamp is a second ledger. And **the model normalises rather than trusts**: an
 index naming nothing becomes absent, `defaultTarget()` is total and stands in the first target for a project
