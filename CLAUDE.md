@@ -556,11 +556,32 @@ opens the frozen sampler; without one it falls back to the host's live screen pi
 after saying so once. That is why this editor never has to send anybody to a dialog before they can answer
 the question in front of them — which matters because the capture-targets dialog is still Studio's.
 
-**`ZoomPan` is in the wrong module on purpose.** It names nothing of the SDK's API — it is a pure gesture, so
-on the shape-versus-table rule it belongs in `botmaker-plugin-toolkit`. It is here because its second caller,
-Studio's `ObjectCaptureSurface`, is still Studio's, and Studio source may not name a toolkit type. Move it
-when that surface follows, which is the **image-template** slice and not the precision one — the plan lists
-`ObjectCaptureSurface` under precision, and its only caller is `OverlayTemplateCapture`.
+**`ZoomPan` was in the wrong module on purpose and left on 2026-08-30**, for `botmaker-plugin-toolkit`, the
+moment `ObjectCaptureSurface` — its second caller, and the reason it could not go earlier, since Studio
+source may not name a toolkit type — arrived here too. What the SDK keeps is the two surfaces that use it.
+
+## The capture surfaces are this plugin's (2026-08-30)
+
+`internal/plugin/capture/{CaptureSurface, ObjectCaptureSurface, MagicWand, OverlayStage}`, out of Studio's
+`ui/app/capture` and `ui/app/overlay`. **The overlay is a feature of the SDK, not of Studio** — it exists to
+produce an `ImageTemplate`, which is this plugin's type, from a `CaptureTargetModel`, which is this plugin's
+data. Studio's `OverlayTemplateCapture` still drives them for one more step and names them where they now
+live, exactly as it named `ZoomPan` before.
+
+Three things in the move are worth keeping:
+
+- **The dead parameter became the live one.** Both surfaces took a `Window owner` they never used — they are
+  deliberately ownerless, so a user can minimise the editor and keep capturing. That parameter is now
+  `StudioServices`, which is how they reach `Capture.toFxImage` for the frozen backdrop. Nothing was added
+  to the contract to make the move: the conversion was already on it.
+- **`Styles.UNTHEMED` replaced `ThemedWindows.UNTHEMED`.** A translucent surface over a live game must not
+  acquire the shell's chrome, and the host themes a plugin's windows for it, so the opt-out had to become
+  something a plugin can say. It is the same string, now in the toolkit.
+- **`OverlayStage` is here rather than in the toolkit** because the raise itself is `botmaker-shared`'s
+  (`NativeControllerFactory.promoteOverlayAboveFullscreen`, EWMH hints found by window title) and the
+  toolkit may name no BotMaker upstream but the contract. It is not on the contract either, deliberately:
+  any plugin may depend on shared and do this for itself, so the host is not the only possible source.
+  Studio's `OverlayToolbars` delegates to it, and its last two callers leave with the launch pickers.
 
 ## The project's pictures are this plugin's folder (2026-08-30)
 

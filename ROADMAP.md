@@ -8,6 +8,34 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-30 — the capture surfaces move, and `ZoomPan` finally lands
+
+**Done**
+
+- **`internal/plugin/capture/{CaptureSurface, ObjectCaptureSurface, MagicWand, OverlayStage}`**, out of
+  Studio's `ui/app/capture` and `ui/app/overlay`. The overlay is a feature of this plugin, not of the host:
+  it exists to turn a `CaptureTargetModel` into an `ImageTemplate`, and both of those are ours. The two
+  `MagicWand` tests came with it (11 tests).
+- **`ZoomPan` reached `botmaker-plugin-toolkit`**, where it has belonged since it arrived here — a gesture
+  over a `Pane` and a `Group`, naming nobody's vocabulary. It could not go earlier only because its second
+  caller was Studio's, and Studio source may not name a toolkit type.
+- **The dead parameter became the live one.** Both surfaces took a `Window owner` they never used (they are
+  deliberately ownerless, so the editor can be minimised mid-capture); it is now `StudioServices`, which is
+  how they reach `Capture.toFxImage`. Nothing was added to the contract.
+- **`Styles.UNTHEMED`** replaced Studio's `ThemedWindows.UNTHEMED` — the same string, moved to the toolkit,
+  because a plugin drawing a translucent surface over a live game has to be able to refuse the host's theme.
+- **`OverlayStage`** carries the promote-above-fullscreen trick. It is here rather than in the toolkit
+  because the raise is `botmaker-shared`'s; Studio's `OverlayToolbars` delegates to it until the launch
+  pickers take its last two callers.
+
+**Deferred / next**
+
+- **`OverlayTemplateCapture` and `BatchTemplateNamingDialog` are still Studio's.** They need `TagPicklist`
+  and `ImageTemplatePicker`, which move with the template editors, so they follow in the same step as the
+  toolbar item rather than ahead of it.
+
+---
+
 ## 2026-08-30 — the picture store moves
 
 **Done**
@@ -29,7 +57,9 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 - **The pickers, the capture surfaces and the toolbar item.** `TemplateEditors` over `Modals.gallery`,
   `internal/plugin/capture/{CaptureSurface, ObjectCaptureSurface, MagicWand, BatchTemplateNamingDialog,
   OverlayTemplateCapture}`, and *Capture Templates* as a `ToolbarItem`. `ZoomPan` reaches
-  `botmaker-plugin-toolkit` with them.
+  `botmaker-plugin-toolkit` with them. *(The surfaces and `ZoomPan` landed later the same day — see the
+  entry above; what is left of this item is `BatchTemplateNamingDialog`, `OverlayTemplateCapture`, the
+  editors and the toolbar item.)*
 - **`ResourceManagerDialog` stays in Studio**, and the reason is worth knowing before anyone tries to move
   it: its rename and delete guards go through `TemplateReferences`, which reads the editor's open buffers
   (`ProjectState`) and writes `@NeedsReview` through `ReviewMarker`. Rewriting a user's Java is host work.

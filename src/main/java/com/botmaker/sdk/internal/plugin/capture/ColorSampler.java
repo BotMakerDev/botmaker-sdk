@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.plugin.capture;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.ZoomPan;
 import com.botmaker.shared.opencv.ColorMatcher;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
