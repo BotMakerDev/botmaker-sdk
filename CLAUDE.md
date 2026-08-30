@@ -394,8 +394,9 @@ properties, the placeholder image, the four `src/` directories — and every `.j
 **The rule: a project's structure belongs to the user, and a plugin contributes methods a user calls.** It is
 the argument `pom.xml` had already won — the pom declares *which* SDK and which other plugins a project has,
 and the SDK is one plugin among them, so only the thing that knows the whole set can write it — applied
-without an exception left. The entry point *installs* those plugins, which is the same argument; every other
-file is the user's in the plainer sense.
+without an exception left. Nothing is *installed* anywhere: what a bot's entry point holds is ordinary static
+calls into whatever plugins its pom pins — `PopupGuard.install`, `Bot.start`, `FlowGraph.run` — written by
+the user and deletable by the user, like every other line in the file.
 
 **The seeds were the near miss, and they lasted one day.** `internal/plugin/seeds/` held `GoHome`, `Popups`
 and `ActivityTemplate` as real compiling classes marked with what a host could substitute, so javac checked
@@ -453,6 +454,27 @@ where a random default would make every open of an old project look like a renam
 **`SdkPlugin.SDK_PARAMETERS` moved off `SourceEmitter`** and is private to the plugin. It was never about the
 generated `Parameters` file it once named — a `ParameterGroup` is how the editor's Parameters dialog decides
 which plugin a variable belongs to.
+
+## The two pickers the lambda was built for (2026-08-30)
+
+`internal/plugin/editors/ActivityEditors` is the other half of the paragraph above: `CallSites.ACTIVITY_NAME`
+(argument 0 of `Activities.define`) and `CallSites.OUTCOME_NAME` (argument 0 of `ActivityContext.outcome`)
+are two `SlotEditor`s in `SdkEditors.ALL`, and they are the reason `outcome` takes a context rather than the
+body returning a `String`.
+
+- **The list is read out of `activities.json`, by `Authoring.readModel`.** The canvas is the source of truth
+  and it is a file, so there is nothing to ask a host for beyond `StudioServices.resourcesDir()` — which is
+  the contract's rule doing its job: which project is open is the one thing only the host knows.
+- **Read when the dropdown opens, never when the block is drawn** (`Editors.choiceSlot` takes a `Supplier`,
+  the same rule as `Editors.gallery`), so an activity added in the flow window a moment ago is offered
+  without reopening anything.
+- **The outcome box offers every outcome in the project, not this activity's own**, and the honest reason is
+  that an editor is told the call it sits in and no more: the `Activities.define("Mining", …)` it is nested
+  inside is two levels up a syntax tree no plugin sees. The union with duplicates collapsed is what can
+  actually be answered; a name typed anyway is still accepted.
+- **Both boxes stay typeable**, which is `Editors.choiceSlot`'s editable `ComboBox`. Writing a body before
+  drawing the activity is an ordinary way to work, and an editor that could only pick from what exists would
+  make it unsayable — the same trade `define`'s string name already makes.
 
 ## The scaffold templates are gone (2026-08-25)
 

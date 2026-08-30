@@ -1,6 +1,8 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
 import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.sdk.api.bot.Activities;
+import com.botmaker.sdk.api.bot.ActivityContext;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.launch.Game;
 
@@ -63,4 +65,19 @@ final class CallSites {
      */
     static final Predicate<ValueContext> BOT_SETTING = com.botmaker.plugin.toolkit.CallSites
             .firstArgumentWhere(BotSettings.class, setter -> SettingsEditors.bounds(setter) != null);
+
+    /** The activity named by {@code Activities.define(name, body)}. */
+    static final Predicate<ValueContext> ACTIVITY_NAME = com.botmaker.plugin.toolkit.CallSites
+            .firstArgumentOf(Activities.class, "define");
+
+    /**
+     * The outcome named by {@code ctx.outcome(name)}.
+     *
+     * <p>The receiver is an {@link ActivityContext}, which is a type the user never spells — the parameter of
+     * the lambda they were handed. That is the reason the method takes a context at all rather than the body
+     * returning a bare {@code String}: a call on a typed receiver is one this predicate can recognise, and a
+     * returned string is indistinguishable from every other string in the bot.
+     */
+    static final Predicate<ValueContext> OUTCOME_NAME = com.botmaker.plugin.toolkit.CallSites
+            .firstArgumentOf(ActivityContext.class, "outcome");
 }

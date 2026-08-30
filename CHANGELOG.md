@@ -28,7 +28,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
       return ctx.done();
   });
   ```
-  Both names are dropdowns in the editor, filled from your own canvas. **An activity with no `define` call is
+  Both names are dropdowns in the editor, filled from your own canvas — the activities it holds, and the
+  outcomes it declares — and both stay typeable, so you can write a body before you have drawn the activity. **An activity with no `define` call is
   not an error** — it behaves exactly like one you switched off and follows its `DISABLED` wire, so you can
   draw a whole flow before writing any of it. Two things to know: a misspelled outcome is not a compile error
   (it is reported, and behaves like an outcome you never wired), and renaming an activity on the canvas does

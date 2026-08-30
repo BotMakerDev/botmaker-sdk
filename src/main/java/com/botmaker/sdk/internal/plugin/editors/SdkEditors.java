@@ -38,6 +38,10 @@ public final class SdkEditors {
             SlotEditor.of(CallSites.LAUNCH_PROGRAM, LaunchEditors::program),
             SlotEditor.of(CallSites.LAUNCH_OPTION, LaunchEditors::option),
             SlotEditor.of(CallSites.BOT_SETTING, SettingsEditors::setting),
+            // The two names that tie a bot's code to its Activity Flow canvas. Both are a String and both
+            // name something drawn elsewhere, so nothing but the call could choose these.
+            SlotEditor.of(CallSites.ACTIVITY_NAME, ActivityEditors::activityName),
+            SlotEditor.of(CallSites.OUTCOME_NAME, ActivityEditors::outcomeName),
 
             // Chosen by the type, and so drawn in the Parameters window as well as on a block.
             SlotEditor.of(ctx -> ctx.type().is(Rect.class), GeometryEditors::rect),

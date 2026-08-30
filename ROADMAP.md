@@ -8,6 +8,25 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-30 — the two pickers the lambda was built for
+
+**Done**
+
+- **`internal/plugin/editors/ActivityEditors`** — `activityName` and `outcomeName`, registered in
+  `SdkEditors.ALL` behind `CallSites.ACTIVITY_NAME` (argument 0 of `Activities.define`) and
+  `CallSites.OUTCOME_NAME` (argument 0 of `ActivityContext.outcome`). Both values are a `String`, so nothing
+  but the call could choose them — which is why `outcome` takes a context at all.
+- The list comes from `Authoring.readModel` over `StudioServices.resourcesDir()`: the canvas is a file, so
+  there is nothing to ask a host for beyond which project is open. Read when the dropdown opens, not when
+  the block is drawn.
+- **The outcome box offers the project's outcomes, not this activity's own.** An editor is told the call it
+  sits in and no more; the enclosing `define(` is two levels up a syntax tree no plugin sees. The union,
+  duplicates collapsed, is what can honestly be answered.
+- Both boxes stay typeable (`Editors.choiceSlot`, new in the toolkit the same day) — a body written before
+  the activity is drawn is an ordinary way to work.
+
+---
+
 ## 2026-08-29 — an activity is a lambda
 
 **Done**
