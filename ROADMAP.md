@@ -8,6 +8,30 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-31 — the project checklist is this plugin's, and every row of it is a statement
+
+**Done**
+
+- `internal/plugin/setup/ProjectSetup` — Studio's *Project Setup* dialog, moved whole and contributed as a
+  fourth `ToolbarItem` (`PROJECT`/40, immediately before Capture Targets because it is the window that sends
+  a user there). Single-instance, like the other three.
+- All four rows read files this module owns: the launch target through shared's `ProjectFile`, the capture
+  target and the reference resolution through `Authoring.readCapture`, the pictures through
+  `TemplateLibrary.list`. The editor could only ever have answered them by asking here, which is the whole
+  argument for the move.
+
+**What changed in the move, and why**
+
+- **Every row lost its button.** Two of the four destinations are this plugin's own toolbar items and a
+  plugin has no handle on another item; the other two are host dialogs this window may not name. So a row
+  reports its state and says where to change it — the precedent the Capture Templates and Capture Targets
+  steps set. **▶ Launch now survives**, because starting the configured target is this module's own work.
+- **The refresh triggers are the window regaining focus and a Re-check button.** Studio's copy also
+  subscribed to its `SettingsChangedEvent`; there is no such thing on the contract and there should not be.
+  Between focus and Re-check, every way a row's answer can change while the window is open is covered.
+- **The auto-open on project creation is gone**, not replaced. Studio opened this dialog itself for a fresh
+  project; the shell has no handle on a plugin's item. The button is on the bar the moment the project opens.
+
 ## 2026-08-31 — Capture Targets is a toolbar item, and the capture file's reader moves with it
 
 **Done**

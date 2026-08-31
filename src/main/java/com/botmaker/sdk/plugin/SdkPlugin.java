@@ -15,6 +15,7 @@ import com.botmaker.sdk.internal.plugin.capture.CaptureTargets;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
+import com.botmaker.sdk.internal.plugin.setup.ProjectSetup;
 
 import java.util.List;
 
@@ -213,7 +214,11 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                 ToolbarItem.of("capture-targets", "🎯 Capture Targets",
                         "Choose what the bot looks at — a monitor, an application window or an emulator "
                                 + "instance — and which of them is the project's default",
-                        ToolbarGroup.PROJECT, 50, this::openCaptureTargets));
+                        ToolbarGroup.PROJECT, 50, this::openCaptureTargets),
+                ToolbarItem.of("project-setup", "📋 Project Setup",
+                        "What this project still needs before it can run — something to launch, something "
+                                + "to capture, a reference resolution, and the pictures it looks for",
+                        ToolbarGroup.PROJECT, 40, this::openProjectSetup));
     }
 
     /**
@@ -243,6 +248,21 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     private void openCaptureTargets(ActionContext context) {
         StudioServices services = context.services();
         CaptureTargets.open(services, services.dialogs().owner());
+    }
+
+    /**
+     * Opens the project checklist.
+     *
+     * <p>It sits at order 40, immediately <em>before</em> Capture Targets, because it is the window that sends
+     * a user to that one. It was Studio's <i>Project Setup</i> dialog until 2026-08-31 and it was never
+     * Studio's subject: all four of its rows read files this module owns — the launch target and the capture
+     * size out of {@code botmaker-project.properties}, the capture target and the reference resolution out of
+     * {@code capture.json}, the pictures out of the images folder — so the editor could only ever have
+     * answered them by asking here.
+     */
+    private void openProjectSetup(ActionContext context) {
+        StudioServices services = context.services();
+        ProjectSetup.open(services, services.dialogs().owner());
     }
 
     /**
