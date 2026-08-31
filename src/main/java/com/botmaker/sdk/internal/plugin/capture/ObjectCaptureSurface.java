@@ -98,7 +98,7 @@ public final class ObjectCaptureSurface {
         this.scaleY = frame.getHeight() / (double) bounds.height;
 
         // Show the frozen frame as the surface body so the user points at exactly what will be captured.
-        background = new ImageView(services.capture().toFxImage(frame));
+        background = new ImageView(ScreenCapture.toFxImage(frame));
         background.setFitWidth(bounds.width);
         background.setFitHeight(bounds.height);
         preview.setMouseTransparent(true);

@@ -121,7 +121,7 @@ public final class TemplateNaming {
             VBox content = new VBox(10);
             content.setPadding(new Insets(10));
             if (preview != null) {
-                ImageView thumb = new ImageView(services.capture().toFxImage(preview));
+                ImageView thumb = new ImageView(ScreenCapture.toFxImage(preview));
                 thumb.setPreserveRatio(true);
                 thumb.setFitWidth(180);
                 thumb.setFitHeight(140);
@@ -232,7 +232,7 @@ public final class TemplateNaming {
         badge.setMinWidth(20);
         badge.setAlignment(Pos.CENTER);
 
-        ImageView thumb = new ImageView(services.capture().toFxImage(row.image()));
+        ImageView thumb = new ImageView(ScreenCapture.toFxImage(row.image()));
         thumb.setPreserveRatio(true);
         thumb.setFitWidth(96);
         thumb.setFitHeight(72);

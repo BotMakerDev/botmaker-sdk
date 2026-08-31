@@ -123,7 +123,7 @@ public final class ColorSampler {
             double displayH = Math.max(1, Math.floor(image.getHeight() * fit));
             this.pixelsPerContentUnit = image.getWidth() / displayW;
 
-            view = new ImageView(services.capture().toFxImage(image));
+            view = new ImageView(ScreenCapture.toFxImage(image));
             view.setFitWidth(displayW);
             view.setFitHeight(displayH);
 

@@ -7,6 +7,7 @@ import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.sdk.authoring.WireText;
 import com.botmaker.sdk.internal.plugin.capture.ColorSampler;
 import com.botmaker.sdk.internal.plugin.capture.EditorFrame;
+import com.botmaker.sdk.internal.plugin.capture.ScreenCapture;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
@@ -94,8 +95,9 @@ final class ColorEditors {
         alert.setContentText(failure.detail() + "\n\nPicking off the screen instead — the game has to be "
                 + "visible, and there is no magnifier or tolerance reading on this path.");
         alert.showAndWait();
-        services.capture().sampleColor(picked -> {
-            if (picked != null) onPicked.accept(picked);
+        new ScreenCapture().pickColor(services.dialogs().owner(), pick -> {
+            java.awt.Color c = pick.color();
+            onPicked.accept(Color.rgb(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha() / 255.0));
         });
     }
 

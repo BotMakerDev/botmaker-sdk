@@ -445,7 +445,7 @@ public final class SourcePicker {
     }
 
     private Image toFx(BufferedImage image) {
-        return image == null ? null : services.capture().toFxImage(image);
+        return image == null ? null : ScreenCapture.toFxImage(image);
     }
 
     private void setThumb(VBox tile, Image image) {

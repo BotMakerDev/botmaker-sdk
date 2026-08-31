@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.ActionContext;
 import com.botmaker.plugin.api.ParameterGroup;
+import com.botmaker.plugin.api.Region;
 import com.botmaker.plugin.api.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.StudioServices;
@@ -10,14 +11,19 @@ import com.botmaker.plugin.api.ToolbarItem;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
+import com.botmaker.plugin.toolkit.Editors;
+import com.botmaker.plugin.toolkit.ScreenPicks;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTargets;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
+import com.botmaker.sdk.internal.plugin.capture.ScreenCapture;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
 import com.botmaker.sdk.internal.plugin.setup.ProjectSetup;
+import javafx.scene.paint.Color;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * The BotMaker SDK, as a Studio plugin.
@@ -58,8 +64,54 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     /** The stable identifier the host files this plugin's contributions under. */
     public static final String ID = "com.botmaker.sdk";
 
+    /**
+     * Registers this plugin's screen picker with the toolkit, which is the only work the constructor does.
+     *
+     * <p>The toolkit's {@code Editors.region} and {@code Editors.tuplePill} are widgets whose whole point is
+     * a screen pick, and the toolkit has no capture code of its own — the shape is its, the pixels are ours.
+     * They came from the contract's {@code Capture} until 2026-08-31; see {@link ScreenPicks} for why that
+     * member went and why a static registration is safe across two plugins.
+     *
+     * <p>It is done here rather than lazily because {@code ServiceLoader} constructs this class before any
+     * editor is drawn, and it costs one field write. Everything expensive stays lazy — the catalog is built
+     * on first ask, the pilot on first press.
+     */
     public SdkPlugin() {
         super(ID, "BotMaker SDK");
+        Editors.pickWith(new SdkScreenPicks());
+    }
+
+    /**
+     * The overlay, as the toolkit asks for it: one {@link ScreenCapture} per pick, over this machine's
+     * screens.
+     *
+     * <p>Over the screens and not over the project's capture target, deliberately. These three are the picks
+     * a widget makes with nothing but a slot in hand — a region, a coordinate, a colour — and a slot does not
+     * say which project it belongs to. An editor that wants the bot's own frame asks {@code EditorFrame} for
+     * it by name, which is what the colour and picture editors do.
+     */
+    private static final class SdkScreenPicks implements ScreenPicks {
+
+        @Override
+        public void region(Consumer<Region> onSelected) {
+            new ScreenCapture().selectRegion(null,
+                    r -> onSelected.accept(new Region(r[0], r[1], r[2], r[3])));
+        }
+
+        @Override
+        public void point(Consumer<Region> onPicked) {
+            // A Region with no size: the contract has one coordinate type, and a point is a region whose
+            // width and height are nobody's business.
+            new ScreenCapture().pickPoint(null, p -> onPicked.accept(new Region(p[0], p[1], 0, 0)));
+        }
+
+        @Override
+        public void color(Consumer<Color> onSampled) {
+            new ScreenCapture().pickColor(null, pick -> {
+                java.awt.Color c = pick.color();
+                onSampled.accept(Color.rgb(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha() / 255.0));
+            });
+        }
     }
 
     /**

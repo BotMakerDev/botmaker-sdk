@@ -92,7 +92,7 @@ public final class CaptureSurface {
         if (backdrop != null) {
             // The frame isn't on the desktop behind us (an emulator's pixels arrive over ADB), so draw it —
             // otherwise the user rubber-bands over their own desktop and crops something else entirely.
-            ImageView frame = new ImageView(services.capture().toFxImage(backdrop));
+            ImageView frame = new ImageView(ScreenCapture.toFxImage(backdrop));
             frame.setFitWidth(bounds.width);
             frame.setFitHeight(bounds.height);
             frame.setMouseTransparent(true);

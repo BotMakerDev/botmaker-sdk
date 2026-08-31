@@ -268,7 +268,7 @@ public final class CaptureTargets {
             thumbs.put(item, new ThumbEntry(null, false));   // sentinel, so the same row submits once
             thumbExec.submit(() -> {
                 TargetThumbnail.Result result = TargetThumbnail.grab(item);
-                Image image = result.image() == null ? null : services.capture().toFxImage(result.image());
+                Image image = result.image() == null ? null : ScreenCapture.toFxImage(result.image());
                 Platform.runLater(() -> {
                     thumbs.put(item, new ThumbEntry(image, result.exists()));
                     if (stage != null && stage.isShowing()) list.refresh();
