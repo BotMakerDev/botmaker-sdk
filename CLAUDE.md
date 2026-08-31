@@ -635,6 +635,38 @@ delete the seed.
 has nothing to write back to) and returns `null` for a name that no longer resolves, which the host draws as
 the plain label — the honest reading of *this picture was deleted*, and the same answer the pill gives.
 
+## Capture Templates is a toolbar item (2026-08-31)
+
+`internal/plugin/capture/CaptureTemplates` — Studio's `OverlayTemplateCapture`, and the second whole feature
+to reach the bar through `SdkPlugin.toolbarItems()` after the pilot. `ToolbarGroup.TOOLS` at order 20, which
+is the slot Studio's own ✂ Templates vacated; `TOOLS`' own javadoc names a template cutter. **Nothing was
+added to the contract**, which is the standing condition: the capture target and the capture size come out of
+`capture.json`, the pixels through `botmaker-shared`, and the result is an `ImageTemplate` in this plugin's
+own folder. The host answers *which project is open*, plus theming and an owner window.
+
+**`EditorFrame` grew two components rather than a second grab path existing.** `bounds` is where the pixels
+are, which is what a rubber-band surface is placed over and what a drawn crop is mapped back through.
+`onScreen` says whether they are really there — false for exactly one kind, an emulator, whose frame arrives
+over ADB. That one is load-bearing rather than informational: a transparent surface over an emulator would
+show the user the host window while the crop is taken from the ADB frame, which is the Waydroid bug in a
+different disguise.
+
+**There are two `grabAsync` overloads and the second is not the first with a flag.** A pixel editor samples
+the target *as it is* — raising a game to read one colour rearranges the user's screen for nothing. A capture
+does the opposite: what it writes becomes a picture the bot matches against, so the window is raised and
+snapped to the project's size first, or every picture is authored at whatever size the window happened to be
+and the matcher rescales all of them. Both are no-ops for a target that is not a window.
+
+**The Wayland fallback is not optional.** A blank per-window native grab falls through to a whole-desktop
+capture cropped to the window's bounds. Without it, every capture on a native Wayland session reports "the
+target produced a blank frame" while the window is plainly on screen.
+
+**One thing the move cost, stated rather than buried: the suggested tag.** Studio's menu entry passed the open
+activity's tag, so pictures captured while an activity was open were filed under it by default. *Which file
+the editor has open* is host state with no contract member for it, and adding one is exactly what the stop
+condition refuses. The tag menu is still on the naming dialog, so what was lost is a default, not a
+capability.
+
 ## Naming a captured picture, and the tag it gets (2026-08-31)
 
 `internal/plugin/capture/{TemplateNaming, TagPicker}` — the step between a crop and a saved picture. It runs

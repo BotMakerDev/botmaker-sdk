@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin;
 
+import com.botmaker.plugin.api.ActionContext;
 import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
@@ -10,6 +11,7 @@ import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
+import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
 
@@ -176,7 +178,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * One button, <b>Pilot</b> — and it is the case the toolbar surface was added for.
+     * Two buttons: <b>Pilot</b>, the case the toolbar surface was added for, and <b>Capture Templates</b>.
      *
      * <p>The Remote Pilot is not an editor for a slot: it binds a port, opens a nested {@code :N} display,
      * streams frames to a phone and drives input back. It was Studio's until 2026-08-30 and it was never
@@ -184,16 +186,43 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * this plugin's subject. What the host keeps is the bar itself: the grouping, the order, the packing and
      * the overflow, which is exactly why an item is contributed as data rather than as a {@code Node}.
      *
-     * <p>The UI is built lazily and kept, because it owns the port and the display: a second press must
-     * re-show the pairing dialog rather than rebind and drop an already-paired phone. It is released in
-     * {@link #projectClosing()}.
+     * <p>The pilot UI is built lazily and kept, because it owns the port and the display: a second press
+     * must re-show the pairing dialog rather than rebind and drop an already-paired phone. It is released in
+     * {@link #projectClosing()}. Capture Templates keeps nothing — it is single-instance in its own class,
+     * because what it owns is the screen rather than a resource, and the screen is gone when it closes.
+     *
+     * <p><b>Capture Templates is in {@link ToolbarGroup#TOOLS}</b>, whose own definition names a template
+     * cutter: it is opened <em>over</em> a running target rather than beside the code. It was Studio's
+     * <i>Capture Templates</i> menu entry and toolbar button until 2026-08-31, and it was never Studio's
+     * subject — it reads a capture target out of {@code capture.json}, grabs pixels through
+     * {@code botmaker-shared}, and writes an {@code ImageTemplate} into the picture folder, all three of
+     * which are this plugin's.
      */
     @Override
     public List<ToolbarItem> toolbarItems() {
-        return List.of(ToolbarItem.of("pilot", "🎮 Pilot",
-                "Stream what the bot sees to your phone or browser — watch it, start/stop it, "
-                        + "or turn on Interact to click and drag in the game yourself",
-                ToolbarGroup.RUN, 10, context -> pilot(context.services()).open()));
+        return List.of(
+                ToolbarItem.of("pilot", "🎮 Pilot",
+                        "Stream what the bot sees to your phone or browser — watch it, start/stop it, "
+                                + "or turn on Interact to click and drag in the game yourself",
+                        ToolbarGroup.RUN, 10, context -> pilot(context.services()).open()),
+                ToolbarItem.of("capture-templates", "✂ Capture Templates",
+                        "Draw regions over the game and save them as pictures the bot can look for — "
+                                + "one at a time, several in a pass, or an object cut out of its background",
+                        ToolbarGroup.TOOLS, 20, this::openCaptureTemplates));
+    }
+
+    /**
+     * Opens the capture tool over the project's target.
+     *
+     * <p>The tag is not pre-filled, and that is the one thing this lost on the way out of the host. Studio's
+     * menu entry passed the open activity's tag, so pictures captured while an activity was open were filed
+     * under it by default — and <em>which file the editor has open</em> is host state with no member on the
+     * contract for it. Growing one is exactly the move the platform's stop condition exists to refuse, and
+     * the cost is a default rather than a capability: the tag menu is on the naming dialog either way.
+     */
+    private void openCaptureTemplates(ActionContext context) {
+        StudioServices services = context.services();
+        CaptureTemplates.open(services, services.dialogs().owner(), null);
     }
 
     /**

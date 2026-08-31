@@ -8,6 +8,39 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-31 — Capture Templates is a toolbar item
+
+**Done**
+
+- **`internal/plugin/capture/CaptureTemplates`** — Studio's `OverlayTemplateCapture`, and the second whole
+  feature to reach the bar as a `ToolbarItem` after the pilot. `SdkPlugin.toolbarItems()` contributes it into
+  `ToolbarGroup.TOOLS` at order 20, the slot Studio's own ✂ Templates vacated. Everything behind the button
+  is this plugin's: the capture target and the capture size out of `capture.json`, the pixels through
+  `botmaker-shared`, an `ImageTemplate` into the picture folder. **Nothing was added to the contract.**
+- **`EditorFrame` grew the two components an overlay needs** — `bounds` (where the pixels are, so a
+  rubber-band surface can be placed and a crop mapped back) and `onScreen` (false only for an emulator,
+  whose frame arrives over ADB and is nowhere on the display; a transparent surface over one would show the
+  host window while the crop came from the ADB frame). A pixel editor ignores both.
+- **A second `grabAsync`, not a flag**, and the difference belongs at the call site: a pixel editor samples
+  the target *as it is*, because raising a game to read one colour rearranges the user's screen for nothing;
+  a capture raises the window and snaps it to the project's size first, because what it writes becomes a
+  picture the bot matches against. Both are no-ops for a target that is not a window.
+- **The Wayland fallback came across with it.** A blank per-window native grab falls through to a
+  whole-desktop capture cropped to the window's bounds — without it every capture on a native Wayland
+  session reads as "the target produced a blank frame" while the window is plainly on screen.
+- **`OverlayStage` gained `bar` and `installDrag`**, the ownerless, unthemed, draggable mini-toolbar Studio's
+  `OverlayToolbars.show` used to build. Studio's class is a two-line seam over this one now.
+
+**Deferred / next**
+
+- **The suggested tag is gone from this flow**, and it is the one thing the move cost. Studio's menu entry
+  passed the open activity's tag, so pictures captured while an activity was open were filed under it by
+  default. *Which file the editor has open* is host state with no member on the contract, and growing one is
+  what the stop condition exists to refuse. The tag menu is still on the naming dialog, so this is a default
+  rather than a capability — but it is worth revisiting if a second plugin ever wants the same thing.
+
+---
+
 ## 2026-08-31 — the size pictures are captured at is this plugin's
 
 **Done**

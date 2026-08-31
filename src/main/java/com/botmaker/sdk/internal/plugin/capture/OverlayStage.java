@@ -1,11 +1,17 @@
 package com.botmaker.sdk.internal.plugin.capture;
 
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.scene.Node;
+import javafx.scene.Scene;
+import javafx.scene.layout.Region;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 
 import java.util.function.BooleanSupplier;
 
@@ -72,5 +78,55 @@ public final class OverlayStage {
         keepOnTop.play();
         // Stop when the overlay is no longer showing (an additive listener — won't clobber a caller's onHidden).
         stage.showingProperty().addListener((o, was, showing) -> { if (!showing) keepOnTop.stop(); });
+    }
+
+    /** The translucent pill every overlay panel and mini-toolbar is drawn on. */
+    public static final String PANEL = "-fx-background-color: rgba(20,24,33,0.92); -fx-background-radius: 8;";
+
+    /**
+     * Shows {@code bar} as a small floating toolbar just above {@code over}, and returns its stage.
+     *
+     * <p>Three properties this centralises, all of which a capture tool needs and none of which are the
+     * default:
+     * <ul>
+     *   <li><b>Draggable by its body.</b> A button consumes its own mouse press, so the drag only ever starts
+     *       from the bar or a label — which is what lets a toolbar be moved without a title bar to grab.</li>
+     *   <li><b>Ownerless.</b> Deliberately not owned by any host window: JavaFX hides an owned window with
+     *       its owner, and the user must be able to minimise the editor and go on capturing.</li>
+     *   <li><b>Unthemed.</b> {@link Styles#UNTHEMED} opts the bar out of the host's chrome — it paints its
+     *       own pill over a live game, and a scene background from the shell would show up around it as an
+     *       opaque rectangle.</li>
+     * </ul>
+     *
+     * <p>It is tucked <em>inside</em> the top of {@code over} when there is no room above it, so a target at
+     * the top edge of the screen does not put its toolbar off-screen.
+     */
+    public static Stage bar(Region bar, java.awt.Rectangle over) {
+        bar.getStyleClass().add(Styles.UNTHEMED);
+        Scene scene = new Scene(bar, Color.TRANSPARENT);
+        Stage stage = new Stage(StageStyle.TRANSPARENT);
+        stage.setAlwaysOnTop(true);
+        stage.setScene(scene);
+        installDrag(bar, stage);
+        stage.show();
+        stage.sizeToScene();
+        double height = stage.getHeight();
+        stage.setX(over.x);
+        stage.setY(over.y - height - 4 >= 0 ? over.y - height - 4 : over.y + 4);
+        promoteAboveFullscreen(stage);
+        return stage;
+    }
+
+    /** Makes dragging on {@code handle} move {@code stage} (tracks the press offset from the stage origin). */
+    public static void installDrag(Node handle, Stage stage) {
+        final double[] offset = new double[2];
+        handle.setOnMousePressed(e -> {
+            offset[0] = e.getScreenX() - stage.getX();
+            offset[1] = e.getScreenY() - stage.getY();
+        });
+        handle.setOnMouseDragged(e -> {
+            stage.setX(e.getScreenX() - offset[0]);
+            stage.setY(e.getScreenY() - offset[1]);
+        });
     }
 }
