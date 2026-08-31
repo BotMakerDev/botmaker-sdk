@@ -8,6 +8,33 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-31 — naming a captured picture, and the tag it gets
+
+**Done**
+
+- **`internal/plugin/capture/TemplateNaming`** — the naming step for a freshly captured picture, in both its
+  forms: one crop (a thumbnail, a name field, a tag picker) and a whole batch (one row per crop, with a
+  Discard toggle and a *Tag them all as* control). It was two classes in Studio, `ImageTemplatePicker`'s
+  private `prompt` loop and `BatchTemplateNamingDialog`, which enforced the same three refusals apart and
+  had already drifted: the single form had **no tag field at all**, so a picture captured on its own could
+  only be filed later from the resource manager. One `nameProblem` now answers for both.
+- **`internal/plugin/capture/TagPicker`** — Studio's `TagPicklist`, over `StudioServices` and this plugin's
+  own `TagCatalog`. A tag is a tag *of a picture*, and a picture is `ImageTemplate`'s concept; the catalog is
+  read out of the manifest under `resourcesDir()`, and nothing about it needs the host beyond knowing which
+  project is open.
+- **Nothing was added to the contract.** Theming is `services.theme()`, the thumbnails are
+  `services.capture().toFxImage`, and the rest is files.
+
+**Deferred / next**
+
+- **`OverlayTemplateCapture` itself has not moved**, and it is what becomes a `ToolbarItem`. It still needs
+  the host's `TargetCapture` for three things this plugin has no equivalent of yet: the target's **bounds**
+  (to place the rubber-band surface), whether the pixels are really on screen (to decide a backdrop), and
+  snapping a window to the project's reference resolution before each grab. `EditorFrame` answers the frame
+  and the label but not those, so it is what grows next.
+
+---
+
 ## 2026-08-31 — the picture editor, and three dispatch sites rather than two
 
 **Done**

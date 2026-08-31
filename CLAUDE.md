@@ -623,6 +623,31 @@ delete the seed.
 has nothing to write back to) and returns `null` for a name that no longer resolves, which the host draws as
 the plain label — the honest reading of *this picture was deleted*, and the same answer the pill gives.
 
+## Naming a captured picture, and the tag it gets (2026-08-31)
+
+`internal/plugin/capture/{TemplateNaming, TagPicker}` — the step between a crop and a saved picture. It runs
+in two forms, and they are one class on purpose: `promptNew` for a single crop, `showBatch` for a whole
+*Capture many* pass. In Studio they were `ImageTemplatePicker`'s private `prompt` loop and
+`BatchTemplateNamingDialog`, enforcing the same three refusals apart — sanitized and non-blank, not already
+on disk, not reserved — and they had drifted, the single form having **no tag field at all**, so a picture
+captured on its own could only be filed later from the resource manager. `nameProblem` is now one method with
+one wording, and its only per-caller argument is the blank sentence, because a single capture has no Discard
+box to be pointed at.
+
+**`TagPicker` is here because a tag is a tag *of a picture*.** The catalog it offers is `TagCatalog`, read out
+of this plugin's own manifest under `resourcesDir()`; the host is the only possible source of which project is
+open, and everything after that is files. Studio's `TagPicklist` is a two-line subclass — the tag manager, the
+parameters screen and the resource manager are host work that is not moving, and they should not each have to
+build a `StudioServices` to open a menu.
+
+**Nothing was added to the contract for the move**, which is the test each of these passes: theming is
+`services.theme()`, the thumbnails are `services.capture().toFxImage`, and the rest is a folder.
+
+**`OverlayTemplateCapture` did not come with them, and what holds it is precise.** It needs the target's
+**bounds** to place a rubber-band surface, whether those pixels are really on screen to decide a backdrop,
+and a window snapped to the project's reference resolution before each grab. `EditorFrame` answers the frame
+and its label and none of those three, so it is what grows when the overlay follows.
+
 ## The project's pictures are this plugin's folder (2026-08-30)
 
 `authoring/TemplateLibrary` — Studio's `services.ImageTemplateLibrary` until this date — with `TagCatalog`
