@@ -172,6 +172,13 @@ public final class TemplateGallery extends HBox {
 
     /** Re-reads the library and the tag catalog from disk, keeping the rail row and selection where it can. */
     public void reload() {
+        // See TemplateEditors.items: the placeholder is made on the first look at a project's pictures, not
+        // written into every project at creation. Best-effort, for the same reason.
+        try {
+            TemplateLibrary.ensurePlaceholder(resourcesDir);
+        } catch (java.io.IOException ignored) {
+            // an unwritable folder is a gallery with one fewer cell, not a refusal
+        }
         TemplateGalleryModel.Row was = rail.getSelectionModel().getSelectedItem();
         TagCatalog catalog = TemplateLibrary.tagCatalog(resourcesDir);
         List<TemplateGalleryModel.Row> rows =

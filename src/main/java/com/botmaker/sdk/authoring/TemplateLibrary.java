@@ -77,11 +77,12 @@ public final class TemplateLibrary {
                                    String target, String createdAt) {}
 
     /**
-     * File name of the built-in default template shipped in every new project.
+     * File name of the built-in default template.
      *
-     * <p>The SDK's, since it is the SDK that writes the file at creation (the inversion, phase 3). Studio asks
-     * two further questions about it — <em>is this the placeholder?</em> (rename/delete protection) and
-     * <em>is it still untouched?</em> (export) — and both have to be asking about the same file.
+     * <p>The SDK's, since it is the SDK that makes the file — at creation until 2026-09-01, and now on the
+     * first look at a project's picture folder ({@link #ensurePlaceholder}). Three questions are asked about
+     * it — <em>is this the placeholder?</em> (rename/delete protection), <em>is it still untouched?</em>
+     * (export) and <em>is it there at all?</em> — and all three have to be asking about the same file.
      */
     public static final String DEFAULT_TEMPLATE_FILE = TemplateNames.DEFAULT_TEMPLATE_FILE;
 
@@ -111,11 +112,27 @@ public final class TemplateLibrary {
     }
 
     /**
+     * The placeholder in {@code resourcesDir}'s images folder, made if it is not there.
+     *
+     * <p><b>Creation stopped writing it on 2026-09-01</b> and this is what replaced it. A placeholder picture
+     * is only meaningful to whoever offers {@code ImageTemplate}, so a project created in an editor that
+     * never loaded this plugin has no business being given one — and the surfaces that <em>do</em> need it
+     * (the gallery, the picture pickers, a value seeded with {@code default_template}) all hold a resources
+     * directory at the moment they need it. Calling this when a picture folder is first looked at is both
+     * later and narrower than writing it into every new project.
+     *
+     * <p>Idempotent, and deliberately so: it is called on every open of every picture surface, and the file
+     * it makes is the user's from the moment they point it at something real.
+     */
+    public static void ensurePlaceholder(Path resourcesDir) throws IOException {
+        writePlaceholderAt(resourcesDir.resolve("images").resolve(DEFAULT_TEMPLATE_FILE));
+    }
+
+    /**
      * Writes the placeholder at exactly {@code target}, if it is not already there.
      *
-     * <p>Creation does not go through this — the SDK writes the placeholder with the rest of the project —
-     * but <em>recovery</em> does: it knows the path it found missing, and the alternative is a second copy of
-     * the "which file is the placeholder" rule for the two to drift apart on.
+     * <p>The path-taking half, for <em>recovery</em>: it knows the path it found missing, and the alternative
+     * is a second copy of the "which file is the placeholder" rule for the two to drift apart on.
      */
     public static void writePlaceholderAt(Path target) throws IOException {
         if (Files.exists(target)) return;

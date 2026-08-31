@@ -3,7 +3,6 @@ package com.botmaker.sdk.authoring;
 import com.botmaker.plugin.api.authoring.ProjectModel;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.sdk.internal.authoring.AuthoringMixins;
-import com.botmaker.sdk.internal.authoring.ProjectWriter;
 import com.botmaker.shared.config.ProjectFile;
 import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
@@ -325,48 +324,24 @@ public final class Authoring {
     }
 
     // ---- creation ---------------------------------------------------------------------------------------
-
-    /**
-     * Creates a whole bot project at {@code projectDir} — every file the SDK owns, or none of them.
-     *
-     * <p>What that set is: the four {@code src/} directories, {@code activities.json} (a game bot's; an empty
-     * project has no model to store), {@code botmaker-project.properties} carrying the reference resolution,
-     * and the placeholder image template. It is the SDK's because every one of those files is <em>about</em>
-     * the SDK: the shape of the data it reads back at run time.
-     *
-     * <p><b>No {@code .java} is in that set, and since 2026-08-29 none ever is.</b> A project's structure
-     * belongs to the user, so every source file arrives through {@code callerFiles} — including the entry
-     * point, which was the last one the SDK wrote. That extends an argument the pom had already won: the pom
-     * <em>declares which</em> SDK, and which other plugins, the project has, and the SDK is one plugin among
-     * however many the editor loaded, so it cannot be the author of the file that lists them. The same is
-     * true of the file that <em>installs</em> them, and true in a plainer way of every other file: only the
-     * user should own the shape of their own project.
-     *
-     * <p>What this is deliberately <b>not</b>, beyond the source: where projects live, whether the name is
-     * one the user may use, the editor's own {@code settings.json}, and version control. Those are the
-     * editor's.
-     *
-     * <p><b>Everything is rendered before anything is committed</b>, and an existing {@code pom.xml} at the
-     * target is refused first. So a refusal never leaves a half-created project for someone to find and
-     * delete by hand — the rule the editor's own creator enforced before this moved here, preserved exactly.
-     *
-     * @param callerFiles files the <em>caller</em> composed, keyed by project-relative path, committed in
-     *                    this same all-or-none pass. {@code pom.xml} is the one that matters: handing it in
-     *                    here rather than writing it before or after is what keeps both properties at once —
-     *                    the editor authors the pom, and creation is still all of it or none of it. Keys
-     *                    colliding with a file the SDK owns are refused; whole-file ownership, never a merge.
-     * @param schemaVersion the stamp {@code activities.json} carries — the caller's ledger, for the same
-     *                      reason {@link #writeModel} takes it rather than deriving it
-     * @throws IOException              if the target already holds a project, or a file cannot be written
-     * @throws IllegalArgumentException if the spec is missing a name, a package or an entry class, or a
-     *                                  caller file claims a path the SDK writes
-     */
-    public static void createProject(SdkVersion version, ProjectSpec spec, Path projectDir,
-                                     int schemaVersion, Map<String, String> callerFiles) throws IOException {
-        requireVersion(version);
-        ProjectWriter.create(version, spec, projectDir, schemaVersion, callerFiles);
-    }
-
+    //
+    // There is none here any more (2026-09-01). createProject, ProjectSpec and ProjectWriter are deleted:
+    // the SDK no longer creates a project, in the same way and for the same reason it no longer writes any
+    // .java into one.
+    //
+    // What it owned had shrunk to nothing worth a boundary. The four src/ directories were a mkdir list.
+    // botmaker-project.properties carried only the capture resolution, which the editor stopped choosing
+    // the same day — the capturing plugin seeds it now. The placeholder image belongs to whoever offers the
+    // type it stands for, so TemplateLibrary.ensurePlaceholder is called by the picture surfaces that need
+    // it rather than written into every project whether or not this plugin is loaded. And the last one,
+    // activities.json, is the interesting case: the editor already writes that file with its own mapper on
+    // every single edit, so an empty one at creation was never knowledge the SDK held and the editor did
+    // not. Once each file's owner is named, one pass writing all of them belongs to whoever owns the most
+    // of them, which is the editor.
+    //
+    // "All of it or none of it" moved with the writing rather than being given up — see ProjectCreator's
+    // writeProject in botmaker-studio, which keeps both the render-then-commit shape and the
+    // whole-file-ownership collision check.
     private static void requireVersion(SdkVersion version) {
         if (version == null) {
             throw new IllegalArgumentException("An SdkVersion is required — see Authoring's class javadoc "
