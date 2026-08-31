@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.ValueContext;
 import com.botmaker.sdk.api.bot.Activities;
 import com.botmaker.sdk.api.bot.ActivityContext;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.emulator.Emulators;
 import com.botmaker.sdk.api.launch.Game;
 
 import java.util.Map;
@@ -65,6 +66,16 @@ final class CallSites {
      */
     static final Predicate<ValueContext> BOT_SETTING = com.botmaker.plugin.toolkit.CallSites
             .firstArgumentWhere(BotSettings.class, setter -> SettingsEditors.bounds(setter) != null);
+
+    /**
+     * The instance name of {@code Emulators.use(name)}, {@code named(name)}, {@code launch(name)} or
+     * {@code stop(name)} — always argument 0.
+     *
+     * <p>{@code use()} with no argument is not matched and cannot be: there is no slot. That overload means
+     * <i>the project's default emulator</i>, which is a capture target rather than a name typed into code.
+     */
+    static final Predicate<ValueContext> EMULATOR_NAME = com.botmaker.plugin.toolkit.CallSites
+            .firstArgumentOf(Emulators.class, "use", "named", "launch", "stop");
 
     /** The activity named by {@code Activities.define(name, body)}. */
     static final Predicate<ValueContext> ACTIVITY_NAME = com.botmaker.plugin.toolkit.CallSites

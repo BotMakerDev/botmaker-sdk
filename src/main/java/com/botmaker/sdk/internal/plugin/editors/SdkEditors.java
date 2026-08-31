@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.Precision;
+import com.botmaker.sdk.internal.plugin.emulator.EmulatorEditors;
 import com.botmaker.shared.game.EpicLibraryScanner;
 import com.botmaker.shared.game.SteamLibraryScanner;
 
@@ -40,6 +41,12 @@ public final class SdkEditors {
             SlotEditor.of(CallSites.LAUNCH_PROGRAM, LaunchEditors::program),
             SlotEditor.of(CallSites.LAUNCH_OPTION, LaunchEditors::option),
             SlotEditor.of(CallSites.BOT_SETTING, SettingsEditors::setting),
+            // The emulator instance name, and the last call-site editor the host still owned. It stayed
+            // behind on 2026-08-28 because the dialog under it reached Studio's emulator probe, app cache and
+            // phone-pairing dialog; all three came here on 2026-08-31, since none of them ever needed the
+            // host — botmaker-shared is published, and scanning for emulators was only ever something the
+            // editor happened to be written to do first.
+            SlotEditor.of(CallSites.EMULATOR_NAME, EmulatorEditors::instanceName),
             // The two names that tie a bot's code to its Activity Flow canvas. Both are a String and both
             // name something drawn elsewhere, so nothing but the call could choose these.
             SlotEditor.of(CallSites.ACTIVITY_NAME, ActivityEditors::activityName),

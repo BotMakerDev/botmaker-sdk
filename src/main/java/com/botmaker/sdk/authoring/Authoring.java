@@ -297,6 +297,27 @@ public final class Authoring {
         }
     }
 
+    /**
+     * Sets {@code botmaker-project.properties}' {@code launch.target} — what {@code Bot.start} opens before
+     * the bot runs, in {@code LaunchSpec} form.
+     *
+     * <p>Beside {@link #writeCaptureSource} because the two are written together by the one editor that has
+     * cause to write either: choosing an app inside an emulator says both what to launch and where to look,
+     * and the launch half used to go through the host's own project writer while the capture half had no
+     * path at all. Same load-modify-store, same silence on a blank spec, same reason.
+     */
+    public static void writeLaunchTarget(SdkVersion version, Path resourcesDir, String spec)
+            throws IOException {
+        requireVersion(version);
+        if (spec == null || spec.isBlank()) return;
+        Files.createDirectories(resourcesDir);
+        Properties props = ProjectFile.read(resourcesDir);
+        props.setProperty(ProjectProperties.KEY_LAUNCH_TARGET, spec.trim());
+        try (var out = Files.newOutputStream(resourcesDir.resolve(ProjectProperties.FILE_NAME))) {
+            props.store(out, "BotMaker project defaults");
+        }
+    }
+
     // ---- creation ---------------------------------------------------------------------------------------
 
     /**
