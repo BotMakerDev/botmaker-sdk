@@ -1,11 +1,11 @@
 package com.botmaker.sdk.internal.config;
 
 import com.botmaker.plugin.api.value.ValueChoice;
-import com.botmaker.sdk.authoring.ActivityModel;
+import com.botmaker.plugin.api.authoring.ActivityModel;
+import com.botmaker.plugin.api.authoring.ProjectModel;
+import com.botmaker.plugin.api.authoring.VariableModel;
 import com.botmaker.sdk.authoring.Authoring;
-import com.botmaker.sdk.authoring.ProjectModel;
 import com.botmaker.sdk.authoring.SdkVersion;
-import com.botmaker.sdk.authoring.VariableModel;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 
 import org.junit.jupiter.api.Test;

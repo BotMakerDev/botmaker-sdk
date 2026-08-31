@@ -6,7 +6,6 @@ import com.botmaker.session.Preview;
 import com.botmaker.shared.capture.GamescopeHost;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
-import com.botmaker.shared.capture.ScreenCapture;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorProbe;
@@ -256,7 +255,9 @@ public final class SourcePicker {
             tiles.add(tile);
         }
         thumbs().submit(() -> {
-            BufferedImage desktop = ScreenCapture.captureDesktop();
+            // Qualified, and both names are load-bearing: shared's ScreenCapture grabs pixels, this
+            // package's converts one to a JavaFX Image. An import of either shadows the other.
+            BufferedImage desktop = com.botmaker.shared.capture.ScreenCapture.captureDesktop();
             if (desktop == null) return;
             for (int i = 0; i < tiles.size() && i < screens.size(); i++) {
                 BufferedImage shot = EditorFrame.cropped(desktop, toAwt(screens.get(i).getBounds()));
@@ -278,7 +279,7 @@ public final class SourcePicker {
         // flow's default, where the whole desktop is a better guess than screen 1.
         if (selected == null) select(tile, new Selection.Concrete(target));
         into.getChildren().add(tile);
-        thumbs().submit(() -> show(tile, ScreenCapture.captureDesktop()));
+        thumbs().submit(() -> show(tile, com.botmaker.shared.capture.ScreenCapture.captureDesktop()));
     }
 
     /**

@@ -5,7 +5,7 @@ import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.Activity;
 import com.botmaker.sdk.api.bot.Outcome;
-import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.plugin.api.authoring.FlowEdgeModel;
 import com.botmaker.sdk.internal.bot.ActivityRegistry;
 import com.botmaker.sdk.internal.bot.LegacyActivity;
 import com.botmaker.sdk.internal.config.ProjectData;
@@ -146,6 +146,15 @@ public final class FlowGraph {
             Map<String, String> routes = new LinkedHashMap<>(data.routes(name));
             // DISABLED is not an outcome an activity can report — it did not run — so it is one slot on the
             // node rather than a route, exactly as the generated table spelled it.
+            //
+            // FlowEdgeModel is a com.botmaker.plugin.api type named from inside api.*, which the standing
+            // invariant forbids — and this is not an exception to it, for the same reason the four palette
+            // annotations are not. The invariant is about a bot's *runtime*: no api.* signature or field
+            // type may name a contract type, because the contract dependency is optional and never
+            // transitive. DISABLED_OUTCOME is a compile-time String constant, so javac writes its value
+            // into this class's constant pool and a running bot never resolves the class it came from.
+            // Spelling the literal here instead would be the actual violation: two copies of one wire word,
+            // and the flow silently taking the wrong branch when one of them changes.
             String whenDisabled = routes.remove(FlowEdgeModel.DISABLED_OUTCOME);
             byName.put(name, new Node(name, activity,
                     data.popupCheck(name) ? PopupCheck.ON : PopupCheck.OFF,

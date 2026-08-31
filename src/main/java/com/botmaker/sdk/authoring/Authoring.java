@@ -1,6 +1,8 @@
 package com.botmaker.sdk.authoring;
 
+import com.botmaker.plugin.api.authoring.ProjectModel;
 import com.botmaker.plugin.api.value.ValueCatalog;
+import com.botmaker.sdk.internal.authoring.AuthoringMixins;
 import com.botmaker.sdk.internal.authoring.ProjectWriter;
 import com.botmaker.shared.config.ProjectFile;
 import com.botmaker.shared.config.ProjectProperties;
@@ -68,7 +70,11 @@ public final class Authoring {
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .registerModule(ValueJson.module(SdkValueTypes.CATALOG));
+            .registerModule(ValueJson.module(SdkValueTypes.CATALOG))
+            // How the model records bind, kept out of the records: they live in the plugin contract, whose
+            // one dependency is javafx-controls at provided, so a Jackson annotation on one of them would
+            // impose Jackson on every plugin that ever compiles against the contract.
+            .registerModule(AuthoringMixins.module());
 
     private Authoring() {
     }

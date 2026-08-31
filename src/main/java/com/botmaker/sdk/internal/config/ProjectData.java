@@ -1,8 +1,8 @@
 package com.botmaker.sdk.internal.config;
 
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.authoring.FlowEdgeModel;
-import com.botmaker.sdk.authoring.FlowModel;
+import com.botmaker.plugin.api.authoring.FlowEdgeModel;
+import com.botmaker.plugin.api.authoring.FlowModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

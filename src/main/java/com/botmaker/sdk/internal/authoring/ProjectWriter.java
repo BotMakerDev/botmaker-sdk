@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.authoring;
 
+import com.botmaker.plugin.api.authoring.ProjectModel;
 import com.botmaker.sdk.authoring.Authoring;
-import com.botmaker.sdk.authoring.ProjectModel;
 import com.botmaker.sdk.authoring.ProjectSpec;
 import com.botmaker.sdk.authoring.SdkVersion;
 import com.botmaker.sdk.authoring.TemplateNames;
