@@ -511,6 +511,18 @@ and a widened accessor would silently capture the wrong surface.
 four sealed records and is ordinary now: a hand-edited file, or one written by a newer Studio that knows a
 form this one does not. Nothing throws and nothing refuses the project.
 
+**The size those targets are captured at joined them on 2026-08-31** — `CaptureModel.reference`, a
+`Resolution` record on the same file. The maintainer's framing settles it in one line: *the reference
+resolution is a property of the SDK, not of Studio*. It describes the pictures — every one carries it in its
+sidecar and the matcher rescales by it — so the plugin that captures and matches them has to be able to read
+it; a size stored beside the editor's window layout is one the capture overlay cannot reach the moment that
+overlay stops being the host's. Studio's `StudioProjectSettings.Resolution` is **deleted** and its ~25 sites
+retype onto this one, exactly as the four target shapes did the day before. It migrates in
+`StudioProjectSettings.withCapture`, and it needs its own read (`legacyReference`) rather than riding on the
+targets': `capture.json` gained the targets a day earlier, so a project written in between has one file with
+the targets and the other with the size. A zero or negative value normalises to *none* — it can only come
+from a hand-edited file, and a project must still open.
+
 **The one thing that stayed out of the model is the live window id**, in Studio's
 `TargetCapture.WindowRef`. A gamescope host window cannot be named by title, so the caller that launched it
 holds its native handle for the length of one session — and a handle is meaningless once persisted, which is

@@ -8,6 +8,30 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-31 — the size pictures are captured at is this plugin's
+
+**Done**
+
+- **`CaptureModel` gained a third component, `reference`** — the capture resolution, in `capture.json`
+  beside the targets. It was `StudioProjectSettings.Resolution` in the editor's `settings.json`, and the
+  maintainer's framing is the whole argument: *the reference resolution is a property of the SDK, not of
+  Studio*. It describes the pictures — every one carries it in its sidecar and the matcher rescales by it —
+  so the plugin that captures and matches them has to be able to read it. A resolution stored beside the
+  editor's window layout is one the capture overlay cannot reach once that overlay is a plugin's.
+- **`CaptureModel.Resolution` is the one vocabulary now.** Studio's nested record is deleted and its ~25
+  sites retype onto this one — the same move the four capture-target record shapes made on 2026-08-30, and
+  for the same reason: a size is a size on both sides of the boundary.
+- **A zero or negative size reads as none**, normalised in the compact constructor. It can only come from a
+  hand-edited file, and a project must still open.
+
+**Deferred / next**
+
+- **The overlay still needs bounds and an on-screen flag.** With the resolution readable, what `EditorFrame`
+  is still missing for *Capture Templates* is where the target is on screen and whether its pixels are there
+  at all (an emulator's are not). That is the last thing between the overlay and a `ToolbarItem`.
+
+---
+
 ## 2026-08-31 — naming a captured picture, and the tag it gets
 
 **Done**

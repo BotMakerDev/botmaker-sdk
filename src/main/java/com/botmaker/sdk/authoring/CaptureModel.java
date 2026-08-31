@@ -7,8 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Where a project's pictures come from — the targets the user has set up, and which of them is the default.
- * This is {@code capture.json}, as a value.
+ * Where a project's pictures come from — the targets the user has set up, which of them is the default, and
+ * the size they are captured at. This is {@code capture.json}, as a value.
  *
  * <h2>Why it is here and not in the editor's own settings</h2>
  *
@@ -31,26 +31,42 @@ import java.util.List;
  * @param defaultIndex which one is the default, or {@code null} when the project has not chosen — boxed
  *                     because absent and "the first one" are different answers, and an out-of-range value is
  *                     normalised away rather than trusted
+ * @param reference    the size a window target is snapped to before every capture, so a project's pictures
+ *                     share one resolution and nothing has to be rescaled at match time; {@code null} until
+ *                     the project has one, which is an ordinary state and not an error
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record CaptureModel(List<CaptureTargetModel> targets, Integer defaultIndex) {
+public record CaptureModel(List<CaptureTargetModel> targets, Integer defaultIndex, Resolution reference) {
 
     /** The file this model is stored in, relative to the project's resources directory. */
     public static final String FILE_NAME = "capture.json";
 
+    /**
+     * A capture size in logical screen pixels.
+     *
+     * <p>It was the editor's {@code StudioProjectSettings.Resolution} until 2026-08-31 and it is here for the
+     * same reason the target list is: <b>a file whose contents describe the bot belongs to the bot's own SDK
+     * version.</b> A resolution stored beside the editor's window layout is a resolution the plugin that
+     * captures at it cannot read, and the capture overlay is that plugin's.
+     */
+    public record Resolution(int width, int height) {}
+
     public CaptureModel {
         targets = targets == null ? List.of() : List.copyOf(targets);
         if (defaultIndex != null && (defaultIndex < 0 || defaultIndex >= targets.size())) defaultIndex = null;
+        // A zero or negative size is not a smaller resolution, it is an unusable one — and it can only come
+        // from a hand-edited file, so it reads as "none" rather than stopping the project from opening.
+        if (reference != null && (reference.width() <= 0 || reference.height() <= 0)) reference = null;
     }
 
     /** No target set up — how a freshly created project reads. */
     public static CaptureModel empty() {
-        return new CaptureModel(List.of(), null);
+        return new CaptureModel(List.of(), null, null);
     }
 
     /** A model over {@code targets} whose default is the first of them, if there is one. */
     public static CaptureModel of(List<CaptureTargetModel> targets) {
-        return new CaptureModel(targets, targets == null || targets.isEmpty() ? null : 0);
+        return new CaptureModel(targets, targets == null || targets.isEmpty() ? null : 0, null);
     }
 
     /** True when the project names no target at all. */
@@ -77,12 +93,17 @@ public record CaptureModel(List<CaptureTargetModel> targets, Integer defaultInde
         if (target == null) return this;
         List<CaptureTargetModel> next = new ArrayList<>(targets);
         next.add(target);
-        return new CaptureModel(next, defaultIndex == null ? next.size() - 1 : defaultIndex);
+        return new CaptureModel(next, defaultIndex == null ? next.size() - 1 : defaultIndex, reference);
     }
 
     /** The same list with a different default; an index naming nothing leaves the model alone. */
     public CaptureModel withDefaultIndex(int index) {
         if (index < 0 || index >= targets.size()) return this;
-        return new CaptureModel(targets, index);
+        return new CaptureModel(targets, index, reference);
+    }
+
+    /** The same targets at a different capture size; {@code null} clears it. */
+    public CaptureModel withReference(Resolution resolution) {
+        return new CaptureModel(targets, defaultIndex, resolution);
     }
 }

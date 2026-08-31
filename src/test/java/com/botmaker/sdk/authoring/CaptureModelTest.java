@@ -43,7 +43,8 @@ class CaptureModelTest {
         CaptureModel written = new CaptureModel(List.of(
                 CaptureTargetModel.of("desktop"),
                 new CaptureTargetModel("window:Diablo IV", "The game"),
-                CaptureTargetModel.of("emulator:BlueStacks-1")), 1);
+                CaptureTargetModel.of("emulator:BlueStacks-1")), 1,
+                new CaptureModel.Resolution(1920, 1080));
 
         Authoring.writeCapture(V, dir, written);
         CaptureModel read = Authoring.readCapture(V, dir);
@@ -56,12 +57,34 @@ class CaptureModelTest {
 
     @Test
     void anIndexNamingNothingIsNormalisedAwayAndTheFirstTargetStandsIn() {
-        CaptureModel model = new CaptureModel(List.of(CaptureTargetModel.of("desktop")), 7);
+        CaptureModel model = new CaptureModel(List.of(CaptureTargetModel.of("desktop")), 7, null);
 
         assertNull(model.defaultIndex());
         assertEquals("desktop", model.defaultTarget().spec());
         assertEquals(model, model.withDefaultIndex(-1));
         assertEquals(0, model.withDefaultIndex(0).defaultIndex());
+    }
+
+    /**
+     * The capture resolution is a third component of this file since 2026-08-31, and the two states that
+     * cannot come from the editor are the ones worth pinning: absent, which every project written before
+     * that date is, and unusable, which only a hand-edited file can be. Both read as "no resolution", so a
+     * project opens either way and the overlay simply does not snap.
+     */
+    @Test
+    void aCaptureSizeIsCarriedAndAnUnusableOneReadsAsNone() {
+        CaptureModel none = CaptureModel.of(List.of(CaptureTargetModel.desktop()));
+        assertNull(none.reference());
+
+        CaptureModel sized = none.withReference(new CaptureModel.Resolution(1280, 720));
+        assertEquals(new CaptureModel.Resolution(1280, 720), sized.reference());
+        // It survives the two withers that rebuild the model around it.
+        assertEquals(sized.reference(), sized.withTarget(CaptureTargetModel.monitor(0)).reference());
+        assertEquals(sized.reference(), sized.withDefaultIndex(0).reference());
+        assertNull(sized.withReference(null).reference());
+
+        assertNull(none.withReference(new CaptureModel.Resolution(0, 1080)).reference());
+        assertNull(none.withReference(new CaptureModel.Resolution(1920, -1)).reference());
     }
 
     @Test
