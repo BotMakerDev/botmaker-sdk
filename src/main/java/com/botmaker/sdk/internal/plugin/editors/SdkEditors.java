@@ -52,6 +52,16 @@ public final class SdkEditors {
             // How exact a pixel match has to be. Three numbers that each fail silently on their own, so the
             // editor is a dialog that shows what each of them does rather than three fields that state them.
             SlotEditor.of(ctx -> ctx.type().is(Precision.class), PrecisionEditors::precision),
+            // Several named pictures, and it comes FIRST because it claims a subset of what the single
+            // picture below would: an ImageTemplate argument that the host says is one of a run. A narrower
+            // match belongs ahead of a wider one, and here the order is the whole difference between
+            // "found.hasAny(coin, gem)" drawn as one row and drawn as two unrelated pickers.
+            //
+            // It does NOT yet claim an ImageTemplateGroup slot, though the editor draws that shape too.
+            // Filling one is the second of the two edits that let the host seed a group find's body with a
+            // Matches switch, and that seeding emits this API from the host — the thing the generation
+            // phase exists to move. Claiming the slot now would silently delete the seed.
+            SlotEditor.of(TemplateEditors::isRunOfPictures, TemplateEditors::group),
             // A named picture. The third argument is the tile drawn beside a *declared choice* — the one
             // place the host shows a value without editing it, and the place where a stored name would
             // otherwise be listed as raw text in a list somebody picks pictures from.

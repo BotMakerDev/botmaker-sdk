@@ -601,6 +601,24 @@ uses, and it is why one editor can serve a canvas slot and a Parameters row.
 any folder in the path, and answers *no picture* for a variable, a constant or a call — a reference the editor
 cannot represent and therefore must never overwrite. Writing always spells `WireText.IMAGE_PREFIX`.
 
+**Several pictures are the same editor, over two shapes (2026-08-31).** `TemplateEditors.group` draws a chip
+row over either the arguments of an `ImageTemplateGroup.of(…)` slot — read with `Slots.arguments`, written as
+one new call — or a `SlotRun`, which is what a varargs tail (`found.hasAny(coin, gem)`) and a `Matches` case
+are. Only the host can say that several arguments are one list, and that is all it says: `elements()` and
+`allowed()` are Java source, so Studio's writer no longer builds `new ImageTemplate(path)` on this plugin's
+behalf.
+
+**Two rules the row follows, both about not destroying what it cannot read.** An element it cannot parse is
+kept exactly as it stands — every write hands back the whole list, so dropping one would delete a constant or
+a variable on the strength of not understanding it. And *Remove* is **disabled** at `run.minimum()` rather
+than hidden, with the reason in its label: a `Matches` branch with no pictures is unconditional and would not
+compile.
+
+**It does not claim an `ImageTemplateGroup` slot yet**, though it draws that shape. Filling one is the second
+of the two edits that let the host seed a group find's body with a `Matches` switch, and that seeding emits
+this API *from the host* — the thing the generation phase exists to move. Claiming the slot now would silently
+delete the seed.
+
 **`preview` is not `create` with the controls removed.** It is asked with an inert context (a declared choice
 has nothing to write back to) and returns `null` for a name that no longer resolves, which the host draws as
 the plain label — the honest reading of *this picture was deleted*, and the same answer the pill gives.

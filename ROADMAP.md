@@ -23,13 +23,42 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
   folder in the path, and answers *no picture* for a variable, a constant or a call — a reference the editor
   cannot represent and must not overwrite. `TemplateEditorTest`, 9 tests, holds those cases. 542 SDK tests.
 
-**Deferred / next**
+**Deferred / next** *(the two runs landed later the same day — see below; what is left is the group slot)*
 
 - **`ImageTemplateGroup` has not moved**, and its `PickerRegistry` entry stays for now. Its chip row spans a
   **run** of arguments rather than one slot — that is what `SlotRun` was added for — and moving it needs
   `HostSlotContext.run()` implemented at the three places Studio composes such a row: the group slot, the
   image varargs tail in `MethodInvocationBlock`, and the `Matches` switch, whose narrowing must switch from
   decoded template paths to element sources.
+
+---
+
+## 2026-08-31 — several pictures, over a run of slots
+
+**Done**
+
+- **`TemplateEditors.group`**, drawn over two shapes with one body: the arguments of an
+  `ImageTemplateGroup.of(…)` slot, and a `SlotRun` — which is what a varargs tail
+  (`found.hasAny(coin, gem)`) and a `Matches` case are. It is registered **before** the single-picture
+  editor, because it claims a subset of what that one would: an `ImageTemplate` argument the host says is
+  one of a run.
+- **Studio's writer stopped spelling this API.** `CodeEditor.setImageTemplateArgs` and
+  `setMatchesCheckTemplates` took template *paths* and built `new ImageTemplate(path)` themselves; they are
+  one `setTrailingArguments(call, fromIndex, expressions, imports…)` that puts back whatever it is handed.
+  `MatchesGroupScope.allowedSources` is the same change to the narrowing — element source, not paths —
+  while `allowedPaths` survives for `StatementFactory`, which is *generating* a seeded switch and genuinely
+  needs a path. Two questions, two answers.
+- **Two rules the row follows, both about not destroying what it cannot read.** An element it cannot parse
+  is kept as it stands, since every write hands back the whole list; and *Remove* is **disabled** at
+  `run.minimum()` with the reason in its label, because a `Matches` branch with no pictures is
+  unconditional and would not compile.
+
+**Deferred / next**
+
+- **The `ImageTemplateGroup` slot is still Studio's**, deliberately. Filling one is the second of the two
+  edits that let the host seed a group find's body with a `Matches` switch (`LambdaCallHandler.seedIfReady`),
+  and that seeding emits this API from the host. Claiming the slot before the generation phase moves that
+  would silently delete the seed.
 
 ---
 

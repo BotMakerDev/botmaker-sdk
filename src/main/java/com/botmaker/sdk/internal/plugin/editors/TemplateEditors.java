@@ -1,5 +1,7 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
+import com.botmaker.plugin.api.SlotContext;
+import com.botmaker.plugin.api.SlotRun;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.ValueContext;
 import com.botmaker.plugin.toolkit.Modals;
@@ -9,9 +11,12 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.plugin.toolkit.Thumbnail;
 import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.authoring.TemplateLibrary;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
@@ -101,6 +106,150 @@ final class TemplateEditors {
         return Styles.on(new HBox(view), Styles.TILE);
     }
 
+    // ── several pictures ────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * A row of picture chips standing in for <b>several</b> pictures — the multi-picture counterpart of
+     * {@link #template}, and the editor the contract's {@link SlotRun} was added for.
+     *
+     * <p>It draws the same row over two different shapes, which is the whole reason it is one editor:
+     *
+     * <ul>
+     *   <li><b>An {@code ImageTemplateGroup} slot.</b> One slot holding {@code ImageTemplateGroup.of(a, b)},
+     *       whose elements are the arguments of its own expression — read with {@link Slots#arguments} and
+     *       written back as a whole new call. No {@code SlotRun} involved: the slot is one slot.</li>
+     *   <li><b>A run of {@code ImageTemplate} arguments.</b> {@code found.hasAny(coin, gem)} and a
+     *       {@code Matches} case are several sibling slots, and only the host can say so — which is what
+     *       {@link SlotContext#run()} answers.</li>
+     * </ul>
+     *
+     * <p>Before this, a varargs slot rendered one single-picture picker per argument that already existed, so
+     * {@code found.hasAny(coin)} could never become {@code found.hasAny(coin, gem)}: each picker worked, and
+     * there was simply no affordance that added a second one. Handing back the whole list is what fixes that,
+     * and it is why {@code SlotRun.replace} takes a list rather than an index.
+     */
+    static Node group(ValueContext ctx) {
+        HBox row = new HBox(4);
+        row.setAlignment(Pos.CENTER_LEFT);
+        rebuild(row, ctx);
+        return row;
+    }
+
+    /**
+     * Redraws the whole row from the value.
+     *
+     * <p>Rebuilding rather than patching: every edit rewrites the source, the source is re-read, and a chip
+     * holding an index into the old list would be pointing at the wrong picture after a removal. The same
+     * reasoning that makes {@code HostSlotContext} resolve its slot on every call.
+     */
+    private static void rebuild(HBox row, ValueContext ctx) {
+        List<String> elements = elementsOf(ctx);
+        SlotRun run = runOf(ctx);
+        int floor = run == null ? 0 : run.minimum();
+
+        row.getChildren().clear();
+        for (int i = 0; i < elements.size(); i++) {
+            row.getChildren().add(chip(row, ctx, elements, i, floor));
+        }
+        row.getChildren().add(addButton(row, ctx, elements));
+    }
+
+    /** One picture: its thumbnail and name, with a menu to change or remove it. */
+    private static MenuButton chip(HBox row, ValueContext ctx, List<String> elements, int index, int floor) {
+        String name = nameOfSource(elements.get(index));
+        MenuButton pill = Pills.bare(Values.labelOr(name, "?"));
+        ImageView thumb = new ImageView();
+        thumb.setFitWidth(24);
+        thumb.setFitHeight(24);
+        thumb.setPreserveRatio(true);
+        showPicture(thumb, ctx.services(), name, 24);
+        pill.setGraphic(thumb);
+
+        Pills.onOpen(pill, () -> {
+            MenuItem change = Pills.item("Change…", () -> choose(ctx, picked ->
+                    write(row, ctx, replace(elements, index, literalFor(picked)))));
+            // Disabled rather than absent at the floor: the row still shows that removal exists, and the
+            // label says why this one cannot go. Silently omitting it reads as a missing feature.
+            MenuItem remove = elements.size() <= floor
+                    ? disabled("Remove (this branch needs at least " + floor
+                               + (floor == 1 ? " picture)" : " pictures)"))
+                    : Pills.item("Remove", () -> write(row, ctx, without(elements, index)));
+            return List.of(change, remove);
+        });
+        return pill;
+    }
+
+    /** A menu entry that says what it would do and why it cannot. */
+    private static MenuItem disabled(String label) {
+        MenuItem item = new MenuItem(label);
+        item.setDisable(true);
+        return item;
+    }
+
+    /** The trailing add button — {@code Choose pictures…} while the row is empty, {@code ＋} after that. */
+    private static Node addButton(HBox row, ValueContext ctx, List<String> elements) {
+        return Pills.button(elements.isEmpty() ? "Choose pictures…" : "＋",
+                () -> choose(ctx, picked -> {
+                    List<String> next = new ArrayList<>(elements);
+                    next.add(literalFor(picked));
+                    write(row, ctx, next);
+                }));
+    }
+
+    /** Writes the whole list back — through the run when there is one, as one call when there is not. */
+    private static void write(HBox row, ValueContext ctx, List<String> elements) {
+        SlotRun run = runOf(ctx);
+        if (run != null) {
+            run.replace(elements, ImageTemplate.class.getName());
+        } else {
+            SlotContext slot = ctx.asSlot();
+            if (slot == null) return;
+            slot.replaceWith(ImageTemplateGroup.class.getSimpleName() + ".of("
+                             + String.join(", ", elements) + ")",
+                    ImageTemplateGroup.class.getName(), ImageTemplate.class.getName());
+        }
+        rebuild(row, ctx);
+    }
+
+    /**
+     * The pictures the value currently names, as the expressions that name them.
+     *
+     * <p>An element this editor cannot read is kept exactly as it stands rather than dropped — a group
+     * holding a constant is a real thing to have written, and every write here hands back the whole list, so
+     * dropping one would delete it on the strength of not understanding it.
+     */
+    static List<String> elementsOf(ValueContext ctx) {
+        SlotRun run = runOf(ctx);
+        if (run != null) return run.elements();
+        SlotContext slot = ctx.asSlot();
+        if (slot == null) return List.of();
+        String source = slot.currentSource();
+        return source != null && source.contains(".of(") ? Slots.arguments(source) : List.of();
+    }
+
+    /** This slot's run, or {@code null} — the question only a host can answer. */
+    private static SlotRun runOf(ValueContext ctx) {
+        SlotContext slot = ctx.asSlot();
+        return slot == null ? null : slot.run();
+    }
+
+    /** Whether this is one argument of a run of pictures, which is what makes {@link #group} claim it. */
+    static boolean isRunOfPictures(ValueContext ctx) {
+        return ctx.type().is(ImageTemplate.class) && runOf(ctx) != null;
+    }
+
+    private static List<String> replace(List<String> base, int index, String element) {
+        List<String> copy = new ArrayList<>(base);
+        copy.set(index, element);
+        return copy;
+    }
+
+    private static List<String> without(List<String> base, int index) {
+        List<String> copy = new ArrayList<>(base);
+        copy.remove(index);
+        return copy;
+    }
+
     // ── the gallery ─────────────────────────────────────────────────────────────────────────────────────
 
     /**
@@ -112,11 +261,45 @@ final class TemplateEditors {
      */
     private static void choose(ValueContext ctx, java.util.function.Consumer<String> onPicked) {
         StudioServices services = ctx.services();
+        SlotRun run = runOf(ctx);
+        List<String> only = run == null ? null : namesOf(run.allowed());
         Modals.gallery(ctx,
                 Modals.Gallery.pictures("Choose a picture",
-                        "No pictures yet — capture some with the toolbar's Capture Templates."),
-                () -> items(services),
+                        only == null || !only.isEmpty()
+                                ? "No pictures yet — capture some with the toolbar's Capture Templates."
+                                : "This branch can only test pictures its find call was given, and none of "
+                                  + "them can be read from the code around it."),
+                () -> narrow(items(services), only),
                 picked -> onPicked.accept(picked.value()));
+    }
+
+    /**
+     * The pictures a narrowed row may offer, or all of them when {@code only} is {@code null}.
+     *
+     * <p>A {@code Matches} case can only ever test pictures its enclosing find call was given, so offering
+     * the whole library there lets somebody write a branch that is dead by construction. The host works the
+     * set out from the code around the run and hands it over as **element sources**, which is the only form
+     * it could hand over without knowing what a picture is; decoding them back to names is this plugin's job
+     * and is exactly what it is qualified to do.
+     */
+    private static List<Thumbnail> narrow(List<Thumbnail> all, List<String> only) {
+        if (only == null) return all;
+        List<Thumbnail> out = new ArrayList<>();
+        for (Thumbnail item : all) {
+            if (only.contains(item.value())) out.add(item);
+        }
+        return out;
+    }
+
+    /** Element sources as the picture names they spell, dropping any that name none. */
+    private static List<String> namesOf(List<String> sources) {
+        if (sources == null) return null;
+        List<String> names = new ArrayList<>();
+        for (String source : sources) {
+            String name = nameOfSource(source);
+            if (!name.isEmpty()) names.add(name);
+        }
+        return names;
     }
 
     /** Every picture in the project, as gallery cells keyed by base name. Called off the FX thread. */
