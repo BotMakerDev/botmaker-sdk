@@ -635,6 +635,43 @@ delete the seed.
 has nothing to write back to) and returns `null` for a name that no longer resolves, which the host draws as
 the plain label — the honest reading of *this picture was deleted*, and the same answer the pill gives.
 
+## The capture targets are managed here, and this module both writes and reads them (2026-08-31)
+
+`internal/plugin/capture/{CaptureTargets, SourcePicker, TargetThumbnail}` — Studio's
+`ManageCaptureTargetsDialog`, its Steam-style `CaptureSourcePicker` and their shared probe, contributed as a
+third `ToolbarItem` (`ToolbarGroup.PROJECT`, order 50 — the slot Studio's own 🎯 button vacated).
+`internal/plugin/launch/QuickLaunch` came with them, because the ▶ Launch now button is what makes a game's
+window exist to be picked at all.
+
+**The rule the maintainer stated, and it is stronger than "the SDK stores this": *anything the SDK writes,
+the SDK reads*.** So `Authoring.readCapture` now carries the migration off the editor's old
+`settings.json` shape, and `Authoring.writeCaptureSource` projects the default target onto
+`botmaker-project.properties`. Both used to be the editor's, and leaving either there had a defect with **no
+symptom**: an editor that has stopped writing the targets never moves an old project's across, so the first
+thing to read them would tell a properly configured user they had none, and their window list would quietly
+become *the whole desktop*.
+
+**A projection is not a second answer as long as it has one author.** A running bot cannot read
+`capture.json` — `Authoring` names the contract's value vocabulary, which is deliberately off a bot's
+classpath — so `capture.source` is the bot's side of the same question, written in the same pass as the list
+it comes from. A blank spec **leaves the key alone** rather than clearing it: the launch dialog and the
+emulator picker write it directly for a project that has no target list at all.
+
+**The write is a load-modify-store that carries the editor's schema stamp through untouched.** The migration
+ledger belongs to whoever owns it, and this write is not an entry in it.
+
+**What the move cost is the button's label.** Studio's read *"🎯 " + the current default target's name*,
+because the editor held the list. `StudioPlugin.toolbarItems()` is called with no `StudioServices`, so a
+plugin's item has no project to read one out of, and giving the plugin a services field to close over would
+make a label depend on load order. A constant label on a button that opens the list is the better of the two.
+
+**`TargetThumbnail` is not `EditorFrame` with a different name.** It answers *does this target exist* beside
+*here are its pixels*, which an editor asking for a frame has no use for and a list of configured targets
+cannot do without: an emulator that is configured but not booted has to read differently from one that is
+running and refusing its pixels. It reuses `EditorFrame`'s `cropped`, `usable`, `looksBlank` and `findWindow`
+— now package-private rather than private — so the desktop-crop fallback and the blank test are not written
+twice.
+
 ## Capture Templates is a toolbar item (2026-08-31)
 
 `internal/plugin/capture/CaptureTemplates` — Studio's `OverlayTemplateCapture`, and the second whole feature

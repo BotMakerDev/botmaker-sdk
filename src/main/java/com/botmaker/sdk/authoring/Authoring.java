@@ -2,6 +2,8 @@ package com.botmaker.sdk.authoring;
 
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.sdk.internal.authoring.ProjectWriter;
+import com.botmaker.shared.config.ProjectFile;
+import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.authoring.ValueJson;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -13,8 +15,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 /**
  * The one entry point an editor uses to read, write and create a bot project.
@@ -161,6 +165,14 @@ public final class Authoring {
     // ---- capture ----------------------------------------------------------------------------------------
 
     /**
+     * The editor file the capture targets lived in before {@code capture.json} — read here, never written.
+     *
+     * <p>Named as a string rather than reached through an editor's class because it is not this module's
+     * file: it is a shape this reader has to recognise once, for projects written before 2026-08-30.
+     */
+    private static final String LEGACY_SETTINGS_FILE = "settings.json";
+
+    /**
      * Reads {@code capture.json} out of a project's resources directory.
      *
      * <p>Missing is {@link CaptureModel#empty()} and not an error, for the same reason a missing
@@ -175,8 +187,69 @@ public final class Authoring {
     public static CaptureModel readCapture(SdkVersion version, Path resourcesDir) throws IOException {
         requireVersion(version);
         Path file = resourcesDir.resolve(CaptureModel.FILE_NAME);
+        if (!Files.exists(file)) return legacyCapture(resourcesDir);
+        CaptureModel model = MAPPER.readValue(file.toFile(), CaptureModel.class);
+        // The size arrived in this file a day after the targets did, so a project written in between has one
+        // answer here and the other in the editor's file. Read only when this file does not carry it: once it
+        // does, it wins, or the migration would resurrect a size the user has since changed.
+        return model.reference() != null ? model : model.withReference(legacyReference(resourcesDir));
+    }
+
+    /**
+     * The capture targets and size an editor's {@code settings.json} carried before this file existed, or an
+     * empty model.
+     *
+     * <p><b>The reader of a file owns its migration, which is why this is here and not in an editor.</b> It
+     * was the editor's until 2026-08-31, and that arrangement had a hole with no symptom: an editor that has
+     * stopped writing the targets never moves them across, so the first thing to read them — this — would
+     * hand back nothing for a project that plainly had them, and a user's window list would quietly become
+     * "the whole desktop".
+     *
+     * <p>Walked as a tree rather than bound to records. The four polymorphic shapes that file stored were an
+     * editor's vocabulary and are gone; what is actually needed is the mapping from an old node to a spec,
+     * and that is four lines. An entry whose {@code type} nothing recognises is skipped: this runs against a
+     * file written by an older editor, and a target it cannot read is one the user re-adds rather than a
+     * reason a project will not open.
+     */
+    private static CaptureModel legacyCapture(Path resourcesDir) throws IOException {
+        Path file = resourcesDir.resolve(LEGACY_SETTINGS_FILE);
         if (!Files.exists(file)) return CaptureModel.empty();
-        return MAPPER.readValue(file.toFile(), CaptureModel.class);
+        JsonNode root = MAPPER.readTree(file.toFile());
+        List<CaptureTargetModel> targets = new ArrayList<>();
+        for (JsonNode node : root.path("captureTargets")) {
+            CaptureTargetModel target = legacyTarget(node);
+            if (target != null) targets.add(target);
+        }
+        JsonNode index = root.path("defaultTargetIndex");
+        return new CaptureModel(targets, index.isInt() ? index.intValue() : null,
+                legacyReference(resourcesDir));
+    }
+
+    /** One legacy {@code captureTargets} entry as a target, or {@code null} when its {@code type} is unknown. */
+    private static CaptureTargetModel legacyTarget(JsonNode node) {
+        return switch (node.path("type").asText("")) {
+            case "desktop" -> CaptureTargetModel.desktop();
+            // "screen" is what the editor's own file called a monitor; "monitor" is this module's word for
+            // it. Both are accepted because the file being read was written by the other one.
+            case "screen", "monitor" -> CaptureTargetModel.monitor(node.path("index").asInt(0));
+            case "window" -> CaptureTargetModel.window(node.path("titleSubstring").asText(""));
+            case "emulator" -> CaptureTargetModel.emulator(node.path("instanceName").asText(""));
+            default -> null;
+        };
+    }
+
+    /** The {@code referenceResolution} a legacy {@code settings.json} carried, or {@code null}. */
+    private static CaptureModel.Resolution legacyReference(Path resourcesDir) {
+        try {
+            Path file = resourcesDir.resolve(LEGACY_SETTINGS_FILE);
+            if (!Files.exists(file)) return null;
+            JsonNode node = MAPPER.readTree(file.toFile()).path("referenceResolution");
+            int width = node.path("width").asInt(0);
+            int height = node.path("height").asInt(0);
+            return width > 0 && height > 0 ? new CaptureModel.Resolution(width, height) : null;
+        } catch (Exception unreadable) {
+            return null;
+        }
     }
 
     /** Writes {@code capture.json}; the directory is created if it does not exist. */
@@ -193,6 +266,35 @@ public final class Authoring {
     public static String captureJson(SdkVersion version, CaptureModel model) throws IOException {
         requireVersion(version);
         return MAPPER.writeValueAsString(model == null ? CaptureModel.empty() : model);
+    }
+
+    /**
+     * Projects the default capture target onto {@code botmaker-project.properties}' {@code capture.source} —
+     * the one spec a <em>running bot</em> resolves.
+     *
+     * <p>Written here, beside the file it is projected from, because the two answers must not have two
+     * authors. A bot cannot read {@code capture.json} at all: {@link CaptureModel} is authoring data, and the
+     * properties file is the bot's side of the same question — which is why the projection exists and why it
+     * has exactly one direction.
+     *
+     * <p><b>A {@code null} or blank spec leaves the key alone rather than clearing it.</b> The same key is
+     * also set for a project that has no target list, and clearing it here would silently un-configure such a
+     * project the first time somebody opened the targets dialog and applied an empty list.
+     *
+     * <p>Load-modify-store, so every other key survives — including the editor's schema stamp, which is
+     * carried through untouched rather than re-stamped: the migration ledger belongs to whoever owns it, and
+     * this write is not an entry in it.
+     */
+    public static void writeCaptureSource(SdkVersion version, Path resourcesDir, String spec)
+            throws IOException {
+        requireVersion(version);
+        if (spec == null || spec.isBlank()) return;
+        Files.createDirectories(resourcesDir);
+        Properties props = ProjectFile.read(resourcesDir);
+        props.setProperty(ProjectProperties.KEY_CAPTURE_SOURCE, spec.trim());
+        try (var out = Files.newOutputStream(resourcesDir.resolve(ProjectProperties.FILE_NAME))) {
+            props.store(out, "BotMaker project defaults");
+        }
     }
 
     // ---- creation ---------------------------------------------------------------------------------------

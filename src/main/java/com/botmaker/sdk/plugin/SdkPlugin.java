@@ -11,6 +11,7 @@ import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
+import com.botmaker.sdk.internal.plugin.capture.CaptureTargets;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
@@ -208,7 +209,11 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                 ToolbarItem.of("capture-templates", "✂ Capture Templates",
                         "Draw regions over the game and save them as pictures the bot can look for — "
                                 + "one at a time, several in a pass, or an object cut out of its background",
-                        ToolbarGroup.TOOLS, 20, this::openCaptureTemplates));
+                        ToolbarGroup.TOOLS, 20, this::openCaptureTemplates),
+                ToolbarItem.of("capture-targets", "🎯 Capture Targets",
+                        "Choose what the bot looks at — a monitor, an application window or an emulator "
+                                + "instance — and which of them is the project's default",
+                        ToolbarGroup.PROJECT, 50, this::openCaptureTargets));
     }
 
     /**
@@ -223,6 +228,21 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     private void openCaptureTemplates(ActionContext context) {
         StudioServices services = context.services();
         CaptureTemplates.open(services, services.dialogs().owner(), null);
+    }
+
+    /**
+     * Opens the capture-targets manager.
+     *
+     * <p><b>The label is constant, and it used not to be.</b> Studio's own button read "🎯 " plus the current
+     * default target's short name, because the editor held that list in memory. It no longer holds it — the
+     * targets are {@code capture.json}, which is this plugin's file — and {@link #toolbarItems()} is called
+     * with no {@link StudioServices}, so a label supplier here has no project to read one out of. Giving the
+     * plugin a services field to close over would make the item's <em>label</em> depend on load order, which
+     * is worse than a button that says what it opens.
+     */
+    private void openCaptureTargets(ActionContext context) {
+        StudioServices services = context.services();
+        CaptureTargets.open(services, services.dialogs().owner());
     }
 
     /**

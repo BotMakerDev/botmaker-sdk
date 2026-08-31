@@ -8,6 +8,26 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-31 — Capture Targets is a toolbar item, and the capture file's reader moves with it
+
+**Done**
+
+- `internal/plugin/capture/CaptureTargets` — the targets manager, contributed as a third `ToolbarItem`
+  (`PROJECT`/50). Single-instance; Apply writes off the FX thread.
+- `internal/plugin/capture/SourcePicker` — the visual chooser (desktop, monitors, emulators, windows) with
+  live thumbnails, and `TargetThumbnail`, the existence-plus-pixels probe both dialogs share.
+- `internal/plugin/launch/QuickLaunch` — the ▶ Launch now button, moved whole. Its only editor dependency was
+  three reads that already went through shared's `ProjectFile`. `QuickLaunchRoutingTest` came with it.
+- `Authoring.readCapture` gained the migration off the editor's old `settings.json` shape, and
+  `Authoring.writeCaptureSource` the `capture.source` projection — the maintainer's rule that whatever this
+  module writes, it also reads. `CaptureFileTest` holds both.
+- `EditorFrame.cropped`/`usable`/`looksBlank`/`findWindow` are package-private, so the probe reuses them.
+
+**Cost, recorded**
+
+- The toolbar button's label is constant now; it used to name the current default target. `toolbarItems()` is
+  called with no `StudioServices`, so a plugin's item has no project to read.
+
 ## 2026-08-31 — Capture Templates is a toolbar item
 
 **Done**

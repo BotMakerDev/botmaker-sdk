@@ -275,8 +275,14 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
         }
     }
 
-    /** {@code desktop} cropped to {@code bounds}, clamped to the image, or {@code null}. */
-    private static BufferedImage cropped(BufferedImage desktop, Rectangle bounds) {
+    /**
+     * {@code desktop} cropped to {@code bounds}, clamped to the image, or {@code null}.
+     *
+     * <p>Package-private rather than private since the targets dialog moved here: its thumbnails need the
+     * same desktop-crop, the same blank test and the same "is this worth showing" answer this class already
+     * had, and a second copy of them beside it would be three heuristics to keep in step.
+     */
+    static BufferedImage cropped(BufferedImage desktop, Rectangle bounds) {
         if (desktop == null || bounds == null || bounds.width <= 0 || bounds.height <= 0) return null;
         Rectangle virtual = ScreenCapture.getVirtualScreenBounds();
         int x = Math.max(0, Math.min(bounds.x - virtual.x, desktop.getWidth() - 1));
@@ -302,12 +308,12 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
     }
 
     /** A grab worth returning: real pixels, and not the uniform frame a failed capture produces. */
-    private static boolean usable(BufferedImage image) {
+    static boolean usable(BufferedImage image) {
         return image != null && image.getWidth() > 0 && image.getHeight() > 0 && !looksBlank(image);
     }
 
     /** The first window whose title contains {@code titleSubstring}, case-insensitively, or {@code null}. */
-    private static GenericWindow findWindow(String titleSubstring) {
+    static GenericWindow findWindow(String titleSubstring) {
         String needle = titleSubstring.toLowerCase();
         for (GenericWindow window : NativeControllerFactory.get().getAllWindows(true)) {
             String title = window.getTitle();
@@ -324,7 +330,7 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
      * "all identical" rather than "all black": a Wayland grab that fails returns black, and a window captured
      * before it has painted returns its background colour, and both are equally useless to sample from.
      */
-    private static boolean looksBlank(BufferedImage image) {
+    static boolean looksBlank(BufferedImage image) {
         int first = image.getRGB(0, 0);
         int stepX = Math.max(1, image.getWidth() / 10);
         int stepY = Math.max(1, image.getHeight() / 10);
