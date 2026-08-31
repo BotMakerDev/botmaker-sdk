@@ -583,6 +583,28 @@ Three things in the move are worth keeping:
   any plugin may depend on shared and do this for itself, so the host is not the only possible source.
   Studio's `OverlayToolbars` delegates to it, and its last two callers leave with the launch pickers.
 
+## The picture editor, and the third place a value is shown (2026-08-31)
+
+`internal/plugin/editors/TemplateEditors` — one editor for `ImageTemplate` in both places the host edits one,
+plus the tile beside a declared choice. **Three** of Studio's dispatch sites went with it, not the usual two:
+the `PickerRegistry` entry, `ValueEditors`' `IMAGE_TEMPLATE` case (and its `TemplateChip`), and
+`optionGraphic`'s `IMAGE_TEMPLATE` arm — the third being the one nobody had counted, and the one that forced
+`SlotEditor.preview` into the contract.
+
+**The two places disagree about what a picture is called, and the editor never asks which it is in.** A slot
+holds `new ImageTemplate("src/main/resources/images/gold.png")`; a project file holds `gold`. A stored path
+would break when the folder moved and a stored constructor would be Java in a file that holds none, so
+`Slots.write(ctx, literal, name, …)` takes both and picks. That is the same shape every ported editor here
+uses, and it is why one editor can serve a canvas slot and a Parameters row.
+
+**Reading is deliberately more permissive than writing.** The reader accepts a fully-qualified constructor and
+any folder in the path, and answers *no picture* for a variable, a constant or a call — a reference the editor
+cannot represent and therefore must never overwrite. Writing always spells `WireText.IMAGE_PREFIX`.
+
+**`preview` is not `create` with the controls removed.** It is asked with an inert context (a declared choice
+has nothing to write back to) and returns `null` for a name that no longer resolves, which the host draws as
+the plain label — the honest reading of *this picture was deleted*, and the same answer the pill gives.
+
 ## The project's pictures are this plugin's folder (2026-08-30)
 
 `authoring/TemplateLibrary` — Studio's `services.ImageTemplateLibrary` until this date — with `TagCatalog`

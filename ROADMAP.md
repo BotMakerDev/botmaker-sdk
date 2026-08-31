@@ -8,6 +8,31 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-08-31 — the picture editor, and three dispatch sites rather than two
+
+**Done**
+
+- **`internal/plugin/editors/TemplateEditors`** — `ImageTemplate` in a canvas slot, in a Parameters row, and
+  as the tile beside a declared choice. Registered with the contract's new three-argument `SlotEditor.of`,
+  whose third argument is `preview`.
+- **Three of Studio's arms deleted, not two.** The `PickerRegistry` entry, `ValueEditors`' `IMAGE_TEMPLATE`
+  case with its `TemplateChip`, and `optionGraphic`'s `IMAGE_TEMPLATE` arm. The third had no contract hook
+  and is what forced `SlotEditor.preview`; Studio's `previewFromPlugin` is the host side of it.
+- **The reader was rebuilt off the syntax tree**, as every ported editor's has been: the constructor's one
+  argument read with `Slots.arguments`/`stringLiteral`. It accepts a fully-qualified constructor and any
+  folder in the path, and answers *no picture* for a variable, a constant or a call — a reference the editor
+  cannot represent and must not overwrite. `TemplateEditorTest`, 9 tests, holds those cases. 542 SDK tests.
+
+**Deferred / next**
+
+- **`ImageTemplateGroup` has not moved**, and its `PickerRegistry` entry stays for now. Its chip row spans a
+  **run** of arguments rather than one slot — that is what `SlotRun` was added for — and moving it needs
+  `HostSlotContext.run()` implemented at the three places Studio composes such a row: the group slot, the
+  image varargs tail in `MethodInvocationBlock`, and the `Matches` switch, whose narrowing must switch from
+  decoded template paths to element sources.
+
+---
+
 ## 2026-08-30 — the capture surfaces move, and `ZoomPan` finally lands
 
 **Done**

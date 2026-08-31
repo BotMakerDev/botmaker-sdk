@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.SlotEditor;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.shared.game.EpicLibraryScanner;
 import com.botmaker.shared.game.SteamLibraryScanner;
@@ -51,6 +52,11 @@ public final class SdkEditors {
             // How exact a pixel match has to be. Three numbers that each fail silently on their own, so the
             // editor is a dialog that shows what each of them does rather than three fields that state them.
             SlotEditor.of(ctx -> ctx.type().is(Precision.class), PrecisionEditors::precision),
+            // A named picture. The third argument is the tile drawn beside a *declared choice* — the one
+            // place the host shows a value without editing it, and the place where a stored name would
+            // otherwise be listed as raw text in a list somebody picks pictures from.
+            SlotEditor.of(ctx -> ctx.type().is(ImageTemplate.class),
+                    TemplateEditors::template, TemplateEditors::preview),
             // A wait length: the unit is invisible in a bare number, and this is the type that carries the
             // random range the humanized wait needs. Both spellings are accepted, and that is not belt and
             // braces — the Parameters window knows this type by the fully-qualified name its vocabulary
