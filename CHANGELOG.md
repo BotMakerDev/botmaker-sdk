@@ -62,6 +62,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   time: the pairing token moved with the feature, so an already-paired phone has to scan the QR code once
   more.
 
+- **The picture library ships with the SDK now, as 🖼 Manage Pictures.** Renaming, retagging, replacing,
+  deleting, importing and exporting the pictures your bot looks for were an editor window; they are the SDK's,
+  beside ✂ Capture Templates on the toolbar. Nothing about what it does has changed, **including the part that
+  edits your code**: renaming a picture still finds every block that names it and carries them along, and
+  deleting one that is still in use still lists the uses and offers to point those blocks at another picture
+  first — with the enclosing functions marked for review, because that one changes what your bot watches for.
+  A rename is not marked, because it is not a change: it is the same picture under a new name.
+
+  What moved underneath is worth one line, since it is why any plugin can now do this: rewriting your Java is
+  the editor's job and it stays the editor's job. What the SDK supplies is only the knowledge that `ore.png`
+  is written `Templates.ORE` — the editor no longer knows that, and never needed to.
+
 - **Your capture targets are one list now, in `capture.json`.** The screens, windows and emulators you set up
   as targets were kept in the editor's own settings, while the one your bot actually looks at was kept
   separately in `botmaker-project.properties` — so the two could drift apart with nothing to tell you. The

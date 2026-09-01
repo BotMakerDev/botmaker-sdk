@@ -25,6 +25,7 @@ import com.botmaker.sdk.internal.plugin.capture.ScreenCapture;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
 import com.botmaker.sdk.internal.plugin.setup.ProjectSetup;
+import com.botmaker.sdk.internal.plugin.templates.ResourceManagerDialog;
 import javafx.scene.paint.Color;
 
 import java.util.List;
@@ -268,7 +269,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * Two buttons: <b>Pilot</b>, the case the toolbar surface was added for, and <b>Capture Templates</b>.
+     * Five buttons, of which <b>Pilot</b> is the case the toolbar surface was added for.
      *
      * <p>The Remote Pilot is not an editor for a slot: it binds a port, opens a nested {@code :N} display,
      * streams frames to a phone and drives input back. It was Studio's until 2026-08-30 and it was never
@@ -299,6 +300,10 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                         "Draw regions over the game and save them as pictures the bot can look for — "
                                 + "one at a time, several in a pass, or an object cut out of its background",
                         ToolbarGroup.TOOLS, 20, this::openCaptureTemplates),
+                ToolbarItem.of("manage-templates", "🖼 Manage Pictures",
+                        "Rename, retag, replace, delete, import and export the pictures the bot looks for — "
+                                + "a rename carries every block that uses it",
+                        ToolbarGroup.TOOLS, 30, this::openResourceManager),
                 ToolbarItem.of("capture-targets", "🎯 Capture Targets",
                         "Choose what the bot looks at — a monitor, an application window or an emulator "
                                 + "instance — and which of them is the project's default",
@@ -321,6 +326,24 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     private void openCaptureTemplates(ActionContext context) {
         StudioServices services = context.services();
         CaptureTemplates.open(services, services.dialogs().owner(), null);
+    }
+
+    /**
+     * Opens the picture library.
+     *
+     * <p>It sits beside Capture Templates at order 30, because the two are the same subject from either end:
+     * that one makes pictures, this one manages the ones that exist. It was Studio's <i>Resource Manager</i>
+     * until 2026-09-01, and the reason it stayed there so much longer than the rest of the picture stack is
+     * worth remembering: its rename and delete guards rewrite the user's own Java, which is host work no
+     * plugin can do. What unblocked it was {@link com.botmaker.plugin.api.Sources} — the host keeps the
+     * rewrite, this module keeps knowing that {@code ore.png} is spelled {@code Templates.ORE}.
+     *
+     * <p>Single-instance is not enforced, unlike the pilot: this window owns no port and no display, so a
+     * second one is a second view of the same folder rather than a conflict.
+     */
+    private void openResourceManager(ActionContext context) {
+        StudioServices services = context.services();
+        ResourceManagerDialog.open(services, services.dialogs().owner());
     }
 
     /**

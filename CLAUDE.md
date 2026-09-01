@@ -704,6 +704,41 @@ the editor has open* is host state with no contract member for it, and adding on
 condition refuses. The tag menu is still on the naming dialog, so what was lost is a default, not a
 capability.
 
+## The picture library is a toolbar item, and its rewrite is a host capability (2026-09-01)
+
+`internal/plugin/templates/{ResourceManagerDialog, TemplateGalleryDialog, TemplateUses}` — Studio's
+*Resource Manager*, reaching the bar as **🖼 Manage Pictures**, `ToolbarGroup.TOOLS` at order 30, beside the
+✂ Capture Templates this file's previous section describes. It is the third whole feature to leave the editor
+through `toolbarItems()`, and the one that took longest, because it was the only one that **edits the user's
+own Java**.
+
+**This is the one move that did grow the contract, and the addition is the point.** `StudioServices.sources()`
+returns a `Sources`: `find(List<String> needles)` and `replace(Map<String,String>, historyLabel, reviewNote)`.
+Studio's `TemplateReferences` was refused a move for weeks on a correct argument — the open buffers are editor
+state, and `@NeedsReview` plus the Project History snapshot are the host's undo model — and the argument was
+about *half* the class. The other half is that `ore.png` is spelled `Templates.ORE`, which is
+`ImageTemplate`'s concept. So the host kept the rewrite and this module took the spellings, as
+**`TemplateUses`**: `needlesFor`, `repointing`, `Scan.describe` and the sentence a repointed block is marked
+with. Nothing in the contract's half names a picture — a needle is a sequence of Java tokens.
+
+**The needle is matched as tokens, not text, and that is what let the vocabulary leave.**
+`Templates.ORE` matches `Templates . ORE` and not `Templates.OREX`; a path literal matches whole and not
+inside a longer one. `TemplateReferences` hand-wrote `\bTemplates\s*\.\s*ORE\b` because it knew the shape of a
+template reference; the host now derives the same pattern from a string this module typed.
+
+**Two spellings, and both are still read.** A name that predates the lowercase rule has no constant (see
+`TemplateNames`), so its uses are raw path literals — and a repoint whose *new* name has no constant rewrites
+constant uses to the path, which is the only thing left to write. `TemplateUsesTest` holds that asymmetry;
+everything about matching and writing files is tested in the host's own module, which is the split working.
+
+**What did not move: rewriting Java.** `HostSources` in the editor still owns the walk, the buffers, the
+snapshot and the mark — including two things this dialog no longer does for itself, ensuring the
+`NeedsReview` annotation exists before a mark names it and asking the editor to redraw the file it rewrote
+underneath. A plugin never learns which file was open, so it could not have done the second.
+
+**Single-instance is not enforced, unlike the pilot's.** This window owns no port and no display, so a second
+one is a second view of one folder rather than a conflict; `projectClosing()` has nothing to release for it.
+
 ## Naming a captured picture, and the tag it gets (2026-08-31)
 
 `internal/plugin/capture/{TemplateNaming, TagPicker}` — the step between a crop and a saved picture. It runs
@@ -717,9 +752,9 @@ box to be pointed at.
 
 **`TagPicker` is here because a tag is a tag *of a picture*.** The catalog it offers is `TagCatalog`, read out
 of this plugin's own manifest under `resourcesDir()`; the host is the only possible source of which project is
-open, and everything after that is files. Studio's `TagPicklist` is a two-line subclass — the tag manager, the
-parameters screen and the resource manager are host work that is not moving, and they should not each have to
-build a `StudioServices` to open a menu.
+open, and everything after that is files. Studio kept a two-line `TagPicklist` subclass over it while the tag
+manager, the parameters screen and the resource manager were still host work; **that subclass is gone** —
+those callers have left the editor, and `TagPicker.promptNewTag(services, owner)` is what they use directly.
 
 **Nothing was added to the contract for the move**, which is the test each of these passes: theming is
 `services.theme()`, the thumbnails are `services.capture().toFxImage`, and the rest is a folder.
