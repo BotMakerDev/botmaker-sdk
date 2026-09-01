@@ -15,8 +15,20 @@ import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.plugin.toolkit.Editors;
 import com.botmaker.plugin.toolkit.ScreenPicks;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.geometry.Direction;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.interaction.MouseButton;
+import com.botmaker.sdk.api.vision.ColorMatch;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.ImageTemplateGroup;
+import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.api.vision.Matches;
 import com.botmaker.sdk.api.vision.Precision;
+import com.botmaker.sdk.api.vision.TextMatch;
+import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTargets;
@@ -211,8 +223,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * What a fresh {@code CaptureSource}, {@code Precision} and {@code ImageTemplate} look like — the three
-     * types the host's generic {@code new T()} cannot fill on its own.
+     * What a fresh value of each of this plugin's holdable types looks like, written as Java.
      *
      * <p>Not cached, and deliberately so: {@link CaptureExpr#projectDefault()} is the SDK's <em>live</em>
      * ambient source, so a slot seeded with it keeps following the project's configured target when that is
@@ -220,24 +231,54 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * default happened to be at project open — the exact bug the comment on {@code projectDefault()} exists
      * to prevent, moved intact from {@code InitializerFactory}'s arm for it.
      *
-     * <p>{@code Precision.DEFAULT} rather than a number for the reason the type exists at all: the constant
-     * says what the slot is for, where {@code new Precision(12.0, …)} states three numbers that each fail
-     * silently on their own. Fully qualified so no seed depends on an import the host happens to add.
+     * <h2>This list answers two questions since 2026-09-01, and the second one used to be Studio's</h2>
      *
-     * <p>{@code new ImageTemplate("")} is the odd one, and it is here because of what it replaces: the host's
-     * {@code ListHandler} carried an arm that built exactly this node, naming {@code ImageTemplate} and the
-     * generated {@code Templates} class to do it. The empty path is not an oversight — it is what opens the
-     * per-element picture picker on the element just added, so the user picks in the editor rather than
-     * typing a path. A picture is this plugin's concept, so the sentence describing a fresh one is this
-     * plugin's to write.
+     * <p>It started as three seeds — the types the host's generic {@code new T()} cannot fill on its own: an
+     * interface, a record with required components, and a type whose meaning lives in a constant. It is
+     * fourteen now, and the eleven that joined are not here because {@code new T()} would fail. They are here
+     * because <b>Studio's {@code palette/BotType} used to list them</b>, as fourteen {@code Class} literals
+     * with a default value beside each, and that list is what "Declare Bot Variable" and the Add Function
+     * dialog offer. An editor curating one plugin's API is the back door the platform exists to close — and a
+     * second plugin's types could never have joined that enum at all.
+     *
+     * <p>So a seed now means <em>this type is one a bot author can hold</em>, and nothing was added to the
+     * contract to say it: the surface answering <em>what does a fresh one look like</em> already had the whole
+     * triple a declarable type needs — the name, the expression, and the imports it wants. Adding a type here
+     * makes it declarable; removing one takes it out of both menus. That is the curation Studio's allow-list
+     * used to perform, moved to the plugin that knows which of its types are worth holding.
+     *
+     * <p><b>Every expression is fully qualified.</b> The host writes a seeded declaration with the qualified
+     * type name and has no rewriter to add an import with, so a seed that named {@code Point} would compile
+     * only where something else had already imported it.
+     *
+     * <p>Two of the fourteen state a judgement rather than a value. {@code Precision.DEFAULT} rather than a
+     * number for the reason the type exists at all: the constant says what the slot is for, where
+     * {@code new Precision(12.0, …)} states three numbers that each fail silently on their own. And
+     * {@code new ImageTemplate("")} carries an empty path on purpose — it is what opens the per-element
+     * picture picker on the element just added, so the user picks in the editor rather than typing a path.
+     * The three {@code Vision.last…} seeds are the same idea again: a match is something the bot <em>found</em>,
+     * so the honest starting value is the last one it found, not a fabricated hit.
      */
     @Override
     public List<SourceSeed> sourceSeeds() {
+        String vision = Vision.class.getName();
         return List.of(
                 SourceSeed.of(CaptureSource.class.getName(), CaptureExpr.projectDefault()),
                 SourceSeed.of(Precision.class.getName(), Precision.class.getName() + ".DEFAULT"),
                 SourceSeed.of(ImageTemplate.class.getName(),
-                        "new " + ImageTemplate.class.getName() + "(\"\")"));
+                        "new " + ImageTemplate.class.getName() + "(\"\")"),
+                SourceSeed.of(ImageTemplateGroup.class.getName(),
+                        ImageTemplateGroup.class.getName() + ".of()"),
+                SourceSeed.of(MatchResult.class.getName(), vision + ".lastMatch()"),
+                SourceSeed.of(Matches.class.getName(), Matches.class.getName() + ".none()"),
+                SourceSeed.of(ColorMatch.class.getName(), vision + ".lastColorMatch()"),
+                SourceSeed.of(TextMatch.class.getName(), vision + ".lastTextMatch()"),
+                SourceSeed.of(Point.class.getName(), "new " + Point.class.getName() + "(0, 0)"),
+                SourceSeed.of(Rect.class.getName(), "new " + Rect.class.getName() + "(0, 0, 0, 0)"),
+                SourceSeed.of(Size.class.getName(), "new " + Size.class.getName() + "(0, 0)"),
+                SourceSeed.of(Direction.class.getName(), Direction.class.getName() + ".NORTH"),
+                SourceSeed.of(Key.class.getName(), Key.class.getName() + ".A"),
+                SourceSeed.of(MouseButton.class.getName(), MouseButton.class.getName() + ".LEFT"));
     }
 
     /**
