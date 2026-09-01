@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.ActionContext;
 import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.Region;
 import com.botmaker.plugin.api.SlotEditor;
+import com.botmaker.plugin.api.SourceSeed;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.ToolbarGroup;
@@ -13,7 +14,10 @@ import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.plugin.toolkit.Editors;
 import com.botmaker.plugin.toolkit.ScreenPicks;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
+import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTargets;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
 import com.botmaker.sdk.internal.plugin.capture.ScreenCapture;
@@ -201,6 +205,27 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     @Override
     protected List<SlotEditor> buildSlotEditors() {
         return SdkEditors.ALL;
+    }
+
+    /**
+     * What a fresh {@code CaptureSource} and a fresh {@code Precision} look like — the two types the host's
+     * generic {@code new T()} cannot fill, and the last two SDK class names the host's parser held.
+     *
+     * <p>Not cached, and deliberately so: {@link CaptureExpr#projectDefault()} is the SDK's <em>live</em>
+     * ambient source, so a slot seeded with it keeps following the project's configured target when that is
+     * changed later. A snapshot taken when the plugin loaded would silently freeze the slot into whatever the
+     * default happened to be at project open — the exact bug the comment on {@code projectDefault()} exists
+     * to prevent, moved intact from {@code InitializerFactory}'s arm for it.
+     *
+     * <p>{@code Precision.DEFAULT} rather than a number for the reason the type exists at all: the constant
+     * says what the slot is for, where {@code new Precision(12.0, …)} states three numbers that each fail
+     * silently on their own. Fully qualified so neither seed depends on an import the host happens to add.
+     */
+    @Override
+    public List<SourceSeed> sourceSeeds() {
+        return List.of(
+                SourceSeed.of(CaptureSource.class.getName(), CaptureExpr.projectDefault()),
+                SourceSeed.of(Precision.class.getName(), Precision.class.getName() + ".DEFAULT"));
     }
 
     /**

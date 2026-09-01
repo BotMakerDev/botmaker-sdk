@@ -10,7 +10,7 @@ import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.interaction.Key;
 import com.botmaker.sdk.api.interaction.MouseButton;
 import com.botmaker.sdk.api.vision.Precision;
-import com.botmaker.sdk.authoring.TemplateNames;
+import com.botmaker.shared.project.TemplateNames;
 import com.botmaker.sdk.authoring.WireText;
 
 import java.awt.Color;

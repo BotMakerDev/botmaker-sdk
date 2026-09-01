@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.interaction.Key;
 import com.botmaker.sdk.api.interaction.MouseButton;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.Precision;
+import com.botmaker.shared.project.TemplateNames;
 
 import java.awt.Color;
 import java.time.Duration;
@@ -51,8 +52,13 @@ public final class WireText {
      * the files there; this is the half of that agreement the generator needs, so that an
      * {@link ValueType#IMAGE_TEMPLATE} value spelled {@code "ore"} in the file becomes
      * {@code new ImageTemplate("src/main/resources/images/ore.png")} in source.
+     *
+     * <p>Delegates to {@link TemplateNames#IMAGE_PREFIX} since 2026-09-01. The folder is one agreement with
+     * two parties — this generator, and the host's editor rewriting every use of a renamed picture — so it
+     * moved to the module both can see. This constant stays because it is the <em>wire format's</em> name for
+     * it, and every caller here reads it as such.
      */
-    public static final String IMAGE_PREFIX = "src/main/resources/images/";
+    public static final String IMAGE_PREFIX = TemplateNames.IMAGE_PREFIX;
 
     private static final long SECOND = 1000L;
     private static final long MINUTE = 60 * SECOND;
