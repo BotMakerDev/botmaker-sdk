@@ -8,6 +8,26 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-01 — a fresh picture is this plugin's sentence
+
+**Done**
+
+- A third `SourceSeed` in `SdkPlugin.sourceSeeds()`:
+  `SourceSeed.of("com.botmaker.sdk.api.vision.ImageTemplate", "new com.botmaker.sdk.api.vision.ImageTemplate(\"\")")`.
+  Fully qualified, so it depends on no import the host happens to add.
+
+**Why the empty path is not an oversight**
+
+- It is what opens the per-element picture picker on the element just added, so the user picks in the editor
+  instead of typing a path. That behaviour used to live in Studio's `ListHandler`, as an arm that built
+  `new ImageTemplate(Templates…)` by hand — the host naming this module's types and its generated constants
+  class to say what a fresh picture is. A picture is this plugin's concept, so the sentence describing a
+  fresh one is this plugin's to write, and `SourceSeed` is where a plugin writes it.
+- The host's side of the trade is that its list "+" became generic: it asks whether *any* plugin seeds the
+  element type, rather than asking whether the type is `ImageTemplate`.
+
+---
+
 ## 2026-09-01 — the branch chain replaces the guarded switch
 
 **Done**

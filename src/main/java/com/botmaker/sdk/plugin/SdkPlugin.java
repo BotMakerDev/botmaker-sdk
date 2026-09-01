@@ -15,6 +15,7 @@ import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.plugin.toolkit.Editors;
 import com.botmaker.plugin.toolkit.ScreenPicks;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
@@ -209,8 +210,8 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * What a fresh {@code CaptureSource} and a fresh {@code Precision} look like — the two types the host's
-     * generic {@code new T()} cannot fill, and the last two SDK class names the host's parser held.
+     * What a fresh {@code CaptureSource}, {@code Precision} and {@code ImageTemplate} look like — the three
+     * types the host's generic {@code new T()} cannot fill on its own.
      *
      * <p>Not cached, and deliberately so: {@link CaptureExpr#projectDefault()} is the SDK's <em>live</em>
      * ambient source, so a slot seeded with it keeps following the project's configured target when that is
@@ -220,13 +221,22 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      *
      * <p>{@code Precision.DEFAULT} rather than a number for the reason the type exists at all: the constant
      * says what the slot is for, where {@code new Precision(12.0, …)} states three numbers that each fail
-     * silently on their own. Fully qualified so neither seed depends on an import the host happens to add.
+     * silently on their own. Fully qualified so no seed depends on an import the host happens to add.
+     *
+     * <p>{@code new ImageTemplate("")} is the odd one, and it is here because of what it replaces: the host's
+     * {@code ListHandler} carried an arm that built exactly this node, naming {@code ImageTemplate} and the
+     * generated {@code Templates} class to do it. The empty path is not an oversight — it is what opens the
+     * per-element picture picker on the element just added, so the user picks in the editor rather than
+     * typing a path. A picture is this plugin's concept, so the sentence describing a fresh one is this
+     * plugin's to write.
      */
     @Override
     public List<SourceSeed> sourceSeeds() {
         return List.of(
                 SourceSeed.of(CaptureSource.class.getName(), CaptureExpr.projectDefault()),
-                SourceSeed.of(Precision.class.getName(), Precision.class.getName() + ".DEFAULT"));
+                SourceSeed.of(Precision.class.getName(), Precision.class.getName() + ".DEFAULT"),
+                SourceSeed.of(ImageTemplate.class.getName(),
+                        "new " + ImageTemplate.class.getName() + "(\"\")"));
     }
 
     /**
