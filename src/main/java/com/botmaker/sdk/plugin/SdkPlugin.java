@@ -176,6 +176,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
             com.botmaker.sdk.api.vision.ImageTemplate.class,
             com.botmaker.sdk.api.vision.ImageTemplateGroup.class,
             com.botmaker.sdk.api.vision.Matches.class,
+            com.botmaker.sdk.api.vision.MatchBranch.class,
             com.botmaker.sdk.api.vision.MatchResult.class,
             com.botmaker.sdk.api.vision.Precision.class,
             com.botmaker.sdk.api.vision.TextMatch.class,

@@ -8,6 +8,63 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-01 — the branch chain replaces the guarded switch
+
+**Done**
+
+- `api/vision/MatchBranch` and `Matches.when(Predicate<Matches>, Runnable)` — a first-match-wins chain of
+  branches over one frame, terminated by an optional `otherwise`. `MatchBranchTest` holds the two guarantees
+  a reader assumes without checking and that are invisible when broken: at most one branch runs, and a later
+  predicate is not evaluated once one has matched.
+- `MatchBranch` is `@Palette` (in the recognition set) and `@Hidden` (offered by no menu): a chain is started
+  by calling `when` on a `Matches`, never built from the insert menu. `settled()` is `@Hidden` for the same
+  reason — it is plumbing, and a bot reads the chain by writing branches.
+
+**Why this and not the guarded switch**
+
+- Studio held roughly 1,550 lines that existed only to edit
+  `switch (matches) { case Matches m when m.hasAny(ORE) -> {…} default -> {} }` — `MatchesSwitchBlock`,
+  `MatchesSwitchHandler`, `MatchesGroupScope`, `GuardTree` and their palette enums. **A switch is a language
+  construct, and an editor cannot compose one out of a catalogue of methods**: the type name, the pattern
+  variable, the guard's method and the mandatory `default` all had to be spelled by whoever wrote the editor,
+  so the host was holding this library's vocabulary on its behalf and no second library could ever have
+  contributed a branching shape of its own.
+- The alternative on the table was an SPI in `botmaker-studio-api` — `SwitchHandler`, taking JDT's
+  `ITypeBinding`, `AST` and `SwitchStatement`, implemented per plugin. **Rejected**, on the platform's own
+  rules: `24-plugin-platform.md` §2 says the contract needs no JDT and Studio's AST never becomes plugin
+  surface, and §5's test asks whether the host is the *only possible* source — a language construct composed
+  on a plugin's behalf is a **vocabulary**, which is the back door that got `Assets` and `SourceChoice`
+  deleted on 2026-08-27.
+- So the construct goes rather than the coupling, and the contract grows by nothing at all. Three
+  compile-time traps go with it: a statement switch over patterns must be exhaustive, an unguarded
+  `case Matches m` silently dominates every branch after it, and the pattern variable is a second name for a
+  frame the enclosing lambda has already named.
+- **`Predicate`, not `boolean`.** An argument would be evaluated before the call, so every branch's test
+  would run even after one had already matched.
+
+**Two fixes carried in the same commit**
+
+- `ActivityModel.enabledVariable()` (in `botmaker-studio-api`) built `ValueType.of(FLAG_ID).build()`, which
+  **throws** — `build()` refuses a type declaring no source spelling — so every caller of
+  `ProjectModel.activityFlags()` failed. It spells the flag out now (`boolean`/`Boolean`, primitive, closed
+  set). Saying how a flag is written in Java is a statement about the language, not about a plugin's
+  vocabulary, and `FLAG_ID` is one of the two ids the contract declares as its own floor.
+- `AuthoringModelTest.aStoredAnyOfWithNoSetBehindItReadsAsAnOpenList` is deleted. It called
+  `VariableModel.listShapeOf` directly, which was reachable while that record lived in
+  `com.botmaker.sdk.authoring`; it is the contract's now and the method is deliberately package-private
+  there, existing for Jackson to bind through `AuthoringMixins`. Making it public to keep one test would
+  have grown the versioned contract surface for something that is not a capability.
+
+**Deferred / next**
+
+- Studio still holds all 1,550 lines. Deleting them waits on Studio being able to *render* a chain: the
+  existing `LambdaCallHandler` builds and decodes only `Facade.method(args…, lambda)` — a static call with
+  one trailing lambda — while a chain is an instance call on a lambda parameter, with two lambda arguments,
+  chained leftward. That block is the next phase, and it is written generically (a catalogued method whose
+  parameters are functional interfaces), so no SDK name appears in it and any future plugin gets it free.
+
+---
+
 ## 2026-08-31 — the project checklist is this plugin's, and every row of it is a statement
 
 **Done**

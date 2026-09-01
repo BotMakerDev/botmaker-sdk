@@ -1,6 +1,13 @@
 package com.botmaker.sdk.authoring;
 
 import com.botmaker.plugin.api.ParameterGroup;
+import com.botmaker.plugin.api.authoring.ActivityModel;
+import com.botmaker.plugin.api.authoring.FlowEdgeModel;
+import com.botmaker.plugin.api.authoring.FlowModel;
+import com.botmaker.plugin.api.authoring.FlowNodeModel;
+import com.botmaker.plugin.api.authoring.PresetModel;
+import com.botmaker.plugin.api.authoring.ProjectModel;
+import com.botmaker.plugin.api.authoring.VariableModel;
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueChoice;
 import com.botmaker.plugin.api.value.Visibility;

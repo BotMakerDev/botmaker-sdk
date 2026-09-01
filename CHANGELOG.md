@@ -19,6 +19,26 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Branching on what was found is a chain of calls now — `found.when(…).when(…).otherwise(…)`.** Deciding
+  what to do about a *combination* of templates is what `Matches` exists for, and until now the only ways to
+  write it were an `if`/`else if` chain or a Java 21 guarded switch the editor built for you:
+  ```java
+  ImageFinder.whileFindAny(POPUPS, found -> {
+      found.when(m -> m.hasAny(MAIL, GIFT),             () -> ImageClicker.click(CLAIM))
+           .when(m -> m.hasAll(CHEST) && !m.hasAny(AD), () -> ImageClicker.click(CHEST))
+           .otherwise(                                   () -> Debug.log("nothing to do"));
+  });
+  ```
+  It reads the way the switch did — **at most one branch runs**, and a later test is not even evaluated once
+  one has matched — and every predicate sees the same frame, so two branches asking about the same instant
+  cannot disagree. `otherwise` is optional; a chain that ends without one does nothing when nothing matched.
+  Both older forms keep working and compiling; nothing you have written changes.
+
+  The reason for the new shape is worth one line, because it is why the editor gets better: a `switch` is a
+  language construct, so everything about it — the type name, the pattern variable, the guard, the mandatory
+  `default` — had to be spelled by whoever wrote the editor. These are ordinary methods, so the editor offers
+  them, draws them and edits their predicates with the machinery it already has for every other call.
+
 - **You write an activity as a call now — `Activities.define`.** An activity is created on the Activity Flow
   canvas; what it *does* is this, written wherever you like:
   ```java

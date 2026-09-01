@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * What a group of templates looked like in <em>one</em> frame: for each {@link ImageTemplate} that cleared the
@@ -98,6 +99,33 @@ public final class Matches {
             if (has(template)) return true;
         }
         return false;
+    }
+
+    /**
+     * Starts a chain of branches over this frame — "if these were found do that, otherwise…".
+     *
+     * {@snippet lang=java :
+     * ImageFinder.whileFindAny(POPUPS, found -> {
+     *     found.when(m -> m.hasAny(MAIL, GIFT),             () -> ImageClicker.click(CLAIM))
+     *          .when(m -> m.hasAll(CHEST) && !m.hasAny(AD), () -> ImageClicker.click(CHEST))
+     *          .otherwise(                                   () -> Debug.log("nothing to do"));
+     * });
+     * }
+     *
+     * <p>Branching on a combination is what this whole type exists for, and until now the only way to write
+     * it was an {@code if}/{@code else if} chain or a Java 21 guarded switch the editor composed. Both work;
+     * neither is something an editor can offer from a menu, because both are language constructs rather than
+     * calls. These are calls, so the editor lists them, draws them and edits their predicates with the same
+     * machinery it uses for everything else — see {@link MatchBranch} for the full reasoning.
+     *
+     * <p><b>At most one branch runs</b>, and later predicates are not evaluated once one has matched — the
+     * first-match-wins reading of the constructs it replaces. {@link MatchBranch#otherwise} is optional.
+     *
+     * @param test   the question this branch asks of the frame; handed this same {@code Matches}
+     * @param action what to do when it passes
+     */
+    public MatchBranch when(Predicate<Matches> test, Runnable action) {
+        return new MatchBranch(this, false).when(test, action);
     }
 
     /**
