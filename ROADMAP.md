@@ -8,6 +8,51 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-02 — the release that reported success and published nothing
+
+**Done**
+
+- **CI checks out `botmaker-plugin-toolkit`.** The pom has declared it at `${botmaker.plugintoolkit.version}`
+  = `0.0.0-SNAPSHOT` since plugin-platform phase 12a and the checkout list never followed, so
+  `.github/workflows/ci.yml` had been **red on every push** from 2026-08-27 to 2026-09-02 with
+  `Could not find artifact com.github.LiQiyeDev:botmaker-plugin-toolkit:jar:0.0.0-SNAPSHOT`. The umbrella
+  reactor cannot catch this class of break by construction: there the toolkit is a sibling module and
+  resolves for free, so `mvn install` at the root is green while the standalone build is not. The umbrella's
+  `release.sh` gained `check_ci_deps`, which compares a pom's `0.0.0-SNAPSHOT` upstreams against the
+  checkout list in its own `ci.yml` and refuses the release before any tag is pushed.
+- **CI runs `verify`, not `package` — so the never-delete gate runs for the first time.** japicmp binds to
+  the verify phase, and this step had always stopped at `package`, so the rule that
+  `com.botmaker.sdk.api.**` never removes anything ran **nowhere automatic**: not here, and not on JitPack,
+  whose build is `install -DskipTests` on a tag that already exists. It was enforced only by whoever
+  happened to run `mvn verify` locally. `-DskipTests` still holds — skipping tests does not skip phases.
+- **japicmp moved into an `api-gate` profile that `jitpack.yml` declines to load.** The plugin declares a
+  Maven 3.6.3 prerequisite, checked when Maven *loads* the plugin, so the existing `<skip>` flag could never
+  have avoided it; `botmaker-studio-api` v0.0.1 died on exactly that on JitPack's older Maven, published no
+  artifact, and took this module's v1.1.1 down behind it
+  (`Could not find artifact com.github.LiQiyeDev:botmaker-studio-api:jar:v0.0.1`). The profile is activated
+  by the **absence** of `botmaker.japicmp.skip` rather than `<activeByDefault>`, which Maven cancels the
+  moment any profile is named — `mvn -Ppilot package` would otherwise have silently dropped the gate.
+  The reasoning for skipping it there is the one `-DskipTests` has always used in that file: JitPack builds
+  an artifact from a tag that already exists, so a gate there can only break the publish, never prevent the
+  change.
+- **`botmaker.japicmp.baseline` is bumped by `release.sh` now** (`bump_japicmp_baseline`), in the release
+  commit. Both this module's `CLAUDE.md` and the contract's instructed a human to move it every release and
+  nobody ever did — and a baseline naming a tag that does not exist is not a strict gate, because
+  `ignoreMissingOldVersion` makes it report and pass. It **never moves backwards**: this module's `v1.2.0`
+  stands while the newest tag is below it, because never-delete begins at v1.2.0 and is not retroactive.
+
+**Deferred / next**
+
+- **`botmaker validate` refuses this module**, on `pom-scopes`: *"botmaker-studio-api is declared at scope
+  'compile'; it must be `provided`"*. The contract is declared `optional` at `compile` here, which is
+  non-transitive and so keeps it off a bot's classpath just as `provided` would — but the platform's own
+  gate, which this module is plugin #1 of, states the rule as `provided`. Wiring the validator into this
+  module's CI and into `release.sh`'s decide pass is blocked on that being settled one way or the other: a
+  gate the SDK cannot pass is a gate nobody can turn on, and *the SDK gets no back door* is the whole
+  premise of the plugin platform.
+
+---
+
 ## 2026-09-01 — a fresh picture is this plugin's sentence
 
 **Done**
