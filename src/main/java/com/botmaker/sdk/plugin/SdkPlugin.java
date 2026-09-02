@@ -36,6 +36,7 @@ import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
 import com.botmaker.sdk.internal.plugin.capture.ScreenCapture;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
+import com.botmaker.sdk.internal.plugin.record.MacroRecorderDialog;
 import com.botmaker.sdk.internal.plugin.setup.ProjectSetup;
 import com.botmaker.sdk.internal.plugin.templates.ResourceManagerDialog;
 import javafx.scene.paint.Color;
@@ -341,6 +342,10 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                         "Draw regions over the game and save them as pictures the bot can look for — "
                                 + "one at a time, several in a pass, or an object cut out of its background",
                         ToolbarGroup.TOOLS, 20, this::openCaptureTemplates),
+                ToolbarItem.of("record-macro", "⏺ Record Macro",
+                        "Watch what you click and type in the game, and write it back out as the Java "
+                                + "that would have done the same thing",
+                        ToolbarGroup.TOOLS, 25, this::openMacroRecorder),
                 ToolbarItem.of("manage-templates", "🖼 Manage Pictures",
                         "Rename, retag, replace, delete, import and export the pictures the bot looks for — "
                                 + "a rename carries every block that uses it",
@@ -382,6 +387,23 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * <p>Single-instance is not enforced, unlike the pilot: this window owns no port and no display, so a
      * second one is a second view of the same folder rather than a conflict.
      */
+    /**
+     * Opens the macro recorder.
+     *
+     * <p>It sits between the two picture tools at order 25 because it is the third way to get a bot to do
+     * something without typing it: cut a picture, manage the pictures, or record the clicks themselves.
+     *
+     * <p>It was <i>Record Macro</i> on Studio's toolbar until 2026-09-02, and it recorded straight into the
+     * program-shape overlay's cursor. Losing that insertion point is the price of the move and it is a real
+     * one — see {@link MacroRecorderDialog} for why it was paid rather than bought off with a contract
+     * surface. What the editor was holding to make it work was five SDK class literals deciding that a click
+     * is a {@code Mouse}, which is this plugin's sentence to write.
+     */
+    private void openMacroRecorder(ActionContext context) {
+        StudioServices services = context.services();
+        MacroRecorderDialog.open(services, services.dialogs().owner());
+    }
+
     private void openResourceManager(ActionContext context) {
         StudioServices services = context.services();
         ResourceManagerDialog.open(services, services.dialogs().owner());
