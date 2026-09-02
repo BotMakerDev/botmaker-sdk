@@ -473,8 +473,20 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * group is not about the generated {@code Parameters} file it once named — that file has not existed
      * since the derived files became runtime reads — it is how the editor's Parameters dialog decides which
      * plugin a variable belongs to.
+     *
+     * <p><b>The categories are new, and they replace a vocabulary that had stopped meaning anything.</b> The
+     * Parameters rail used to be filed by {@code TagCatalog} — one tag per activity in {@code activities.json},
+     * plus the user's custom tags out of {@code templates.json} — which made sense while Studio defined the
+     * activities. It does not any more, and a rail whose categories are the activity list is a rail that
+     * renames itself behind the user. So a category is now something a <em>plugin declares</em>, inside its
+     * own section: a second layer within one group rather than a second set of groups.
+     *
+     * <p>These six are the axes a bot's own settings actually fall along, and they are deliberately about
+     * <em>what a parameter configures</em>, not about where in the flow it is read — a delay two activities
+     * both wait for is one parameter, which is the whole reason the list is flat underneath.
      */
-    private static final ParameterGroup SDK_PARAMETERS =
-            new ParameterGroup(ParameterGroup.DEFAULT_ID, "Parameters", "Parameters");
+    private static final ParameterGroup SDK_PARAMETERS = ParameterGroup.of(
+            ParameterGroup.DEFAULT_ID, "Parameters",
+            List.of("Timing", "Targets", "Vision", "Input", "Limits", "Debug"));
 
 }
