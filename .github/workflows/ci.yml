@@ -118,6 +118,36 @@ jobs:
       - name: API pointer gate (@ReplacedBy / @Replaces)
         run: mvn -B test -Dtest=ApiPointersTest -DfailIfNoTests=false
 
+      # THE PLUGIN GATE. This module is Studio's plugin #1, and the premise of the whole plugin platform is
+      # that it gets no back door — a privileged default plugin, but a plugin. So the seven checks the
+      # plugin registry runs on every third-party submission run here, on every push, against this build.
+      #
+      # Nobody had ever run them on this module until 2026-09-02, and `pom-scopes` failed the moment
+      # somebody did: botmaker-studio-api was declared `optional` at `compile` where the platform's rule is
+      # `provided`, which left a second copy of com.botmaker.plugin.api on this jar's own RUNTIME classpath
+      # — the set a host hands to PluginLoader, where it is resolved child-first and becomes a second Class
+      # object for every contract type. Exactly what `provided` exists to prevent, in the module that
+      # defines the platform.
+      #
+      # botmaker-cli is built from source here for the same reason the other upstreams are: its pom pins
+      # the contract and the loader at 0.0.0-SNAPSHOT, so there is no published artifact under those
+      # coordinates. It is NOT in this module's pom and is not a dependency of anything — it is a tool this
+      # job runs, which is why it is built in its own step rather than added to the install list above.
+      #
+      # `--no-build` because `mvn -B -DskipTests verify` two steps up has already compiled this module; the
+      # validator would otherwise shell out to Maven and compile it a second time.
+      - name: Check out botmaker-cli
+        uses: actions/checkout@v4
+        with:
+          repository: LiQiyeDev/botmaker-cli
+          path: .deps/botmaker-cli
+
+      - name: Plugin gate (the checks the plugin registry runs)
+        run: |
+          source .github/mvn-retry.sh
+          mvn_retry mvn -B -q -f .deps/botmaker-cli/pom.xml package -DskipTests
+          java -jar .deps/botmaker-cli/target/botmaker-cli-0.0.0-SNAPSHOT-all.jar validate . --no-build
+
   # JitPack builds the artifact itself from the pushed tag; this just asks it to start eagerly so the
   # first consumer doesn't wait. No secrets required.
   jitpack:

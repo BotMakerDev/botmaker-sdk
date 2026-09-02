@@ -118,17 +118,31 @@
              plugin: it contributes its own palette catalog and its own value-slot editors through this
              contract rather than through a back door. See ../docs/refactor/24-plugin-platform.md.
 
-             <optional>true</optional> is what keeps it off a generated bot's classpath. A bot compiles
-             against api.* and never names a plugin type; the classes in this jar that DO implement the
-             contract (under internal.plugin) are simply never linked in a bot's JVM, exactly as an SLF4J
-             binding is never linked by code that only calls the logger. Nothing under com.botmaker.sdk.api
-             may reference a com.botmaker.plugin.api type — that is what makes the optional dependency safe
-             rather than a NoClassDefFoundError waiting for its first caller. -->
+             `provided` is what keeps it off a generated bot's classpath. A bot compiles against api.* and
+             never names a plugin type; the classes in this jar that DO implement the contract (under
+             internal.plugin) are simply never linked in a bot's JVM, exactly as an SLF4J binding is never
+             linked by code that only calls the logger. Nothing under com.botmaker.sdk.api may reference a
+             com.botmaker.plugin.api type — that is what makes the absent dependency safe rather than a
+             NoClassDefFoundError waiting for its first caller.
+
+             IT WAS <optional>true</optional> AT compile SCOPE UNTIL 2026-09-02, and the change is not
+             cosmetic even though both are non-transitive and a bot's classpath is identical either way.
+             `botmaker-cli`'s `pom-scopes` check — the gate the plugin registry runs on every submission —
+             refuses a plugin declaring the contract at any scope but `provided`, with the reason in its own
+             message: the host has the contract already, and a second copy makes a contract class two
+             different Class objects, which is precisely what PluginLoader's parent-first arm for
+             com.botmaker.plugin.api.** exists to prevent. Running that validator against this module was
+             the first time anyone had, and it failed on this line.
+
+             The SDK is plugin #1 and a *privileged default* plugin, but a plugin, with no back door — so
+             the one module that must not be exempt from the platform's own gate is this one. `provided`
+             also states the intent where `optional` merely achieves it: drop the `<optional>` flag by
+             accident and the contract silently goes transitive, while a `provided` dependency cannot. -->
         <dependency>
             <groupId>com.github.LiQiyeDev</groupId>
             <artifactId>botmaker-studio-api</artifactId>
             <version>${botmaker.studioapi.version}</version>
-            <optional>true</optional>
+            <scope>provided</scope>
         </dependency>
 
         <!-- The plugin widget toolkit, and JavaFX under it: what internal.plugin.editors is built from.
