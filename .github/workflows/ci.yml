@@ -15,10 +15,16 @@ name: CI
 # `jitpack` runs only on a version tag. It was a separate file (publish.yml) purely because its trigger
 # differs, which a job-level `if:` expresses just as well.
 #
-# botmaker-shared and botmaker-session are resolved from source, not from JitPack. This repo's pom pins
-# both at 0.0.0-SNAPSHOT — the version the umbrella reactor and a local `mvn install` produce — so there
-# is no published artifact under those coordinates to download. Building their main branches here means
-# CI compiles the same three-module pairing a maintainer builds locally.
+# All FOUR upstreams — botmaker-studio-api, botmaker-plugin-toolkit, botmaker-shared, botmaker-session —
+# are resolved from source, not from JitPack. This repo's pom pins every one at 0.0.0-SNAPSHOT — the
+# version the umbrella reactor and a local `mvn install` produce — so there is no published artifact under
+# those coordinates to download. Building their main branches here means CI compiles the same pairing a
+# maintainer builds locally.
+#
+# THE LIST BELOW MUST MATCH THE POM'S ${botmaker.*.version} PROPERTIES, and nothing about a local build
+# can tell you when it stops matching: in the umbrella reactor each of the four is a sibling module and
+# resolves for free. That is exactly how the toolkit went missing here for five days. The umbrella's
+# release.sh checks the two against each other (check_ci_deps) before it pushes a tag.
 
 on:
   push:
@@ -39,6 +45,21 @@ jobs:
           repository: LiQiyeDev/botmaker-studio-api
           path: .deps/botmaker-studio-api
 
+      # The widget kit this module's slot editors (internal/plugin/editors) are built from — an ordinary
+      # <dependencies> entry at ${botmaker.plugintoolkit.version}, OPTIONAL so it never reaches a bot.
+      # It went into the pom with phase 12a and this checkout list did not follow, which is a class of
+      # break the umbrella reactor CANNOT catch: there the toolkit is a sibling module and resolves for
+      # free, so `mvn install` at the root is green while this standalone build has been red on every push
+      # since. release.sh's check_ci_deps is the gate that now compares the two.
+      #
+      # After studio-api, before this module's own build: the toolkit declares the contract `provided`,
+      # so the contract has to be installed first rather than arriving transitively.
+      - name: Check out botmaker-plugin-toolkit
+        uses: actions/checkout@v4
+        with:
+          repository: LiQiyeDev/botmaker-plugin-toolkit
+          path: .deps/botmaker-plugin-toolkit
+
       - name: Check out botmaker-shared
         uses: actions/checkout@v4
         with:
@@ -57,11 +78,16 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Install botmaker-studio-api, botmaker-shared and botmaker-session (0.0.0-SNAPSHOT)
+      # RETRIED — Maven Central answers 429 Too Many Requests to GitHub-hosted runners often enough to have
+      # failed a release (botmaker-studio, 2026-09-02, on the very first plugin descriptor of the first
+      # upstream). See .github/mvn-retry.sh for why the retry cannot be a Maven flag.
+      - name: Install the four upstreams (0.0.0-SNAPSHOT)
         run: |
-          mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
-          mvn -B -f .deps/botmaker-shared/pom.xml install -DskipTests
-          mvn -B -f .deps/botmaker-session/pom.xml install -DskipTests
+          source .github/mvn-retry.sh
+          mvn_retry mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-plugin-toolkit/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-shared/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-session/pom.xml install -DskipTests
 
       - name: Build
         run: mvn -B -DskipTests package
