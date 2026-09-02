@@ -17,6 +17,14 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+- **Your bot now builds and runs on Java 25 (LTS), with JavaFX 25.0.4 behind the editors.** This is the one
+  change here you have to act on: a project pinned to this SDK needs a JDK 25 or newer, and a bot run on an
+  older JVM fails at class load with `UnsupportedClassVersionError` rather than at compile time. Nothing in
+  `com.botmaker.sdk.api` moved — never-delete still holds — so once your JDK is new enough there is nothing
+  to change in your code.
+
 ## [1.1.1] — 2026-09-02
 
 - **Branching on what was found is a chain of calls now — `found.when(…).when(…).otherwise(…)`.** Deciding

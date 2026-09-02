@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-02 — JDK 25 LTS, and what that means for a bot
+
+**Done**
+
+- `jitpack.yml` → `openjdk25`, the pom to `maven.compiler.release` 25, `javafx.version` → 25.0.4, CI to
+  `java-version: '25'`. No source changed and nothing in `com.botmaker.sdk.api` moved.
+- **This is the module where the floor is felt.** A generated bot pins this SDK and runs as its own JVM
+  process, so a bot on a JDK older than 25 fails at class load with `UnsupportedClassVersionError` rather
+  than at compile time — which is why the CHANGELOG entry leads with it instead of listing it as a build
+  detail. Studio's own runtime is irrelevant to that: what a bot compiles against is whatever its pom pins.
+- The full account of the constellation-wide move, including the JitPack branch-build probe that proved
+  `openjdk25` exists before anything was touched, is in `../botmaker-studio-api/ROADMAP.md`.
+
+---
+
 ## 2026-09-02 — the release that reported success and published nothing
 
 **Done**

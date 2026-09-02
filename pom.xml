@@ -9,8 +9,7 @@
     <version>0.0.0-SNAPSHOT</version>
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Stamped into the jar manifest (Build-Time) so a bot/editor can tell which SDK build it loaded;
              crucial for local dev where every rebuild reuses the same 0.0.0-SNAPSHOT jar file name. -->
@@ -58,7 +57,7 @@
         <botmaker.japicmp.skip>false</botmaker.japicmp.skip>
         <!-- JavaFX, for the slot editors only. Held in one place because the two artifacts must move
              together — javafx-controls is compiled against one exact javafx-graphics. -->
-        <javafx.version>21</javafx.version>
+        <javafx.version>25.0.4</javafx.version>
 
         <!--
           The OCR stack's three versions move TOGETHER. Tess4J pins a lept4j, and lept4j's generated
