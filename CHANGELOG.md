@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.1.2] — 2026-09-02
 
 - **Your bot now builds and runs on Java 25 (LTS), with JavaFX 25.0.4 behind the editors.** This is the one
   change here you have to act on: a project pinned to this SDK needs a JDK 25 or newer, and a bot run on an
