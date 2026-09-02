@@ -131,8 +131,16 @@ jobs:
       #
       # botmaker-cli is built from source here for the same reason the other upstreams are: its pom pins
       # the contract and the loader at 0.0.0-SNAPSHOT, so there is no published artifact under those
-      # coordinates. It is NOT in this module's pom and is not a dependency of anything — it is a tool this
-      # job runs, which is why it is built in its own step rather than added to the install list above.
+      # coordinates. It is NOT in this module's pom and is a dependency of nothing here — it is a TOOL this
+      # job runs, which is why it and its own upstream are checked out and built in their own steps rather
+      # than added to the install list above. (check_ci_deps in the umbrella's release.sh compares that
+      # list against this pom; a tool has no business in it.)
+      #
+      # botmaker-plugin-host comes with it and is easy to forget — it is the CLI's dependency, not this
+      # module's, and this job's first run failed on exactly that:
+      #   Could not resolve dependencies for project com.github.LiQiyeDev:botmaker-cli:jar:0.0.0-SNAPSHOT
+      #   dependency: com.github.LiQiyeDev:botmaker-plugin-host:jar:0.0.0-SNAPSHOT (compile)
+      # The contract it also pins is already installed above, at the same 0.0.0-SNAPSHOT.
       #
       # `--no-build` because `mvn -B -DskipTests verify` two steps up has already compiled this module; the
       # validator would otherwise shell out to Maven and compile it a second time.
@@ -142,9 +150,16 @@ jobs:
           repository: LiQiyeDev/botmaker-cli
           path: .deps/botmaker-cli
 
+      - name: Check out botmaker-plugin-host (botmaker-cli's own upstream)
+        uses: actions/checkout@v4
+        with:
+          repository: LiQiyeDev/botmaker-plugin-host
+          path: .deps/botmaker-plugin-host
+
       - name: Plugin gate (the checks the plugin registry runs)
         run: |
           source .github/mvn-retry.sh
+          mvn_retry mvn -B -q -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
           mvn_retry mvn -B -q -f .deps/botmaker-cli/pom.xml package -DskipTests
           java -jar .deps/botmaker-cli/target/botmaker-cli-0.0.0-SNAPSHOT-all.jar validate . --no-build
 
