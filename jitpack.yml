@@ -29,4 +29,10 @@ install:
   # published rather than merely used.
   - . ./.deps.env
   - '[ -n "${SHARED_TAG:-}" ] && [ -n "${SESSION_TAG:-}" ] && [ -n "${STUDIO_API_TAG:-}" ] && [ -n "${PLUGIN_TOOLKIT_TAG:-}" ] || { echo "ERROR: .deps.env must pin SHARED_TAG, SESSION_TAG, STUDIO_API_TAG and PLUGIN_TOOLKIT_TAG. Cut releases with the umbrella release.sh, which writes it into the release commit." >&2; exit 1; }'
-  - mvn install -DskipTests -Dmaven.javadoc.skip=true -B -Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG -Dbotmaker.studioapi.version=$STUDIO_API_TAG -Dbotmaker.plugintoolkit.version=$PLUGIN_TOOLKIT_TAG
+  #
+  # -Dbotmaker.japicmp.skip=true deactivates the `api-gate` profile, so the japicmp plugin is not even
+  # loaded. JitPack's builder runs a Maven older than the 3.6.3 that plugin declares as a prerequisite —
+  # botmaker-studio-api v0.0.1 died on exactly that, publishing nothing — and a gate here could only ever
+  # refuse a tag that is already pushed. The refusal that matters is `mvn verify` in CI, before the tag
+  # exists. Same reasoning as the -DskipTests beside it.
+  - mvn install -DskipTests -Dmaven.javadoc.skip=true -Dbotmaker.japicmp.skip=true -B -Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG -Dbotmaker.studioapi.version=$STUDIO_API_TAG -Dbotmaker.plugintoolkit.version=$PLUGIN_TOOLKIT_TAG

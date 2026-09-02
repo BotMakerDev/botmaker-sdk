@@ -302,83 +302,6 @@
                 </configuration>
             </plugin>
 
-            <!-- japicmp — com.botmaker.sdk.api.** never removes anything.
-
-                 This is what makes dropping @Replaces safe. The back edge existed because Studio holds only
-                 two jars at upgrade time — the bot's pin and the target — so a bot on 1.0 jumping to 3.0
-                 could not see a pointer added in 2.0 on an element deleted in 3.0. Under never-delete the
-                 target jar still carries the deprecated element AND its own @ReplacedBy, so the forward
-                 pointer alone answers every upgrade including a skipped one. A rename is: add the new name,
-                 deprecate the old, keep both, point one at the other.
-
-                 The 2026-08-22 gate died because CI could not tell an intended break from an accident — it
-                 cannot see the version, and the SDK was allowed to break in a major. This rule is
-                 UNCONDITIONAL, so that objection does not apply: there is no legitimate removal to
-                 distinguish. Hence no ignore list, no exemption annotation and no verdict file — the escape
-                 hatch is what killed the last one. No postAnalysisScript either: its bundled Groovy cannot
-                 read Java 26 class files.
-
-                 Scoped to api.** on purpose. internal.** stays freely breakable, as it must. -->
-            <plugin>
-                <groupId>com.github.siom79.japicmp</groupId>
-                <artifactId>japicmp-maven-plugin</artifactId>
-                <version>0.23.1</version>
-                <executions>
-                    <execution>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>cmp</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <oldVersion>
-                        <dependency>
-                            <groupId>com.github.LiQiyeDev</groupId>
-                            <artifactId>botmaker-sdk</artifactId>
-                            <version>${botmaker.japicmp.baseline}</version>
-                            <type>jar</type>
-                        </dependency>
-                    </oldVersion>
-                    <parameter>
-                        <onlyModified>true</onlyModified>
-                        <!-- The baseline is the release never-delete begins at, which until it is tagged does
-                             not exist; a baseline that cannot be fetched reports rather than failing a build
-                             for a reason the author cannot act on. See the property comment. -->
-                        <ignoreMissingOldVersion>true</ignoreMissingOldVersion>
-                        <includes>
-                            <include>com.botmaker.sdk.api</include>
-                        </includes>
-                        <breakBuildBasedOnSemanticVersioning>false</breakBuildBasedOnSemanticVersioning>
-                        <!-- Binary/source incompatibility in general is NOT the rule — only removal is, and
-                             the override block below is what makes exactly that fatal. -->
-                        <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
-                        <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>
-                        <includeSynthetic>false</includeSynthetic>
-                        <ignoreMissingClasses>true</ignoreMissingClasses>
-                        <!-- The whole rule: nothing under api.** is ever removed. -->
-                        <overrideCompatibilityChangeParameters>
-                            <overrideCompatibilityChangeParameter>
-                                <compatibilityChange>METHOD_REMOVED</compatibilityChange>
-                                <binaryCompatible>false</binaryCompatible>
-                                <sourceCompatible>false</sourceCompatible>
-                            </overrideCompatibilityChangeParameter>
-                            <overrideCompatibilityChangeParameter>
-                                <compatibilityChange>CLASS_REMOVED</compatibilityChange>
-                                <binaryCompatible>false</binaryCompatible>
-                                <sourceCompatible>false</sourceCompatible>
-                            </overrideCompatibilityChangeParameter>
-                            <overrideCompatibilityChangeParameter>
-                                <compatibilityChange>FIELD_REMOVED</compatibilityChange>
-                                <binaryCompatible>false</binaryCompatible>
-                                <sourceCompatible>false</sourceCompatible>
-                            </overrideCompatibilityChangeParameter>
-                        </overrideCompatibilityChangeParameters>
-                    </parameter>
-                    <skip>${botmaker.japicmp.skip}</skip>
-                </configuration>
-            </plugin>
-
             <!--
               Stage the Linux OCR natives into the jar, under JNA's Platform.RESOURCE_PREFIX for this
               platform (linux-x86-64). Tess4J's LoadLibs static initialiser extracts every classpath
@@ -627,6 +550,114 @@
     </build>
 
     <profiles>
+        <!-- The API gate, in a profile so that a build which only wants the ARTIFACT can decline to load
+             the plugin at all.
+
+             ACTIVE BY DEFAULT: the activation is the ABSENCE of botmaker.japicmp.skip, and a property
+             declared in <properties> above does not count for profile activation — only a -D does. So
+             `mvn verify` runs the gate exactly as before, and only an explicit
+             `-Dbotmaker.japicmp.skip=true` turns it off. It is a property activation rather than
+             <activeByDefault> for a second reason: activeByDefault is cancelled the moment any profile is
+             named on the command line, so `mvn -Ppilot package` would silently drop the gate.
+
+             WHY THE PROFILE RATHER THAN THE <skip> FLAG: skipping is a decision the mojo makes after Maven
+             has resolved and loaded the plugin, and this plugin declares a PREREQUISITE. JitPack's builder
+             runs an older Maven, and botmaker-studio-api v0.0.1 died there before any configuration was
+             read — `The plugin ... requires Maven version 3.6.3` — publishing no artifact, which took
+             botmaker-sdk v1.1.1 down with it. A gate that can only refuse a tag ALREADY PUSHED protects
+             nothing and can only break the publish; the refusal that matters happens in CI, before the tag
+             exists. Same reasoning as the `-DskipTests` jitpack.yml has always passed. -->
+        <profile>
+            <id>api-gate</id>
+            <activation>
+                <property>
+                    <name>!botmaker.japicmp.skip</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <!-- japicmp — com.botmaker.sdk.api.** never removes anything.
+
+                         This is what makes dropping @Replaces safe. The back edge existed because Studio
+                         holds only two jars at upgrade time — the bot's pin and the target — so a bot on 1.0
+                         jumping to 3.0 could not see a pointer added in 2.0 on an element deleted in 3.0.
+                         Under never-delete the target jar still carries the deprecated element AND its own
+                         @ReplacedBy, so the forward pointer alone answers every upgrade including a skipped
+                         one. A rename is: add the new name, deprecate the old, keep both, point one at the
+                         other.
+
+                         The 2026-08-22 gate died because CI could not tell an intended break from an
+                         accident — it cannot see the version, and the SDK was allowed to break in a major.
+                         This rule is UNCONDITIONAL, so that objection does not apply: there is no legitimate
+                         removal to distinguish. Hence no ignore list, no exemption annotation and no verdict
+                         file — the escape hatch is what killed the last one. No postAnalysisScript either:
+                         its bundled Groovy cannot read Java 26 class files.
+
+                         Scoped to api.** on purpose. internal.** stays freely breakable, as it must. -->
+                    <plugin>
+                        <groupId>com.github.siom79.japicmp</groupId>
+                        <artifactId>japicmp-maven-plugin</artifactId>
+                        <version>0.23.1</version>
+                        <executions>
+                            <execution>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>cmp</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <oldVersion>
+                                <dependency>
+                                    <groupId>com.github.LiQiyeDev</groupId>
+                                    <artifactId>botmaker-sdk</artifactId>
+                                    <version>${botmaker.japicmp.baseline}</version>
+                                    <type>jar</type>
+                                </dependency>
+                            </oldVersion>
+                            <parameter>
+                                <onlyModified>true</onlyModified>
+                                <!-- The baseline is the release never-delete begins at, which until it is
+                                     tagged does not exist; a baseline that cannot be fetched reports rather
+                                     than failing a build for a reason the author cannot act on. See the
+                                     property comment. -->
+                                <ignoreMissingOldVersion>true</ignoreMissingOldVersion>
+                                <includes>
+                                    <include>com.botmaker.sdk.api</include>
+                                </includes>
+                                <breakBuildBasedOnSemanticVersioning>false</breakBuildBasedOnSemanticVersioning>
+                                <!-- Binary/source incompatibility in general is NOT the rule — only removal
+                                     is, and the override block below is what makes exactly that fatal. -->
+                                <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
+                                <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>
+                                <includeSynthetic>false</includeSynthetic>
+                                <ignoreMissingClasses>true</ignoreMissingClasses>
+                                <!-- The whole rule: nothing under api.** is ever removed. -->
+                                <overrideCompatibilityChangeParameters>
+                                    <overrideCompatibilityChangeParameter>
+                                        <compatibilityChange>METHOD_REMOVED</compatibilityChange>
+                                        <binaryCompatible>false</binaryCompatible>
+                                        <sourceCompatible>false</sourceCompatible>
+                                    </overrideCompatibilityChangeParameter>
+                                    <overrideCompatibilityChangeParameter>
+                                        <compatibilityChange>CLASS_REMOVED</compatibilityChange>
+                                        <binaryCompatible>false</binaryCompatible>
+                                        <sourceCompatible>false</sourceCompatible>
+                                    </overrideCompatibilityChangeParameter>
+                                    <overrideCompatibilityChangeParameter>
+                                        <compatibilityChange>FIELD_REMOVED</compatibilityChange>
+                                        <binaryCompatible>false</binaryCompatible>
+                                        <sourceCompatible>false</sourceCompatible>
+                                    </overrideCompatibilityChangeParameter>
+                                </overrideCompatibilityChangeParameters>
+                            </parameter>
+                            <skip>${botmaker.japicmp.skip}</skip>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
         <!--
           `pilot` profile: rebuild the BotPilot web client (Vite + React + TS in the sibling
           `botmaker-pilot` repository) from source and stage its `dist` as the assets this jar serves.

@@ -89,8 +89,16 @@ jobs:
           mvn_retry mvn -B -f .deps/botmaker-shared/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-session/pom.xml install -DskipTests
 
-      - name: Build
-        run: mvn -B -DskipTests package
+      # `verify`, not `package`, and the difference is a whole gate: japicmp binds to the verify phase, so
+      # for as long as this step stopped at `package` the never-delete rule on com.botmaker.sdk.api.** ran
+      # nowhere automatic — not here, and not on JitPack, whose build is `install -DskipTests` on a tag that
+      # already exists. It was enforced only by whoever happened to run `mvn verify` locally.
+      #
+      # -DskipTests still holds: the suite is run locally and CI is a compile gate. Skipping tests does not
+      # skip phases, so verify is reached with the tests compiled and not run — which is exactly the
+      # arrangement this file's header already describes.
+      - name: Build (and the never-delete API gate, which binds to verify)
+        run: mvn -B -DskipTests verify
 
       # The pointer gate. NOT the API compatibility gate that used to be here: that one compared this build
       # against the previously published jar with japicmp and demanded a declared migration for every break
