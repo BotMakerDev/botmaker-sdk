@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.1.1] — 2026-09-02
 
 - **Branching on what was found is a chain of calls now — `found.when(…).when(…).otherwise(…)`.** Deciding
   what to do about a *combination* of templates is what `Matches` exists for, and until now the only ways to
