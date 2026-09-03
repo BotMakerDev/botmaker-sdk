@@ -8,6 +8,47 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-04 — the plugin surface is asserted, not assumed
+
+**Done**
+
+- **`SdkPluginSurfaceTest`** (8 tests) — the replacement for Studio's `PluginHostLoadTest`, which was deleted
+  on 2026-09-02 with the bundled plugin it tested. It asserts every contribution surface *structurally*: the
+  six toolbar ids with their groups and orders, the seventeen value type ids **in registration order**, the
+  one blank-id parameter group, a seed list with a type and an expression on each, a palette with no
+  `problems()` that is memoised across two asks, and that no item claims `ToolbarGroup.STUDIO`.
+- **Every `slotEditors()` predicate is now run**, against a `TestContexts` recording context in the three
+  shapes a host hands one — a Parameters row, a typed slot, a slot known only by its call site. The assertion
+  is *no throw* and nothing else: which editor claims which value is the per-editor tests' business, and what
+  nothing covered was that asking the question at all is safe. A predicate that throws leaves a Parameters
+  row with no widget in it and no explanation, which reads as the host being broken. `create()` is not
+  called — a `Node` needs a live FX toolkit; a predicate needs nothing.
+- **Why structural rather than more behaviour: this plugin's characteristic failure is silent.**
+  `PluginHost.discover` catches a plugin that will not load — correctly, since a classpath with no plugin is
+  an ordinary state — so a broken surface is an editor with an empty palette, no toolbar buttons and one line
+  on stderr, with nothing failing to compile. That shipped once, on 2026-08-28. A button that disappears is a
+  red build now.
+- **`docs/refactor/26-sdk-migration.md`** in the umbrella: one row per moved feature — what it is, where it
+  lives, what checks it, and the click path for the part no suite can walk. The document a later session
+  reads instead of re-deriving the migration from twelve commit messages.
+
+**Corrected**
+
+- **The CI plugin gate's `editors` check does *not* skip for this module**, contrary to what was assumed when
+  this work was planned. It skips when `javafx.scene.Node` is absent, and the classpath it builds is
+  `dependency:build-classpath -DincludeScope=runtime`; JavaFX here is `<optional>true</optional>` at the
+  **default compile scope**, and `optional` means *not transitive*, not *not present*. Verified — that
+  classpath carries `javafx-controls`, `javafx-graphics`, `javafx-base` and `botmaker-plugin-toolkit`. So the
+  predicates are checked twice, by two tools, on two classpaths. The check does skip for a plugin declaring
+  JavaFX `provided`, which is what the archetype generates.
+
+**Not done, deliberately**
+
+- No `CHANGELOG.md` entry. That file answers *"should I upgrade, and what changes for me?"* for a bot author,
+  and a test gives one nothing.
+
+---
+
 ## 2026-09-02 — JDK 25 LTS, and what that means for a bot
 
 **Done**
