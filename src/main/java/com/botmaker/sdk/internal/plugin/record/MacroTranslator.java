@@ -218,11 +218,13 @@ public final class MacroTranslator {
 
     // ── Statement builders ──────────────────────────────────────────────────────────────────────────────
     //
-    // Written with simple names rather than through Source.call, which fully-qualifies its type: the whole
-    // delivery of a recording is text somebody reads before pasting it, and a wall of
-    // com.botmaker.sdk.api.interaction.Keyboard.type(…) is not that. What Source is used for is the two
-    // things a hand-rolled builder gets wrong — escaping a typed string, and vouching that the method name
-    // exists on the class rather than discovering it at the user's next compile.
+    // Written with simple names, because the whole delivery of a recording is text somebody reads before
+    // pasting it into a file where these types are imported, and a wall of
+    // com.botmaker.sdk.api.interaction.Keyboard.type(…) is not that. The toolkit had a `Source.call` that
+    // composed the call and qualified the type in full; this was its only would-be caller, it declined for
+    // that reason, and the member was deleted on 2026-09-04. What Source is used for here is the two things
+    // a hand-rolled builder gets wrong — escaping a typed string, and vouching that the method name exists
+    // on the class rather than discovering it at the user's next compile.
 
     private static String click(String title, int relX, int relY, Set<Class<?>> used) {
         used.add(Mouse.class);
