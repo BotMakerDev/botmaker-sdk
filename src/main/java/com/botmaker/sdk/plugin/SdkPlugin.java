@@ -84,20 +84,36 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     public static final String ID = "com.botmaker.sdk";
 
     /**
-     * Registers this plugin's screen picker with the toolkit, which is the only work the constructor does.
+     * Does nothing but name the plugin, and that emptiness is load-bearing.
      *
-     * <p>The toolkit's {@code Editors.region} and {@code Editors.tuplePill} are widgets whose whole point is
-     * a screen pick, and the toolkit has no capture code of its own — the shape is its, the pixels are ours.
-     * They came from the contract's {@code Capture} until 2026-08-31; see {@link ScreenPicks} for why that
-     * member went and why a static registration is safe across two plugins.
+     * <p>It registered the screen picker until 2026-09-05 — {@code Editors.pickWith(new SdkScreenPicks())},
+     * defended on the grounds that it costs one field write and {@code ServiceLoader} constructs this class
+     * before any editor is drawn. Both halves are true and the conclusion was wrong: {@code Editors} and
+     * {@code ScreenPicks} are JavaFX-typed, {@code javafx-controls} is {@code optional} here, and
+     * <b>{@code optional} means the classpath a host resolves this plugin onto does not have it</b>. So a
+     * host with no JavaFX could not construct this plugin at all:
      *
-     * <p>It is done here rather than lazily because {@code ServiceLoader} constructs this class before any
-     * editor is drawn, and it costs one field write. Everything expensive stays lazy — the catalog is built
-     * on first ask, the pilot on first press.
+     * <pre>
+     * ServiceConfigurationError: Provider com.botmaker.sdk.plugin.SdkPlugin could not be instantiated
+     *   Caused by: NoClassDefFoundError: javafx/scene/Node
+     * </pre>
+     *
+     * <p>{@code PluginLoader} catches that — a classpath with no loadable plugin on it is an ordinary state
+     * — so the symptom is an empty palette and one line on stderr, which is the failure mode the whole
+     * plugin-loading design keeps meeting. The <b>plugin registry's own gate found it</b>, on the SDK's own
+     * submission, by resolving the published artifact exactly as a host does: {@code botmaker validate
+     * --coordinate com.github.LiQiyeDev:botmaker-sdk:v1.1.5} reproduces it. It never showed locally because
+     * an {@code optional} dependency <em>is</em> on this module's own classpath, so validating the working
+     * copy resolved JavaFX and validating the artifact did not.
+     *
+     * <p>The rule it states, and it is the one to apply to anything a constructor is tempted to do:
+     * <b>constructing a plugin must not link an optional dependency.</b> A headless host — the CLI's
+     * {@code validate} and {@code run}, the registry's CI — is a legitimate host, and it is the one that
+     * decides whether a plugin may be published at all. Everything JavaFX-shaped belongs behind a
+     * {@code build…} hook, which is where the catalog, the value types and the parameters already were.
      */
     public SdkPlugin() {
         super(ID, "BotMaker SDK");
-        Editors.pickWith(new SdkScreenPicks());
     }
 
     /**
@@ -217,9 +233,18 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * <p>The classes behind this list touch JavaFX and the plugin widget toolkit, both
      * {@code <optional>true</optional>} in this module's pom, so they are in the jar and never linked on a
      * bot's classpath — the same arrangement that makes the contract dependency safe.
+     *
+     * <p><b>This is where the screen picker is registered</b>, since 2026-09-05 and for the reason the
+     * constructor's javadoc gives at length: registering it there linked {@code Editors} and made the plugin
+     * unconstructible on a host with no JavaFX. Here it is reached only by a host that is asking for
+     * editors, which is a host that has one. {@link AbstractStudioPlugin} calls this once and caches, so it
+     * is still the single registration {@link ScreenPicks} describes; and it happens before any editor in
+     * the returned list can draw, because a {@code SlotEditor} is a predicate and a factory and the pick is
+     * read when the widget runs.
      */
     @Override
     protected List<SlotEditor> buildSlotEditors() {
+        Editors.pickWith(new SdkScreenPicks());
         return SdkEditors.ALL;
     }
 

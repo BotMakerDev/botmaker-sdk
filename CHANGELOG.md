@@ -17,6 +17,34 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Fixed
+
+- **The palette, the slot editors and the toolbar buttons appear when you install the SDK through
+  *Manage Plugins*.** Constructing the plugin needed JavaFX, and JavaFX is `optional` in this jar — which
+  means *not transitive*, so it is on the SDK's own classpath and absent from yours. A project that added
+  `botmaker-sdk` as a dependency therefore got:
+
+  ```
+  ServiceConfigurationError: Provider com.botmaker.sdk.plugin.SdkPlugin could not be instantiated
+    Caused by: NoClassDefFoundError: javafx/scene/Node
+  ```
+
+  which the host catches — a classpath with no loadable plugin on it is an ordinary state — leaving an empty
+  palette, no name recognition, no slot editors and one line on stderr. Nothing crashed and nothing failed to
+  compile. The cause was one line in the constructor registering the screen picker with the toolkit; it now
+  happens where the editors are built, which only a host that has JavaFX ever asks for.
+
+  **Found by the plugin registry's own gate**, on this plugin's first real submission, because the gate
+  resolves the *published* artifact exactly as a host does. `botmaker validate --coordinate
+  com.github.LiQiyeDev:botmaker-sdk:v1.1.5` reproduces it; validating a working copy never could, since an
+  `optional` dependency is present on the module's own classpath.
+
+  The rule, now held by `SdkPluginHeadlessTest`: **constructing a plugin must not link an optional
+  dependency.** A headless host — `botmaker validate`, `botmaker run`, the registry's CI — is a legitimate
+  host, and it is the one that decides whether a plugin may be published at all.
+
 ## [1.1.5] — 2026-09-05
 
 ### Fixed
