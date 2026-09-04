@@ -144,21 +144,38 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- The plugin widget toolkit, and JavaFX under it: what internal.plugin.editors is built from.
+        <!-- The plugin widget toolkit: what internal.plugin.editors is built from, and the superclass of
+             SdkPlugin itself (AbstractStudioPlugin).
 
-             All three are <optional>true</optional> for exactly the reason the contract above is. A bot
-             compiles against api.* and never names an editor; the editor classes are in this jar and are
-             simply never linked in a bot's JVM. A generated bot must NOT drag JavaFX onto its classpath —
-             it is a headless program, and on a machine with no JavaFX distribution for its platform the
-             resolve would fail outright.
+             NOT <optional>true</optional>, and it was until 2026-09-04. `optional` means NOT TRANSITIVE,
+             not "not present" — so anything that resolves botmaker-sdk as a dependency got this jar's
+             plugin half without the classes it extends. Studio loads every plugin off the open project's
+             own resolved classpath, so a bot that adds the SDK through Project ▸ Manage Plugins hit
+             NoClassDefFoundError while ServiceLoader was constructing SdkPlugin, PluginHost.discover
+             caught it — correctly; a classpath with no plugin on it is an ordinary state — and the user
+             got one line on stderr and an empty palette. That is the same failure Studio itself hit on
+             2026-08-28 while it still bundled the SDK; it was fixed there by giving Studio the toolkit,
+             and it escaped into user projects when Studio stopped bundling a plugin at all.
 
-             The toolkit is the plugin's own dependency and never the host's: botmaker-studio must not list
-             it, or two plugins can no longer hold two versions of it. See ../CLAUDE.md. -->
+             The toolkit cannot come from the host: PluginLoader is parent-first only for
+             com.botmaker.plugin.api.** and the platform namespaces, and CHILD-FIRST for the toolkit,
+             deliberately, so two plugins may hold two versions of it. A plugin must therefore bring its
+             own — which is what botmaker-plugin-archetype generates and what botmaker-cli's `pom-scopes`
+             check enforces by refusing a `provided` toolkit. This module is a plugin. It brings its own.
+
+             The cost, stated rather than hidden: a headless bot that uses no editor now resolves 106 KB
+             it never links. The toolkit has no dependencies of its own and its javafx is `provided`, so
+             nothing follows it onto a bot's classpath — which is why this is the cheap side of the trade
+             and an unloadable plugin is the expensive one.
+
+             JavaFX below stays optional, and the difference is exactly the loader: javafx.* IS
+             parent-first, so the host supplies it and a plugin that declared it would be handed the
+             host's classes anyway. A generated bot must not drag it in — it is a headless program, and on
+             a machine with no JavaFX distribution for its platform the resolve fails outright. -->
         <dependency>
             <groupId>com.github.LiQiyeDev</groupId>
             <artifactId>botmaker-plugin-toolkit</artifactId>
             <version>${botmaker.plugintoolkit.version}</version>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>

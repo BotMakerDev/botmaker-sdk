@@ -17,6 +17,30 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Fixed
+
+- **Installing the SDK through *Project ▸ Manage Plugins* now gives you a working palette.** It did not.
+  The SDK is a library *and* Studio's plugin #1, and its plugin half extends `AbstractStudioPlugin` from
+  `botmaker-plugin-toolkit` — which this pom declared `<optional>true</optional>`. `optional` means **not
+  transitive**, so a project that added `botmaker-sdk` as a dependency got the plugin classes without the
+  classes they extend. Studio loads plugins off your project's own resolved classpath, so `ServiceLoader`
+  threw `NoClassDefFoundError` while constructing the plugin, Studio caught it — correctly; a project with
+  no plugin on its classpath is an ordinary state — and you got an empty palette, no name recognition, no
+  slot editors and one line on stderr. The toolkit is an ordinary dependency now, so it travels with the
+  SDK wherever the SDK is resolved.
+
+  It costs a headless bot 106 KB it never links. The toolkit has no dependencies of its own and its JavaFX
+  is `provided`, so **nothing follows it onto a bot's classpath** — no JavaFX, no window toolkit, nothing
+  new to download for the machine a bot actually runs on. A project created by Studio is unchanged either
+  way: its pom already declared the toolkit itself.
+
+- **Resolvable from JitPack again.** `v1.1.2` published a pom naming `botmaker-session` and
+  `botmaker-studio-api` versions that had never been built there: neither of those modules pinned
+  `maven-compiler-plugin`, and JitPack's Maven defaults it to 3.1, which predates
+  `maven.compiler.release` and builds with `source 5`. Every module in the chain pins it now.
+
 ## [1.1.2] — 2026-09-02
 
 - **Your bot now builds and runs on Java 25 (LTS), with JavaFX 25.0.4 behind the editors.** This is the one
