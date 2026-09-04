@@ -17,6 +17,21 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Fixed
+
+- **`1.1.4` still does not resolve — third time, third plugin, and this one is caught by a gate rather than
+  by a tag.** `botmaker-session` and `botmaker-studio-api` did build this time. `botmaker-plugin-toolkit`
+  did not: it pinned `flatten-maven-plugin` 1.6.0, which declares a Maven 3.6.3 prerequisite that JitPack's
+  **Apache Maven 3.6.1** cannot satisfy, so it published nothing and this jar's pom named a toolkit that
+  does not exist. The toolkit and `botmaker-plugin-host` now pin 1.4.1, exactly as this module always has.
+
+  The SDK itself is unchanged from `1.1.3`. What changed outside it is that the umbrella's `release.sh`
+  gained `check_jitpack_plugins`, which reads each pinned plugin's own `<prerequisites><maven>` and refuses
+  the release while nothing has been pushed — three chains have now been burned on this one failure, each
+  time on a different plugin, and each time invisible locally because a developer's Maven is new enough.
+
 ## [1.1.4] — 2026-09-04
 
 ### Fixed
