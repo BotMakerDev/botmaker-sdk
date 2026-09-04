@@ -17,6 +17,17 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Fixed
+
+- **`1.1.3` still does not resolve, and this is the release that fixes it.** The upstream repair it
+  announced was pinning `maven-compiler-plugin` in the modules that lacked one — and the pin named 3.13.0,
+  which the plugin's own Maven prerequisite (raised to 3.6.3 in 3.12.0) puts out of reach of JitPack's
+  Maven. So `botmaker-session` and `botmaker-studio-api` failed to build again, one line later, and this
+  jar's pom went on naming versions that do not exist. Every module now pins **3.11.0**, the version
+  `botmaker-shared` has always used. Nothing in the SDK itself changed between `1.1.3` and this release.
+
 ## [1.1.3] — 2026-09-04
 
 ### Fixed
