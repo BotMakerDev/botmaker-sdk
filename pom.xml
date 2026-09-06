@@ -35,8 +35,11 @@
         <botmaker.studioapi.version>0.0.0-SNAPSHOT</botmaker.studioapi.version>
         <!-- botmaker-plugin-toolkit version: the widgets this module's slot editors are built from. Same
              0.0.0-SNAPSHOT contract as the three above, and the same flatten reason — it IS in
-             <dependencies>, so the published pom must carry a resolvable version. Optional there, exactly
-             like the contract: a bot never links an editor. -->
+             <dependencies>, so the published pom must carry a resolvable version.
+
+             NOT optional, and this comment said it was until 2026-09-06, three days after the element
+             below stopped being: `optional` means not transitive, so a host resolving botmaker-sdk got a
+             jar whose SdkPlugin could not resolve its own superclass. See the dependency's own comment. -->
         <botmaker.plugintoolkit.version>0.0.0-SNAPSHOT</botmaker.plugintoolkit.version>
         <!-- The published tag japicmp compares this build against. Bump it in the release commit, beside the
              CHANGELOG section, so it is always the LAST release — the gate then asks "did this build remove
