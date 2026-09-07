@@ -1,14 +1,14 @@
 package com.botmaker.sdk.internal.authoring;
 
-import com.botmaker.plugin.api.authoring.ActivityModel;
-import com.botmaker.plugin.api.authoring.FlowEdgeModel;
-import com.botmaker.plugin.api.authoring.FlowModel;
-import com.botmaker.plugin.api.authoring.FlowNodeModel;
-import com.botmaker.plugin.api.authoring.ProjectModel;
-import com.botmaker.plugin.api.authoring.VariableModel;
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueChoice;
 import com.botmaker.plugin.api.value.Visibility;
+import com.botmaker.sdk.authoring.ActivityModel;
+import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.sdk.authoring.FlowModel;
+import com.botmaker.sdk.authoring.FlowNodeModel;
+import com.botmaker.sdk.authoring.ProjectModel;
+import com.botmaker.sdk.authoring.VariableModel;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -20,12 +20,13 @@ import java.util.Map;
 /**
  * How Jackson binds the authoring model records, kept out of the records themselves.
  *
- * <p>The records live in {@code com.botmaker.plugin.api.authoring} — the plugin contract — and the contract
- * has exactly one dependency, {@code javafx-controls} at {@code provided}. Adding a library there imposes it
- * on every plugin that ever compiles against the contract, which is why the standing rule is that <b>the
- * contract declares the wire form and whoever owns the file supplies the parser</b>. The records carried
- * {@code @JsonCreator}, {@code @JsonProperty}, {@code @JsonIgnore} and {@code @JsonIgnoreProperties} for one
- * day in August 2026; this class is where those marks went.
+ * <p>The records live in {@link com.botmaker.sdk.authoring} and this class stays anyway, which is the part
+ * worth knowing. They were in the plugin contract from 2026-08-31 to 2026-09-07, and the commit that put
+ * them there added {@code jackson-annotations} to the contract's pom — a library in that pom is imposed on
+ * every plugin that ever compiles against it, so the marks were pulled back out into this class within the
+ * day. The records are the SDK's again and could carry the annotations now; keeping them here is the same
+ * rule stated the other way round, that <b>a record describing a file's shape should not name the library
+ * that happens to read it</b>. A second reader binding these records with its own mapper is still possible.
  *
  * <p>A Jackson <em>mix-in</em> is a type whose annotations are applied to another type as if they had been
  * written on it. Nothing here is ever instantiated or called: the abstract methods exist only so that

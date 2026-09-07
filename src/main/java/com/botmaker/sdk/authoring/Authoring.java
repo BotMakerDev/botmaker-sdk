@@ -1,6 +1,5 @@
 package com.botmaker.sdk.authoring;
 
-import com.botmaker.plugin.api.authoring.ProjectModel;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.sdk.internal.authoring.AuthoringMixins;
 import com.botmaker.shared.config.ProjectFile;

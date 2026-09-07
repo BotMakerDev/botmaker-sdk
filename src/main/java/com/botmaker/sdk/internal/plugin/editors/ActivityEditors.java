@@ -2,8 +2,8 @@ package com.botmaker.sdk.internal.plugin.editors;
 
 import com.botmaker.plugin.api.ValueContext;
 import com.botmaker.plugin.toolkit.Editors;
-import com.botmaker.plugin.api.authoring.ActivityModel;
-import com.botmaker.plugin.api.authoring.ProjectModel;
+import com.botmaker.sdk.authoring.ActivityModel;
+import com.botmaker.sdk.authoring.ProjectModel;
 import com.botmaker.sdk.authoring.Authoring;
 import com.botmaker.sdk.authoring.SdkVersion;
 import javafx.scene.Node;

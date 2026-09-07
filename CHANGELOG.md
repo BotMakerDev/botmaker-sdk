@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The seven authoring records are `com.botmaker.sdk.authoring` again** — `ProjectModel`, `ActivityModel`,
+  `VariableModel`, `FlowModel`, `FlowNodeModel`, `FlowEdgeModel`, `PresetModel`. They spent a week in the
+  plugin contract (2026-08-31 to 2026-09-07). Nothing a bot writes changes; they sit beside `SdkVersion`,
+  `Authoring` and `WireText`, which is where they were before and where the file they describe is read.
+  `AuthoringMixins` keeps the Jackson marks out of the records regardless of which module they live in.
+- `AuthoringModelTest.aStoredAnyOfWithNoSetBehindItReadsAsAnOpenList` is restored. It calls
+  `VariableModel.listShapeOf`, which is package-private; the move away made it unreachable and the move back
+  makes it reachable. The rule it asserts never stopped running.
+
 - Nothing a bot can see. `SdkPlugin` follows `Region` to its new home in the toolkit, and `WireText`'s class
   javadoc stops describing a generator that no longer exists — it claimed a value's text was parsed "at
   generation time" and written into source as `Duration.ofMillis(5400000L)`, which stopped being true when

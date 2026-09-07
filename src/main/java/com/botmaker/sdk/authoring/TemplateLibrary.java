@@ -1,6 +1,5 @@
 package com.botmaker.sdk.authoring;
 
-import com.botmaker.plugin.api.authoring.ActivityModel;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javax.imageio.ImageIO;
