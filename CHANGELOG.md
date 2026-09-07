@@ -17,6 +17,15 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Changed
+
+- Nothing a bot can see. `SdkPlugin` follows `Region` to its new home in the toolkit, and `WireText`'s class
+  javadoc stops describing a generator that no longer exists — it claimed a value's text was parsed "at
+  generation time" and written into source as `Duration.ofMillis(5400000L)`, which stopped being true when
+  the inversion was reversed between 2026-08-29 and 2026-09-02. A bot reads its own text at run time.
+
 ## [1.1.6] — 2026-09-05
 
 ### Fixed
