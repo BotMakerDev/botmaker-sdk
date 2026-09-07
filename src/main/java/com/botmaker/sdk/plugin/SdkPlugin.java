@@ -2,7 +2,6 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.ActionContext;
 import com.botmaker.plugin.api.ParameterGroup;
-import com.botmaker.plugin.api.Region;
 import com.botmaker.plugin.api.SlotEditor;
 import com.botmaker.plugin.api.SourceSeed;
 import com.botmaker.plugin.api.StudioPlugin;
@@ -13,6 +12,7 @@ import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.plugin.toolkit.Editors;
+import com.botmaker.plugin.toolkit.Region;
 import com.botmaker.plugin.toolkit.ScreenPicks;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Direction;

@@ -16,22 +16,27 @@ import java.time.LocalTime;
 import java.util.Locale;
 
 /**
- * What a stored value's text means. One reader per {@link ValueType}, and the grammar every one of them is
+ * What a stored value's text means. One reader per {@code ValueType}, and the grammar every one of them is
  * written in.
  *
- * <h2>Why this exists at all, when the value is now baked into the source</h2>
+ * <h2>Why this exists at all</h2>
  *
- * <p>{@link VariableModel#value()} is text — one shape on disk, one reader, one writer. Something still has
- * to turn {@code "1h30m"} into a {@link Duration}; what changed in this release is <em>when</em>. It used to
- * happen inside the running bot, through a generated field that called a parser at startup; it happens here
- * now, at generation time, and the emitter writes the answer as {@code java.time.Duration.ofMillis(5400000L)}.
- * The maintainer's objection to the old arrangement is the whole of the reasoning: if a reader knows how to
- * turn the text into a value, the generator can do that once instead of every bot doing it on every launch.
+ * <p>A variable's stored value is text — one shape on disk, one reader, one writer. Something has to turn
+ * {@code "1h30m"} into a {@link Duration}, and this is where every such answer lives, once per type.
  *
- * <p>So this class is the parsers' home, not their grave. It is public because the <em>editor</em> needs the
- * same answers — a Parameters dialog showing a duration field has to read {@code "1h30m"} too — and one
- * grammar per type means one implementation per type, called from both sides. That is the settlement the old
- * {@code Wire} reached after the parsers had been Java-source-inside-Java-strings, and it survives the class.
+ * <p><b>Two readers ask, and that is the reason it is public.</b> The <em>editor</em> needs it — a Parameters
+ * dialog showing a duration field has to read {@code "1h30m"} — and so does a <em>running bot</em>, through
+ * {@code com.botmaker.sdk.api.config.Wire}. One grammar per type means one implementation per type, called
+ * from both sides. That is the settlement the old {@code Wire} reached after the parsers had been
+ * Java-source-inside-Java-strings, and it survives the class.
+ *
+ * <p><b>A paragraph here claimed the parsing "happens here now, at generation time, and the emitter writes
+ * {@code java.time.Duration.ofMillis(5400000L)}" — deleted 2026-09-07, because there is no emitter.</b>
+ * {@code SourceEmitter} was deleted with the inversion (2026-08-29 to 2026-09-02); Studio composes a bot's
+ * one starting file itself and generates no field per variable. So a bot reads its own text at run time
+ * again, which is what {@code Wire} does, and {@code LiteralWriter}'s initializer path — the half that wrote
+ * a parsed value into source — has no live caller left. Nothing about the grammar changed; only the claim
+ * about who runs it and when.
  *
  * <h2>Every reader is total</h2>
  *
@@ -48,9 +53,9 @@ public final class WireText {
 
     /**
      * Where a bot's image templates sit, relative to the project root. The editor's own template manager puts
-     * the files there; this is the half of that agreement the generator needs, so that an
-     * {@link ValueType#IMAGE_TEMPLATE} value spelled {@code "ore"} in the file becomes
-     * {@code new ImageTemplate("src/main/resources/images/ore.png")} in source.
+     * the files there; this is the half of that agreement every reader needs, so that an
+     * {@code IMAGE_TEMPLATE} value spelled {@code "ore"} in the file resolves to
+     * {@code src/main/resources/images/ore.png}.
      */
     public static final String IMAGE_PREFIX = "src/main/resources/images/";
 
@@ -205,7 +210,7 @@ public final class WireText {
         return new ImageTemplate(templatePath(stored));
     }
 
-    /** The project-relative path an {@link ValueType#IMAGE_TEMPLATE} value names. */
+    /** The project-relative path an {@code IMAGE_TEMPLATE} value names. */
     public static String templatePath(String stored) {
         return IMAGE_PREFIX + trim(stored) + ".png";
     }
