@@ -21,6 +21,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **`ProjectData` keeps the flow and delegates the rest.** The untyped store — a variable's stored text, an
+  activity's flags — is `com.botmaker.shared.config.ProjectValues` now, so every plugin can read a bot's
+  parameters and not only this one. Nothing a bot writes changes and no method was removed: `value`,
+  `values`, `declares`, `variables`, `enabled`, `outcomes`, `activities`, `goHome`, `popupCheck` and
+  `isEmpty` all still answer here, through the store. `ProjectData.use(…)` sets the shared seam, so a test
+  stubbing the model here also stubs what `Settings` reads.
+
+  What stayed is the half that knows what the file *means*: `start`, `placed`, `maxSteps`, `stepDelayMs`
+  and `routes` are `FlowModel`'s and `FlowEdgeModel`'s rules, and reading them through a second set anywhere
+  else is how the editor and a running bot would come to disagree about which activity runs first.
+
 - **The seven authoring records are `com.botmaker.sdk.authoring` again** — `ProjectModel`, `ActivityModel`,
   `VariableModel`, `FlowModel`, `FlowNodeModel`, `FlowEdgeModel`, `PresetModel`. They spent a week in the
   plugin contract (2026-08-31 to 2026-09-07). Nothing a bot writes changes; they sit beside `SdkVersion`,
