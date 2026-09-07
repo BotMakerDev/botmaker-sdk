@@ -5,7 +5,7 @@ import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.Activity;
 import com.botmaker.sdk.api.bot.Outcome;
-import com.botmaker.plugin.api.authoring.FlowEdgeModel;
+import com.botmaker.sdk.authoring.FlowEdgeModel;
 import com.botmaker.sdk.internal.bot.ActivityRegistry;
 import com.botmaker.sdk.internal.bot.LegacyActivity;
 import com.botmaker.sdk.internal.config.ProjectData;

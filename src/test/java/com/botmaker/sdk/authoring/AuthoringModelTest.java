@@ -1,13 +1,6 @@
 package com.botmaker.sdk.authoring;
 
 import com.botmaker.plugin.api.ParameterGroup;
-import com.botmaker.plugin.api.authoring.ActivityModel;
-import com.botmaker.plugin.api.authoring.FlowEdgeModel;
-import com.botmaker.plugin.api.authoring.FlowModel;
-import com.botmaker.plugin.api.authoring.FlowNodeModel;
-import com.botmaker.plugin.api.authoring.PresetModel;
-import com.botmaker.plugin.api.authoring.ProjectModel;
-import com.botmaker.plugin.api.authoring.VariableModel;
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.api.value.ValueChoice;
@@ -114,13 +107,22 @@ class AuthoringModelTest {
         assertEquals(ValueShape.ONE, ValueChoice.fromWire(CATALOG, "TEXT", null, Boolean.FALSE).shape());
     }
 
-    // aStoredAnyOfWithNoSetBehindItReadsAsAnOpenList stood here. It called VariableModel.listShapeOf
-    // directly, which was reachable while that record lived in this package; it is the contract's now
-    // (com.botmaker.plugin.api.authoring) and the method is deliberately package-private there, since it
-    // exists for Jackson to bind through AuthoringMixins rather than for anyone to call. The rule it
-    // asserted — a stored ANY_OF with no set behind it reads as an OPEN_LIST — is unchanged and still runs
-    // on every project opened with a legacy variable; making the method public to keep one test would have
-    // grown the versioned contract surface for a reason that is not a capability.
+    /**
+     * A stored {@code ANY_OF} with no set behind it reads as an {@code OPEN_LIST}.
+     *
+     * <p><b>This test was deleted on 2026-08-31 and is restored on 2026-09-07, without either side of the
+     * rule changing.</b> It calls {@code VariableModel.listShapeOf} directly, which is package-private
+     * because it exists for {@code fromWire} rather than for anyone to call. That was reachable while the
+     * record lived here, unreachable for the week it lived in the plugin contract, and is reachable again
+     * now the record is back. The rule it asserts ran on every project opened with a legacy variable
+     * throughout; only the test could not see it.
+     */
+    @Test
+    void aStoredAnyOfWithNoSetBehindItReadsAsAnOpenList() {
+        ValueChoice anyOfText = new ValueChoice(SdkValueTypes.TEXT, ValueShape.ANY_OF);
+        assertEquals(ValueShape.OPEN_LIST, VariableModel.listShapeOf(anyOfText, List.of()).shape());
+        assertEquals(ValueShape.ANY_OF, VariableModel.listShapeOf(anyOfText, List.of("a")).shape());
+    }
 
     @Test
     void everyParseIsTotal() {
