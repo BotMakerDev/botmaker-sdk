@@ -33,7 +33,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Wire.whole`, `Wire.duration`, `Wire.area` and the fifteen others could only ever read *this* plugin's
   value types — `Wire.one(String)`'s own javadoc called itself "the escape hatch for a type this class has no
   reader for". Passing the type in makes the set open: whichever plugin introduced a type ships a
-  `com.botmaker.shared.config.ValueGrammar` that reads it, and every call site is the same shape. Both
+  `com.botmaker.plugin.toolkit.config.ValueGrammar` that reads it, and every call site is the same shape. Both
   `int.class` and `Integer.class` resolve, so you write whichever your field is.
 
   Everything else is unchanged. A missing file, a missing name, a name declared as another type and text that
@@ -58,7 +58,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 ### Changed
 
 - **`ProjectData` keeps the flow and delegates the rest.** The untyped store — a variable's stored text, an
-  activity's flags — is `com.botmaker.shared.config.ProjectValues` now, so every plugin can read a bot's
+  activity's flags — is `com.botmaker.plugin.toolkit.config.ProjectValues` now, so every plugin can read a bot's
   parameters and not only this one. Nothing a bot writes changes and no method was removed: `value`,
   `values`, `declares`, `variables`, `enabled`, `outcomes`, `activities`, `goHome`, `popupCheck` and
   `isEmpty` all still answer here, through the store. `ProjectData.use(…)` sets the shared seam, so a test

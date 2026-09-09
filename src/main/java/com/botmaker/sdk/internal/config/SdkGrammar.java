@@ -9,7 +9,7 @@ import com.botmaker.sdk.api.interaction.MouseButton;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.authoring.WireText;
-import com.botmaker.shared.config.ValueGrammar;
+import com.botmaker.plugin.toolkit.config.ValueGrammar;
 
 import java.awt.Color;
 import java.time.Duration;
@@ -20,7 +20,7 @@ import java.util.List;
 /**
  * The SDK's seventeen value types, spelled for a running bot.
  *
- * <p>Declared in {@code META-INF/services/com.botmaker.shared.config.ValueGrammar}, so a bot that has the SDK
+ * <p>Declared in {@code META-INF/services/com.botmaker.plugin.toolkit.config.ValueGrammar}, so a bot with the SDK
  * on its classpath can write {@code Settings.load("wait", Duration.class)} and nothing else has to be
  * arranged. A plugin that introduces a value type ships one of these beside it; this class is the worked
  * example the mechanism was designed against.
