@@ -2,7 +2,7 @@ package com.botmaker.sdk.internal.config;
 
 import com.botmaker.sdk.authoring.FlowEdgeModel;
 import com.botmaker.sdk.authoring.FlowModel;
-import com.botmaker.shared.config.ProjectValues;
+import com.botmaker.plugin.toolkit.config.ProjectValues;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.LinkedHashMap;
@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * A running bot's own {@code activities.json}: the <b>flow</b>, plus a view onto the untyped store.
  *
- * <p><b>The store itself is {@link ProjectValues}, in {@code botmaker-shared}, since 2026-09-07.</b> What
+ * <p><b>The store itself is {@link ProjectValues}, in {@code botmaker-plugin-toolkit}.</b> What
  * moved is the untyped key lookup — given a name, what text is stored — which has no schema in it and has to
  * be answerable by every plugin rather than by the one that owns the file. What stayed is everything below
  * the {@code flow} heading: what a node, an edge, a start and a step delay <em>mean</em> is
