@@ -28,7 +28,7 @@ import java.util.Locale;
  * <p><b>Two readers ask, and that is the reason it is public.</b> The <em>editor</em> needs it — a Parameters
  * dialog showing a duration field has to read {@code "1h30m"} — and so does a <em>running bot</em>, through
  * {@code com.botmaker.sdk.api.config.Settings}, which reaches these readers as a
- * {@code com.botmaker.plugin.toolkit.config.ValueGrammar}. One grammar per type means one implementation per type,
+ * {@code com.botmaker.plugin.basics.store.ValueGrammar}. One grammar per type means one implementation per type,
  * called from both sides. That is the settlement the old {@code Wire} reached after the parsers had been
  * Java-source-inside-Java-strings, and it survives the class.
  *

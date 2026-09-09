@@ -48,7 +48,7 @@ import java.util.List;
  *
  * <h2>Where the work actually happens</h2>
  *
- * <p>{@code com.botmaker.plugin.toolkit.config.Settings}, and this class is a facade over it holding no
+ * <p>{@code com.botmaker.plugin.basics.store.Settings}, and this class is a facade over it holding no
  * logic. Of the five stages in a value's life — declaring, editing, writing, reading it in an editor,
  * reading it in a running bot — the first four are already plugin-general, because they are contract types.
  * The fifth could not join them, because <b>a bot's classpath does not have the contract on it</b>: a plugin
@@ -78,7 +78,7 @@ public final class Settings {
      *                                  javadoc for why that is the one failure that is not a fallback
      */
     public static <T> T load(String name, Class<T> type) {
-        return com.botmaker.plugin.toolkit.config.Settings.load(name, type);
+        return com.botmaker.plugin.basics.store.Settings.load(name, type);
     }
 
     /**
@@ -89,7 +89,7 @@ public final class Settings {
      * the result is always the same length as what the editor stored.
      */
     public static <T> List<T> loadAll(String name, Class<T> type) {
-        return com.botmaker.plugin.toolkit.config.Settings.loadAll(name, type);
+        return com.botmaker.plugin.basics.store.Settings.loadAll(name, type);
     }
 
     // ---- the questions that need no grammar -------------------------------------------------------------
@@ -102,7 +102,7 @@ public final class Settings {
      * configuration had never heard of would be worse than one that quietly skips it.
      */
     public static boolean enabled(String activity) {
-        return com.botmaker.plugin.toolkit.config.Settings.enabled(activity);
+        return com.botmaker.plugin.basics.store.Settings.enabled(activity);
     }
 
     /**
@@ -112,7 +112,7 @@ public final class Settings {
      * read as {@code ""}, and only one of the two is a mistake.
      */
     public static boolean declares(String name) {
-        return com.botmaker.plugin.toolkit.config.Settings.declares(name);
+        return com.botmaker.plugin.basics.store.Settings.declares(name);
     }
 
     // ---- the stored text --------------------------------------------------------------------------------
@@ -126,12 +126,12 @@ public final class Settings {
      * the plugin is genuinely absent.
      */
     public static String one(String name) {
-        return com.botmaker.plugin.toolkit.config.ProjectValues.current().one(name);
+        return com.botmaker.plugin.basics.store.ProjectValues.current().one(name);
     }
 
     /** Every stored value of the named variable as text — one element for a plain value, several for a list. */
     public static List<String> many(String name) {
-        return com.botmaker.plugin.toolkit.config.ProjectValues.current().many(name);
+        return com.botmaker.plugin.basics.store.ProjectValues.current().many(name);
     }
 
     /**
@@ -142,6 +142,6 @@ public final class Settings {
      */
     @Hidden("a bot reads its settings by name; enumerating them is a debugging move")
     public static List<String> names() {
-        return com.botmaker.plugin.toolkit.config.ProjectValues.current().variables();
+        return com.botmaker.plugin.basics.store.ProjectValues.current().variables();
     }
 }

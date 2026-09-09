@@ -328,6 +328,11 @@ the running bot cannot disagree about what `"1m30s"` means. Two readers of one f
 `ProjectDataTest.readsBackWhatTheEditorWrites` writes with `Authoring.modelJson` and reads with `ProjectData`,
 which is the only honest mitigation. **Add a value type to `SdkValueTypes` and add its reader here.**
 
+**And a reader here has a partner in `BasicsGrammar`.** `SdkGrammar` reads the SDK's own eight types for a
+running bot; the nine JDK ones are `botmaker-plugin-basics`' `BasicsGrammar`, which arrives on every bot's
+classpath with this jar. `Settings` indexes both and refuses two grammars claiming one type, so the split
+has to stay disjoint — `ValueVocabularyTest` asserts that it is.
+
 **Nine of those codecs left on 2026-09-09 and the delegation is what kept the sentence true.** `TEXT`,
 `YES_NO`, `WHOLE_NUMBER`, `DECIMAL_NUMBER`, `CHARACTER`, `COLOR`, `DATE`, `TIME_OF_DAY` and `DURATION` are
 `botmaker-plugin-basics`' registrations now — they are nobody's vocabulary in particular and were this
