@@ -18,7 +18,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code public static final} fields: the values keep their names, and a misspelling stops being a compile
  * error. That is only acceptable while <b>every</b> misspelling has a defined, harmless answer, which is what
  * most of these tests check.
+ *
+ * <p><b>Kept after {@link Settings} replaced it (2026-09-09)</b>, and that is what the suppression below
+ * says: {@code Wire} is deprecated and never deleted, so the guarantee under test is that an already-written
+ * bot keeps reading exactly what it read. {@code SettingsTest} covers the replacement separately, through a
+ * grammar the classpath supplies rather than a reader named in a method.
  */
+@SuppressWarnings("deprecation")
 class WireTest {
 
     @Test

@@ -34,8 +34,6 @@ import java.nio.file.Paths;
 @Hidden("a value type: the generated templates class builds them, a bot holds and passes them on")
 public class ImageTemplate implements AutoCloseable {
 
-    static { OpenCvNative.ensureLoaded(); }
-
     private final String filePath;
     private final String id;
     private double threshold = 0.8; // Default confidence
@@ -95,8 +93,16 @@ public class ImageTemplate implements AutoCloseable {
      * caller is a matcher in this package ({@link ImageFinder}, {@link ImageClicker}) plus this package's own
      * tests; no bot has ever had a reason to hold a {@code Mat}. A bot that genuinely needs the pixels should
      * be given an SDK-owned type instead, which stays possible as an addition at any time.
+     *
+     * <p><b>The OpenCV native is loaded here rather than in a {@code static {}} block</b> (moved 2026-09-09).
+     * This class links {@code Mat} in exactly one method, and holding a template is now something a bot does
+     * without ever asking for its pixels: {@code Settings}' value grammar builds one as the fallback for an
+     * unreadable image variable, so a class-initialiser load would make every bot that reads <em>any</em>
+     * setting extract and link the native library. {@link OpenCvNative#ensureLoaded()} is idempotent and
+     * synchronized, so paying it per call costs a volatile read after the first one.
      */
     Mat getMat() {
+        OpenCvNative.ensureLoaded();
         if (mat == null || mat.empty()) {
             String absPath = new File(filePath).getAbsolutePath();
             // IMREAD_UNCHANGED keeps a transparent PNG's alpha channel (4-channel BGRA) so the matcher can
