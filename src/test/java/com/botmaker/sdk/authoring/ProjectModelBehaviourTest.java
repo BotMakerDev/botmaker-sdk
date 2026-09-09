@@ -4,7 +4,7 @@ import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueChoice;
 import com.botmaker.plugin.api.value.Visibility;
-import com.botmaker.sdk.internal.authoring.SdkValueTypes;
+import com.botmaker.plugin.basics.values.BasicsValueTypes;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -87,7 +87,7 @@ class ProjectModelBehaviourTest {
     @Test
     void anActivityAndAVariableShareOneNamespace() {
         ProjectModel model = ProjectModel.of(List.of(activity("Mining")),
-                List.of(VariableModel.of("Rest", ValueChoice.of(SdkValueTypes.DURATION), List.of("90s"))));
+                List.of(VariableModel.of("Rest", ValueChoice.of(BasicsValueTypes.DURATION), List.of("90s"))));
 
         assertTrue(model.nameClash("Mining", null));
         assertTrue(model.nameClash("Rest", null));
@@ -106,7 +106,7 @@ class ProjectModelBehaviourTest {
     /** Two plugins may each offer a {@code timeout}: they are fields of two classes, not one declared twice. */
     @Test
     void theNamespaceIsTheGroup() {
-        VariableModel mine = VariableModel.of("Timeout", ValueChoice.of(SdkValueTypes.DURATION), List.of("5s"));
+        VariableModel mine = VariableModel.of("Timeout", ValueChoice.of(BasicsValueTypes.DURATION), List.of("5s"));
         ProjectModel model = ProjectModel.of(List.of(activity("Mining")),
                 List.of(mine, mine.withName("Timeout").withGroup("discord")));
 
@@ -120,7 +120,7 @@ class ProjectModelBehaviourTest {
     /** An absent group is the default plugin's, which is what makes every pre-1.2.0 project read back whole. */
     @Test
     void aVariableWithNoGroupIsTheDefaultPluginS() {
-        VariableModel v = VariableModel.of("Rest", ValueChoice.of(SdkValueTypes.DURATION), List.of("90s"));
+        VariableModel v = VariableModel.of("Rest", ValueChoice.of(BasicsValueTypes.DURATION), List.of("90s"));
 
         assertEquals("", v.group());
         assertTrue(v.isIn(""));
@@ -140,7 +140,7 @@ class ProjectModelBehaviourTest {
         VariableModel flag = new ActivityModel("Mining", true, "dig", List.of(), null, null).enabledVariable();
 
         assertEquals("Mining", flag.name());
-        assertEquals(SdkValueTypes.YES_NO, flag.type().type());
+        assertEquals(BasicsValueTypes.YES_NO, flag.type().type());
         assertEquals(List.of("true"), flag.value());
         assertEquals("Mining", flag.tag());
         assertEquals(Visibility.EDITOR_ONLY, flag.visibility());
@@ -168,7 +168,7 @@ class ProjectModelBehaviourTest {
 
     @Test
     void onlyPublicVariablesAreGroupedForTheRunnerAndAnUntaggedOneLandsUnderGeneral() {
-        VariableModel shown = VariableModel.of("Rest", ValueChoice.of(SdkValueTypes.DURATION), List.of("90s"));
+        VariableModel shown = VariableModel.of("Rest", ValueChoice.of(BasicsValueTypes.DURATION), List.of("90s"));
         VariableModel tagged = shown.withName("Depth").withTag("Mining");
         VariableModel hidden = shown.withName("Retry").withVisibility(Visibility.EDITOR_ONLY);
         ProjectModel model = ProjectModel.of(List.of(), List.of(shown, tagged, hidden));
@@ -183,7 +183,7 @@ class ProjectModelBehaviourTest {
     /** A copy swaps one component and re-derives nothing — the record stays the file, not the editing of it. */
     @Test
     void aCopyChangesOneThingAndCarriesTheRest() {
-        VariableModel original = new VariableModel("Rest", ValueChoice.of(SdkValueTypes.WHOLE_NUMBER),
+        VariableModel original = new VariableModel("Rest", ValueChoice.of(BasicsValueTypes.WHOLE_NUMBER),
                 List.of("5"), "how long", "Mining", Visibility.PUBLIC, List.of(), new Range("0", "10"),
                 ParameterGroup.DEFAULT_ID);
 

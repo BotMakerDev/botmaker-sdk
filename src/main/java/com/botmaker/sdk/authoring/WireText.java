@@ -1,5 +1,6 @@
 package com.botmaker.sdk.authoring;
 
+import com.botmaker.plugin.basics.values.JdkText;
 import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -49,6 +50,19 @@ import java.util.Locale;
  *
  * <p>It is also why {@link #precision} clamps — {@link Precision}'s constructor rejects a negative tolerance,
  * and a hand-edited file must never be able to reach it.
+ *
+ * <h2>Nine of these readers are plugin #2's now (2026-09-09)</h2>
+ *
+ * <p>{@link #text}, {@link #flag}, {@link #whole}, {@link #decimal}, {@link #letter}, {@link #color},
+ * {@link #date}, {@link #time}, {@link #duration} and the two spellers beside them are
+ * {@link JdkText}'s, in {@code botmaker-plugin-basics}, and every one here <b>delegates</b>. Nothing about a
+ * whole number or a time of day is about automating a game: they were the SDK's only because the SDK was
+ * written first, which made a project having a duration variable plugin #1's privilege.
+ *
+ * <p><b>They are kept here rather than deleted</b>, and not merely out of politeness to callers.
+ * {@code api.config.Wire} — what a bot writes — calls straight through this class, and never-delete is
+ * unconditional in this module. What is gained is that there is still exactly one implementation of the
+ * grammar: two readers of one file is the standing risk, and a delegation cannot drift where a copy would.
  */
 public final class WireText {
 
@@ -60,53 +74,41 @@ public final class WireText {
      */
     public static final String IMAGE_PREFIX = "src/main/resources/images/";
 
-    private static final long SECOND = 1000L;
-    private static final long MINUTE = 60 * SECOND;
-    private static final long HOUR = 60 * MINUTE;
-
     private WireText() {}
 
     /** Text, exactly as stored — not trimmed, because a trailing space may be the point. */
     public static String text(String stored) {
-        return stored == null ? "" : stored;
+        return JdkText.text(stored);
     }
 
     /** A tick box. Anything that is not {@code "true"} is false. */
     public static boolean flag(String stored) {
-        return Boolean.parseBoolean(trim(stored));
+        return JdkText.flag(stored);
     }
 
     /** A whole number, rounded from what was stored so a hand-edited {@code "3.0"} still reads as 3. */
     public static int whole(String stored) {
-        return (int) Math.rint(number(stored, 0));
+        return JdkText.whole(stored);
     }
 
     /** A decimal number; 0.0 when unreadable. */
     public static double decimal(String stored) {
-        return number(stored, 0);
+        return JdkText.decimal(stored);
     }
 
     /** The first character, or {@code 'a'} when nothing was stored. */
     public static char letter(String stored) {
-        return stored == null || stored.isEmpty() ? 'a' : stored.charAt(0);
+        return JdkText.letter(stored);
     }
 
     /** An ISO date ({@code 2026-08-24}); 2000-01-01 when unreadable. */
     public static LocalDate date(String stored) {
-        try {
-            return LocalDate.parse(trim(stored));
-        } catch (RuntimeException e) {
-            return LocalDate.of(2000, 1, 1);
-        }
+        return JdkText.date(stored);
     }
 
     /** An ISO time of day ({@code 07:30}); midnight when unreadable. */
     public static LocalTime time(String stored) {
-        try {
-            return LocalTime.parse(trim(stored));
-        } catch (RuntimeException e) {
-            return LocalTime.MIDNIGHT;
-        }
+        return JdkText.time(stored);
     }
 
     /**
@@ -121,42 +123,7 @@ public final class WireText {
      * is stored as {@code "1m30s"} and a diff never churns on spacing.
      */
     public static Duration duration(String stored) {
-        String s = trim(stored).toLowerCase(Locale.ROOT).replace(" ", "");
-        long total = 0;
-        long digits = 0;
-        boolean sawDigit = false;
-        boolean sawAny = false;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (Character.isDigit(c)) {
-                digits = digits * 10 + (c - '0');
-                if (digits > Integer.MAX_VALUE) return Duration.ZERO;
-                sawDigit = true;
-                continue;
-            }
-            if (!sawDigit) return Duration.ZERO;
-            // "ms" is the only two-letter unit, and it must be checked before the bare "m" it starts with.
-            if (c == 'm' && i + 1 < s.length() && s.charAt(i + 1) == 's') {
-                total += digits;
-                i++;
-            } else if (c == 'h') {
-                total += digits * HOUR;
-            } else if (c == 'm') {
-                total += digits * MINUTE;
-            } else if (c == 's') {
-                total += digits * SECOND;
-            } else {
-                return Duration.ZERO;
-            }
-            digits = 0;
-            sawDigit = false;
-            sawAny = true;
-        }
-        if (sawDigit) {
-            total += digits;
-            sawAny = true;
-        }
-        return Duration.ofMillis(sawAny ? total : 0L);
+        return JdkText.duration(stored);
     }
 
     /**
@@ -172,20 +139,7 @@ public final class WireText {
      * {@code 90000} in a file says nothing, and whoever wrote it had "a minute and a half" in mind.
      */
     public static String spellDuration(long millis) {
-        if (millis <= 0) return "0s";
-        StringBuilder out = new StringBuilder();
-        long left = millis;
-        left = spellUnit(out, left, HOUR, "h");
-        left = spellUnit(out, left, MINUTE, "m");
-        left = spellUnit(out, left, SECOND, "s");
-        if (left > 0) out.append(left).append("ms");
-        return out.toString();
-    }
-
-    private static long spellUnit(StringBuilder out, long left, long unit, String suffix) {
-        long count = left / unit;
-        if (count > 0) out.append(count).append(suffix);
-        return left % unit;
+        return JdkText.spellDuration(millis);
     }
 
     /**
@@ -197,13 +151,7 @@ public final class WireText {
      * only have been meant one way.
      */
     public static Color color(String stored) {
-        String text = trim(stored);
-        if (text.matches("[0-9a-fA-F]{6}")) text = "#" + text;
-        try {
-            return Color.decode(text);
-        } catch (RuntimeException e) {
-            return Color.WHITE;
-        }
+        return JdkText.color(stored);
     }
 
     /** The image template of that name, from the project's own {@code images/} directory. */
@@ -272,7 +220,7 @@ public final class WireText {
 
     /** A colour as {@code #RRGGBB}, the spelling {@link #color} reads back. */
     public static String spellColor(Color value) {
-        return "#%02X%02X%02X".formatted(value.getRed(), value.getGreen(), value.getBlue());
+        return JdkText.spellColor(value);
     }
 
     /** A precision as {@code deltaE,minArea,minCount}. */

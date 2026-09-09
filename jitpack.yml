@@ -27,12 +27,17 @@ install:
   # IS an ordinary <dependencies> entry (optional, so it never reaches a bot), which means flatten bakes it
   # into the published pom — so it is required for the same reason SHARED_TAG is, and a stale one would be
   # published rather than merely used.
+  #
+  # PLUGIN_BASICS_TAG is plugin #2, which owns the nine JDK value types — com.botmaker.sdk.authoring.WireText
+  # delegates their parsing to it, so this is an ordinary <dependencies> entry at compile scope, transitive
+  # onto a bot's classpath, and baked into the published pom by flatten. Required for the same reason as the
+  # four above, and the reason its own release FORCES an SDK release.
   - . ./.deps.env
-  - '[ -n "${SHARED_TAG:-}" ] && [ -n "${SESSION_TAG:-}" ] && [ -n "${STUDIO_API_TAG:-}" ] && [ -n "${PLUGIN_TOOLKIT_TAG:-}" ] || { echo "ERROR: .deps.env must pin SHARED_TAG, SESSION_TAG, STUDIO_API_TAG and PLUGIN_TOOLKIT_TAG. Cut releases with the umbrella release.sh, which writes it into the release commit." >&2; exit 1; }'
+  - '[ -n "${SHARED_TAG:-}" ] && [ -n "${SESSION_TAG:-}" ] && [ -n "${STUDIO_API_TAG:-}" ] && [ -n "${PLUGIN_TOOLKIT_TAG:-}" ] && [ -n "${PLUGIN_BASICS_TAG:-}" ] || { echo "ERROR: .deps.env must pin SHARED_TAG, SESSION_TAG, STUDIO_API_TAG, PLUGIN_TOOLKIT_TAG and PLUGIN_BASICS_TAG. Cut releases with the umbrella release.sh, which writes it into the release commit." >&2; exit 1; }'
   #
   # -Dbotmaker.japicmp.skip=true deactivates the `api-gate` profile, so the japicmp plugin is not even
   # loaded. JitPack's builder runs a Maven older than the 3.6.3 that plugin declares as a prerequisite —
   # botmaker-studio-api v0.0.1 died on exactly that, publishing nothing — and a gate here could only ever
   # refuse a tag that is already pushed. The refusal that matters is `mvn verify` in CI, before the tag
   # exists. Same reasoning as the -DskipTests beside it.
-  - mvn install -DskipTests -Dmaven.javadoc.skip=true -Dbotmaker.japicmp.skip=true -B -Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG -Dbotmaker.studioapi.version=$STUDIO_API_TAG -Dbotmaker.plugintoolkit.version=$PLUGIN_TOOLKIT_TAG
+  - mvn install -DskipTests -Dmaven.javadoc.skip=true -Dbotmaker.japicmp.skip=true -B -Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG -Dbotmaker.studioapi.version=$STUDIO_API_TAG -Dbotmaker.plugintoolkit.version=$PLUGIN_TOOLKIT_TAG -Dbotmaker.pluginbasics.version=$PLUGIN_BASICS_TAG

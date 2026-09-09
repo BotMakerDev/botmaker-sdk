@@ -6,7 +6,7 @@ import com.botmaker.sdk.authoring.ProjectModel;
 import com.botmaker.sdk.authoring.VariableModel;
 import com.botmaker.sdk.authoring.Authoring;
 import com.botmaker.sdk.authoring.SdkVersion;
-import com.botmaker.sdk.internal.authoring.SdkValueTypes;
+import com.botmaker.plugin.basics.values.BasicsValueTypes;
 
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +39,7 @@ class ProjectDataTest {
                 List.of(ActivityModel.create("Mining", "dig").withOutcomes(List.of("BAG_FULL"))
                                 .withEnabled(true),
                         ActivityModel.create("Fishing", "").withEnabled(false)),
-                List.of(VariableModel.of("minHealth", ValueChoice.of(SdkValueTypes.WHOLE_NUMBER),
+                List.of(VariableModel.of("minHealth", ValueChoice.of(BasicsValueTypes.WHOLE_NUMBER),
                         List.of("20"))));
 
         ProjectData data = ProjectData.of(Authoring.modelJson(SdkVersion.latest(), model, 2));

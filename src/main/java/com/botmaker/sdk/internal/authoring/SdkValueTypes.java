@@ -13,15 +13,12 @@ import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.authoring.TemplateNames;
 import com.botmaker.sdk.authoring.WireText;
 
-import java.awt.Color;
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 
 /**
- * The seventeen types the SDK contributes to a project's vocabulary — registered through the same
+ * The eight types the SDK contributes to a project's vocabulary — registered through the same
  * {@link ValueCatalog} builder any other plugin uses, with no privilege a second plugin is denied.
  *
  * <h2>This was an enum, and the loss of it is the point</h2>
@@ -29,8 +26,22 @@ import java.util.function.Function;
  * <p>{@code ValueType} was seventeen constants in {@code api.authoring} and two exhaustive {@code switch}es
  * over them. That is exactly right for as long as there is one plugin and wrong the moment there are two: a
  * Discord plugin wanting a {@code Channel} variable would have needed a constant granted to it in the SDK's
- * enum. The seventeen are still declared in one place, and that place is still the SDK — but as
- * registrations, which anyone can make.
+ * enum.
+ *
+ * <h2>Nine of the seventeen left on 2026-09-09, and the eight that stayed are the test</h2>
+ *
+ * <p>{@code TEXT}, {@code YES_NO}, {@code WHOLE_NUMBER}, {@code DECIMAL_NUMBER}, {@code CHARACTER},
+ * {@code COLOR}, {@code DATE}, {@code TIME_OF_DAY} and {@code DURATION} are
+ * {@code com.botmaker.plugin.basics.values.BasicsValueTypes}' now — plugin #2's, with the same ids, so no
+ * stored project changed meaning. Nothing about a whole number is about automating a game; they were here
+ * only because the SDK was written first, which made having a duration variable plugin #1's privilege.
+ * What is left is what a bot's own API actually names: a picture, how exactly to match it, three geometry
+ * shapes and three enums.
+ *
+ * <p><b>A host merges the two.</b> {@code SdkPlugin.valueTypes()} answers this catalog and nothing else, as
+ * every plugin does; the editor's vocabulary is {@link ValueCatalog#merge} over every loaded plugin's. Where
+ * the SDK itself has to read a whole project file — {@code Authoring}'s Jackson mapper — it merges the two
+ * itself, because it resolves plugin-basics as an ordinary dependency and can.
  *
  * <p>What is absent is absent for one reason: it has no value anyone writes down. {@code void}; a group of
  * templates (a {@code List of Image template} says it better); and the vision <em>results</em> — a match is
@@ -45,11 +56,11 @@ import java.util.function.Function;
  *
  * <h2>Qualified or imported</h2>
  *
- * <p>The {@code java.time} and {@code java.awt} types are written <b>fully qualified</b>, for the reason that
- * has not changed: a generated file carries a fixed import block, and a type that needs no import cannot be
- * left out of one. The SDK's own types are written by simple name and declare an
+ * <p>Every type here is the SDK's own, so every one is written by simple name and declares an
  * {@link ValueType.Builder#importing import}, named by a real {@link Class} literal so a rename in
- * {@code api.*} breaks this file rather than a bot's build.
+ * {@code api.*} breaks this file rather than a bot's build. (The fully-qualified spellings the JDK types
+ * used went with them to plugin-basics, where the rule is unchanged: a type that needs no import cannot be
+ * left out of a generated file's fixed import block.)
  *
  * <h2>What each codec's {@code T} is</h2>
  *
@@ -69,44 +80,11 @@ public final class SdkValueTypes {
     /**
      * The headings a picker files these under. Free strings by contract — a second plugin groups its own
      * types without a constant being granted to it — so they are named once here rather than spelled at
-     * seventeen call sites, where a typo would silently split a group in two.
+     * eight call sites, where a typo would silently split a group in two.
      */
-    private static final String BASICS = "Basics";
-    private static final String WHEN = "Date & time";
     private static final String VISION = "Vision";
     private static final String GEOMETRY = "Geometry";
     private static final String INPUT = "Input";
-
-    public static final ValueType TEXT = ValueType.of(ValueCatalog.TEXT_ID)
-            .label("Text").group(BASICS).source("String").build();
-
-    public static final ValueType YES_NO = ValueType.of("YES_NO")
-            .label("Yes / no").group(BASICS)
-            .source("boolean").boxed("Boolean").primitive().closedSet().build();
-
-    public static final ValueType WHOLE_NUMBER = ValueType.of("WHOLE_NUMBER")
-            .label("Whole number").group(BASICS)
-            .source("int").boxed("Integer").primitive().bounded().build();
-
-    public static final ValueType DECIMAL_NUMBER = ValueType.of("DECIMAL_NUMBER")
-            .label("Decimal number").group(BASICS)
-            .source("double").boxed("Double").primitive().bounded().build();
-
-    public static final ValueType CHARACTER = ValueType.of("CHARACTER")
-            .label("Character").group(BASICS)
-            .source("char").boxed("Character").primitive().build();
-
-    public static final ValueType COLOR = ValueType.of("COLOR")
-            .label("Colour").group(BASICS).source("java.awt.Color").build();
-
-    public static final ValueType DATE = ValueType.of("DATE")
-            .label("Date").group(WHEN).source("java.time.LocalDate").build();
-
-    public static final ValueType TIME_OF_DAY = ValueType.of("TIME_OF_DAY")
-            .label("Time of day").group(WHEN).source("java.time.LocalTime").build();
-
-    public static final ValueType DURATION = ValueType.of("DURATION")
-            .label("Duration").group(WHEN).source("java.time.Duration").build();
 
     public static final ValueType IMAGE_TEMPLATE = sdk("IMAGE_TEMPLATE", "Image template", VISION,
             com.botmaker.sdk.api.vision.ImageTemplate.class, false);
@@ -123,21 +101,11 @@ public final class SdkValueTypes {
             MouseButton.class, true);
 
     /**
-     * The SDK's vocabulary, in the order a menu should offer it: the literals a bot mostly counts, flags and
-     * labels with, then the time types, then the vision and geometry ones, then the two input enums.
+     * The SDK's vocabulary, in the order a menu should offer it: the vision types, then the geometry ones,
+     * then the two input enums. A host offers plugin-basics' nine before them, which is what puts the
+     * literals a bot mostly counts and labels with at the top of the list, exactly as before the split.
      */
     public static final ValueCatalog CATALOG = ValueCatalog.builder()
-            .add(TEXT, codec(WireText::text, s -> s, LiteralWriter::quote))
-            .add(YES_NO, codec(WireText::flag, b -> Boolean.toString(b), b -> Boolean.toString(b)))
-            .add(WHOLE_NUMBER, codec(WireText::whole, i -> Integer.toString(i), i -> Integer.toString(i)))
-            .add(DECIMAL_NUMBER, codec(WireText::decimal, d -> Double.toString(d), d -> Double.toString(d)))
-            .add(CHARACTER, codec(WireText::letter, String::valueOf, LiteralWriter::quoteChar))
-            .add(COLOR, codec(WireText::color, WireText::spellColor, SdkValueTypes::colorLiteral))
-            .add(DATE, codec(WireText::date, LocalDate::toString, SdkValueTypes::dateLiteral))
-            .add(TIME_OF_DAY, codec(WireText::time, LocalTime::toString, SdkValueTypes::timeLiteral))
-            .add(DURATION, codec(WireText::duration,
-                    d -> WireText.spellDuration(d.toMillis()),
-                    d -> "java.time.Duration.ofMillis(" + d.toMillis() + "L)"))
             // The one codec whose default is a choice rather than a fallback: a fresh image variable points
             // at the placeholder every project ships, for the same reason a fresh `new ImageTemplate(...)`
             // block does — an empty chip is a value the bot cannot run on.
@@ -162,21 +130,6 @@ public final class SdkValueTypes {
     // than `Color.decode("#FF0000")`, `LocalDate.of(2026, 8, 26)` rather than `LocalDate.parse(…)`. A
     // generated file therefore holds no expression that can throw at class initialisation, which is what it
     // means for a bot never to fail to start because of its own configuration file.
-
-    /** The components, not {@code Color.decode(…)}: {@code decode} parses at class-init and can throw. */
-    private static String colorLiteral(Color c) {
-        return "new java.awt.Color(%d, %d, %d)".formatted(c.getRed(), c.getGreen(), c.getBlue());
-    }
-
-    private static String dateLiteral(LocalDate d) {
-        return "java.time.LocalDate.of(%d, %d, %d)".formatted(d.getYear(), d.getMonthValue(),
-                d.getDayOfMonth());
-    }
-
-    /** Seconds included always, so a stored {@code 07:30:15} is not silently truncated to the minute. */
-    private static String timeLiteral(LocalTime t) {
-        return "java.time.LocalTime.of(%d, %d, %d)".formatted(t.getHour(), t.getMinute(), t.getSecond());
-    }
 
     private static String templateLiteral(String name) {
         return "new ImageTemplate(" + LiteralWriter.quote(WireText.IMAGE_PREFIX + name + ".png") + ")";

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.authoring;
 
 import com.botmaker.plugin.api.value.ValueCatalog;
+import com.botmaker.plugin.basics.values.BasicsValueTypes;
 import com.botmaker.sdk.internal.authoring.AuthoringMixins;
 import com.botmaker.shared.config.ProjectFile;
 import com.botmaker.shared.config.ProjectProperties;
@@ -68,7 +69,15 @@ public final class Authoring {
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .registerModule(ValueJson.module(SdkValueTypes.CATALOG))
+            // BOTH plugins' registrations, and it has to be both: this mapper reads a whole project file,
+            // where a variable typed DURATION is ordinary, and plugin-basics owns the nine JDK types since
+            // 2026-09-09. An id nothing here registers is still not an error — it comes back as an unknown
+            // type, keeps its text and declines to emit — but reading every project's commonest types as
+            // unknown would make that state the rule rather than the exception.
+            //
+            // plugin-basics first, so its types lead the order a menu offers, which is where they were
+            // before the split. There is no id clash to mediate: the SDK kept the eight that are its own.
+            .registerModule(ValueJson.module(BasicsValueTypes.CATALOG.merge(SdkValueTypes.CATALOG)))
             // How the model records bind, kept out of the records: they live in the plugin contract, whose
             // one dependency is javafx-controls at provided, so a Jackson annotation on one of them would
             // impose Jackson on every plugin that ever compiles against the contract.

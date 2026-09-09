@@ -328,6 +328,16 @@ the running bot cannot disagree about what `"1m30s"` means. Two readers of one f
 `ProjectDataTest.readsBackWhatTheEditorWrites` writes with `Authoring.modelJson` and reads with `ProjectData`,
 which is the only honest mitigation. **Add a value type to `SdkValueTypes` and add its reader here.**
 
+**Nine of those codecs left on 2026-09-09 and the delegation is what kept the sentence true.** `TEXT`,
+`YES_NO`, `WHOLE_NUMBER`, `DECIMAL_NUMBER`, `CHARACTER`, `COLOR`, `DATE`, `TIME_OF_DAY` and `DURATION` are
+`botmaker-plugin-basics`' registrations now — they are nobody's vocabulary in particular and were this
+module's only because it was written first. `WireText`'s nine readers and its two spellers stay, public and
+unchanged in behaviour, and **delegate** to `com.botmaker.plugin.basics.values.JdkText`: one grammar, so the
+editor and the running bot still cannot disagree about `"1m30s"`. That module is a `compile`-scope
+dependency here — one plugin depending on another, which `PluginLoader`'s single `URLClassLoader` makes
+resolvable — and only its bot-safe half (`JdkText`, JDK imports only) may be named from this module's
+library half.
+
 **Nothing throws, and that is load-bearing rather than polite.** The old generated class wrote *parsed
 literals* (`new java.awt.Color(255, 0, 0)`, never `Color.decode(…)`) precisely so a bot could not fail at
 class initialisation over its own configuration. Moving to a runtime read is only safe because `WireText` is

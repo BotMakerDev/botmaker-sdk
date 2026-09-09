@@ -58,14 +58,16 @@ import static org.junit.jupiter.api.Assertions.fail;
 class SdkPluginSurfaceTest {
 
     /**
-     * The seventeen ids, <b>in registration order</b>, which is the order a "what type is this variable"
-     * dropdown offers them in. Written out rather than derived from the catalog, because a test that reads
-     * its expectation from its subject asserts nothing.
+     * The eight ids <b>this plugin</b> registers, in registration order, which is the order a "what type is
+     * this variable" dropdown offers them in after plugin-basics' nine. Written out rather than derived from
+     * the catalog, because a test that reads its expectation from its subject asserts nothing.
+     *
+     * <p>It was seventeen until 2026-09-09: {@code TEXT} … {@code DURATION} are
+     * {@code botmaker-plugin-basics}' now, with the same ids, and a host sees all seventeen by merging the
+     * two catalogs. {@code ValueVocabularyTest} is where that merge is asserted.
      */
     private static final List<String> VALUE_TYPE_IDS = List.of(
-            "TEXT", "YES_NO", "WHOLE_NUMBER", "DECIMAL_NUMBER", "CHARACTER", "COLOR", "DATE", "TIME_OF_DAY",
-            "DURATION", "IMAGE_TEMPLATE", "PRECISION", "POINT", "RECT", "SIZE", "DIRECTION", "KEY",
-            "MOUSE_BUTTON");
+            "IMAGE_TEMPLATE", "PRECISION", "POINT", "RECT", "SIZE", "DIRECTION", "KEY", "MOUSE_BUTTON");
 
     private final SdkPlugin plugin = new SdkPlugin();
 
