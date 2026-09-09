@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.value.ValueChoice;
 import com.botmaker.plugin.api.value.ValueShape;
 import com.botmaker.plugin.api.value.ValueType;
 import com.botmaker.plugin.api.value.Visibility;
+import com.botmaker.plugin.basics.values.BasicsValueTypes;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -32,7 +33,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AuthoringModelTest {
 
     private static final SdkVersion V = SdkVersion.latest();
-    private static final ValueCatalog CATALOG = Authoring.valueTypes(V);
+    /**
+     * A <em>host's</em> vocabulary, which is what these rules are about: plugin-basics' nine merged with the
+     * SDK's eight. {@code Authoring.valueTypes} answers the SDK's own registrations and nothing else, as
+     * every plugin's does, so a catalog built from it alone would not know {@code TEXT}.
+     */
+    private static final ValueCatalog CATALOG = BasicsValueTypes.CATALOG.merge(Authoring.valueTypes(V));
 
     @Test
     void anAbsentFileIsAnEmptyModelRatherThanAnError(@TempDir Path dir) throws IOException {
@@ -50,7 +56,7 @@ class AuthoringModelTest {
     void aModelRoundTripsWithItsStamp(@TempDir Path dir) throws IOException {
         ProjectModel written = new ProjectModel(
                 List.of(new ActivityModel("Mining", true, "dig", List.of("FULL"), null, Boolean.FALSE)),
-                List.of(new VariableModel("REST", ValueChoice.of(SdkValueTypes.DURATION), List.of("90s"),
+                List.of(new VariableModel("REST", ValueChoice.of(BasicsValueTypes.DURATION), List.of("90s"),
                                 "How long to rest", "Mining", Visibility.PUBLIC, List.of(),
                                 new Range("30s", null), ParameterGroup.DEFAULT_ID),
                         new VariableModel("HOTKEYS", ValueChoice.listOf(SdkValueTypes.KEY),
@@ -96,7 +102,7 @@ class AuthoringModelTest {
     @Test
     void theLegacyChoicePseudoTypeLoadsAsTextOutOfASet() {
         ValueChoice c = ValueChoice.fromWire(CATALOG, "CHOICE", null, Boolean.FALSE);
-        assertEquals(SdkValueTypes.TEXT, c.type());
+        assertEquals(BasicsValueTypes.TEXT, c.type());
         assertEquals(ValueShape.ONE_OF, c.shape());
     }
 
@@ -119,7 +125,7 @@ class AuthoringModelTest {
      */
     @Test
     void aStoredAnyOfWithNoSetBehindItReadsAsAnOpenList() {
-        ValueChoice anyOfText = new ValueChoice(SdkValueTypes.TEXT, ValueShape.ANY_OF);
+        ValueChoice anyOfText = new ValueChoice(BasicsValueTypes.TEXT, ValueShape.ANY_OF);
         assertEquals(ValueShape.OPEN_LIST, VariableModel.listShapeOf(anyOfText, List.of()).shape());
         assertEquals(ValueShape.ANY_OF, VariableModel.listShapeOf(anyOfText, List.of("a")).shape());
     }
@@ -147,7 +153,7 @@ class AuthoringModelTest {
                 "an unknown type declines to emit rather than guessing a literal");
 
         // Null is the one case that is still text: it is an absent field, not a name nobody claimed.
-        assertEquals(SdkValueTypes.TEXT, CATALOG.type(null));
+        assertEquals(BasicsValueTypes.TEXT, CATALOG.type(null));
     }
 
     /** The unknown value survives the round trip, which is the whole of the guarantee. */
@@ -171,8 +177,8 @@ class AuthoringModelTest {
     /** "One of yes and no" is a boolean, said twice and worse — the shape is corrected, not stored. */
     @Test
     void aClosedSetCannotCarryAnAuthorWrittenSubset() {
-        assertEquals(ValueShape.ONE, new ValueChoice(SdkValueTypes.YES_NO, ValueShape.ONE_OF).shape());
-        assertEquals(ValueShape.ONE_OF, new ValueChoice(SdkValueTypes.TEXT, ValueShape.ONE_OF).shape());
+        assertEquals(ValueShape.ONE, new ValueChoice(BasicsValueTypes.YES_NO, ValueShape.ONE_OF).shape());
+        assertEquals(ValueShape.ONE_OF, new ValueChoice(BasicsValueTypes.TEXT, ValueShape.ONE_OF).shape());
     }
 
     @Test
@@ -206,10 +212,10 @@ class AuthoringModelTest {
     /** The emitter's spellings — qualified where a fixed import block could otherwise forget them. */
     @Test
     void theSourceSpellingsAreTheOnesTheGeneratorWrites() {
-        assertEquals("java.time.Duration", ValueChoice.of(SdkValueTypes.DURATION).sourceName());
+        assertEquals("java.time.Duration", ValueChoice.of(BasicsValueTypes.DURATION).sourceName());
         assertEquals("java.util.List<Key>", ValueChoice.listOf(SdkValueTypes.KEY).sourceName());
-        assertEquals("int", ValueChoice.of(SdkValueTypes.WHOLE_NUMBER).sourceName());
+        assertEquals("int", ValueChoice.of(BasicsValueTypes.WHOLE_NUMBER).sourceName());
         assertEquals("java.util.List<Integer>",
-                ValueChoice.listOf(SdkValueTypes.WHOLE_NUMBER).sourceName());
+                ValueChoice.listOf(BasicsValueTypes.WHOLE_NUMBER).sourceName());
     }
 }

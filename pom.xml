@@ -41,6 +41,11 @@
              below stopped being: `optional` means not transitive, so a host resolving botmaker-sdk got a
              jar whose SdkPlugin could not resolve its own superclass. See the dependency's own comment. -->
         <botmaker.plugintoolkit.version>0.0.0-SNAPSHOT</botmaker.plugintoolkit.version>
+        <!-- botmaker-plugin-basics version: PLUGIN #2, which owns the nine JDK value types this module's
+             WireText delegates the parsing of. Same 0.0.0-SNAPSHOT contract as the four above and the same
+             flatten reason — it is an ordinary <dependencies> entry, so the published pom must carry a
+             resolvable version, and cutting plugin-basics therefore forces an SDK release. -->
+        <botmaker.pluginbasics.version>0.0.0-SNAPSHOT</botmaker.pluginbasics.version>
         <!-- The published tag japicmp compares this build against. Bump it in the release commit, beside the
              CHANGELOG section, so it is always the LAST release — the gate then asks "did this build remove
              anything the previous one offered?", which is the whole of the never-delete rule.
@@ -180,6 +185,30 @@
             <artifactId>botmaker-plugin-toolkit</artifactId>
             <version>${botmaker.plugintoolkit.version}</version>
         </dependency>
+
+        <!-- PLUGIN #2, and the first time this project has one plugin depending on another (2026-09-09).
+             It owns the nine JDK value types — TEXT, YES_NO, WHOLE_NUMBER, DECIMAL_NUMBER, CHARACTER,
+             COLOR, DATE, TIME_OF_DAY, DURATION — and this module's WireText delegates their parsing to it,
+             so there is one grammar rather than two.
+
+             `compile`, and never `optional`: com.botmaker.sdk.authoring.WireText is the SDK's LIBRARY half,
+             reached by a running bot, so plugin-basics travels onto a bot's classpath exactly as the
+             toolkit does. Only its bot-safe half is named from here — JdkText, which imports nothing but
+             the JDK. BasicsValueTypes names the contract and is reached only by an editor.
+
+             What makes this resolvable at all is PluginLoader: one URLClassLoader over the whole resolved
+             project classpath, so plugin A sees plugin B's classes and Maven has already mediated B to one
+             version. The price is that plugin-basics stops being freely breakable — it owes never-delete
+             the way com.botmaker.sdk.api does — and the trap is Maven's NEAREST-WINS mediation: nothing may
+             declare botmaker-plugin-basics directly in a bot's pom beside this SDK, or the direct entry
+             wins and the bot runs a version this jar was never built against. That is the landmine
+             MavenService.TOOLKIT_FALLBACK_VERSION was. -->
+        <dependency>
+            <groupId>com.github.LiQiyeDev</groupId>
+            <artifactId>botmaker-plugin-basics</artifactId>
+            <version>${botmaker.pluginbasics.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>

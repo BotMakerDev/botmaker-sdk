@@ -8,6 +8,37 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-09 — the nine JDK value types leave, and this plugin depends on another plugin
+
+**Done**
+
+- **`TEXT`, `YES_NO`, `WHOLE_NUMBER`, `DECIMAL_NUMBER`, `CHARACTER`, `COLOR`, `DATE`, `TIME_OF_DAY` and
+  `DURATION` are `botmaker-plugin-basics`' registrations** (`BasicsValueTypes`). `SdkValueTypes` keeps the
+  eight that are genuinely this API's vocabulary — `IMAGE_TEMPLATE`, `PRECISION`, `POINT`, `RECT`, `SIZE`,
+  `DIRECTION`, `KEY`, `MOUSE_BUTTON`. Nothing about a whole number is about automating a game; registering
+  them here made *having a duration variable* plugin #1's privilege, which is the back door the plugin
+  platform exists to close. Phase 2 of `~/.claude/plans/settings-becomes-a-plugin.md`.
+- **The ids did not change**, so no stored project changed meaning. `ValueVocabularyTest` merges the two
+  catalogs and asserts seventeen types, no id clash, no Java-type clash, that every id a project may already
+  hold still resolves, and that `forJava(Duration.class)` answers plugin-basics' registration.
+- **`WireText` delegates rather than duplicating.** Its nine readers and its two spellers are unchanged in
+  signature and in behaviour and now call `com.botmaker.plugin.basics.values.JdkText`. Kept rather than
+  deleted for two reasons: never-delete is unconditional here, and `api.config.Wire` — what a bot writes —
+  calls straight through this class. One grammar means the editor and the running bot cannot drift.
+- **`botmaker-plugin-basics` is a `compile`-scope dependency of this module**, the first plugin-to-plugin
+  Maven dependency in the project. It is not `optional`: `WireText` is the library half, so the jar travels
+  onto a bot's classpath, and only plugin-basics' bot-safe half (`JdkText`, JDK imports only) is named from
+  here. The trap that comes with it is Maven's nearest-wins mediation — a bot's pom must never declare
+  `botmaker-plugin-basics` directly, or it outranks the copy this jar brings.
+- **`Authoring`'s Jackson mapper merges both catalogs**, because it reads a whole project file and a
+  `DURATION` variable is ordinary. `Authoring.valueTypes(version)` still answers this plugin's own eight and
+  nothing else, exactly as every plugin's does.
+- Release plumbing: `botmaker.pluginbasics.version` in the pom, `PLUGIN_BASICS_TAG` in `.deps.env` (blank
+  until the first plugin-basics release, which the forcing edge already requires), required and injected by
+  `jitpack.yml`, and a fifth upstream checked out and installed from source by `ci.yml`.
+
+---
+
 ## 2026-09-04 — the plugin surface is asserted, not assumed
 
 **Done**

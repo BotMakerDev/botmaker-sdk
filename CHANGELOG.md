@@ -57,6 +57,19 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The nine JDK value types are `botmaker-plugin-basics`' now** — `TEXT`, `YES_NO`, `WHOLE_NUMBER`,
+  `DECIMAL_NUMBER`, `CHARACTER`, `COLOR`, `DATE`, `TIME_OF_DAY`, `DURATION`. Nothing about a whole number or
+  a time of day is about automating a game; they were registered here only because this SDK was written
+  first, which made having a duration variable plugin #1's privilege. **Nothing changes for a bot or for a
+  stored project**: the ids are the same, `WireText`'s nine readers and their two spellers are still here and
+  still public — they delegate to `com.botmaker.plugin.basics.values.JdkText`, so there is one grammar rather
+  than two — and `Settings.load("rest", Duration.class)` reads exactly what it read before. What changes is
+  who registers them: this SDK now declares `botmaker-plugin-basics` as an ordinary `compile`-scope
+  dependency, one plugin depending on another, and contributes the eight types that really are its own
+  (`ImageTemplate`, `Precision`, `Point`, `Rect`, `Size`, `Direction`, `Key`, `MouseButton`). A bot's pom
+  must **not** declare `botmaker-plugin-basics` itself: Maven's nearest-wins mediation would make that entry
+  outrank the one this jar brings, and the bot would run a version this SDK was never built against.
+
 - **`ProjectData` keeps the flow and delegates the rest.** The untyped store — a variable's stored text, an
   activity's flags — is `com.botmaker.plugin.toolkit.config.ProjectValues` now, so every plugin can read a bot's
   parameters and not only this one. Nothing a bot writes changes and no method was removed: `value`,

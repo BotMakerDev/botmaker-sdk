@@ -2,15 +2,17 @@ package com.botmaker.sdk.internal.authoring;
 
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.api.value.ValueType;
-import com.botmaker.plugin.toolkit.config.ValueGrammar;
-import com.botmaker.sdk.internal.config.SdkGrammar;
+import com.botmaker.sdk.api.geometry.Direction;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.interaction.MouseButton;
+import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.Precision;
 import org.junit.jupiter.api.Test;
 
-import java.awt.Color;
 import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,17 +21,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The SDK's vocabulary, asked for by Java class rather than by id.
+ * The SDK's own eight, asked for by Java class rather than by id.
  *
  * <p>This is the consumer half of {@code ValueCatalog.forJava}: a bot author writes
- * {@code Settings.load("wait", Duration.class)} and an editor author writes {@code Duration.class} too, and
- * neither of them ever spells {@code DURATION}. The id stays what the project file holds and stops being
+ * {@code Settings.load("target", Rect.class)} and an editor author writes {@code Rect.class} too, and
+ * neither of them ever spells {@code RECT}. The id stays what the project file holds and stops being
  * something anybody outside this class has to know.
  *
- * <p>The last test is the one worth having. The catalog is what the <b>editor</b> knows about a type and the
- * grammar is what a <b>running bot</b> knows about it, and they are written in two modules that cannot see
- * each other — so nothing but a test can say that a type the editor lets you declare is a type the bot can
- * actually read back.
+ * <p><b>The nine JDK types are plugin-basics' since 2026-09-09</b>, and what a host actually holds is the
+ * merge of the two catalogs — that is {@link ValueVocabularyTest}'s subject, together with the bot-side
+ * grammar, which reads types from both halves and so cannot be checked against this catalog alone.
  */
 class SdkValueTypesJavaIndexTest {
 
@@ -37,45 +38,33 @@ class SdkValueTypesJavaIndexTest {
 
     @Test
     void everySdkTypeIsFoundByItsJavaClass() {
-        assertEquals(SdkValueTypes.TEXT, CATALOG.forJava(String.class).orElseThrow());
-        assertEquals(SdkValueTypes.YES_NO, CATALOG.forJava(boolean.class).orElseThrow());
-        assertEquals(SdkValueTypes.WHOLE_NUMBER, CATALOG.forJava(int.class).orElseThrow());
-        assertEquals(SdkValueTypes.DECIMAL_NUMBER, CATALOG.forJava(double.class).orElseThrow());
-        assertEquals(SdkValueTypes.CHARACTER, CATALOG.forJava(char.class).orElseThrow());
-        assertEquals(SdkValueTypes.COLOR, CATALOG.forJava(Color.class).orElseThrow());
-        assertEquals(SdkValueTypes.DATE, CATALOG.forJava(LocalDate.class).orElseThrow());
-        assertEquals(SdkValueTypes.TIME_OF_DAY, CATALOG.forJava(LocalTime.class).orElseThrow());
-        assertEquals(SdkValueTypes.DURATION, CATALOG.forJava(Duration.class).orElseThrow());
+        assertEquals(SdkValueTypes.IMAGE_TEMPLATE, CATALOG.forJava(ImageTemplate.class).orElseThrow());
+        assertEquals(SdkValueTypes.PRECISION, CATALOG.forJava(Precision.class).orElseThrow());
+        assertEquals(SdkValueTypes.POINT, CATALOG.forJava(Point.class).orElseThrow());
+        assertEquals(SdkValueTypes.RECT, CATALOG.forJava(Rect.class).orElseThrow());
+        assertEquals(SdkValueTypes.SIZE, CATALOG.forJava(Size.class).orElseThrow());
+        assertEquals(SdkValueTypes.DIRECTION, CATALOG.forJava(Direction.class).orElseThrow());
+        assertEquals(SdkValueTypes.KEY, CATALOG.forJava(Key.class).orElseThrow());
+        assertEquals(SdkValueTypes.MOUSE_BUTTON, CATALOG.forJava(MouseButton.class).orElseThrow());
     }
 
-    /** A boxed ask is the same type: it is how a list of them is written. */
+    /** The nine went, ids and Java types together — asking here for one is now an ordinary empty answer. */
     @Test
-    void aWrapperFindsThePrimitiveType() {
-        assertEquals(SdkValueTypes.YES_NO, CATALOG.forJava(Boolean.class).orElseThrow());
-        assertEquals(SdkValueTypes.WHOLE_NUMBER, CATALOG.forJava(Integer.class).orElseThrow());
-        assertEquals(SdkValueTypes.DECIMAL_NUMBER, CATALOG.forJava(Double.class).orElseThrow());
-        assertEquals(SdkValueTypes.CHARACTER, CATALOG.forJava(Character.class).orElseThrow());
+    void theJdkTypesAreNotTheSdksAnyMore() {
+        assertTrue(CATALOG.forJava(Duration.class).isEmpty());
+        assertTrue(CATALOG.forJava(String.class).isEmpty());
+        assertTrue(CATALOG.forJava(int.class).isEmpty());
+        assertEquals(8, CATALOG.types().size(), CATALOG.types().toString());
     }
 
     /**
-     * Seventeen types, seventeen Java types. It was already true and nothing made it true; the builder
-     * refuses a second claimant now, so this test is what says the SDK never asks it to.
+     * Eight types, eight Java types. It was already true and nothing made it true; the builder refuses a
+     * second claimant now, so this test is what says the SDK never asks it to.
      */
     @Test
     void noTwoSdkTypesClaimOneJavaType() {
         List<String> names = CATALOG.types().stream().map(ValueType::javaName).toList();
         Set<String> distinct = new LinkedHashSet<>(names);
         assertEquals(names.size(), distinct.size(), names.toString());
-    }
-
-    /** A type the editor offers is a type the bot can read: the two halves are written in two modules. */
-    @Test
-    void theBotsGrammarAndTheEditorsCatalogDescribeTheSameTypes() {
-        List<String> unreadable = new ArrayList<>();
-        for (ValueGrammar.Reader<?> reader : new SdkGrammar().readers()) {
-            if (CATALOG.forJava(reader.type()).isEmpty()) unreadable.add(reader.type().getName());
-        }
-        assertEquals(List.of(), unreadable, "the grammar reads a type the catalog cannot declare");
-        assertTrue(CATALOG.types().size() >= new SdkGrammar().readers().size());
     }
 }
