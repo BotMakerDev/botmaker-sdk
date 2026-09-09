@@ -2,7 +2,7 @@ package com.botmaker.sdk.internal.config;
 
 import com.botmaker.sdk.authoring.FlowEdgeModel;
 import com.botmaker.sdk.authoring.FlowModel;
-import com.botmaker.plugin.toolkit.config.ProjectValues;
+import com.botmaker.plugin.basics.store.ProjectValues;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.LinkedHashMap;

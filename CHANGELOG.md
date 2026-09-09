@@ -33,7 +33,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Wire.whole`, `Wire.duration`, `Wire.area` and the fifteen others could only ever read *this* plugin's
   value types — `Wire.one(String)`'s own javadoc called itself "the escape hatch for a type this class has no
   reader for". Passing the type in makes the set open: whichever plugin introduced a type ships a
-  `com.botmaker.plugin.toolkit.config.ValueGrammar` that reads it, and every call site is the same shape. Both
+  `com.botmaker.plugin.basics.store.ValueGrammar` that reads it, and every call site is the same shape. Both
   `int.class` and `Integer.class` resolve, so you write whichever your field is.
 
   Everything else is unchanged. A missing file, a missing name, a name declared as another type and text that
@@ -57,6 +57,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A bot reads its parameters through `botmaker-plugin-basics`**, and that is the package to import if you
+  call `Settings` directly rather than through `com.botmaker.sdk.api.config.Settings`:
+  `com.botmaker.plugin.basics.store.Settings`. It was `com.botmaker.plugin.toolkit.config.Settings` for part
+  of one day and never shipped under that name. `SdkGrammar` now reads the SDK's own eight types and
+  plugin-basics' `BasicsGrammar` reads the nine JDK ones — two grammars, indexed together off the classpath,
+  which is what the mechanism was built for and had never been exercised while there was one plugin.
+
 - **The nine JDK value types are `botmaker-plugin-basics`' now** — `TEXT`, `YES_NO`, `WHOLE_NUMBER`,
   `DECIMAL_NUMBER`, `CHARACTER`, `COLOR`, `DATE`, `TIME_OF_DAY`, `DURATION`. Nothing about a whole number or
   a time of day is about automating a game; they were registered here only because this SDK was written
@@ -71,7 +78,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   outrank the one this jar brings, and the bot would run a version this SDK was never built against.
 
 - **`ProjectData` keeps the flow and delegates the rest.** The untyped store — a variable's stored text, an
-  activity's flags — is `com.botmaker.plugin.toolkit.config.ProjectValues` now, so every plugin can read a bot's
+  activity's flags — is `com.botmaker.plugin.basics.store.ProjectValues` now, so every plugin can read a bot's
   parameters and not only this one. Nothing a bot writes changes and no method was removed: `value`,
   `values`, `declares`, `variables`, `enabled`, `outcomes`, `activities`, `goHome`, `popupCheck` and
   `isEmpty` all still answer here, through the store. `ProjectData.use(…)` sets the shared seam, so a test

@@ -1,2 +1,0 @@
-# How a running bot reads the SDK's own value types. Found by com.botmaker.plugin.toolkit.config.Settings.
-com.botmaker.sdk.internal.config.SdkGrammar

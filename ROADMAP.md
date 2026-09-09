@@ -36,6 +36,13 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 - Release plumbing: `botmaker.pluginbasics.version` in the pom, `PLUGIN_BASICS_TAG` in `.deps.env` (blank
   until the first plugin-basics release, which the forcing edge already requires), required and injected by
   `jitpack.yml`, and a fifth upstream checked out and installed from source by `ci.yml`.
+- **The same evening: `Settings`, `ProjectValues` and `ValueGrammar` moved again**, from
+  `com.botmaker.plugin.toolkit.config` to `com.botmaker.plugin.basics.store`, and `SdkGrammar` split with
+  them — it reads the SDK's own eight types and plugin-basics' `BasicsGrammar` reads the nine JDK ones.
+  `api/config/Settings` and `internal/config/ProjectData` import the new package; the services file is
+  `META-INF/services/com.botmaker.plugin.basics.store.ValueGrammar`. Nothing a bot writes changed. This is
+  the first time the *two grammars* the mechanism was designed for actually exist, and `Settings` refuses
+  two claiming one type, so `ValueVocabularyTest` asserts the split is disjoint.
 
 ---
 

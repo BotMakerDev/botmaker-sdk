@@ -9,21 +9,24 @@ import com.botmaker.sdk.api.interaction.MouseButton;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.authoring.WireText;
-import com.botmaker.plugin.toolkit.config.ValueGrammar;
+import com.botmaker.plugin.basics.store.ValueGrammar;
 
-import java.awt.Color;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
 /**
- * The SDK's seventeen value types, spelled for a running bot.
+ * The SDK's eight value types, spelled for a running bot.
  *
- * <p>Declared in {@code META-INF/services/com.botmaker.plugin.toolkit.config.ValueGrammar}, so a bot with the SDK
- * on its classpath can write {@code Settings.load("wait", Duration.class)} and nothing else has to be
+ * <p>Declared in {@code META-INF/services/com.botmaker.plugin.basics.store.ValueGrammar}, so a bot with the
+ * SDK on its classpath can write {@code Settings.load("target", Rect.class)} and nothing else has to be
  * arranged. A plugin that introduces a value type ships one of these beside it; this class is the worked
  * example the mechanism was designed against.
+ *
+ * <p><b>The nine JDK types are not here since 2026-09-09</b> — {@code String}, {@code Boolean},
+ * {@code Integer}, {@code Double}, {@code Character}, {@code Color}, {@code LocalDate}, {@code LocalTime}
+ * and {@code Duration} are read by {@code botmaker-plugin-basics}' {@code BasicsGrammar}, which arrives on
+ * every bot's classpath with this jar. That is the mechanism working rather than a change to it: two
+ * grammars, disjoint, indexed together by {@code Settings}. Leaving them here as well would be the one thing
+ * it refuses — two grammars claiming one type, with a bot's answer decided by jar order.
  *
  * <h2>Every reader is one {@code WireText} call, and that is the point</h2>
  *
@@ -39,7 +42,7 @@ import java.util.List;
  * {@code com.botmaker.plugin.api.value}, which is <em>not on a bot's classpath</em> — the SDK declares
  * {@code botmaker-studio-api} {@code provided} deliberately. Naming one here would make this class
  * unloadable in exactly the process it exists for. {@code SdkValueTypes} names them and is editor-side only;
- * the two files describe the same seventeen types to two different audiences, and both go through
+ * the two files describe the same eight types to two different audiences, and both go through
  * {@code WireText}, which is what keeps them one vocabulary rather than two.
  *
  * <p><b>No fallback of its own invention.</b> Each fallback below is what the corresponding
@@ -54,16 +57,6 @@ public final class SdkGrammar implements ValueGrammar {
     @Override
     public List<Reader<?>> readers() {
         return List.of(
-                new Reader<>(String.class, WireText::text, s -> s, ""),
-                new Reader<>(Boolean.class, WireText::flag, String::valueOf, false),
-                new Reader<>(Integer.class, WireText::whole, String::valueOf, 0),
-                new Reader<>(Double.class, WireText::decimal, String::valueOf, 0.0),
-                new Reader<>(Character.class, WireText::letter, String::valueOf, 'a'),
-                new Reader<>(Color.class, WireText::color, WireText::spellColor, Color.WHITE),
-                new Reader<>(LocalDate.class, WireText::date, LocalDate::toString, WireText.date("")),
-                new Reader<>(LocalTime.class, WireText::time, LocalTime::toString, LocalTime.MIDNIGHT),
-                new Reader<>(Duration.class, WireText::duration,
-                        d -> WireText.spellDuration(d.toMillis()), Duration.ZERO),
                 new Reader<>(ImageTemplate.class, WireText::template, ImageTemplate::id, NO_IMAGE),
                 new Reader<>(Precision.class, WireText::precision, WireText::spellPrecision,
                         WireText.precision("")),
