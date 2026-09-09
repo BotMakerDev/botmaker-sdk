@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.sdk.api.config.Wire;
+import com.botmaker.sdk.api.config.Settings;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.bot.ActivityRegistry;
 import com.botmaker.sdk.internal.trace.Trace;
@@ -84,7 +84,7 @@ public final class Activities {
      */
     public static boolean active(String name) {
         ActivityRegistry.Runner runner = ActivityRegistry.get(name);
-        return runner == null ? Wire.enabled(name) : runner.active();
+        return runner == null ? Settings.enabled(name) : runner.active();
     }
 
     /**
@@ -94,7 +94,7 @@ public final class Activities {
      * <p>Not a record, for the one reason a record cannot serve: the override is genuinely mutable state —
      * the whole point of {@code ctx.disable()} is that a body can switch its own activity off mid-run.
      *
-     * <p>{@code active()} reads {@link Wire#enabled} rather than caching it, and {@code null} means nothing
+     * <p>{@code active()} reads {@link Settings#enabled} rather than caching it, and {@code null} means nothing
      * has been said, which is a different answer from {@code false}. So a value changed in the editor is
      * picked up on the next run without the definition knowing anything about files, and an override made
      * during a run outranks it.
@@ -117,7 +117,7 @@ public final class Activities {
 
         @Override
         public boolean active() {
-            return override != null ? override : Wire.enabled(name);
+            return override != null ? override : Settings.enabled(name);
         }
 
         @Override

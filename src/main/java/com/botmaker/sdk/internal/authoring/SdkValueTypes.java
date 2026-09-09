@@ -132,7 +132,7 @@ public final class SdkValueTypes {
             .add(WHOLE_NUMBER, codec(WireText::whole, i -> Integer.toString(i), i -> Integer.toString(i)))
             .add(DECIMAL_NUMBER, codec(WireText::decimal, d -> Double.toString(d), d -> Double.toString(d)))
             .add(CHARACTER, codec(WireText::letter, String::valueOf, LiteralWriter::quoteChar))
-            .add(COLOR, codec(WireText::color, SdkValueTypes::hex, SdkValueTypes::colorLiteral))
+            .add(COLOR, codec(WireText::color, WireText::spellColor, SdkValueTypes::colorLiteral))
             .add(DATE, codec(WireText::date, LocalDate::toString, SdkValueTypes::dateLiteral))
             .add(TIME_OF_DAY, codec(WireText::time, LocalTime::toString, SdkValueTypes::timeLiteral))
             .add(DURATION, codec(WireText::duration,
@@ -143,13 +143,13 @@ public final class SdkValueTypes {
             // block does — an empty chip is a value the bot cannot run on.
             .add(IMAGE_TEMPLATE, seeded(codec(SdkValueTypes::trim, s -> s, SdkValueTypes::templateLiteral),
                     TemplateNames.DEFAULT_TEMPLATE_NAME))
-            .add(PRECISION, codec(WireText::precision, SdkValueTypes::spellPrecision,
+            .add(PRECISION, codec(WireText::precision, WireText::spellPrecision,
                     SdkValueTypes::precisionLiteral))
-            .add(POINT, codec(WireText::point, p -> p.x() + "," + p.y(),
+            .add(POINT, codec(WireText::point, WireText::spellPoint,
                     p -> "new Point(%d, %d)".formatted(p.x(), p.y())))
-            .add(RECT, codec(WireText::area, r -> r.x() + "," + r.y() + "," + r.width() + "," + r.height(),
+            .add(RECT, codec(WireText::area, WireText::spellArea,
                     r -> "new Rect(%d, %d, %d, %d)".formatted(r.x(), r.y(), r.width(), r.height())))
-            .add(SIZE, codec(WireText::size, s -> s.width() + "," + s.height(),
+            .add(SIZE, codec(WireText::size, WireText::spellSize,
                     s -> "new Size(%d, %d)".formatted(s.width(), s.height())))
             .add(DIRECTION, enumCodec(WireText::direction, "Direction"))
             .add(KEY, enumCodec(WireText::key, "Key"))
@@ -185,14 +185,6 @@ public final class SdkValueTypes {
     /** Through {@link WireText#precision}, which is where the clamping to what the record accepts lives. */
     private static String precisionLiteral(Precision p) {
         return "new Precision(%s, %d, %d)".formatted(Double.toString(p.deltaE()), p.minArea(), p.minCount());
-    }
-
-    private static String spellPrecision(Precision p) {
-        return p.deltaE() + "," + p.minArea() + "," + p.minCount();
-    }
-
-    private static String hex(Color c) {
-        return "#%02X%02X%02X".formatted(c.getRed(), c.getGreen(), c.getBlue());
     }
 
     private static String trim(String wire) {

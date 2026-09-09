@@ -26,8 +26,9 @@ import java.util.Locale;
  *
  * <p><b>Two readers ask, and that is the reason it is public.</b> The <em>editor</em> needs it — a Parameters
  * dialog showing a duration field has to read {@code "1h30m"} — and so does a <em>running bot</em>, through
- * {@code com.botmaker.sdk.api.config.Wire}. One grammar per type means one implementation per type, called
- * from both sides. That is the settlement the old {@code Wire} reached after the parsers had been
+ * {@code com.botmaker.sdk.api.config.Settings}, which reaches these readers as a
+ * {@code com.botmaker.shared.config.ValueGrammar}. One grammar per type means one implementation per type,
+ * called from both sides. That is the settlement the old {@code Wire} reached after the parsers had been
  * Java-source-inside-Java-strings, and it survives the class.
  *
  * <p><b>A paragraph here claimed the parsing "happens here now, at generation time, and the emitter writes
@@ -260,6 +261,38 @@ public final class WireText {
     public static Rect area(String stored) {
         int[] n = ints(stored, 4);
         return new Rect(n[0], n[1], n[2], n[3]);
+    }
+
+    // ---- the writers ------------------------------------------------------------------------------------
+    //
+    // The other half of five of the readers above, and here for the reason spellDuration is here: one
+    // grammar, so a value written by the editor and a value read by a bot cannot mean two things. They are
+    // deliberately *not* the Java literals — those are `SdkValueTypes`' business and describe a source file,
+    // while these describe the stored text. Every one is exact: `parse(spell(v))` equals `v`.
+
+    /** A colour as {@code #RRGGBB}, the spelling {@link #color} reads back. */
+    public static String spellColor(Color value) {
+        return "#%02X%02X%02X".formatted(value.getRed(), value.getGreen(), value.getBlue());
+    }
+
+    /** A precision as {@code deltaE,minArea,minCount}. */
+    public static String spellPrecision(Precision value) {
+        return value.deltaE() + "," + value.minArea() + "," + value.minCount();
+    }
+
+    /** A point as {@code x,y}. */
+    public static String spellPoint(Point value) {
+        return value.x() + "," + value.y();
+    }
+
+    /** A size as {@code width,height}. */
+    public static String spellSize(Size value) {
+        return value.width() + "," + value.height();
+    }
+
+    /** A rectangle as {@code x,y,width,height}. */
+    public static String spellArea(Rect value) {
+        return value.x() + "," + value.y() + "," + value.width() + "," + value.height();
     }
 
     // ---- shared parsing ---------------------------------------------------------------------------------

@@ -19,6 +19,42 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Added
+
+- **`Settings` replaces `Wire`, and two methods replace eighteen.** The type is an argument now:
+
+  ```java
+  Duration   rest  = Settings.load("restBetween", Duration.class);
+  int        health = Settings.load("minHealth", int.class);
+  List<Rect> zones = Settings.loadAll("zones", Rect.class);
+  boolean    on    = Settings.enabled("Mining");
+  ```
+
+  `Wire.whole`, `Wire.duration`, `Wire.area` and the fifteen others could only ever read *this* plugin's
+  value types — `Wire.one(String)`'s own javadoc called itself "the escape hatch for a type this class has no
+  reader for". Passing the type in makes the set open: whichever plugin introduced a type ships a
+  `com.botmaker.shared.config.ValueGrammar` that reads it, and every call site is the same shape. Both
+  `int.class` and `Integer.class` resolve, so you write whichever your field is.
+
+  Everything else is unchanged. A missing file, a missing name, a name declared as another type and text that
+  will not parse all answer that type's own fallback, so **a bot still never fails to start because of its own
+  configuration file**. One thing throws, and it is not about the file: a type no grammar on the classpath
+  claims, which is a bot compiled against a plugin it does not run with.
+
+  The parsers are the same parsers. `internal.config.SdkGrammar` wraps the `WireText` calls the editor's own
+  codecs use, so the Parameters window and the running bot cannot disagree about what `"3s500ms"` means.
+
+- **`Images.named("ore")` is `images/ore.png`** — `Wire.image` moved to `com.botmaker.sdk.api.vision`. It
+  reads a *file*, where everything else on that class read a *variable*, and it was most of why `Wire` looked
+  like it did too much. A picture is vision's business.
+
+### Deprecated
+
+- **`Wire` and every member of it**, each with a `@ReplacedBy` naming its replacement, so *Project ▸ Upgrade
+  SDK* rewrites the calls for you. **Nothing is removed** — `api.*` only ever grows — so an existing bot
+  compiles and behaves exactly as it did. The class stays in the recognition set (its imports must resolve)
+  and is out of the menus, because nothing new should be written against it.
+
 ### Changed
 
 - **`ProjectData` keeps the flow and delegates the rest.** The untyped store — a variable's stored text, an
@@ -41,7 +77,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `VariableModel.listShapeOf`, which is package-private; the move away made it unreachable and the move back
   makes it reachable. The rule it asserts never stopped running.
 
-- Nothing a bot can see. `SdkPlugin` follows `Region` to its new home in the toolkit, and `WireText`'s class
+- **An `ImageTemplate` no longer loads the OpenCV native when it is constructed**, only when a matcher first
+  asks for its pixels. Holding a template is now something a bot does without meaning to — the value grammar
+  builds one as the fallback for an unreadable image variable — and a class-initialiser load would have made
+  every bot that reads *any* setting extract and link the library. Nothing about matching changes.
+
+- Nothing a bot can see. `WireText` grew the writers for the five types whose spellings the editor had kept
+  privately (`spellColor`, `spellPrecision`, `spellPoint`, `spellSize`, `spellArea`), so that reading and
+  writing one stored value is one grammar rather than two — the same reason `spellDuration` is there.
+  `SdkPlugin` follows `Region` to its new home in the toolkit, and `WireText`'s class
   javadoc stops describing a generator that no longer exists — it claimed a value's text was parsed "at
   generation time" and written into source as `Duration.ofMillis(5400000L)`, which stopped being true when
   the inversion was reversed between 2026-08-29 and 2026-09-02. A bot reads its own text at run time.
