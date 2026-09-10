@@ -27,7 +27,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   about the file changes; what changes is who reads it. Studio parsed it itself, which meant the host knew
   one plugin's storage format and no second plugin could have had parameters at all. A plugin with no
   project bound answers nothing, and a group id this plugin does not own answers nothing — a project's
-  parameters can now be several plugins' at once.
+  parameters can now be several plugins' at once. The value a host hands back is **canonicalised, clamped to
+  any declared range and pruned to the options still on offer** before it is stored, and the row that comes
+  back says what was actually stored — so a window renders the value the bot will get rather than the text
+  somebody typed.
 
 - **`Settings` replaces `Wire`, and two methods replace eighteen.** The type is an argument now:
 

@@ -8,6 +8,55 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-10 (later) — the Parameters editor is becoming this plugin's, and its rules arrive first
+
+**Done**
+
+- `internal/plugin/SdkValues` — the coercion rules, ported unchanged from Studio's
+  `project/activity/ValueWire`: canonicalise through the owning type's codec, clamp to a declared `Range`,
+  prune a value to the options still on offer, seed a fresh one with the type's default.
+- `SdkParameters` grows the eight verbs a parameters editor performs — `declare`, `remove`, `rename`,
+  `retype`, `setOptions`, `setBounds`, `setCategory`, `setVisibility`, `setDescription` — each reading the
+  file, changing one row and writing it back, with `edit(name, change)` as the single place that does so.
+- `apply` (the contract's `parameterEdited`) now **normalises** what it is handed, which the first slice
+  explicitly did not.
+
+**The decision behind it, taken by the maintainer on 2026-09-10.** Two questions were put when phase 6 hit
+them. First: how does a parameter's *declaration* — add, delete, rename, retype, options, bounds, category,
+visibility — reach the plugin that owns the file? The answer is that **it does not cross at all**: Studio's
+Parameters dialog becomes this plugin's own window, opened from a toolbar item, so the contract keeps
+exactly the two verbs phase 4 gave it and never learns what retyping means. Second: the Runner and the flow
+editor move here too, because both are host UI over this plugin's vocabulary — an *activity* is this
+plugin's concept, and the alternative was a contract that learns it.
+
+**Neither move needs the panels surface**, which `docs/refactor/24-plugin-platform.md` still refuses.
+That exclusion is about docked views composing the primary editor; `RunnerWindow` and `ActivityFlowDialog`
+each own a `Stage`, and this plugin already opens whole windows from a toolbar item — Macro Recorder,
+Resource Manager, Project Setup, Capture Targets.
+
+**Why the rules moved before the window.** The standing rule is that coercion belongs to the editor, where a
+user can watch it happen, which is why `VariableModel` is plain data and has deliberately never had a
+`withType` or a `withOptions`. The rule has not changed — the editor has. Landing the rules and the verbs
+first, with headless tests, is what makes the port of ~1,150 lines of JavaFX a mechanical next step rather
+than a blind one; nothing calls any of it yet, so there is still exactly one writer of `activities.json`.
+
+**The one limit worth knowing**: `SdkValues.CATALOG` is this plugin's own vocabulary merged with plugin #2's
+— the same pair `Authoring` merges — so a value of a *third* plugin's type filed in this plugin's section is
+left untouched rather than canonicalised. That is `ValueCatalog.normalize`'s own rule for an unregistered id,
+and the reason is the same: never rewrite a value you cannot read.
+
+**Renaming does not touch the user's source**, and that is the honest behaviour rather than a gap: a
+parameter is a field of a generated class, so a rename makes the old spelling stop compiling — a readable
+error naming the line, at the next build. Rewriting somebody's own file from a settings window would be an
+edit they did not ask for.
+
+`SdkParametersTest` is 22 tests now: the seeded default, the identifier and uniqueness refusals, the reset
+on retype, options surviving a shape change and not a type change, the prune, the clamp (declared *and* on
+an incoming edit), canonicalisation, every verb declining a row it does not hold and writing nothing, and
+another plugin's variable in the same file being untouchable from here.
+
+---
+
 ## 2026-09-10 — this plugin serves its own parameter rows
 
 **Done**
@@ -28,11 +77,11 @@ second plugin could not have had parameters at all. Now the host asks and gets c
 not: this plugin is loaded off *the open project's own resolved classpath*, so the jar running the code **is**
 the SDK that project pins. Reading a pin and honouring it would be this jar pretending to be a different one.
 
-**Nothing here coerces.** A value arrives as text and is stored as text; clamping to a `Range`, pruning a
-list to the declared options and resetting a retyped value are the editor's rules and stay where a user can
-watch them happen — the split `VariableModel` already documents against the editor's own record. The
-surface's return type is what carries a normalisation for the plugins that *do* have one, and the refusal
-case for everybody.
+**Nothing here coerces** — *true for the first slice only; the next entry moves the editor here and the
+rules with it.* A value arrived as text and was stored as text; clamping to a `Range`, pruning a list to the
+declared options and resetting a retyped value are the editor's rules and stay where a user can watch them
+happen — the split `VariableModel` documents against the editor's own record. The surface's return type is
+what carries a normalisation for the plugins that *do* have one, and the refusal case for everybody.
 
 **What refuses how.** `Optional.empty()` means *not mine* — a foreign group, or a name this plugin holds no
 row for — and the host reads it as "leave the screen alone". A write that could not happen therefore
