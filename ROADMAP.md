@@ -8,6 +8,47 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-10 — this plugin serves its own parameter rows
+
+**Done**
+
+- **`internal/plugin/SdkParameters`** and the two overrides on `SdkPlugin` (`parameterRows`,
+  `parameterEdited`), plus `projectOpened` holding the bound project. Phase 6 of
+  `~/.claude/plans/settings-becomes-a-plugin.md`, first slice.
+- Rows come from `Authoring.readModel` over the open project's `resourcesDir`, filtered to the one
+  `ParameterGroup` this plugin declares; an edit is `VariableModel.withValue` written back through
+  `Authoring.writeModel`, carrying the schema stamp the file already had.
+
+**Why it is worth an entry.** Nothing about `activities.json` changed — the same reader, the same writer,
+the same bytes. What changed is **who is allowed to know the format**. Studio parsed that file itself and
+drew the Parameters window out of its own records, so the host knew one plugin's storage format, and a
+second plugin could not have had parameters at all. Now the host asks and gets contract vocabulary back.
+
+**The version is `SdkVersion.latest()` rather than the project's pin**, which looks like a shortcut and is
+not: this plugin is loaded off *the open project's own resolved classpath*, so the jar running the code **is**
+the SDK that project pins. Reading a pin and honouring it would be this jar pretending to be a different one.
+
+**Nothing here coerces.** A value arrives as text and is stored as text; clamping to a `Range`, pruning a
+list to the declared options and resetting a retyped value are the editor's rules and stay where a user can
+watch them happen — the split `VariableModel` already documents against the editor's own record. The
+surface's return type is what carries a normalisation for the plugins that *do* have one, and the refusal
+case for everybody.
+
+**What refuses how.** `Optional.empty()` means *not mine* — a foreign group, or a name this plugin holds no
+row for — and the host reads it as "leave the screen alone". A write that could not happen therefore
+**throws** rather than answering empty: contained and reported by the host, with the row left as it was,
+which is the truth rather than a silent discard. An absent or unreadable file is neither: it is a project
+with no parameters yet, which is what a freshly created one is.
+
+`SdkParametersTest` covers the crossing component for component, the two refusals, the list shape, the file
+actually changing, and the schema stamp surviving — nine tests, no host and no JavaFX.
+
+**Still Studio's, and named here so the next slice is not re-derived:** `ParametersDialog` does not use any
+of this yet. It reads `ActivitiesConfig` as it always has, so the file has two readers until the dialog is
+rewired and Studio's own record set goes.
+
+---
+
 ## 2026-09-09 — the nine JDK value types leave, and this plugin depends on another plugin
 
 **Done**
