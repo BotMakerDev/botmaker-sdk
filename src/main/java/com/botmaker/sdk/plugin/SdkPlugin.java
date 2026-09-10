@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.ActionContext;
+import com.botmaker.plugin.api.ParameterDeclaration;
 import com.botmaker.plugin.api.ParameterEdit;
 import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.ParameterRow;
@@ -372,6 +373,19 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     public Optional<ParameterRow> parameterEdited(ParameterEdit edit) {
         ParameterStore open = parameters;
         return open == null ? Optional.empty() : open.apply(edit);
+    }
+
+    /**
+     * Stores a declared row — added, renamed, retyped, refiled, bounded, re-optioned or removed.
+     *
+     * <p>One call rather than nine, because what crosses is the row as the host wants it. What a retype
+     * resets and what a range clamps are this plugin's rules and stay in {@link ParameterStore}, which is
+     * plugin #2's and therefore every plugin's.
+     */
+    @Override
+    public Optional<ParameterRow> parameterDeclared(ParameterDeclaration declaration) {
+        ParameterStore open = parameters;
+        return open == null ? Optional.empty() : open.declared(declaration);
     }
 
     /**

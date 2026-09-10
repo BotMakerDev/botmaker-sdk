@@ -30,7 +30,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   stored, and the row that comes back says what was actually stored — so a window renders the value the bot
   will get rather than the text somebody typed.
 
-  **Where they are stored changed the same day.** Both methods go through
+  **The declaration half landed the same day**: `parameterDeclared` takes the row the host wants and answers
+  the row this plugin stored — an add, a rename, a retype, new choices, a range, a category, a note, a
+  visibility change or a removal, all as one call. What each costs is `ParameterStore`'s rule, so the window
+  that asks needs to know nothing about what a value type is.
+
+  **Where they are stored changed the same day.** All three methods go through
   `botmaker-plugin-basics`' `ParameterStore`, over this plugin's own folder in the project —
   `src/main/resources/plugins/com.botmaker/sdk/parameters.json`. Storing parameters was plugin #1's
   privilege only because plugin #1 owned `activities.json`; it is an ordinary plugin's file now, and any
