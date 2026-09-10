@@ -21,6 +21,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The Parameters window's rows are this plugin's, not the host's.** `SdkPlugin` implements the contract's
+  parameter-data surface — `parameterRows(groupId)` and `parameterEdited(edit)` — over the open project's own
+  `activities.json`, read through `Authoring` exactly as a bot's generation path already reads it. Nothing
+  about the file changes; what changes is who reads it. Studio parsed it itself, which meant the host knew
+  one plugin's storage format and no second plugin could have had parameters at all. A plugin with no
+  project bound answers nothing, and a group id this plugin does not own answers nothing — a project's
+  parameters can now be several plugins' at once.
+
 - **`Settings` replaces `Wire`, and two methods replace eighteen.** The type is an argument now:
 
   ```java

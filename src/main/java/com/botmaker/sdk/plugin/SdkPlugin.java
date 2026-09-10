@@ -1,7 +1,9 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.ActionContext;
+import com.botmaker.plugin.api.ParameterEdit;
 import com.botmaker.plugin.api.ParameterGroup;
+import com.botmaker.plugin.api.ParameterRow;
 import com.botmaker.plugin.api.SlotEditor;
 import com.botmaker.plugin.api.SourceSeed;
 import com.botmaker.plugin.api.StudioPlugin;
@@ -30,6 +32,7 @@ import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.TextMatch;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
+import com.botmaker.sdk.internal.plugin.SdkParameters;
 import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTargets;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
@@ -42,6 +45,7 @@ import com.botmaker.sdk.internal.plugin.templates.ResourceManagerDialog;
 import javafx.scene.paint.Color;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -338,6 +342,51 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
+     * The rows of that section, read out of the open project's own {@code activities.json}.
+     *
+     * <p><b>This is where the data stopped being the host's.</b> Studio parsed that file itself and drew the
+     * Parameters window from its own records, which meant the host knew this plugin's storage format and a
+     * second plugin could not have had parameters at all. Now the host asks, and what it gets back is
+     * {@link com.botmaker.plugin.api.ParameterRow}s built out of vocabulary the contract already owned.
+     *
+     * <p>Answered from {@link #parameters} — the field, set on bind — so a plugin with no project answers
+     * nothing rather than reading somebody else's directory. Read on every call and never cached: a window
+     * asks when it is drawn, and the file is the truth.
+     */
+    @Override
+    public List<ParameterRow> parameterRows(String groupId) {
+        SdkParameters open = parameters;
+        return open == null ? List.of() : open.rows(groupId);
+    }
+
+    /**
+     * Stores a changed value and answers the row as stored.
+     *
+     * <p>Nothing is coerced on the way in: clamping, pruning to the declared options and resetting a retyped
+     * value are the editor's rules and stay where a user can watch them happen. What this answers is
+     * therefore what it was handed — the return type is there for the plugins that <em>do</em> normalise, and
+     * for the refusal case.
+     */
+    @Override
+    public Optional<ParameterRow> parameterEdited(ParameterEdit edit) {
+        SdkParameters open = parameters;
+        return open == null ? Optional.empty() : open.apply(edit);
+    }
+
+    /**
+     * Takes the project being bound — which is what makes the two methods above answerable.
+     *
+     * <p>A data surface takes a group id and nothing else, so the project has to arrive some other way, and
+     * this is the only way it can: a plugin is constructed once and then serves whatever the host binds.
+     * Nothing is read here — a project open must not pay for a window nobody has looked at yet — so this is
+     * one field write, exactly as {@code buildValueTypes} and the other lazy builders are.
+     */
+    @Override
+    public void projectOpened(StudioServices services) {
+        parameters = new SdkParameters(services.resourcesDir(), SDK_PARAMETERS.id());
+    }
+
+    /**
      * Five buttons, of which <b>Pilot</b> is the case the toolbar surface was added for.
      *
      * <p>The Remote Pilot is not an editor for a slot: it binds a port, opens a nested {@code :N} display,
@@ -478,7 +527,19 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         RemotePilotUi open = pilot;
         pilot = null;
         if (open != null) open.close();
+        // Dropped for the same reason the pilot is: it holds the closing project's resources directory, and
+        // answering parameter rows out of a project the user has left would be worse than answering none.
+        parameters = null;
     }
+
+    /**
+     * The parameter data of the project currently bound, or {@code null} between projects.
+     *
+     * <p>Written by {@link #projectOpened(StudioServices)} and cleared by {@link #projectClosing()}, both of
+     * which the host calls one after the other on the same thread during a bind — so, like {@link #pilot},
+     * it needs no synchronization.
+     */
+    private SdkParameters parameters;
 
     private RemotePilotUi pilot(StudioServices services) {
         if (pilot == null) pilot = new RemotePilotUi(services);
