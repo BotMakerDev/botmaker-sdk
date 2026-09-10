@@ -8,7 +8,38 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-10 (evening) — the parameter mechanism leaves this plugin
+
+**Done**
+
+- `internal/plugin/SdkParameters` and `internal/plugin/SdkValues` are **deleted**. What they did is
+  `com.botmaker.plugin.basics.store.ParameterStore`, one module down, where any plugin gets it: the rows,
+  the nine declaration verbs and the coercion rules, unchanged.
+- `SdkPlugin` holds a `ParameterStore` over `PluginData.of(services.resourcesDir(), ID)` and this plugin's
+  own catalog. `parameterRows` and `parameterEdited` are two delegations, as before.
+- `SdkParametersTest` is `ParameterStoreTest` in `botmaker-plugin-basics`, asserting the same things.
+
+**Why it moved the day it was written.** The maintainer's call, and it reverses half of the entry below:
+the Parameters window stays **Studio's** and a plugin supplies sections as data, so what a plugin needs is
+not a window but a *mechanism* — something shaped like `Settings`, standardising how parameters are stored
+and read, owned by the toolkit or by plugin #2 and never by Studio. Between those two it is plugin #2, on
+the same argument that moved `Settings` there on 2026-09-09: a widget kit owns no value types and carries no
+JSON parser.
+
+**What this plugin stops being able to do, and that is the point.** Storing parameters was plugin #1's
+privilege because plugin #1 owned the file. It now stores them exactly the way a Discord plugin would —
+`plugins/com.botmaker/sdk/parameters.json`, a folder of its own — which also means **every project written
+so far shows no parameters in that window**, since nothing reads `activities.json`'s `variables` array as
+this plugin's rows any more. That is the maintainer's *no migration* decision, taken with the storage swap;
+the data is still on disk and a converter is writable later.
+
+---
+
 ## 2026-09-10 (later) — the Parameters editor is becoming this plugin's, and its rules arrive first
+
+> **⚠ Half superseded the same evening.** The window does **not** move — Studio draws every window frame and
+> a plugin supplies sections as data — and `SdkValues`/`SdkParameters` moved down to
+> `botmaker-plugin-basics` rather than staying here. The rules below are unchanged; only their address is.
 
 **Done**
 

@@ -12,6 +12,9 @@ import com.botmaker.plugin.api.ToolbarGroup;
 import com.botmaker.plugin.api.ToolbarItem;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ValueCatalog;
+import com.botmaker.plugin.basics.store.ParameterStore;
+import com.botmaker.plugin.basics.store.PluginData;
+import com.botmaker.plugin.basics.values.BasicsValueTypes;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.plugin.toolkit.Editors;
 import com.botmaker.plugin.toolkit.Region;
@@ -32,7 +35,6 @@ import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.TextMatch;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
-import com.botmaker.sdk.internal.plugin.SdkParameters;
 import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTargets;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
@@ -342,7 +344,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * The rows of that section, read out of the open project's own {@code activities.json}.
+     * The rows of that section, read out of this plugin's own file in the open project.
      *
      * <p><b>This is where the data stopped being the host's.</b> Studio parsed that file itself and drew the
      * Parameters window from its own records, which meant the host knew this plugin's storage format and a
@@ -355,21 +357,20 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     @Override
     public List<ParameterRow> parameterRows(String groupId) {
-        SdkParameters open = parameters;
+        ParameterStore open = parameters;
         return open == null ? List.of() : open.rows(groupId);
     }
 
     /**
      * Stores a changed value and answers the row as stored.
      *
-     * <p>Nothing is coerced on the way in: clamping, pruning to the declared options and resetting a retyped
-     * value are the editor's rules and stay where a user can watch them happen. What this answers is
-     * therefore what it was handed — the return type is there for the plugins that <em>do</em> normalise, and
-     * for the refusal case.
+     * <p>The value is coerced on the way in — canonicalised by its own type, clamped to a declared range,
+     * pruned to the options still on offer — which is why the answer may differ from the edit. Those rules
+     * are the editor's and live in {@link ParameterStore}, one module down, where any plugin gets them.
      */
     @Override
     public Optional<ParameterRow> parameterEdited(ParameterEdit edit) {
-        SdkParameters open = parameters;
+        ParameterStore open = parameters;
         return open == null ? Optional.empty() : open.apply(edit);
     }
 
@@ -383,7 +384,8 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     @Override
     public void projectOpened(StudioServices services) {
-        parameters = new SdkParameters(services.resourcesDir(), SDK_PARAMETERS.id());
+        parameters = new ParameterStore(PluginData.of(services.resourcesDir(), ID), SDK_PARAMETERS.id(),
+                BasicsValueTypes.CATALOG.merge(SdkValueTypes.CATALOG));
     }
 
     /**
@@ -539,7 +541,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * which the host calls one after the other on the same thread during a bind — so, like {@link #pilot},
      * it needs no synchronization.
      */
-    private SdkParameters parameters;
+    private ParameterStore parameters;
 
     private RemotePilotUi pilot(StudioServices services) {
         if (pilot == null) pilot = new RemotePilotUi(services);

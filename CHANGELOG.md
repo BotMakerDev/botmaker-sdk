@@ -22,15 +22,21 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 ### Added
 
 - **The Parameters window's rows are this plugin's, not the host's.** `SdkPlugin` implements the contract's
-  parameter-data surface — `parameterRows(groupId)` and `parameterEdited(edit)` — over the open project's own
-  `activities.json`, read through `Authoring` exactly as a bot's generation path already reads it. Nothing
-  about the file changes; what changes is who reads it. Studio parsed it itself, which meant the host knew
-  one plugin's storage format and no second plugin could have had parameters at all. A plugin with no
-  project bound answers nothing, and a group id this plugin does not own answers nothing — a project's
-  parameters can now be several plugins' at once. The value a host hands back is **canonicalised, clamped to
-  any declared range and pruned to the options still on offer** before it is stored, and the row that comes
-  back says what was actually stored — so a window renders the value the bot will get rather than the text
-  somebody typed.
+  parameter-data surface — `parameterRows(groupId)` and `parameterEdited(edit)`. Studio parsed the project
+  file itself, which meant the host knew one plugin's storage format and no second plugin could have had
+  parameters at all. A plugin with no project bound answers nothing, and a group id this plugin does not own
+  answers nothing — a project's parameters can now be several plugins' at once. The value a host hands back
+  is **canonicalised, clamped to any declared range and pruned to the options still on offer** before it is
+  stored, and the row that comes back says what was actually stored — so a window renders the value the bot
+  will get rather than the text somebody typed.
+
+  **Where they are stored changed the same day.** Both methods go through
+  `botmaker-plugin-basics`' `ParameterStore`, over this plugin's own folder in the project —
+  `src/main/resources/plugins/com.botmaker/sdk/parameters.json`. Storing parameters was plugin #1's
+  privilege only because plugin #1 owned `activities.json`; it is an ordinary plugin's file now, and any
+  plugin declares parameters the same way. **A project created before this reads as having none**: nothing
+  converts the old `variables` array, and nothing deletes it either, so the data is on disk and a converter
+  can be written later.
 
 - **`Settings` replaces `Wire`, and two methods replace eighteen.** The type is an argument now:
 
