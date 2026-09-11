@@ -8,6 +8,49 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-11 — the Activity Flow editor is this plugin's
+
+**Done**
+
+- `internal/plugin/flow/` — `ActivityFlowDialog`, `FlowCanvas`, `ActivityDraft`, `NewActivityDialog`,
+  `FlowRules`, `FlowNames`, `FlowSnapshot`, `SnapshotHistory` and `FlowStyles`, plus `flow.css`. Ported from
+  Studio's `ui/app/flow` and `ui/app/ActivityFlowDialog`, retyped from the editor's own record set onto this
+  plugin's `authoring` models — `ActivityModel`, `FlowModel`, `FlowNodeModel`, `FlowEdgeModel`,
+  `PresetModel`, `ProjectModel`.
+- A **🔀 Activity Flow** toolbar item, `ToolbarGroup.AUTHORING` at order 10 — the slot Studio's own 🔀 Flow
+  button vacated, so the bar reads where it always did.
+- `FlowEdgeModel` gained `isDisabled`, `rewired` and `withOutcome`: a rename rewrites every wire that named
+  the node, which is an editor's business and was on the host's copy of the record.
+- The editor reads and writes `activities.json` itself, through `Authoring.readModel`/`writeModel` at
+  `SdkVersion.latest()` — *whatever this plugin writes, this plugin reads* — carrying the file's schema stamp
+  back unchanged, because the migration ledger is still the host's. Writes are off the FX thread, serialised,
+  and coalesced 400 ms behind the last edit, exactly as before.
+- `FlowRulesTest` and `ActivityFlowValidationTest` came with it, over `FlowEdgeModel` and `ProjectModel`.
+
+**Why this one window moved when the Parameters window and the Runner did not.** The maintainer's rule is
+that the host draws every window frame and a plugin supplies sections as data — which works because a
+parameter *is* a `ParameterRow`, contract vocabulary the host can render. **A flow is not.** Its nodes,
+edges, ports and outcomes would have to become contract vocabulary for Studio to draw them, and a contract
+that learns what a branch is has learned one plugin's subject. So the two windows over rows stayed in Studio
+and the graph came here.
+
+**Studio's original is deleted in the same commit**, and so is the explorer's *New Activity* button. That is
+the two-writers rule: `ActivityService` caches the parsed file and publishes an event on every write, so a
+plugin writing the same file behind it leaves that state stale and fires nothing. Both host writers had to
+go the moment this one arrived.
+
+**What the move cost, stated plainly.** The window no longer remembers its size and position (that is the
+host's `StudioWindow`, which a plugin has no access to); the side panel's **Open Parameters…** button is a
+sentence naming Project ▸ Parameters… instead, because a plugin has no handle on one of the editor's own
+windows; and a theme switched while the flow is open repaints its grid only if the host restyles the scene
+root — the contract's `Theme` applies a look, it does not announce one, so otherwise it costs a reopen.
+
+**Deferred / next.** The activities and the flow still live at the top level of `activities.json` rather than
+in this plugin's own folder under `plugins/com.botmaker/sdk/` — the same tree the parameters moved to on
+2026-09-10. That move is phase 6f's, with the host's last readers of the file.
+
+---
+
 ## 2026-09-10 (evening) — the parameter mechanism leaves this plugin
 
 **Done**

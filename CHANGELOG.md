@@ -21,6 +21,19 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The Activity Flow editor is this plugin's** — 🔀 Activity Flow on the toolbar, where Studio's own 🔀 Flow
+  button used to be. The canvas, the cards, the outcome ports, the wiring rules, the auto-arrange, the undo
+  arrows and the loop-safety fields all came across unchanged; what changed is who owns them. It reads and
+  writes `activities.json` itself, so the editor and the running bot cannot disagree about what a flow is,
+  and it is the only one of the three windows over this plugin's project data that moved: a parameter is a
+  `ParameterRow` the host can draw, while a flow's nodes, edges and outcomes are this plugin's own
+  vocabulary.
+
+  Two consequences worth knowing. **Studio's Project ▸ Activity Flow menu entry and its New Activity button
+  in the file explorer are gone** — the toolbar item is the one way in, and adding an activity is a button on
+  the canvas, which is the only place that can also say where it sits and what it reports. And the window no
+  longer remembers its size between openings, which is host state a plugin has no access to.
+
 - **The Parameters window's rows are this plugin's, not the host's.** `SdkPlugin` implements the contract's
   parameter-data surface — `parameterRows(groupId)` and `parameterEdited(edit)`. Studio parsed the project
   file itself, which meant the host knew one plugin's storage format and no second plugin could have had
