@@ -63,4 +63,19 @@ public record FlowEdgeModel(String from, String to, String outcome) {
     public boolean isNext() {
         return outcome.isBlank() || NEXT_OUTCOME.equals(outcome);
     }
+
+    /** True when this is the "switched off, go here instead" wire. */
+    public boolean isDisabled() {
+        return DISABLED_OUTCOME.equals(outcome);
+    }
+
+    /** The same wire re-pointed at {@code newFrom}/{@code newTo} — what a node rename leaves behind. */
+    public FlowEdgeModel rewired(String newFrom, String newTo) {
+        return new FlowEdgeModel(newFrom, newTo, outcome);
+    }
+
+    /** The same wire carrying a different outcome — what an outcome rename leaves behind. */
+    public FlowEdgeModel withOutcome(String newOutcome) {
+        return new FlowEdgeModel(from, to, newOutcome);
+    }
 }

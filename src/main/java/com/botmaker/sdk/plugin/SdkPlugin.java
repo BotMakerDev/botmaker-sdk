@@ -41,6 +41,7 @@ import com.botmaker.sdk.internal.plugin.capture.CaptureTargets;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
 import com.botmaker.sdk.internal.plugin.capture.ScreenCapture;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
+import com.botmaker.sdk.internal.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
 import com.botmaker.sdk.internal.plugin.record.MacroRecorderDialog;
 import com.botmaker.sdk.internal.plugin.setup.ProjectSetup;
@@ -442,6 +443,10 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                         "Rename, retag, replace, delete, import and export the pictures the bot looks for — "
                                 + "a rename carries every block that uses it",
                         ToolbarGroup.TOOLS, 30, this::openResourceManager),
+                ToolbarItem.of("activity-flow", "🔀 Activity Flow",
+                        "Define what this bot does, one card per activity, and wire each outcome to what "
+                                + "runs next — the graph, its loop safety, and which activities are on",
+                        ToolbarGroup.AUTHORING, 10, this::openActivityFlow),
                 ToolbarItem.of("capture-targets", "🎯 Capture Targets",
                         "Choose what the bot looks at — a monitor, an application window or an emulator "
                                 + "instance — and which of them is the project's default",
@@ -491,6 +496,24 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * surface. What the editor was holding to make it work was five SDK class literals deciding that a click
      * is a {@code Mouse}, which is this plugin's sentence to write.
      */
+    /**
+     * Opens the flow editor.
+     *
+     * <p>It sits in {@link ToolbarGroup#AUTHORING} at order 10, the slot Studio's own 🔀 Flow button vacated,
+     * so the bar reads where it always did. It was the host's until 2026-09-11, and it is the <b>only</b> one
+     * of the three windows over this plugin's project data that moved: a parameter is a
+     * {@link com.botmaker.plugin.api.ParameterRow} and the host can draw one, while a flow's nodes, edges,
+     * ports and outcomes are vocabulary of this plugin's own that the contract must never learn.
+     *
+     * <p>Single-instance is not enforced: this window owns no port and no display, so a second one is a
+     * second view of the same file. What it does own is the writing of {@code activities.json}, which is why
+     * Studio's copy was deleted in the commit this arrived in rather than a commit later.
+     */
+    private void openActivityFlow(ActionContext context) {
+        StudioServices services = context.services();
+        new ActivityFlowDialog(services, services.dialogs().owner()).show();
+    }
+
     private void openMacroRecorder(ActionContext context) {
         StudioServices services = context.services();
         MacroRecorderDialog.open(services, services.dialogs().owner());
