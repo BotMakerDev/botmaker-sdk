@@ -83,12 +83,34 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   reads a *file*, where everything else on that class read a *variable*, and it was most of why `Wire` looked
   like it did too much. A picture is vision's business.
 
-### Deprecated
+### Removed
 
-- **`Wire` and every member of it**, each with a `@ReplacedBy` naming its replacement, so *Project ▸ Upgrade
-  SDK* rewrites the calls for you. **Nothing is removed** — `api.*` only ever grows — so an existing bot
-  compiles and behaves exactly as it did. The class stays in the recognition set (its imports must resolve)
-  and is out of the menus, because nothing new should be written against it.
+- **`com.botmaker.sdk.api.config.Settings` and `com.botmaker.sdk.api.config.Wire` are deleted.** A bot reads
+  its own parameters from **`com.botmaker.plugin.basics.store.Settings`**, which is where the work always
+  happened — the SDK classes were a facade over it holding no logic, so every answer is the one you already
+  get. The change you make is the import:
+
+  ```java
+  import com.botmaker.plugin.basics.store.Settings;      // was com.botmaker.sdk.api.config.Settings
+
+  Settings.load("minHealth", int.class);                 // unchanged
+  Settings.loadAll("zones", Rect.class);                 // unchanged
+  Settings.enabled("Mining");                            // unchanged
+  ```
+
+  `Settings.one`, `Settings.many` and `Settings.names` were the facade's own and are
+  `ProjectValues.current().one(…)` / `.many(…)` / `.variables()` in the same package. `Wire`'s eighteen typed
+  readers were already replaced by `Settings.load(name, T.class)` and `Wire.image` by `Images.named(file)`;
+  those replacements are unchanged and are what the calls become.
+
+  **This breaks a bot that imports either class, and there is no migrator for a deleted type** — only a
+  compile error naming it. It is a deliberate decision, taken while `api.*` was still allowed one last
+  pre-policy removal: never-delete's baseline is `v1.2.0`, which is the release this deletion is in, so the
+  rule begins from a surface that no longer offers them. Nothing is removed from `api.*` after it.
+
+  **No menu offers a settings read until `botmaker-plugin-basics` catalogues its own `Settings`** — the SDK
+  may not catalogue another plugin's API, which is the same rule that moved the nine JDK value types there.
+  Write the call yourself in the meantime; it compiles and runs exactly as before.
 
 ### Changed
 

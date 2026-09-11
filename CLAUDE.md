@@ -178,6 +178,15 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   `@Scaffolding` and `Text`'s nine shared-`OcrOptions` overloads, every one a recorded decision taken while
   `api.*` was still freely breakable.
 
+  **The last of those removals is inside v1.2.0 itself (2026-09-11): `api.config.Settings` and
+  `api.config.Wire`, deleted rather than deprecated** — decision 8 of the settings-becomes-a-plugin plan, the
+  maintainer's explicit call. It passes this gate without an exemption for one reason, and it is the reason
+  the baseline is a release rather than a tag-of-the-day: the baseline is the release that *contains* the
+  deletion, so the jar compared against already lacks both classes. Nothing is skipped, ignored or
+  annotated; the rule simply begins one release after those two classes ended. What a bot gets is a compile
+  error naming the type — there is no migrator for a deletion, and the replacement is one import away
+  (`com.botmaker.plugin.basics.store.Settings`).
+
   The accepted cost, stated plainly: **`com.botmaker.sdk.api` only ever grows.** That is the trade, and it is
   the same policy the JDK runs.
 
@@ -307,7 +316,17 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   last use of a switch and a file that were themselves deleted hours later (above). Neither was a name a bot
   could write down.
 
-## `api.config.Wire` — a bot reads its own settings (2026-08-29)
+## A bot reads its own settings — `api.config.Wire` (2026-08-29), deleted 2026-09-11
+
+**Neither class exists here any more.** `Wire` was replaced by `api.config.Settings` on 2026-09-09, and both
+were deleted on 2026-09-11: a bot reads its parameters through **`com.botmaker.plugin.basics.store.Settings`**,
+plugin #2's own class, which is where the work had already moved and which every plugin can use. What stays
+in this module is the half that is genuinely the SDK's — `internal/config/ProjectData`,
+`internal/config/SdkGrammar` and `authoring/WireText` — and `SdkGrammarReadsTest` is the test that the
+grammar is found through `META-INF/services` and answers for the SDK's eight types.
+
+The section below is kept because every decision in it still binds whoever adds a value type here. Read
+`Wire` as *the reader a bot uses*, wherever it appears.
 
 The runtime half of *derived files stop being Java*, and the precondition for deleting `SourceEmitter`. A
 generated `Parameters` class of `public static final` fields exists only to give stored values a name;

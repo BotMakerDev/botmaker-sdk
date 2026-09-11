@@ -27,8 +27,8 @@ import java.util.Locale;
  *
  * <p><b>Two readers ask, and that is the reason it is public.</b> The <em>editor</em> needs it — a Parameters
  * dialog showing a duration field has to read {@code "1h30m"} — and so does a <em>running bot</em>, through
- * {@code com.botmaker.sdk.api.config.Settings}, which reaches these readers as a
- * {@code com.botmaker.plugin.basics.store.ValueGrammar}. One grammar per type means one implementation per type,
+ * {@code com.botmaker.plugin.basics.store.Settings}, which reaches these readers as a
+ * {@code com.botmaker.plugin.basics.store.ValueGrammar} registered by {@code internal.config.SdkGrammar}. One grammar per type means one implementation per type,
  * called from both sides. That is the settlement the old {@code Wire} reached after the parsers had been
  * Java-source-inside-Java-strings, and it survives the class.
  *
@@ -59,10 +59,13 @@ import java.util.Locale;
  * whole number or a time of day is about automating a game: they were the SDK's only because the SDK was
  * written first, which made a project having a duration variable plugin #1's privilege.
  *
- * <p><b>They are kept here rather than deleted</b>, and not merely out of politeness to callers.
- * {@code api.config.Wire} — what a bot writes — calls straight through this class, and never-delete is
- * unconditional in this module. What is gained is that there is still exactly one implementation of the
- * grammar: two readers of one file is the standing risk, and a delegation cannot drift where a copy would.
+ * <p><b>They are kept here rather than deleted</b>, and not merely out of politeness to callers. The reason
+ * given here used to be that {@code api.config.Wire} called straight through them; that class was deleted on
+ * 2026-09-11 and the better reason is the one that outlives it — this class is the SDK's own grammar, reached
+ * by {@code internal.config.SdkGrammar} and by the editor's codecs, and there is still exactly one
+ * implementation of it. Two readers of one file is the standing risk, and a delegation cannot drift where a
+ * copy would. Never-delete keeps them public regardless: they are {@code authoring}, not {@code api.*}, but
+ * a plugin author's code may already name them.
  */
 public final class WireText {
 

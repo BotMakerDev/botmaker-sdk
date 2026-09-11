@@ -50,6 +50,16 @@
              CHANGELOG section, so it is always the LAST release — the gate then asks "did this build remove
              anything the previous one offered?", which is the whole of the never-delete rule.
 
+             THE LAST PRE-POLICY REMOVAL IS IN v1.2.0 ITSELF (2026-09-11): `api.config.Settings` and
+             `api.config.Wire` are deleted, not deprecated — the maintainer's explicit call, recorded as
+             decision 8 of the settings-becomes-a-plugin plan. That is safe against this gate for exactly one
+             reason, and it is the reason the baseline is what it is: the baseline is the release that
+             CONTAINS the deletion, so the jar the gate compares against already lacks both classes and
+             never-delete begins from a surface that no longer offers them. Nothing here is an exemption, an
+             ignore list or a skip — the rule stays unconditional, it simply starts one release later than
+             those two classes ended. The cost is stated where a user meets it: a bot importing either class
+             stops compiling, with no migrator and only a readable error naming the type.
+
              It is v1.2.0, the release never-delete BEGINS at, and not the currently-newest tag v1.1.0. The
              rule is not retroactive and cannot be: v1.1.0 → now already removed api.config.Wire, @Palette,
              @Scaffolding and Text's nine shared-OcrOptions overloads, every one of them a deliberate decision

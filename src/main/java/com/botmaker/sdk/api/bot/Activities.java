@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.sdk.api.config.Settings;
+import com.botmaker.plugin.basics.store.Settings;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.bot.ActivityRegistry;
 import com.botmaker.sdk.internal.trace.Trace;
