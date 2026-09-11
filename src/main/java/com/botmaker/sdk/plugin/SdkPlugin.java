@@ -190,8 +190,11 @@ public final class SdkPlugin extends AbstractStudioPlugin {
             com.botmaker.sdk.api.bot.Watchdog.class,
             com.botmaker.sdk.api.bot.PopupGuard.class,
             com.botmaker.sdk.api.bot.Activity.class,
-            com.botmaker.sdk.api.config.Settings.class,
-            com.botmaker.sdk.api.config.Wire.class,
+            // api.config.Settings and api.config.Wire stood here and are deleted (2026-09-11). A bot reads
+            // its parameters through com.botmaker.plugin.basics.store.Settings, which is plugin #2's class
+            // and so plugin #2's to catalogue — this plugin may not offer another plugin's API, which is the
+            // same rule that put the nine JDK value types there. Until it does, no menu offers a settings
+            // read and a bot writes the call itself.
             com.botmaker.sdk.api.vision.Images.class,
             com.botmaker.sdk.api.launch.Game.class,
             com.botmaker.sdk.api.launch.Target.class,

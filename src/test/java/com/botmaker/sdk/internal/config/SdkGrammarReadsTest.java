@@ -1,5 +1,7 @@
-package com.botmaker.sdk.api.config;
+package com.botmaker.sdk.internal.config;
 
+import com.botmaker.plugin.basics.store.ProjectValues;
+import com.botmaker.plugin.basics.store.Settings;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -18,19 +20,25 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The bot-facing reader, over {@code src/test/resources/activities.json} — the same file {@code WireTest}
- * reads, sitting exactly where a generated bot's own file sits.
+ * This SDK's own eight value types, read back the way a running bot reads them — through plugin #2's
+ * {@link Settings}, over {@code src/test/resources/activities.json}, which sits exactly where a generated
+ * bot's own file sits.
  *
- * <p><b>Nothing here registers a grammar.</b> That is the test: {@code SdkGrammar} is found through
+ * <p><b>Nothing here registers a grammar.</b> That is the test: {@link SdkGrammar} is found through
  * {@code META-INF/services}, which is the whole arrangement a bot depends on and the one part of it that no
  * amount of unit testing of {@code WireText} would exercise. A missing or misspelled service file makes every
  * case below throw.
  *
- * <p>What is being defended is the trade this class inherits from {@code Wire}: the values keep the names the
- * editor gave them, and a misspelling stops being a compile error. That is only acceptable while every
- * misspelling has a defined, harmless answer — which is most of what follows.
+ * <p><b>It asks {@code com.botmaker.plugin.basics.store.Settings} directly since 2026-09-11</b>, when the
+ * SDK facade over it — {@code api.config.Settings}, and {@code Wire} before that — was deleted. The test is
+ * unchanged otherwise, which is the useful part: the facade held no logic, so every answer below is the one
+ * it always gave, and this file is now testing the thing that actually answers rather than a delegation.
+ *
+ * <p>What is being defended is the trade inherited from {@code Wire}: the values keep the names the editor
+ * gave them, and a misspelling stops being a compile error. That is only acceptable while every misspelling
+ * has a defined, harmless answer — which is most of what follows.
  */
-class SettingsTest {
+class SdkGrammarReadsTest {
 
     // ---- the grammar the classpath supplies -------------------------------------------------------------
 
@@ -128,12 +136,20 @@ class SettingsTest {
 
     // ---- the text underneath ----------------------------------------------------------------------------
 
+    /**
+     * The honest bottom of the stack: a value written by a plugin whose grammar this bot does not carry is
+     * still text, and reading it is better than a throw.
+     *
+     * <p>It asks {@code ProjectValues.current()} rather than {@code Settings}, which is where these three
+     * always did their work — the deleted SDK facade forwarded {@code one}/{@code many}/{@code names}
+     * straight to it, and plugin #2's {@code Settings} does not repeat them.
+     */
     @Test
     void theStoredTextIsStillReachable() {
-        assertEquals("1m30s", Settings.one("restBetween"));
-        assertEquals(List.of("ore", "gem"), Settings.many("targets"));
-        assertTrue(Settings.names().contains("minHealth"));
-        assertFalse(Settings.names().contains("Mining"));
+        assertEquals("1m30s", ProjectValues.current().one("restBetween"));
+        assertEquals(List.of("ore", "gem"), ProjectValues.current().many("targets"));
+        assertTrue(ProjectValues.current().variables().contains("minHealth"));
+        assertFalse(ProjectValues.current().variables().contains("Mining"));
     }
 
     // ---- the member that moved --------------------------------------------------------------------------

@@ -8,6 +8,39 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-11 (later) — the SDK sheds the settings facade
+
+**Done**
+
+- **`com.botmaker.sdk.api.config.Settings` and `com.botmaker.sdk.api.config.Wire` are deleted**, package and
+  all — decision 8 of the settings-becomes-a-plugin plan, the maintainer's explicit call ("remove, don't care
+  yet"). A bot reads its parameters through `com.botmaker.plugin.basics.store.Settings`. The facade held no
+  logic, so no answer changes; the only edit at a call site is the import. `Settings.one`/`many`/`names` were
+  the facade's own convenience over `ProjectValues.current()` and are spelled that way now.
+- `api.bot.Activities` imports plugin #2's `Settings` for its two `enabled(name)` calls — the SDK's library
+  half naming another plugin's API, which is the arrangement `internal/config/SdkGrammar` already had.
+- `SdkPlugin`'s catalog loses both class literals. **No menu offers a settings read until plugin-basics
+  catalogues its own `Settings`**: the SDK may not catalogue another plugin's API, which is the same rule
+  that moved the nine JDK value types there. Stated as a gap rather than worked around, because the fix is a
+  decision about `BasicsIsBotSafeTest` — a `@Palette` mark would put a contract annotation on a class a bot
+  loads, which is the documented annotations exception in this module and an explicit exemption in that one.
+- `WireTest` is deleted; `SettingsTest` becomes `internal/config/SdkGrammarReadsTest`, asking plugin #2's
+  `Settings` directly. Every case is unchanged, which is the useful part — it now tests the class that
+  answers rather than a delegation. SDK suite: **613 tests, 0 failures**.
+
+**The never-delete consequence, and why no exemption was needed.** japicmp makes `CLASS_REMOVED` fatal over
+`com.botmaker.sdk.api.**`, and the umbrella rule says `api.*` only ever grows. The baseline is
+`botmaker.japicmp.baseline` = `v1.2.0`, **the release this deletion is in** — so the jar the gate compares
+against already lacks both classes, and the rule begins from a surface that no longer offers them. No ignore
+list, no annotation, no skip; the escape hatch is what killed the 2026-08-22 gate. The pom property comment,
+the module `CLAUDE.md` and the umbrella `CLAUDE.md` each record it as the last pre-policy removal.
+
+**The cost, written where a user meets it.** A bot importing either class stops compiling. There is no
+migrator for a deleted type — a pointer needs an element to hang on — so what the author gets is a compile
+error naming the type, and the repair is one import line.
+
+---
+
 ## 2026-09-11 — the Activity Flow editor is this plugin's
 
 **Done**
