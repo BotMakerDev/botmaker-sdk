@@ -122,26 +122,33 @@ class SdkPluginSurfaceTest {
     }
 
     /**
-     * The seven buttons, their sections and their order within them.
+     * The ten buttons, their sections and their order within them.
      *
      * <p>The order values are asserted rather than only the sequence, because a bar assembled from two
      * plugins interleaves by order and ties break on the plugin id — so a wrong number here moves a button
      * on a bar this test cannot see. {@code activity-flow} takes {@link ToolbarGroup#AUTHORING} at 10, which
      * is the slot Studio's own 🔀 Flow button vacated when the graph editor moved here on 2026-09-11.
+     *
+     * <p>The last three are {@link ToolbarGroup#OVERLAY}, added 2026-09-12: they are drawn on the overlay
+     * editor's own row rather than on the main bar, and their subject is the window the HUD is drawn over —
+     * which is why they are a group of their own and not an order within {@code TOOLS}.
      */
     @Test
-    void the_toolbar_contributes_seven_items_in_their_groups_and_orders() {
+    void the_toolbar_contributes_ten_items_in_their_groups_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();
 
         assertEquals(List.of("pilot", "capture-templates", "record-macro", "manage-templates",
-                        "activity-flow", "capture-targets", "project-setup"),
+                        "activity-flow", "capture-targets", "project-setup",
+                        "point-here", "picture-here", "record-here"),
                 items.stream().map(ToolbarItem::id).toList());
 
         assertEquals(List.of(ToolbarGroup.RUN, ToolbarGroup.TOOLS, ToolbarGroup.TOOLS, ToolbarGroup.TOOLS,
-                        ToolbarGroup.AUTHORING, ToolbarGroup.PROJECT, ToolbarGroup.PROJECT),
+                        ToolbarGroup.AUTHORING, ToolbarGroup.PROJECT, ToolbarGroup.PROJECT,
+                        ToolbarGroup.OVERLAY, ToolbarGroup.OVERLAY, ToolbarGroup.OVERLAY),
                 items.stream().map(ToolbarItem::group).toList());
 
-        assertEquals(List.of(10, 20, 25, 30, 10, 50, 40), items.stream().map(ToolbarItem::order).toList());
+        assertEquals(List.of(10, 20, 25, 30, 10, 50, 40, 10, 20, 30),
+                items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {
             assertNotNull(item.label().get(), item::id);

@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Three buttons on the overlay editor's own row** — the translucent HUD Studio draws over the game now
+  carries this plugin's items, so the window you are looking at is the subject of all three. **⌖ Point bot
+  here** makes that window the project's capture target, written to `capture.json` through the same path the
+  Capture Targets dialog's Apply uses. **✂ Picture of this** opens the capture tool against that window
+  whatever the project's target is — including a project that names none, which used to make the tool refuse
+  to open — and changes no file. **⏺ Record at cursor** gives the recorder back what it lost when it became a
+  plugin: an *Insert at cursor* button that places the recorded lines where you were working, instead of
+  handing you text to paste.
+
 - **The Activity Flow editor is this plugin's** — 🔀 Activity Flow on the toolbar, where Studio's own 🔀 Flow
   button used to be. The canvas, the cards, the outcome ports, the wiring rules, the auto-arrange, the undo
   arrows and the loop-safety fields all came across unchanged; what changed is who owns them. It reads and

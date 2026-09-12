@@ -35,6 +35,7 @@ import com.botmaker.sdk.api.vision.Matches;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.TextMatch;
 import com.botmaker.sdk.api.vision.Vision;
+import com.botmaker.sdk.authoring.CaptureTargetModel;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTargets;
@@ -457,7 +458,72 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                 ToolbarItem.of("project-setup", "📋 Project Setup",
                         "What this project still needs before it can run — something to launch, something "
                                 + "to capture, a reference resolution, and the pictures it looks for",
-                        ToolbarGroup.PROJECT, 40, this::openProjectSetup));
+                        ToolbarGroup.PROJECT, 40, this::openProjectSetup),
+                ToolbarItem.of("point-here", "⌖ Point bot here",
+                        "Make the window the overlay is drawn over this project's capture target",
+                        ToolbarGroup.OVERLAY, 10, this::pointCaptureTargetHere),
+                ToolbarItem.of("picture-here", "✂ Picture of this",
+                        "Cut a picture out of the window the overlay is drawn over, whatever the project's "
+                                + "capture target is",
+                        ToolbarGroup.OVERLAY, 20, this::capturePictureHere),
+                ToolbarItem.of("record-here", "⏺ Record at cursor",
+                        "Record clicks and keys, and place them at the overlay's insertion cursor",
+                        ToolbarGroup.OVERLAY, 30, this::recordAtCursor));
+    }
+
+    /**
+     * Writes the window the overlay is drawn over into this project's capture target.
+     *
+     * <p><b>This is the direction the fact travels, and it only travels this way.</b> The host tells the
+     * plugin which window its own HUD is drawn over — something only the host can know — and the plugin
+     * writes its own {@code capture.json} in its own vocabulary, through the same path
+     * {@link CaptureTargets}' Apply uses. Studio holds no capture target of its own and never reads this
+     * file; see {@code docs/refactor/28-overlay-items.md}.
+     */
+    private void pointCaptureTargetHere(ActionContext context) {
+        StudioServices services = context.services();
+        String title = context.overWindowTitle().orElse(null);
+        if (title == null) {
+            services.status("Nothing to point at — the overlay is not over a window.");
+            return;
+        }
+        CaptureTargets.pointDefaultAt(services, CaptureTargetModel.window(title), failure -> {
+            if (failure == null) services.status("Capture target is now \"" + title + "\".");
+            else services.status("Couldn't write the capture target: " + failure);
+        });
+    }
+
+    /**
+     * Cuts a picture out of the window the overlay is over, rather than out of the project's default target.
+     *
+     * <p>There is no screen chooser to skip — the capture tool has always read the project's own default —
+     * so what the overlay adds is the opposite: a target for <em>this</em> session, which makes the tool
+     * usable over a window the project has never heard of, including a project that names no target at all.
+     * The override is not written down. Pointing the bot at that window is the button beside this one, so a
+     * user who wanted a picture does not silently get a re-pointed bot.
+     *
+     * <p>{@link ActionContext#overBounds()} is deliberately unused: the capture tool re-probes and raises its
+     * target at save time so a window the user has since moved is still tracked, and a rectangle captured
+     * when the HUD opened would be stale exactly then.
+     */
+    private void capturePictureHere(ActionContext context) {
+        StudioServices services = context.services();
+        CaptureTargetModel target = context.overWindowTitle()
+                .map(CaptureTargetModel::window)
+                .orElse(null);
+        CaptureTemplates.open(services, services.dialogs().owner(), target, null, () -> {});
+    }
+
+    /**
+     * Records clicks and keys, and places the translated statements at the overlay's cursor.
+     *
+     * <p>This is the capability the recorder lost when it became a plugin: it hands back source the user has
+     * to paste, because there was no way to say "insert these statements here". {@code insertAtCursor} is
+     * that way, and the recorder is one consumer of it rather than the reason it exists.
+     */
+    private void recordAtCursor(ActionContext context) {
+        StudioServices services = context.services();
+        MacroRecorderDialog.open(services, services.dialogs().owner(), context::insertAtCursor);
     }
 
     /**

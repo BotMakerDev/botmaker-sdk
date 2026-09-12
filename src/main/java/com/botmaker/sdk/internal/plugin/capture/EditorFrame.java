@@ -126,13 +126,35 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
      */
     public static void grabAsync(StudioServices services, CaptureModel.Resolution snapTo,
                                  Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {
-        grabAsync(services, snapTo, true, onFrame, onFailure);
+        grabAsync(services, null, snapTo, onFrame, onFailure);
+    }
+
+    /**
+     * The same capture-session grab against a target the <b>caller</b> names, rather than the project's
+     * default; a {@code null} target falls back to the default, so one call site serves both.
+     *
+     * <p>It exists for one caller with a fact nobody else has: the overlay editor is already drawn over a
+     * window, so <i>this</i> window is what "a picture of this" means, whatever the project's default target
+     * happens to be. The override is per grab and is <b>never written down</b> — pointing the project at that
+     * window is a separate, explicit action ({@link CaptureTargets#pointDefaultAt}), because a button that
+     * takes a picture must not silently re-point the bot.
+     */
+    public static void grabAsync(StudioServices services, CaptureTargetModel target,
+                                 CaptureModel.Resolution snapTo,
+                                 Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {
+        grabAsync(services, target, snapTo, true, onFrame, onFailure);
     }
 
     private static void grabAsync(StudioServices services, CaptureModel.Resolution snapTo, boolean raise,
                                   Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {
+        grabAsync(services, null, snapTo, raise, onFrame, onFailure);
+    }
+
+    private static void grabAsync(StudioServices services, CaptureTargetModel chosen,
+                                  CaptureModel.Resolution snapTo, boolean raise,
+                                  Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {
         Thread worker = new Thread(() -> {
-            CaptureTargetModel target = defaultTarget(services);
+            CaptureTargetModel target = chosen != null ? chosen : defaultTarget(services);
             EditorFrame frame = target == null ? null : grab(target, snapTo, raise);
             Failure failure = frame != null ? null : (target == null ? Failure.NO_TARGET : Failure.BLANK);
             Platform.runLater(() -> {

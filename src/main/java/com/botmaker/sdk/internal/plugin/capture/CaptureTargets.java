@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /**
  * Managing the project's capture targets — the monitors, windows and emulator instances a bot may be pointed
@@ -127,6 +128,56 @@ public final class CaptureTargets {
         active = new CaptureTargets(services, owner);
         active.onClosed = onClosed;
         active.show();
+    }
+
+    /**
+     * Makes {@code target} the project's default, with no window shown — the write this dialog's Apply does,
+     * for a caller that already knows the answer.
+     *
+     * <p>The one such caller is the overlay editor's row: the host says which window its HUD is drawn over,
+     * which is a fact only the host has, and pointing the bot at that window is this plugin's own sentence to
+     * write. It is <b>the same write path</b> as Apply, deliberately — {@code capture.json} through
+     * {@link Authoring#writeCapture} plus the projection onto {@code capture.source} through
+     * {@link Authoring#writeCaptureSource} — because two writers of one file disagree on the first key either
+     * of them forgets.
+     *
+     * <p>A target already in the list is promoted rather than added again, so pressing the button twice over
+     * one window does not grow the list. The reference size and every other target are read in and written
+     * back untouched, for the reason Apply carries the reference: this is not the window that owns them.
+     *
+     * <p>Off the FX thread, because it is a read-modify-store of two files on disk. {@code onDone} is called
+     * on the FX thread with {@code null} when it is written, or with the failure to report.
+     */
+    public static void pointDefaultAt(StudioServices services, CaptureTargetModel target,
+                                      Consumer<String> onDone) {
+        Path resources = services == null ? null : services.resourcesDir();
+        if (resources == null || target == null) {
+            if (onDone != null) onDone.accept("No project is open.");
+            return;
+        }
+        Thread worker = new Thread(() -> {
+            String failure = null;
+            try {
+                CaptureModel current = Authoring.readCapture(SdkVersion.latest(), resources);
+                // By spec, not by equals: a row the user typed carries their own label, and the same window
+                // listed twice under two labels is one target.
+                int existing = -1;
+                for (int i = 0; i < current.targets().size(); i++) {
+                    if (current.targets().get(i).spec().equals(target.spec())) existing = i;
+                }
+                CaptureModel next = existing >= 0
+                        ? current.withDefaultIndex(existing)
+                        : current.withTarget(target).withDefaultIndex(current.targets().size());
+                Authoring.writeCapture(SdkVersion.latest(), resources, next);
+                Authoring.writeCaptureSource(SdkVersion.latest(), resources, target.spec());
+            } catch (Exception ex) {
+                failure = ex.getMessage() == null ? ex.toString() : ex.getMessage();
+            }
+            String message = failure;
+            if (onDone != null) Platform.runLater(() -> onDone.accept(message));
+        }, "capture-target-point");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private void show() {

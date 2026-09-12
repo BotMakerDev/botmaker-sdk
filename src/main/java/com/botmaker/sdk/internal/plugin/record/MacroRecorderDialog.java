@@ -25,6 +25,7 @@ import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * The macro recorder: pick the window to record against, press Record (or {@value RecordHotkey#KEY_NAME} from
@@ -36,12 +37,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * literals, deciding on this plugin's behalf that a click is a {@code Mouse}. That is a vocabulary, and the
  * platform's rule is that a host owns capabilities and a plugin owns vocabularies.
  *
- * <p>So the recorder came here whole, and the cursor went with the overlay. <b>The accepted cost is that a
- * recording is delivered as text rather than inserted where you were working.</b> The contract has no
- * "insert these statements at the cursor" capability and should not grow one lightly: where the cursor is,
- * and what a statement means in the tree under it, is the editor's own model, and a surface shaped to this
- * one caller is the back door the platform exists to close. {@code Sources} is find-and-replace, not append.
- * If insertion is worth a capability it should be designed as one, with a second caller in mind.
+ * <p>So the recorder came here whole, and the cursor went with the overlay. The accepted cost was that a
+ * recording came back as text to be copied rather than inserted where you were working — and <b>since
+ * 2026-09-12 it is paid back</b>: the contract carries
+ * {@code ActionContext.insertAtCursor(String...)}, and {@link #open(StudioServices, Window, Consumer)} adds
+ * an <i>Insert at cursor</i> button for a caller that has one.
+ *
+ * <p>The condition the old note set is what was met, and it is worth keeping rather than deleting. Insertion
+ * was not to be bought with a surface shaped to this one caller: where the cursor is, and what a statement
+ * means in the tree under it, stays entirely the editor's own model, so what crosses is statements as text
+ * and nothing comes back. It arrived as a capability with two callers on the overlay's row, this being one of
+ * them, rather than as a member added because the recorder asked.
  *
  * <p>Linux/X11 only, like the engine behind it — {@link RecordingSession#isSupported()} decides, and the
  * window says so rather than showing a button that does nothing.
@@ -57,7 +63,14 @@ public final class MacroRecorderDialog {
     private Button recordBtn;
     private Button stopBtn;
     private Button copyBtn;
+    private Button insertBtn;
     private Stage stage;
+
+    /** Where a recording goes when the caller has a cursor for it, or {@code null} when it has none. */
+    private final Consumer<String[]> onInsert;
+
+    /** The statements of the last translation, so <i>Insert at cursor</i> sends lines rather than one blob. */
+    private List<String> recorded = List.of();
 
     private RecordingSession session;
     private RecordHotkey hotkey;
@@ -71,14 +84,30 @@ public final class MacroRecorderDialog {
     /** Set while a coalesced status refresh is already queued, so one FX runnable serves a burst of input. */
     private final AtomicBoolean statusQueued = new AtomicBoolean();
 
-    private MacroRecorderDialog(StudioServices services, Window owner) {
+    private MacroRecorderDialog(StudioServices services, Window owner, Consumer<String[]> onInsert) {
         this.services = services;
         this.owner = owner;
+        this.onInsert = onInsert;
     }
 
     /** Opens a recorder window. Not single-instance: it owns no port and no display. */
     public static void open(StudioServices services, Window owner) {
-        new MacroRecorderDialog(services, owner).show();
+        open(services, owner, null);
+    }
+
+    /**
+     * As {@link #open(StudioServices, Window)}, with an <i>Insert at cursor</i> button that hands the
+     * recorded statements to {@code onInsert} — {@code null} for no such button, which is every caller but
+     * the overlay editor's row.
+     *
+     * <p>This is the cost recorded in this class's javadoc being paid back rather than argued away. The
+     * recording used to be inserted at the program-shape overlay's cursor and lost that on the way out of the
+     * host, because the contract had no way to say <i>put these statements here</i>. It has one now —
+     * {@code ActionContext.insertAtCursor} — designed as a capability with the cursor staying entirely the
+     * host's: this window hands over statements as text and never learns where they land.
+     */
+    public static void open(StudioServices services, Window owner, Consumer<String[]> onInsert) {
+        new MacroRecorderDialog(services, owner, onInsert).show();
     }
 
     private void show() {
@@ -107,6 +136,14 @@ public final class MacroRecorderDialog {
         copyBtn.setDisable(true);
         copyBtn.setOnAction(e -> copy());
         HBox buttons = new HBox(6, recordBtn, stopBtn, copyBtn);
+        if (onInsert != null) {
+            insertBtn = new Button("Insert at cursor");
+            insertBtn.setTooltip(new Tooltip("Place these lines where you were working"));
+            insertBtn.setDisable(true);
+            insertBtn.setDefaultButton(true);
+            insertBtn.setOnAction(e -> insert());
+            buttons.getChildren().add(insertBtn);
+        }
         buttons.setAlignment(Pos.CENTER_LEFT);
 
         output.setEditable(false);
@@ -259,7 +296,9 @@ public final class MacroRecorderDialog {
             return;
         }
         output.clear();
+        recorded = List.of();
         copyBtn.setDisable(true);
+        if (insertBtn != null) insertBtn.setDisable(true);
         recordBtn.setText("⏸ Pause");
         stopBtn.setDisable(false);
         updateStatus();
@@ -281,14 +320,33 @@ public final class MacroRecorderDialog {
 
         if (macro.isEmpty()) {
             output.clear();
+            recorded = List.of();
             copyBtn.setDisable(true);
+            if (insertBtn != null) insertBtn.setDisable(true);
             status.setText("Nothing to write down — no recognizable actions were recorded.");
             return;
         }
         output.setText(macro.java());
+        recorded = macro.statements();
         copyBtn.setDisable(false);
+        if (insertBtn != null) insertBtn.setDisable(false);
         int lines = macro.statements().size();
-        status.setText("Recorded " + lines + (lines == 1 ? " line" : " lines") + " — copy it into your bot.");
+        status.setText("Recorded " + lines + (lines == 1 ? " line" : " lines")
+                + (insertBtn == null ? " — copy it into your bot." : " — insert them, or copy them."));
+    }
+
+    /**
+     * Hands the recorded statements to the caller's cursor.
+     *
+     * <p>The statements rather than {@link MacroTranslator.Macro#java()}: the text carries its imports as
+     * lines of their own, and the host adds the imports a statement needs as part of inserting it. The window
+     * stays open, because a recording usually comes in passes.
+     */
+    private void insert() {
+        if (onInsert == null || recorded.isEmpty()) return;
+        onInsert.accept(recorded.toArray(String[]::new));
+        int lines = recorded.size();
+        status.setText("Inserted " + lines + (lines == 1 ? " line" : " lines") + " at the cursor.");
     }
 
     private void copy() {

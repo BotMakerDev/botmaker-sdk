@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.plugin.capture;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.authoring.CaptureModel;
+import com.botmaker.sdk.authoring.CaptureTargetModel;
 import com.botmaker.sdk.authoring.TemplateLibrary;
 import com.botmaker.sdk.internal.plugin.capture.CaptureSurface.Region;
 import com.botmaker.sdk.internal.plugin.capture.TemplateNaming.NamedCapture;
@@ -76,6 +77,17 @@ public final class CaptureTemplates {
     private final CaptureModel.Resolution referenceSize;
 
     /**
+     * The target every grab in this session reads, or {@code null} to read the project's default each time.
+     *
+     * <p>Set only by the overlay editor's own row, where the window being drawn over is the subject and the
+     * project's default may be something else entirely — or nothing at all, which used to make this tool
+     * refuse to open over a perfectly good window. It is not persisted: see
+     * {@link EditorFrame#grabAsync(StudioServices, com.botmaker.sdk.authoring.CaptureTargetModel,
+     * CaptureModel.Resolution, Consumer, Consumer)}.
+     */
+    private final CaptureTargetModel target;
+
+    /**
      * The tag a batch is pre-filled with — the activity that was open when the tool was opened, or
      * {@code null}. Fixed at open time on purpose: the tool is long-lived and deliberately keeps the editor
      * out of the way, so a tag that changed underneath the user would be a worse default than the one they
@@ -100,10 +112,11 @@ public final class CaptureTemplates {
     private boolean closed;
 
     private CaptureTemplates(StudioServices services, Window owner, CaptureModel.Resolution referenceSize,
-                             String suggestedTag, Runnable onClosed) {
+                             CaptureTargetModel target, String suggestedTag, Runnable onClosed) {
         this.services = services;
         this.owner = owner;
         this.referenceSize = referenceSize;
+        this.target = target;
         this.suggestedTag = suggestedTag;
         this.onClosed = onClosed;
     }
@@ -119,6 +132,18 @@ public final class CaptureTemplates {
      * up), so a caller that hid itself always comes back.
      */
     public static void open(StudioServices services, Window owner, String suggestedTag, Runnable onClosed) {
+        open(services, owner, null, suggestedTag, onClosed);
+    }
+
+    /**
+     * As {@link #open(StudioServices, Window, String, Runnable)}, capturing from {@code target} rather than
+     * from the project's default — {@code null} means the default, so this is the one implementation.
+     *
+     * <p>The overlay editor's row is the caller with a target of its own: the window its HUD is drawn over.
+     * The override lasts as long as the tool and changes no file.
+     */
+    public static void open(StudioServices services, Window owner, CaptureTargetModel target,
+                            String suggestedTag, Runnable onClosed) {
         Runnable done = onClosed == null ? () -> {} : onClosed;
         // Single-instance: focus the live tool instead of stacking another one.
         if (active != null && active.toolbarStage != null && active.toolbarStage.isShowing()) {
@@ -126,7 +151,8 @@ public final class CaptureTemplates {
             done.run();
             return;
         }
-        new CaptureTemplates(services, owner, EditorFrame.referenceSize(services), suggestedTag, done).start();
+        new CaptureTemplates(services, owner, EditorFrame.referenceSize(services), target, suggestedTag, done)
+                .start();
     }
 
     /**
@@ -325,7 +351,7 @@ public final class CaptureTemplates {
      * the user has moved or resized between two captures.
      */
     private void grab(Consumer<EditorFrame> onFrame, Consumer<EditorFrame.Failure> onFailure) {
-        EditorFrame.grabAsync(services, referenceSize, onFrame, onFailure);
+        EditorFrame.grabAsync(services, target, referenceSize, onFrame, onFailure);
     }
 
     /**
