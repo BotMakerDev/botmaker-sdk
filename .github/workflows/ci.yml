@@ -157,6 +157,12 @@ jobs:
       #
       # `--no-build` because `mvn -B -DskipTests verify` two steps up has already compiled this module; the
       # validator would otherwise shell out to Maven and compile it a second time.
+      #
+      # `plugin validate`, two words, since botmaker-cli grew two nouns on 2026-09-05. This step said
+      # `validate` until 2026-09-16 and had been red on every push since: the bare verb is a hidden alias
+      # that prints its replacement and exits 2, so the job failed with `Unknown option: '--no-build'` and
+      # the usage of a different command. It is what made the SDK unreleasable — CiGate refuses a module
+      # whose main is red, and the SDK is forced into every release plugin-basics is in.
       - name: Check out botmaker-cli
         uses: actions/checkout@v4
         with:
@@ -174,7 +180,7 @@ jobs:
           source .github/mvn-retry.sh
           mvn_retry mvn -B -q -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
           mvn_retry mvn -B -q -f .deps/botmaker-cli/pom.xml package -DskipTests
-          java -jar .deps/botmaker-cli/target/botmaker-cli-0.0.0-SNAPSHOT-all.jar validate . --no-build
+          java -jar .deps/botmaker-cli/target/botmaker-cli-0.0.0-SNAPSHOT-all.jar plugin validate . --no-build
 
   # JitPack builds the artifact itself from the pushed tag; this just asks it to start eagerly so the
   # first consumer doesn't wait. No secrets required.
