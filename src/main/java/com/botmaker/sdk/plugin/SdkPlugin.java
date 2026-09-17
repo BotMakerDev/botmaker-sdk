@@ -1,7 +1,6 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.ActionContext;
-import com.botmaker.plugin.api.ParameterDeclaration;
 import com.botmaker.plugin.api.ParameterEdit;
 import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.ParameterRow;
@@ -380,18 +379,10 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         return open == null ? Optional.empty() : open.apply(edit);
     }
 
-    /**
-     * Stores a declared row — added, renamed, retyped, refiled, bounded, re-optioned or removed.
-     *
-     * <p>One call rather than nine, because what crosses is the row as the host wants it. What a retype
-     * resets and what a range clamps are this plugin's rules and stay in {@link ParameterStore}, which is
-     * plugin #2's and therefore every plugin's.
-     */
-    @Override
-    public Optional<ParameterRow> parameterDeclared(ParameterDeclaration declaration) {
-        ParameterStore open = parameters;
-        return open == null ? Optional.empty() : open.declared(declaration);
-    }
+    // parameterDeclared stood here until 2026-09-17, storing a row the host declared. The contract method is
+    // gone: a user parameter is a @Param field in the bot's own Java and the host edits it there. This
+    // plugin's own rows — an activity's enable flag — are declared in this plugin's own code, through
+    // ParameterStore's verbs, which are unchanged.
 
     /**
      * Takes the project being bound — which is what makes the two methods above answerable.
