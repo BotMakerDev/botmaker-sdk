@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The six parameter categories are gone** — Timing, Targets, Vision, Input, Limits, Debug. They were this
+  plugin's declaration of how a bot's settings are filed, and a bot's settings are its own Java now: a
+  `@Param`'s `category` is free text, so the Parameters rail lists the categories *you* wrote and nothing
+  else. A project that used one keeps it, because the category was always just text on the row; what
+  changes is that the six no longer appear in an empty project, offering a filing system for parameters
+  that do not exist yet.
 - **`SdkPlugin` no longer stores declared parameter rows.** The contract's
   `parameterDeclared(ParameterDeclaration)` is gone (studio-api, 2026-09-17): a user parameter is a
   `@Param` field in the bot's own Java and the host writes it there. This plugin's own rows — an activity's

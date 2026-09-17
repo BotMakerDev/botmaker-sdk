@@ -108,7 +108,10 @@ class SdkPluginSurfaceTest {
         ParameterGroup group = groups.getFirst();
         assertEquals(ParameterGroup.DEFAULT_ID, group.id());
         assertEquals("Parameters", group.className());
-        assertFalse(group.categories().isEmpty());
+        // And it declares no categories. Six stood here for a week; a @Param's category is free text, so the
+        // only ones that exist are the ones a bot's author wrote, and a plugin offering more would be filing
+        // rows it does not own.
+        assertEquals(List.of(), group.categories());
     }
 
     @Test

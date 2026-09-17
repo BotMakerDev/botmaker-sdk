@@ -489,6 +489,16 @@ where a random default would make every open of an old project look like a renam
 generated `Parameters` file it once named — a `ParameterGroup` is how the editor's Parameters dialog decides
 which plugin a variable belongs to.
 
+**It declares no categories (2026-09-17).** Six stood there for a week — Timing, Targets, Vision, Input,
+Limits, Debug — the third vocabulary tried for that rail, and they went the way of the first two: a user
+parameter is a `@Param` field in the bot's own Java and its `category` is **free text**, so the only
+categories that exist are the ones a bot's author wrote. A plugin declaring six more would be offering a
+filing system for rows it does not have. The group stays, with its blank id, because this plugin does have
+rows of its own — an activity's enable flag — and a project written before groups existed reads back blank.
+**`parameterDeclared` is gone from the contract too**, so what crosses for those rows is
+`parameterRows`/`parameterEdited`: read them, change a value. Declaring one is this plugin's own call into
+`ParameterStore`'s verbs.
+
 ## The Remote Pilot is this plugin's feature (2026-08-30)
 
 `internal/plugin/pilot/` — the server, the routes, the input path, the video encode, the Tailscale Funnel
