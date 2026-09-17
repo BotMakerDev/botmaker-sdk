@@ -661,19 +661,17 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * since the derived files became runtime reads — it is how the editor's Parameters dialog decides which
      * plugin a variable belongs to.
      *
-     * <p><b>The categories are new, and they replace a vocabulary that had stopped meaning anything.</b> The
-     * Parameters rail used to be filed by {@code TagCatalog} — one tag per activity in {@code activities.json},
-     * plus the user's custom tags out of {@code templates.json} — which made sense while Studio defined the
-     * activities. It does not any more, and a rail whose categories are the activity list is a rail that
-     * renames itself behind the user. So a category is now something a <em>plugin declares</em>, inside its
-     * own section: a second layer within one group rather than a second set of groups.
+     * <p><b>It declares no categories (2026-09-17).</b> Six of them stood here for a week — Timing, Targets,
+     * Vision, Input, Limits, Debug — as the axes a bot's settings fall along. They were the third vocabulary
+     * to be tried for that rail and they went the way of the first two: a user parameter is a {@code @Param}
+     * field in the bot's own Java now, and {@code @Param(category = "…")} is <em>free text</em>, so the only
+     * categories that exist are the ones a bot's author wrote. A plugin declaring six more would be offering
+     * a filing system for rows it does not have and a vocabulary for parameters it does not own.
      *
-     * <p>These six are the axes a bot's own settings actually fall along, and they are deliberately about
-     * <em>what a parameter configures</em>, not about where in the flow it is read — a delay two activities
-     * both wait for is one parameter, which is the whole reason the list is flat underneath.
+     * <p>The group itself stays, and its id is still blank, because this plugin does have rows of its own —
+     * an activity's enable flag — and a project written before groups existed reads back blank.
      */
-    private static final ParameterGroup SDK_PARAMETERS = ParameterGroup.of(
-            ParameterGroup.DEFAULT_ID, "Parameters",
-            List.of("Timing", "Targets", "Vision", "Input", "Limits", "Debug"));
+    private static final ParameterGroup SDK_PARAMETERS =
+            ParameterGroup.of(ParameterGroup.DEFAULT_ID, "Parameters");
 
 }
