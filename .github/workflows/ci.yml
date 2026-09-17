@@ -35,12 +35,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The Studio plugin contract. This SDK is Studio's plugin #1 and compiles against it (an OPTIONAL
       # dependency, so it never reaches a bot's classpath — but the build still needs it present).
       - name: Check out botmaker-studio-api
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: LiQiyeDev/botmaker-studio-api
           path: .deps/botmaker-studio-api
@@ -55,7 +55,7 @@ jobs:
       # After studio-api, before this module's own build: the toolkit declares the contract `provided`,
       # so the contract has to be installed first rather than arriving transitively.
       - name: Check out botmaker-plugin-toolkit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: LiQiyeDev/botmaker-plugin-toolkit
           path: .deps/botmaker-plugin-toolkit
@@ -67,24 +67,24 @@ jobs:
       # After the toolkit, because it declares the toolkit at compile scope and the contract `provided`:
       # both have to be installed before it rather than arriving transitively.
       - name: Check out botmaker-plugin-basics
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: LiQiyeDev/botmaker-plugin-basics
           path: .deps/botmaker-plugin-basics
 
       - name: Check out botmaker-shared
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: LiQiyeDev/botmaker-shared
           path: .deps/botmaker-shared
 
       - name: Check out botmaker-session
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: LiQiyeDev/botmaker-session
           path: .deps/botmaker-session
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
@@ -164,13 +164,13 @@ jobs:
       # the usage of a different command. It is what made the SDK unreleasable — CiGate refuses a module
       # whose main is red, and the SDK is forced into every release plugin-basics is in.
       - name: Check out botmaker-cli
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: LiQiyeDev/botmaker-cli
           path: .deps/botmaker-cli
 
       - name: Check out botmaker-plugin-host (botmaker-cli's own upstream)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: LiQiyeDev/botmaker-plugin-host
           path: .deps/botmaker-plugin-host
@@ -207,7 +207,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
