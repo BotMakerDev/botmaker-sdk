@@ -42,7 +42,7 @@ jobs:
       - name: Check out botmaker-studio-api
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-studio-api
+          repository: BotMakerDev/botmaker-studio-api
           path: .deps/botmaker-studio-api
 
       # The widget kit this module's slot editors (internal/plugin/editors) are built from — an ordinary
@@ -57,7 +57,7 @@ jobs:
       - name: Check out botmaker-plugin-toolkit
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-plugin-toolkit
+          repository: BotMakerDev/botmaker-plugin-toolkit
           path: .deps/botmaker-plugin-toolkit
 
       # Plugin #2, which owns the nine JDK value types com.botmaker.sdk.authoring.WireText delegates the
@@ -69,19 +69,19 @@ jobs:
       - name: Check out botmaker-plugin-basics
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-plugin-basics
+          repository: BotMakerDev/botmaker-plugin-basics
           path: .deps/botmaker-plugin-basics
 
       - name: Check out botmaker-shared
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-shared
+          repository: BotMakerDev/botmaker-shared
           path: .deps/botmaker-shared
 
       - name: Check out botmaker-session
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-session
+          repository: BotMakerDev/botmaker-session
           path: .deps/botmaker-session
 
       - uses: actions/setup-java@v6
@@ -166,13 +166,13 @@ jobs:
       - name: Check out botmaker-cli
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-cli
+          repository: BotMakerDev/botmaker-cli
           path: .deps/botmaker-cli
 
       - name: Check out botmaker-plugin-host (botmaker-cli's own upstream)
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-plugin-host
+          repository: BotMakerDev/botmaker-plugin-host
           path: .deps/botmaker-plugin-host
 
       - name: Plugin gate (the checks the plugin registry runs)
