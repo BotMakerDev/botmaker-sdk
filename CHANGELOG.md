@@ -17,6 +17,26 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+No source changes since v1.1.9; re-released for updated upstream pins.
+
+No source changes since v1.1.8; re-released for updated upstream pins.
+
+### Changed
+
+- **The six parameter categories are gone** — Timing, Targets, Vision, Input, Limits, Debug. They were this
+  plugin's declaration of how a bot's settings are filed, and a bot's settings are its own Java now: a
+  `@Param`'s `category` is free text, so the Parameters rail lists the categories *you* wrote and nothing
+  else. A project that used one keeps it, because the category was always just text on the row; what
+  changes is that the six no longer appear in an empty project, offering a filing system for parameters
+  that do not exist yet.
+- **`SdkPlugin` no longer stores declared parameter rows.** The contract's
+  `parameterDeclared(ParameterDeclaration)` is gone (studio-api, 2026-09-17): a user parameter is a
+  `@Param` field in the bot's own Java and the host writes it there. This plugin's own rows — an activity's
+  enable flag — are unaffected, and it still answers `parameterRows` and `parameterEdited`. Nothing in
+  `api.*` changed, so no bot is affected.
+
 ## [1.1.9] — 2026-09-18
 
 No source changes since v1.1.8; re-released for updated upstream pins.
