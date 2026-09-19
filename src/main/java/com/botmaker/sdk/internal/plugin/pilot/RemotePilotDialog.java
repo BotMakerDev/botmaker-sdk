@@ -33,7 +33,7 @@ final class RemotePilotDialog {
 
     /** Stable "latest release" permalink the install-app QR points at; the botmaker-pilot CI attaches this. */
     private static final String APK_URL =
-            "https://github.com/LiQiyeDev/botmaker-pilot/releases/latest/download/botpilot.apk";
+            "https://github.com/BotMakerDev/botmaker-pilot/releases/latest/download/botpilot.apk";
 
     /** Where a user without Tailscale installs it. */
     static final String TAILSCALE_DOWNLOAD_URL = "https://tailscale.com/download";
