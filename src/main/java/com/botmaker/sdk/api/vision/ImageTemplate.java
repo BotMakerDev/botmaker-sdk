@@ -3,13 +3,16 @@ package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.internal.vision.TemplateMetadata;
+import com.botmaker.sdk.internal.vision.TemplateSource;
 import com.botmaker.shared.opencv.OpenCvNative;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
 import org.opencv.imgcodecs.Imgcodecs;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Public handle for a template image used by the vision API.
@@ -104,12 +107,24 @@ public class ImageTemplate implements AutoCloseable {
     Mat getMat() {
         OpenCvNative.ensureLoaded();
         if (mat == null || mat.empty()) {
-            String absPath = new File(filePath).getAbsolutePath();
+            // The file as written first, then the classpath (TemplateSource says why): a bot run from an IDE
+            // rooted elsewhere, or from its own jar, has no src/main/resources relative to its working dir.
+            List<String> tried = new ArrayList<>();
+            TemplateSource.Found found = TemplateSource.read(filePath, tried).orElseThrow(() ->
+                    new RuntimeException("Failed to load image template \"" + filePath + "\". Looked in: "
+                            + String.join("; ", tried) + " (working directory "
+                            + Path.of("").toAbsolutePath() + ")"));
             // IMREAD_UNCHANGED keeps a transparent PNG's alpha channel (4-channel BGRA) so the matcher can
             // use it as a mask (ignoring transparent pixels); opaque PNGs still load as 3-channel BGR.
-            mat = Imgcodecs.imread(absPath, Imgcodecs.IMREAD_UNCHANGED);
+            MatOfByte encoded = new MatOfByte(found.bytes());
+            try {
+                mat = Imgcodecs.imdecode(encoded, Imgcodecs.IMREAD_UNCHANGED);
+            } finally {
+                encoded.release();                      // native memory; the decoded Mat is a copy
+            }
             if (mat.empty()) {
-                throw new RuntimeException("Failed to load image template. Path: " + absPath);
+                throw new RuntimeException("Failed to load image template \"" + filePath + "\": "
+                        + found.where() + " is not an image OpenCV can decode");
             }
         }
         return mat;

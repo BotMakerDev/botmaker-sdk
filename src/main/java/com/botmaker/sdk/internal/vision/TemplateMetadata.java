@@ -4,8 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.awt.Dimension;
-import java.io.File;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -50,12 +51,14 @@ public final class TemplateMetadata {
     private static Dimension read(String templatePath) {
         int dot = templatePath.lastIndexOf('.');
         String sidecar = (dot == -1 ? templatePath : templatePath.substring(0, dot)) + ".json";
-        File file = new File(sidecar).getAbsoluteFile();
-        if (!file.isFile()) {
+        // Found where the image is found — a sidecar only the working directory could reach would give a
+        // template loaded from the classpath no authored size, and the matcher would silently stop rescaling.
+        Optional<TemplateSource.Found> found = TemplateSource.read(sidecar, new ArrayList<>());
+        if (found.isEmpty()) {
             return ABSENT;
         }
         try {
-            JsonNode root = new ObjectMapper().readTree(file);
+            JsonNode root = new ObjectMapper().readTree(found.get().bytes());
             JsonNode w = root.get("captureWidth");
             JsonNode h = root.get("captureHeight");
             if (w != null && h != null && w.asInt() > 0 && h.asInt() > 0) {
