@@ -12,6 +12,12 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 **Done**
 
+- **`SdkPlugin.managedFields()` claims `static final ImageTemplate` constants** through the contract's new
+  `ManagedField`. The host draws them with `TemplateEditors.preview` and refuses a canvas edit, naming
+  🖼 Manage Pictures — the window that renames the file, the constant and every use of it in one pass, which
+  is the half the canvas cannot do. A class of nothing but picture constants is refused whole, so the
+  template's `Pictures` is read-only without Studio knowing what a picture is.
+
 - **`internal/vision/TemplateSource`** is the one lookup order for a template and its sidecar: the path as
   written (relative to `user.dir`, unchanged), then the classpath with a leading `src/main/resources/`
   stripped. `ImageTemplate.getMat` decodes the bytes (`imdecode`, `IMREAD_UNCHANGED` as before) and, when

@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Added
+
+- **Picture constants are managed by 🖼 Manage Pictures.** A `static final ImageTemplate` field is shown in
+  the editor with its thumbnail and cannot be edited on the canvas, which says to use that window — the one
+  that renames the file, the constant and every use of it together. A class of nothing but picture constants
+  (the template's `Pictures`) is read-only as a whole.
+
 ### Fixed
 
 - **A picture loads whatever directory the bot was started from.** `new ImageTemplate("src/main/resources/
