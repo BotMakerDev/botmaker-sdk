@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.ActionContext;
+import com.botmaker.plugin.api.ManagedField;
 import com.botmaker.plugin.api.ParameterEdit;
 import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.ParameterRow;
@@ -318,6 +319,22 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                 SourceSeed.of(Direction.class.getName(), Direction.class.getName() + ".NORTH"),
                 SourceSeed.of(Key.class.getName(), Key.class.getName() + ".A"),
                 SourceSeed.of(MouseButton.class.getName(), MouseButton.class.getName() + ".LEFT"));
+    }
+
+    /**
+     * A picture constant — {@code static final ImageTemplate COLLECT = new ImageTemplate(…)} — is shown on the
+     * canvas and changed in 🖼 Manage Pictures.
+     *
+     * <p>That window renames the file, the constant and every use of it together (through the host's
+     * {@code Sources}); the canvas can only rename the one it is looking at, which leaves the bot calling a
+     * name that is gone. A class of nothing but picture constants — {@code botmaker-gamebot}'s
+     * {@code Pictures} — is therefore read-only as a whole, and says where to go.
+     */
+    @Override
+    public List<ManagedField> managedFields() {
+        return List.of(new ManagedField(ImageTemplate.class.getName(),
+                "Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every use of"
+                        + " it together."));
     }
 
     /**
