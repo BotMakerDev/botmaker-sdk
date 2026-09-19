@@ -8,6 +8,26 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-19 — a picture is found from any working directory
+
+**Done**
+
+- **`internal/vision/TemplateSource`** is the one lookup order for a template and its sidecar: the path as
+  written (relative to `user.dir`, unchanged), then the classpath with a leading `src/main/resources/`
+  stripped. `ImageTemplate.getMat` decodes the bytes (`imdecode`, `IMREAD_UNCHANGED` as before) and, when
+  nothing is found, names every location tried and the working directory. `TemplateMetadata` reads the
+  sidecar through the same lookup, so a classpath-loaded picture keeps its authored size. Found dogfooding:
+  IntelliJ's run configuration rooted at the umbrella made `botmaker-gamebot`'s `Pictures` unloadable.
+  `api.*` gained nothing and lost nothing (japicmp green).
+
+**Deferred / next**
+
+- `botmaker-gamebot`'s constants may become `new ImageTemplate("images/collect.png")` once it pins an SDK
+  with this fallback — through Studio's *Project ▸ Upgrade…*, never by hand. On 1.1.9 that spelling would
+  fail inside Studio, whose runs use the project directory as the working directory.
+
+---
+
 ## 2026-09-11 (later) — the SDK sheds the settings facade
 
 **Done**

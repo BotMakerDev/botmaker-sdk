@@ -17,6 +17,18 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Fixed
+
+- **A picture loads whatever directory the bot was started from.** `new ImageTemplate("src/main/resources/
+  images/collect.png")` only resolved against the working directory, so a bot run from an IDE rooted
+  anywhere but the project, or from its own jar, failed with `Failed to load image template`. The path as
+  written is still tried first; then the same picture on the classpath, where Maven packages it
+  (`images/collect.png`). The picture's size sidecar is found the same way.
+- **A picture that cannot be found says where it looked**: every location tried and the working directory,
+  instead of one absolute path that was only ever the first guess.
+
 ## [1.1.11] — 2026-09-19
 
 ### Changed
