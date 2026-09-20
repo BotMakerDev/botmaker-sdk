@@ -1,7 +1,7 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.ActionContext;
-import com.botmaker.plugin.api.ManagedField;
+import com.botmaker.plugin.api.ManagedValue;
 import com.botmaker.plugin.api.ParameterEdit;
 import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.ParameterRow;
@@ -327,15 +327,24 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      *
      * <p>That window renames the file, the constant and every use of it together (through the host's
      * {@code Sources}); the canvas can only rename the one it is looking at, which leaves the bot calling a
-     * name that is gone. A class of nothing but picture constants — {@code botmaker-gamebot}'s
-     * {@code Pictures} — is therefore read-only as a whole, and says where to go.
+     * name that is gone. The class holding them — {@code @Managed("pictures")} — is therefore read-only as a
+     * whole, and says where to go.
+     *
+     * <p><b>The class says so itself now</b> (2026-09-20). This claimed every {@code static final} field
+     * whose type was {@code ImageTemplate}, wherever it was written, and Studio inferred that a class of
+     * nothing but those was managed whole. Both were guesses about shape: a bot keeping one picture beside
+     * ordinary code was locked out of it, and a second class of pictures could not be told from the first.
+     * The annotation is on the file this plugin ships, so it is a statement rather than an inference.
      */
     @Override
-    public List<ManagedField> managedFields() {
-        return List.of(new ManagedField(ImageTemplate.class.getName(),
+    public List<ManagedValue> managedValues() {
+        return List.of(new ManagedValue(PICTURES,
                 "Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every use of"
                         + " it together."));
     }
+
+    /** The {@code @Managed} id on the class of picture constants this plugin's window keeps in step. */
+    public static final String PICTURES = "pictures";
 
     /**
      * The seventeen types a project variable could hold before there was a registry to hold them in.

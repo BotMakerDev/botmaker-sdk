@@ -21,6 +21,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 No source changes since v1.1.12; re-released for updated upstream pins.
 
+### Changed
+
+- **Your picture class says it is managed, instead of Studio guessing.** Until now Studio locked every
+  `static final ImageTemplate` field it found anywhere, and treated a class of nothing but those as owned
+  whole by *🖼 Manage Pictures*. So a bot that kept one picture beside ordinary code was locked out of that
+  code, and a second class of pictures could not be told from the first. The class carries
+  `@Managed("pictures")` now and only the class that carries it is refused; a picture constant you write
+  yourself, anywhere else, is yours to edit. The `Pictures.java` the SDK ships from the next release carries
+  it already.
+
 ### Added
 
 - **The SDK's eight value types read their own Java back.** A picture, a precision, a point, a rectangle, a
