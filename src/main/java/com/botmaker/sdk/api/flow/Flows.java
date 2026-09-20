@@ -47,4 +47,18 @@ public final class Flows {
     public static Flow installed() {
         return current;
     }
+
+    /**
+     * Whether the flow has the named activity switched on — its configured default, before any
+     * {@code enable}/{@code disable} a running bot has made.
+     *
+     * <p><b>An activity the flow does not mention is on.</b> That is the answer
+     * {@code Settings.enabled} gave for a name with no entry, and it has to stay: a bot may define an
+     * activity that is not on the canvas at all, and reading an absent name as <em>off</em> would make such
+     * an activity silently do nothing.
+     */
+    public static boolean enabled(String activity) {
+        Flow.Activity found = current.activity(activity);
+        return found == null || found.enabled();
+    }
 }

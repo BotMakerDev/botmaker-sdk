@@ -1,7 +1,11 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.sdk.internal.bot.ActivityRegistry;
-import com.botmaker.sdk.internal.config.ProjectData;
+import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.Flows;
+import com.botmaker.sdk.api.bot.ActivityBody;
+
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +35,7 @@ class ActivitiesTest {
     void tearDown() {
         // The name registry is process-global; keep tests independent.
         ActivityRegistry.clear();
-        ProjectData.use(null);
+        Flows.use(null);
     }
 
     /** A legacy activity, to prove the two kinds share one registry. */
@@ -105,9 +109,9 @@ class ActivitiesTest {
      */
     @Test
     void disableByNameReachesADefinedActivityAndASubclassAlike() {
-        ProjectData.use(ProjectData.of("""
-                { "activities": [ { "name": "Mining", "enabled": true } ] }
-                """));
+        Flows.use(Flow.of(List.of(
+                Flow.activity(ActivityBody.NONE, "Mining", "", true, false, false, List.of())),
+                List.of(), List.of(), "", Flow.Limits.DEFAULT));
         Activities.define("Mining", ctx -> ctx.done());
         Smelting smelting = new Smelting();
 
@@ -135,11 +139,11 @@ class ActivitiesTest {
      * is picked up without the definition knowing anything about files.
      */
     @Test
-    void aDefinedActivityDefersToTheValueSetInTheEditor() {
-        ProjectData.use(ProjectData.of("""
-                { "activities": [ { "name": "Mining", "enabled": false },
-                                  { "name": "Selling", "enabled": true } ] }
-                """));
+    void aDefinedActivityDefersToTheFlowsOwnSwitch() {
+        Flows.use(Flow.of(List.of(
+                Flow.activity(ActivityBody.NONE, "Mining", "", false, false, false, List.of()),
+                Flow.activity(ActivityBody.NONE, "Selling", "", true, false, false, List.of())),
+                List.of(), List.of(), "", Flow.Limits.DEFAULT));
         Activities.define("Mining", ctx -> ctx.done());
         Activities.define("Selling", ctx -> ctx.done());
 
@@ -150,9 +154,9 @@ class ActivitiesTest {
     /** The "do this once, then stop" pattern, from inside the body. */
     @Test
     void aBodyCanSwitchItsOwnActivityOffMidRun() {
-        ProjectData.use(ProjectData.of("""
-                { "activities": [ { "name": "Mining", "enabled": true } ] }
-                """));
+        Flows.use(Flow.of(List.of(
+                Flow.activity(ActivityBody.NONE, "Mining", "", true, false, false, List.of())),
+                List.of(), List.of(), "", Flow.Limits.DEFAULT));
         AtomicInteger runs = new AtomicInteger();
         Activities.define("Mining", ctx -> {
             runs.incrementAndGet();
@@ -163,15 +167,15 @@ class ActivitiesTest {
         ActivityRegistry.Runner mining = ActivityRegistry.get("Mining");
         assertTrue(mining.active());
         mining.execute();
-        assertFalse(mining.active(), "the override outranks the value set in the editor");
+        assertFalse(mining.active(), "the override outranks the switch on the canvas");
         assertEquals(1, runs.get());
     }
 
     @Test
-    void anOverrideOutranksTheEditorInBothDirections() {
-        ProjectData.use(ProjectData.of("""
-                { "activities": [ { "name": "Mining", "enabled": false } ] }
-                """));
+    void anOverrideOutranksTheFlowInBothDirections() {
+        Flows.use(Flow.of(List.of(
+                Flow.activity(ActivityBody.NONE, "Mining", "", false, false, false, List.of())),
+                List.of(), List.of(), "", Flow.Limits.DEFAULT));
         Activities.define("Mining", ctx -> ctx.done());
 
         Activity.enable("Mining");
@@ -201,9 +205,9 @@ class ActivitiesTest {
      */
     @Test
     void anUndeclaredOutcomeIsStillReported() {
-        ProjectData.use(ProjectData.of("""
-                { "activities": [ { "name": "Mining", "enabled": true, "outcomes": [ "BAG_FULL" ] } ] }
-                """));
+        Flows.use(Flow.of(List.of(
+                Flow.activity(ActivityBody.NONE, "Mining", "", true, false, false, List.of("BAG_FULL"))),
+                List.of(), List.of(), "", Flow.Limits.DEFAULT));
         Activities.define("Mining", ctx -> ctx.outcome("BAG_FUL"));
 
         assertEquals("BAG_FUL", ActivityRegistry.get("Mining").execute().name());

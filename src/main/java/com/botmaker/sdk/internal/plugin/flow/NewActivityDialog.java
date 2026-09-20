@@ -1,7 +1,6 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
 import com.botmaker.plugin.api.Theme;
-import com.botmaker.sdk.authoring.ActivityModel;
 import com.botmaker.sdk.authoring.FlowEdgeModel;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -204,9 +203,12 @@ public final class NewActivityDialog {
         String text = description.getText() == null ? "" : description.getText().trim();
         // Enabled from the start: an activity you just asked for and then have to tick on is a papercut, and
         // the canvas already shows a disabled card greyed out if you change your mind.
-        // An id of its own from the moment it is created, so the very first rename is already a rename.
+        //
+        // No body yet, which is an ordinary state and not a half-made card: drawing the flow before writing
+        // the methods is a way people work, the card is written as ActivityBody.NONE, and the "Runs" box in
+        // the side panel is where the method reference goes when it exists.
         created = new ActivityDraft(candidate, text, true, List.copyOf(outcomes),
-                goHome.isSelected(), popupCheck.isSelected(), x, y, ActivityModel.newId());
+                goHome.isSelected(), popupCheck.isSelected(), x, y);
         stage.close();
     }
 

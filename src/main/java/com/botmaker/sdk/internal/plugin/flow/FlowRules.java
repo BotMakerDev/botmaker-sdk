@@ -1,11 +1,15 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
 import com.botmaker.sdk.authoring.FlowEdgeModel;
-import com.botmaker.sdk.authoring.FlowModel;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -46,8 +50,8 @@ public final class FlowRules {
 
     /**
      * The activities that are placed but unreachable from {@code start} — they won't run. With no wires at
-     * all nothing is wired yet, so nothing is an orphan (the generator falls back to plain list order; see
-     * {@link FlowModel#reachable}).
+     * all nothing is wired yet, so nothing is an orphan — a flow with no wires runs its activities in the
+     * order they are listed.
      */
     public static List<String> orphans(List<String> placed, List<FlowEdgeModel> edges, String start) {
         if (edges.isEmpty()) return List.of();
@@ -60,13 +64,38 @@ public final class FlowRules {
     }
 
     /**
-     * The activities a run can reach, breadth-first from {@code start} (falling back to the first placed card
-     * when {@code start} names nothing placed, exactly as {@link FlowModel#resolvedStart} does). Delegates to
-     * {@link FlowModel#reachableFrom} — the same walk the code generator uses — so what the canvas marks as
-     * reachable is by construction what gets generated.
+     * The activities a run can reach, breadth-first from {@code start}, falling back to the first placed
+     * card when {@code start} names nothing placed — which is the rule {@code FlowGraph} resolves a start
+     * with, so what the canvas marks as reachable is what a run actually reaches.
+     *
+     * <p><b>It walks here rather than delegating, since 2026-09-21.</b> The walk was
+     * {@code FlowModel.reachableFrom}, shared so that the canvas and the code generator could not disagree
+     * about it. There is no generator, and there is no {@code FlowModel}: the flow is a value in the bot's
+     * own Java. What is left is one canvas asking one question about its own wires.
      */
     public static List<String> reachable(List<String> placed, List<FlowEdgeModel> edges, String start) {
         String from = placed.contains(start) ? start : (placed.isEmpty() ? "" : placed.getFirst());
-        return FlowModel.reachableFrom(placed, edges, from);
+        Set<String> known = new HashSet<>(placed);
+        if (!known.contains(from)) return List.of();
+
+        Map<String, List<String>> successors = new LinkedHashMap<>();
+        for (FlowEdgeModel edge : edges) {
+            // A wire naming something that is not placed is stale — a card that has been deleted — and is
+            // dropped rather than making a node of a name nothing draws.
+            if (!known.contains(edge.from()) || !known.contains(edge.to())) continue;
+            successors.computeIfAbsent(edge.from(), k -> new ArrayList<>()).add(edge.to());
+        }
+
+        Set<String> visited = new LinkedHashSet<>();
+        Deque<String> queue = new ArrayDeque<>();
+        queue.add(from);
+        while (!queue.isEmpty()) {
+            String node = queue.removeFirst();
+            // Already reached; this is also the cycle guard, which is what makes a looping flow terminate
+            // here rather than spin.
+            if (!visited.add(node)) continue;
+            queue.addAll(successors.getOrDefault(node, List.of()));
+        }
+        return List.copyOf(visited);
     }
 }

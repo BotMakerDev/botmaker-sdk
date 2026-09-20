@@ -1,6 +1,5 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
-import com.botmaker.sdk.authoring.ActivityModel;
 import com.botmaker.sdk.authoring.FlowEdgeModel;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.authoring.SdkFlowValues;
@@ -59,7 +58,8 @@ public final class ActivityDraft {
      * the code — one fact, checked by the compiler, instead of two kept in step by hand.
      *
      * <p>Blank for a card added on the canvas whose method has not been written yet, which is an ordinary
-     * way to work: the flow refuses to save until it is filled in, and says which card is missing one.
+     * way to work: it is written as {@code ActivityBody.NONE}, the flow walks through the card, and the card
+     * does nothing until the "Runs" box names a method.
      *
      * <p>Not a property, because nothing may observe it and nothing may bind to it.
      */
@@ -103,8 +103,7 @@ public final class ActivityDraft {
     }
 
     /**
-     * Every constant of this activity's generated {@code Outcome} enum: the implicit default first, then the
-     * declared ones. Mirrors {@link ActivityModel#allOutcomes()}.
+     * Every outcome this activity can report: the implicit default first, then the declared ones.
      */
     public List<String> allOutcomes() {
         List<String> all = new ArrayList<>(outcomes.size() + 1);
@@ -118,7 +117,7 @@ public final class ActivityDraft {
 
     /**
      * Every outcome this activity's card has a port for: {@link #allOutcomes()}, then
-     * {@link FlowEdgeModel#DISABLED_OUTCOME} last. Mirrors {@link ActivityModel#flowPorts()}.
+     * {@link FlowEdgeModel#DISABLED_OUTCOME} last.
      *
      * <p>This is the list the canvas draws ports from <em>and</em> the list it prunes wires against, which is
      * what stops a {@code DISABLED} wire from being deleted the moment it is drawn.

@@ -8,6 +8,73 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-21 (later) — the bot runs from the flow it installed, and `activities.json` is gone
+
+Phase 6 of *"a plugin's values live in one file the plugin ships"*, and the only irreversible one.
+
+**Done**
+
+- **`FlowGraph.load/run` walk `Flows.installed()`.** `assemble(Class, Flow)` replaces
+  `assemble(Class, ProjectData)`: a node per `Flow.Activity`, routes built from `Flow.Edge` (a blank
+  outcome is `NEXT`, which is the same blank-means-implicit rule the file had), `DISABLED` lifted out as
+  the node's own slot, and the start resolved against what is in the flow.
+
+- **A named body needs no lookup.** `Flow.Activity.body()` is the method reference javac resolved, so the
+  common case is one `FlowBody` around something the compiler checked. `ActivityLoader` is consulted only
+  for an activity whose body is `ActivityBody.NONE` — that is, for the two older ways, a name given to
+  `Activities.define` and a pre-2026-08-29 generated class — which is what keeps those bots running.
+
+- **`FlowBody` registers itself.** `Activity.disable("Mining")` and `ctx.disable()` both find an activity
+  through `ActivityRegistry`, so a runner that was not in it would be one those calls silently missed.
+
+- **Enablement comes from the flow.** `Activities.active`, `Activities.Defined.active()` and the new
+  `Flows.enabled(name)` replace `Settings.enabled`. An activity the flow does not mention reads as **on**,
+  which is the answer the old call gave for a name with no entry — a bot may define an activity that is
+  not on the canvas at all, and reading that as *off* would make it silently do nothing.
+
+- **`ActivityContext`'s constructor is public**, which reverses its own `@Hidden` note. The flow has to
+  build one to call a body with, so the constructor is reachable outside `api.bot` either way; once it is,
+  refusing it to the user would refuse them the thing the method-reference design buys — a body is a
+  static method a plain JUnit test can call.
+
+- **Deleted**: `Authoring.readModel`/`writeModel`/`modelJson`/`readSchemaVersion`; `ProjectModel`,
+  `FlowModel`, `FlowNodeModel`, `PresetModel`, `ActivityModel`, `VariableModel`; `internal.config.ProjectData`;
+  `internal.config.SdkGrammar` and its `META-INF/services` file; `AuthoringMixins`; `ValueJson`. With them
+  went `ProjectModelBehaviourTest`, `ProjectDataTest` and `SdkGrammarReadsTest`.
+
+- **`FlowModel.reachableFrom` was inlined into `FlowRules`** rather than moved. It was shared so that the
+  canvas and the code generator could not disagree about reachability; there is no generator, so what is
+  left is one canvas asking one question about its own wires.
+
+- **A defect from phase 5, found by the compiler while deleting `ActivityModel`.** `NewActivityDialog`
+  passed `ActivityModel.newId()` as the ninth constructor argument, which phase 5 had changed from the
+  activity's id to its **body reference** — so every card added on the canvas would have been written with
+  a generated id where `Collect::body` goes. It now passes nothing, and the card is written as
+  `ActivityBody.NONE`. This is the argument for doing the deletions rather than leaving the old types
+  standing: the second use of a parameter that changed meaning is invisible until the first one is gone.
+
+**Two items of the plan's phase 6 were not done, and neither is an oversight**
+
+- **`ValueCatalog.initializerOfWires`, `wiresOfInitializer`, `defaultItem` and `normalize` stay.** The plan
+  listed them as dying with the legacy wire form. They are not legacy: `ParameterStore` — a plugin's own
+  `parameters.json`, which the plan explicitly keeps — is built on all four, at nine call sites. Deleting
+  them means porting that store onto the form/value pair, which is a phase of its own and has nothing to
+  do with the flow. `StoredForms` stays for the same reason.
+
+- **`Settings.enabled` was deleted, though the plan listed it under "keep".** It read
+  `activities.json`. With that file gone it could only ever have answered `false` — a method that compiles,
+  runs, and switches every activity off. `Flows.enabled` is the same question against the flow the bot
+  installed.
+
+**Deferred / next**
+
+- **Phase 7**: `botmaker-gamebot` by hand — `Collect`/`Battle`/`Rest` become `public` with
+  `public static Outcome body(ActivityContext ctx)`, `Gamebot.main` calls `Sdk.install()`, its
+  `activities.json` is deleted, and the *"joined by a string, deliberately"* paragraph goes.
+- `botmaker-project.properties`' `capture.source` is still what a bot reads for its capture source, and
+  is still written beside the managed value. Retiring the key is a step of its own.
+- `ParameterStore` onto the form/value pair, as above.
+
 ## 2026-09-21 — the flow editor writes the value, and the layout is gitignored
 
 Phase 5 of *"a plugin's values live in one file the plugin ships"*. The editor stops owning a file.

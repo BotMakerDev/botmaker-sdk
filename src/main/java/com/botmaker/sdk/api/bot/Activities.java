@@ -2,7 +2,7 @@ package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.meta.ReplacedBy;
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.plugin.basics.store.Settings;
+import com.botmaker.sdk.api.flow.Flows;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.bot.ActivityRegistry;
 import com.botmaker.sdk.internal.trace.Trace;
@@ -87,7 +87,7 @@ public final class Activities {
     }
 
     /**
-     * Whether the named activity is switched on right now — its value in Project ▸ Set Activity Values, plus
+     * Whether the named activity is switched on right now — its switch on the Activity Flow canvas, plus
      * any {@link Activity#enable(String)} / {@link Activity#disable(String)} made during this run.
      *
      * <p>The flow consults this itself before running anything, so a body does not need to. It is here for
@@ -95,7 +95,7 @@ public final class Activities {
      */
     public static boolean active(String name) {
         ActivityRegistry.Runner runner = ActivityRegistry.get(name);
-        return runner == null ? Settings.enabled(name) : runner.active();
+        return runner == null ? Flows.enabled(name) : runner.active();
     }
 
     /**
@@ -105,10 +105,11 @@ public final class Activities {
      * <p>Not a record, for the one reason a record cannot serve: the override is genuinely mutable state —
      * the whole point of {@code ctx.disable()} is that a body can switch its own activity off mid-run.
      *
-     * <p>{@code active()} reads {@link Settings#enabled} rather than caching it, and {@code null} means nothing
-     * has been said, which is a different answer from {@code false}. So a value changed in the editor is
-     * picked up on the next run without the definition knowing anything about files, and an override made
-     * during a run outranks it.
+     * <p>{@code active()} reads {@link Flows#enabled} rather than caching it, and {@code null} means nothing
+     * has been said, which is a different answer from {@code false}. So the switch this activity has on the
+     * canvas is what it defaults to, and an override made during a run outranks it. It read
+     * {@code Settings.enabled} — that is, {@code activities.json} — until 2026-09-21; the flow the bot
+     * installed is the same answer, in the bot's own source.
      */
     private static final class Defined implements ActivityRegistry.Runner {
 
@@ -128,7 +129,7 @@ public final class Activities {
 
         @Override
         public boolean active() {
-            return override != null ? override : Settings.enabled(name);
+            return override != null ? override : Flows.enabled(name);
         }
 
         @Override

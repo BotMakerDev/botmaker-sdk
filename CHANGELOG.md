@@ -68,6 +68,20 @@ No source changes since v1.1.12; re-released for updated upstream pins.
   namespace. Neither generates a field now, so javac is what has an opinion, and the editor checks only the
   names it is still the author of.
 
+- **A bot runs from the flow it installed, not from `activities.json`.** `FlowGraph.load` and
+  `FlowGraph.run` walk `Flows.installed()`. An activity whose body the flow names is run directly — the
+  method reference javac resolved — and only one that names none is still looked for by the old convention
+  at `<your package>.activities.<Name>`, so bots written the older way keep running.
+
+- **`ActivityContext`'s constructor is public.** A body is a `public static Outcome body(ActivityContext
+  ctx)` in your own file, so a plain JUnit test can call it: `assertEquals("BAG_FULL",
+  Collect.body(new ActivityContext("Collect")).name())`. That is the thing the method-reference design
+  buys, and it needed a constructor to be reachable.
+
+- **`Flows.enabled(name)`** — whether the installed flow has an activity switched on. An activity the flow
+  does not mention reads as **on**, which is the answer `Settings.enabled` gave for a name with no entry: a
+  bot may define an activity that is not on the canvas at all.
+
 - **`Activities.define(String, …)` is deprecated**, with a `@ReplacedBy` pointing at `Flow.activity`. It
   still works and still registers a body by name; the name is exactly the link the method reference
   replaces. Move the lambda into a `public static Outcome body(ActivityContext ctx)` and name that.
@@ -80,6 +94,19 @@ No source changes since v1.1.12; re-released for updated upstream pins.
   yourself, anywhere else, is yours to edit. The SDK **ships that file** (`plugins/sdk/Pictures.java`), so
   the class is one this plugin owns rather than one it hoped you had: picture renames searched for
   `Templates.ORE` before, in bots whose author had called theirs something else, and found nothing.
+
+### Removed
+
+- **`activities.json`, and everything that read or wrote it.** `Authoring.readModel`, `writeModel`,
+  `modelJson` and `readSchemaVersion`; `ProjectModel`, `FlowModel`, `FlowNodeModel`, `PresetModel`,
+  `ActivityModel` and `VariableModel`; `internal.config.ProjectData`; `internal.config.SdkGrammar` and its
+  `META-INF/services` registration; `AuthoringMixins` and `ValueJson`.
+
+  **There is no migration, and that is deliberate** — a project written before this reads as having no
+  flow, which is a state the editor can show and offer to fix, where a converter would be a second reader
+  of a format nothing writes. Nothing deletes anyone's `activities.json`; it is simply not read.
+
+  `Authoring.SCHEMA_FIELD` survives, because `capture.json` carries the same stamp.
 
 ### Added
 

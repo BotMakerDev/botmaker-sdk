@@ -2,7 +2,7 @@ package com.botmaker.sdk.api.flow;
 
 import com.botmaker.sdk.api.bot.Activity;
 import com.botmaker.sdk.api.bot.PopupGuard;
-import com.botmaker.sdk.internal.config.ProjectData;
+import com.botmaker.sdk.api.bot.ActivityBody;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -263,24 +263,22 @@ class FlowWalkerTest {
      * code exists, and the run passes through every card rather than stopping at the first one with no body.
      *
      * <p>{@code Unwritten} has no {@code Activities.define} and no class beside this test, so the walk treats
-     * it exactly as an activity switched off in the editor — it takes the {@code DISABLED} wire, and the one
+     * it exactly as an activity switched off on the canvas — it takes the {@code DISABLED} wire, and the one
      * activity that <em>is</em> written runs.
      */
     @Test
     void anActivityWithNoBodyFallsThroughItsDisabledWire() {
         List<String> log = new ArrayList<>();
         new Fake("written-A", log, true);
-        ProjectData model = ProjectData.of("""
-                { "activities": [ { "name": "Unwritten", "enabled": true },
-                                  { "name": "written-A", "enabled": true } ],
-                  "flow": { "nodes": [ { "activity": "Unwritten" }, { "activity": "written-A" } ],
-                            "edges": [ { "from": "Unwritten", "to": "written-A", "outcome": "DISABLED" } ],
-                            "start": "Unwritten" } }
-                """);
+        Flow model = Flow.of(
+                List.of(Flow.activity(ActivityBody.NONE, "Unwritten", "", true, false, false, List.of()),
+                        Flow.activity(ActivityBody.NONE, "written-A", "", true, false, false, List.of())),
+                List.of(Flow.edge("Unwritten", "written-A", "DISABLED")),
+                List.of(), "Unwritten", Flow.Limits.DEFAULT);
 
         walk(FlowGraph.assemble(FlowWalkerTest.class, model), 10, null);
 
-        // -popup because the model declares no popupCheck for the node, which reads as OFF.
+        // -popup because the flow leaves popupCheck off for the node, which reads as OFF.
         assertEquals(List.of("written-A-popup"), log,
                 "the unwritten activity did nothing and handed on; the written one ran");
     }

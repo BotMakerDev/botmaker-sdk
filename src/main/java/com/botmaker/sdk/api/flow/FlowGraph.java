@@ -4,15 +4,17 @@ import com.botmaker.plugin.api.meta.ReplacedBy;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.Activity;
+import com.botmaker.sdk.api.bot.ActivityBody;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.authoring.FlowEdgeModel;
 import com.botmaker.sdk.internal.bot.ActivityRegistry;
 import com.botmaker.sdk.internal.bot.LegacyActivity;
-import com.botmaker.sdk.internal.config.ProjectData;
 import com.botmaker.sdk.internal.flow.ActivityLoader;
+import com.botmaker.sdk.internal.flow.FlowBody;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -106,7 +108,7 @@ public final class FlowGraph {
      * @param anchor a class in the project's base package
      */
     public static FlowGraph load(Class<?> anchor) {
-        return assemble(anchor, ProjectData.current());
+        return assemble(anchor, Flows.installed());
     }
 
     /**
@@ -121,29 +123,35 @@ public final class FlowGraph {
      *               loader guessing at it would be the one piece of this that was magic
      */
     public static void run(Class<?> anchor, Runnable goHome) {
-        ProjectData data = ProjectData.current();
-        walk(assemble(anchor, data), data.maxSteps(), data.stepDelayMs(), goHome);
+        Flow flow = Flows.installed();
+        walk(assemble(anchor, flow), flow.limits().maxSteps(), flow.limits().stepDelayMs(), goHome);
     }
 
     /**
-     * The graph one model describes.
+     * The graph one installed {@link Flow} describes.
      *
      * <p>It is here rather than in {@code internal} for one reason: {@link Node}'s constructor is private, and
      * widening it so a loader elsewhere could call it would put the only unchecked way to build a node on the
-     * public surface. Reading the model is {@link ProjectData}'s and constructing the activities is
-     * {@link ActivityLoader}'s; what is left here is the assembly, which is the part that must not be
-     * reachable from anywhere else.
+     * public surface. Finding a body a bot wrote some other way is {@link ActivityLoader}'s; what is left
+     * here is the assembly, which is the part that must not be reachable from anywhere else.
+     *
+     * <p><b>A body usually needs no finding at all.</b> {@link Flow.Activity#body()} is the method reference
+     * javac already resolved, so the common case is one {@link FlowBody} around something the compiler
+     * checked. {@link ActivityLoader} is consulted only for the two older ways — a name given to
+     * {@code Activities.define}, and a pre-2026-08-29 generated class — and is what keeps those bots running.
      */
-    static FlowGraph assemble(Class<?> anchor, ProjectData data) {
-        Map<String, ActivityRegistry.Runner> activities = ActivityLoader.load(anchor, data.activities());
+    static FlowGraph assemble(Class<?> anchor, Flow flow) {
+        List<String> names = flow.activities().stream().map(Flow.Activity::name).toList();
+        Map<String, ActivityRegistry.Runner> written = ActivityLoader.load(anchor, names);
         Map<String, Node> byName = new LinkedHashMap<>();
-        for (String name : data.placed()) {
-            // A placed activity with no body is still a node, and that is a deliberate reversal: it used to
-            // be dropped, so a wire into it ended the run. An activity nobody has written yet is an activity
+        for (Flow.Activity activity : flow.activities()) {
+            String name = activity.name();
+            // An activity with no body is still a node, and that is a deliberate reversal: it used to be
+            // dropped, so a wire into it ended the run. An activity nobody has written yet is an activity
             // that does nothing, which the flow already has a word for — it takes its DISABLED wire, exactly
             // as one switched off in the editor does, and a flow drawn ahead of its code walks through.
-            ActivityRegistry.Runner activity = activities.get(name);
-            Map<String, String> routes = new LinkedHashMap<>(data.routes(name));
+            ActivityRegistry.Runner runner = runnerFor(activity, written.get(name));
+            Map<String, String> routes = routesFrom(flow, name);
             // DISABLED is not an outcome an activity can report — it did not run — so it is one slot on the
             // node rather than a route, exactly as the generated table spelled it.
             //
@@ -156,13 +164,55 @@ public final class FlowGraph {
             // Spelling the literal here instead would be the actual violation: two copies of one wire word,
             // and the flow silently taking the wrong branch when one of them changes.
             String whenDisabled = routes.remove(FlowEdgeModel.DISABLED_OUTCOME);
-            byName.put(name, new Node(name, activity,
-                    data.popupCheck(name) ? PopupCheck.ON : PopupCheck.OFF,
-                    data.goHome(name) ? Recovery.GO_HOME : Recovery.NONE,
+            byName.put(name, new Node(name, runner,
+                    activity.popupCheck() ? PopupCheck.ON : PopupCheck.OFF,
+                    activity.goHome() ? Recovery.GO_HOME : Recovery.NONE,
                     whenDisabled, Map.copyOf(routes)));
         }
-        String start = data.start();
+        String start = resolvedStart(flow, byName.keySet());
         return new FlowGraph(byName.containsKey(start) ? start : null, byName);
+    }
+
+    /**
+     * What runs one activity: its own body when it has one, else whatever was written for its name.
+     *
+     * <p>Registered as it is built, because {@code Activity.disable("Mining")} and {@code ctx.disable()}
+     * both find an activity through {@link ActivityRegistry} and a runner that was not in it would be one
+     * those calls silently missed — the kind of bug that looks like the flow being wrong.
+     */
+    private static ActivityRegistry.Runner runnerFor(Flow.Activity activity,
+                                                     ActivityRegistry.Runner writtenElsewhere) {
+        ActivityBody body = activity.body();
+        if (body == null || body == ActivityBody.NONE) return writtenElsewhere;
+        ActivityRegistry.Runner runner = new FlowBody(activity.name(), body, activity.enabled());
+        ActivityRegistry.register(runner);
+        return runner;
+    }
+
+    /**
+     * Where each of one activity's outcomes leads, keyed by outcome name.
+     *
+     * <p>A blank {@link Flow.Edge#outcome()} is the implicit one — blank-means-implicit is how
+     * {@code NEXT} survived being renamed once already — and a wire naming an activity that is not in the
+     * flow is left in: the walk drops it when it looks the node up and finds nothing.
+     */
+    private static Map<String, String> routesFrom(Flow flow, String from) {
+        Map<String, String> routes = new LinkedHashMap<>();
+        for (Flow.Edge edge : flow.edges()) {
+            if (!edge.from().equals(from)) continue;
+            String outcome = edge.outcome().isBlank() ? FlowEdgeModel.NEXT_OUTCOME : edge.outcome();
+            routes.putIfAbsent(outcome, edge.to());
+        }
+        return routes;
+    }
+
+    /**
+     * The node a run begins at: {@link Flow#start()} when it names an activity of the flow, else the first
+     * one. The fallback is what lets a flow whose start activity was deleted or renamed still run.
+     */
+    private static String resolvedStart(Flow flow, java.util.Set<String> placed) {
+        if (placed.contains(flow.start())) return flow.start();
+        return placed.isEmpty() ? "" : placed.iterator().next();
     }
 
     /**

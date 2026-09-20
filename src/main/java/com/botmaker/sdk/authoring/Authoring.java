@@ -2,11 +2,9 @@ package com.botmaker.sdk.authoring;
 
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.basics.values.BasicsValueTypes;
-import com.botmaker.sdk.internal.authoring.AuthoringMixins;
 import com.botmaker.shared.config.ProjectFile;
 import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.sdk.internal.authoring.SdkValueTypes;
-import com.botmaker.sdk.internal.authoring.ValueJson;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,17 +35,19 @@ import java.util.Properties;
  *
  * <h2>What this class is not</h2>
  *
- * <p>It does not validate, and it does not repair. A model may name activities that do not exist and values
- * outside their own bounds; reading gives them back as written and writing puts them back. Refusing belongs
- * where a user is watching.
+ * <p>It does not validate, and it does not repair. A file may name a capture target that no longer exists;
+ * reading gives it back as written and writing puts it back. Refusing belongs where a user is watching.
  *
- * <h2>The schema stamp</h2>
+ * <h2>What left on 2026-09-21</h2>
  *
- * <p>{@code activities.json} carries a {@code schemaVersion} as its first member. The SDK writes it and
- * reads it back, but the <b>ledger of migration steps still belongs to the caller</b> — which is why
- * {@link #writeModel} takes the number rather than deriving it. That is a deliberate seam and not the final
- * shape: the ledger moves here when the generator does, and until it has, a stamp derived in two places
- * would be two answers to one question.
+ * <p>The project model. {@code activities.json} held a bot's activities, its wiring, its variables and its
+ * schema stamp, and this class read and wrote it; all of that is a {@code Flow} in the bot's own Java now,
+ * and the file is gone rather than migrated — a pre-change project reads as having no flow, which is
+ * exactly what {@code docs/refactor/33-plugin-java.md} said it would.
+ *
+ * <p>{@link #SCHEMA_FIELD} survives it, because {@code capture.json} carries the same stamp and reads it
+ * back. There is no migration ledger any more: the one file that had a version to migrate is the one that
+ * no longer exists.
  */
 public final class Authoring {
 
@@ -77,11 +77,7 @@ public final class Authoring {
             //
             // plugin-basics first, so its types lead the order a menu offers, which is where they were
             // before the split. There is no id clash to mediate: the SDK kept the eight that are its own.
-            .registerModule(ValueJson.module(BasicsValueTypes.CATALOG.merge(SdkValueTypes.CATALOG)))
-            // How the model records bind, kept out of the records: they live in the plugin contract, whose
-            // one dependency is javafx-controls at provided, so a Jackson annotation on one of them would
-            // impose Jackson on every plugin that ever compiles against the contract.
-            .registerModule(AuthoringMixins.module());
+            ;
 
     private Authoring() {
     }
@@ -112,67 +108,6 @@ public final class Authoring {
      */
     public static SdkVersion require(String sdkPin) throws AuthoringUnsupported {
         return SdkVersion.ofPin(sdkPin).orElseThrow(() -> AuthoringUnsupported.unknownVersion(sdkPin));
-    }
-
-    /**
-     * Reads {@code activities.json} out of a project's resources directory.
-     *
-     * <p>A missing file is {@link ProjectModel#empty()} and not an error: an empty project has none, and a
-     * game bot that has never had an activity added reads the same as one whose file was deleted — in both
-     * cases there is nothing declared, which is a state the editor can show.
-     *
-     * <p>A file that exists but cannot be parsed <b>is</b> an error, and is thrown. Silently treating
-     * corruption as emptiness is how a project gets overwritten with nothing on the next save.
-     */
-    public static ProjectModel readModel(SdkVersion version, Path resourcesDir) throws IOException {
-        requireVersion(version);
-        Path file = resourcesDir.resolve(ProjectModel.FILE_NAME);
-        if (!Files.exists(file)) return ProjectModel.empty();
-        return MAPPER.readValue(file.toFile(), ProjectModel.class);
-    }
-
-    /**
-     * The schema stamp the stored file carries, or {@code 0} when it has none — which is what every file
-     * written before stamping existed reads as, and is the value a migration ledger starts counting from.
-     */
-    public static int readSchemaVersion(SdkVersion version, Path resourcesDir) throws IOException {
-        requireVersion(version);
-        Path file = resourcesDir.resolve(ProjectModel.FILE_NAME);
-        if (!Files.exists(file)) return 0;
-        JsonNode root = MAPPER.readTree(file.toFile());
-        JsonNode stamp = root.path(SCHEMA_FIELD);
-        return stamp.isInt() ? stamp.asInt() : 0;
-    }
-
-    /**
-     * Writes {@code activities.json}, stamped with {@code schemaVersion} as its first member.
-     *
-     * <p>The stamp goes first because a person opening the file to see what version it is should not have to
-     * scroll past the whole model to find out. The directory is created if it does not exist.
-     */
-    public static void writeModel(SdkVersion version, Path resourcesDir, ProjectModel model,
-                                  int schemaVersion) throws IOException {
-        Files.createDirectories(resourcesDir);
-        Files.writeString(resourcesDir.resolve(ProjectModel.FILE_NAME),
-                modelJson(version, model, schemaVersion));
-    }
-
-    /**
-     * The same bytes {@link #writeModel} would write, as text.
-     *
-     * <p>It is public because <b>creating</b> a project renders every file before committing any of them,
-     * and {@code activities.json} is one of those files: a creation that can produce the JSON but not the
-     * caller's own files must leave nothing behind. A caller that already has a directory to write into
-     * should use {@link #writeModel} instead.
-     */
-    public static String modelJson(SdkVersion version, ProjectModel model, int schemaVersion)
-            throws IOException {
-        requireVersion(version);
-        ObjectNode body = MAPPER.valueToTree(model);
-        ObjectNode stamped = MAPPER.createObjectNode();
-        stamped.put(SCHEMA_FIELD, schemaVersion);
-        stamped.setAll(body);
-        return MAPPER.writeValueAsString(stamped);
     }
 
     // ---- capture ----------------------------------------------------------------------------------------
@@ -273,8 +208,10 @@ public final class Authoring {
     }
 
     /**
-     * The same bytes {@link #writeCapture} would write, as text — the counterpart of {@link #modelJson}, and
-     * public for the same reason: creation renders every file before committing any of them.
+     * The same bytes {@link #writeCapture} would write, as text.
+     *
+     * <p>Public because creation renders every file before committing any of them: a creation that can
+     * produce the JSON but not the caller's own files must leave nothing behind.
      */
     public static String captureJson(SdkVersion version, CaptureModel model) throws IOException {
         requireVersion(version);

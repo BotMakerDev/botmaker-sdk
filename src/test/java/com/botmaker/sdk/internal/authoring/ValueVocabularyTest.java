@@ -3,11 +3,8 @@ package com.botmaker.sdk.internal.authoring;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.api.value.ValueType;
 import com.botmaker.plugin.basics.values.BasicsValueTypes;
-import com.botmaker.plugin.basics.store.BasicsGrammar;
-import com.botmaker.plugin.basics.store.ValueGrammar;
 import com.botmaker.sdk.authoring.Authoring;
 import com.botmaker.sdk.authoring.SdkVersion;
-import com.botmaker.sdk.internal.config.SdkGrammar;
 import org.junit.jupiter.api.Test;
 
 import java.awt.Color;
@@ -94,35 +91,10 @@ class ValueVocabularyTest {
         assertEquals(SdkValueTypes.CATALOG.types(), Authoring.valueTypes(SdkVersion.latest()).types());
     }
 
-    /**
-     * A type the editor offers is a type the bot can read, across <em>both</em> plugins: the catalogs are
-     * contract-typed and the grammars are not, and the two halves of each plugin are written in files that
-     * do not share a class. Nothing but a test can say they describe the same types.
-     */
-    @Test
-    void theBotsGrammarsAndTheEditorsCatalogDescribeTheSameTypes() {
-        List<ValueGrammar> grammars = List.of(new BasicsGrammar(), new SdkGrammar());
-        List<String> unreadable = new ArrayList<>();
-        int readers = 0;
-        for (ValueGrammar grammar : grammars) {
-            for (ValueGrammar.Reader<?> reader : grammar.readers()) {
-                readers++;
-                if (MERGED.forJava(reader.type()).isEmpty()) unreadable.add(reader.type().getName());
-            }
-        }
-        assertEquals(List.of(), unreadable, "a grammar reads a type no catalog can declare");
-        assertTrue(MERGED.types().size() >= readers);
-    }
-
-    /** Disjoint by construction: two grammars claiming one type is what {@code Settings} refuses by name. */
-    @Test
-    void theTwoGrammarsClaimNoTypeInCommon() {
-        List<String> basics = new BasicsGrammar().readers().stream()
-                .map(reader -> reader.type().getName()).toList();
-        List<String> sdk = new SdkGrammar().readers().stream()
-                .map(reader -> reader.type().getName()).toList();
-        assertEquals(9, basics.size(), basics.toString());
-        assertEquals(8, sdk.size(), sdk.toString());
-        assertTrue(basics.stream().noneMatch(sdk::contains), basics + " vs " + sdk);
-    }
+    // Two tests stood here until 2026-09-21 and went with the grammars they were about. One asserted that
+    // every ValueGrammar.Reader named a type the merged catalog could declare — the bot's half and the
+    // editor's half describing the same types — and the other that the two plugins' grammars claimed no
+    // type in common. There are no grammars: a running bot reads a @Param field and an installed Flow, both
+    // of which javac types, so there is no second, string-keyed description of a type to keep in step with
+    // this one. What remains above is the editor's half, which is now the only half.
 }
