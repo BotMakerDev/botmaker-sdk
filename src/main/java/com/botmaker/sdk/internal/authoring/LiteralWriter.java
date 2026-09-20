@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.value.ValueChoice;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -92,6 +93,58 @@ public final class LiteralWriter {
     /** A Java char literal, quotes included. */
     public static String quoteChar(char c) {
         return "'" + escape(c, '\'') + "'";
+    }
+
+    /**
+     * {@link #quote} read backwards: the text a Java string literal holds, or empty when the source is not
+     * one literal.
+     *
+     * <p>Duplicated from the toolkit's {@code Source.stringValue} for the reason {@link #quote} gives, and
+     * it is the same fifteen lines. What it must stay exactly is {@link #quote}'s inverse — including the
+     * {@code \\u} escape that method emits for a pasted control character, since refusing that one would
+     * make exactly those values write-only.
+     *
+     * <p>Strict everywhere else: a concatenation, an unescaped quote in the middle and an octal escape each
+     * answer empty, because each says the source was written by a person rather than by {@link #quote}.
+     */
+    public static Optional<String> unquote(String javaSource) {
+        String source = javaSource == null ? "" : javaSource.strip();
+        if (source.length() < 2 || source.charAt(0) != '"' || !source.endsWith("\"")) {
+            return Optional.empty();
+        }
+        String body = source.substring(1, source.length() - 1);
+        StringBuilder out = new StringBuilder(body.length());
+        for (int i = 0; i < body.length(); i++) {
+            char c = body.charAt(i);
+            if (c != '\\') {
+                if (c == '"') return Optional.empty();             // an unescaped quote: not one literal
+                out.append(c);
+                continue;
+            }
+            if (++i >= body.length()) return Optional.empty();
+            switch (body.charAt(i)) {
+                case 'n' -> out.append('\n');
+                case 't' -> out.append('\t');
+                case 'r' -> out.append('\r');
+                case 'b' -> out.append('\b');
+                case 'f' -> out.append('\f');
+                case 's' -> out.append(' ');
+                case '\\', '"', '\'' -> out.append(body.charAt(i));
+                case 'u' -> {
+                    if (i + 4 >= body.length()) return Optional.empty();
+                    try {
+                        out.append((char) Integer.parseInt(body.substring(i + 1, i + 5), 16));
+                    } catch (NumberFormatException notAnEscape) {
+                        return Optional.empty();
+                    }
+                    i += 4;
+                }
+                default -> {
+                    return Optional.empty();                       // an octal escape: not ours to read
+                }
+            }
+        }
+        return Optional.of(out.toString());
     }
 
     /**

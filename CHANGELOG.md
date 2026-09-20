@@ -23,6 +23,14 @@ No source changes since v1.1.12; re-released for updated upstream pins.
 
 ### Added
 
+- **The SDK's eight value types read their own Java back.** A picture, a precision, a point, a rectangle, a
+  size and the three enums could all be *written* into a user's `@Param` field and none of them could be
+  read, so the editor listed them read-only and could only ever offer to overwrite. Each inverse now sits in
+  the same expression as the literal it undoes. They recognise **only** what the SDK emits — `Point.of(3,
+  4)` and `Precision.TIGHT.minArea(400)` mean the same thing and are declined, because the author wrote
+  those on purpose and the window shows them as written. An enum constant this build does not have is
+  declined rather than parsed: `Direction.UP` would otherwise read back as `NORTH`.
+
 - **Picture constants are managed by 🖼 Manage Pictures.** A `static final ImageTemplate` field is shown in
   the editor with its thumbnail and cannot be edited on the canvas, which says to use that window — the one
   that renames the file, the constant and every use of it together. A class of nothing but picture constants
