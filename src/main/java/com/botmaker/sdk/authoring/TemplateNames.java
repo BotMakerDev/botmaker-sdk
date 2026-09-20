@@ -30,8 +30,22 @@ import java.util.Locale;
  */
 public final class TemplateNames {
 
-    /** The generated class's simple name, in the project's base package next to {@code Parameters}. */
-    public static final String CLASS_NAME = "Templates";
+    /**
+     * The class the constants live in, which is the one this plugin <b>ships</b> — {@code Pictures}, written
+     * into {@code <bot package>/plugins/sdk/} the first time the SDK is added.
+     *
+     * <p>It was {@code "Templates"} and it was a <em>guess</em>: nothing generated that class, nothing
+     * required a project to have one, and a bot whose author called theirs anything else had its picture
+     * renames silently miss every use. The name is this plugin's own now because the file is
+     * ({@code SdkPlugin.pluginSources()}), which is what makes matching {@code Pictures.COLLECT} a fact
+     * rather than a hope.
+     *
+     * <p>It is still only used to build <em>needles</em> — what to search a bot's source for when a picture
+     * is renamed. A user who renames the class themselves is renaming a class they own, and their uses stop
+     * being found; that is the residual cost of matching source text, and it is bounded by the annotation,
+     * which tells the canvas not to let them do it from there.
+     */
+    public static final String CLASS_NAME = "Pictures";
 
     /**
      * The placeholder template every project is created with, so a freshly dropped vision block points at a

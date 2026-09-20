@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin;
 import com.botmaker.plugin.api.ActionContext;
 import com.botmaker.plugin.api.ManagedValue;
 import com.botmaker.plugin.api.ParameterEdit;
+import com.botmaker.plugin.api.PluginSource;
 import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.ParameterRow;
 import com.botmaker.plugin.api.SlotEditor;
@@ -52,6 +53,7 @@ import javafx.scene.paint.Color;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * The BotMaker SDK, as a Studio plugin.
@@ -338,13 +340,68 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     @Override
     public List<ManagedValue> managedValues() {
-        return List.of(new ManagedValue(PICTURES,
-                "Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every use of"
-                        + " it together."));
+        return List.of(
+                new ManagedValue(FLOW,
+                        "This is the bot's activity flow. Draw it in ✂ Activity Flow, which keeps the"
+                                + " activities, the wires and the layout in step."),
+                new ManagedValue(CAPTURE,
+                        "This is where the bot reads pixels from. Choose it in Project ▸ Settings."),
+                new ManagedValue(PICTURES,
+                        "Picture constants are managed in 🖼 Manage Pictures, which renames the picture and"
+                                + " every use of it together."));
     }
+
+    /** The {@code @Managed} id on the method holding this bot's flow. */
+    public static final String FLOW = "flow";
+
+    /** The {@code @Managed} id on the method holding this bot's capture source. */
+    public static final String CAPTURE = "capture";
 
     /** The {@code @Managed} id on the class of picture constants this plugin's window keeps in step. */
     public static final String PICTURES = "pictures";
+
+    /**
+     * The two files this plugin gives a bot: {@code Sdk.java}, which holds the flow and the capture source,
+     * and {@code Pictures.java}, which holds one constant per picture.
+     *
+     * <p>Shipped as text and copied once, the first time the host sees this plugin on a project's classpath.
+     * From that moment they are the user's: nothing regenerates them, and what the host rewrites afterwards
+     * is one {@code @Managed} method's returned expression, or — for {@code Pictures} — the constants that
+     * 🖼 Manage Pictures adds, renames and removes.
+     *
+     * <p><b>{@code Pictures} is shipped rather than guessed at.</b> {@code TemplateNames.CLASS_NAME} named a
+     * class no project was required to have, so a picture rename searched for {@code Templates.ORE} in bots
+     * whose author had called theirs something else. The plugin owning the file is what makes the name a
+     * fact.
+     *
+     * <p>Read off the jar each time rather than held: it is two small files, read once per project, and a
+     * static cache would be a second copy of text that only ever comes from here.
+     */
+    @Override
+    public List<PluginSource> pluginSources() {
+        return Stream.of("Sdk", "Pictures")
+                .map(SdkPlugin::shippedSource)
+                .filter(PluginSource::isPresent)
+                .toList();
+    }
+
+    /**
+     * One shipped file, or an empty {@link PluginSource} when it cannot be read.
+     *
+     * <p>Empty rather than throwing: a jar built without its resources is a broken build, and the project
+     * opening without a file is a better answer than the project not opening. The host skips what is not
+     * {@linkplain PluginSource#isPresent present}.
+     */
+    private static PluginSource shippedSource(String simpleName) {
+        String resource = "/com/botmaker/sdk/plugin/sources/" + simpleName + ".java.txt";
+        try (java.io.InputStream in = SdkPlugin.class.getResourceAsStream(resource)) {
+            return in == null ? new PluginSource(simpleName, "")
+                    : new PluginSource(simpleName, new String(in.readAllBytes(),
+                            java.nio.charset.StandardCharsets.UTF_8));
+        } catch (java.io.IOException unreadable) {
+            return new PluginSource(simpleName, "");
+        }
+    }
 
     /**
      * The seventeen types a project variable could hold before there was a registry to hold them in.

@@ -21,15 +21,38 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 No source changes since v1.1.12; re-released for updated upstream pins.
 
+### Added
+
+- **Your flow is a value in your own Java: `Flow`, `Flow.Activity`, `Flow.Edge`, `Flow.Limits`.** The SDK
+  gives your project a file — `plugins/sdk/Sdk.java` — with a `@Managed("flow")` method that returns one,
+  and BotMaker rewrites that one expression when you draw. Everything you add to the file survives.
+
+- **An activity's body is a method reference: `Flow.activity(Collect::body, "Collect", …)`.** That is the
+  point of the change. `Activities.define("Collect", …)` matched a string in a JSON file against a string in
+  a Java call, so renaming or deleting the method compiled fine and the flow quietly took the `DISABLED`
+  wire three screens into a run. `Collect::body` is resolved by javac, so the same rename **fails the
+  build**, naming the file. The new type is `ActivityBody`, an ordinary functional interface.
+
+- **`Flows.use(Flow)`** — the whole hand-off, one static call from the `install()` in the file you were
+  given, which your `main` calls. No reflection, no service loader, no file.
+
+- **The capture source is a value too**, `@Managed("capture")` in the same file, installed through the
+  `Source.set` that has always existed.
+
 ### Changed
+
+- **`Activities.define(String, …)` is deprecated**, with a `@ReplacedBy` pointing at `Flow.activity`. It
+  still works and still registers a body by name; the name is exactly the link the method reference
+  replaces. Move the lambda into a `public static Outcome body(ActivityContext ctx)` and name that.
 
 - **Your picture class says it is managed, instead of Studio guessing.** Until now Studio locked every
   `static final ImageTemplate` field it found anywhere, and treated a class of nothing but those as owned
   whole by *🖼 Manage Pictures*. So a bot that kept one picture beside ordinary code was locked out of that
   code, and a second class of pictures could not be told from the first. The class carries
   `@Managed("pictures")` now and only the class that carries it is refused; a picture constant you write
-  yourself, anywhere else, is yours to edit. The `Pictures.java` the SDK ships from the next release carries
-  it already.
+  yourself, anywhere else, is yours to edit. The SDK **ships that file** (`plugins/sdk/Pictures.java`), so
+  the class is one this plugin owns rather than one it hoped you had: picture renames searched for
+  `Templates.ORE` before, in bots whose author had called theirs something else, and found nothing.
 
 ### Added
 

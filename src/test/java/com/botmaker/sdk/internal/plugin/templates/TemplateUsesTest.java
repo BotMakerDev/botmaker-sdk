@@ -22,7 +22,7 @@ class TemplateUsesTest {
 
     @Test
     void aLowercaseNameHasBothSpellings() {
-        assertEquals(List.of("Templates.ORE", "\"src/main/resources/images/ore.png\""),
+        assertEquals(List.of("Pictures.ORE", "\"src/main/resources/images/ore.png\""),
                 TemplateUses.needlesFor("ore"));
     }
 
@@ -42,14 +42,14 @@ class TemplateUsesTest {
         Map<String, String> repointing = TemplateUses.repointing("ore", "gold");
 
         assertEquals(Map.of(
-                        "Templates.ORE", "Templates.GOLD",
+                        "Pictures.ORE", "Pictures.GOLD",
                         "\"src/main/resources/images/ore.png\"", "\"src/main/resources/images/gold.png\""),
                 repointing);
     }
 
     @Test
     void theConstantLeadsSoItIsAppliedFirst() {
-        assertEquals("Templates.ORE", TemplateUses.repointing("ore", "gold").keySet().iterator().next(),
+        assertEquals("Pictures.ORE", TemplateUses.repointing("ore", "gold").keySet().iterator().next(),
                 "the host applies these in iteration order, first match wins");
     }
 
@@ -61,15 +61,15 @@ class TemplateUsesTest {
     @Test
     void aConstantRepointedAtANameWithNoConstantBecomesThePath() {
         assertEquals("\"src/main/resources/images/Gold-Ore.png\"",
-                TemplateUses.repointing("ore", "Gold-Ore").get("Templates.ORE"));
+                TemplateUses.repointing("ore", "Gold-Ore").get("Pictures.ORE"));
     }
 
     @Test
     void aScanCountsUsesAndFiles() {
         TemplateUses.Scan scan = new TemplateUses.Scan("ore", List.of(
-                new Sources.Use(Path.of("/bot/Main.java"), 4, "find(Templates.ORE);"),
-                new Sources.Use(Path.of("/bot/Main.java"), 9, "find(Templates.ORE);"),
-                new Sources.Use(Path.of("/bot/Mining.java"), 2, "find(Templates.ORE);")));
+                new Sources.Use(Path.of("/bot/Main.java"), 4, "find(Pictures.ORE);"),
+                new Sources.Use(Path.of("/bot/Main.java"), 9, "find(Pictures.ORE);"),
+                new Sources.Use(Path.of("/bot/Mining.java"), 2, "find(Pictures.ORE);")));
 
         assertAll(
                 () -> assertEquals(2, scan.fileCount()),
@@ -79,7 +79,7 @@ class TemplateUsesTest {
     @Test
     void oneUseIsSingularOnBothCounts() {
         assertEquals("1 use in 1 file", new TemplateUses.Scan("ore",
-                List.of(new Sources.Use(Path.of("/bot/Main.java"), 4, "find(Templates.ORE);"))).describe());
+                List.of(new Sources.Use(Path.of("/bot/Main.java"), 4, "find(Pictures.ORE);"))).describe());
     }
 
     @Test

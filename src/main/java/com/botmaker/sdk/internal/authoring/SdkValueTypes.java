@@ -127,6 +127,15 @@ public final class SdkValueTypes {
             .add(DIRECTION, enumCodec(WireText::direction, "Direction"))
             .add(KEY, enumCodec(WireText::key, "Key"))
             .add(MOUSE_BUTTON, enumCodec(WireText::mouseButton, "MouseButton"))
+            // The two leaves whose value is a name — a method reference, a capture source's own factory —
+            // and the four fixed shapes a flow is written as. Registered here rather than in a second
+            // catalog for the reason there is one catalog at all: a host merges per plugin, not per file.
+            .add(SdkFlowValues.ACTIVITY_BODY, SdkFlowValues.BODY_CODEC)
+            .add(SdkFlowValues.CAPTURE_SOURCE, SdkFlowValues.SOURCE_CODEC)
+            .add(SdkFlowValues.FLOW_SHAPE)
+            .add(SdkFlowValues.ACTIVITY_SHAPE)
+            .add(SdkFlowValues.EDGE_SHAPE)
+            .add(SdkFlowValues.LIMITS_SHAPE)
             .build();
 
     // ---- literals -------------------------------------------------------------------------------------
@@ -242,7 +251,7 @@ public final class SdkValueTypes {
      * constants are never curated (they are the type's whole value set), so there is nothing here for a
      * hand-kept list to add beyond a second place to forget one.
      */
-    private static ValueType sdk(String id, String label, String group, Class<?> type, boolean closedSet) {
+    static ValueType sdk(String id, String label, String group, Class<?> type, boolean closedSet) {
         ValueType.Builder b = ValueType.of(id).label(label).group(group)
                 .source(type.getSimpleName()).importing(type.getName());
         return (closedSet ? b.closedSet().options(constantNames(type)) : b).build();
@@ -260,9 +269,9 @@ public final class SdkValueTypes {
      * and cannot have one: a type that cannot read its own literal is one the editor writes once and
      * thereafter refuses to edit, which is what all eight of these were until 2026-09-20.
      */
-    private static <T> ValueCodec<T> codec(Function<String, T> parse, Function<T, String> store,
-                                           Function<T, String> literal,
-                                           Function<String, Optional<T>> valueOfLiteral) {
+    static <T> ValueCodec<T> codec(Function<String, T> parse, Function<T, String> store,
+                                   Function<T, String> literal,
+                                   Function<String, Optional<T>> valueOfLiteral) {
         return new ValueCodec<>() {
             @Override
             public T parse(String wire) {

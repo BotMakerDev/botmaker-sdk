@@ -1,0 +1,26 @@
+package ${package};
+
+import com.botmaker.plugin.basics.managed.Managed;
+import com.botmaker.sdk.api.vision.ImageTemplate;
+
+/**
+ * The pictures this bot looks for, one constant each.
+ *
+ * <p>Managed by <i>🖼 Manage Pictures</i>, which adds, renames and removes these together with the image
+ * files they point at and every use of them in your code. That is why the whole class is
+ * {@code @Managed("pictures")} and the code canvas will not edit it: the canvas can rename the constant it
+ * is looking at, and nothing else, which leaves the bot calling a name that is gone.
+ *
+ * <p>Everywhere else this is an ordinary class. Your code reads {@code Pictures.COLLECT} like any other
+ * constant, a misspelling is a compile error, and a developer with no BotMaker installed can read the whole
+ * of what this bot watches for by opening one file.
+ */
+@Managed("pictures")
+public final class Pictures {
+
+    /** The picture every new project ships, so a fresh bot has something to match. Replace it. */
+    public static final ImageTemplate DEFAULT_TEMPLATE =
+            new ImageTemplate("src/main/resources/images/default_template.png");
+
+    private Pictures() {}
+}

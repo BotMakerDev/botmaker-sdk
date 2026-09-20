@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.plugin.api.meta.ReplacedBy;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.basics.store.Settings;
 import com.botmaker.sdk.api.util.Debug;
@@ -62,7 +63,17 @@ public final class Activities {
      * @param name the activity's name, exactly as it reads on the Activity Flow canvas
      * @param body the work, handed the activity's own {@link ActivityContext}; it reports what happened with
      *             {@code ctx.outcome("…")} or {@code ctx.done()}
+     * @deprecated the flow names an activity's body by <b>method reference</b> now
+     *             ({@link com.botmaker.sdk.api.flow.Flow#activity}), so renaming or deleting the method is a
+     *             compile error instead of a flow that quietly does nothing
      */
+    @Deprecated(since = "1.2.0", forRemoval = false)
+    @ReplacedBy(value = "com.botmaker.sdk.api.flow.Flow#activity", behaviourChanged = true,
+            note = "An activity is a part of the Flow value in your plugins/sdk/Sdk.java now, and its body "
+                    + "is a method reference: Flow.activity(Collect::body, \"Collect\", …). Move the lambda "
+                    + "into a `public static Outcome body(ActivityContext ctx)` and name it there. This call "
+                    + "still registers a body by name and still works; the two match up by name, which is "
+                    + "the link the method reference exists to replace.")
     public static void define(String name, Function<ActivityContext, Outcome> body) {
         if (name == null || name.isBlank()) {
             Debug.error("[Activity] define: an activity needs a name. Ignoring.");

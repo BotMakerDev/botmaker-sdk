@@ -8,6 +8,50 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-20 — a flow is a value, and an activity's body is a method reference
+
+**Done**
+
+- **`api/flow/Flow`**: a record of four fixed parts — `List<Activity>`, `List<Edge>`, `String start`,
+  `Limits` — with `Flow.of/activity/edge/limits` as the factories the editor writes. Four parts and no
+  varargs, because arity has to be a property of the *type* for the editor to take an expression apart,
+  change one activity and put the rest back exactly as written.
+
+- **`api/bot/ActivityBody`**, an ordinary functional interface, and it is the point of the phase.
+  `Activities.define("Collect", …)` matched a string in `activities.json` against a string in a Java call:
+  renaming or deleting the method compiled fine, and the flow silently took the `DISABLED` wire three
+  screens into a run. `Collect::body` is four tokens javac resolves, so the same rename is a compile error
+  naming the file. `Activities.define` is deprecated with a `@ReplacedBy` and still works.
+
+- **`api/flow/Flows.use(Flow)`** — the hand-off, one static call from the `install()` in the shipped file.
+  Anything the SDK *discovered* (a known class name, an annotation scan, a `ServiceLoader`) would be a
+  second way for a bot to be wrong that the compiler could not see.
+
+- **`internal/authoring/SdkFlowValues`**: the four records as `ValueContainer`s of **arity zero** — the
+  contract's new fixed shape — plus two leaves whose value is a *name*, `ACTIVITY_BODY` (`Collect::body`)
+  and `CAPTURE_SOURCE` (`CaptureSource.desktop()`). Neither codec parses into a live object; both refuse
+  anything the SDK did not write, so a lambda body and a `region(…)` narrowing come back read-only rather
+  than being replaced. The vocabulary is ten types, and with plugin-basics' nine, nineteen.
+
+- **`SdkPlugin.pluginSources()` ships `Sdk.java` and `Pictures.java`** as text, copied once into
+  `<bot package>/plugins/sdk/`. `managedValues()` declares `flow`, `capture` and `pictures`.
+
+- **`TemplateNames.CLASS_NAME` is `Pictures`, and it is no longer a guess.** It named a class nothing
+  generated and no project was required to have, so a picture rename searched for `Templates.ORE` in bots
+  whose author had called theirs anything else, and found nothing. The plugin ships the file now, which is
+  what makes the name a fact. `TemplateUses` still builds *needles* for `Sources.replace` and this phase
+  deliberately did not move it onto AST edits: `Sources` is a token-aware rewrite with word boundaries,
+  which is the right tool for a rename, and the harm the plan named — a guessed class name — is the part
+  the annotation actually fixed.
+
+**Deferred / next**
+
+- `FlowGraph.load/run` still walk `ProjectData.current()` rather than `Flows.installed()`. That, and
+  deleting `activities.json` with everything that reads it, is phase 6 of
+  `../docs/refactor/33-plugin-java.md` — the one irreversible phase.
+
+---
+
 ## 2026-09-19 — a picture is found from any working directory
 
 **Done**

@@ -41,11 +41,16 @@ class ValueVocabularyTest {
     /** plugin-basics first, which is what {@code Authoring}'s own mapper does and what a menu shows. */
     private static final ValueCatalog MERGED = BasicsValueTypes.CATALOG.merge(SdkValueTypes.CATALOG);
 
+    /**
+     * Nineteen since 2026-09-20: the eight a bot's own API names, plus the two whose value is a
+     * <em>name</em> — an activity's body as {@code Collect::body}, and a capture source as its own factory
+     * call. Both arrived with the flow moving out of {@code activities.json} and into the bot's Java.
+     */
     @Test
-    void theTwoPluginsTogetherOfferSeventeenTypes() {
+    void theTwoPluginsTogetherOfferNineteenTypes() {
         assertEquals(9, BasicsValueTypes.CATALOG.types().size());
-        assertEquals(8, SdkValueTypes.CATALOG.types().size());
-        assertEquals(17, MERGED.types().size(), MERGED.types().toString());
+        assertEquals(10, SdkValueTypes.CATALOG.types().size());
+        assertEquals(19, MERGED.types().size(), MERGED.types().toString());
     }
 
     /** Neither kind of clash: no id claimed twice, and no Java type claimed by two ids. */
@@ -57,7 +62,7 @@ class ValueVocabularyTest {
         List<String> names = MERGED.types().stream().map(ValueType::javaName).toList();
         assertEquals(names.size(), new LinkedHashSet<>(names).size(), names.toString());
         Set<String> ids = new LinkedHashSet<>(MERGED.types().stream().map(ValueType::id).toList());
-        assertEquals(17, ids.size(), ids.toString());
+        assertEquals(19, ids.size(), ids.toString());
     }
 
     /** The nine answer as plugin #2's, which is the whole of the move being real rather than cosmetic. */

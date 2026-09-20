@@ -54,7 +54,7 @@ class SdkValueTypesJavaIndexTest {
         assertTrue(CATALOG.forJava(Duration.class).isEmpty());
         assertTrue(CATALOG.forJava(String.class).isEmpty());
         assertTrue(CATALOG.forJava(int.class).isEmpty());
-        assertEquals(8, CATALOG.types().size(), CATALOG.types().toString());
+        assertEquals(10, CATALOG.types().size(), CATALOG.types().toString());
     }
 
     /**

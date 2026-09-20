@@ -67,7 +67,8 @@ class SdkPluginSurfaceTest {
      * two catalogs. {@code ValueVocabularyTest} is where that merge is asserted.
      */
     private static final List<String> VALUE_TYPE_IDS = List.of(
-            "IMAGE_TEMPLATE", "PRECISION", "POINT", "RECT", "SIZE", "DIRECTION", "KEY", "MOUSE_BUTTON");
+            "IMAGE_TEMPLATE", "PRECISION", "POINT", "RECT", "SIZE", "DIRECTION", "KEY", "MOUSE_BUTTON",
+            "ACTIVITY_BODY", "CAPTURE_SOURCE");
 
     private final SdkPlugin plugin = new SdkPlugin();
 
