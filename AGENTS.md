@@ -316,6 +316,45 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   last use of a switch and a file that were themselves deleted hours later (above). Neither was a name a bot
   could write down.
 
+## A plugin's values are Java this plugin ships (2026-09-21) — read this before the sections below
+
+`docs/refactor/33-plugin-java.md`, implemented as *"a plugin's values live in one file the plugin ships"*
+over seven phases on 2026-09-20/21. **`ROADMAP.md` is the live log; the dated sections below this one are
+snapshots and several of them are now wrong.** This section says which.
+
+**What is true now.** `SdkPlugin.pluginSources()` ships two files, copied once into
+`src/main/java/<bot package>/plugins/sdk/`: `Sdk.java`, with a `@Managed("flow")` method returning a
+`com.botmaker.sdk.api.flow.Flow` and a `@Managed("capture")` method returning a `CaptureSource`; and
+`Pictures.java`, `@Managed("pictures")` on the type. From the copy on they are the user's — the host
+rewrites the expression a `@Managed` method returns and nothing else, and a body that is not exactly
+`return <expr>;` is read-only with a reason. An activity's work is a **method reference**,
+`Flow.activity(Collect::body, …)`, so renaming it is a compile error naming `Sdk.java`. A bot installs it
+all with one `Sdk.install()` from its own `main`, and `FlowGraph.load`/`run` walk `Flows.installed()`.
+
+**What is now false below.**
+
+- **`activities.json` does not exist**, and nothing reads it. `Authoring.readModel`/`writeModel`/`modelJson`/
+  `readSchemaVersion`, `ProjectModel`, `FlowModel`, `FlowNodeModel`, `PresetModel`, `ActivityModel`,
+  `VariableModel`, `internal.config.ProjectData`, `internal.config.SdkGrammar`, `AuthoringMixins` and
+  `ValueJson` are all deleted. Wherever a section below says the flow, the activity list or a project
+  variable is read out of that file, read *the flow the bot installed* instead. There is **no migration**,
+  by rule: a project written before this reads as having no flow, and nothing deletes anyone's copy.
+- **`ProjectWriter` no longer writes `activities.json`** when it creates a project (*The SDK writes no
+  `.java`*). It writes the project properties, the placeholder image and the `src/` directories; the flow
+  arrives as `Sdk.java`, from the plugin, through the host.
+- **`capture.json`'s "no schema stamp, the ledger's one entry point is `activities.json`" is stale** (*The
+  capture targets are authoring data*). `Authoring.SCHEMA_FIELD` survives **for `capture.json` itself**,
+  which is now the only file carrying it. The rest of that section holds: a target's identity is still its
+  spec text, and `botmaker-project.properties`' `capture.source` is still what a running bot resolves —
+  retiring that key is a step of its own, still owed.
+- **`ActivityEditors`' activity list comes from `FlowValue.current()`**, not `Authoring.readModel` (*The two
+  pickers the lambda was built for*). Everything else in that section stands, `Activities.define` included:
+  it is deprecated with a `@ReplacedBy` to `Flow#activity`, still works, and its `CallSites.ACTIVITY_NAME`
+  editor is still why `outcome` takes a context.
+- **A bot's enable flag is `Flow.Activity.enabled()`**, read through `Flows.enabled(name)`.
+  `Settings.enabled` is deleted rather than deprecated — it read `activities.json`, so with that file gone
+  it could only ever have answered `false`, switching every activity off.
+
 ## A bot reads its own settings — `api.config.Wire` (2026-08-29), deleted 2026-09-11
 
 **Neither class exists here any more.** `Wire` was replaced by `api.config.Settings` on 2026-09-09, and both

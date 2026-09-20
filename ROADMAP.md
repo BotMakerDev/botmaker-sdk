@@ -8,6 +8,58 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-21 (last) — the worked bot is migrated, and the string is gone
+
+Phase 7 of *"a plugin's values live in one file the plugin ships"*, and the end of it. The plan existed to
+delete one sentence from `Gamebot`'s javadoc — *"The two halves are joined by a **string**, deliberately"* —
+and this is the entry where that sentence is no longer true.
+
+**Done**
+
+- **`botmaker-gamebot` migrated by hand.** `Collect`, `Battle` and `Rest` are `public` with one
+  `public static Outcome body(ActivityContext ctx)` each and no `define()` wrapper. `Pictures` moved to
+  `com.botmaker.gamebot.plugins.sdk`, became `public` and carries `@Managed("pictures")` — the package and
+  the annotation the SDK now ships, rather than the guess `TemplateNames.CLASS_NAME` used to make.
+  `plugins/sdk/Sdk.java` holds the flow — three activities, five edges, `start = "Collect"`,
+  `limits(1000, 1000)` — and the capture source. `Gamebot.main` calls `Sdk.install()` and nothing else
+  changed about how it starts. `src/main/resources/activities.json` is deleted.
+
+- **The javadoc and the README say the new thing.** Both said the halves were joined by a string and that
+  an activity with no `define` call behaved as one switched off. Both now say the join is
+  `Collect::body`, four tokens javac resolves, and that a rename is a build failure naming `Sdk.java`. The
+  *label* being a separate string is stated as the deliberate part, because it still is: renaming the card
+  must not touch the code and renaming the class must not touch the card.
+
+- **No card positions ship.** The gamebot's `activities.json` carried x/y for its three nodes; the layout
+  sidecar is gitignored, so a clone opens on an auto-arranged canvas. That is the intended state and it is
+  what phase 5 decided: what changes without the bot changing does not belong in the repository.
+
+- **A real bug, found by running the migrated bot.** `FlowGraph.assemble` asked `ActivityLoader` about
+  *every* activity of the flow, and the loader says one line on the console for a name it cannot place. So
+  a fully migrated bot printed three lines on every start saying it had no body for three bodies written
+  three lines away. The loader is now asked only about activities whose body is `ActivityBody.NONE`. The
+  line itself is wanted — an activity drawn and not yet written otherwise never runs with no visible cause
+  — which is exactly why it must not be printed about one that *is* written: a warning that is wrong every
+  time is one a user learns to ignore. `FlowLoadTest.aFlowThatNamesItsBodiesSaysNothingOnTheConsole`.
+
+**The gamebot could not be compiled by its own pom, and was compiled anyway**
+
+`botmaker-gamebot` pins a released SDK (1.1.9) and an assistant never bumps that pin by hand — the upgrade
+goes through Studio, which is the one end-to-end run the upgrade engine gets. So the migrated sources were
+compiled and run against the local `0.0.0-SNAPSHOT` through a throwaway pom outside the repository, which
+is what found the bug above. **The template does not build from its own pom until the SDK carrying `Flow`
+is released**, and that is the ordinary state of a template between a breaking SDK change and the release
+that carries it.
+
+**Deferred / next**
+
+- **The release**, in `Order`: studio-api → plugin-toolkit → plugin-host → cli → plugin-basics → sdk →
+  studio, each with its `.deps.env` pins. Then the gamebot's own SDK pin and its publish, through Studio.
+- `botmaker-project.properties`' `capture.source` is still what a bot reads for its capture source, and is
+  still written beside the managed value. Retiring the key is a step of its own.
+- `ParameterStore` onto the form/value pair.
+- `FileRole.GENERATED` still has no files. Phase 6 was to delete it if nothing claimed it; nothing has.
+
 ## 2026-09-21 (later) — the bot runs from the flow it installed, and `activities.json` is gone
 
 Phase 6 of *"a plugin's values live in one file the plugin ships"*, and the only irreversible one.

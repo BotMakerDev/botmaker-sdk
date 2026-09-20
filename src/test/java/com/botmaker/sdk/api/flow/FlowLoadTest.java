@@ -193,6 +193,37 @@ class FlowLoadTest {
         assertEquals("DONE", node.runner().execute().name());
     }
 
+    /**
+     * A flow whose bodies are all named says nothing on the console.
+     *
+     * <p>Found by running the migrated {@code botmaker-gamebot}: the loader was asked about every activity
+     * of the flow, so a bot whose three bodies were right there in its source printed three lines saying it
+     * had none, on every start. The line itself is wanted — an activity drawn and not yet written otherwise
+     * never runs with no visible cause — which is exactly why it must not be printed about an activity that
+     * is written.
+     */
+    @Test
+    void aFlowThatNamesItsBodiesSaysNothingOnTheConsole() {
+        Flow flow = Flow.of(List.of(Flow.activity(ctx -> ctx.done(), "Nowhere", "",
+                        true, false, false, List.of())),
+                List.of(), List.of(), "Nowhere", Flow.Limits.DEFAULT);
+
+        java.io.PrintStream realOut = System.out;
+        java.io.ByteArrayOutputStream said = new java.io.ByteArrayOutputStream();
+        boolean wasEnabled = com.botmaker.sdk.api.util.Debug.isEnabled();
+        com.botmaker.sdk.api.util.Debug.enable();
+        try {
+            System.setOut(new java.io.PrintStream(said, true, java.nio.charset.StandardCharsets.UTF_8));
+            graph(flow);
+        } finally {
+            System.setOut(realOut);
+            com.botmaker.sdk.api.util.Debug.set(wasEnabled);
+        }
+
+        assertEquals("", said.toString(java.nio.charset.StandardCharsets.UTF_8).strip(),
+                "the flow named this activity's body, so nothing should have been looked up or reported");
+    }
+
     /** An activity switched off in the flow is switched off in the graph, before anything overrides it. */
     @Test
     void theEnableFlagComesFromTheFlow() {

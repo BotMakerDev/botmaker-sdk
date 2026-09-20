@@ -139,10 +139,19 @@ public final class FlowGraph {
      * javac already resolved, so the common case is one {@link FlowBody} around something the compiler
      * checked. {@link ActivityLoader} is consulted only for the two older ways — a name given to
      * {@code Activities.define}, and a pre-2026-08-29 generated class — and is what keeps those bots running.
+     *
+     * <p>It is asked <b>only about the activities that need it</b>, and that is not merely an optimisation.
+     * The loader says one line on the console for a name it cannot place, because "my activity never runs"
+     * otherwise has no visible cause; asking it about a name the flow has already answered would print that
+     * line for every activity of a fully migrated bot, on every start, about a body that is right there in
+     * the source. A warning that is wrong every time is one a user learns to ignore.
      */
     static FlowGraph assemble(Class<?> anchor, Flow flow) {
-        List<String> names = flow.activities().stream().map(Flow.Activity::name).toList();
-        Map<String, ActivityRegistry.Runner> written = ActivityLoader.load(anchor, names);
+        List<String> unwritten = flow.activities().stream()
+                .filter(activity -> activity.body() == null || activity.body() == ActivityBody.NONE)
+                .map(Flow.Activity::name)
+                .toList();
+        Map<String, ActivityRegistry.Runner> written = ActivityLoader.load(anchor, unwritten);
         Map<String, Node> byName = new LinkedHashMap<>();
         for (Flow.Activity activity : flow.activities()) {
             String name = activity.name();

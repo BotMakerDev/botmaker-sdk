@@ -71,7 +71,9 @@ No source changes since v1.1.12; re-released for updated upstream pins.
 - **A bot runs from the flow it installed, not from `activities.json`.** `FlowGraph.load` and
   `FlowGraph.run` walk `Flows.installed()`. An activity whose body the flow names is run directly — the
   method reference javac resolved — and only one that names none is still looked for by the old convention
-  at `<your package>.activities.<Name>`, so bots written the older way keep running.
+  at `<your package>.activities.<Name>`, so bots written the older way keep running. The old lookup is asked
+  **only** about the activities that need it, so a bot whose bodies are all named starts silently rather
+  than reporting, once per activity per start, that it has no body for one written three lines away.
 
 - **`ActivityContext`'s constructor is public.** A body is a `public static Outcome body(ActivityContext
   ctx)` in your own file, so a plain JUnit test can call it: `assertEquals("BAG_FULL",
