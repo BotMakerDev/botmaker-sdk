@@ -1,15 +1,9 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.sdk.authoring.ActivityModel;
-import com.botmaker.sdk.authoring.Authoring;
+import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.authoring.FlowEdgeModel;
-import com.botmaker.sdk.authoring.FlowModel;
-import com.botmaker.sdk.authoring.FlowNodeModel;
-import com.botmaker.sdk.authoring.PresetModel;
-import com.botmaker.sdk.authoring.ProjectModel;
-import com.botmaker.sdk.authoring.SdkVersion;
-import com.botmaker.sdk.authoring.VariableModel;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
@@ -37,7 +31,9 @@ import javafx.stage.Window;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -63,37 +59,47 @@ import java.util.Set;
  * an event on every write; a plugin writing the same file behind it would have left that cache stale and
  * fired nothing. So the editor and its host original could never both be alive, and the Studio one is deleted
  * in the same commit this arrived in.
+ *
+ * <h2>What it writes, since 2026-09-20</h2>
+ *
+ * <p>It no longer writes a file at all. The graph is one expression — the one {@code Sdk.flow()} returns —
+ * written through {@link com.botmaker.plugin.api.PluginValues}, so it lands in the bot's own Java, in the
+ * open buffer as well as on disk, as one entry in the project's history. The card positions go to the
+ * gitignored {@link FlowLayout} sidecar, because dragging a node is not a change to the bot.
+ *
+ * <p>Two consequences worth stating. A flow whose expression the plugin cannot read — hand-written, or a
+ * call to something else — is <b>shown empty and refused</b> rather than overwritten, which is the same rule
+ * every other value editor follows. And the variables this window never showed are no longer carried
+ * through a save, because there is nothing to carry: a user parameter is a {@code @Param} field in the bot's
+ * own Java and has not been in this file since 2026-09-17.
  */
 public final class ActivityFlowDialog {
 
     private final Window owner;
     private final StudioServices services;
 
-    /** The project's resources directory — where {@code activities.json} lives. */
+    /** The project's resources directory — where the gitignored {@link FlowLayout} sidecar lives. */
     private final Path resourcesDir;
 
-    /** The SDK doing the reading and writing: this jar's own. Whatever this plugin writes, this plugin reads. */
-    private final SdkVersion version = SdkVersion.latest();
-
     private final FlowCanvas canvas = new FlowCanvas();
-    private final List<PresetModel> presets = new ArrayList<>();
+    private final List<Flow.Preset> presets = new ArrayList<>();
 
     /**
-     * The model as it was last read, so everything this window does not edit — the variables above all —
-     * survives a save untouched.
+     * The {@code @Managed("flow")} value this window edits, or empty when the project has none — no
+     * {@code Sdk.java}, or a {@code flow()} whose body somebody wrote by hand.
      */
-    private ProjectModel loaded = ProjectModel.empty();
+    private Optional<ValueContext> value = Optional.empty();
 
-    /** The stamp the stored file carries, written back unchanged: the migration ledger is not this editor's. */
-    private int schemaVersion;
+    /** Why the flow cannot be edited, or {@code null} when it can. Shown once, on the status line. */
+    private String readOnlyReason;
 
     private final Label statusLabel = new Label();
 
-    /** The generated driver's step budget; edited in the no-selection panel alongside the globals. */
-    private int maxSteps = FlowModel.DEFAULT_MAX_STEPS;
+    /** The flow's step budget; edited in the no-selection panel alongside the globals. */
+    private int maxSteps = Flow.Limits.DEFAULT.maxSteps();
 
-    /** The generated driver's pause between activities, in ms; edited beside {@link #maxSteps}. */
-    private int stepDelayMs = FlowModel.DEFAULT_STEP_DELAY_MS;
+    /** The flow's pause between activities, in ms; edited beside {@link #maxSteps}. */
+    private int stepDelayMs = Flow.Limits.DEFAULT.stepDelayMs();
 
     /** Whether a newly added activity starts with its "go home first" tick on. */
     private boolean goHomeByDefault = true;
@@ -108,7 +114,7 @@ public final class ActivityFlowDialog {
     private final Label orderLabel = new Label();
     private final ProgressIndicator progress = new ProgressIndicator();
     private final VBox sidePanel = new VBox(10);
-    private final ComboBox<PresetModel> presetCombo = new ComboBox<>();
+    private final ComboBox<Flow.Preset> presetCombo = new ComboBox<>();
 
     /**
      * Autosave, coalesced. Every edit on the canvas asks to be written, which is far too much work to do per
@@ -183,45 +189,69 @@ public final class ActivityFlowDialog {
         });
     }
 
-    /** Seeds the canvas from the stored model: a card per activity, at its stored spot or a fresh one. */
+    /** Seeds the canvas from the stored flow: a card per activity, at its stored spot or a fresh one. */
     private void loadCurrent() {
-        loaded = readModel();
-        FlowModel flow = loaded.flow();
+        value = FlowValue.open(services);
+        Flow flow = readFlow();
+        FlowLayout.Layout layout = FlowLayout.read(resourcesDir);
         boolean anyPlaced = false;
-        for (ActivityModel a : loaded.activities()) {
-            Optional<FlowNodeModel> placed = flow.node(a.name());
-            anyPlaced |= placed.isPresent();
-            Point2D at = placed.map(n -> new Point2D(n.x(), n.y())).orElseGet(canvas::nextFreeSpot);
+        for (Flow.Activity a : flow.activities()) {
+            FlowLayout.Spot placed = layout.spot(a.name());
+            anyPlaced |= placed != null;
+            Point2D at = placed == null ? canvas.nextFreeSpot() : new Point2D(placed.x(), placed.y());
             canvas.add(ActivityDraft.of(a, at.getX(), at.getY()));
         }
         // Only when nothing at all was placed: one saved position is enough to mean someone laid this out.
-        arrangeOnOpen = !anyPlaced && !loaded.activities().isEmpty();
-        canvas.edges().setAll(flow.edges());
+        // With the sidecar gitignored this is now the ordinary state of a fresh clone, rather than the state
+        // of a flow nobody has opened — which is exactly why auto-arrange has to be good enough to land on.
+        arrangeOnOpen = !anyPlaced && !flow.activities().isEmpty();
+        canvas.edges().setAll(edgesOf(flow));
         canvas.setStart(flow.start());
-        maxSteps = flow.maxSteps();
-        stepDelayMs = flow.stepDelayMs();
-        goHomeByDefault = loaded.goHomeByDefault();
+        maxSteps = flow.limits().maxSteps();
+        stepDelayMs = flow.limits().stepDelayMs();
+        goHomeByDefault = layout.goHomeByDefault();
         canvas.select(null);
-        presets.addAll(loaded.presets());
+        presets.addAll(flow.presets());
         canvas.refresh();
     }
 
     /**
-     * Reads the stored model, or reports a broken file and opens empty.
+     * Reads the stored flow, or says why it cannot be edited and opens empty.
      *
-     * <p>A file that will not parse is the one case worth being loud about: the editor cannot show it, and
-     * saving over it is how a corrupt file becomes a lost one. The window still opens — with nothing on the
-     * canvas and the reason on its status line — because closing it outright leaves the user no way to see
+     * <p>Three states, one shape of answer. <b>No value</b> means the project has no {@code Sdk.java} — the
+     * SDK was never added, or the file was deleted — and the window opens empty saying so. <b>An expression
+     * the plugin did not write</b> means somebody wrote the flow by hand, and the window opens empty,
+     * refuses to save, and says which it is; overwriting it is exactly what this whole design exists to
+     * avoid. Otherwise there is a flow, and it may perfectly well be {@link Flow#NONE}.
+     *
+     * <p>The window still opens in every case, because closing it outright leaves the user no way to see
      * what the project has.
      */
-    private ProjectModel readModel() {
-        try {
-            schemaVersion = Authoring.readSchemaVersion(version, resourcesDir);
-            return Authoring.readModel(version, resourcesDir);
-        } catch (Exception e) {
-            error("Couldn't read this project's activities: " + rootMessage(e));
-            return ProjectModel.empty();
+    private Flow readFlow() {
+        if (value.isEmpty()) {
+            readOnly("This project has no Sdk.java with a @Managed(\"flow\") method, so there is nothing to "
+                    + "draw into. Add the BotMaker SDK to the project and it will be put there.");
+            return Flow.NONE;
         }
+        if (!FlowValue.readable(value.get())) {
+            readOnly("The flow in Sdk.flow() isn't one this editor wrote, so it is shown empty and left "
+                    + "alone. Edit it in Sdk.java, or replace it with Flow.of(…) to draw it here.");
+            return Flow.NONE;
+        }
+        return FlowValue.read(value.get());
+    }
+
+    /** Records why the flow cannot be written, and says it once. */
+    private void readOnly(String reason) {
+        readOnlyReason = reason;
+        error(reason);
+    }
+
+    /** The flow's wires as the canvas holds them. */
+    private static List<FlowEdgeModel> edgesOf(Flow flow) {
+        List<FlowEdgeModel> edges = new ArrayList<>(flow.edges().size());
+        for (Flow.Edge e : flow.edges()) edges.add(new FlowEdgeModel(e.from(), e.to(), e.outcome()));
+        return edges;
     }
 
     // --- top bar: presets + add activity ---
@@ -230,14 +260,14 @@ public final class ActivityFlowDialog {
         presetCombo.setPromptText("Preset…");
         presetCombo.setPrefWidth(180);
         presetCombo.setConverter(new javafx.util.StringConverter<>() {
-            @Override public String toString(PresetModel preset) { return preset == null ? "" : preset.name(); }
-            @Override public PresetModel fromString(String s) { return null; } // display-only
+            @Override public String toString(Flow.Preset preset) { return preset == null ? "" : preset.name(); }
+            @Override public Flow.Preset fromString(String s) { return null; } // display-only
         });
         refreshPresetCombo();
 
         Button applyPreset = new Button("Apply");
         applyPreset.setOnAction(e -> {
-            PresetModel preset = presetCombo.getValue();
+            Flow.Preset preset = presetCombo.getValue();
             if (preset == null) { error("Pick a preset first."); return; }
             // One step, not one per activity: a preset flips every switch at once, and taking that back should
             // be a single ↶ rather than a dozen.
@@ -349,23 +379,33 @@ public final class ActivityFlowDialog {
             if (d.enabled()) on.add(d.name());
         }
         presets.removeIf(p -> p.name().equals(name)); // re-saving a name overwrites it
-        presets.add(new PresetModel(name, on));
+        presets.add(Flow.preset(name, on));
         refreshPresetCombo();
         presetCombo.getSelectionModel().select(presets.size() - 1);
         error("");
         markDirty();
     }
 
-    /** The built-in presets plus the user's saved ones — built-ins are derived from what's on the canvas. */
+    /**
+     * The built-in presets plus the user's saved ones — built-ins are derived from what's on the canvas.
+     *
+     * <p>The two built-ins are built here rather than stored, which is what keeps them true: "Everything"
+     * over a canvas that has gained a card means the new card too, and a stored copy of the list would mean
+     * every card except the new one.
+     */
     private void refreshPresetCombo() {
         List<String> all = new ArrayList<>();
         for (ActivityDraft d : canvas.drafts()) all.add(d.name());
-        List<PresetModel> items = new ArrayList<>();
-        items.add(PresetModel.everything(all));
-        items.add(PresetModel.nothing());
+        List<Flow.Preset> items = new ArrayList<>();
+        items.add(Flow.preset(EVERYTHING, all));
+        items.add(Flow.preset(NOTHING, List.of()));
         items.addAll(presets);
         presetCombo.getItems().setAll(items);
     }
+
+    /** The two presets the editor offers over whatever is on the canvas; never saved into the flow. */
+    private static final String EVERYTHING = "Everything";
+    private static final String NOTHING = "Nothing";
 
     // --- side panel: the selected activity's graph properties, or the project globals ---
 
@@ -419,14 +459,30 @@ public final class ActivityFlowDialog {
                         + "activity that works through a popup itself — otherwise the guard closes it "
                         + "underneath."));
 
+        TextField body = new TextField(draft.body());
+        body.setPromptText("Collect::body");
+        body.setTooltip(new javafx.scene.control.Tooltip(
+                "The method that does this activity's work, as a method reference. Leave it blank and the "
+                        + "card is a placeholder: the flow walks through it and it does nothing."));
+        body.focusedProperty().addListener((o, was, is) -> {
+            if (is) return;
+            commitBody(draft, body);
+        });
+        body.setOnAction(e -> {
+            commitBody(draft, body);
+            e.consume();
+        });
+
         GridPane head = new GridPane();
         head.setHgap(8);
         head.setVgap(6);
         head.addRow(0, new Label("Name"), name);
-        head.addRow(1, new Label("Description"), description);
-        head.add(goHome, 1, 2);
-        head.add(popupCheck, 1, 3);
+        head.addRow(1, new Label("Runs"), body);
+        head.addRow(2, new Label("Description"), description);
+        head.add(goHome, 1, 3);
+        head.add(popupCheck, 1, 4);
         GridPane.setHgrow(name, Priority.ALWAYS);
+        GridPane.setHgrow(body, Priority.ALWAYS);
         GridPane.setHgrow(description, Priority.ALWAYS);
 
         Button delete = new Button("Delete activity");
@@ -657,6 +713,31 @@ public final class ActivityFlowDialog {
         }
     }
 
+    /**
+     * Points {@code draft} at the method that does its work, or says why the text is not one.
+     *
+     * <p>Checked here and not only on save, because it is the one field in this window whose value is
+     * <em>code</em>: what is typed goes into the bot's own Java verbatim, and a form with a space in it
+     * would be a file that does not compile. Blank is legal and means the card is a placeholder.
+     *
+     * <p>What is <b>not</b> checked is whether the class and method exist. This editor has no classpath for
+     * the bot it is drawing, and javac says so in the user's own file, on the line, far better than a
+     * dialog could.
+     */
+    private void commitBody(ActivityDraft draft, TextField field) {
+        String candidate = field.getText() == null ? "" : field.getText().trim();
+        if (candidate.equals(draft.body())) return;
+        if (!candidate.isEmpty() && !FlowNames.isMethodReference(candidate)) {
+            error("“Runs” has to be a method reference like Collect::body — reverted.");
+            field.setText(draft.body());
+            return;
+        }
+        draft.setBody(candidate);
+        field.setText(candidate);
+        error("");
+        markDirty();
+    }
+
     private void renameDraft(ActivityDraft draft, String candidate, TextField field) {
         if (candidate.equals(draft.name())) return;
         if (!FlowNames.isValidIdentifier(candidate)) {
@@ -760,38 +841,48 @@ public final class ActivityFlowDialog {
         autosaveDelay.playFromStart();
     }
 
-    /** The flow as it currently stands, ready to be written. */
-    private ProjectModel currentModel() {
-        List<ActivityModel> activities = new ArrayList<>();
-        List<FlowNodeModel> nodes = new ArrayList<>();
+    /** The flow as it currently stands, ready to be written into the bot's Java. */
+    private Flow currentFlow() {
+        List<Flow.Activity> activities = new ArrayList<>();
+        for (ActivityDraft d : canvas.drafts()) activities.add(d.toActivity());
+        List<Flow.Edge> edges = new ArrayList<>(canvas.edges().size());
+        for (FlowEdgeModel e : canvas.edges()) edges.add(new Flow.Edge(e.from(), e.to(), e.outcome()));
+        return Flow.of(activities, edges, List.copyOf(presets), canvas.start(),
+                Flow.limits(maxSteps, stepDelayMs));
+    }
+
+    /** Where every card sits, plus the one editor preference that rides along with them. */
+    private FlowLayout.Layout currentLayout() {
+        Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
         for (ActivityDraft d : canvas.drafts()) {
-            activities.add(d.toModel());
-            nodes.add(new FlowNodeModel(d.name(), d.x(), d.y()));
+            spots.put(d.name(), new FlowLayout.Spot(d.x(), d.y()));
         }
-        // Built on the model as it was read, so the variables this dialog never shows survive the save
-        // untouched.
-        return loaded
-                .withActivities(activities)
-                .withFlow(new FlowModel(nodes, new ArrayList<>(canvas.edges()), canvas.start(),
-                        maxSteps, stepDelayMs))
-                .withPresets(new ArrayList<>(presets))
-                .withGoHomeByDefault(goHomeByDefault);
+        return new FlowLayout.Layout(spots, goHomeByDefault);
     }
 
     /**
      * Writes the flow, if there is anything to write and nothing already in flight.
      *
-     * <p>Serialised rather than parallel on purpose: two writes of one file overlapping is a project in an
-     * order nobody chose. A change that arrives mid-write simply leaves {@link #dirty} set, and the write
-     * that lands starts the next one.
+     * <p><b>On the FX thread</b>, which is a reversal. It used to be a daemon thread, because writing
+     * {@code activities.json} was this window's own file I/O; the flow is now one expression handed to the
+     * host, which is what every slot editor on the canvas does on every keystroke and which
+     * {@link com.botmaker.plugin.api.ValueContext#set} requires. The layout sidecar goes with it rather than
+     * behind it, so a save is one thing that either happened or did not.
      *
-     * <p>Off the FX thread, because it is file I/O and the canvas is being dragged while it happens; the
-     * thread is a daemon, so a write that somehow hangs cannot keep the editor alive after it is closed.
+     * <p>{@link #saving} is still honoured, because the write can re-enter: the host's write lands in the
+     * open buffer, and anything listening to that must not start a second save underneath this one.
      */
     private void flush() {
         if (!dirty || saving) return;
-        ProjectModel model = currentModel();
-        String problem = validate(model);
+        if (readOnlyReason != null) {
+            // Nothing to fix and nothing to retry: the value is one the user wrote, and it stays theirs.
+            error(readOnlyReason);
+            savedLabel.setText("Not saved");
+            releaseClose();
+            return;
+        }
+        Flow flow = currentFlow();
+        String problem = validate(flow);
         if (problem != null) {
             // Refused, not failed — a duplicate name or a bad identifier. Stay dirty so the fix saves it, and
             // let go of any pending close: closing now would leave the edit only in the window.
@@ -805,35 +896,40 @@ public final class ActivityFlowDialog {
         saving = true;
         progress.setVisible(true);
         savedLabel.setText("Saving…");
-        Thread writer = new Thread(() -> {
-            Throwable failure = null;
+
+        String refused = FlowValue.write(value.orElse(null), flow);
+        Throwable failure = null;
+        if (refused == null) {
             try {
-                Authoring.writeModel(version, resourcesDir, model, schemaVersion);
+                // After the flow, never before: a layout for a card the saved flow does not have is the one
+                // way round that is merely untidy.
+                FlowLayout.write(resourcesDir, currentLayout());
             } catch (Exception | LinkageError e) {
                 failure = e;
             }
-            Throwable err = failure;
-            Platform.runLater(() -> saved(model, err));
-        }, "activity-flow-save");
-        writer.setDaemon(true);
-        writer.start();
+        }
+        saved(refused, failure);
     }
 
-    /** What the FX thread does once a write has landed — or has not. */
-    private void saved(ProjectModel written, Throwable err) {
+    /** What happens once a write has landed — or has not. */
+    private void saved(String refused, Throwable err) {
         saving = false;
         progress.setVisible(false);
-        if (err != null) {
+        if (refused != null) {
             dirty = true;   // the next edit, or Close, tries again
-            error(rootMessage(err));
+            error(refused);
             savedLabel.setText("Not saved");
             releaseClose();
             return;
         }
-        // What was written is what the next save builds on, so a variable this window never showed is carried
-        // forward from the same place it came from rather than from a stale read.
-        loaded = written;
-        savedLabel.setText("Saved");
+        if (err != null) {
+            // The flow itself is written; only the positions are not. Saying so rather than "not saved"
+            // matters, because the two have very different consequences for what is lost.
+            error("The flow was saved. The card positions weren't: " + rootMessage(err));
+            savedLabel.setText("Saved");
+        } else {
+            savedLabel.setText("Saved");
+        }
         if (dirty) flush();
         else if (closeWhenSaved) stage.close();
     }
@@ -857,24 +953,30 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * Returns an error message if the model can't be generated from (bad or duplicate names, collisions),
-     * else null.
+     * Returns an error message if the flow can't be written (bad or duplicate names, collisions), else null.
+     *
+     * <p><b>The generated-field check is gone</b>, and it was the largest of these. An activity's enable
+     * flag and a project's variables used to become fields of one generated class, so their names had to be
+     * unique valid identifiers within one namespace; the flag is now {@link Flow.Activity#enabled()} and a
+     * variable is a {@code @Param} field of the user's own class, so neither of them generates a field and
+     * javac is what has an opinion about the names. What is left checks the names this editor is still the
+     * author of.
      */
-    public static String validate(ProjectModel model) {
+    public static String validate(Flow flow) {
         Set<String> actNames = new HashSet<>();
         Set<String> registryFields = new HashSet<>();
-        for (ActivityModel a : model.activities()) {
+        for (Flow.Activity a : flow.activities()) {
             if (!FlowNames.isValidIdentifier(a.name())) return "Invalid activity name: '" + a.name() + "'.";
             if (!actNames.add(a.name())) return "Duplicate activity name: '" + a.name() + "'.";
-            // The registry's singleton per activity is named by upper-casing, so two activities differing only
-            // in case would generate one field twice. (Their stub files would also collide on a
-            // case-insensitive filesystem, so this is a broken project either way — just say so here.)
+            // Two activities differing only in case is a project whose stub files collide on a
+            // case-insensitive filesystem, and a canvas on which two cards read the same. Neither is worth
+            // letting through for the sake of a distinction only Linux can see.
             if (!registryFields.add(a.name().toUpperCase())) {
                 return "'" + a.name() + "' clashes with another activity whose name differs only in case.";
             }
-            // Outcomes become constants of the activity's generated Outcome enum. Checked against the declared
-            // list, not allOutcomes(): that one de-duplicates defensively, so validating it would report a
-            // clash as clean and leave the user with an outcome that silently has no port.
+            // Checked against the declared list, not allOutcomes(): that one de-duplicates defensively, so
+            // validating it would report a clash as clean and leave the user with an outcome that silently
+            // has no port.
             Set<String> outcomeNames = new HashSet<>();
             outcomeNames.add(FlowEdgeModel.NEXT_OUTCOME);
             outcomeNames.add(FlowEdgeModel.DISABLED_OUTCOME);
@@ -892,19 +994,6 @@ public final class ActivityFlowDialog {
                     }
                     return "Duplicate outcome '" + outcome + "' in " + a.name() + ".";
                 }
-            }
-        }
-        // Every generated field name must be a unique valid identifier — the activity flags and the variables
-        // are validated as one namespace, for the reason ProjectModel.nameClash records: which class a name
-        // belongs to is answered by the name alone, so a name on both has no answer.
-        Set<String> fields = new HashSet<>();
-        for (VariableModel v : model.allVariables()) {
-            if (!FlowNames.isValidIdentifier(v.name())) {
-                return "Invalid generated field name: '" + v.name() + "'.";
-            }
-            if (!fields.add(v.name())) {
-                return "Name collision on generated field '" + v.name() + "'. Rename an activity or a "
-                        + "parameter.";
             }
         }
         return null;

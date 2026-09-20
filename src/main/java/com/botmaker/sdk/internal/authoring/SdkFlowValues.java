@@ -12,10 +12,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The shapes a {@code @Managed} value of this plugin's takes: the flow's four records as containers, and the
+ * The shapes a {@code @Managed} value of this plugin's takes: the flow's five records as containers, and the
  * two leaves whose value is a <b>name</b> rather than data.
  *
- * <h2>Why a flow is four containers and not one type</h2>
+ * <h2>Why a flow is five containers and not one type</h2>
  *
  * <p>A {@link ValueContainer} is what lets the editor take an expression apart into typed parts, change one
  * of them and put the rest back exactly as written. One opaque {@code FLOW} leaf with a codec would give the
@@ -23,7 +23,7 @@ import java.util.Optional;
  * containers give it {@code Flow.of(List.of(Flow.activity(…), …), List.of(…), "Collect", Flow.limits(…))} as
  * a tree it can walk, with a leaf codec at every tip.
  *
- * <p><b>All four have arity zero</b>, which the contract allows since 2026-09-20: they take no type
+ * <p><b>All five have arity zero</b>, which the contract allows since 2026-09-20: they take no type
  * arguments and still have parts, so {@link ValueContainer#partForms} answers a fixed list and ignores the
  * (empty) arguments. That is the difference between a record a plugin registers and one the <em>bot</em>
  * declares, which is {@code ValueForm.Declared} and read out of the project's own source instead.
@@ -63,7 +63,10 @@ public final class SdkFlowValues {
      * user's own file, where it is a compile error naming the line.
      */
     static final com.botmaker.plugin.api.value.ValueCodec<String> BODY_CODEC = SdkValueTypes.codec(
-            SdkFlowValues::strip, s -> s, s -> s, SdkFlowValues::methodReference);
+            SdkFlowValues::strip, s -> s, SdkFlowValues::bodyLiteral, SdkFlowValues::methodReference);
+
+    /** How the constant for "drawn, not written yet" is spelled in a file — fully qualified, as all of these are. */
+    private static final String NO_BODY = ActivityBody.class.getName() + ".NONE";
 
     /**
      * One of {@link CaptureSource}'s three canonical factories, written as the SDK writes them.
@@ -79,15 +82,37 @@ public final class SdkFlowValues {
         return wire == null ? "" : wire.strip();
     }
 
+    /** A blank body is the card nobody has written yet, and it is written as the constant that says so. */
+    private static String bodyLiteral(String reference) {
+        return strip(reference).isEmpty() ? NO_BODY : reference;
+    }
+
     private static Optional<String> methodReference(String java) {
         String source = strip(java);
+        // The one accepted expression that is not a method reference. It reads back as blank, which is what
+        // the editor draws as a card with no method behind it — and what it writes out again unchanged.
+        if (source.equals(NO_BODY) || source.equals(ActivityBody.class.getSimpleName() + ".NONE")) {
+            return Optional.of("");
+        }
+        return isMethodReference(source) ? Optional.of(source) : Optional.empty();
+    }
+
+    /**
+     * Whether {@code source} is a method reference — {@code Collect::body}, or {@code com.mybot.Collect::body}.
+     *
+     * <p>Public because the flow editor asks the same question of what the user types, and one rule about
+     * what may be written into a bot's Java is the difference between a field that refuses a form and a
+     * codec that then declines to read it back.
+     */
+    public static boolean isMethodReference(String source) {
+        if (source == null) return false;
         int arrow = source.indexOf("::");
-        if (arrow <= 0 || arrow + 2 >= source.length()) return Optional.empty();
+        if (arrow <= 0 || arrow + 2 >= source.length()) return false;
         for (int i = 0; i < source.length(); i++) {
             char c = source.charAt(i);
-            if (c != ':' && c != '.' && !Character.isJavaIdentifierPart(c)) return Optional.empty();
+            if (c != ':' && c != '.' && !Character.isJavaIdentifierPart(c)) return false;
         }
-        return Optional.of(source);
+        return true;
     }
 
     private static Optional<String> captureSource(String java) {
@@ -132,42 +157,45 @@ public final class SdkFlowValues {
         return -1;
     }
 
-    // ---- the four containers ---------------------------------------------------------------------------
+    // ---- the five containers ---------------------------------------------------------------------------
 
-    /** {@code Flow.of(List<Activity>, List<Edge>, String, Limits)}. */
+    /** {@code Flow.of(List<Activity>, List<Edge>, List<Preset>, String, Limits)}. */
     public static final ValueContainer<Flow> FLOW_SHAPE = new Fixed<>(Flow.class, "of") {
         @Override
         public List<Object> parts(Flow value) {
             return value == null ? partsOfNone()
-                    : List.of(value.activities(), value.edges(), value.start(), value.limits());
+                    : List.of(value.activities(), value.edges(), value.presets(), value.start(),
+                    value.limits());
         }
 
         @Override
         public Flow build(List<Object> parts) {
-            return parts.size() != 4 ? Flow.NONE : new Flow(list(parts.get(0)), list(parts.get(1)),
-                    text(parts.get(2)), parts.get(3) instanceof Flow.Limits l ? l : Flow.Limits.DEFAULT);
+            return parts.size() != 5 ? Flow.NONE
+                    : new Flow(list(parts.get(0)), list(parts.get(1)), list(parts.get(2)), text(parts.get(3)),
+                    parts.get(4) instanceof Flow.Limits l ? l : Flow.Limits.DEFAULT);
         }
 
         @Override
         public List<ValueForm> fixedForms() {
             return List.of(ValueForm.listOf(new ValueForm.Of(ACTIVITY_SHAPE, List.of())),
                     ValueForm.listOf(new ValueForm.Of(EDGE_SHAPE, List.of())),
+                    ValueForm.listOf(new ValueForm.Of(PRESET_SHAPE, List.of())),
                     ValueForm.of(BasicsValueTypes.TEXT),
                     new ValueForm.Of(LIMITS_SHAPE, List.of()));
         }
 
         private List<Object> partsOfNone() {
-            return List.of(List.of(), List.of(), "", Flow.Limits.DEFAULT);
+            return List.of(List.of(), List.of(), List.of(), "", Flow.Limits.DEFAULT);
         }
     };
 
-    /** {@code Flow.activity(ActivityBody, String, String, boolean, boolean, List<String>)}. */
+    /** {@code Flow.activity(ActivityBody, String, String, boolean, boolean, boolean, List<String>)}. */
     public static final ValueContainer<Flow.Activity> ACTIVITY_SHAPE =
             new Fixed<>(Flow.Activity.class, "activity", Flow.class) {
                 @Override
                 public List<Object> parts(Flow.Activity value) {
-                    return value == null ? List.of("", "", "", false, false, List.of())
-                            : List.of(body(value.body()), value.name(), value.description(),
+                    return value == null ? List.of("", "", "", true, false, false, List.of())
+                            : List.of(body(value.body()), value.name(), value.description(), value.enabled(),
                             value.goHome(), value.popupCheck(), value.outcomes());
                 }
 
@@ -181,14 +209,15 @@ public final class SdkFlowValues {
                  * rather than guessed at.
                  */
                 private Object body(ActivityBody body) {
-                    return body instanceof Named named ? named.source() : "";
+                    return sourceOf(body);
                 }
 
                 @Override
                 public Flow.Activity build(List<Object> parts) {
-                    if (parts.size() != 6) return null;
+                    if (parts.size() != 7) return null;
                     return new Flow.Activity(new Named(text(parts.get(0))), text(parts.get(1)),
-                            text(parts.get(2)), flag(parts.get(3)), flag(parts.get(4)), list(parts.get(5)));
+                            text(parts.get(2)), flag(parts.get(3)), flag(parts.get(4)), flag(parts.get(5)),
+                            list(parts.get(6)));
                 }
 
                 @Override
@@ -198,6 +227,29 @@ public final class SdkFlowValues {
                             ValueForm.of(BasicsValueTypes.TEXT),
                             ValueForm.of(BasicsValueTypes.YES_NO),
                             ValueForm.of(BasicsValueTypes.YES_NO),
+                            ValueForm.of(BasicsValueTypes.YES_NO),
+                            ValueForm.listOf(ValueForm.of(BasicsValueTypes.TEXT)));
+                }
+            };
+
+    /** {@code Flow.preset(String, List<String>)}. */
+    public static final ValueContainer<Flow.Preset> PRESET_SHAPE =
+            new Fixed<>(Flow.Preset.class, "preset", Flow.class) {
+                @Override
+                public List<Object> parts(Flow.Preset value) {
+                    return value == null ? List.of("", List.of())
+                            : List.of(value.name(), value.activities());
+                }
+
+                @Override
+                public Flow.Preset build(List<Object> parts) {
+                    return parts.size() != 2 ? null
+                            : new Flow.Preset(text(parts.get(0)), list(parts.get(1)));
+                }
+
+                @Override
+                public List<ValueForm> fixedForms() {
+                    return List.of(ValueForm.of(BasicsValueTypes.TEXT),
                             ValueForm.listOf(ValueForm.of(BasicsValueTypes.TEXT)));
                 }
             };
@@ -255,6 +307,24 @@ public final class SdkFlowValues {
      * assembled was never meant to be run, and a body that silently did nothing would be a bot that walks
      * its flow reporting nothing.
      */
+    /**
+     * An {@link ActivityBody} that only knows what it is written as — {@code Collect::body} — for an editor
+     * assembling a {@link Flow} it will never run.
+     */
+    public static ActivityBody body(String source) {
+        return new Named(source == null ? "" : source);
+    }
+
+    /**
+     * How {@code body} is written, or {@code ""} for a real one.
+     *
+     * <p>A live method reference has nothing to spell it back as, so it answers blank — which the editor
+     * reads as "no body named yet" and the initialiser writer refuses, rather than inventing a name.
+     */
+    public static String sourceOf(ActivityBody body) {
+        return body instanceof Named named ? named.source() : "";
+    }
+
     record Named(String source) implements ActivityBody {
 
         @Override
@@ -270,11 +340,12 @@ public final class SdkFlowValues {
      * A container of {@linkplain ValueContainer#arity() arity zero}: a record with fixed components, taken
      * apart and put back positionally.
      *
-     * <p>{@link #partForms} ignores the arguments — there are none — and answers {@link #fixedForms()},
-     * truncated or padded to however many parts were actually written. Padding rather than refusing is what
-     * lets a file written by an older SDK, with one component fewer, still be read and shown: the host's
-     * own rule is that a form it cannot read whole is displayed and left alone, and a length mismatch is
-     * caught there rather than thrown here.
+     * <p>{@link #partForms} ignores the arguments — there are none — and answers {@link #fixedForms()} when
+     * the expression has exactly that many parts, and nothing when it has any other number. A call with the
+     * wrong number of arguments is not this shape, and the host's answer to a form it cannot read whole is
+     * to show the expression read-only and leave it exactly as written. That is the right answer here too:
+     * it is a call to something else, or to a newer version of this factory, and either way guessing which
+     * of its parts line up with which of these would be rewriting code on a hunch.
      */
     private abstract static class Fixed<C> implements ValueContainer<C> {
 

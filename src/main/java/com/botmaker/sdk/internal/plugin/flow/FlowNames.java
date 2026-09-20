@@ -29,6 +29,22 @@ public final class FlowNames {
     }
 
     /**
+     * Whether {@code s} is a method reference — {@code Collect::body}, or {@code com.mybot.Collect::body}.
+     *
+     * <p>Purely syntactic, and that is the whole of what this editor is entitled to say about it: it has no
+     * classpath for the bot being drawn, so whether the class exists and whether the method has the right
+     * shape are javac's to answer, in the user's own file. What this stops is a text that could not be a
+     * reference at all going into that file and breaking the build in a way nobody typed.
+     *
+     * <p>Deliberately the <em>same</em> rule the value codec reads back with, and not a second copy of it: a
+     * field that accepted what the codec then declined would leave the user with a flow shown read-only the
+     * moment it was saved.
+     */
+    public static boolean isMethodReference(String s) {
+        return com.botmaker.sdk.internal.authoring.SdkFlowValues.isMethodReference(s);
+    }
+
+    /**
      * An outcome name in the shape Java wants: trimmed, upper-cased, with runs of spaces, dots and dashes
      * collapsed to {@code _}. "bag full" becomes {@code BAG_FULL} rather than being rejected — the user is
      * naming a result, not writing an enum constant, and the one mechanical step between the two is ours to

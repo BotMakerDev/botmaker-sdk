@@ -41,6 +41,20 @@ import com.botmaker.plugin.api.palette.Palette;
 public interface ActivityBody {
 
     /**
+     * The work of an activity that has been <b>drawn but not written</b>.
+     *
+     * <p>Drawing the flow first and writing the bodies afterwards is an ordinary way to work, so a card on
+     * the canvas with no method behind it yet has to be sayable. This is how it is said: the flow editor
+     * writes {@code ActivityBody.NONE} where a method reference will go, and the activity is a node like any
+     * other — it simply does nothing, and the run takes the wire it would take for one switched off.
+     *
+     * <p>Comparable by identity on purpose, and the one place in this vocabulary where that is true: it is a
+     * constant, not a value read back out of a file, so {@code body == ActivityBody.NONE} is exactly the
+     * question the flow asks. Calling it is harmless and reports nothing in particular.
+     */
+    ActivityBody NONE = ctx -> null;
+
+    /**
      * Does the work and says what happened.
      *
      * @param ctx this activity, from the inside — {@code ctx.outcome("…")} or {@code ctx.done()}

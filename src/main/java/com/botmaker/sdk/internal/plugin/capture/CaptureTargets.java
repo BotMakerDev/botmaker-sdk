@@ -51,14 +51,16 @@ import java.util.function.Consumer;
  * supplies is the three things nobody else can — which project is open, the current look, and the window this
  * modal should be owned by.
  *
- * <h2>Two files, one direction</h2>
+ * <h2>Three writes, one direction</h2>
  *
- * <p>Applying writes {@code capture.json} <em>and</em> projects the default onto
- * {@code botmaker-project.properties}' {@code capture.source}, through {@link Authoring#writeCaptureSource}.
- * That projection is not a second answer: a running bot cannot read {@code capture.json} at all, so the
- * properties file is the bot's side of the same question and it has exactly one author.
+ * <p>Applying writes {@code capture.json}, projects the default onto {@code botmaker-project.properties}'
+ * {@code capture.source} through {@link Authoring#writeCaptureSource}, and since 2026-09-21 writes the same
+ * default into the bot's own Java as the expression {@code Sdk.captureSource()} returns
+ * ({@link CaptureValue}). None of the three is a second answer: they are one target, written by one code
+ * path at one instant, to the three places that have to know — this window, the host's tooling, and the bot.
  *
- * <p>Both writes happen off the FX thread, because the second one is a load-modify-store of a file on disk.
+ * <p>The first two happen off the FX thread, because they are a load-modify-store of files on disk. The
+ * third is a value the host writes, so it happens on the FX thread once they have landed.
  */
 public final class CaptureTargets {
 
@@ -174,7 +176,12 @@ public final class CaptureTargets {
                 failure = ex.getMessage() == null ? ex.toString() : ex.getMessage();
             }
             String message = failure;
-            if (onDone != null) Platform.runLater(() -> onDone.accept(message));
+            Platform.runLater(() -> {
+                // On the FX thread and after the two files, because it is a value the host writes into the
+                // bot's own Java. Nothing here fails: a project with no Sdk.java has nowhere to write it.
+                if (message == null) CaptureValue.point(services, target);
+                if (onDone != null) onDone.accept(message);
+            });
         }, "capture-target-point");
         worker.setDaemon(true);
         worker.start();
@@ -396,8 +403,12 @@ public final class CaptureTargets {
             String message = failure;
             Platform.runLater(() -> {
                 setBusy(apply, cancel, false);
-                if (message != null) error(message);
-                else stage.close();
+                if (message != null) {
+                    error(message);
+                    return;
+                }
+                CaptureValue.point(services, defaultTarget);
+                stage.close();
             });
         }, "capture-targets-save");
         worker.setDaemon(true);

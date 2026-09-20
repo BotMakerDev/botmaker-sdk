@@ -2,10 +2,8 @@ package com.botmaker.sdk.internal.plugin.editors;
 
 import com.botmaker.plugin.api.ValueContext;
 import com.botmaker.plugin.toolkit.Editors;
-import com.botmaker.sdk.authoring.ActivityModel;
-import com.botmaker.sdk.authoring.ProjectModel;
-import com.botmaker.sdk.authoring.Authoring;
-import com.botmaker.sdk.authoring.SdkVersion;
+import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.internal.plugin.flow.FlowValue;
 import javafx.scene.Node;
 
 import java.util.ArrayList;
@@ -23,10 +21,10 @@ import java.util.Set;
  * user: a name that matches nothing is not an error anywhere, it is an activity that never runs and an
  * outcome nothing is wired to.
  *
- * <p><b>The list is read from {@code activities.json}, not from a running bot.</b> The canvas is the source
- * of truth and it is a file, so {@link Authoring#readModel} is the whole implementation. It is read when the
- * dropdown is opened rather than when the block is drawn, so an activity added in the flow window a moment
- * ago is offered without reopening anything.
+ * <p><b>The list is read from the project's own {@code Sdk.flow()}, not from a running bot.</b> The canvas
+ * is the source of truth and what it writes is one expression in the bot's Java, so {@link FlowValue} is the
+ * whole implementation. It is read when the dropdown is opened rather than when the block is drawn, so an
+ * activity added in the flow window a moment ago is offered without reopening anything.
  *
  * <p><b>Both boxes stay typeable</b>, and that is deliberate rather than a concession. Writing the body
  * before drawing the activity is an ordinary way to work, and an editor that could only pick from what
@@ -61,15 +59,15 @@ public final class ActivityEditors {
 
     private static List<String> activityNames(ValueContext ctx) {
         List<String> names = new ArrayList<>();
-        for (ActivityModel activity : model(ctx).activities()) {
-            if (activity.name() != null && !activity.name().isBlank()) names.add(activity.name());
+        for (Flow.Activity activity : flow(ctx).activities()) {
+            if (!activity.name().isBlank()) names.add(activity.name());
         }
         return names;
     }
 
     private static List<String> outcomeNames(ValueContext ctx) {
         Set<String> names = new LinkedHashSet<>();
-        for (ActivityModel activity : model(ctx).activities()) {
+        for (Flow.Activity activity : flow(ctx).activities()) {
             for (String outcome : activity.outcomes()) {
                 if (outcome != null && !outcome.isBlank()) names.add(outcome);
             }
@@ -78,17 +76,14 @@ public final class ActivityEditors {
     }
 
     /**
-     * The open project's model, or an empty one.
+     * The open project's flow, or an empty one.
      *
-     * <p>Rule 2 of the toolkit, applied to reading a file: a project with no {@code activities.json} yet, one
-     * whose file cannot be parsed, and one whose directory the host could not name all have to produce a
-     * dropdown with nothing in it rather than an editor that throws while it is being built.
+     * <p>Rule 2 of the toolkit, applied to reading a value: a project with no {@code Sdk.java} yet, one
+     * whose {@code flow()} somebody wrote by hand, and one the host could not open all have to produce a
+     * dropdown with nothing in it rather than an editor that throws while it is being built. Every one of
+     * them answers {@link Flow#NONE}, which is why there is no {@code try} here any more.
      */
-    private static ProjectModel model(ValueContext ctx) {
-        try {
-            return Authoring.readModel(SdkVersion.latest(), ctx.services().resourcesDir());
-        } catch (Exception unreadable) {
-            return ProjectModel.empty();
-        }
+    private static Flow flow(ValueContext ctx) {
+        return FlowValue.open(ctx.services()).map(FlowValue::read).orElse(Flow.NONE);
     }
 }

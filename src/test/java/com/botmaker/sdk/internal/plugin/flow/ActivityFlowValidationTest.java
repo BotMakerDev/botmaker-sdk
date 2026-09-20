@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
-import com.botmaker.sdk.authoring.ActivityModel;
-import com.botmaker.sdk.authoring.ProjectModel;
+import com.botmaker.sdk.api.bot.ActivityBody;
+import com.botmaker.sdk.api.flow.Flow;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -15,17 +15,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * What the flow dialog refuses to save. Every rule here exists because the generator would otherwise emit
  * Java that doesn't compile — the point is to say so in the dialog rather than in a build log.
  *
- * <p>It was the host's until 2026-09-11, over the editor's own record set; it is over {@link ProjectModel}
- * now, which is the shape the editor actually reads and writes.
+ * <p>It was the host's until 2026-09-11, over the editor's own record set; it is over {@link Flow} since
+ * 2026-09-21, which is the value the editor actually reads and writes.
  */
 class ActivityFlowValidationTest {
 
-    private static ProjectModel of(ActivityModel... activities) {
-        return ProjectModel.of(List.of(activities), List.of());
+    private static Flow of(Flow.Activity... activities) {
+        return Flow.of(List.of(activities), List.of(), List.of(), "", Flow.Limits.DEFAULT);
     }
 
-    private static ActivityModel activity(String name, String... outcomes) {
-        return ActivityModel.create(name, "").withOutcomes(List.of(outcomes));
+    private static Flow.Activity activity(String name, String... outcomes) {
+        return Flow.activity(ActivityBody.NONE, name, "", true, false, true, List.of(outcomes));
     }
 
     @Test
@@ -77,8 +77,7 @@ class ActivityFlowValidationTest {
 
     @Test
     void twoActivitiesDifferingOnlyInCaseAreRejected() {
-        // The registry names its singleton by upper-casing, so MINING would be declared twice. Their stub
-        // files would also collide on a case-insensitive filesystem.
+        // Two cards that read the same, and two stub files that collide on a case-insensitive filesystem.
         String problem = ActivityFlowDialog.validate(of(activity("Mining"), activity("MINING")));
         assertNotNull(problem);
         assertTrue(problem.contains("case"), problem);

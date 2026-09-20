@@ -34,7 +34,7 @@ public final class Sdk {
      */
     @Managed("flow")
     public static Flow flow() {
-        return Flow.of(List.of(), List.of(), "", Flow.limits(1000, 1000));
+        return Flow.of(List.of(), List.of(), List.of(), "", Flow.limits(1000, 1000));
     }
 
     /**

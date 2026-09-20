@@ -37,9 +37,36 @@ No source changes since v1.1.12; re-released for updated upstream pins.
   given, which your `main` calls. No reflection, no service loader, no file.
 
 - **The capture source is a value too**, `@Managed("capture")` in the same file, installed through the
-  `Source.set` that has always existed.
+  `Source.set` that has always existed. *Capture Targets ▸ Apply* and the overlay's "point the bot here"
+  button both write it, beside the two files they already wrote.
+
+- **`ActivityBody.NONE`** — the body of an activity you have drawn but not written yet. Drawing the flow
+  first is an ordinary way to work, so the card has to be sayable: it is a node like any other, it does
+  nothing, and the run takes the wire it would take for one switched off.
 
 ### Changed
+
+- **✂ Activity Flow reads and writes `Sdk.flow()`, not `activities.json`.** Drawing changes one expression
+  in your own source — one hunk in `git diff`, one entry in the project's history — and everything you wrote
+  around it survives. A `flow()` body you wrote by hand is shown empty and **left alone**: the editor says
+  so on its status line and refuses to save over it.
+
+- **Where the cards sit is not in your source.** The graph is Java and committed; the positions go to
+  `src/main/resources/plugins/com.botmaker/sdk/flow-layout.json`, which both templates gitignore, so
+  dragging a node never shows up in a diff. A clone without the file opens on an auto-arranged canvas.
+
+- **A flow carries its enable flags and its presets.** `Flow.Activity.enabled()` is part of what the bot
+  does, so it is in the bot's own source; a saved preset is a named set of those flags, so it travels beside
+  them rather than being lost the moment the project is cloned.
+
+- **The side panel has a "Runs" box** — the method reference this card's work is written as. It is checked
+  as you type against the same rule the file is read back with, so a value the editor accepts is never one
+  it then shows read-only.
+
+- **The flow no longer validates generated field names.** An activity's enable flag and a project's
+  variables used to become fields of one generated class, so their names had to be unique identifiers in one
+  namespace. Neither generates a field now, so javac is what has an opinion, and the editor checks only the
+  names it is still the author of.
 
 - **`Activities.define(String, …)` is deprecated**, with a `@ReplacedBy` pointing at `Flow.activity`. It
   still works and still registers a body by name; the name is exactly the link the method reference

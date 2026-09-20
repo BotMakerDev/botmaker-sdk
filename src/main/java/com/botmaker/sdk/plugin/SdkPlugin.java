@@ -44,6 +44,7 @@ import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
 import com.botmaker.sdk.internal.plugin.capture.ScreenCapture;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 import com.botmaker.sdk.internal.plugin.flow.ActivityFlowDialog;
+import com.botmaker.sdk.internal.plugin.flow.FlowValue;
 import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
 import com.botmaker.sdk.internal.plugin.record.MacroRecorderDialog;
 import com.botmaker.sdk.internal.plugin.setup.ProjectSetup;
@@ -479,6 +480,10 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     public void projectOpened(StudioServices services) {
         parameters = new ParameterStore(PluginData.of(services.resourcesDir(), ID), SDK_PARAMETERS.id(),
                 BasicsValueTypes.CATALOG.merge(SdkValueTypes.CATALOG));
+        // The flow is a value in the bot's own Java now, so reading it needs the host rather than a path.
+        // Two readers have no value cell to ask through — see FlowValue's own note — and this is where they
+        // are given one.
+        FlowValue.bind(services);
     }
 
     /**
@@ -712,6 +717,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         // Dropped for the same reason the pilot is: it holds the closing project's resources directory, and
         // answering parameter rows out of a project the user has left would be worse than answering none.
         parameters = null;
+        FlowValue.unbind();
     }
 
     /**

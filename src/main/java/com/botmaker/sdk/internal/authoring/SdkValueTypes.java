@@ -128,13 +128,14 @@ public final class SdkValueTypes {
             .add(KEY, enumCodec(WireText::key, "Key"))
             .add(MOUSE_BUTTON, enumCodec(WireText::mouseButton, "MouseButton"))
             // The two leaves whose value is a name — a method reference, a capture source's own factory —
-            // and the four fixed shapes a flow is written as. Registered here rather than in a second
+            // and the five fixed shapes a flow is written as. Registered here rather than in a second
             // catalog for the reason there is one catalog at all: a host merges per plugin, not per file.
             .add(SdkFlowValues.ACTIVITY_BODY, SdkFlowValues.BODY_CODEC)
             .add(SdkFlowValues.CAPTURE_SOURCE, SdkFlowValues.SOURCE_CODEC)
             .add(SdkFlowValues.FLOW_SHAPE)
             .add(SdkFlowValues.ACTIVITY_SHAPE)
             .add(SdkFlowValues.EDGE_SHAPE)
+            .add(SdkFlowValues.PRESET_SHAPE)
             .add(SdkFlowValues.LIMITS_SHAPE)
             .build();
 

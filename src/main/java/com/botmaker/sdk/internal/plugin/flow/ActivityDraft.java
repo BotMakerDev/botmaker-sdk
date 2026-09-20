@@ -2,6 +2,8 @@ package com.botmaker.sdk.internal.plugin.flow;
 
 import com.botmaker.sdk.authoring.ActivityModel;
 import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.internal.authoring.SdkFlowValues;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -15,9 +17,9 @@ import java.util.List;
 /**
  * One activity while it is being edited on the Activity Flow canvas: its name, description and outcomes,
  * whether it is enabled, and where its card sits. Mutable and observable — the node card, the side panel and
- * the preset bar all bind to the same draft, so a change in one is visible in the others immediately. It is
- * converted back to an immutable {@link ActivityModel} plus a
- * {@link com.botmaker.sdk.authoring.FlowNodeModel} only on save.
+ * the preset bar all bind to the same draft, so a change in one is visible in the others immediately. On
+ * save it splits in two: a {@link Flow.Activity} written into the bot's own Java, and a position written
+ * into the gitignored {@link FlowLayout} sidecar.
  *
  * <p><b>It carries no parameters.</b> The Studio class this was ported from held an observable list of the
  * activity's variables, left over from the day values were edited in this dialog's side panel; nothing has
@@ -48,25 +50,29 @@ public final class ActivityDraft {
     private double y;
 
     /**
-     * The activity's stable identity, carried through this draft untouched and never shown.
+     * The activity's work, as the method reference it is written as — {@code Collect::body}.
      *
-     * <p><b>It is here because renaming happens here.</b> The name is a {@link StringProperty} the side panel
-     * edits in place, so a draft that did not carry the id would hand back a model whose identity was the new
-     * name — and anything reconciling activities by identity would see one deleted and another created.
+     * <p><b>This is the draft's identity, and it replaced a generated id on 2026-09-20.</b> While a flow was
+     * JSON, an activity needed a stable key of its own so that renaming the card on the canvas did not read
+     * as a delete plus a create; the key was a string nothing else in the project mentioned. The work is now
+     * named by a method reference javac resolves, so the identity is the same token that links the card to
+     * the code — one fact, checked by the compiler, instead of two kept in step by hand.
      *
-     * <p>Not a property, because nothing may observe it and nothing may bind to it. Blank means "this draft
-     * was built before ids existed"; {@link ActivityModel} resolves that to the name.
+     * <p>Blank for a card added on the canvas whose method has not been written yet, which is an ordinary
+     * way to work: the flow refuses to save until it is filled in, and says which card is missing one.
+     *
+     * <p>Not a property, because nothing may observe it and nothing may bind to it.
      */
-    private final String id;
+    private String body;
 
     public ActivityDraft(String name, String description, boolean enabled, List<String> outcomes,
                          boolean goHome, boolean popupCheck, double x, double y) {
-        this(name, description, enabled, outcomes, goHome, popupCheck, x, y, null);
+        this(name, description, enabled, outcomes, goHome, popupCheck, x, y, "");
     }
 
     public ActivityDraft(String name, String description, boolean enabled, List<String> outcomes,
-                         boolean goHome, boolean popupCheck, double x, double y, String id) {
-        this.id = id;
+                         boolean goHome, boolean popupCheck, double x, double y, String body) {
+        this.body = body == null ? "" : body;
         this.name.set(name);
         this.description.set(description == null ? "" : description);
         this.enabled.set(enabled);
@@ -77,22 +83,23 @@ public final class ActivityDraft {
         this.y = y;
     }
 
-    /** A draft of an existing activity, placed at {@code (x, y)} — carrying its id. */
-    public static ActivityDraft of(ActivityModel model, double x, double y) {
-        return new ActivityDraft(model.name(), model.description(), model.enabled(), model.outcomes(),
-                model.goHome(), model.popupCheck(), x, y, model.id());
+    /** A draft of an activity of the stored flow, placed at {@code (x, y)} — carrying its body reference. */
+    public static ActivityDraft of(Flow.Activity activity, double x, double y) {
+        return new ActivityDraft(activity.name(), activity.description(), activity.enabled(),
+                activity.outcomes(), activity.goHome(), activity.popupCheck(), x, y,
+                SdkFlowValues.sourceOf(activity.body()));
     }
 
     /**
-     * The immutable model this draft currently describes, <b>with the identity it came in with</b>.
+     * The value this draft currently describes, <b>with the body reference it came in with</b>.
      *
-     * <p>The last argument is the whole reason {@link #id} exists on this class. Rebuilding the model from
-     * the draft's visible fields alone makes a rename indistinguishable from a delete plus a create, because
-     * the name is the only identity left.
+     * <p>Carrying the body through is the whole reason {@link #body} is a field. Rebuilding the activity
+     * from the draft's visible fields alone would hand back one whose work was blank, which is how a rename
+     * on the canvas would come to unwire a card from the code behind it.
      */
-    public ActivityModel toModel() {
-        return new ActivityModel(name.get(), enabled.get(), description.get(), List.copyOf(outcomes),
-                goHome.get(), popupCheck.get(), id);
+    public Flow.Activity toActivity() {
+        return new Flow.Activity(SdkFlowValues.body(body), name.get(), description.get(), enabled.get(),
+                goHome.get(), popupCheck.get(), List.copyOf(outcomes));
     }
 
     /**
@@ -139,6 +146,12 @@ public final class ActivityDraft {
 
     public double x() { return x; }
     public double y() { return y; }
+
+    /** The method reference this activity's work is written as, or {@code ""} when none is named yet. */
+    public String body() { return body; }
+
+    /** Names the method this activity's work is written as — {@code Collect::body}. */
+    public void setBody(String reference) { this.body = reference == null ? "" : reference; }
 
     public void moveTo(double newX, double newY) {
         this.x = newX;

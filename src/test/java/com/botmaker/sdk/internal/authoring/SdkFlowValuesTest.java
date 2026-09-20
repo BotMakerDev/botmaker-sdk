@@ -36,12 +36,13 @@ class SdkFlowValuesTest {
     private static Flow gamebot() {
         return Flow.of(
                 List.of(Flow.activity(new SdkFlowValues.Named("Collect::body"), "Collect",
-                                "Click collect, then battle.", false, true, List.of("NOTHING_LEFT")),
+                                "Click collect, then battle.", true, false, true, List.of("NOTHING_LEFT")),
                         Flow.activity(new SdkFlowValues.Named("Rest::body"), "Rest",
-                                "Wait, then go round again.", true, false, List.of())),
+                                "Wait, then go round again.", false, true, false, List.of())),
                 List.of(Flow.edge("Collect", "Collect", ""),
                         Flow.edge("Collect", "Rest", "NOTHING_LEFT"),
                         Flow.edge("Rest", "Collect", "")),
+                List.of(Flow.preset("Gathering only", List.of("Collect"))),
                 "Collect",
                 Flow.limits(1000, 1000));
     }
@@ -119,11 +120,51 @@ class SdkFlowValuesTest {
         String java = CATALOG.initializer(FLOW, gamebot()).orElseThrow();
         List<ValueCatalog.Part> parts = CATALOG.partsOfInitializer(FLOW, java).orElseThrow();
 
-        assertEquals(4, parts.size());
+        assertEquals(5, parts.size());
         assertEquals("java.util.List<com.botmaker.sdk.api.flow.Flow.Activity>",
                 parts.getFirst().form().sourceName());
         assertEquals("java.util.List<com.botmaker.sdk.api.flow.Flow.Edge>", parts.get(1).form().sourceName());
-        assertEquals("String", parts.get(2).form().sourceName());
-        assertEquals("com.botmaker.sdk.api.flow.Flow.Limits", parts.get(3).form().sourceName());
+        assertEquals("java.util.List<com.botmaker.sdk.api.flow.Flow.Preset>",
+                parts.get(2).form().sourceName());
+        assertEquals("String", parts.get(3).form().sourceName());
+        assertEquals("com.botmaker.sdk.api.flow.Flow.Limits", parts.get(4).form().sourceName());
+    }
+
+    /**
+     * A card drawn but not written yet round-trips as the constant that says so.
+     *
+     * <p>The alternative was writing a blank where the method reference goes, which is a file that does not
+     * compile — and the reason this had to be sayable at all is that drawing the flow first is an ordinary
+     * way to work.
+     */
+    @Test
+    void anActivityWithNoBodyYetIsWrittenAsTheConstantForOne() {
+        String java = CATALOG.initializer(BODY, "").orElseThrow();
+        assertEquals("com.botmaker.sdk.api.bot.ActivityBody.NONE", java);
+        assertEquals("", CATALOG.valueOf(BODY, java).orElseThrow());
+        assertEquals("", CATALOG.valueOf(BODY, "ActivityBody.NONE").orElseThrow());
+    }
+
+    /** The enable flag is part of the flow, because a run reads it. */
+    @Test
+    void anActivitySwitchedOffIsStillWrittenIntoTheFlow() {
+        Flow off = Flow.of(List.of(Flow.activity(new SdkFlowValues.Named("Rest::body"), "Rest", "",
+                        false, false, false, List.of())),
+                List.of(), List.of(), "Rest", Flow.Limits.DEFAULT);
+        String java = CATALOG.initializer(FLOW, off).orElseThrow();
+        Flow read = (Flow) CATALOG.valueOf(FLOW, java).orElseThrow();
+        assertFalse(read.activities().getFirst().enabled());
+        assertEquals(off, read);
+    }
+
+    /** A saved preset is a named set of enable flags, and it travels in the value beside them. */
+    @Test
+    void aPresetRoundTripsWithTheFlow() {
+        Flow read = (Flow) CATALOG.valueOf(FLOW, CATALOG.initializer(FLOW, gamebot()).orElseThrow())
+                .orElseThrow();
+        assertEquals(1, read.presets().size());
+        assertEquals("Gathering only", read.presets().getFirst().name());
+        assertTrue(read.presets().getFirst().enables("Collect"));
+        assertFalse(read.presets().getFirst().enables("Rest"));
     }
 }

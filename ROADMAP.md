@@ -8,6 +8,70 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-21 — the flow editor writes the value, and the layout is gitignored
+
+Phase 5 of *"a plugin's values live in one file the plugin ships"*. The editor stops owning a file.
+
+**Done**
+
+- **`ActivityFlowDialog` reads and writes `@Managed("flow")`.** `FlowValue` is the whole translation:
+  `services.pluginValues().open("flow")` for the context, `ValueCatalog.valueOf(form, source)` for the
+  `Flow`, `initializer` plus `imports` for the write. `Authoring.readModel`/`writeModel`/`readSchemaVersion`
+  are gone from it, and so is the daemon save thread — a value is handed to the host, on the FX thread, the
+  way every slot editor on the canvas already does it.
+
+- **Three states, one shape of answer.** No `Sdk.java`, a `flow()` body written by hand, or an expression
+  that is not `Flow.of(…)`: the window opens empty, says which on its status line, and **refuses to save**.
+  Overwriting the user's own code is the one outcome this whole design exists to prevent, so the refusal is
+  a field (`readOnlyReason`) checked before validation rather than a case inside it.
+
+- **The layout sidecar.** `FlowLayout` writes `plugins/com.botmaker/sdk/flow-layout.json` through
+  `PluginData`, keyed by activity name; both templates' `.gitignore` gain it. `FlowNodeModel` is no longer
+  read by the editor. The one non-position that rides along is `goHomeByDefault`, which is a preference
+  about the editor rather than about the bot — flipping it changes no existing activity and nothing at
+  runtime reads it.
+
+- **`Flow` grew two components, and both belong in the bot's source.** `Flow.Activity.enabled()`, because a
+  disabled activity is one the run walks through by its disabled wire — that is what the bot does, not what
+  the editor shows. And `Flow.presets()`, a named set of those flags: the sidecar is gitignored, so a preset
+  kept there would be lost on the first clone, and `ProjectModel`'s own argument about one owner carrying
+  fields it does not interpret transfers verbatim.
+
+- **`ActivityBody.NONE`.** A card drawn before its method is written had no spelling, and a blank would have
+  been `Flow.activity(, "Collect", …)` — a file that does not compile. The codec writes the constant for a
+  blank body and reads it back as blank; it is the only expression `BODY_CODEC` accepts that is not a method
+  reference.
+
+- **The body is the activity's identity.** `ActivityDraft.id` — a generated key nothing else in the project
+  mentioned, carried so that a rename did not read as a delete plus a create — is replaced by the method
+  reference. One fact, checked by javac, instead of two kept in step by hand. The side panel gained a "Runs"
+  box for it, validated with `FlowNames.isMethodReference`, which delegates to `SdkFlowValues` so that the
+  field and the codec cannot disagree.
+
+- **`validate` lost its largest rule.** Generated field names were checked as one namespace because an
+  activity's flag and a project's variables became fields of one class. Neither generates a field now.
+
+- **`ActivityEditors` and `TemplateLibrary.activityNames` re-pointed.** The first has a `ValueContext` and
+  asks through it. The second takes only a path — six dialogs pass it — so `FlowValue.bind`/`unbind` hold
+  the open project's services, written on `SdkPlugin.projectOpened`/`projectClosing`. The parameter is kept
+  and ignored rather than churned through those six call sites.
+
+- **The capture source is written as a value too.** `CaptureValue.point` writes `CaptureExpr.of(target)`
+  into `@Managed("capture")`, on the FX thread, after the two files *Capture Targets* already wrote. Not a
+  second answer: one target, one code path, one instant, three readers. An emulator target writes
+  `new EmulatorSource("…")`, which the codec declines to read back — correct Java, and the editor then shows
+  it as written rather than replacing it, which is the safe way round.
+
+**Deferred / next**
+
+- **Phase 6 is where `botmaker-project.properties`' `capture.source` and the whole of `activities.json` are
+  retired**, once `FlowGraph.load/run` walk `Flows.installed()` instead of `ProjectData.current()`.
+  `ActivityBody.NONE` is the constant that walk should compare against by identity.
+- `ProjectModel`, `FlowModel`, `FlowNodeModel`, `PresetModel` and `ActivityModel` are now read only by the
+  runtime half and by `Authoring`; they die with it.
+
+---
+
 ## 2026-09-20 — a flow is a value, and an activity's body is a method reference
 
 **Done**
