@@ -24,10 +24,11 @@ class TemplateEditorTest {
     }
 
     @Test
-    void aRowHoldsTheBareName() {
-        // The two places store different things on purpose: a project file holds "gold", not a path and not
-        // Java. An editor that assumed one shape would write the other one's form into it.
-        assertEquals("gold", TemplateEditors.nameOf(TestContexts.row("IMAGE_TEMPLATE", "gold")));
+    void aValueWithNoCallSiteIsReadAsJavaToo() {
+        // It held the bare name "gold" until 2026-09-20, when a Parameters row stopped being a stored string
+        // and became the same expression a slot holds. One shape to write, one shape to read.
+        assertEquals("gold", TemplateEditors.nameOf(
+                TestContexts.row("IMAGE_TEMPLATE", "new ImageTemplate(\"images/gold.png\")")));
         assertEquals("", TemplateEditors.nameOf(TestContexts.row("IMAGE_TEMPLATE", "")));
     }
 
@@ -59,15 +60,15 @@ class TemplateEditorTest {
                 "com.botmaker.sdk.api.vision.ImageTemplate", "new ImageTemplate(\"\")");
         TemplateEditors.commit(ctx, "gold");
 
-        assertEquals("new ImageTemplate(\"src/main/resources/images/gold.png\")", ctx.replacement());
+        assertEquals("new ImageTemplate(\"src/main/resources/images/gold.png\")", ctx.written());
         assertEquals("com.botmaker.sdk.api.vision.ImageTemplate", ctx.imports().getFirst());
     }
 
     @Test
-    void writingARowSpellsTheNameAlone() {
+    void writingAValueWithNoCallSiteSpellsTheSamePath() {
         TestContexts.Recording ctx = TestContexts.row("IMAGE_TEMPLATE", "");
         TemplateEditors.commit(ctx, "gold");
-        assertEquals(java.util.List.of("gold"), ctx.written());
+        assertEquals("new ImageTemplate(\"src/main/resources/images/gold.png\")", ctx.written());
     }
 
     @Test

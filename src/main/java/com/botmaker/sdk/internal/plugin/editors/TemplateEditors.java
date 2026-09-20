@@ -79,7 +79,7 @@ final class TemplateEditors {
                 })),
                 Pills.separator(),
                 Pills.item("Clear", () -> {
-                    Slots.write(ctx, "new " + ImageTemplate.class.getSimpleName() + "(\"\")", "",
+                    Slots.write(ctx, "new " + ImageTemplate.class.getSimpleName() + "(\"\")",
                             ImageTemplate.class.getName());
                     pill.setText(label(""));
                     showPicture(thumb, ctx.services(), "", CHIP);
@@ -202,10 +202,8 @@ final class TemplateEditors {
         if (run != null) {
             run.replace(elements, ImageTemplate.class.getName());
         } else {
-            SlotContext slot = ctx.asSlot();
-            if (slot == null) return;
-            slot.replaceWith(ImageTemplateGroup.class.getSimpleName() + ".of("
-                             + String.join(", ", elements) + ")",
+            ctx.set(ImageTemplateGroup.class.getSimpleName() + ".of("
+                    + String.join(", ", elements) + ")",
                     ImageTemplateGroup.class.getName(), ImageTemplate.class.getName());
         }
         rebuild(row, ctx);
@@ -221,16 +219,13 @@ final class TemplateEditors {
     static List<String> elementsOf(ValueContext ctx) {
         SlotRun run = runOf(ctx);
         if (run != null) return run.elements();
-        SlotContext slot = ctx.asSlot();
-        if (slot == null) return List.of();
-        String source = slot.currentSource();
-        return source != null && source.contains(".of(") ? Slots.arguments(source) : List.of();
+        String source = Slots.raw(ctx);
+        return source.contains(".of(") ? Slots.arguments(source) : List.of();
     }
 
     /** This slot's run, or {@code null} — the question only a host can answer. */
     private static SlotRun runOf(ValueContext ctx) {
-        SlotContext slot = ctx.asSlot();
-        return slot == null ? null : slot.run();
+        return ctx.slot().flatMap(SlotContext::siblingRun).orElse(null);
     }
 
     /** Whether this is one argument of a run of pictures, which is what makes {@link #group} claim it. */
@@ -262,7 +257,7 @@ final class TemplateEditors {
     private static void choose(ValueContext ctx, java.util.function.Consumer<String> onPicked) {
         StudioServices services = ctx.services();
         SlotRun run = runOf(ctx);
-        List<String> only = run == null ? null : namesOf(run.allowed());
+        List<String> only = run == null ? null : namesOf(run.allowedSources().orElse(null));
         Modals.gallery(ctx,
                 Modals.Gallery.pictures("Choose a picture",
                         only == null || !only.isEmpty()
@@ -327,14 +322,13 @@ final class TemplateEditors {
     /**
      * The base name the value currently names, or {@code ""}.
      *
-     * <p>Two readings, because the two places store different things: a row holds the name already, and a slot
-     * holds {@code new ImageTemplate("…/gold.png")}, whose path is read out with {@link Slots#arguments} and
-     * {@link Slots#stringLiteral} rather than with a parser — the contract hands over source text and the
-     * toolkit depends on no parsing library. Anything else (a variable, a constant, a call) reads as no name,
-     * which is right: the editor cannot represent it and must not overwrite it silently.
+     * <p>The value holds {@code new ImageTemplate("…/gold.png")}, whose path is read out with
+     * {@link Slots#arguments} and {@link Slots#stringLiteral} rather than with a parser — the contract hands
+     * over source text and the toolkit depends on no parsing library. Anything else (a variable, a constant,
+     * a call) reads as no name, which is right: the editor cannot represent it and must not overwrite it
+     * silently.
      */
     static String nameOf(ValueContext ctx) {
-        if (ctx.asSlot() == null) return ctx.single().trim();
         return nameOfSource(Slots.raw(ctx));
     }
 
@@ -354,10 +348,9 @@ final class TemplateEditors {
         return path == null || path.isBlank() ? null : path;
     }
 
-    /** Writes the picture called {@code baseName} — Java in a slot, the name itself in a row. */
+    /** Writes the picture called {@code baseName} as the constructor that names its file. */
     static void commit(ValueContext ctx, String baseName) {
-        Slots.write(ctx, literalFor(baseName), baseName == null ? "" : baseName,
-                ImageTemplate.class.getName());
+        Slots.write(ctx, literalFor(baseName), ImageTemplate.class.getName());
     }
 
     /** {@code new ImageTemplate("src/main/resources/images/<name>.png")}. */

@@ -38,6 +38,14 @@ No source changes since v1.1.12; re-released for updated upstream pins.
 
 ### Changed
 
+- **A duration, a colour and a precision are edited the same way everywhere.** Each of them drew one control
+  in the Parameters window and a different one on a block — four boxes written on every keystroke against a
+  pill committing on OK, a hex string against a constructor call, three stored numbers against the shortest
+  exact Java. A value is written as Java in both places now, so there is one control and one spelling. Two
+  consequences worth naming: a colour the editor cannot write back (`Color.RED`, a variable) leaves the
+  swatch alone instead of showing white, and a duration in the Parameters window commits when you press OK
+  rather than as you type.
+
 - **`VariableModel`'s type is a `ValueForm`.** The component is called `form` and the stored file still calls
   it `type`, so every project on disk reads unchanged; `ValueJson` writes the `type`/`shape`/`list` object it
   always wrote and reads it back through plugin-basics' `StoredForms`. `VariableModel.of` and

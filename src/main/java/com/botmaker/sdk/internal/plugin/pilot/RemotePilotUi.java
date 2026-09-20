@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * shape of the pilot's move out of the editor. It used to hold an event bus, a settings service, a project
  * config and the execution service — four editor classes — for four facts: which project is open
  * ({@code resourcesDir}), how to say a line in the status bar ({@code status}), how to look like the rest of
- * the application ({@code theme}, {@code dialogs().owner()}), and the bot as a process ({@code runs}). Every
+ * the application ({@code theme}, {@code dialogs().ownerWindow()}), and the bot as a process ({@code runs}). Every
  * one of those is something only a host can answer, which is why they are on the contract; everything else
  * the pilot does — binding a port, driving Tailscale, capturing pixels, opening a nested display — it does
  * for itself out of shared and session.
@@ -231,7 +231,7 @@ public final class RemotePilotUi implements AutoCloseable {
     /** Indeterminate spinner shown while the (possibly multi-second) Tailscale bring-up runs off-thread. */
     private Alert progressDialog(AtomicBoolean cancelled) {
         Alert a = services.theme().alert(Alert.AlertType.NONE);
-        a.initOwner(services.dialogs().owner());
+        a.initOwner(services.dialogs().ownerWindow().orElse(null));
         a.setTitle("Remote Pilot");
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setPrefSize(30, 30);

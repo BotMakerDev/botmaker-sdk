@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
+import com.botmaker.plugin.api.SlotContext;
 import com.botmaker.plugin.api.ValueContext;
 import com.botmaker.plugin.toolkit.Editors;
 import javafx.scene.Node;
@@ -70,7 +71,7 @@ final class SettingsEditors {
 
     /** The editor for whichever setter this slot sits in. */
     static Node setting(ValueContext ctx) {
-        Setting bound = bounds(ctx.asSlot() == null ? null : ctx.asSlot().enclosingMethod());
+        Setting bound = bounds(ctx.slot().flatMap(SlotContext::enclosingMethodName).orElse(null));
         if (bound == null) return null;
         return bound.flagLabel() != null
                 ? Editors.flag(ctx, bound.flagLabel())

@@ -62,7 +62,7 @@ final class RemotePilotDialog {
         boolean funnelLive = mode == PilotMode.FUNNEL_HTTPS;
 
         Alert alert = services.theme().alert(Alert.AlertType.INFORMATION);
-        alert.initOwner(services.dialogs().owner());
+        alert.initOwner(services.dialogs().ownerWindow().orElse(null));
         alert.setTitle("Remote Pilot");
         alert.setHeaderText(switch (mode) {
             case FUNNEL_HTTPS -> "Remote Pilot is live over HTTPS — your phone needs nothing installed.";

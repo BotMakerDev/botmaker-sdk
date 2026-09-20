@@ -187,7 +187,8 @@ class SdkPluginSurfaceTest {
 
         List<String> failures = new ArrayList<>();
         for (SlotEditor editor : editors) {
-            ask(editor, "a Parameters row", () -> editor.matches(TestContexts.row("TEXT", "")), failures);
+            ask(editor, "a value with no call site",
+                    () -> editor.matches(TestContexts.row("TEXT", "")), failures);
             ask(editor, "a typed slot",
                     () -> editor.matches(TestContexts.typedSlot("java.lang.String", "\"\"")), failures);
             ask(editor, "a call site",

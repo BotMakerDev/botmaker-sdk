@@ -114,7 +114,7 @@ public final class ColorSampler {
             this.frame = frame;
             this.image = frame.image();
             this.onPicked = onPicked;
-            Window owner = services.dialogs().owner();
+            Window owner = services.dialogs().ownerWindow().orElse(null);
 
             Rectangle2D screen = Screen.getPrimary().getVisualBounds();
             double fit = Math.min(1.0, Math.min(screen.getWidth() * 0.85 / image.getWidth(),

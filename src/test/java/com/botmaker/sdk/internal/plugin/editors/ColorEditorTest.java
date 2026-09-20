@@ -33,18 +33,26 @@ class ColorEditorTest {
 
         ColorEditors.commit(slot, Color.rgb(255, 128, 0));
 
-        assertEquals("new java.awt.Color(255, 128, 0)", slot.replacement());
+        assertEquals("new java.awt.Color(255, 128, 0)", slot.written());
         assertEquals(List.of("java.awt.Color"), slot.imports(),
                 "fully qualified in the expression and named again as the import is the always-safe pair");
     }
 
+    /**
+     * A value with no call site gets the same expression a slot does.
+     *
+     * <p>It got {@code #FF8000} until 2026-09-20, because a Parameters row held stored text rather than
+     * Java. One spelling everywhere means one thing to write and one thing to read back, and it is why
+     * {@code WireText.color} — which decoded that text, total, and answered white for anything it could not
+     * parse — is no longer in this path.
+     */
     @Test
-    void a_row_gets_the_hex_the_project_file_stores() {
+    void a_value_with_no_call_site_gets_the_same_expression() {
         TestContexts.Recording row = TestContexts.row("java.awt.Color", "");
 
         ColorEditors.commit(row, Color.rgb(255, 128, 0));
 
-        assertEquals(List.of("#FF8000"), row.written());
+        assertEquals("new java.awt.Color(255, 128, 0)", row.written());
     }
 
     /**
@@ -58,7 +66,7 @@ class ColorEditorTest {
 
         ColorEditors.commit(slot, Color.BLACK);
 
-        assertEquals("new java.awt.Color(0, 0, 0)", slot.replacement());
+        assertEquals("new java.awt.Color(0, 0, 0)", slot.written());
     }
 
     @Test
@@ -83,31 +91,31 @@ class ColorEditorTest {
     }
 
     /**
-     * A row always answers, because a row always holds text and {@code WireText.color} is total. Unreadable
-     * text reads as white in the editor because that is what it reads as in the running bot; the two must not
-     * disagree.
+     * A value with no call site declines for the same reasons a slot does.
+     *
+     * <p>It used to answer white for anything unreadable, because a row held text and {@code WireText.color}
+     * was total. A row holds Java now, so the honest answer for {@code Color.RED} is the same one a slot
+     * gives: leave the swatch alone rather than claim a colour this editor cannot write back.
      */
     @Test
-    void a_row_reads_the_hex_back_and_never_declines() {
+    void a_value_with_no_call_site_declines_what_it_cannot_write_back() {
         assertEquals(Color.rgb(255, 128, 0),
-                ColorEditors.current(TestContexts.row("java.awt.Color", "#FF8000")));
-        assertEquals(Color.rgb(255, 128, 0),
-                ColorEditors.current(TestContexts.row("java.awt.Color", "FF8000")),
-                "a person typing a colour routinely leaves the hash off");
-        assertEquals(Color.WHITE, ColorEditors.current(TestContexts.row("java.awt.Color", "not a colour")));
+                ColorEditors.current(TestContexts.row("java.awt.Color", "new java.awt.Color(255, 128, 0)")));
+        assertNull(ColorEditors.current(TestContexts.row("java.awt.Color", "Color.RED")));
+        assertNull(ColorEditors.current(TestContexts.row("java.awt.Color", "")));
     }
 
-    /** What a pick writes, read straight back, is the colour that was picked — in both places. */
+    /** What a pick writes, read straight back, is the colour that was picked — wherever the value is. */
     @Test
-    void the_round_trip_holds_in_both_places() {
+    void the_round_trip_holds_wherever_the_value_is() {
         TestContexts.Recording slot = TestContexts.typedSlot("java.awt.Color", "null");
         ColorEditors.commit(slot, Color.rgb(9, 200, 77));
         assertEquals(Color.rgb(9, 200, 77),
-                ColorEditors.current(TestContexts.typedSlot("java.awt.Color", slot.replacement())));
+                ColorEditors.current(TestContexts.typedSlot("java.awt.Color", slot.written())));
 
         TestContexts.Recording row = TestContexts.row("java.awt.Color", "");
         ColorEditors.commit(row, Color.rgb(9, 200, 77));
         assertEquals(Color.rgb(9, 200, 77),
-                ColorEditors.current(TestContexts.row("java.awt.Color", row.written().getFirst())));
+                ColorEditors.current(TestContexts.row("java.awt.Color", row.written())));
     }
 }

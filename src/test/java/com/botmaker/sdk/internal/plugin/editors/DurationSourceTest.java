@@ -89,7 +89,7 @@ class DurationSourceTest {
         var slot = bare("Duration.ofSeconds(120)");
         DurationEditor.Span span = DurationEditor.span(slot);
         DurationEditor.write(slot, span, span.from(), span.to(), false);
-        assertEquals("Duration.ofSeconds(120)", slot.replacement(),
+        assertEquals("Duration.ofSeconds(120)", slot.written(),
                 "opening the editor and pressing OK must not rewrite seconds into minutes");
     }
 
@@ -141,7 +141,8 @@ class DurationSourceTest {
         DurationEditor.write(slot, DurationEditor.span(slot), 800L, 2_000L, true);
         assertEquals("Wait.between(Duration.ofMillis(800), Duration.ofSeconds(2))",
                 slot.enclosingReplacement());
-        assertNull(slot.replacement(), "the value in the slot is not what changed");
+        assertEquals("Duration.ofMillis(800)", slot.written(),
+                "the value in the slot is not what changed");
     }
 
     @Test
@@ -165,7 +166,7 @@ class DurationSourceTest {
     void a_range_whose_ends_are_equal_is_not_a_range() {
         var slot = slot("Duration.ofSeconds(2)", "Wait", "time", "Wait.time(Duration.ofSeconds(2))");
         DurationEditor.write(slot, DurationEditor.span(slot), 2_000L, 2_000L, true);
-        assertEquals("Duration.ofSeconds(2)", slot.replacement());
+        assertEquals("Duration.ofSeconds(2)", slot.written());
         assertNull(slot.enclosingReplacement());
     }
 
@@ -173,7 +174,7 @@ class DurationSourceTest {
     void outside_a_wait_there_is_no_call_to_restructure_and_only_the_value_is_written() {
         var slot = bare("Duration.ofSeconds(2)");
         DurationEditor.write(slot, DurationEditor.span(slot), 800L, 2_000L, true);
-        assertEquals("Duration.ofMillis(800)", slot.replacement());
+        assertEquals("Duration.ofMillis(800)", slot.written());
         assertNull(slot.enclosingReplacement());
     }
 }

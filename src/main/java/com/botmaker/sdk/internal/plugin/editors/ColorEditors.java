@@ -95,7 +95,7 @@ final class ColorEditors {
         alert.setContentText(failure.detail() + "\n\nPicking off the screen instead — the game has to be "
                 + "visible, and there is no magnifier or tolerance reading on this path.");
         alert.showAndWait();
-        new ScreenCapture().pickColor(services.dialogs().owner(), pick -> {
+        new ScreenCapture().pickColor(services.dialogs().ownerWindow().orElse(null), pick -> {
             java.awt.Color c = pick.color();
             onPicked.accept(Color.rgb(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha() / 255.0));
         });
@@ -115,20 +115,17 @@ final class ColorEditors {
         // Fully qualified in the expression and named again as the import, which is the combination the
         // contract documents as always safe. The components rather than Color.decode("#…"): decode parses at
         // class-initialisation time and can throw, and a bot must not fail to start over its own configuration.
-        Slots.write(ctx, "new java.awt.Color(" + r + ", " + g + ", " + b + ")", hex(r, g, b), "java.awt.Color");
+        Slots.write(ctx, "new java.awt.Color(" + r + ", " + g + ", " + b + ")", "java.awt.Color");
     }
 
     /**
      * The colour the value currently holds, or {@code null} to leave the swatch at its default.
      *
-     * <p>The two halves answer differently and both are right. A <b>slot</b> may hold a named constant, a
-     * variable or a call — things this editor did not write — and seeding the swatch from them is not
-     * possible, so it stays at its default and is overwritten on the first pick. A <b>row</b> always holds
-     * text, and {@link WireText#color} is total: unreadable text reads as white, which is what the project
-     * file means by it and what the running bot will use.
+     * <p>A value may hold a named constant, a variable or a call — things this editor did not write — and
+     * seeding the swatch from them is not possible, so it stays at its default and is overwritten on the
+     * first pick. Showing a colour this editor cannot round-trip would claim a value the user never set.
      */
     static Color current(ValueContext ctx) {
-        if (ctx.asSlot() == null) return fx(WireText.color(ctx.single()));
         if (!Slots.holdsNumbers(ctx, 3)) return null;
         int[] rgb = Slots.ints(ctx, 3);
         return Color.rgb(clamp(rgb[0]), clamp(rgb[1]), clamp(rgb[2]));

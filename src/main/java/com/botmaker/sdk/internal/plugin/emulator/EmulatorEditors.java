@@ -41,7 +41,7 @@ public final class EmulatorEditors {
     public static Node instanceName(ValueContext ctx) {
         Button pill = Pills.button(label(Slots.stringLiteral(Slots.raw(ctx))), null);
         pill.setOnAction(e ->
-                EmulatorPicker.show(ctx.services(), ctx.services().dialogs().owner()).ifPresent(chosen -> {
+                EmulatorPicker.show(ctx.services(), ctx.services().dialogs().ownerWindow().orElse(null)).ifPresent(chosen -> {
                     String name = chosen.instance().name();
                     if (name == null || name.isBlank()) return;
                     Slots.writeText(ctx, name);

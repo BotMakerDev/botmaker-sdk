@@ -117,7 +117,7 @@ class PrecisionEditorTest {
         assertTrue(readout.contains("20×20"), readout);
     }
 
-    // --- the two places a value lives ---------------------------------------------------------------------
+    // --- what is written, wherever the value lives --------------------------------------------------------
 
     @Test
     void a_slot_gets_the_java_form_and_asks_for_its_import() {
@@ -126,37 +126,40 @@ class PrecisionEditorTest {
 
         PrecisionEditors.commit(slot, new PrecisionEditors.Settings(5.0, 400, 0));
 
-        assertEquals("Precision.TIGHT.minArea(400)", slot.replacement());
+        assertEquals("Precision.TIGHT.minArea(400)", slot.written());
         assertEquals(List.of("com.botmaker.sdk.api.vision.Precision"), slot.imports());
     }
 
     /**
-     * A row gets the three numbers, spelled exactly as the SDK's own {@code PRECISION} codec spells them —
-     * the editor and the codec are two writers of one file and a disagreement between them is a value that
-     * changes meaning when it is written back.
+     * A value with no call site gets that same Java form.
+     *
+     * <p>It got the SDK's three stored numbers — {@code 18.0,400,2000} — until 2026-09-20, because a
+     * Parameters row held text its codec had written. The editor and the codec were two writers of one file,
+     * and a disagreement between them was a value that changed meaning on the way back. There is one writer
+     * now.
      */
     @Test
-    void a_row_gets_the_three_numbers_the_project_file_stores() {
+    void a_value_with_no_call_site_gets_the_same_java_form() {
         TestContexts.Recording row = TestContexts.row("com.botmaker.sdk.api.vision.Precision", "");
 
         PrecisionEditors.commit(row, new PrecisionEditors.Settings(18.0, 400, 2000));
 
-        assertEquals(List.of("18.0,400,2000"), row.written());
+        assertEquals("Precision.of(18, 400, 2000)", row.written());
     }
 
     @Test
-    void the_round_trip_holds_in_both_places() {
+    void the_round_trip_holds_wherever_the_value_is() {
         PrecisionEditors.Settings picked = new PrecisionEditors.Settings(5.0, 400, 2000);
 
         TestContexts.Recording slot = TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision", "");
         PrecisionEditors.commit(slot, picked);
         assertEquals(picked, PrecisionEditors.current(
-                TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision", slot.replacement())));
+                TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision", slot.written())));
 
         TestContexts.Recording row = TestContexts.row("com.botmaker.sdk.api.vision.Precision", "");
         PrecisionEditors.commit(row, picked);
         assertEquals(picked, PrecisionEditors.current(
-                TestContexts.row("com.botmaker.sdk.api.vision.Precision", row.written().getFirst())));
+                TestContexts.row("com.botmaker.sdk.api.vision.Precision", row.written())));
     }
 
     /** An empty or half-written row reads as the default rather than as zeroes, on the same reasoning. */

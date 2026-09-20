@@ -519,7 +519,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         CaptureTargetModel target = context.overWindowTitle()
                 .map(CaptureTargetModel::window)
                 .orElse(null);
-        CaptureTemplates.open(services, services.dialogs().owner(), target, null, () -> {});
+        CaptureTemplates.open(services, services.dialogs().ownerWindow().orElse(null), target, null, () -> {});
     }
 
     /**
@@ -531,7 +531,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void recordAtCursor(ActionContext context) {
         StudioServices services = context.services();
-        MacroRecorderDialog.open(services, services.dialogs().owner(), context::insertAtCursor);
+        MacroRecorderDialog.open(services, services.dialogs().ownerWindow().orElse(null), context::insertAtCursor);
     }
 
     /**
@@ -545,7 +545,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void openCaptureTemplates(ActionContext context) {
         StudioServices services = context.services();
-        CaptureTemplates.open(services, services.dialogs().owner(), null);
+        CaptureTemplates.open(services, services.dialogs().ownerWindow().orElse(null), null);
     }
 
     /**
@@ -588,17 +588,17 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void openActivityFlow(ActionContext context) {
         StudioServices services = context.services();
-        new ActivityFlowDialog(services, services.dialogs().owner()).show();
+        new ActivityFlowDialog(services, services.dialogs().ownerWindow().orElse(null)).show();
     }
 
     private void openMacroRecorder(ActionContext context) {
         StudioServices services = context.services();
-        MacroRecorderDialog.open(services, services.dialogs().owner());
+        MacroRecorderDialog.open(services, services.dialogs().ownerWindow().orElse(null));
     }
 
     private void openResourceManager(ActionContext context) {
         StudioServices services = context.services();
-        ResourceManagerDialog.open(services, services.dialogs().owner());
+        ResourceManagerDialog.open(services, services.dialogs().ownerWindow().orElse(null));
     }
 
     /**
@@ -613,7 +613,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void openCaptureTargets(ActionContext context) {
         StudioServices services = context.services();
-        CaptureTargets.open(services, services.dialogs().owner());
+        CaptureTargets.open(services, services.dialogs().ownerWindow().orElse(null));
     }
 
     /**
@@ -628,7 +628,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void openProjectSetup(ActionContext context) {
         StudioServices services = context.services();
-        ProjectSetup.open(services, services.dialogs().owner());
+        ProjectSetup.open(services, services.dialogs().ownerWindow().orElse(null));
     }
 
     /**

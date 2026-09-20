@@ -58,32 +58,19 @@ final class DurationEditor {
 
     private DurationEditor() {}
 
-    /** The editor: fields for a Parameters row, a pill that opens them for a slot in source. */
-    static Node duration(ValueContext ctx) {
-        return ctx.asSlot() == null ? row(ctx) : pill(ctx);
-    }
-
-    // --- the Parameters window: the fields themselves ------------------------------------------------------
-
     /**
-     * Four boxes and the total spelled out beside them, written on every keystroke.
+     * The editor: a pill that opens a small modal, wherever the value is.
      *
-     * <p>Writing continuously is right here and wrong for a slot: a row's value is a stored string with no
-     * undo history behind it, while a slot is source code where every write is an edit somebody may want to
-     * take back.
+     * <p>There were two until 2026-09-20 — four boxes written on every keystroke for a Parameters row, and
+     * this pill for a slot — because a row held a stored string with no undo history behind it while a slot
+     * held source code where every write is an edit somebody may want to take back. Every value is source
+     * now, so every value gets the one that commits on OK.
      */
-    private static Node row(ValueContext ctx) {
-        long millis = WireText.duration(ctx.single()).toMillis();
-        Label preview = Styles.on(new Label(WireText.spellDuration(millis)), Styles.CAPTION);
-        HBox fields = Fields.duration(millis, total -> {
-            preview.setText(WireText.spellDuration(total));
-            ctx.set(WireText.spellDuration(total));
-        });
-        fields.getChildren().add(preview);
-        return fields;
+    static Node duration(ValueContext ctx) {
+        return pill(ctx);
     }
 
-    // --- a slot in a bot's source: a pill over a small modal -----------------------------------------------
+    // --- a pill over a small modal ------------------------------------------------------------------------
 
     private static Node pill(ValueContext ctx) {
         MenuButton button = Pills.bare(slotLabel(ctx));
@@ -143,23 +130,18 @@ final class DurationEditor {
             highSource = swapSource;
         }
 
-        SlotContext slot = ctx.asSlot();
-        if (slot == null) {
-            ctx.set(WireText.spellDuration(from));
-            return;
-        }
-
-        boolean rewritable = !waitArguments(ctx).isEmpty();
+        SlotContext slot = ctx.slot().orElse(null);
+        boolean rewritable = slot != null && !waitArguments(ctx).isEmpty();
         if (rewritable && range && to > from) {
             // The simple name, not the qualified one: the call being rewritten is already a Wait call, so the
             // import that makes it legal is by definition present.
             slot.replaceEnclosingCall("Wait.between(" + lowSource + ", " + highSource + ")", FQN);
-        } else if (rewritable && "between".equals(slot.enclosingMethod())) {
+        } else if (rewritable && "between".equals(slot.enclosingMethodName().orElse(""))) {
             // Un-ticking the range: the call has to shrink back to one argument, which no edit confined to
             // this slot could say — dropping the far end is a change to the call, not to the value in it.
             slot.replaceEnclosingCall("Wait.time(" + lowSource + ")", FQN);
         } else {
-            slot.replaceWith(lowSource, FQN);
+            ctx.set(lowSource, FQN);
         }
     }
 
@@ -194,11 +176,11 @@ final class DurationEditor {
      * end, and keeping it is worth more than the toggle.
      */
     static List<String> waitArguments(ValueContext ctx) {
-        SlotContext slot = ctx.asSlot();
+        SlotContext slot = ctx.slot().orElse(null);
         if (slot == null) return List.of();
-        String call = slot.enclosingSource();
-        String method = slot.enclosingMethod();
-        String owner = slot.enclosingClass();
+        String call = slot.enclosingCall().orElse(null);
+        String method = slot.enclosingMethodName().orElse(null);
+        String owner = slot.enclosingClassName().orElse(null);
         String simple = Wait.class.getSimpleName();
         if (call == null || owner == null || !(owner.equals(simple) || owner.endsWith("." + simple))) {
             return List.of();

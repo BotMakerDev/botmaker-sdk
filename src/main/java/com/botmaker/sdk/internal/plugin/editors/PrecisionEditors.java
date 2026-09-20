@@ -149,8 +149,7 @@ final class PrecisionEditors {
 
     private static void open(ValueContext ctx, Consumer<String> relabel) {
         Settings current = current(ctx);
-        SlotContext slot = ctx.asSlot();
-        String methodName = slot == null ? null : slot.enclosingMethod();
+        String methodName = ctx.slot().flatMap(SlotContext::enclosingMethodName).orElse(null);
         Knobs knobs = knobsFor(methodName);
 
         Slider slider = new Slider(0, MAX_DELTA_E, clamp(current.deltaE()));
@@ -424,14 +423,14 @@ final class PrecisionEditors {
     // compiles, and what is read is what the user sees claimed about a value they may not have set. See
     // PrecisionEditorTest.
 
-    /** Writes the setting: the shortest exact Java form in a slot, the SDK's own three numbers in a row. */
+    /** Writes the setting as the shortest exact Java form. */
     static void commit(ValueContext ctx, Settings s) {
-        Slots.write(ctx, literalFor(s.deltaE(), s.minArea(), s.minCount()), wireFor(s), FQN);
+        Slots.write(ctx, literalFor(s.deltaE(), s.minArea(), s.minCount()), FQN);
     }
 
-    /** The three values the value currently holds, however it is spelled. */
+    /** The three values the value currently holds. */
     static Settings current(ValueContext ctx) {
-        return ctx.asSlot() == null ? wireOf(ctx.single()) : settingsOf(Slots.raw(ctx));
+        return settingsOf(Slots.raw(ctx));
     }
 
     /** The stored form, spelled exactly as the SDK's own {@code PRECISION} codec spells it. */
@@ -556,12 +555,11 @@ final class PrecisionEditors {
 
     /**
      * The {@code new java.awt.Color(r, g, b)} argument of the same call, if there is one — the colour these
-     * thresholds are measured from. Null for a named constant, a variable, or a Parameters row, where there is
-     * nothing to preview against until the user samples one.
+     * thresholds are measured from. Null for a named constant, a variable, or a value with no call around it,
+     * where there is nothing to preview against until the user samples one.
      */
     private static java.awt.Color siblingColor(ValueContext ctx) {
-        SlotContext slot = ctx.asSlot();
-        String enclosing = slot == null ? null : slot.enclosingSource();
+        String enclosing = ctx.slot().flatMap(SlotContext::enclosingCall).orElse(null);
         if (enclosing == null) return null;
         for (String argument : Slots.arguments(enclosing)) {
             String a = argument.trim();
