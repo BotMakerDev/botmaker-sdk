@@ -36,6 +36,24 @@ No source changes since v1.1.12; re-released for updated upstream pins.
   that renames the file, the constant and every use of it together. A class of nothing but picture constants
   (the template's `Pictures`) is read-only as a whole.
 
+### Changed
+
+- **`VariableModel`'s type is a `ValueForm`.** The component is called `form` and the stored file still calls
+  it `type`, so every project on disk reads unchanged; `ValueJson` writes the `type`/`shape`/`list` object it
+  always wrote and reads it back through plugin-basics' `StoredForms`. `VariableModel.of` and
+  `LiteralWriter`'s four methods take a form too. The contract deleted `ValueChoice` and `ValueShape` on
+  2026-09-20 — `api.*`'s never-delete rule does not reach these, which are `authoring` and `internal`.
+
+- **`VariableModel.fromWire` and `listShapeOf` are gone, and so is the question they answered.** A stored
+  `ANY_OF` meant tick boxes over the author's choices or a free list the user fills in, and which one showed
+  only in whether any choices were written down — so reading a variable's type needed a sibling field. Both
+  shapes emitted `List<T>`; a form says `List<T>` and the widget question is asked of the row's options,
+  where it belongs. Jackson binds the canonical constructor again.
+
+  One consequence is stated plainly because it is user-visible for one release: the shape written into
+  `activities.json` can no longer say *a set was declared*, so a Studio built before this change draws a
+  free list where it drew tick boxes. The values are the same either way, and it goes when the file does.
+
 ### Fixed
 
 - **A picture loads whatever directory the bot was started from.** `new ImageTemplate("src/main/resources/

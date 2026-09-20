@@ -2,9 +2,10 @@ package com.botmaker.sdk.internal.authoring;
 
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.api.value.ValueChoice;
+import com.botmaker.plugin.api.value.ValueForm;
 import com.botmaker.plugin.api.value.ValueType;
 import com.botmaker.plugin.api.value.Visibility;
+import com.botmaker.plugin.basics.store.StoredForms;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -29,8 +30,9 @@ import java.io.IOException;
  *
  * <h2>What is written, and why it is byte-for-byte what was written before</h2>
  *
- * <p>A {@link ValueChoice} is {@code {"type": "<id>", "shape": "<SHAPE>"}} and a {@link Visibility} is its
- * {@code id()} — exactly what the enum-based vocabulary wrote. That is not luck to be preserved by accident:
+ * <p>A {@link ValueForm} is {@code {"type": "<id>", "shape": "<SHAPE>", "list": <boolean>}} and a
+ * {@link Visibility} is its {@code id()} — exactly what the enum-based vocabulary wrote, and what the
+ * deleted shape axis wrote after it. That is not luck to be preserved by accident:
  * {@link ValueType#id()} is deliberately the name its old enum constant had, and these serializers are what
  * make every project ever written keep its meaning rather than merely intend to.
  *
@@ -57,8 +59,8 @@ public final class ValueJson {
         SimpleModule m = new SimpleModule("botmaker-value");
         m.addSerializer(ValueType.class, new TypeOut());
         m.addDeserializer(ValueType.class, new TypeIn(catalog));
-        m.addSerializer(ValueChoice.class, new ChoiceOut());
-        m.addDeserializer(ValueChoice.class, new ChoiceIn(catalog));
+        m.addSerializer(ValueForm.class, new FormOut());
+        m.addDeserializer(ValueForm.class, new FormIn(catalog));
         m.addSerializer(Visibility.class, new VisibilityOut());
         m.addDeserializer(Visibility.class, new VisibilityIn());
         m.addSerializer(Range.class, new RangeOut());
@@ -89,37 +91,48 @@ public final class ValueJson {
         }
     }
 
-    // ---- choice -----------------------------------------------------------------------------------------
+    // ---- form -------------------------------------------------------------------------------------------
 
-    private static final class ChoiceOut extends JsonSerializer<ValueChoice> {
+    /**
+     * Written as the object the shape axis wrote, so a Studio built before 2026-09-20 still opens the file.
+     *
+     * <p>The one thing it cannot write is whether the author declared a set of values: that was half of what
+     * a shape said, it is a sibling field of the variable rather than anything a form knows, and an older
+     * reader therefore sees {@code OPEN_LIST} where it once saw {@code ANY_OF}. The consequence is one
+     * release of the previous Studio drawing a free list where it drew tick boxes — the values are the same
+     * either way — and it goes when the file does.
+     */
+    private static final class FormOut extends JsonSerializer<ValueForm> {
         @Override
-        public void serialize(ValueChoice v, JsonGenerator g, SerializerProvider p) throws IOException {
+        public void serialize(ValueForm v, JsonGenerator g, SerializerProvider p) throws IOException {
+            ValueType leaf = v.leaf();
             g.writeStartObject();
-            g.writeStringField("type", v.type().id());
-            g.writeStringField("shape", v.shape().name());
+            g.writeStringField("type", leaf == null ? v.sourceName() : leaf.id());
+            g.writeStringField("shape", StoredForms.shapeOf(v, false));
+            g.writeBooleanField("list", StoredForms.isList(v));
             g.writeEndObject();
         }
     }
 
     /**
-     * Reads through {@link ValueChoice#fromWire}, which is where the two legacy readings live — the old
-     * {@code CHOICE} pseudo-type, and the {@code list} boolean that predates {@code shape}. A bare string is
-     * accepted too: that is what a type written before shapes existed at all looks like.
+     * Reads through {@link StoredForms}, which is where the legacy readings live — the old {@code CHOICE}
+     * pseudo-type, the four shape names, and the {@code list} boolean that predates {@code shape}. A bare
+     * string is accepted too: that is what a type written before shapes existed at all looks like.
      */
-    private static final class ChoiceIn extends JsonDeserializer<ValueChoice> {
+    private static final class FormIn extends JsonDeserializer<ValueForm> {
         private final ValueCatalog catalog;
 
-        ChoiceIn(ValueCatalog catalog) {
+        FormIn(ValueCatalog catalog) {
             this.catalog = catalog;
         }
 
         @Override
-        public ValueChoice deserialize(JsonParser p, DeserializationContext ctx) throws IOException {
+        public ValueForm deserialize(JsonParser p, DeserializationContext ctx) throws IOException {
             JsonNode n = p.readValueAsTree();
             if (n == null || n.isNull()) return null;
-            if (n.isTextual()) return ValueChoice.fromWire(catalog, n.asText(), null, null);
+            if (n.isTextual()) return StoredForms.formOf(catalog, n.asText(), null, null);
             JsonNode list = n.get("list");
-            return ValueChoice.fromWire(catalog, text(n.get("type")), text(n.get("shape")),
+            return StoredForms.formOf(catalog, text(n.get("type")), text(n.get("shape")),
                     list == null || !list.isBoolean() ? null : list.asBoolean());
         }
     }

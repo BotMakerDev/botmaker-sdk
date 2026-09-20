@@ -1,8 +1,6 @@
 package com.botmaker.sdk.internal.authoring;
 
-import com.botmaker.plugin.api.value.Range;
-import com.botmaker.plugin.api.value.ValueChoice;
-import com.botmaker.plugin.api.value.Visibility;
+import com.botmaker.plugin.api.value.ValueForm;
 import com.botmaker.sdk.authoring.ActivityModel;
 import com.botmaker.sdk.authoring.FlowEdgeModel;
 import com.botmaker.sdk.authoring.FlowModel;
@@ -83,26 +81,17 @@ public final class AuthoringMixins {
     }
 
     /**
-     * {@link VariableModel}'s derived answers, and its creator.
+     * {@link VariableModel}'s derived answers, and the one component whose stored name is not its own.
      *
-     * <p>The creator is not decoration: {@code fromWire} settles a shape a stored file cannot state — an
-     * {@code ANY_OF} with no set behind it is an open list, not tick boxes over nothing — so binding
-     * straight to the canonical constructor would open old projects wrong.
+     * <p>The component is {@code form} and the file says {@code type}. The shape axis went on 2026-09-20 and
+     * the files did not, so the name on disk stays what every project already wrote; naming it on the
+     * accessor renames the property in both directions, which is what a record's implicit creator reads. It
+     * replaced a {@code fromWire} creator that existed to settle a question the shapes asked and a
+     * {@link ValueForm} does not — see {@code VariableModel}'s own note.
      */
     abstract static class VariableMixin {
 
-        @JsonCreator
-        static VariableModel fromWire(@JsonProperty("name") String name,
-                                      @JsonProperty("type") ValueChoice type,
-                                      @JsonProperty("value") List<String> value,
-                                      @JsonProperty("description") String description,
-                                      @JsonProperty("tag") String tag,
-                                      @JsonProperty("visibility") Visibility visibility,
-                                      @JsonProperty("options") List<String> options,
-                                      @JsonProperty("bounds") Range bounds,
-                                      @JsonProperty("group") String group) {
-            throw new UnsupportedOperationException("mix-in");
-        }
+        @JsonProperty("type") abstract ValueForm form();
 
         @JsonIgnore abstract String singleValue();
         @JsonIgnore abstract boolean isPublic();

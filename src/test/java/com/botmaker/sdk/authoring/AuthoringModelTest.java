@@ -3,8 +3,8 @@ package com.botmaker.sdk.authoring;
 import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.api.value.ValueChoice;
-import com.botmaker.plugin.api.value.ValueShape;
+import com.botmaker.plugin.api.value.ValueForm;
+import com.botmaker.plugin.basics.store.StoredForms;
 import com.botmaker.plugin.api.value.ValueType;
 import com.botmaker.plugin.api.value.Visibility;
 import com.botmaker.plugin.basics.values.BasicsValueTypes;
@@ -56,10 +56,10 @@ class AuthoringModelTest {
     void aModelRoundTripsWithItsStamp(@TempDir Path dir) throws IOException {
         ProjectModel written = new ProjectModel(
                 List.of(new ActivityModel("Mining", true, "dig", List.of("FULL"), null, Boolean.FALSE)),
-                List.of(new VariableModel("REST", ValueChoice.of(BasicsValueTypes.DURATION), List.of("90s"),
+                List.of(new VariableModel("REST", ValueForm.of(BasicsValueTypes.DURATION), List.of("90s"),
                                 "How long to rest", "Mining", Visibility.PUBLIC, List.of(),
                                 new Range("30s", null), ParameterGroup.DEFAULT_ID),
-                        new VariableModel("HOTKEYS", ValueChoice.listOf(SdkValueTypes.KEY),
+                        new VariableModel("HOTKEYS", ValueForm.listOf(ValueForm.of(SdkValueTypes.KEY)),
                                 List.of("SPACE", "ESCAPE"), "", "", Visibility.EDITOR_ONLY, List.of(),
                                 Range.NONE, ParameterGroup.DEFAULT_ID)),
                 new FlowModel(List.of(new FlowNodeModel("Mining", 12, 34)),
@@ -100,39 +100,34 @@ class AuthoringModelTest {
 
     /** The pseudo-type that predates the shape axis: {@code CHOICE} was text out of a written-down set. */
     @Test
-    void theLegacyChoicePseudoTypeLoadsAsTextOutOfASet() {
-        ValueChoice c = ValueChoice.fromWire(CATALOG, "CHOICE", null, Boolean.FALSE);
-        assertEquals(BasicsValueTypes.TEXT, c.type());
-        assertEquals(ValueShape.ONE_OF, c.shape());
-    }
-
-    /** The boolean that predates the shape axis: {@code list:true} was both list shapes at once. */
-    @Test
-    void theLegacyListBooleanBecomesAListShape() {
-        assertEquals(ValueShape.ANY_OF, ValueChoice.fromWire(CATALOG, "TEXT", null, Boolean.TRUE).shape());
-        assertEquals(ValueShape.ONE, ValueChoice.fromWire(CATALOG, "TEXT", null, Boolean.FALSE).shape());
+    void theLegacyChoicePseudoTypeLoadsAsText() {
+        assertEquals(ValueForm.of(BasicsValueTypes.TEXT),
+                StoredForms.formOf(CATALOG, "CHOICE", null, Boolean.FALSE));
     }
 
     /**
-     * A stored {@code ANY_OF} with no set behind it reads as an {@code OPEN_LIST}.
+     * Every legacy spelling of "this is a list" becomes one {@code List<T>}.
      *
-     * <p><b>This test was deleted on 2026-08-31 and is restored on 2026-09-07, without either side of the
-     * rule changing.</b> It calls {@code VariableModel.listShapeOf} directly, which is package-private
-     * because it exists for {@code fromWire} rather than for anyone to call. That was reachable while the
-     * record lived here, unreachable for the week it lived in the plugin contract, and is reachable again
-     * now the record is back. The rule it asserts ran on every project opened with a legacy variable
-     * throughout; only the test could not see it.
+     * <p>The four shapes collapsed to two on 2026-09-20 and to a container after that: {@code ANY_OF} and
+     * {@code OPEN_LIST} always emitted the same field and differed only in whether the author had written a
+     * set of values down, which is asked of the row's options. So the reading no longer needs the sibling
+     * field the old {@code VariableModel.listShapeOf} existed to consult.
      */
     @Test
-    void aStoredAnyOfWithNoSetBehindItReadsAsAnOpenList() {
-        ValueChoice anyOfText = new ValueChoice(BasicsValueTypes.TEXT, ValueShape.ANY_OF);
-        assertEquals(ValueShape.OPEN_LIST, VariableModel.listShapeOf(anyOfText, List.of()).shape());
-        assertEquals(ValueShape.ANY_OF, VariableModel.listShapeOf(anyOfText, List.of("a")).shape());
+    void everyLegacyListSpellingBecomesOneListForm() {
+        ValueForm list = ValueForm.listOf(ValueForm.of(BasicsValueTypes.TEXT));
+        assertEquals(list, StoredForms.formOf(CATALOG, "TEXT", null, Boolean.TRUE));
+        assertEquals(list, StoredForms.formOf(CATALOG, "TEXT", "ANY_OF", null));
+        assertEquals(list, StoredForms.formOf(CATALOG, "TEXT", "OPEN_LIST", null));
+        assertEquals(ValueForm.of(BasicsValueTypes.TEXT),
+                StoredForms.formOf(CATALOG, "TEXT", null, Boolean.FALSE));
     }
 
     @Test
     void everyParseIsTotal() {
-        assertEquals(ValueShape.ONE, ValueShape.fromWire("SOME_NEW_SHAPE"));
+        // A shape a newer writer invented reads as one free value, which holds the stored text.
+        assertEquals(ValueForm.of(BasicsValueTypes.TEXT),
+                StoredForms.formOf(CATALOG, "TEXT", "SOME_NEW_SHAPE", null));
         assertEquals(Visibility.EDITOR_ONLY, Visibility.fromId("something-else"));
         assertEquals(Visibility.EDITOR_ONLY, Visibility.fromId(null));
     }
@@ -149,7 +144,7 @@ class AuthoringModelTest {
         assertFalse(invented.known());
         assertEquals("A_TYPE_SOME_PLUGIN_OWNS", invented.id(), "and it keeps the id, so a save round-trips");
         assertFalse(CATALOG.knows("A_TYPE_SOME_PLUGIN_OWNS"));
-        assertTrue(CATALOG.initializer(ValueChoice.of(invented), List.of("whatever")).isEmpty(),
+        assertTrue(CATALOG.initializerOfWires(ValueForm.of(invented), List.of("whatever")).isEmpty(),
                 "an unknown type declines to emit rather than guessing a literal");
 
         // Null is the one case that is still text: it is an absent field, not a name nobody claimed.
@@ -166,7 +161,7 @@ class AuthoringModelTest {
 
         ProjectModel read = Authoring.readModel(V, dir);
         VariableModel v = read.variables().getFirst();
-        assertEquals("discord.Channel", v.type().type().id());
+        assertEquals("discord.Channel", v.form().leaf().id());
         assertEquals(List.of("#general"), v.value());
 
         Authoring.writeModel(V, dir, read, 1);
@@ -174,11 +169,11 @@ class AuthoringModelTest {
         assertTrue(Files.readString(dir.resolve(ProjectModel.FILE_NAME)).contains("discord.Channel"));
     }
 
-    /** "One of yes and no" is a boolean, said twice and worse — the shape is corrected, not stored. */
+    /** "One of yes and no" is a boolean, said twice and worse — the type says so about itself. */
     @Test
     void aClosedSetCannotCarryAnAuthorWrittenSubset() {
-        assertEquals(ValueShape.ONE, new ValueChoice(BasicsValueTypes.YES_NO, ValueShape.ONE_OF).shape());
-        assertEquals(ValueShape.ONE_OF, new ValueChoice(BasicsValueTypes.TEXT, ValueShape.ONE_OF).shape());
+        assertFalse(BasicsValueTypes.YES_NO.shapeable());
+        assertTrue(BasicsValueTypes.TEXT.shapeable());
     }
 
     @Test
@@ -212,10 +207,11 @@ class AuthoringModelTest {
     /** The emitter's spellings — qualified where a fixed import block could otherwise forget them. */
     @Test
     void theSourceSpellingsAreTheOnesTheGeneratorWrites() {
-        assertEquals("java.time.Duration", ValueChoice.of(BasicsValueTypes.DURATION).sourceName());
-        assertEquals("java.util.List<Key>", ValueChoice.listOf(SdkValueTypes.KEY).sourceName());
-        assertEquals("int", ValueChoice.of(BasicsValueTypes.WHOLE_NUMBER).sourceName());
+        assertEquals("java.time.Duration", ValueForm.of(BasicsValueTypes.DURATION).sourceName());
+        assertEquals("java.util.List<Key>",
+                ValueForm.listOf(ValueForm.of(SdkValueTypes.KEY)).sourceName());
+        assertEquals("int", ValueForm.of(BasicsValueTypes.WHOLE_NUMBER).sourceName());
         assertEquals("java.util.List<Integer>",
-                ValueChoice.listOf(BasicsValueTypes.WHOLE_NUMBER).sourceName());
+                ValueForm.listOf(ValueForm.of(BasicsValueTypes.WHOLE_NUMBER)).sourceName());
     }
 }

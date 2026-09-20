@@ -2,7 +2,7 @@ package com.botmaker.sdk.authoring;
 
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.api.value.ValueChoice;
+import com.botmaker.plugin.api.value.ValueForm;
 import com.botmaker.plugin.api.value.ValueType;
 import com.botmaker.plugin.api.value.Visibility;
 
@@ -111,7 +111,7 @@ public record ActivityModel(String name, boolean enabled, String description, Li
      * switch; a second one under a tag heading is the same flag twice.
      */
     public VariableModel enabledVariable() {
-        return new VariableModel(name, ValueChoice.of(flagType()),
+        return new VariableModel(name, ValueForm.of(flagType()),
                 List.of(Boolean.toString(enabled)), description, name, Visibility.EDITOR_ONLY,
                 List.of(), Range.NONE, com.botmaker.plugin.api.ParameterGroup.DEFAULT_ID);
     }

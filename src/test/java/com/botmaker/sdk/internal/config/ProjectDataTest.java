@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.config;
 
-import com.botmaker.plugin.api.value.ValueChoice;
+import com.botmaker.plugin.api.value.ValueForm;
 import com.botmaker.sdk.authoring.ActivityModel;
 import com.botmaker.sdk.authoring.ProjectModel;
 import com.botmaker.sdk.authoring.VariableModel;
@@ -39,7 +39,7 @@ class ProjectDataTest {
                 List.of(ActivityModel.create("Mining", "dig").withOutcomes(List.of("BAG_FULL"))
                                 .withEnabled(true),
                         ActivityModel.create("Fishing", "").withEnabled(false)),
-                List.of(VariableModel.of("minHealth", ValueChoice.of(BasicsValueTypes.WHOLE_NUMBER),
+                List.of(VariableModel.of("minHealth", ValueForm.of(BasicsValueTypes.WHOLE_NUMBER),
                         List.of("20"))));
 
         ProjectData data = ProjectData.of(Authoring.modelJson(SdkVersion.latest(), model, 2));

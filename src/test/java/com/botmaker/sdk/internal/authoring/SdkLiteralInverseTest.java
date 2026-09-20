@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.authoring;
 
 import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.api.value.ValueChoice;
+import com.botmaker.plugin.api.value.ValueForm;
 import com.botmaker.plugin.api.value.ValueType;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +25,14 @@ class SdkLiteralInverseTest {
 
     private static final ValueCatalog CATALOG = SdkValueTypes.CATALOG;
 
+    private static ValueForm one(ValueType type) {
+        return ValueForm.of(type);
+    }
+
+    private static ValueForm list(ValueType type) {
+        return ValueForm.listOf(ValueForm.of(type));
+    }
+
     /** Every type, every sample: the initialiser is written, then read, and the stored value comes back. */
     @Test
     void everyTypeReadsBackWhatItWrote() {
@@ -43,19 +51,19 @@ class SdkLiteralInverseTest {
                 new Sample(SdkValueTypes.MOUSE_BUTTON, "LEFT"));
 
         for (Sample sample : samples) {
-            ValueChoice choice = ValueChoice.of(sample.type());
+            ValueForm form = one(sample.type());
             String canonical = CATALOG.normalize(sample.type().id(), sample.wire());
-            String java = CATALOG.initializer(choice, List.of(sample.wire())).orElseThrow();
-            assertEquals(Optional.of(List.of(canonical)), CATALOG.valueOfInitializer(choice, java),
+            String java = CATALOG.initializerOfWires(form, List.of(sample.wire())).orElseThrow();
+            assertEquals(Optional.of(List.of(canonical)), CATALOG.wiresOfInitializer(form, java),
                     sample.type().id() + " wrote " + java + " and could not read it back");
         }
     }
 
     @Test
     void aListOfPicturesRoundTripsItemByItem() {
-        ValueChoice pictures = ValueChoice.listOf(SdkValueTypes.IMAGE_TEMPLATE);
-        String java = CATALOG.initializer(pictures, List.of("ore", "gem")).orElseThrow();
-        assertEquals(Optional.of(List.of("ore", "gem")), CATALOG.valueOfInitializer(pictures, java));
+        ValueForm pictures = list(SdkValueTypes.IMAGE_TEMPLATE);
+        String java = CATALOG.initializerOfWires(pictures, List.of("ore", "gem")).orElseThrow();
+        assertEquals(Optional.of(List.of("ore", "gem")), CATALOG.wiresOfInitializer(pictures, java));
     }
 
     /**
@@ -69,18 +77,18 @@ class SdkLiteralInverseTest {
     @Test
     void anEnumConstantThatDoesNotExistIsDeclined() {
         assertEquals(Optional.empty(),
-                CATALOG.valueOfInitializer(ValueChoice.of(SdkValueTypes.DIRECTION), "Direction.UP"));
+                CATALOG.wiresOfInitializer(one(SdkValueTypes.DIRECTION), "Direction.UP"));
         assertEquals(Optional.empty(),
-                CATALOG.valueOfInitializer(ValueChoice.of(SdkValueTypes.KEY), "Key.MISSING"));
+                CATALOG.wiresOfInitializer(one(SdkValueTypes.KEY), "Key.MISSING"));
     }
 
     /** A file that did not import the type writes the package too, and that is still this codec's literal. */
     @Test
     void aFullyQualifiedSpellingReadsToo() {
-        assertEquals(Optional.of(List.of("3,4")), CATALOG.valueOfInitializer(
-                ValueChoice.of(SdkValueTypes.POINT), "new com.botmaker.sdk.api.geometry.Point(3, 4)"));
-        assertEquals(Optional.of(List.of("NORTH")), CATALOG.valueOfInitializer(
-                ValueChoice.of(SdkValueTypes.DIRECTION),
+        assertEquals(Optional.of(List.of("3,4")), CATALOG.wiresOfInitializer(
+                one(SdkValueTypes.POINT), "new com.botmaker.sdk.api.geometry.Point(3, 4)"));
+        assertEquals(Optional.of(List.of("NORTH")), CATALOG.wiresOfInitializer(
+                one(SdkValueTypes.DIRECTION),
                 "com.botmaker.sdk.api.geometry.Direction.NORTH"));
     }
 
@@ -94,15 +102,15 @@ class SdkLiteralInverseTest {
     @Test
     void anInitializerThisPluginDoesNotWriteIsDeclined() {
         assertEquals(Optional.empty(),
-                CATALOG.valueOfInitializer(ValueChoice.of(SdkValueTypes.POINT), "Point.of(3, 4)"));
+                CATALOG.wiresOfInitializer(one(SdkValueTypes.POINT), "Point.of(3, 4)"));
         assertEquals(Optional.empty(),
-                CATALOG.valueOfInitializer(ValueChoice.of(SdkValueTypes.POINT), "ORIGIN"));
+                CATALOG.wiresOfInitializer(one(SdkValueTypes.POINT), "ORIGIN"));
         assertEquals(Optional.empty(),
-                CATALOG.valueOfInitializer(ValueChoice.of(SdkValueTypes.PRECISION), "Precision.TIGHT"));
-        assertEquals(Optional.empty(), CATALOG.valueOfInitializer(
-                ValueChoice.of(SdkValueTypes.PRECISION), "Precision.TIGHT.minArea(400)"));
-        assertEquals(Optional.empty(), CATALOG.valueOfInitializer(
-                ValueChoice.of(SdkValueTypes.SIZE), "new Size(width, height)"));
+                CATALOG.wiresOfInitializer(one(SdkValueTypes.PRECISION), "Precision.TIGHT"));
+        assertEquals(Optional.empty(), CATALOG.wiresOfInitializer(
+                one(SdkValueTypes.PRECISION), "Precision.TIGHT.minArea(400)"));
+        assertEquals(Optional.empty(), CATALOG.wiresOfInitializer(
+                one(SdkValueTypes.SIZE), "new Size(width, height)"));
     }
 
     /**
@@ -113,16 +121,16 @@ class SdkLiteralInverseTest {
      */
     @Test
     void aPictureOutsideTheProjectsFolderIsDeclined() {
-        assertEquals(Optional.empty(), CATALOG.valueOfInitializer(
-                ValueChoice.of(SdkValueTypes.IMAGE_TEMPLATE), "new ImageTemplate(\"/tmp/ore.png\")"));
-        assertEquals(Optional.empty(), CATALOG.valueOfInitializer(
-                ValueChoice.of(SdkValueTypes.IMAGE_TEMPLATE),
+        assertEquals(Optional.empty(), CATALOG.wiresOfInitializer(
+                one(SdkValueTypes.IMAGE_TEMPLATE), "new ImageTemplate(\"/tmp/ore.png\")"));
+        assertEquals(Optional.empty(), CATALOG.wiresOfInitializer(
+                one(SdkValueTypes.IMAGE_TEMPLATE),
                 "new ImageTemplate(\"src/main/resources/images/ore.jpg\")"));
     }
 
     @Test
     void whitespaceAsAFormatterWouldLeaveItIsTolerated() {
-        assertEquals(Optional.of(List.of("10,20,640,480")), CATALOG.valueOfInitializer(
-                ValueChoice.of(SdkValueTypes.RECT), "  new Rect( 10 , 20 , 640 , 480 )  "));
+        assertEquals(Optional.of(List.of("10,20,640,480")), CATALOG.wiresOfInitializer(
+                one(SdkValueTypes.RECT), "  new Rect( 10 , 20 , 640 , 480 )  "));
     }
 }

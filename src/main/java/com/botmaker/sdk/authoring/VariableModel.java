@@ -3,8 +3,7 @@ package com.botmaker.sdk.authoring;
 import com.botmaker.plugin.api.ParameterGroup;
 import com.botmaker.plugin.api.value.Range;
 import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.api.value.ValueChoice;
-import com.botmaker.plugin.api.value.ValueShape;
+import com.botmaker.plugin.api.value.ValueForm;
 import com.botmaker.plugin.api.value.ValueType;
 import com.botmaker.plugin.api.value.Visibility;
 
@@ -28,12 +27,12 @@ import java.util.List;
  * file said. Whatever coercion an editor wants belongs in the editor, where the user can see it happen.
  *
  * @param name        the generated field name; a valid Java identifier
- * @param type        what kind of value, and in what shape
+ * @param form        what kind of value — a catalogued leaf, or a container over other forms
  * @param value       the wire form of the current value
  * @param description a human-readable note explaining what it is for; may be empty
  * @param tag         the group it is filed under; blank means ungrouped
  * @param visibility  whether the bot's user is offered this at all
- * @param options     the declared set of values, for a shape that {@link ValueChoice#hasOptions has one}
+ * @param options     the declared set of values; empty for a free value, which is how having a set is asked
  * @param bounds      the declared range, for a bounded number
  * @param group       the {@link com.botmaker.plugin.api.ParameterGroup} this is filed under — which plugin
  *                    owns it, and so which generated class it becomes a field of. Blank is the default
@@ -41,7 +40,7 @@ import java.util.List;
  *                    correctly. Unlike {@link #tag()}, this <em>is</em> a scope: names are unique within a
  *                    group, not across the project.
  */
-public record VariableModel(String name, ValueChoice type, List<String> value, String description,
+public record VariableModel(String name, ValueForm form, List<String> value, String description,
                             String tag, Visibility visibility, List<String> options, Range bounds,
                             String group) {
 
@@ -51,7 +50,7 @@ public record VariableModel(String name, ValueChoice type, List<String> value, S
         // always had — ValueCatalog.type(null) says the same thing. The id is all this needs: a ValueType's
         // identity *is* its id, and the label, the group and the Java type it emits belong to whichever
         // plugin registered TEXT, arriving when a catalog is merged.
-        if (type == null) type = ValueChoice.of(ValueType.of(ValueCatalog.TEXT_ID).build());
+        if (form == null) form = ValueForm.of(ValueType.of(ValueCatalog.TEXT_ID).build());
         value = value == null ? List.of() : List.copyOf(value);
         if (description == null) description = "";
         if (tag == null) tag = "";
@@ -64,9 +63,9 @@ public record VariableModel(String name, ValueChoice type, List<String> value, S
     /** The heading a variable with no tag is listed under. Not a real tag: nothing declares it. */
     public static final String GENERAL = "General";
 
-    /** A variable of {@code type} holding {@code value}, with nothing else declared. */
-    public static VariableModel of(String name, ValueChoice type, List<String> value) {
-        return new VariableModel(name, type, value, "", "", Visibility.PUBLIC, List.of(), Range.NONE,
+    /** A variable of {@code form} holding {@code value}, with nothing else declared. */
+    public static VariableModel of(String name, ValueForm form, List<String> value) {
+        return new VariableModel(name, form, value, "", "", Visibility.PUBLIC, List.of(), Range.NONE,
                 ParameterGroup.DEFAULT_ID);
     }
 
@@ -98,11 +97,11 @@ public record VariableModel(String name, ValueChoice type, List<String> value, S
     // because both need the coercion rules, and those belong to the editor rather than to the file.
 
     public VariableModel withName(String newName) {
-        return new VariableModel(newName, type, value, description, tag, visibility, options, bounds, group);
+        return new VariableModel(newName, form, value, description, tag, visibility, options, bounds, group);
     }
 
     public VariableModel withValue(List<String> newValue) {
-        return new VariableModel(name, type, newValue, description, tag, visibility, options, bounds, group);
+        return new VariableModel(name, form,newValue, description, tag, visibility, options, bounds, group);
     }
 
     /** Convenience for the single-valued types, which is most of them. */
@@ -111,24 +110,24 @@ public record VariableModel(String name, ValueChoice type, List<String> value, S
     }
 
     public VariableModel withDescription(String newDescription) {
-        return new VariableModel(name, type, value, newDescription, tag, visibility, options, bounds, group);
+        return new VariableModel(name, form,value, newDescription, tag, visibility, options, bounds, group);
     }
 
     public VariableModel withTag(String newTag) {
-        return new VariableModel(name, type, value, description, newTag, visibility, options, bounds, group);
+        return new VariableModel(name, form,value, description, newTag, visibility, options, bounds, group);
     }
 
     public VariableModel withVisibility(Visibility newVisibility) {
-        return new VariableModel(name, type, value, description, tag, newVisibility, options, bounds, group);
+        return new VariableModel(name, form,value, description, tag, newVisibility, options, bounds, group);
     }
 
     public VariableModel withBounds(Range newBounds) {
-        return new VariableModel(name, type, value, description, tag, visibility, options, newBounds, group);
+        return new VariableModel(name, form,value, description, tag, visibility, options, newBounds, group);
     }
 
     /** Files this variable under another {@link ParameterGroup} — which plugin owns it, and so which class. */
     public VariableModel withGroup(String newGroup) {
-        return new VariableModel(name, type, value, description, tag, visibility, options, bounds, newGroup);
+        return new VariableModel(name, form,value, description, tag, visibility, options, bounds, newGroup);
     }
 
     /** True when this variable belongs to {@code groupId}, reading a blank group as the default plugin's. */
@@ -136,35 +135,9 @@ public record VariableModel(String name, ValueChoice type, List<String> value, S
         return group.equals(groupId == null ? ParameterGroup.DEFAULT_ID : groupId.trim());
     }
 
-    /**
-     * Reads the persisted form, settling the one question {@link ValueChoice#fromWire} cannot.
-     *
-     * <p>{@link ValueShape#ANY_OF} once meant two things — tick boxes over the author's choices, or a free
-     * list the user filled in — and which one it was showed only in whether any choices were written down.
-     * Now that they are two shapes, a file written before the split has to be read the way it used to
-     * <em>render</em>, or a project full of "List of text" parameters opens as tick boxes over nothing.
-     *
-     * <p>So: a stored {@code ANY_OF} keeps its shape when there is a set behind it — the author's options, or
-     * the type's own constants for a closed set like {@code Direction} — and becomes
-     * {@link ValueShape#OPEN_LIST} when there is not.
-     *
-     * <p><b>Nothing in this module calls it, and that is not dead code.</b> It is the factory a parser binds
-     * to instead of the canonical constructor, named from outside — the SDK's
-     * {@code internal.authoring.AuthoringMixins} marks it as Jackson's creator. The mark cannot live here:
-     * these records are the plugin contract, whose one dependency is {@code javafx-controls} at
-     * {@code provided}, so a JSON annotation on one of them would impose that library on every plugin.
-     */
-    static VariableModel fromWire(String name, ValueChoice type, List<String> value, String description,
-                                  String tag, Visibility visibility, List<String> options, Range bounds,
-                                  String group) {
-        return new VariableModel(name, listShapeOf(type, options), value, description, tag, visibility,
-                options, bounds, group);
-    }
-
-    /** {@link #fromWire}'s rule, alone so it can be read — and tested — without a file. */
-    static ValueChoice listShapeOf(ValueChoice type, List<String> options) {
-        if (type == null || type.shape() != ValueShape.ANY_OF) return type;
-        boolean hasSet = (options != null && !options.isEmpty()) || type.type().isClosedSet();
-        return hasSet ? type : new ValueChoice(type.type(), ValueShape.OPEN_LIST);
-    }
+    // fromWire and listShapeOf stood here until 2026-09-20. They settled the one thing a stored file could
+    // not state: whether an ANY_OF meant tick boxes over the author's choices or a free list the user fills
+    // in, which showed only in whether any choices were written down. Both shapes emitted List<T>, and a
+    // ValueForm says List<T> and nothing else — the question about the widget is asked of the row's options,
+    // where it always belonged. So the reading is the canonical constructor again, and Jackson binds to it.
 }
