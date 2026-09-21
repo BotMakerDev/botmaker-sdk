@@ -17,6 +17,17 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+No source changes since v1.1.14; re-released for updated upstream pins.
+
+### Changed
+
+- **Nothing changes for a bot.** The SDK's plugin half was recompiled against the plugin contract's new
+  package layout (`com.botmaker.plugin.api.slot`, `.parameters`, `.toolbar`, `.source`). No `api.*` type,
+  method or behaviour changed, and a bot never writes a contract name down — this line exists so the version
+  bump has a reason on it.
+
 ## [1.1.14] — 2026-09-21
 
 ### Changed
