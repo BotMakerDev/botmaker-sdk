@@ -8,7 +8,6 @@ import com.botmaker.plugin.api.parameters.ParameterGroup;
 import com.botmaker.plugin.api.parameters.ParameterRow;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.source.ManagedValue;
-import com.botmaker.plugin.api.source.PluginSource;
 import com.botmaker.plugin.api.source.SourceSeed;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
@@ -361,48 +360,19 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     /** The {@code @Managed} id on the class of picture constants this plugin's window keeps in step. */
     public static final String PICTURES = "pictures";
 
-    /**
-     * The two files this plugin gives a bot: {@code Sdk.java}, which holds the flow and the capture source,
-     * and {@code Pictures.java}, which holds one constant per picture.
-     *
-     * <p>Shipped as text and copied once, the first time the host sees this plugin on a project's classpath.
-     * From that moment they are the user's: nothing regenerates them, and what the host rewrites afterwards
-     * is one {@code @Managed} method's returned expression, or — for {@code Pictures} — the constants that
-     * 🖼 Manage Pictures adds, renames and removes.
-     *
-     * <p><b>{@code Pictures} is shipped rather than guessed at.</b> {@code TemplateNames.CLASS_NAME} named a
-     * class no project was required to have, so a picture rename searched for {@code Templates.ORE} in bots
-     * whose author had called theirs something else. The plugin owning the file is what makes the name a
-     * fact.
-     *
-     * <p>Read off the jar each time rather than held: it is two small files, read once per project, and a
-     * static cache would be a second copy of text that only ever comes from here.
-     */
-    @Override
-    public List<PluginSource> pluginSources() {
-        return Stream.of("Sdk", "Pictures")
-                .map(SdkPlugin::shippedSource)
-                .filter(PluginSource::isPresent)
-                .toList();
-    }
-
-    /**
-     * One shipped file, or an empty {@link PluginSource} when it cannot be read.
-     *
-     * <p>Empty rather than throwing: a jar built without its resources is a broken build, and the project
-     * opening without a file is a better answer than the project not opening. The host skips what is not
-     * {@linkplain PluginSource#isPresent present}.
-     */
-    private static PluginSource shippedSource(String simpleName) {
-        String resource = "/com/botmaker/sdk/plugin/sources/" + simpleName + ".java.txt";
-        try (java.io.InputStream in = SdkPlugin.class.getResourceAsStream(resource)) {
-            return in == null ? new PluginSource(simpleName, "")
-                    : new PluginSource(simpleName, new String(in.readAllBytes(),
-                            java.nio.charset.StandardCharsets.UTF_8));
-        } catch (java.io.IOException unreadable) {
-            return new PluginSource(simpleName, "");
-        }
-    }
+    // pluginSources() and shippedSource() stood here on 2026-09-20/21, shipping Sdk.java.txt and
+    // Pictures.java.txt out of src/main/resources for the host to copy into a project. Both are deleted with
+    // the contract method they implemented.
+    //
+    // Nothing about what those files ARE changed: a bot still holds this plugin's values as @Managed methods
+    // in its own plugins/sdk/Sdk.java, and this plugin's windows still rewrite one returned expression at a
+    // time. What changed is where a project's first copy comes from — the template it was created from,
+    // which already carries one — and that the file no longer needs an install() for a bot's main to call,
+    // because Bot.run installs every @Managed value it is handed.
+    //
+    // The one thing genuinely given up: adding this plugin to a project that has no Sdk.java brings none.
+    // The answer to that is this plugin's own flow window offering to write one, which is a click and one
+    // file rather than a host copying text on every bind.
 
     /**
      * The seventeen types a project variable could hold before there was a registry to hold them in.

@@ -8,7 +8,48 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
-## 2026-09-21 (last) — the worked bot is migrated, and the string is gone
+## 2026-09-21 (last) — `Bot.run` installs the values; the SDK ships no source text
+
+**Done**
+
+- **`Bot.run(Class<?> anchor, Runnable goHome, Class<?>... values)`** — the whole of a bot's `main`. It
+  claims this plugin's two ids through `internal/bot/SdkValues` (`"flow"` → `Flows.use`, `"capture"` →
+  `Source.set`), calls `ManagedValues.install(values)` and then the existing `start(…)`. A bot writes
+  `run(Gamebot.class, Gamebot::goHome, Sdk.class)` and nothing else.
+- **`Bot` is no longer `final`** and has a `protected` constructor, so `extends Bot` reads as one line and
+  *this class is a bot's entry point* is a fact javac knows. Removing `final` is a widening; `Bot.run(…)`
+  spelled in full works for a bot that does not extend it, and never-delete is untouched.
+- **`SdkPlugin.pluginSources()` and `shippedSource()` are deleted**, with
+  `src/main/resources/com/botmaker/sdk/plugin/sources/*.java.txt`, alongside the contract method they
+  implemented.
+
+**Why**
+
+`Flows`' own javadoc recorded the cost of the arrangement this replaces: *"and `main` calls
+`Sdk.install()`. That is the whole hand-off."* One hand-written line per plugin, in a file the user owns —
+forget it and the bot runs with no flow and no error, which is the failure the whole `@Managed` migration
+exists to end. The bot still **names** each values class, because that is a fact only it has and one javac
+checks; it no longer says what to do with them.
+
+With `install()` gone the file the SDK was shipping is two `@Managed` methods, which is too little to be
+worth a contract surface — so the shipping went too. A project gets its `plugins/sdk/Sdk.java` from the
+template it was created from.
+
+**An earlier answer, tried and replaced the same day.** Those two `.java.txt` files were first moved into
+`src/main/java` so javac would read them, with an antrun copy into the jar and a `maven-jar-plugin`
+exclusion keeping their classes out of it. It worked — a broken `@Managed` method became
+`Sdk.java:[48,29] cannot find symbol` instead of a surprise for the next person to create a project — and it
+was a lot of machinery to have javac read twelve lines. Deleting the files answers the same question by
+having none.
+
+**Still owed**: `botmaker-gamebot` writes `Sdk.install(); Bot.start(…)` and must move to `extends Bot` +
+`run(…)`. It is **not** done here on purpose — the template pins a *released* SDK (1.1.14) that has no
+`Bot.run`, so migrating its source now would leave it not compiling at its own pin, which is exactly the
+2026-09-21 failure `TemplateGate` was built to catch. It lands in the same release run as the SDK that
+ships `Bot.run`: `--sdk X --gamebot Y`, where `TemplatePin` moves the pin and `TemplateGate.afterBump`
+recompiles the template against it before the tag.
+
+## 2026-09-21 — the worked bot is migrated, and the string is gone
 
 Phase 7 of *"a plugin's values live in one file the plugin ships"*, and the end of it. The plan existed to
 delete one sentence from `Gamebot`'s javadoc — *"The two halves are joined by a **string**, deliberately"* —

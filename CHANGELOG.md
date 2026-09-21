@@ -19,9 +19,34 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
-No source changes since v1.1.14; re-released for updated upstream pins.
+### Added
+
+- **`Bot.run(anchor, goHome, Sdk.class)` — the whole of a bot's `main`.** It installs every `@Managed` value
+  the classes you name declare, then starts the flow. What it replaces is a hand-written `Sdk.install()`:
+  one line per plugin, in a file you own, and a bot that lost that line ran with no flow and said nothing.
+  Your bot still *names* each plugin's values class — javac checks that — and no longer says what to do with
+  it.
+
+  ```java
+  public final class Gamebot extends Bot {
+
+      public static void main(String[] args) {
+          run(Gamebot.class, Gamebot::goHome, Sdk.class);
+      }
+  }
+  ```
+
+  `Sdk.install()` still works and is not deprecated: it is your file, and `Flows.use` and `Source.set` are
+  unchanged.
 
 ### Changed
+
+- **`Bot` is no longer `final`** and has a `protected` constructor, so `extends Bot` lets the entry point
+  above read as one line. `Bot.run(…)` spelled in full does the same thing for a bot that does not extend
+  it. Nothing that compiled before stops compiling.
+- **The SDK no longer ships `Sdk.java` and `Pictures.java` for the host to copy in.** A new project gets
+  them from the template it is created from. Adding the SDK to a project that has neither brings neither —
+  the flow window offering to write one is owed and not in this release.
 
 - **Nothing changes for a bot.** The SDK's plugin half was recompiled against the plugin contract's new
   package layout (`com.botmaker.plugin.api.slot`, `.parameters`, `.toolbar`, `.source`). No `api.*` type,
