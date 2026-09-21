@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.1.13] — 2026-09-21
 
 No source changes since v1.1.12; re-released for updated upstream pins.
 
