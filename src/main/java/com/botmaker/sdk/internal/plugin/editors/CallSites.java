@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.bot.Activities;
 import com.botmaker.sdk.api.bot.ActivityContext;
 import com.botmaker.sdk.api.bot.BotSettings;

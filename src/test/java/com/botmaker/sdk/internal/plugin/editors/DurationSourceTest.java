@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
-import com.botmaker.plugin.api.SlotContext;
+import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;

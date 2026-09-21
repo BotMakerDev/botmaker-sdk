@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Editors;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.plugin.flow.FlowValue;

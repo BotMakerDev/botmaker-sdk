@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.plugin.capture;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.authoring.CaptureTargetModel;
 

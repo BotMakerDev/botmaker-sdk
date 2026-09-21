@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
-import com.botmaker.plugin.api.SlotEditor;
+import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
@@ -23,7 +23,7 @@ import java.util.List;
  * contract's {@code ValueContext} bought: an editor chosen by type is drawn both in a bot's source and in the
  * Parameters window, while one chosen by {@code enclosingMethod()} can only ever appear in the first. Where a
  * call site genuinely is what decides — a Steam app id and a window title are both {@code String} — the editor
- * asks {@link com.botmaker.plugin.api.ValueContext#asSlot()} and declines when the answer is {@code null}.
+ * asks {@link com.botmaker.plugin.api.slot.ValueContext#asSlot()} and declines when the answer is {@code null}.
  */
 public final class SdkEditors {
 

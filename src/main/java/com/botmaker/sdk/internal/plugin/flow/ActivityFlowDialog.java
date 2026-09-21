@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.authoring.FlowEdgeModel;
 import javafx.application.Platform;
@@ -63,7 +63,7 @@ import java.util.Set;
  * <h2>What it writes, since 2026-09-20</h2>
  *
  * <p>It no longer writes a file at all. The graph is one expression — the one {@code Sdk.flow()} returns —
- * written through {@link com.botmaker.plugin.api.PluginValues}, so it lands in the bot's own Java, in the
+ * written through {@link com.botmaker.plugin.api.source.PluginValues}, so it lands in the bot's own Java, in the
  * open buffer as well as on disk, as one entry in the project's history. The card positions go to the
  * gitignored {@link FlowLayout} sidecar, because dragging a node is not a change to the bot.
  *
@@ -866,7 +866,7 @@ public final class ActivityFlowDialog {
      * <p><b>On the FX thread</b>, which is a reversal. It used to be a daemon thread, because writing
      * {@code activities.json} was this window's own file I/O; the flow is now one expression handed to the
      * host, which is what every slot editor on the canvas does on every keystroke and which
-     * {@link com.botmaker.plugin.api.ValueContext#set} requires. The layout sidecar goes with it rather than
+     * {@link com.botmaker.plugin.api.slot.ValueContext#set} requires. The layout sidecar goes with it rather than
      * behind it, so a save is one thing that either happened or did not.
      *
      * <p>{@link #saving} is still honoured, because the write can re-enter: the host's write lands in the

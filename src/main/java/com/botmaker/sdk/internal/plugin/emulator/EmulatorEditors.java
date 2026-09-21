@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.plugin.emulator;
 
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.sdk.authoring.Authoring;

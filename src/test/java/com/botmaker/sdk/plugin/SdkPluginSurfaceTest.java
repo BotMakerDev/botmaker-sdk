@@ -1,10 +1,10 @@
 package com.botmaker.sdk.plugin;
 
-import com.botmaker.plugin.api.ParameterGroup;
-import com.botmaker.plugin.api.SlotEditor;
-import com.botmaker.plugin.api.SourceSeed;
-import com.botmaker.plugin.api.ToolbarGroup;
-import com.botmaker.plugin.api.ToolbarItem;
+import com.botmaker.plugin.api.parameters.ParameterGroup;
+import com.botmaker.plugin.api.slot.SlotEditor;
+import com.botmaker.plugin.api.source.SourceSeed;
+import com.botmaker.plugin.api.toolbar.ToolbarGroup;
+import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.api.value.ValueType;
 import com.botmaker.plugin.toolkit.testing.TestContexts;

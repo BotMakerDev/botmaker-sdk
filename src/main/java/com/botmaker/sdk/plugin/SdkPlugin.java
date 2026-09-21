@@ -1,18 +1,18 @@
 package com.botmaker.sdk.plugin;
 
-import com.botmaker.plugin.api.ActionContext;
-import com.botmaker.plugin.api.ManagedValue;
-import com.botmaker.plugin.api.ParameterEdit;
-import com.botmaker.plugin.api.PluginSource;
-import com.botmaker.plugin.api.ParameterGroup;
-import com.botmaker.plugin.api.ParameterRow;
-import com.botmaker.plugin.api.SlotEditor;
-import com.botmaker.plugin.api.SourceSeed;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.ToolbarGroup;
-import com.botmaker.plugin.api.ToolbarItem;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
+import com.botmaker.plugin.api.parameters.ParameterEdit;
+import com.botmaker.plugin.api.parameters.ParameterGroup;
+import com.botmaker.plugin.api.parameters.ParameterRow;
+import com.botmaker.plugin.api.slot.SlotEditor;
+import com.botmaker.plugin.api.source.ManagedValue;
+import com.botmaker.plugin.api.source.PluginSource;
+import com.botmaker.plugin.api.source.SourceSeed;
+import com.botmaker.plugin.api.toolbar.ActionContext;
+import com.botmaker.plugin.api.toolbar.ToolbarGroup;
+import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.basics.store.ParameterStore;
 import com.botmaker.plugin.basics.store.PluginData;
@@ -438,7 +438,8 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * <p><b>This is where the data stopped being the host's.</b> Studio parsed that file itself and drew the
      * Parameters window from its own records, which meant the host knew this plugin's storage format and a
      * second plugin could not have had parameters at all. Now the host asks, and what it gets back is
-     * {@link com.botmaker.plugin.api.ParameterRow}s built out of vocabulary the contract already owned.
+     * {@link com.botmaker.plugin.api.parameters.ParameterRow}s built out of vocabulary the contract already
+     * owned.
      *
      * <p>Answered from {@link #parameters} — the field, set on bind — so a plugin with no project answers
      * nothing rather than reading somebody else's directory. Read on every call and never cached: a window
@@ -650,7 +651,8 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * <p>It sits in {@link ToolbarGroup#AUTHORING} at order 10, the slot Studio's own 🔀 Flow button vacated,
      * so the bar reads where it always did. It was the host's until 2026-09-11, and it is the <b>only</b> one
      * of the three windows over this plugin's project data that moved: a parameter is a
-     * {@link com.botmaker.plugin.api.ParameterRow} and the host can draw one, while a flow's nodes, edges,
+     * {@link com.botmaker.plugin.api.parameters.ParameterRow} and the host can draw one, while a flow's
+     * nodes, edges,
      * ports and outcomes are vocabulary of this plugin's own that the contract must never learn.
      *
      * <p>Single-instance is not enforced: this window owns no port and no display, so a second one is a

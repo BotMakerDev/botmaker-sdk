@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.value.ValueCatalog;
 import com.botmaker.plugin.basics.values.BasicsValueTypes;
 import com.botmaker.sdk.api.flow.Flow;
@@ -16,7 +16,7 @@ import java.util.Optional;
  * <h2>The whole of what replaced {@code activities.json}</h2>
  *
  * <p>The flow editor used to read a file, parse it into a {@code ProjectModel} and write the file back. It
- * now opens one value through {@link com.botmaker.plugin.api.PluginValues}, reads the expression that value
+ * now opens one value through {@link com.botmaker.plugin.api.source.PluginValues}, reads the expression that value
  * holds and writes one expression back. Everything between — which file, which package, which buffer is
  * unsaved, how the write becomes one undo step — is the host's, and this class is the two lines of
  * translation left over.

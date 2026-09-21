@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
-import com.botmaker.plugin.api.SlotContext;
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.SlotContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Editors;
 import javafx.scene.Node;
 

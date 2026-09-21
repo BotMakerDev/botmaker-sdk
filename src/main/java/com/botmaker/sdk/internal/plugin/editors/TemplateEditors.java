@@ -1,9 +1,9 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
-import com.botmaker.plugin.api.SlotContext;
-import com.botmaker.plugin.api.SlotRun;
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.SlotContext;
+import com.botmaker.plugin.api.slot.SlotRun;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Slots;

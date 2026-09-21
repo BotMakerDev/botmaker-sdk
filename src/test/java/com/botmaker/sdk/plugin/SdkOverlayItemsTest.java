@@ -1,7 +1,7 @@
 package com.botmaker.sdk.plugin;
 
-import com.botmaker.plugin.api.ToolbarGroup;
-import com.botmaker.plugin.api.ToolbarItem;
+import com.botmaker.plugin.api.toolbar.ToolbarGroup;
+import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
