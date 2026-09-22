@@ -3,9 +3,6 @@ package com.botmaker.sdk.plugin;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
-import com.botmaker.plugin.api.parameters.ParameterEdit;
-import com.botmaker.plugin.api.parameters.ParameterGroup;
-import com.botmaker.plugin.api.parameters.ParameterRow;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.SourceSeed;
@@ -13,9 +10,6 @@ import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.basics.store.ParameterStore;
-import com.botmaker.plugin.basics.store.PluginData;
-import com.botmaker.plugin.basics.values.BasicsValueTypes;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.plugin.toolkit.Editors;
 import com.botmaker.plugin.toolkit.Region;
@@ -51,7 +45,6 @@ import com.botmaker.sdk.internal.plugin.templates.ResourceManagerDialog;
 import javafx.scene.paint.Color;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -387,70 +380,29 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         return SdkValueTypes.CATALOG;
     }
 
-    /**
-     * One section, {@code Parameters} — the class every bot has always had, now declared rather than assumed.
-     *
-     * <p>Its id is blank ({@link ParameterGroup#DEFAULT_ID}), which is the whole of the migration: a variable
-     * in a project written before groups existed carries no group, reads back as blank, and is therefore this
-     * plugin's. A second plugin declares {@code ParameterGroup.of("discord", "DiscordParameters")} and gets
-     * its own section, its own file and its own namespace.
-     *
-     * <p>Total in the pin, like {@link #catalog(String)}: the class has existed in every SDK there has been.
-     */
-    @Override
-    protected List<ParameterGroup> buildParameters() {
-        return List.of(SDK_PARAMETERS);
-    }
+    // buildParameters(), parameterRows(String) and parameterEdited(ParameterEdit) stood here from
+    // 2026-09-10 to 2026-09-22, over a ParameterStore held in a field set on bind. The whole surface is
+    // deleted from the contract, and this was its only implementation.
+    //
+    // It declared one section and no rows. ParameterStore.declare -- the call that would have written a row
+    // into this plugin's file -- had no caller in this module or any other, so parameterRows returned
+    // whatever sat in a pre-2026-09-17 project's JSON and empty for every project created since. The
+    // replacement was already in place by then: a parameter is a @Param field in the bot's own Java, and a
+    // row this plugin wants for itself is a @Param field in the file this plugin ships. The host's ordinary
+    // walk of the bot's sources finds it, which is why nothing here replaces the three methods.
+    //
+    // parameterDeclared went first, on 2026-09-17, for the same reason one step earlier.
 
     /**
-     * The rows of that section, read out of this plugin's own file in the open project.
+     * Takes the project being bound.
      *
-     * <p><b>This is where the data stopped being the host's.</b> Studio parsed that file itself and drew the
-     * Parameters window from its own records, which meant the host knew this plugin's storage format and a
-     * second plugin could not have had parameters at all. Now the host asks, and what it gets back is
-     * {@link com.botmaker.plugin.api.parameters.ParameterRow}s built out of vocabulary the contract already
-     * owned.
-     *
-     * <p>Answered from {@link #parameters} — the field, set on bind — so a plugin with no project answers
-     * nothing rather than reading somebody else's directory. Read on every call and never cached: a window
-     * asks when it is drawn, and the file is the truth.
-     */
-    @Override
-    public List<ParameterRow> parameterRows(String groupId) {
-        ParameterStore open = parameters;
-        return open == null ? List.of() : open.rows(groupId);
-    }
-
-    /**
-     * Stores a changed value and answers the row as stored.
-     *
-     * <p>The value is coerced on the way in — canonicalised by its own type, clamped to a declared range,
-     * pruned to the options still on offer — which is why the answer may differ from the edit. Those rules
-     * are the editor's and live in {@link ParameterStore}, one module down, where any plugin gets them.
-     */
-    @Override
-    public Optional<ParameterRow> parameterEdited(ParameterEdit edit) {
-        ParameterStore open = parameters;
-        return open == null ? Optional.empty() : open.apply(edit);
-    }
-
-    // parameterDeclared stood here until 2026-09-17, storing a row the host declared. The contract method is
-    // gone: a user parameter is a @Param field in the bot's own Java and the host edits it there. This
-    // plugin's own rows — an activity's enable flag — are declared in this plugin's own code, through
-    // ParameterStore's verbs, which are unchanged.
-
-    /**
-     * Takes the project being bound — which is what makes the two methods above answerable.
-     *
-     * <p>A data surface takes a group id and nothing else, so the project has to arrive some other way, and
-     * this is the only way it can: a plugin is constructed once and then serves whatever the host binds.
-     * Nothing is read here — a project open must not pay for a window nobody has looked at yet — so this is
-     * one field write, exactly as {@code buildValueTypes} and the other lazy builders are.
+     * <p>A plugin is constructed once and then serves whatever the host binds, so which project it has can
+     * only arrive this way. Nothing is read here — a project open must not pay for a window nobody has
+     * looked at yet — so this is one call, exactly as {@code buildValueTypes} and the other lazy builders
+     * are.
      */
     @Override
     public void projectOpened(StudioServices services) {
-        parameters = new ParameterStore(PluginData.of(services.resourcesDir(), ID), SDK_PARAMETERS.id(),
-                BasicsValueTypes.CATALOG.merge(SdkValueTypes.CATALOG));
         // The flow is a value in the bot's own Java now, so reading it needs the host rather than a path.
         // Two readers have no value cell to ask through — see FlowValue's own note — and this is where they
         // are given one.
@@ -686,20 +638,8 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         RemotePilotUi open = pilot;
         pilot = null;
         if (open != null) open.close();
-        // Dropped for the same reason the pilot is: it holds the closing project's resources directory, and
-        // answering parameter rows out of a project the user has left would be worse than answering none.
-        parameters = null;
         FlowValue.unbind();
     }
-
-    /**
-     * The parameter data of the project currently bound, or {@code null} between projects.
-     *
-     * <p>Written by {@link #projectOpened(StudioServices)} and cleared by {@link #projectClosing()}, both of
-     * which the host calls one after the other on the same thread during a bind — so, like {@link #pilot},
-     * it needs no synchronization.
-     */
-    private ParameterStore parameters;
 
     private RemotePilotUi pilot(StudioServices services) {
         if (pilot == null) pilot = new RemotePilotUi(services);
@@ -714,25 +654,8 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private RemotePilotUi pilot;
 
-    /**
-     * The one parameter group this plugin owns.
-     *
-     * <p>It lived on {@code SourceEmitter} until that class was deleted, which was always the wrong home: a
-     * group is not about the generated {@code Parameters} file it once named — that file has not existed
-     * since the derived files became runtime reads — it is how the editor's Parameters dialog decides which
-     * plugin a variable belongs to.
-     *
-     * <p><b>It declares no categories (2026-09-17).</b> Six of them stood here for a week — Timing, Targets,
-     * Vision, Input, Limits, Debug — as the axes a bot's settings fall along. They were the third vocabulary
-     * to be tried for that rail and they went the way of the first two: a user parameter is a {@code @Param}
-     * field in the bot's own Java now, and {@code @Param(category = "…")} is <em>free text</em>, so the only
-     * categories that exist are the ones a bot's author wrote. A plugin declaring six more would be offering
-     * a filing system for rows it does not have and a vocabulary for parameters it does not own.
-     *
-     * <p>The group itself stays, and its id is still blank, because this plugin does have rows of its own —
-     * an activity's enable flag — and a project written before groups existed reads back blank.
-     */
-    private static final ParameterGroup SDK_PARAMETERS =
-            ParameterGroup.of(ParameterGroup.DEFAULT_ID, "Parameters");
-
+    // SDK_PARAMETERS -- ParameterGroup.of(DEFAULT_ID, "Parameters") -- stood here until 2026-09-22. It had
+    // already lost its categories on 2026-09-17, when a @Param's category became the free text a bot's author
+    // writes; what went now is the group itself, with the whole contract surface that read it. The Parameters
+    // window's sections are the bot's own classes, which javac already guarantees are distinct.
 }

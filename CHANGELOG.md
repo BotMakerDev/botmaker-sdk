@@ -47,6 +47,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **The SDK no longer ships `Sdk.java` and `Pictures.java` for the host to copy in.** A new project gets
   them from the template it is created from. Adding the SDK to a project that has neither brings neither —
   the flow window offering to write one is owed and not in this release.
+- **`SdkPlugin` no longer declares a parameter section**, and no longer answers a parameter row or a
+  parameter edit. The contract surface is deleted: the SDK's group was the only one in existence, it declared
+  no rows, and `botmaker-plugin-basics`' `ParameterStore.declare` had no caller — so what the Parameters
+  window read out of this plugin was a pre-2026-09-17 project's JSON and nothing else. **Nothing changes for
+  a bot**, and nothing is lost in the editor: a parameter is a `@Param` field in your own Java, and one this
+  plugin wants for itself goes in `plugins/sdk/Sdk.java`, which the window already reads.
 
 - **Nothing changes for a bot.** The SDK's plugin half was recompiled against the plugin contract's new
   package layout (`com.botmaker.plugin.api.slot`, `.parameters`, `.toolbar`, `.source`). No `api.*` type,

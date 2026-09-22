@@ -376,7 +376,7 @@ Three things about it are decisions rather than details.
 
 **It reads a JSON tree, not the authoring records, and it has no choice.** `com.botmaker.sdk.authoring` has
 `ProjectModel`/`VariableModel` for all of this and they are **unloadable in a bot**: `VariableModel` names
-`ValueChoice`, `Range`, `Visibility` and `ParameterGroup` in its own components, and `botmaker-studio-api` is
+`ValueChoice`, `Range` and `Visibility` in its own components, and `botmaker-studio-api` is
 `optional` — deliberately off a generated bot's classpath. Loading one in a bot is `NoClassDefFoundError`. So
 `internal/config/ProjectData` walks the tree over field names that are the records' component names.
 
@@ -524,19 +524,21 @@ added: the name is what a rename changes, so anything keying on the name sees a 
 keys on it today. **Absent means the name and nothing migrates** — stable, needs no rewrite of a stored file,
 where a random default would make every open of an old project look like a rename.
 
-**`SdkPlugin.SDK_PARAMETERS` moved off `SourceEmitter`** and is private to the plugin. It was never about the
-generated `Parameters` file it once named — a `ParameterGroup` is how the editor's Parameters dialog decides
-which plugin a variable belongs to.
+**`SdkPlugin.SDK_PARAMETERS` and the whole parameter half are deleted (2026-09-22).** The group moved off
+`SourceEmitter` when that class went, lost its six categories on 2026-09-17 — a `@Param`'s `category` is
+free text, so the only categories that exist are the ones a bot's author wrote — and went entirely with the
+contract surface that read it: `buildParameters()`, `parameterRows(String)` and `parameterEdited(…)`.
 
-**It declares no categories (2026-09-17).** Six stood there for a week — Timing, Targets, Vision, Input,
-Limits, Debug — the third vocabulary tried for that rail, and they went the way of the first two: a user
-parameter is a `@Param` field in the bot's own Java and its `category` is **free text**, so the only
-categories that exist are the ones a bot's author wrote. A plugin declaring six more would be offering a
-filing system for rows it does not have. The group stays, with its blank id, because this plugin does have
-rows of its own — an activity's enable flag — and a project written before groups existed reads back blank.
-**`parameterDeclared` is gone from the contract too**, so what crosses for those rows is
-`parameterRows`/`parameterEdited`: read them, change a value. Declaring one is this plugin's own call into
-`ParameterStore`'s verbs.
+**The measurement, because it is the one this repository keeps making.** This plugin declared one section and
+never a row. `botmaker-plugin-basics`' `ParameterStore.declare` — the call that would have written a row into
+`plugins/com.botmaker/sdk/parameters.json` — had **no caller in this module or any other**, so what the
+Parameters window read back was a pre-2026-09-17 project's JSON and nothing else. *A converter is a second
+reader of a format nothing writes*, and this was one.
+
+**The case it was kept for has a better answer on the same terms.** A row this plugin wants for itself — an
+activity's enable flag — is a `@Param` field in `plugins/sdk/Sdk.java`, the file this plugin already ships,
+which Studio's walk of the bot's sources already reads. One mechanism, one file format, and a row the bot's
+author can see in their own editor.
 
 ## The Remote Pilot is this plugin's feature (2026-08-30)
 

@@ -80,7 +80,6 @@ class SdkPluginHeadlessTest {
 
             assertNotNull(plugin.getMethod("catalog", String.class).invoke(instance, "v1.2.0"));
             assertNotNull(plugin.getMethod("valueTypes").invoke(instance));
-            assertNotNull(plugin.getMethod("parameters", String.class).invoke(instance, "v1.2.0"));
             assertNotNull(plugin.getMethod("toolbarItems").invoke(instance));
         }
     }

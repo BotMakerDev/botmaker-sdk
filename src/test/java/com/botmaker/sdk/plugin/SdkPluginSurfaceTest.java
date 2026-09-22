@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin;
 
-import com.botmaker.plugin.api.parameters.ParameterGroup;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.source.SourceSeed;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
@@ -99,21 +98,10 @@ class SdkPluginSurfaceTest {
         }
     }
 
-    @Test
-    void the_parameters_section_is_one_group_filed_under_the_blank_id() {
-        List<ParameterGroup> groups = plugin.parameters("");
-        assertEquals(1, groups.size());
-
-        // The blank id is the whole of the migration: a variable written before groups existed carries no
-        // group, reads back as blank, and is therefore this plugin's.
-        ParameterGroup group = groups.getFirst();
-        assertEquals(ParameterGroup.DEFAULT_ID, group.id());
-        assertEquals("Parameters", group.className());
-        // And it declares no categories. Six stood here for a week; a @Param's category is free text, so the
-        // only ones that exist are the ones a bot's author wrote, and a plugin offering more would be filing
-        // rows it does not own.
-        assertEquals(List.of(), group.categories());
-    }
+    // the_parameters_section_is_one_group_filed_under_the_blank_id stood here until 2026-09-22, over
+    // plugin.parameters(""). The group, the surface that read it and the store behind it are all deleted:
+    // nothing ever declared a row, so the reading half had nothing to read. A parameter is a @Param field in
+    // the bot's own Java, and the Parameters window's sections are the bot's own classes.
 
     @Test
     void every_source_seed_names_a_type_and_an_expression() {

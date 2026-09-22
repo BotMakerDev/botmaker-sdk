@@ -8,7 +8,29 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
-## 2026-09-21 (last) — `Bot.run` installs the values; the SDK ships no source text
+## 2026-09-22 (last) — the plugin's parameter half is deleted: `@Param` is the only source of a row
+
+**Done**
+
+- **`SdkPlugin` loses `buildParameters()`, `parameterRows(String)`, `parameterEdited(ParameterEdit)`, the
+  `SDK_PARAMETERS` group and the `ParameterStore` field set on bind.** The contract surface under them is
+  gone (`botmaker-studio-api` 0.1.6), and this plugin was its only implementation.
+- **What settled it is a measurement, not a preference.** This plugin declared one section and never a row.
+  `botmaker-plugin-basics`' `ParameterStore.declare` — the call that would have written a row into
+  `plugins/com.botmaker/sdk/parameters.json` — had **no caller in this module or any other**, so
+  `parameterRows` returned whatever sat in a project written before 2026-09-17 and empty for every project
+  created since. The umbrella `CLAUDE.md` forbids exactly that: *a converter is a second reader of a format
+  nothing writes.*
+- **The replacement was already in place.** A parameter is a `@Param` static field in the bot's own Java
+  (2026-09-17), and a row this plugin wants for itself — an activity's enable flag, say — is a `@Param` field
+  in `plugins/sdk/Sdk.java`, which Studio's walk of the bot's sources already reads. One mechanism, one file
+  format, one editor, and the row is one the bot's author can see.
+- **`projectOpened` keeps only `FlowValue.bind`**, and `projectClosing` only the pilot and `FlowValue.unbind`.
+- **Nothing in `api.*` moved**, so never-delete is untouched and no bot is affected.
+
+---
+
+## 2026-09-21 — `Bot.run` installs the values; the SDK ships no source text
 
 **Done**
 
