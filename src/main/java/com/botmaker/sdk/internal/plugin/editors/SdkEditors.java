@@ -1,11 +1,6 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
 import com.botmaker.plugin.api.slot.SlotEditor;
-import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.internal.plugin.emulator.EmulatorEditors;
 import com.botmaker.shared.game.EpicLibraryScanner;
 import com.botmaker.shared.game.SteamLibraryScanner;
@@ -52,28 +47,23 @@ public final class SdkEditors {
             SlotEditor.of(CallSites.ACTIVITY_NAME, ActivityEditors::activityName),
             SlotEditor.of(CallSites.OUTCOME_NAME, ActivityEditors::outcomeName),
 
-            // Chosen by the type, and so drawn in the Parameters window as well as on a block.
-            SlotEditor.of(ctx -> ctx.type().is(Rect.class), GeometryEditors::rect),
-            SlotEditor.of(ctx -> ctx.type().is(Point.class), GeometryEditors::point),
-            SlotEditor.of(ctx -> ctx.type().is(Size.class), GeometryEditors::size),
-            // How exact a pixel match has to be. Three numbers that each fail silently on their own, so the
-            // editor is a dialog that shows what each of them does rather than three fields that state them.
-            SlotEditor.of(ctx -> ctx.type().is(Precision.class), PrecisionEditors::precision),
-            // Several named pictures, and it comes FIRST because it claims a subset of what the single
-            // picture below would: an ImageTemplate argument that the host says is one of a run. A narrower
-            // match belongs ahead of a wider one, and here the order is the whole difference between
-            // "found.hasAny(coin, gem)" drawn as one row and drawn as two unrelated pickers.
+            // Rect, Point, Size, Precision and a single ImageTemplate stood here until 2026-09-23. They are
+            // this plugin's own types, so their editors are PluginType.editor in SdkTypes and the host draws
+            // them from there; listing them here as well made this plugin claim each type twice.
+
+            // Several named pictures, and it comes ahead of SdkTypes' single-picture editor because it claims
+            // a subset of what that one would: an ImageTemplate argument that the host says is one of a run.
+            // The host consults a plugin's slot editors before its types' editors, and here the order is the
+            // whole difference between "found.hasAny(coin, gem)" drawn as one row and drawn as two pickers.
             //
             // It does NOT yet claim an ImageTemplateGroup slot, though the editor draws that shape too.
             // Filling one is the second of the two edits that let the host seed a group find's body with a
             // Matches switch, and that seeding emits this API from the host — the thing the generation
             // phase exists to move. Claiming the slot now would silently delete the seed.
             SlotEditor.of(TemplateEditors::isRunOfPictures, TemplateEditors::group),
-            // A named picture. The third argument is the tile drawn beside a *declared choice* — the one
-            // place the host shows a value without editing it, and the place where a stored name would
-            // otherwise be listed as raw text in a list somebody picks pictures from.
-            SlotEditor.of(ctx -> ctx.type().is(ImageTemplate.class),
-                    TemplateEditors::template, TemplateEditors::preview),
+            // Duration and Color are plugin-basics' types, so this plugin cannot declare them: these two are
+            // overrides, and the host asks the user which editor to use when both are loaded.
+            //
             // A wait length: the unit is invisible in a bare number, and this is the type that carries the
             // random range the humanized wait needs. Both spellings are accepted, and that is not belt and
             // braces — the Parameters window knows this type by the fully-qualified name its vocabulary

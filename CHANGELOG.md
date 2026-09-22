@@ -19,6 +19,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Fixed
+
+- **An activity with no method yet is written as `ActivityBody.NONE` again**, and reads back as a card with
+  no body. Since the codecs went, the flow wrote a blank body as nothing at all, which declined the whole
+  flow — so a flow holding a freshly drawn card could not be saved.
+- **Studio can read the flow at all.** The five records a `Flow` is written as (`Flow.of`,
+  `Flow.activity`, `Flow.edge`, `Flow.preset`, `Flow.limits`) are handed to the host through the
+  contract's new `componentTypes()`; they had no way to reach it.
+
 ### Added
 
 - **`Bot.run(anchor, goHome, Sdk.class)` — the whole of a bot's `main`.** It installs every `@Managed` value

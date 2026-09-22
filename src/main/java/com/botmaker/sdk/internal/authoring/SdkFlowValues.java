@@ -173,13 +173,18 @@ public final class SdkFlowValues {
                  * rather than guessed at.
                  */
                 private Object body(ActivityBody body) {
-                    return sourceOf(body);
+                    // A card with no method yet is written as the constant that says so: the host writes a
+                    // component nothing declares verbatim, and an empty one has no Java at all.
+                    return bodyLiteral(sourceOf(body));
                 }
 
                 @Override
                 public Flow.Activity build(List<Object> parts) {
                     if (parts.size() != 7) return null;
-                    return new Flow.Activity(new Named(text(parts.get(0))), text(parts.get(1)),
+                    // ActivityBody.NONE reads back as blank — the card with no method behind it — and anything
+                    // that is not a method reference is kept exactly as written.
+                    String written = text(parts.get(0));
+                    return new Flow.Activity(new Named(methodReference(written).orElse(written)), text(parts.get(1)),
                             text(parts.get(2)), flag(parts.get(3)), flag(parts.get(4)), flag(parts.get(5)),
                             list(parts.get(6)));
                 }
@@ -253,6 +258,10 @@ public final class SdkFlowValues {
                     return List.of(int.class, int.class);
                 }
             };
+
+    /** All five, which is what {@code SdkPlugin.componentTypes()} hands the host. */
+    public static final List<ComponentType<?>> ALL =
+            List.of(FLOW_SHAPE, ACTIVITY_SHAPE, PRESET_SHAPE, EDGE_SHAPE, LIMITS_SHAPE);
 
     /**
      * An {@link ActivityBody} that is a <em>name</em> and not a body.

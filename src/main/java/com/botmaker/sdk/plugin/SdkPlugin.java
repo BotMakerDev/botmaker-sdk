@@ -8,9 +8,11 @@ import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
+import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.authoring.SdkFlowValues;
 import com.botmaker.sdk.internal.authoring.SdkTypes;
 import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
 import com.botmaker.sdk.internal.plugin.capture.CaptureLabels;
@@ -240,6 +242,16 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     @Override
     protected List<PluginType<?>> buildTypes() {
         return SdkTypes.ALL;
+    }
+
+    /**
+     * The five records a {@code Flow} is written as, none of which is a type anybody declares — they are
+     * parts of the one call that writes a flow, and the host has to read each back to hand the flow editor
+     * a {@code Flow} rather than a string.
+     */
+    @Override
+    public List<ComponentType<?>> componentTypes() {
+        return SdkFlowValues.ALL;
     }
 
     /**
