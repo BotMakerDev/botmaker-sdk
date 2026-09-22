@@ -69,6 +69,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   so a plugin still links the host's copy and there is one `Class` on both sides. **The one thing to know:**
   do not declare `botmaker-studio-api` yourself beside a plugin that brings it, or nearest-wins pins you to a
   contract version your plugin was never built against.
+  **Your bot's imports change with it**: `com.botmaker.plugin.basics.params.Param` is now
+  `com.botmaker.plugin.api.params.Param`, `…basics.managed.Managed` is `…api.managed.Managed`, and
+  `@Param(min, max)` are numbers, so `min = "1"` becomes `min = 1`.
 - **🎯 Capture Targets is 🎯 Capture Source, and it picks one thing.** A project kept a *list* of targets in
   `capture.json` with one marked default; that file is deleted and a project's capture source is the
   expression `Sdk.captureSource()` returns, which is one source. So the list manager is the picker it always

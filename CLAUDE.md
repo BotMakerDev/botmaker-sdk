@@ -360,12 +360,16 @@ all with one `Sdk.install()` from its own `main`, and `FlowGraph.load`/`run` wal
 **Neither class exists here any more.** `Wire` was replaced by `api.config.Settings` on 2026-09-09, and both
 were deleted on 2026-09-11: a bot reads its parameters through **`com.botmaker.plugin.basics.store.Settings`**,
 plugin #2's own class, which is where the work had already moved and which every plugin can use. What stays
-in this module is the half that is genuinely the SDK's — `internal/config/ProjectData`,
-`internal/config/SdkGrammar` and `authoring/WireText` — and `SdkGrammarReadsTest` is the test that the
-grammar is found through `META-INF/services` and answers for the SDK's eight types.
+in this module was `internal/config/ProjectData`, `internal/config/SdkGrammar` and `authoring/WireText`.
 
-The section below is kept because every decision in it still binds whoever adds a value type here. Read
-`Wire` as *the reader a bot uses*, wherever it appears.
+**The rest went on 2026-09-22, and this section is history now.** A bot reads nothing stored: a
+parameter is a `@Param` field and the flow is a `@Managed` value, both Java. `SdkGrammar`, `ProjectData`,
+`WireText` and `SdkValueTypes`' codecs are deleted. What survived is `authoring/TemplateNames` (the
+`img:` prefix `Images.template` still needs) and the spelling of a duration, folded into
+`DurationEditor`. **A type is declared once, in `internal/authoring/SdkTypes`**, as a `PluginType` (and a
+`ComponentType` beside it when its Java is a call), and the host writes and reads its Java. Adding a type
+means adding a class there and nothing else. Wherever the text below says *codec*, *`SdkValueTypes`* or
+*`WireText`*, it describes the machinery that went.
 
 The runtime half of *derived files stop being Java*, and the precondition for deleting `SourceEmitter`. A
 generated `Parameters` class of `public static final` fields exists only to give stored values a name;
@@ -619,8 +623,9 @@ index naming nothing becomes absent, `defaultTarget()` is total and stands in th
 that never chose.
 
 **A bot cannot read this file, and that bounds the move.** `Authoring` names the value vocabulary in
-`botmaker-studio-api`, which is `optional` and deliberately off a bot's classpath — the same trap
-`api.config.Wire` documents. So the running bot still resolves `capture.source` out of the properties file,
+`botmaker-studio-api`, which was `optional` and deliberately off a bot's classpath — the same trap
+`api.config.Wire` documents. (Since 2026-09-22 the SDK declares the contract at `compile`, so `@Param` and
+`@Managed` can sit on a bot's own code. Nothing in this paragraph was revisited because of it.) So the running bot still resolves `capture.source` out of the properties file,
 and Studio writes that key **from the default target, in the same pass as the list**: one writer, one
 direction, a cache rather than a second answer. A classpath reader beside `internal/config/ProjectData` is
 what would retire it.
@@ -696,7 +701,8 @@ uses, and it is why one editor can serve a canvas slot and a Parameters row.
 
 **Reading is deliberately more permissive than writing.** The reader accepts a fully-qualified constructor and
 any folder in the path, and answers *no picture* for a variable, a constant or a call — a reference the editor
-cannot represent and therefore must never overwrite. Writing always spells `WireText.IMAGE_PREFIX`.
+cannot represent and therefore must never overwrite. Writing always spells `TemplateNames.IMAGE_PREFIX`
+(`WireText`'s until 2026-09-22).
 
 **Several pictures are the same editor, over two shapes (2026-08-31).** `TemplateEditors.group` draws a chip
 row over either the arguments of an `ImageTemplateGroup.of(…)` slot — read with `Slots.arguments`, written as
@@ -865,7 +871,7 @@ half that had been left behind.
 `StudioServices.resourcesDir()` hands a plugin. Studio's `ProjectConfig` was answering three questions here
 (the images folder, the project root to relativize against, the activities file) and every one is derivable
 from that single path — which is why `pathFor` now builds `src/main/resources/images/<name>.png` from
-`WireText.IMAGE_PREFIX` and the file's own name rather than relativizing against a root it no longer has.
+`TemplateNames.IMAGE_PREFIX` and the file's own name rather than relativizing against a root it no longer has.
 
 **Two things deliberately did not come**, and the line between them is the same one the whole move runs on —
 *a picture folder is the plugin's, an open editor is the host's*:
