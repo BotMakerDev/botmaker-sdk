@@ -1,10 +1,9 @@
 package com.botmaker.sdk.internal.plugin.setup;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.sdk.authoring.Authoring;
-import com.botmaker.sdk.authoring.CaptureModel;
-import com.botmaker.sdk.authoring.CaptureTargetModel;
-import com.botmaker.sdk.authoring.SdkVersion;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.plugin.capture.CaptureLabels;
+import com.botmaker.sdk.internal.plugin.capture.EditorFrame;
 import com.botmaker.sdk.authoring.TemplateLibrary;
 import com.botmaker.sdk.internal.plugin.launch.QuickLaunch;
 import com.botmaker.shared.config.ProjectFile;
@@ -138,16 +137,15 @@ public final class ProjectSetup {
     /** Re-reads every step's state from the project and rebuilds the rows. */
     private void refresh() {
         Path resources = services.resourcesDir();
-        CaptureModel capture = readCapture(resources);
+        CaptureSource source = EditorFrame.defaultSource(services);
 
         String launchSpec = ProjectFile.launchTarget(resources);
         boolean launchDone = launchSpec != null && !launchSpec.isBlank();
-        boolean captureDone = captureConfigured(capture);
-        boolean resolutionDone = capture.reference() != null;
+        boolean captureDone = captureConfigured(source);
         int templateCount = TemplateLibrary.list(resources).size();
 
-        int required = 3;
-        int doneCount = (launchDone ? 1 : 0) + (captureDone ? 1 : 0) + (resolutionDone ? 1 : 0);
+        int required = 2;
+        int doneCount = (launchDone ? 1 : 0) + (captureDone ? 1 : 0);
         summary.setText(doneCount + " of " + required + " required steps done"
                 + (doneCount == required ? " — you're ready to run." : ""));
 
@@ -158,14 +156,8 @@ public final class ProjectSetup {
                                 : "Not set — pick what the bot should open, with the Launch Target button on "
                                         + "the toolbar.",
                         quickLaunchButton(resources)),
-                row(captureDone, false, "Capture target",
-                        describeCapture(capture) + " Choose it with 🎯 Capture Targets on the toolbar.",
-                        null),
-                row(resolutionDone, false, "Reference resolution",
-                        resolutionDone
-                                ? capture.reference().width() + "×" + capture.reference().height()
-                                : "Not set — the size pictures are captured at. It is set on the first "
-                                        + "capture, or in Project ▸ Project Settings.",
+                row(captureDone, false, "Capture source",
+                        describeCapture(source) + " Choose it with 🎯 Capture Source on the toolbar.",
                         null),
                 row(templateCount > 0, true, "Pictures (optional)",
                         templateCount == 0
@@ -175,15 +167,11 @@ public final class ProjectSetup {
                         null));
     }
 
-    /** The project's stored capture model, or an empty one when it cannot be read. */
-    private CaptureModel readCapture(Path resources) {
-        try {
-            return Authoring.readCapture(SdkVersion.latest(), resources);
-        } catch (Exception unreadable) {
-            System.err.println("Could not read the project's capture targets: " + unreadable.getMessage());
-            return CaptureModel.empty();
-        }
-    }
+    // The "Reference resolution" row stood here until 2026-09-22 -- the size pictures were captured at, read
+    // from capture.json's CaptureModel.reference. Both the file and the field are deleted, and a project's
+    // capture source is an expression in the bot's own Java with nowhere to put a second number. So the
+    // checklist has two required steps rather than three. Nothing is lost that a bot depended on: the matcher
+    // rescales against each picture's own sidecar, which is where an authored size has always really lived.
 
     /**
      * The launch row's control: start the configured target <em>without</em> running the bot, so the user can
@@ -201,27 +189,20 @@ public final class ProjectSetup {
     }
 
     /**
-     * A capture target counts as "chosen" once it is anything other than the whole-desktop seed a fresh
-     * project starts with — so the row nudges the user to point at their game window or emulator, while an
-     * explicit multi-target or non-desktop default still satisfies it.
+     * A capture source counts as "chosen" once it is anything other than the whole desktop a fresh project
+     * starts with — so the row nudges the user to point at their game window or emulator.
+     *
+     * <p>It also covers the source being unreadable, which is the same nudge: no {@code Sdk.java}, a body
+     * the host will not read, or an expression the user wrote themselves.
      */
-    private static boolean captureConfigured(CaptureModel capture) {
-        CaptureTargetModel def = defaultTarget(capture);
-        if (def == null) return false;
-        return !def.isDesktop() || capture.targets().size() > 1;
+    private static boolean captureConfigured(CaptureSource source) {
+        return source != null && !CaptureLabels.isDesktop(source);
     }
 
-    private static CaptureTargetModel defaultTarget(CaptureModel capture) {
-        Integer index = capture.defaultIndex();
-        if (index == null || index < 0 || index >= capture.targets().size()) return null;
-        return capture.targets().get(index);
-    }
-
-    private static String describeCapture(CaptureModel capture) {
-        CaptureTargetModel def = defaultTarget(capture);
-        if (def == null) return "No default set.";
-        String label = def.shortLabel();
-        return captureConfigured(capture) ? label : label + " (default — pick your game window or emulator).";
+    private static String describeCapture(CaptureSource source) {
+        if (source == null) return "Not set.";
+        String label = CaptureLabels.shortLabel(source);
+        return captureConfigured(source) ? label : label + " — pick your game window or emulator.";
     }
 
     /**

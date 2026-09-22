@@ -2,12 +2,8 @@ package com.botmaker.sdk.internal.plugin.flow;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.basics.values.BasicsValueTypes;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.internal.authoring.SdkValueTypes;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -26,7 +22,6 @@ import java.util.Optional;
  * <p>{@link ValueCatalog#valueOf} resolves a container <em>by id, in the catalog it is called on</em>, so a
  * catalog must know every container the form mentions. A flow's form mentions plugin-basics' {@code LIST}
  * and text and yes/no leaves as well as this plugin's five shapes, which is why the merge is the same one
- * {@code SdkPlugin} builds for its parameter store rather than {@code SdkValueTypes.CATALOG} alone.
  *
  * <p><b>Reading may answer nothing, and that is ordinary.</b> A hand-written {@code flow()} body, a call to
  * something other than {@code Flow.of}, an activity whose body is a lambda rather than a method reference —
@@ -39,7 +34,6 @@ public final class FlowValue {
     public static final String ID = "flow";
 
     /** Every container and codec a flow's parts can mention: plugin-basics' vocabulary and this plugin's. */
-    private static final ValueCatalog CATALOG = BasicsValueTypes.CATALOG.merge(SdkValueTypes.CATALOG);
 
     /**
      * The open project's host services, or {@code null} between projects.
@@ -88,11 +82,10 @@ public final class FlowValue {
      * plugin wrote.
      */
     public static Flow read(ValueContext ctx) {
-        if (ctx == null) return Flow.NONE;
-        return CATALOG.valueOf(ctx.form(), ctx.source())
-                .filter(Flow.class::isInstance)
-                .map(Flow.class::cast)
-                .orElse(Flow.NONE);
+        // The host decodes it, through the ComponentTypes this plugin declares in SdkFlowValues. It went
+        // through a ValueCatalog of this plugin's own until 2026-09-22, which meant the plugin held a second
+        // reader of the same Java the host also read — and the two could disagree about one expression.
+        return ctx == null ? Flow.NONE : ctx.value(Flow.class).orElse(Flow.NONE);
     }
 
     /**
@@ -100,7 +93,7 @@ public final class FlowValue {
      * offers to draw one, since an unreadable value is shown rather than replaced.
      */
     public static boolean readable(ValueContext ctx) {
-        return ctx != null && CATALOG.valueOf(ctx.form(), ctx.source()).isPresent();
+        return ctx != null && ctx.value(Flow.class).isPresent();
     }
 
     /**
@@ -110,20 +103,11 @@ public final class FlowValue {
      */
     public static String write(ValueContext ctx, Flow flow) {
         if (ctx == null) return "This project has no Sdk.flow() to write to.";
-        Optional<String> expression = CATALOG.initializer(ctx.form(), flow);
-        if (expression.isEmpty()) {
-            // Only two things reach here: a body that is not a method reference, and a part of the flow
-            // whose codec declined. Both mean the editor is holding something it cannot spell, which is a
-            // refusal to write rather than a write of something else.
-            return "This flow can't be written back as Java — it holds something the SDK can't spell.";
-        }
-        ctx.set(expression.get(), imports(ctx));
+        // The value, and the host spells it: it walks SdkFlowValues' five declarations, writes each
+        // component by its own rule and arranges the imports. There is no failure to report from here any
+        // more — an activity whose body is not a method reference is refused where it is typed, which is
+        // one screen earlier and names the activity.
+        ctx.set(flow);
         return null;
-    }
-
-    /** The imports the written expression needs, as {@link ValueContext#set} takes them. */
-    private static String[] imports(ValueContext ctx) {
-        List<String> imports = CATALOG.imports(ctx.form());
-        return imports.toArray(new String[0]);
     }
 }

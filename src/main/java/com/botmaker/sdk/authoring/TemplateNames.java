@@ -56,6 +56,19 @@ public final class TemplateNames {
     /** The placeholder's file name, {@code default_template.png}. */
     public static final String DEFAULT_TEMPLATE_FILE = DEFAULT_TEMPLATE_NAME + ".png";
 
+    /**
+     * Where a bot's image templates sit, relative to the project root.
+     *
+     * <p>The editor's own template manager puts the files there; this is the half of that agreement every
+     * reader needs, so that a picture named {@code ore} resolves to
+     * {@code src/main/resources/images/ore.png}.
+     *
+     * <p>It was {@code WireText.IMAGE_PREFIX} until 2026-09-22, and it is here now because this class was
+     * already the file↔constant bijection and {@code WireText} was the stored-text reader, which is
+     * deleted. Nothing about a folder path was ever about wire text.
+     */
+    public static final String IMAGE_PREFIX = "src/main/resources/images/";
+
     private TemplateNames() {}
 
     /**
@@ -105,12 +118,24 @@ public final class TemplateNames {
     /** The project-relative path a constant stands for, or {@code null} when it is not one of ours. */
     public static String pathForConstant(String constant) {
         String baseName = baseNameFor(constant);
-        return baseName == null ? null : WireText.IMAGE_PREFIX + baseName + ".png";
+        return baseName == null ? null : pathFor(baseName);
+    }
+
+    /**
+     * The project-relative path a picture's base name stands for — {@code ore} to
+     * {@code src/main/resources/images/ore.png}.
+     *
+     * <p>Total, and never {@code null}: unlike {@link #pathForConstant} it asks nothing about the name
+     * beyond it being one. A blank name answers the folder plus {@code .png}, which is a path that does not
+     * exist rather than a hole a caller has to check for.
+     */
+    public static String pathFor(String baseName) {
+        return IMAGE_PREFIX + (baseName == null ? "" : baseName.trim()) + ".png";
     }
 
     /** The constant for a project-relative template path, or {@code null} when that path has none. */
     public static String constantForPath(String path) {
-        String prefix = WireText.IMAGE_PREFIX;
+        String prefix = IMAGE_PREFIX;
         if (path == null || !path.startsWith(prefix) || !path.endsWith(".png")) return null;
         return constantFor(path.substring(prefix.length(), path.length() - ".png".length()));
     }

@@ -6,8 +6,6 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -23,65 +21,77 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  *
  * <p>No JavaFX toolkit is needed for any of it, which is what {@code commit}/{@code current} being separable
  * from the widget buys.
+ *
+ * <h2>It asserted an expression until 2026-09-22, and now asserts the value</h2>
+ *
+ * <p>Every case here compared {@code slot.written()} against {@code "new java.awt.Color(255, 128, 0)"} — the
+ * Java this editor spelled for itself. It spells nothing now: it hands the host a {@code java.awt.Color} and
+ * the host writes it through the {@code ComponentType} plugin-basics declares for that type. So the subject
+ * is the colour, which is what this editor is actually responsible for; the three components and the fact
+ * that they are written rather than {@code Color.decode("#FF8000")} are asserted in plugin-basics, once,
+ * beside the declaration that decides it.
+ *
+ * <p>That is not a weaker test. It is the same property with the second author removed — the drift it was
+ * guarding against was between this editor's speller and the codec's, and there is one speller now.
  */
 @DisplayNameGeneration(ReplaceUnderscores.class)
 class ColorEditorTest {
 
+    /** A slot holding {@code awt}, which is what the host hands an editor once it has decoded one. */
+    private static TestContexts.Recording slotHolding(java.awt.Color awt) {
+        return TestContexts.typedSlot("java.awt.Color", "new java.awt.Color("
+                + awt.getRed() + ", " + awt.getGreen() + ", " + awt.getBlue() + ")").withValue(awt);
+    }
+
     @Test
-    void a_slot_gets_the_constructor_call_and_asks_for_its_import() {
+    void a_slot_gets_the_colour_itself_and_not_an_expression_for_it() {
         TestContexts.Recording slot = TestContexts.typedSlot("java.awt.Color", "null");
 
         ColorEditors.commit(slot, Color.rgb(255, 128, 0));
 
-        assertEquals("new java.awt.Color(255, 128, 0)", slot.written());
-        assertEquals(List.of("java.awt.Color"), slot.imports(),
-                "fully qualified in the expression and named again as the import is the always-safe pair");
+        assertEquals(new java.awt.Color(255, 128, 0), slot.value());
     }
 
     /**
-     * A value with no call site gets the same expression a slot does.
+     * A value with no call site gets the same thing a slot does.
      *
      * <p>It got {@code #FF8000} until 2026-09-20, because a Parameters row held stored text rather than
-     * Java. One spelling everywhere means one thing to write and one thing to read back, and it is why
+     * Java, and {@code new java.awt.Color(…)} until 2026-09-22, because this editor spelled its own. One
+     * answer everywhere means one thing to write and one thing to read back, and it is why
      * {@code WireText.color} — which decoded that text, total, and answered white for anything it could not
      * parse — is no longer in this path.
      */
     @Test
-    void a_value_with_no_call_site_gets_the_same_expression() {
+    void a_value_with_no_call_site_gets_the_same_colour() {
         TestContexts.Recording row = TestContexts.row("java.awt.Color", "");
 
         ColorEditors.commit(row, Color.rgb(255, 128, 0));
 
-        assertEquals("new java.awt.Color(255, 128, 0)", row.written());
+        assertEquals(new java.awt.Color(255, 128, 0), row.value());
     }
 
-    /**
-     * The components, never {@code Color.decode("#FF8000")}. Decode parses at class-initialisation time and
-     * can throw, and a bot must not fail to start over its own configuration — the same rule the SDK's own
-     * colour codec follows.
-     */
+    /** Each channel is clamped and rounded once, where the colour is made, rather than at each reader. */
     @Test
-    void the_slot_form_is_parsed_numbers_rather_than_text_to_be_decoded() {
+    void the_channels_are_rounded_to_whole_bytes() {
         TestContexts.Recording slot = TestContexts.typedSlot("java.awt.Color", "null");
 
         ColorEditors.commit(slot, Color.BLACK);
+        assertEquals(new java.awt.Color(0, 0, 0), slot.value());
 
-        assertEquals("new java.awt.Color(0, 0, 0)", slot.written());
+        ColorEditors.commit(slot, Color.WHITE);
+        assertEquals(new java.awt.Color(255, 255, 255), slot.value());
     }
 
     @Test
-    void a_slot_that_holds_a_constructor_seeds_the_swatch_from_it() {
+    void a_slot_that_holds_a_colour_seeds_the_swatch_from_it() {
         assertEquals(Color.rgb(12, 34, 56),
-                ColorEditors.current(TestContexts.typedSlot("java.awt.Color", "new Color(12, 34, 56)")));
-        assertEquals(Color.rgb(12, 34, 56),
-                ColorEditors.current(TestContexts.typedSlot("java.awt.Color",
-                        "new java.awt.Color(12, 34, 56)")));
+                ColorEditors.current(slotHolding(new java.awt.Color(12, 34, 56))));
     }
 
     /**
-     * A slot holding something this editor did not write answers {@code null}, which leaves the swatch at its
-     * default rather than claiming a colour. Seeding it from a constant or a variable is not possible, and
-     * showing black for {@code Color.RED} would be a lie about what the bot does.
+     * A slot holding something the host could not decode answers {@code null}, which leaves the swatch at
+     * its default rather than claiming a colour. Showing black for {@code Color.RED} would be a lie about
+     * what the bot does — and a swatch that claimed it would write the claim back on the next redraw.
      */
     @Test
     void a_slot_holding_anything_else_claims_no_colour() {
@@ -94,13 +104,14 @@ class ColorEditorTest {
      * A value with no call site declines for the same reasons a slot does.
      *
      * <p>It used to answer white for anything unreadable, because a row held text and {@code WireText.color}
-     * was total. A row holds Java now, so the honest answer for {@code Color.RED} is the same one a slot
+     * was total. A row holds a value now, so the honest answer for {@code Color.RED} is the same one a slot
      * gives: leave the swatch alone rather than claim a colour this editor cannot write back.
      */
     @Test
     void a_value_with_no_call_site_declines_what_it_cannot_write_back() {
         assertEquals(Color.rgb(255, 128, 0),
-                ColorEditors.current(TestContexts.row("java.awt.Color", "new java.awt.Color(255, 128, 0)")));
+                ColorEditors.current(TestContexts.row("java.awt.Color", "")
+                        .withValue(new java.awt.Color(255, 128, 0))));
         assertNull(ColorEditors.current(TestContexts.row("java.awt.Color", "Color.RED")));
         assertNull(ColorEditors.current(TestContexts.row("java.awt.Color", "")));
     }
@@ -110,12 +121,10 @@ class ColorEditorTest {
     void the_round_trip_holds_wherever_the_value_is() {
         TestContexts.Recording slot = TestContexts.typedSlot("java.awt.Color", "null");
         ColorEditors.commit(slot, Color.rgb(9, 200, 77));
-        assertEquals(Color.rgb(9, 200, 77),
-                ColorEditors.current(TestContexts.typedSlot("java.awt.Color", slot.written())));
+        assertEquals(Color.rgb(9, 200, 77), ColorEditors.current(slot));
 
         TestContexts.Recording row = TestContexts.row("java.awt.Color", "");
         ColorEditors.commit(row, Color.rgb(9, 200, 77));
-        assertEquals(Color.rgb(9, 200, 77),
-                ColorEditors.current(TestContexts.row("java.awt.Color", row.written())));
+        assertEquals(Color.rgb(9, 200, 77), ColorEditors.current(row));
     }
 }

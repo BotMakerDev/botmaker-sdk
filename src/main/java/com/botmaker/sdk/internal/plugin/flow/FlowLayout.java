@@ -1,7 +1,6 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
 import com.botmaker.plugin.basics.store.PluginData;
-import com.botmaker.plugin.basics.store.ProjectStore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -80,12 +79,12 @@ public final class FlowLayout {
      * The saved layout — {@link Layout#NONE} when there is no sidecar, which is the state a fresh clone and
      * a flow nobody has opened are both in.
      *
-     * <p>Never throws. {@link ProjectStore} reads an absent, unreadable or unparseable file as empty, and a
+     * <p>Never throws. {@link PluginData} reads an absent, unreadable or unparseable file as empty, and a
      * layout is the one thing in this editor that is genuinely better lost than reported.
      */
     public static Layout read(Path resourcesDir) {
         if (resourcesDir == null) return Layout.NONE;
-        JsonNode root = PluginData.of(resourcesDir, SdkPlugin.ID).read(FILE).root();
+        JsonNode root = PluginData.of(resourcesDir, SdkPlugin.ID).read(FILE);
         Map<String, Spot> spots = new LinkedHashMap<>();
         root.path(SPOTS).fields().forEachRemaining(entry -> {
             JsonNode spot = entry.getValue();

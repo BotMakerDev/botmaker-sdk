@@ -1,8 +1,7 @@
 package com.botmaker.sdk.internal.plugin.capture;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.sdk.authoring.CaptureModel;
-import com.botmaker.sdk.authoring.CaptureTargetModel;
+import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.authoring.TemplateLibrary;
 import com.botmaker.sdk.internal.plugin.capture.CaptureSurface.Region;
 import com.botmaker.sdk.internal.plugin.capture.TemplateNaming.NamedCapture;
@@ -67,25 +66,21 @@ public final class CaptureTemplates {
     private final StudioServices services;
     private final Window owner;
 
-    /**
-     * The size a window target is snapped to before every grab, or {@code null} when the project names none.
-     *
-     * <p>Fixed when the tool opens rather than read per grab: it is what every picture in one session is
-     * captured at, and a value that changed underneath the user mid-session would produce a batch of
-     * pictures at two sizes with nothing saying so.
-     */
-    private final CaptureModel.Resolution referenceSize;
+    // referenceSize stood here until 2026-09-22: the size a window target was snapped to before every grab,
+    // read out of capture.json. Both that file and EditorFrame's snap are deleted, so a session captures the
+    // window at whatever size it is and the readout below states that size alone. What the snap was for --
+    // every picture in a project authored at one canonical size -- is answered by each picture's own sidecar
+    // and the matcher's rescale, which is where an authored size has always really been recorded.
 
     /**
-     * The target every grab in this session reads, or {@code null} to read the project's default each time.
+     * The source every grab in this session reads, or {@code null} to read the project's own each time.
      *
      * <p>Set only by the overlay editor's own row, where the window being drawn over is the subject and the
-     * project's default may be something else entirely — or nothing at all, which used to make this tool
+     * project's source may be something else entirely — or nothing at all, which used to make this tool
      * refuse to open over a perfectly good window. It is not persisted: see
-     * {@link EditorFrame#grabAsync(StudioServices, com.botmaker.sdk.authoring.CaptureTargetModel,
-     * CaptureModel.Resolution, Consumer, Consumer)}.
+     * {@link EditorFrame#grabAsync(StudioServices, CaptureSource, Consumer, Consumer)}.
      */
-    private final CaptureTargetModel target;
+    private final CaptureSource target;
 
     /**
      * The tag a batch is pre-filled with — the activity that was open when the tool was opened, or
@@ -111,11 +106,10 @@ public final class CaptureTemplates {
     /** Set the first time the tool finishes, so Esc pressed twice doesn't reopen the caller twice. */
     private boolean closed;
 
-    private CaptureTemplates(StudioServices services, Window owner, CaptureModel.Resolution referenceSize,
-                             CaptureTargetModel target, String suggestedTag, Runnable onClosed) {
+    private CaptureTemplates(StudioServices services, Window owner,
+                             CaptureSource target, String suggestedTag, Runnable onClosed) {
         this.services = services;
         this.owner = owner;
-        this.referenceSize = referenceSize;
         this.target = target;
         this.suggestedTag = suggestedTag;
         this.onClosed = onClosed;
@@ -142,7 +136,7 @@ public final class CaptureTemplates {
      * <p>The overlay editor's row is the caller with a target of its own: the window its HUD is drawn over.
      * The override lasts as long as the tool and changes no file.
      */
-    public static void open(StudioServices services, Window owner, CaptureTargetModel target,
+    public static void open(StudioServices services, Window owner, CaptureSource target,
                             String suggestedTag, Runnable onClosed) {
         Runnable done = onClosed == null ? () -> {} : onClosed;
         // Single-instance: focus the live tool instead of stacking another one.
@@ -151,8 +145,7 @@ public final class CaptureTemplates {
             done.run();
             return;
         }
-        new CaptureTemplates(services, owner, EditorFrame.referenceSize(services), target, suggestedTag, done)
-                .start();
+        new CaptureTemplates(services, owner, target, suggestedTag, done).start();
     }
 
     /**
@@ -228,20 +221,15 @@ public final class CaptureTemplates {
     }
 
     /**
-     * {@code "▧ 1600×900"}, or {@code "▧ 1600×900  ·  ref 1920×1080 ⚠"} when the target is not at the size
-     * the project captures at.
+     * {@code "▧ 1600×900"} — the size these pixels are actually being captured at.
      *
-     * <p>The mismatch is worth saying because nothing else reveals it, and it is not a rare state: a private
-     * session's host window is deliberately never resized, and the snap of an ordinary window is
-     * best-effort. A picture authored at the wrong size is matched after a rescale that loses detail.
+     * <p>It carried a {@code · ref 1920×1080 ⚠} mismatch warning until 2026-09-22, against the reference
+     * resolution in {@code capture.json}. There is no project-wide reference any more, so there is nothing
+     * to disagree with: each picture records the size it was authored at in its own sidecar and the matcher
+     * rescales against that.
      */
     private String readout(java.awt.Rectangle bounds) {
-        String plain = "▧ " + bounds.width + "×" + bounds.height;
-        if (referenceSize == null
-                || (bounds.width == referenceSize.width() && bounds.height == referenceSize.height())) {
-            return plain;
-        }
-        return plain + "  ·  ref " + referenceSize.width() + "×" + referenceSize.height() + " ⚠";
+        return "▧ " + bounds.width + "×" + bounds.height;
     }
 
     // ── Capture one ────────────────────────────────────────────────────────────────────────────────────
@@ -351,7 +339,7 @@ public final class CaptureTemplates {
      * the user has moved or resized between two captures.
      */
     private void grab(Consumer<EditorFrame> onFrame, Consumer<EditorFrame.Failure> onFailure) {
-        EditorFrame.grabAsync(services, target, referenceSize, onFrame, onFailure);
+        EditorFrame.grabAsync(services, target, onFrame, onFailure);
     }
 
     /**
@@ -410,10 +398,9 @@ public final class CaptureTemplates {
         return services.resourcesDir();
     }
 
-    /** The window title saved beside a picture, or {@code null} for a screen, desktop or emulator target. */
+    /** The window title saved beside a picture, or {@code null} for a screen, desktop or emulator source. */
     private String windowTitle() {
-        var target = EditorFrame.defaultTarget(services);
-        return target == null ? null : target.windowTitle();
+        return CaptureLabels.windowTitle(target != null ? target : EditorFrame.defaultSource(services));
     }
 
     /**

@@ -1,15 +1,12 @@
 package com.botmaker.sdk.internal.plugin.capture;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.sdk.authoring.Authoring;
-import com.botmaker.sdk.authoring.CaptureModel;
-import com.botmaker.sdk.authoring.CaptureTargetModel;
-import com.botmaker.sdk.authoring.SdkVersion;
+import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.capture.ScreenCapture;
-import com.botmaker.shared.config.CaptureSourceKind;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstances;
 import com.botmaker.shared.emulator.EmulatorProbe;
@@ -17,7 +14,6 @@ import javafx.application.Platform;
 
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
-import java.nio.file.Path;
 import java.util.function.Consumer;
 
 /**
@@ -28,8 +24,8 @@ import java.util.function.Consumer;
  *
  * <p><b>The plugin grabs it, and that is the whole reason this class is here rather than on the contract.</b>
  * Which project is open is the one thing only the host knows, and {@link StudioServices#resourcesDir()}
- * answers it; everything after that — which target the project chose, and what that target's pixels are — is
- * this plugin's own vocabulary read out of its own {@code capture.json} through {@link Authoring}, and
+ * answers it; everything after that — which source the project chose, and what that source's pixels are — is
+ * this plugin's own vocabulary read out of the bot's own Java through {@link CaptureValue}, and
  * {@code botmaker-shared} grabbing it. The contract's {@code Capture.grabFrame} does the same thing from the
  * host side and is scheduled for deletion; it cannot serve this, because it reports a failed or blank grab by
  * simply never calling back, and an editor that cannot tell "failed" from "still working" cannot say
@@ -111,52 +107,42 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
     }
 
     /**
-     * The grab a <b>capture session</b> takes: the target window brought to the front first, and snapped to
-     * {@code snapTo} before the pixels are read when the project names a size.
+     * The grab a <b>capture session</b> takes: the source's window brought to the front before its pixels
+     * are read, and a source the <b>caller</b> may name instead of the project's own.
      *
      * <p>Separate from {@link #grabAsync(StudioServices, Consumer, Consumer)} rather than a flag on it,
-     * because the difference is a real one and belongs at the call site. A pixel editor samples the target
+     * because the difference is a real one and belongs at the call site. A pixel editor samples the source
      * <em>as it is</em> — raising the game to read one colour would rearrange the user's screen for no
      * reason. A capture must do the opposite: what it writes to disk becomes a picture the bot matches
-     * against, so the window has to be visible and at the project's canonical size, or every picture is
-     * authored at whatever size the window happened to be and the matcher rescales all of them.
+     * against, so the window has to be visible.
      *
-     * <p>Both are no-ops for a target that is not a window. A monitor is not resized and an emulator's frame
-     * arrives over ADB at its own resolution.
-     */
-    public static void grabAsync(StudioServices services, CaptureModel.Resolution snapTo,
-                                 Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {
-        grabAsync(services, null, snapTo, onFrame, onFailure);
-    }
-
-    /**
-     * The same capture-session grab against a target the <b>caller</b> names, rather than the project's
-     * default; a {@code null} target falls back to the default, so one call site serves both.
+     * <p>Raising is a no-op for a source that is not a window: a monitor has nothing to raise and an
+     * emulator's frame arrives over ADB.
      *
-     * <p>It exists for one caller with a fact nobody else has: the overlay editor is already drawn over a
-     * window, so <i>this</i> window is what "a picture of this" means, whatever the project's default target
-     * happens to be. The override is per grab and is <b>never written down</b> — pointing the project at that
-     * window is a separate, explicit action ({@link CaptureTargets#pointDefaultAt}), because a button that
-     * takes a picture must not silently re-point the bot.
+     * <p>A {@code null} source falls back to the project's, so one call site serves both. The override is
+     * per grab and is <b>never written down</b> — the overlay editor is already drawn over a window, so
+     * <i>this</i> window is what "a picture of this" means whatever the project points at, and pointing the
+     * project at it is a separate, explicit action ({@link CaptureValue#point}). A button that takes a
+     * picture must not silently re-point the bot.
+     *
+     * <h2>Nothing is snapped to a reference size any more (2026-09-22)</h2>
+     *
+     * <p>A capture used to resize the window to the resolution {@code capture.json} named, so every picture
+     * was authored at one canonical size. That file is deleted and the project's capture source is now an
+     * expression in the bot's own Java, which has nowhere to put a second number — and the matcher rescales
+     * anyway, which is what made the snap a convenience rather than a correctness rule.
      */
-    public static void grabAsync(StudioServices services, CaptureTargetModel target,
-                                 CaptureModel.Resolution snapTo,
+    public static void grabAsync(StudioServices services, CaptureSource source,
                                  Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {
-        grabAsync(services, target, snapTo, true, onFrame, onFailure);
+        grabAsync(services, source, true, onFrame, onFailure);
     }
 
-    private static void grabAsync(StudioServices services, CaptureModel.Resolution snapTo, boolean raise,
-                                  Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {
-        grabAsync(services, null, snapTo, raise, onFrame, onFailure);
-    }
-
-    private static void grabAsync(StudioServices services, CaptureTargetModel chosen,
-                                  CaptureModel.Resolution snapTo, boolean raise,
+    private static void grabAsync(StudioServices services, CaptureSource chosen, boolean raise,
                                   Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {
         Thread worker = new Thread(() -> {
-            CaptureTargetModel target = chosen != null ? chosen : defaultTarget(services);
-            EditorFrame frame = target == null ? null : grab(target, snapTo, raise);
-            Failure failure = frame != null ? null : (target == null ? Failure.NO_TARGET : Failure.BLANK);
+            CaptureSource source = chosen != null ? chosen : defaultSource(services);
+            EditorFrame frame = source == null ? null : grab(source, raise);
+            Failure failure = frame != null ? null : (source == null ? Failure.NO_TARGET : Failure.BLANK);
             Platform.runLater(() -> {
                 if (frame != null) onFrame.accept(frame);
                 else onFailure.accept(failure);
@@ -167,51 +153,36 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
     }
 
     /**
-     * The size the project captures at, or {@code null} when it names none.
+     * The project's capture source, or {@code null} when its Java names none this can read.
      *
-     * <p>Read out of {@code capture.json} for the same reason {@link #defaultTarget} is, and beside it since
-     * 2026-08-31: a resolution set in another window has to take effect here without anything being rebuilt.
+     * <p>Read on every call rather than held: a source changed in another window has to take effect here
+     * without anything being rebuilt. An absent {@code Sdk.java}, a body the host will not read and an
+     * expression {@link CaptureExpr#parse} does not recognise all read as "no source", which is the same
+     * thing to everyone downstream and keeps a mid-save project from throwing at an editor.
      */
-    public static CaptureModel.Resolution referenceSize(StudioServices services) {
-        CaptureModel capture = capture(services);
-        return capture == null ? null : capture.reference();
-    }
-
-    /**
-     * The project's default capture target, or {@code null} when it has none.
-     *
-     * <p>Read on every call rather than held: a target changed in another window has to take effect here
-     * without anything being rebuilt. Any failure to read reads as "no target", which is the same thing to
-     * everyone downstream and keeps a mid-save project file from throwing at an editor.
-     */
-    public static CaptureTargetModel defaultTarget(StudioServices services) {
-        CaptureModel capture = capture(services);
-        return capture == null ? null : capture.defaultTarget();
-    }
-
-    /** The project's {@code capture.json}, or {@code null} when there is no project or it will not read. */
-    private static CaptureModel capture(StudioServices services) {
+    public static CaptureSource defaultSource(StudioServices services) {
         try {
-            Path resources = services == null ? null : services.resourcesDir();
-            if (resources == null) return null;
-            return Authoring.readCapture(SdkVersion.latest(), resources);
+            return CaptureExpr.parse(CaptureValue.open(services).map(ValueContext::source).orElse(null));
         } catch (Exception unreadable) {
             return null;
         }
     }
 
-    /** The pixels of {@code target}, or {@code null} when the grab failed or came back blank. */
-    private static EditorFrame grab(CaptureTargetModel target, CaptureModel.Resolution snapTo, boolean raise) {
+    /** The pixels of {@code source}, or {@code null} when the grab failed or came back blank. */
+    private static EditorFrame grab(CaptureSource source, boolean raise) {
         try {
-            if (target.emulatorName() != null) return emulatorFrame(target);
-            if (target.windowTitle() != null) return windowFrame(target, snapTo, raise);
-            Rectangle bounds = target.is(CaptureSourceKind.MONITOR)
-                    ? ScreenCapture.monitorBounds(target.monitorIndex())
+            String label = CaptureLabels.shortLabel(source);
+            if (CaptureLabels.emulatorName(source) != null) return emulatorFrame(source, label);
+            if (CaptureLabels.windowTitle(source) != null) return windowFrame(source, label, raise);
+            boolean monitor = !CaptureLabels.isDesktop(source);
+            int index = CaptureLabels.monitorIndex(source);
+            Rectangle bounds = monitor
+                    ? ScreenCapture.monitorBounds(index)
                     : ScreenCapture.getVirtualScreenBounds();
-            BufferedImage image = target.is(CaptureSourceKind.MONITOR)
-                    ? ScreenCapture.captureMonitor(target.monitorIndex())
+            BufferedImage image = monitor
+                    ? ScreenCapture.captureMonitor(index)
                     : ScreenCapture.captureDesktop();
-            return usable(image) ? new EditorFrame(image, target.shortLabel(), bounds, true) : null;
+            return usable(image) ? new EditorFrame(image, label, bounds, true) : null;
         } catch (Throwable anything) {
             // A native capture path can throw as well as fail, and neither is worth more than "no frame".
             return null;
@@ -226,16 +197,17 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
      * fired — and the crop looked perfectly accurate, because it <em>was</em> accurate in the space it was
      * taken in. Capturing the way the bot captures makes the two spaces one by construction.
      */
-    private static EditorFrame emulatorFrame(CaptureTargetModel target) {
-        EmulatorInstance instance = EmulatorInstances.byName(target.emulatorName()).orElse(null);
+    private static EditorFrame emulatorFrame(CaptureSource source, String label) {
+        EmulatorInstance instance =
+                EmulatorInstances.byName(CaptureLabels.emulatorName(source)).orElse(null);
         BufferedImage image = instance == null ? null : EmulatorProbe.screencap(instance);
         if (!usable(image)) return null;
-        return new EditorFrame(image, target.shortLabel(),
+        return new EditorFrame(image, label,
                 fitToPrimaryScreen(image.getWidth(), image.getHeight()), false);
     }
 
     /**
-     * The window's pixels, optionally after raising it and snapping it to {@code snapTo}.
+     * The window's pixels, optionally after raising it.
      *
      * <p>The window is re-resolved after the raise, because restoring a minimised window changes its bounds
      * and the surface has to be placed over where it ended up rather than where it was.
@@ -243,14 +215,13 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
      * <p><b>A blank native grab falls through to a desktop crop.</b> Per-window capture returns black on a
      * native Wayland session; the whole-desktop path has a working backend there, so cropping it to the
      * window's bounds recovers the frame. Without the fallback a Wayland user's every capture reads as "the
-     * target produced a blank frame" while the window is plainly on screen.
+     * source produced a blank frame" while the window is plainly on screen.
      */
-    private static EditorFrame windowFrame(CaptureTargetModel target, CaptureModel.Resolution snapTo,
-                                           boolean raise) {
-        GenericWindow window = findWindow(target.windowTitle());
+    private static EditorFrame windowFrame(CaptureSource source, String label, boolean raise) {
+        String title = CaptureLabels.windowTitle(source);
+        GenericWindow window = findWindow(title);
         if (window == null) return null;
         NativeController controller = NativeControllerFactory.get();
-        if (snapTo != null) resize(controller, window, snapTo);
         if (raise) {
             try {
                 controller.restoreWindow(window);
@@ -258,9 +229,7 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
             } catch (Throwable notRaised) {
                 System.err.println("Could not focus window: " + notRaised.getMessage());
             }
-        }
-        if (snapTo != null || raise) {
-            GenericWindow refreshed = findWindow(target.windowTitle());
+            GenericWindow refreshed = findWindow(title);
             if (refreshed != null) window = refreshed;
         }
         Rectangle bounds = window.getRect();
@@ -272,20 +241,7 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
             System.err.println("Native window capture failed: " + notCaptured.getMessage());
         }
         if (!usable(image)) image = cropped(ScreenCapture.captureDesktop(), bounds);
-        return usable(image) ? new EditorFrame(image, target.shortLabel(), bounds, true) : null;
-    }
-
-    /** Snaps {@code window} to {@code size}; a window already that size is left alone. Best-effort. */
-    private static void resize(NativeController controller, GenericWindow window,
-                               CaptureModel.Resolution size) {
-        Rectangle current = window.getRect();
-        if (current != null && current.width == size.width() && current.height == size.height()) return;
-        try {
-            controller.resizeWindow(window, size.width(), size.height());
-            settle();
-        } catch (Throwable notResized) {
-            System.err.println("Could not resize window: " + notResized.getMessage());
-        }
+        return usable(image) ? new EditorFrame(image, label, bounds, true) : null;
     }
 
     /** Lets the compositor finish moving or raising a window before its pixels are read. */

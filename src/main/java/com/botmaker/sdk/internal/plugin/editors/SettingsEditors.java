@@ -25,7 +25,7 @@ import javafx.scene.Node;
  * to decide whether this editor applies at all, and once here to build it. A setter with no entry is not
  * claimed, so adding one is one row rather than a row and a predicate that must agree with it.
  */
-final class SettingsEditors {
+public final class SettingsEditors {
 
     private SettingsEditors() {}
 
@@ -70,7 +70,7 @@ final class SettingsEditors {
     }
 
     /** The editor for whichever setter this slot sits in. */
-    static Node setting(ValueContext ctx) {
+    public static Node setting(ValueContext ctx) {
         Setting bound = bounds(ctx.slot().flatMap(SlotContext::enclosingMethodName).orElse(null));
         if (bound == null) return null;
         return bound.flagLabel() != null

@@ -76,7 +76,7 @@ import java.util.function.Consumer;
  * at the same time: that drew the same value as a preset dropdown and three bare fields, with none of the
  * swatch strip, the blob preview or the frame readout.
  */
-final class PrecisionEditors {
+public final class PrecisionEditors {
 
     private PrecisionEditors() {}
 
@@ -141,7 +141,7 @@ final class PrecisionEditors {
     }
 
     /** The editor: a pill saying the whole setting, opening the dialog that explains each part of it. */
-    static Node precision(ValueContext ctx) {
+    public static Node precision(ValueContext ctx) {
         Button button = Styles.on(new Button(label(current(ctx))), Styles.PILL);
         button.setOnAction(e -> open(ctx, button::setText));
         return button;
@@ -423,33 +423,45 @@ final class PrecisionEditors {
     // compiles, and what is read is what the user sees claimed about a value they may not have set. See
     // PrecisionEditorTest.
 
-    /** Writes the setting as the shortest exact Java form. */
+    /**
+     * Writes the setting.
+     *
+     * <p>The <b>value</b>, so the host spells it through this plugin's own {@code ComponentType} — the three
+     * components of {@code new Precision(…)}. It used to write {@code literalFor(…)}, the shortest exact
+     * Java form ({@code Precision.TIGHT.minArea(400)}), and that was the editor and the codec being two
+     * writers of one file: a disagreement between them is a value that changes meaning when it is written
+     * back. One writer now, and it is the host's.
+     *
+     * <p>{@code literalFor} survives for the dialog's own preview line, which shows what the value would be
+     * written as without writing it.
+     */
     static void commit(ValueContext ctx, Settings s) {
-        Slots.write(ctx, literalFor(s.deltaE(), s.minArea(), s.minCount()), FQN);
+        ctx.set(new Precision(s.deltaE(), s.minArea(), s.minCount()));
     }
 
-    /** The three values the value currently holds. */
+    /**
+     * The three values the value currently holds.
+     *
+     * <p><b>The decoded value first, and {@link #settingsOf} only after it.</b> Everything this editor
+     * writes is a {@code new Precision(…)} the host spells and decodes, so the value is the answer in every
+     * ordinary case and the one that cannot be wrong.
+     *
+     * <p>{@code settingsOf} stays for what the host cannot decode and this plugin can: a <b>wither chain</b>
+     * the user wrote themselves — {@code Precision.TIGHT.minArea(400)} — which is not a factory call and so
+     * has no {@code ComponentType} that reads it. That is the same slot {@code CaptureExpr} sits in, a
+     * plugin reading a shape of its own API, and it is why this one parser survived when the others went:
+     * reading it fills the dialog with the numbers actually in the user's file, where falling through to
+     * {@code Precision.DEFAULT} would show three values they never chose.
+     */
     static Settings current(ValueContext ctx) {
-        return settingsOf(Slots.raw(ctx));
+        return ctx.value(Precision.class)
+                .map(p -> new Settings(p.deltaE(), p.minArea(), p.minCount()))
+                .orElseGet(() -> settingsOf(Slots.raw(ctx)));
     }
 
-    /** The stored form, spelled exactly as the SDK's own {@code PRECISION} codec spells it. */
-    static String wireFor(Settings s) {
-        return s.deltaE() + "," + s.minArea() + "," + s.minCount();
-    }
-
-    /** A stored row, which is three comma-separated numbers and nothing else. */
-    static Settings wireOf(String wire) {
-        String[] parts = (wire == null ? "" : wire).split(",");
-        return new Settings(
-                numberOr(part(parts, 0), DEFAULT_DELTA_E),
-                (int) numberOr(part(parts, 1), DEFAULT_AREA),
-                (int) numberOr(part(parts, 2), DEFAULT_COUNT));
-    }
-
-    private static String part(String[] parts, int index) {
-        return index < parts.length ? parts[index] : "";
-    }
+    // wireFor(Settings) and wireOf(String) stood here until 2026-09-22 -- the three comma-separated numbers
+    // the SDK's own PRECISION codec stored. Both had no caller once a Parameters row stopped holding text,
+    // and the codec they spelled for is deleted.
 
     /**
      * The three values a slot's Java expression spells, defaulting to the SDK's own {@code DEFAULT} for

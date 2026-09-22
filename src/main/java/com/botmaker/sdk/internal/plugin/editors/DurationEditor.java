@@ -8,7 +8,6 @@ import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.interaction.Wait;
-import com.botmaker.sdk.authoring.WireText;
 import javafx.scene.Node;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
@@ -48,7 +47,7 @@ import java.util.List;
  * Reading is the inverse, and an untouched value is written back exactly as it was read, so opening the
  * editor and pressing OK is a no-op on the source.
  */
-final class DurationEditor {
+public final class DurationEditor {
 
     /** The fully-qualified name the slot form is written and imported as. */
     private static final String FQN = "java.time.Duration";
@@ -66,7 +65,7 @@ final class DurationEditor {
      * held source code where every write is an edit somebody may want to take back. Every value is source
      * now, so every value gets the one that commits on OK.
      */
-    static Node duration(ValueContext ctx) {
+    public static Node duration(ValueContext ctx) {
         return pill(ctx);
     }
 
@@ -141,7 +140,7 @@ final class DurationEditor {
             // this slot could say — dropping the far end is a change to the call, not to the value in it.
             slot.replaceEnclosingCall("Wait.time(" + lowSource + ")", FQN);
         } else {
-            ctx.set(lowSource, FQN);
+            ctx.setSource(lowSource, java.time.Duration.class);
         }
     }
 
@@ -247,7 +246,33 @@ final class DurationEditor {
     static String slotLabel(ValueContext ctx) {
         String raw = Slots.raw(ctx);
         Long value = millis(raw);
-        if (value != null) return WireText.spellDuration(value);
+        if (value != null) return spell(value);
         return raw.isBlank() ? "Choose duration…" : raw;
+    }
+
+    /**
+     * {@code 0s}, {@code 250ms}, {@code 1m30s}, {@code 1h30m} — the largest units first, zeroes dropped.
+     *
+     * <p>It was {@code WireText.spellDuration}, which delegated to plugin-basics' stored-text reader; both
+     * are deleted with the rest of the wire layer. What is left is a <b>label</b>, which is a different
+     * thing from a stored form: nothing reads this back, and the duration a person sees on a block is not
+     * the unit the source happens to be written in. {@code Duration.ofMinutes(270)} is four and a half
+     * hours, and that is what the pill says.
+     */
+    private static String spell(long millis) {
+        if (millis <= 0) return "0s";
+        StringBuilder out = new StringBuilder();
+        long left = millis;
+        left = unit(out, left, 3_600_000L, "h");
+        left = unit(out, left, 60_000L, "m");
+        left = unit(out, left, 1000L, "s");
+        if (left > 0) out.append(left).append("ms");
+        return out.toString();
+    }
+
+    private static long unit(StringBuilder out, long left, long size, String suffix) {
+        long count = left / size;
+        if (count > 0) out.append(count).append(suffix);
+        return left - count * size;
     }
 }

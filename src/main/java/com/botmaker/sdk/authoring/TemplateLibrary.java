@@ -214,12 +214,12 @@ public final class TemplateLibrary {
      * The project-root-relative, forward-slashed path string for {@code templateFile}.
      *
      * <p>Built from the file's own <em>name</em> and the one prefix every template shares
-     * ({@link WireText#IMAGE_PREFIX}) rather than by relativizing against a project root, which is what let
+     * ({@link TemplateNames#IMAGE_PREFIX}) rather than by relativizing against a project root, which is what let
      * this class stop needing one. The two agree by construction — a template is a PNG directly inside
      * {@code src/main/resources/images} and there is nowhere else for one to be.
      */
     public static String pathFor(Path templateFile) {
-        return WireText.IMAGE_PREFIX + templateFile.getFileName().toString();
+        return TemplateNames.IMAGE_PREFIX + templateFile.getFileName().toString();
     }
 
     /**
@@ -231,7 +231,7 @@ public final class TemplateLibrary {
      * missing everywhere outside the gallery. Use {@link #fileForName} to open one.
      */
     public static String pathForName(String baseName) {
-        return WireText.IMAGE_PREFIX + baseName + ".png";
+        return TemplateNames.pathFor(baseName);
     }
 
     /** The template PNG named {@code baseName} as a file you can actually read — absolute, may not exist. */

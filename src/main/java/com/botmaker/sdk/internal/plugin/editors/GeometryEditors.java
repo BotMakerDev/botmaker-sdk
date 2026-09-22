@@ -7,6 +7,7 @@ import com.botmaker.plugin.toolkit.Editors.TupleSpec;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.internal.authoring.SdkTypes;
 import javafx.scene.Node;
 
 /**
@@ -28,31 +29,31 @@ public final class GeometryEditors {
     private GeometryEditors() {}
 
     /** {@code 10, 20  640×480} — the reading order of a rectangle: where it is, then how big it is. */
-    private static final TupleSpec RECT = new TupleSpec(Rect.class, "Rect",
+    private static final TupleSpec RECT = new TupleSpec("Rect",
             new String[]{"x", "y", "width", "height"}, "Choose region…", Pick.REGION,
             v -> v[0] + ", " + v[1] + "  " + v[2] + "×" + v[3]);
 
-    private static final TupleSpec POINT = new TupleSpec(Point.class, "Point",
+    private static final TupleSpec POINT = new TupleSpec("Point",
             new String[]{"x", "y"}, "Choose point…", Pick.POINT,
             v -> v[0] + ", " + v[1]);
 
-    private static final TupleSpec SIZE = new TupleSpec(Size.class, "Size",
+    private static final TupleSpec SIZE = new TupleSpec("Size",
             new String[]{"width", "height"}, "Choose size…", Pick.MEASURE,
             v -> v[0] + " × " + v[1]);
 
     /** A {@code Rect}: drag a region on screen, or type {@code x, y, width, height}. */
     public static Node rect(ValueContext ctx) {
-        return Editors.tuplePill(ctx, RECT);
+        return Editors.tuplePill(ctx, SdkTypes.RECT_TYPE, RECT, SdkScreenPicks.get());
     }
 
     /** A {@code Point}: click one pixel under a magnifier, or type {@code x, y}. */
     public static Node point(ValueContext ctx) {
-        return Editors.tuplePill(ctx, POINT);
+        return Editors.tuplePill(ctx, SdkTypes.POINT_TYPE, POINT, SdkScreenPicks.get());
     }
 
     /** A {@code Size}: measure by dragging over the thing, or type {@code width, height}. */
     public static Node size(ValueContext ctx) {
-        return Editors.tuplePill(ctx, SIZE);
+        return Editors.tuplePill(ctx, SdkTypes.SIZE_TYPE, SIZE, SdkScreenPicks.get());
     }
 
     // Package-private rather than private: the label is the one piece of these editors that can be asserted
@@ -60,14 +61,14 @@ public final class GeometryEditors {
     // collapsed pill is read back out of what the last pick wrote, and getting it wrong shows one coordinate
     // while the bot runs another. See GeometryLabelTest.
     static String rectLabel(ValueContext ctx) {
-        return Editors.tupleLabel(ctx, RECT);
+        return Editors.tupleLabel(ctx, SdkTypes.RECT_TYPE, RECT);
     }
 
     static String pointLabel(ValueContext ctx) {
-        return Editors.tupleLabel(ctx, POINT);
+        return Editors.tupleLabel(ctx, SdkTypes.POINT_TYPE, POINT);
     }
 
     static String sizeLabel(ValueContext ctx) {
-        return Editors.tupleLabel(ctx, SIZE);
+        return Editors.tupleLabel(ctx, SdkTypes.SIZE_TYPE, SIZE);
     }
 }

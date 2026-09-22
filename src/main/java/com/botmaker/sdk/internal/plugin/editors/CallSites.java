@@ -1,5 +1,7 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
+import com.botmaker.plugin.api.slot.SlotContext;
+import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.bot.Activities;
 import com.botmaker.sdk.api.bot.ActivityContext;
@@ -13,10 +15,11 @@ import java.util.function.Predicate;
 /**
  * Which of this plugin's calls each call-site editor belongs to.
  *
- * <p>Five constants and nothing else. The matching itself — declining a Parameters row, comparing an argument
- * index, tolerating a qualified or a simple class name — is
- * {@link com.botmaker.plugin.toolkit.CallSites}'s, and moved there on 2026-08-28: not a line of it named an
- * SDK type, and any plugin whose values are told apart by the call around them needs the same four shapes.
+ * <p>Eight constants and nothing else. The matching itself — declining a Parameters row, comparing an
+ * argument index, tolerating a qualified or a simple class name — is
+ * {@link SlotEditor#onCall}'s. It was the toolkit's {@code CallSites} from 2026-08-28 and is the
+ * <b>contract's</b> from 2026-09-22: not a line of it drew anything, and <em>which slot an editor claims</em>
+ * is contract vocabulary, the same argument that put {@code SlotEditor.of} there.
  *
  * <p>What is left is the part that is genuinely this plugin's, and it is the part a reader wants: a Steam app
  * id, an Epic app name, a program path, a launch flag and a bounded setting are all {@code String} or all
@@ -28,20 +31,26 @@ final class CallSites {
 
     private CallSites() {}
 
+    /** Where the varargs begin, per overload — the one shape {@link SlotEditor#onCall} cannot state alone. */
+    private static final Map<String, Integer> LAUNCH_VARARGS =
+            Map.of("launch", 1, "launchIfNotRunning", 2, "launchAndWait", 3);
+
+    private static final java.util.Set<String> EMULATOR_METHODS =
+            java.util.Set.of("use", "named", "launch", "stop");
+
     /** The Steam app id of {@code Game.launchSteam(id)} / {@code launchSteamIfNotRunning(id, source)}. */
-    static final Predicate<ValueContext> STEAM_APP_ID = com.botmaker.plugin.toolkit.CallSites
-            .firstArgumentOf(Game.class, "launchSteam", "launchSteamIfNotRunning");
+    static final Predicate<ValueContext> STEAM_APP_ID = ctx -> SlotEditor.onCall(ctx, Game.class, 0,
+            name -> "launchSteam".equals(name) || "launchSteamIfNotRunning".equals(name));
 
     /** The Epic app name of {@code Game.launchEpic(name)} / {@code launchEpicIfNotRunning(name, source)}. */
-    static final Predicate<ValueContext> EPIC_APP_NAME = com.botmaker.plugin.toolkit.CallSites
-            .firstArgumentOf(Game.class, "launchEpic", "launchEpicIfNotRunning");
+    static final Predicate<ValueContext> EPIC_APP_NAME = ctx -> SlotEditor.onCall(ctx, Game.class, 0,
+            name -> "launchEpic".equals(name) || "launchEpicIfNotRunning".equals(name));
 
     /**
      * The program path of {@code Game.launch(path, …)}, {@code launchIfNotRunning(path, source, …)} or
      * {@code launchAndWait(path, source, timeout, …)} — always argument 0.
      */
-    static final Predicate<ValueContext> LAUNCH_PROGRAM = com.botmaker.plugin.toolkit.CallSites
-            .firstArgumentOf(Game.class, "launch", "launchIfNotRunning", "launchAndWait");
+    static final Predicate<ValueContext> LAUNCH_PROGRAM = ctx -> SlotEditor.onCall(ctx, Game.class, 0, LAUNCH_VARARGS::containsKey);
 
     /**
      * A trailing command-line argument of the same three methods.
@@ -51,11 +60,13 @@ final class CallSites {
      * source, timeout, …)} from 3. Below those indices the argument is the path, the capture source or the
      * timeout, and each of those has an editor of its own.
      */
-    static final Predicate<ValueContext> LAUNCH_OPTION = com.botmaker.plugin.toolkit.CallSites
-            .trailingArgumentOf(Game.class, Map.of(
-                    "launch", 1,
-                    "launchIfNotRunning", 2,
-                    "launchAndWait", 3));
+    static final Predicate<ValueContext> LAUNCH_OPTION = ctx -> {
+        SlotContext slot = ctx.slot().orElse(null);
+        if (slot == null) return false;
+        Integer from = LAUNCH_VARARGS.get(slot.enclosingMethodName().orElse(""));
+        return from != null && slot.argIndex() >= from
+                && SlotEditor.onCall(ctx, Game.class, slot.argIndex(), LAUNCH_VARARGS::containsKey);
+    };
 
     /**
      * The single argument of a bounded {@code BotSettings} setter.
@@ -64,8 +75,8 @@ final class CallSites {
      * predicate claimed and that table had no entry for would be offered an editor with no idea what range to
      * enforce, which is the free-typed number the editor exists to replace.
      */
-    static final Predicate<ValueContext> BOT_SETTING = com.botmaker.plugin.toolkit.CallSites
-            .firstArgumentWhere(BotSettings.class, setter -> SettingsEditors.bounds(setter) != null);
+    static final Predicate<ValueContext> BOT_SETTING = ctx -> SlotEditor.onCall(ctx, BotSettings.class, 0,
+            setter -> SettingsEditors.bounds(setter) != null);
 
     /**
      * The instance name of {@code Emulators.use(name)}, {@code named(name)}, {@code launch(name)} or
@@ -74,12 +85,11 @@ final class CallSites {
      * <p>{@code use()} with no argument is not matched and cannot be: there is no slot. That overload means
      * <i>the project's default emulator</i>, which is a capture target rather than a name typed into code.
      */
-    static final Predicate<ValueContext> EMULATOR_NAME = com.botmaker.plugin.toolkit.CallSites
-            .firstArgumentOf(Emulators.class, "use", "named", "launch", "stop");
+    static final Predicate<ValueContext> EMULATOR_NAME = ctx -> SlotEditor.onCall(ctx, Emulators.class, 0,
+            EMULATOR_METHODS::contains);
 
     /** The activity named by {@code Activities.define(name, body)}. */
-    static final Predicate<ValueContext> ACTIVITY_NAME = com.botmaker.plugin.toolkit.CallSites
-            .firstArgumentOf(Activities.class, "define");
+    static final Predicate<ValueContext> ACTIVITY_NAME = ctx -> SlotEditor.onCall(ctx, Activities.class, 0, "define"::equals);
 
     /**
      * The outcome named by {@code ctx.outcome(name)}.
@@ -89,6 +99,5 @@ final class CallSites {
      * returning a bare {@code String}: a call on a typed receiver is one this predicate can recognise, and a
      * returned string is indistinguishable from every other string in the bot.
      */
-    static final Predicate<ValueContext> OUTCOME_NAME = com.botmaker.plugin.toolkit.CallSites
-            .firstArgumentOf(ActivityContext.class, "outcome");
+    static final Predicate<ValueContext> OUTCOME_NAME = ctx -> SlotEditor.onCall(ctx, ActivityContext.class, 0, "outcome"::equals);
 }

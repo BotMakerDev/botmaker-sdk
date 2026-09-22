@@ -1,9 +1,6 @@
 package com.botmaker.sdk.internal.authoring;
 
-import com.botmaker.plugin.api.value.ValueContainer;
-import com.botmaker.plugin.api.value.ValueForm;
-import com.botmaker.plugin.api.value.ValueType;
-import com.botmaker.plugin.basics.values.BasicsValueTypes;
+import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.bot.ActivityBody;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Flow;
@@ -12,71 +9,42 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The shapes a {@code @Managed} value of this plugin's takes: the flow's five records as containers, and the
- * two leaves whose value is a <b>name</b> rather than data.
+ * The shapes a {@code @Managed} value of this plugin's takes: the flow's five records, as the components
+ * that go inside the calls that write them.
  *
- * <h2>Why a flow is five containers and not one type</h2>
+ * <h2>Why a flow is five declarations and not one type</h2>
  *
- * <p>A {@link ValueContainer} is what lets the editor take an expression apart into typed parts, change one
+ * <p>A {@link ComponentType} is what lets the editor take an expression apart into typed parts, change one
  * of them and put the rest back exactly as written. One opaque {@code FLOW} leaf with a codec would give the
- * editor a string — which is where this whole design started, and what it exists to leave behind. Four
- * containers give it {@code Flow.of(List.of(Flow.activity(…), …), List.of(…), "Collect", Flow.limits(…))} as
- * a tree it can walk, with a leaf codec at every tip.
+ * editor a string — which is where this whole design started, and what it exists to leave behind. Five
+ * declarations give it {@code Flow.of(List.of(Flow.activity(…), …), List.of(…), "Collect", Flow.limits(…))}
+ * as a tree it can walk, typed at every tip.
  *
- * <p><b>All five have arity zero</b>, which the contract allows since 2026-09-20: they take no type
- * arguments and still have parts, so {@link ValueContainer#partForms} answers a fixed list and ignores the
- * (empty) arguments. That is the difference between a record a plugin registers and one the <em>bot</em>
- * declares, which is {@code ValueForm.Declared} and read out of the project's own source instead.
+ * <p><b>None of them implements {@code PluginType}</b>, and that is why the two interfaces are independent:
+ * an {@code Activity}, an {@code Edge}, a {@code Preset} and a {@code Limits} are parts of a flow and are
+ * never picked on their own, so extending it would owe each a {@code fresh()} and an {@code editor()}
+ * nothing would ever call.
  *
- * <h2>The two leaves are names, and their codecs say so</h2>
+ * <h2>Two components are names, and they cross as the source they are written as</h2>
  *
- * <p>{@link #ACTIVITY_BODY} is written {@code Collect::body} and {@link #CAPTURE_SOURCE} is written
- * {@code CaptureSource.desktop()}. Neither codec parses into a live object — the editor never runs a bot's
- * code — so both read as the {@code String} they are written as, exactly as {@code IMAGE_TEMPLATE} reads as
- * a base name. What each {@code valueOfLiteral} does is <b>refuse anything it did not write</b>: a lambda, a
- * conditional, a call into the user's own code all come back empty, and the editor then shows that value
- * read-only rather than replacing code somebody wrote on purpose.
+ * <p>An activity's body is written {@code Collect::body} and a capture source is written
+ * {@code CaptureSource.desktop()}. Neither is parsed into a live object — the editor never runs a bot's
+ * code, and has no classpath to resolve one against — so both cross as the {@code String} they are written
+ * as, and {@link #isMethodReference} is the whole of what this plugin will accept back. A lambda, a
+ * conditional or a call into the user's own code is shown read-only rather than replaced with something
+ * somebody did not write.
+ *
+ * <p>They were two {@code ValueType}s with codecs of their own until 2026-09-22, which is one more layer
+ * than the fact needs: a component of a type nothing else declares already crosses as its source.
  */
 public final class SdkFlowValues {
 
     private SdkFlowValues() {}
 
-    /** The heading a picker files these under. */
-    private static final String FLOW = "Flow";
-
-    /** An activity's work, named by method reference — {@code Collect::body}. */
-    public static final ValueType ACTIVITY_BODY =
-            SdkValueTypes.sdk("ACTIVITY_BODY", "Activity body", FLOW, ActivityBody.class, false);
-
-    /** Where pixels are read from — {@code CaptureSource.desktop()}. */
-    public static final ValueType CAPTURE_SOURCE =
-            SdkValueTypes.sdk("CAPTURE_SOURCE", "Capture source", FLOW, CaptureSource.class, false);
-
     // ---- the leaves' codecs ----------------------------------------------------------------------------
-
-    /**
-     * A method reference, and nothing else.
-     *
-     * <p>{@code Collect::body} and {@code com.mybot.Collect::body} are both accepted; a lambda, a call and a
-     * bare name are not. The rule is purely syntactic because it has to be: the editor has no classpath for
-     * the bot it is drawing, and a reference to a class that does not exist is javac's to report, in the
-     * user's own file, where it is a compile error naming the line.
-     */
-    static final com.botmaker.plugin.api.value.ValueCodec<String> BODY_CODEC = SdkValueTypes.codec(
-            SdkFlowValues::strip, s -> s, SdkFlowValues::bodyLiteral, SdkFlowValues::methodReference);
 
     /** How the constant for "drawn, not written yet" is spelled in a file — fully qualified, as all of these are. */
     private static final String NO_BODY = ActivityBody.class.getName() + ".NONE";
-
-    /**
-     * One of {@link CaptureSource}'s three canonical factories, written as the SDK writes them.
-     *
-     * <p>{@code region(…)} narrowings are deliberately not read back: they compose, so a source may be
-     * narrowed twice, and a picker that could show the first narrowing and not the second would be worse
-     * than one that shows the whole expression read-only and says so.
-     */
-    static final com.botmaker.plugin.api.value.ValueCodec<String> SOURCE_CODEC = SdkValueTypes.codec(
-            SdkFlowValues::strip, s -> s, s -> s, SdkFlowValues::captureSource);
 
     private static String strip(String wire) {
         return wire == null ? "" : wire.strip();
@@ -160,10 +128,10 @@ public final class SdkFlowValues {
     // ---- the five containers ---------------------------------------------------------------------------
 
     /** {@code Flow.of(List<Activity>, List<Edge>, List<Preset>, String, Limits)}. */
-    public static final ValueContainer<Flow> FLOW_SHAPE = new Fixed<>(Flow.class, "of") {
+    public static final ComponentType<Flow> FLOW_SHAPE = new Fixed<>(Flow.class, "of") {
         @Override
-        public List<Object> parts(Flow value) {
-            return value == null ? partsOfNone()
+        public List<Object> components(Flow value) {
+            return value == null ? componentsOfNone()
                     : List.of(value.activities(), value.edges(), value.presets(), value.start(),
                     value.limits());
         }
@@ -176,24 +144,20 @@ public final class SdkFlowValues {
         }
 
         @Override
-        public List<ValueForm> fixedForms() {
-            return List.of(ValueForm.listOf(new ValueForm.Of(ACTIVITY_SHAPE, List.of())),
-                    ValueForm.listOf(new ValueForm.Of(EDGE_SHAPE, List.of())),
-                    ValueForm.listOf(new ValueForm.Of(PRESET_SHAPE, List.of())),
-                    ValueForm.of(BasicsValueTypes.TEXT),
-                    new ValueForm.Of(LIMITS_SHAPE, List.of()));
+        public List<Class<?>> componentTypes() {
+            return List.of(List.class, List.class, List.class, String.class, Flow.Limits.class);
         }
 
-        private List<Object> partsOfNone() {
+        private List<Object> componentsOfNone() {
             return List.of(List.of(), List.of(), List.of(), "", Flow.Limits.DEFAULT);
         }
     };
 
     /** {@code Flow.activity(ActivityBody, String, String, boolean, boolean, boolean, List<String>)}. */
-    public static final ValueContainer<Flow.Activity> ACTIVITY_SHAPE =
+    public static final ComponentType<Flow.Activity> ACTIVITY_SHAPE =
             new Fixed<>(Flow.Activity.class, "activity", Flow.class) {
                 @Override
-                public List<Object> parts(Flow.Activity value) {
+                public List<Object> components(Flow.Activity value) {
                     return value == null ? List.of("", "", "", true, false, false, List.of())
                             : List.of(body(value.body()), value.name(), value.description(), value.enabled(),
                             value.goHome(), value.popupCheck(), value.outcomes());
@@ -221,22 +185,17 @@ public final class SdkFlowValues {
                 }
 
                 @Override
-                public List<ValueForm> fixedForms() {
-                    return List.of(ValueForm.of(ACTIVITY_BODY),
-                            ValueForm.of(BasicsValueTypes.TEXT),
-                            ValueForm.of(BasicsValueTypes.TEXT),
-                            ValueForm.of(BasicsValueTypes.YES_NO),
-                            ValueForm.of(BasicsValueTypes.YES_NO),
-                            ValueForm.of(BasicsValueTypes.YES_NO),
-                            ValueForm.listOf(ValueForm.of(BasicsValueTypes.TEXT)));
+                public List<Class<?>> componentTypes() {
+                    return List.of(ActivityBody.class, String.class, String.class,
+                            boolean.class, boolean.class, boolean.class, List.class);
                 }
             };
 
     /** {@code Flow.preset(String, List<String>)}. */
-    public static final ValueContainer<Flow.Preset> PRESET_SHAPE =
+    public static final ComponentType<Flow.Preset> PRESET_SHAPE =
             new Fixed<>(Flow.Preset.class, "preset", Flow.class) {
                 @Override
-                public List<Object> parts(Flow.Preset value) {
+                public List<Object> components(Flow.Preset value) {
                     return value == null ? List.of("", List.of())
                             : List.of(value.name(), value.activities());
                 }
@@ -248,17 +207,16 @@ public final class SdkFlowValues {
                 }
 
                 @Override
-                public List<ValueForm> fixedForms() {
-                    return List.of(ValueForm.of(BasicsValueTypes.TEXT),
-                            ValueForm.listOf(ValueForm.of(BasicsValueTypes.TEXT)));
+                public List<Class<?>> componentTypes() {
+                    return List.of(String.class, List.class);
                 }
             };
 
     /** {@code Flow.edge(String, String, String)}. */
-    public static final ValueContainer<Flow.Edge> EDGE_SHAPE =
+    public static final ComponentType<Flow.Edge> EDGE_SHAPE =
             new Fixed<>(Flow.Edge.class, "edge", Flow.class) {
                 @Override
-                public List<Object> parts(Flow.Edge value) {
+                public List<Object> components(Flow.Edge value) {
                     return value == null ? List.of("", "", "")
                             : List.of(value.from(), value.to(), value.outcome());
                 }
@@ -270,18 +228,16 @@ public final class SdkFlowValues {
                 }
 
                 @Override
-                public List<ValueForm> fixedForms() {
-                    return List.of(ValueForm.of(BasicsValueTypes.TEXT),
-                            ValueForm.of(BasicsValueTypes.TEXT),
-                            ValueForm.of(BasicsValueTypes.TEXT));
+                public List<Class<?>> componentTypes() {
+                    return List.of(String.class, String.class, String.class);
                 }
             };
 
     /** {@code Flow.limits(int, int)}. */
-    public static final ValueContainer<Flow.Limits> LIMITS_SHAPE =
+    public static final ComponentType<Flow.Limits> LIMITS_SHAPE =
             new Fixed<>(Flow.Limits.class, "limits", Flow.class) {
                 @Override
-                public List<Object> parts(Flow.Limits value) {
+                public List<Object> components(Flow.Limits value) {
                     Flow.Limits limits = value == null ? Flow.Limits.DEFAULT : value;
                     return List.of(limits.maxSteps(), limits.stepDelayMs());
                 }
@@ -293,9 +249,8 @@ public final class SdkFlowValues {
                 }
 
                 @Override
-                public List<ValueForm> fixedForms() {
-                    return List.of(ValueForm.of(BasicsValueTypes.WHOLE_NUMBER),
-                            ValueForm.of(BasicsValueTypes.WHOLE_NUMBER));
+                public List<Class<?>> componentTypes() {
+                    return List.of(int.class, int.class);
                 }
             };
 
@@ -337,37 +292,33 @@ public final class SdkFlowValues {
     // ---- plumbing --------------------------------------------------------------------------------------
 
     /**
-     * A container of {@linkplain ValueContainer#arity() arity zero}: a record with fixed components, taken
-     * apart and put back positionally.
+     * The three things all five of these say the same way: the record, the factory that writes it, and the
+     * class that factory is declared on.
      *
-     * <p>{@link #partForms} ignores the arguments — there are none — and answers {@link #fixedForms()} when
-     * the expression has exactly that many parts, and nothing when it has any other number. A call with the
-     * wrong number of arguments is not this shape, and the host's answer to a form it cannot read whole is
-     * to show the expression read-only and leave it exactly as written. That is the right answer here too:
-     * it is a call to something else, or to a newer version of this factory, and either way guessing which
-     * of its parts line up with which of these would be rewriting code on a hunch.
+     * <p>A call with the wrong number of arguments is <b>not this shape</b>, and every {@code build} below
+     * says so by answering the record's own empty value rather than guessing: it is a call to something
+     * else, or to a newer version of this factory, and either way lining its parts up with these would be
+     * rewriting code on a hunch. The host's answer to an expression it cannot read whole is to show it
+     * read-only and leave it exactly as written.
      */
-    private abstract static class Fixed<C> implements ValueContainer<C> {
+    private abstract static class Fixed<C> implements ComponentType<C> {
 
-        private final Class<?> type;
+        private final Class<C> type;
         private final String factory;
         private final Class<?> owner;
 
-        Fixed(Class<?> type, String factory) {
+        Fixed(Class<C> type, String factory) {
             this(type, factory, type);
         }
 
-        Fixed(Class<?> type, String factory, Class<?> owner) {
+        Fixed(Class<C> type, String factory, Class<?> owner) {
             this.type = type;
             this.factory = factory;
             this.owner = owner;
         }
 
-        /** The static type of each component, in the order the factory takes them. */
-        abstract List<ValueForm> fixedForms();
-
         @Override
-        public final Class<?> type() {
+        public final Class<C> type() {
             return type;
         }
 
@@ -377,19 +328,8 @@ public final class SdkFlowValues {
         }
 
         @Override
-        public final int arity() {
-            return 0;
-        }
-
-        @Override
         public final String factory() {
             return factory;
-        }
-
-        @Override
-        public final List<ValueForm> partForms(List<ValueForm> arguments, int parts) {
-            List<ValueForm> forms = fixedForms();
-            return parts == forms.size() ? forms : List.of();
         }
     }
 

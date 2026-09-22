@@ -180,11 +180,12 @@ public final class QuickLaunch {
         // *is* the screen the game inside sees, so a hardcoded size caps the game's own resolution options at
         // that size whatever the project is authored at — and makes the capture a scaled copy of what the
         // pictures were made from.
-        Dimension size = ProjectFile.captureSize(resourcesDir);
+        // The authored size is gone and it was never there: capture.width / capture.height were read here
+        // and written by nothing in any module, so this took the launcher's own default on every call.
         BackgroundLauncher.forProject(resourcesDir).start(
                 backend.get(), spec,
-                size != null ? size.width : BackgroundLauncher.DEFAULT_WIDTH,
-                size != null ? size.height : BackgroundLauncher.DEFAULT_HEIGHT,
+                BackgroundLauncher.DEFAULT_WIDTH,
+                BackgroundLauncher.DEFAULT_HEIGHT,
                 // The hop is the caller's: BackgroundLauncher lives in botmaker-session, which has no JavaFX,
                 // so the outcome arrives on whichever thread produced it and this one touches a button.
                 (ok, message) -> Platform.runLater(() -> {

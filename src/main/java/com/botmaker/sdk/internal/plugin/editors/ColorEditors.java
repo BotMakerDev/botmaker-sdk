@@ -3,8 +3,6 @@ package com.botmaker.sdk.internal.plugin.editors;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
-import com.botmaker.plugin.toolkit.Slots;
-import com.botmaker.sdk.authoring.WireText;
 import com.botmaker.sdk.internal.plugin.capture.ColorSampler;
 import com.botmaker.sdk.internal.plugin.capture.EditorFrame;
 import com.botmaker.sdk.internal.plugin.capture.ScreenCapture;
@@ -39,12 +37,12 @@ import javafx.scene.paint.Color;
  * two answers, and only one of them offered the ΔE reading. One editor over a {@code ValueContext} serves
  * both places, which is what the contract's {@code ValueContext} was for.
  */
-final class ColorEditors {
+public final class ColorEditors {
 
     private ColorEditors() {}
 
     /** The editor for a {@code java.awt.Color}: a swatch and an eyedropper, in both places a value is edited. */
-    static Node color(ValueContext ctx) {
+    public static Node color(ValueContext ctx) {
         ColorPicker picker = new ColorPicker();
         picker.getStyleClass().add("color-arg-picker");
         Color initial = current(ctx);
@@ -106,16 +104,23 @@ final class ColorEditors {
     // they are the halves worth asserting — what is written is what the bot compiles, and what is read is
     // what the user sees claimed about a value they may not have set. See ColorEditorTest.
 
-    /** Writes the colour: the constructor call in a slot, the hex in a stored row. */
+    /**
+     * Writes the colour.
+     *
+     * <p>The value, not an expression: the host spells it through the {@code ComponentType} plugin-basics
+     * declares for {@code java.awt.Color}, which writes the three components rather than
+     * {@code Color.decode("#…")} — {@code decode} parses at class-initialisation time and can throw, and a
+     * bot must not fail to start over its own configuration.
+     *
+     * <p>This editor <b>overrides</b> that plugin's own swatch, through {@code SlotEditor.forType}, because
+     * it can sample a frozen frame of the capture target and that one cannot: the target's list is this
+     * plugin's own file, and no code reads another plugin's file. Declaring the type and drawing it are
+     * separate questions, which is why one plugin can answer the second for a type the other owns.
+     */
     static void commit(ValueContext ctx, Color colour) {
         if (colour == null) return;
-        int r = channel(colour.getRed());
-        int g = channel(colour.getGreen());
-        int b = channel(colour.getBlue());
-        // Fully qualified in the expression and named again as the import, which is the combination the
-        // contract documents as always safe. The components rather than Color.decode("#…"): decode parses at
-        // class-initialisation time and can throw, and a bot must not fail to start over its own configuration.
-        Slots.write(ctx, "new java.awt.Color(" + r + ", " + g + ", " + b + ")", "java.awt.Color");
+        ctx.set(new java.awt.Color(channel(colour.getRed()), channel(colour.getGreen()),
+                channel(colour.getBlue())));
     }
 
     /**
@@ -126,9 +131,7 @@ final class ColorEditors {
      * first pick. Showing a colour this editor cannot round-trip would claim a value the user never set.
      */
     static Color current(ValueContext ctx) {
-        if (!Slots.holdsNumbers(ctx, 3)) return null;
-        int[] rgb = Slots.ints(ctx, 3);
-        return Color.rgb(clamp(rgb[0]), clamp(rgb[1]), clamp(rgb[2]));
+        return ctx.value(java.awt.Color.class).map(ColorEditors::fx).orElse(null);
     }
 
     private static Color fx(java.awt.Color colour) {

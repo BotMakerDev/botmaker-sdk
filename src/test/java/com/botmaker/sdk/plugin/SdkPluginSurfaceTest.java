@@ -1,12 +1,25 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.slot.SlotEditor;
-import com.botmaker.plugin.api.source.SourceSeed;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
-import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.api.value.ValueType;
+import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.geometry.Direction;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.interaction.MouseButton;
+import com.botmaker.sdk.api.vision.ColorMatch;
+import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.ImageTemplateGroup;
+import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.api.vision.Matches;
+import com.botmaker.sdk.api.vision.Precision;
+import com.botmaker.sdk.api.vision.TextMatch;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
@@ -57,17 +70,22 @@ import static org.junit.jupiter.api.Assertions.fail;
 class SdkPluginSurfaceTest {
 
     /**
-     * The eight ids <b>this plugin</b> registers, in registration order, which is the order a "what type is
-     * this variable" dropdown offers them in after plugin-basics' nine. Written out rather than derived from
-     * the catalog, because a test that reads its expectation from its subject asserts nothing.
+     * The fourteen types <b>this plugin</b> declares, in declaration order, which is the order a "what type
+     * is this variable" dropdown offers them in after plugin-basics' nine. Written out rather than derived
+     * from {@code SdkTypes.ALL}, because a test that reads its expectation from its subject asserts nothing.
      *
-     * <p>It was seventeen until 2026-09-09: {@code TEXT} … {@code DURATION} are
-     * {@code botmaker-plugin-basics}' now, with the same ids, and a host sees all seventeen by merging the
-     * two catalogs. {@code ValueVocabularyTest} is where that merge is asserted.
+     * <p>They were persisted ids — {@code IMAGE_TEMPLATE}, {@code POINT} — until 2026-09-22. A type's
+     * identity is its Java class now, which is what a {@code @Param} field is declared as, so there is no
+     * second name to keep in step with the first.
+     *
+     * <p>The last six are declarable but not editable: their fresh form is a call the bot re-evaluates, so
+     * they answer {@code freshSource()} where the first eight answer {@code fresh()}.
      */
-    private static final List<String> VALUE_TYPE_IDS = List.of(
-            "IMAGE_TEMPLATE", "PRECISION", "POINT", "RECT", "SIZE", "DIRECTION", "KEY", "MOUSE_BUTTON",
-            "ACTIVITY_BODY", "CAPTURE_SOURCE");
+    private static final List<Class<?>> DECLARED_TYPES = List.of(
+            ImageTemplate.class, Precision.class, Point.class, Rect.class, Size.class,
+            Direction.class, Key.class, MouseButton.class,
+            CaptureSource.class, ImageTemplateGroup.class, MatchResult.class, Matches.class,
+            ColorMatch.class, TextMatch.class);
 
     private final SdkPlugin plugin = new SdkPlugin();
 
@@ -80,21 +98,68 @@ class SdkPluginSurfaceTest {
 
     @Test
     void the_palette_builds_with_no_problems_and_is_the_same_object_on_a_second_ask() {
-        assertTrue(plugin.catalog("").problems().isEmpty(), () -> plugin.catalog("").problems().toString());
-        assertFalse(plugin.catalog("").facades().isEmpty());
+        assertTrue(plugin.catalog().problems().isEmpty(), () -> plugin.catalog().problems().toString());
+        assertFalse(plugin.catalog().facades().isEmpty());
 
         // AbstractStudioPlugin memoises, and it matters: reflecting 52 facades happens while a project is
         // opening, so a second ask must not do it again.
-        assertSame(plugin.catalog(""), plugin.catalog("1.1.2"));
+        assertSame(plugin.catalog(), plugin.catalog());
     }
 
     @Test
-    void every_value_type_is_registered_once_and_in_the_order_the_dropdown_shows() {
-        ValueCatalog catalog = plugin.valueTypes();
-        assertEquals(VALUE_TYPE_IDS, catalog.types().stream().map(ValueType::id).toList());
-        for (String id : VALUE_TYPE_IDS) {
-            assertTrue(catalog.knows(id), id);
-            assertTrue(catalog.codec(id).isPresent(), id);
+    void every_type_is_declared_once_and_in_the_order_the_dropdown_shows() {
+        assertEquals(DECLARED_TYPES, plugin.types().stream().map(PluginType::type).toList());
+    }
+
+    /**
+     * Every declared type says what a fresh one is — as a value, or as an expression, never as neither.
+     *
+     * <p>This is what a type picker needs before it can offer a type at all: the host writes a declaration
+     * with an initializer, so a type answering nothing would produce a field with no value and a menu entry
+     * that does nothing.
+     */
+    @Test
+    void every_declared_type_says_what_a_fresh_one_is() {
+        for (PluginType<?> type : plugin.types()) {
+            String name = type.type().getName();
+            Object fresh = type.fresh();
+            if (fresh != null) {
+                assertTrue(type.type().isInstance(fresh), name + " answered a fresh value of another type");
+                assertTrue(type.freshSource().isBlank(),
+                        name + " answered both a value and an expression; the host would not know which");
+            } else {
+                assertFalse(type.freshSource().isBlank(),
+                        name + " answers neither a fresh value nor a fresh expression");
+                assertTrue(type.freshSource().contains("."),
+                        name + "'s fresh expression must be fully qualified: " + type.freshSource());
+            }
+        }
+    }
+
+    /**
+     * {@code build(components(fresh()))} is {@code fresh()} — the law every {@code ComponentType} owes.
+     *
+     * <p>It is the check the deleted id-uniqueness one could never make. A codec pair where only the writer
+     * had a caller is exactly how {@code literal}/{@code valueOfLiteral} drifted until a {@code java.awt.Color}
+     * came back rewritten; asking a type to put its own fresh value back together catches that on the build.
+     *
+     * <p><b>Compared by components rather than by {@code equals}</b>, because not every type this plugin
+     * owns has value equality and requiring it would be the wrong demand: {@code ImageTemplate} holds an
+     * OpenCV {@code Mat} and is {@code AutoCloseable}, so two of them naming one picture are not
+     * interchangeable and an {@code equals} claiming they are would be worse than none. The component list
+     * is what the host actually writes and reads back, so comparing it catches every drift that can reach a
+     * user's file — a part in the wrong position, a part lost — and demands nothing of the type beyond the
+     * two methods it already declares.
+     */
+    @Test
+    void every_composite_type_round_trips_its_fresh_value() {
+        for (PluginType<?> type : plugin.types()) {
+            if (!(type instanceof ComponentType<?> composite)) continue;
+            Object fresh = type.fresh();
+            if (fresh == null) continue;       // a seeded type has no value to take apart
+            List<Object> parts = composite.componentsOf(fresh);
+            assertEquals(parts, composite.componentsOf(composite.build(parts)),
+                    type.type().getName() + " did not survive being taken apart and put back together");
         }
     }
 
@@ -103,15 +168,10 @@ class SdkPluginSurfaceTest {
     // nothing ever declared a row, so the reading half had nothing to read. A parameter is a @Param field in
     // the bot's own Java, and the Parameters window's sections are the bot's own classes.
 
-    @Test
-    void every_source_seed_names_a_type_and_an_expression() {
-        List<SourceSeed> seeds = plugin.sourceSeeds();
-        assertFalse(seeds.isEmpty());
-        for (SourceSeed seed : seeds) {
-            assertFalse(seed.typeName().isBlank(), seed::toString);
-            assertNotNull(seed.expression(), seed::toString);
-        }
-    }
+    // every_source_seed_names_a_type_and_an_expression stood here until 2026-09-22, over
+    // plugin.sourceSeeds(). A seed said two things -- this type is declarable, and here is a fresh one as
+    // Java text javac never looked at -- and both are now types(): the first by being in the list, the
+    // second by fresh() or freshSource(). The two tests above are what it became.
 
     /**
      * The ten buttons, their sections and their order within them.
@@ -130,7 +190,7 @@ class SdkPluginSurfaceTest {
         List<ToolbarItem> items = plugin.toolbarItems();
 
         assertEquals(List.of("pilot", "capture-templates", "record-macro", "manage-templates",
-                        "activity-flow", "capture-targets", "project-setup",
+                        "activity-flow", "capture-source", "project-setup",
                         "point-here", "picture-here", "record-here"),
                 items.stream().map(ToolbarItem::id).toList());
 

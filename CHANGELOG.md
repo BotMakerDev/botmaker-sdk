@@ -53,11 +53,25 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   window read out of this plugin was a pre-2026-09-17 project's JSON and nothing else. **Nothing changes for
   a bot**, and nothing is lost in the editor: a parameter is a `@Param` field in your own Java, and one this
   plugin wants for itself goes in `plugins/sdk/Sdk.java`, which the window already reads.
+- **The plugin contract is a `compile` dependency**, so it reaches your bot rather than stopping at this
+  jar. `@Param` and `@Managed` moved onto the contract and sit on your *own* fields and methods, so your bot
+  needs that jar to compile at all; at `provided` it resolved no copy and failed on its own `@Param` line.
+  Nothing about how a plugin links changes — `PluginLoader` is parent-first for `com.botmaker.plugin.api.**`,
+  so a plugin still links the host's copy and there is one `Class` on both sides. **The one thing to know:**
+  do not declare `botmaker-studio-api` yourself beside a plugin that brings it, or nearest-wins pins you to a
+  contract version your plugin was never built against.
+- **🎯 Capture Targets is 🎯 Capture Source, and it picks one thing.** A project kept a *list* of targets in
+  `capture.json` with one marked default; that file is deleted and a project's capture source is the
+  expression `Sdk.captureSource()` returns, which is one source. So the list manager is the picker it always
+  opened. Nothing read the other entries.
+- **Nothing is snapped to a reference resolution before a capture.** It came from `capture.json` too, and
+  each picture already records the size it was authored at in its own sidecar — which is what the matcher
+  rescales against. *Project Setup* has two required steps rather than three for the same reason.
 
-- **Nothing changes for a bot.** The SDK's plugin half was recompiled against the plugin contract's new
-  package layout (`com.botmaker.plugin.api.slot`, `.parameters`, `.toolbar`, `.source`). No `api.*` type,
-  method or behaviour changed, and a bot never writes a contract name down — this line exists so the version
-  bump has a reason on it.
+- **Otherwise nothing changes for a bot.** The SDK's plugin half was recompiled against the plugin
+  contract's new package layout (`com.botmaker.plugin.api.slot`, `.parameters`, `.toolbar`, `.source`,
+  `.value`). No `api.*` type, method or behaviour changed — japicmp holds that — and a bot never writes a
+  contract name down.
 
 ## [1.1.14] — 2026-09-21
 

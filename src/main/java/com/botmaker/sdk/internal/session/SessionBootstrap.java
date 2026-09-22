@@ -1,7 +1,6 @@
 package com.botmaker.sdk.internal.session;
 
 import com.botmaker.sdk.api.bot.Session;
-import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.config.ProjectProperties;
@@ -104,16 +103,20 @@ public final class SessionBootstrap {
     }
 
     /**
-     * The nested display size from the project's authored resolution, or the default when unset — and which of
-     * the two it was.
+     * The nested display size, which is {@link SessionBackends}' own default.
      *
-     * <p>The source is carried rather than resolved away because a bot is the consumer least able to ask: it
-     * runs headless, and a bot that finds nothing has no way to tell a display sized to its templates from one
-     * sized to a default that matches nothing it captured. {@link #launchIsolated} logs it for exactly that.
+     * <p>It read the project's authored resolution until 2026-09-22 — {@code capture.width} /
+     * {@code capture.height} through {@code ProjectDefaults.defaultResolution} — and the branch is deleted
+     * rather than kept because <b>nothing in any module ever wrote either key</b>. Every bot that has ever
+     * run took the default here; {@link #launchIsolated} carried a "sized to your templates / sized to a
+     * default" distinction that only ever had one side.
+     *
+     * <p>The shape is kept rather than inlined at the call site, because a display size a bot did choose is
+     * a plausible thing to want back — as a {@code @Managed} value beside the capture source, which is where
+     * the rest of this file's facts went. It would then have exactly one author.
      */
     static SessionBackends.DisplaySize size() {
-        Size r = ProjectDefaults.defaultResolution();
-        return SessionBackends.sizeFor(r == null ? 0 : r.width(), r == null ? 0 : r.height());
+        return SessionBackends.sizeFor(0, 0);
     }
 
     /**

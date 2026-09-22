@@ -78,8 +78,8 @@ class SdkPluginHeadlessTest {
             Class<?> plugin = Class.forName(SdkPlugin.class.getName(), true, headless);
             Object instance = plugin.getDeclaredConstructor().newInstance();
 
-            assertNotNull(plugin.getMethod("catalog", String.class).invoke(instance, "v1.2.0"));
-            assertNotNull(plugin.getMethod("valueTypes").invoke(instance));
+            assertNotNull(plugin.getMethod("catalog").invoke(instance));
+            assertNotNull(plugin.getMethod("types").invoke(instance));
             assertNotNull(plugin.getMethod("toolbarItems").invoke(instance));
         }
     }

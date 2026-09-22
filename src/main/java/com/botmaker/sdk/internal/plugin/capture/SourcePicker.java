@@ -1,7 +1,8 @@
 package com.botmaker.sdk.internal.plugin.capture;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.sdk.authoring.CaptureTargetModel;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.emulator.EmulatorSource;
 import com.botmaker.session.Preview;
 import com.botmaker.shared.capture.GamescopeHost;
 import com.botmaker.shared.capture.GenericWindow;
@@ -44,10 +45,15 @@ import java.util.concurrent.Executors;
  * and <b>Windows</b>, each drawn as a tile with a live thumbnail, plus an optional <b>Project default</b>
  * tile that means "whatever the project is pointed at, now and later".
  *
- * <p>It is the plugin's own vocabulary end to end — a {@link CaptureTargetModel} is what a tile stands for,
- * and what a capture source <em>is</em> belongs to the SDK's {@code CaptureSource}, not to the host. The host
- * supplies exactly the three things nobody else can: the current look, the window a modal should be owned by,
- * and the conversion of a grabbed {@link BufferedImage} into something JavaFX can draw.
+ * <p>It is the plugin's own vocabulary end to end — a tile stands for one {@link CaptureSource}, which is
+ * the SDK's own type and not the host's. The host supplies exactly the three things nobody else can: the
+ * current look, the window a modal should be owned by, and the conversion of a grabbed
+ * {@link BufferedImage} into something JavaFX can draw.
+ *
+ * <p>A tile held a {@code CaptureTargetModel} — a {@code (spec, label)} pair over shared's text grammar —
+ * until 2026-09-22. It existed because a chosen source was <em>stored as text</em> in {@code capture.json};
+ * with that file deleted, the thing a tile stands for is the source itself, written into the bot's own Java
+ * by {@link CaptureExpr}.
  *
  * <p>Every grab runs off the FX thread and every one of them is best-effort: a tile with no thumbnail is
  * still a tile the user can pick, because a window that refuses its pixels is still the window they mean.
@@ -66,8 +72,8 @@ public final class SourcePicker {
          * pixel space, where {@code (0,0)} is its top-left, so the narrowing survives the window moving.
          * {@code null} means the whole source.
          */
-        record Concrete(CaptureTargetModel target, Rectangle region) implements Selection {
-            public Concrete(CaptureTargetModel target) {
+        record Concrete(CaptureSource target, Rectangle region) implements Selection {
+            public Concrete(CaptureSource target) {
                 this(target, null);
             }
         }
@@ -246,7 +252,7 @@ public final class SourcePicker {
             String name = String.format("Screen %d — %d×%d", i + 1,
                     (int) bounds.getWidth(), (int) bounds.getHeight());
             VBox tile = tile(name, screen.equals(Screen.getPrimary()) ? "Primary monitor" : "Monitor");
-            CaptureTargetModel target = CaptureTargetModel.monitor(i);
+            CaptureSource target = CaptureSource.monitor(i);
             tile.setOnMouseClicked(e -> {
                 select(tile, new Selection.Concrete(target));
                 if (e.getClickCount() == 2) close();
@@ -270,7 +276,7 @@ public final class SourcePicker {
     /** One "Whole desktop" tile — every monitor combined, which is what a bot with no target sees. */
     private void loadDesktop(FlowPane into) {
         VBox tile = tile("Whole desktop", "All monitors combined");
-        CaptureTargetModel target = CaptureTargetModel.desktop();
+        CaptureSource target = CaptureSource.desktop();
         tile.setOnMouseClicked(e -> {
             select(tile, new Selection.Concrete(target));
             if (e.getClickCount() == 2) close();
@@ -307,7 +313,7 @@ public final class SourcePicker {
                 Image image = running ? toFx(emulatorThumbnail(instance)) : null;
                 Platform.runLater(() -> {
                     VBox tile = tile(name, running ? "Emulator · running" : "Emulator · stopped");
-                    CaptureTargetModel target = CaptureTargetModel.emulator(name);
+                    CaptureSource target = new EmulatorSource(name);
                     tile.setOnMouseClicked(e -> {
                         select(tile, new Selection.Concrete(target));
                         if (e.getClickCount() == 2) close();
@@ -381,7 +387,7 @@ public final class SourcePicker {
                 Image image = toFx(shot);
                 Platform.runLater(() -> {
                     VBox tile = tile(title, "Window");
-                    CaptureTargetModel target = CaptureTargetModel.window(title);
+                    CaptureSource target = CaptureSource.window(title);
                     tile.setOnMouseClicked(e -> {
                         select(tile, new Selection.Concrete(target));
                         if (e.getClickCount() == 2) close();

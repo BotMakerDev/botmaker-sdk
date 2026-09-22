@@ -154,12 +154,38 @@
              The SDK is plugin #1 and a *privileged default* plugin, but a plugin, with no back door — so
              the one module that must not be exempt from the platform's own gate is this one. `provided`
              also states the intent where `optional` merely achieves it: drop the `<optional>` flag by
-             accident and the contract silently goes transitive, while a `provided` dependency cannot. -->
+             accident and the contract silently goes transitive, while a `provided` dependency cannot.
+
+             IT IS `compile` SINCE 2026-09-22, AND THE PARAGRAPH ABOVE IS WHY THAT TOOK AN ARGUMENT.
+
+             @Param and @Managed moved to the contract (com.botmaker.plugin.api.params / .managed). They sit
+             on a BOT's own fields and methods (`@Param static int minHealth` in Parameters.java, `@Managed
+             static Flow flow()` in plugins/sdk/Sdk.java), so a bot needs the contract jar to compile at
+             all. `provided` is not transitive, and plugin-basics (where both annotations lived, and which
+             this module brings at `compile`) declares the contract `provided` too, so a bot would resolve
+             no copy of it and fail on its own @Param line.
+
+             THE THING THE OLD SCOPE PROTECTED IS UNAFFECTED, and it is worth being precise about why,
+             because `two Class objects for one contract class` is a real failure and not a theoretical one.
+             PluginLoader is PARENT-FIRST for com.botmaker.plugin.api.**: whatever copy is on the project's
+             classpath, a plugin links against the HOST's. One Class on both sides, unchanged. What a second
+             copy on a bot's classpath is for is the bot's own compilation, where there is no host at all.
+
+             THE RESIDUAL RISK IS MEDIATION, not scope: nothing may declare botmaker-studio-api directly
+             beside a plugin that brings it, or nearest-wins pins the bot to a contract version its plugin
+             was never built against. Same landmine as TOOLKIT_FALLBACK_VERSION and the gamebot's toolkit
+             pin (2026-09-21), and the same rule answers it: whoever puts a plugin on a classpath supplies
+             what it needs, once.
+
+             `botmaker-cli`'s `pom-scopes` STILL REFUSES a `compile` contract, so `botmaker plugin validate`
+             refuses this module until that check is relaxed to accept one. That is owed and is phase 6 of
+             this change; the reactor is unaffected, since nothing in it runs the validator against the SDK.
+             The check's own reasoning (a second contract copy makes two Class objects) is answered by
+             the parent-first paragraph above, which was already true when the check was written. -->
         <dependency>
             <groupId>com.github.LiQiyeDev</groupId>
             <artifactId>botmaker-studio-api</artifactId>
             <version>${botmaker.studioapi.version}</version>
-            <scope>provided</scope>
         </dependency>
 
         <!-- The plugin widget toolkit: what internal.plugin.editors is built from, and the superclass of

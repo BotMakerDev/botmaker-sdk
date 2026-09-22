@@ -47,7 +47,7 @@ class ApiCatalogTest {
 
     /** Building it is itself half the test: this is the reflection pass the editor will run. */
     private static PaletteCatalog catalog() {
-        return new SdkPlugin().catalog(null);
+        return new SdkPlugin().catalog();
     }
 
     @Test
@@ -122,20 +122,25 @@ class ApiCatalogTest {
         }
     }
 
+    /**
+     * One catalog, built once.
+     *
+     * <p>It took the bot's pinned version and asserted that every pin — old, dev, newer than this jar,
+     * absent — answered the same object. That argument won: {@code catalog(String)} lost its parameter on
+     * 2026-09-22, because a method whose every input must give one answer is a method with no input. The
+     * narrowing that does matter is unchanged and is not here — {@code SdkSurfaceService} intersects this
+     * catalog with the bot's own resolved jar.
+     *
+     * <p>What survives as an assertion is the memoisation, which is load-bearing: reflecting 52 facades
+     * happens while a project is opening, so a second ask must not do it again.
+     */
     @Test
-    @DisplayName("the plugin answers the same catalog for every pin, including none")
-    void pluginIgnoresThePin() {
+    @DisplayName("the plugin builds its catalog once and answers the same object")
+    void pluginBuildsTheCatalogOnce() {
         SdkPlugin plugin = new SdkPlugin();
-        PaletteCatalog current = plugin.catalog("1.1.0");
-        assertFalse(current.isEmpty(), "an old pin must not empty the palette");
-        assertSame(current, plugin.catalog("v1.1.0"));
-        assertSame(current, plugin.catalog("0.0.0-SNAPSHOT"),
-                "a dev pin is this very jar; refusing it would empty the palette in every dev build");
-        assertSame(current, plugin.catalog("9.9.9"),
-                "a bot newer than this jar is still offered this build's curation; the narrowing that"
-                        + " matters is SdkSurfaceService's intersection against the bot's own jar");
-        assertSame(current, plugin.catalog(null),
-                "an absent pin must be total too — nothing here reads the pin at all");
+        PaletteCatalog current = plugin.catalog();
+        assertFalse(current.isEmpty(), "an empty palette is the failure this plugin's surface fails silently with");
+        assertSame(current, plugin.catalog());
     }
 
     // ----------------------------------------------------------------------------------------- helpers

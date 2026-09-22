@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
 import com.botmaker.plugin.toolkit.testing.TestContexts;
+import com.botmaker.sdk.api.vision.Precision;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
@@ -119,32 +120,39 @@ class PrecisionEditorTest {
 
     // --- what is written, wherever the value lives --------------------------------------------------------
 
+    /**
+     * A pick writes the three numbers as a {@link Precision}, not as an expression for one.
+     *
+     * <p>It asserted {@code "Precision.TIGHT.minArea(400)"} until 2026-09-22 — the shortest exact Java
+     * form, spelled by this editor. The host spells it now, through this plugin's own {@code ComponentType},
+     * and {@code literalFor} survives only for the dialog's own preview line. One writer means the editor
+     * and the reader cannot disagree, which is the whole property the old assertion was protecting.
+     */
     @Test
-    void a_slot_gets_the_java_form_and_asks_for_its_import() {
+    void a_slot_gets_the_three_numbers_themselves() {
         TestContexts.Recording slot = TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision",
                 "Precision.DEFAULT");
 
         PrecisionEditors.commit(slot, new PrecisionEditors.Settings(5.0, 400, 0));
 
-        assertEquals("Precision.TIGHT.minArea(400)", slot.written());
-        assertEquals(List.of("com.botmaker.sdk.api.vision.Precision"), slot.imports());
+        assertEquals(new Precision(5.0, 400, 0), slot.value());
     }
 
     /**
-     * A value with no call site gets that same Java form.
+     * A value with no call site gets the same thing.
      *
      * <p>It got the SDK's three stored numbers — {@code 18.0,400,2000} — until 2026-09-20, because a
-     * Parameters row held text its codec had written. The editor and the codec were two writers of one file,
-     * and a disagreement between them was a value that changed meaning on the way back. There is one writer
-     * now.
+     * Parameters row held text its codec had written, and a Java form until 2026-09-22. The editor and the
+     * codec were two writers of one file, and a disagreement between them was a value that changed meaning
+     * on the way back.
      */
     @Test
-    void a_value_with_no_call_site_gets_the_same_java_form() {
+    void a_value_with_no_call_site_gets_the_same_three_numbers() {
         TestContexts.Recording row = TestContexts.row("com.botmaker.sdk.api.vision.Precision", "");
 
         PrecisionEditors.commit(row, new PrecisionEditors.Settings(18.0, 400, 2000));
 
-        assertEquals("Precision.of(18, 400, 2000)", row.written());
+        assertEquals(new Precision(18.0, 400, 2000), row.value());
     }
 
     @Test
@@ -153,20 +161,40 @@ class PrecisionEditorTest {
 
         TestContexts.Recording slot = TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision", "");
         PrecisionEditors.commit(slot, picked);
-        assertEquals(picked, PrecisionEditors.current(
-                TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision", slot.written())));
+        assertEquals(picked, PrecisionEditors.current(slot));
 
         TestContexts.Recording row = TestContexts.row("com.botmaker.sdk.api.vision.Precision", "");
         PrecisionEditors.commit(row, picked);
-        assertEquals(picked, PrecisionEditors.current(
-                TestContexts.row("com.botmaker.sdk.api.vision.Precision", row.written())));
+        assertEquals(picked, PrecisionEditors.current(row));
     }
 
-    /** An empty or half-written row reads as the default rather than as zeroes, on the same reasoning. */
+    /**
+     * A wither chain the user wrote is still read, which is the one parser this editor kept.
+     *
+     * <p>The host cannot decode it — it is not a factory call, so no {@code ComponentType} describes it —
+     * and falling through to {@code Precision.DEFAULT} would open the dialog on three values the user never
+     * chose. See {@code PrecisionEditors.current}.
+     */
     @Test
-    void a_row_that_says_nothing_reads_as_the_sdk_default() {
-        assertEquals(new PrecisionEditors.Settings(12.0, 4, 0), PrecisionEditors.wireOf(""));
-        assertEquals(new PrecisionEditors.Settings(5.0, 4, 0), PrecisionEditors.wireOf("5.0"));
-        assertEquals(new PrecisionEditors.Settings(12.0, 4, 0), PrecisionEditors.wireOf("not,a,number"));
+    void a_wither_chain_the_host_cannot_decode_is_still_read() {
+        assertEquals(new PrecisionEditors.Settings(5.0, 400, 0), PrecisionEditors.current(
+                TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision",
+                        "Precision.TIGHT.minArea(400)")));
+    }
+
+    /**
+     * A value that says nothing reads as the SDK default rather than as zeroes.
+     *
+     * <p>Zeroes would be a {@code Precision} that matches nothing, silently, on a slot the user has not
+     * touched. It asserted this over {@code wireOf} — three comma-separated numbers, the stored row form —
+     * which is deleted with the codec that wrote it; the same property over what a value actually holds now
+     * is what is left.
+     */
+    @Test
+    void a_value_that_says_nothing_reads_as_the_sdk_default() {
+        assertEquals(new PrecisionEditors.Settings(12.0, 4, 0),
+                PrecisionEditors.current(TestContexts.row("com.botmaker.sdk.api.vision.Precision", "")));
+        assertEquals(new PrecisionEditors.Settings(12.0, 4, 0), PrecisionEditors.current(
+                TestContexts.row("com.botmaker.sdk.api.vision.Precision", "somebodysPrecision")));
     }
 }

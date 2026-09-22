@@ -5,36 +5,18 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.source.ManagedValue;
-import com.botmaker.plugin.api.source.SourceSeed;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
-import com.botmaker.plugin.api.value.ValueCatalog;
+import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
-import com.botmaker.plugin.toolkit.Editors;
-import com.botmaker.plugin.toolkit.Region;
-import com.botmaker.plugin.toolkit.ScreenPicks;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.geometry.Direction;
-import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.interaction.Key;
-import com.botmaker.sdk.api.interaction.MouseButton;
-import com.botmaker.sdk.api.vision.ColorMatch;
-import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.api.vision.ImageTemplateGroup;
-import com.botmaker.sdk.api.vision.MatchResult;
-import com.botmaker.sdk.api.vision.Matches;
-import com.botmaker.sdk.api.vision.Precision;
-import com.botmaker.sdk.api.vision.TextMatch;
-import com.botmaker.sdk.api.vision.Vision;
-import com.botmaker.sdk.authoring.CaptureTargetModel;
-import com.botmaker.sdk.internal.authoring.SdkValueTypes;
+import com.botmaker.sdk.internal.authoring.SdkTypes;
 import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
-import com.botmaker.sdk.internal.plugin.capture.CaptureTargets;
+import com.botmaker.sdk.internal.plugin.capture.CaptureLabels;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
-import com.botmaker.sdk.internal.plugin.capture.ScreenCapture;
+import com.botmaker.sdk.internal.plugin.capture.CaptureValue;
+import com.botmaker.sdk.internal.plugin.capture.SourcePicker;
 import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 import com.botmaker.sdk.internal.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.internal.plugin.flow.FlowValue;
@@ -120,38 +102,11 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         super(ID, "BotMaker SDK");
     }
 
-    /**
-     * The overlay, as the toolkit asks for it: one {@link ScreenCapture} per pick, over this machine's
-     * screens.
-     *
-     * <p>Over the screens and not over the project's capture target, deliberately. These three are the picks
-     * a widget makes with nothing but a slot in hand — a region, a coordinate, a colour — and a slot does not
-     * say which project it belongs to. An editor that wants the bot's own frame asks {@code EditorFrame} for
-     * it by name, which is what the colour and picture editors do.
-     */
-    private static final class SdkScreenPicks implements ScreenPicks {
-
-        @Override
-        public void region(Consumer<Region> onSelected) {
-            new ScreenCapture().selectRegion(null,
-                    r -> onSelected.accept(new Region(r[0], r[1], r[2], r[3])));
-        }
-
-        @Override
-        public void point(Consumer<Region> onPicked) {
-            // A Region with no size: the contract has one coordinate type, and a point is a region whose
-            // width and height are nobody's business.
-            new ScreenCapture().pickPoint(null, p -> onPicked.accept(new Region(p[0], p[1], 0, 0)));
-        }
-
-        @Override
-        public void color(Consumer<Color> onSampled) {
-            new ScreenCapture().pickColor(null, pick -> {
-                java.awt.Color c = pick.color();
-                onSampled.accept(Color.rgb(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha() / 255.0));
-            });
-        }
-    }
+    // SdkScreenPicks stood here as a nested class until 2026-09-22, registered process-wide through
+    // Editors.pickWith. Both are deleted. The picker is com.botmaker.sdk.internal.plugin.editors's now,
+    // reached by the one editor that needs it (GeometryEditors, which hands it to Editors.tuplePill as an
+    // argument). pickWith held ONE static ScreenPicks for every plugin in the process, last writer wins and
+    // nothing said so; passing it removes the shared state rather than relocating it.
 
     /**
      * Built once, by reflection over the facades named here. Every member is <em>discovered</em> rather than
@@ -243,77 +198,48 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * {@code <optional>true</optional>} in this module's pom, so they are in the jar and never linked on a
      * bot's classpath — the same arrangement that makes the contract dependency safe.
      *
-     * <p><b>This is where the screen picker is registered</b>, since 2026-09-05 and for the reason the
-     * constructor's javadoc gives at length: registering it there linked {@code Editors} and made the plugin
-     * unconstructible on a host with no JavaFX. Here it is reached only by a host that is asking for
-     * editors, which is a host that has one. {@link AbstractStudioPlugin} calls this once and caches, so it
-     * is still the single registration {@link ScreenPicks} describes; and it happens before any editor in
-     * the returned list can draw, because a {@code SlotEditor} is a predicate and a factory and the pick is
-     * read when the widget runs.
+     * <p><b>The screen picker was registered here</b>, from 2026-09-05 to 2026-09-22 — here rather than in
+     * the constructor, for the reason that javadoc gives at length. It is registered nowhere now: the one
+     * editor that picks on screen holds {@code SdkScreenPicks} itself and passes it, which keeps the
+     * constructor's property (nothing JavaFX-shaped is linked until a host asks for editors) and drops the
+     * process-wide static as well.
      */
     @Override
     protected List<SlotEditor> buildSlotEditors() {
-        Editors.pickWith(new SdkScreenPicks());
         return SdkEditors.ALL;
     }
 
     /**
-     * What a fresh value of each of this plugin's holdable types looks like, written as Java.
+     * The fourteen types this plugin declares — what each one is, what a fresh one is, and how a person
+     * edits one.
      *
-     * <p>Not cached, and deliberately so: {@link CaptureExpr#projectDefault()} is the SDK's <em>live</em>
-     * ambient source, so a slot seeded with it keeps following the project's configured target when that is
-     * changed later. A snapshot taken when the plugin loaded would silently freeze the slot into whatever the
-     * default happened to be at project open — the exact bug the comment on {@code projectDefault()} exists
-     * to prevent, moved intact from {@code InitializerFactory}'s arm for it.
+     * <h2>This list answers two questions, and the second one used to be Studio's</h2>
      *
-     * <h2>This list answers two questions since 2026-09-01, and the second one used to be Studio's</h2>
+     * <p>It started as three {@code SourceSeed}s — the types the host's generic {@code new T()} cannot fill
+     * on its own: an interface, a record with required components, and a type whose meaning lives in a
+     * constant. It became fourteen because <b>Studio's {@code palette/BotType} used to list them</b>, as
+     * fourteen {@code Class} literals with a default value beside each, and that list is what "Declare Bot
+     * Variable" and the Add Function dialog offer. An editor curating one plugin's API is the back door the
+     * platform exists to close — and a second plugin's types could never have joined that enum at all.
      *
-     * <p>It started as three seeds — the types the host's generic {@code new T()} cannot fill on its own: an
-     * interface, a record with required components, and a type whose meaning lives in a constant. It is
-     * fourteen now, and the eleven that joined are not here because {@code new T()} would fail. They are here
-     * because <b>Studio's {@code palette/BotType} used to list them</b>, as fourteen {@code Class} literals
-     * with a default value beside each, and that list is what "Declare Bot Variable" and the Add Function
-     * dialog offer. An editor curating one plugin's API is the back door the platform exists to close — and a
-     * second plugin's types could never have joined that enum at all.
+     * <p>So being in this list means <em>this type is one a bot author can hold</em>. Adding a type here
+     * makes it declarable; removing one takes it out of both menus.
      *
-     * <p>So a seed now means <em>this type is one a bot author can hold</em>, and nothing was added to the
-     * contract to say it: the surface answering <em>what does a fresh one look like</em> already had the whole
-     * triple a declarable type needs — the name, the expression, and the imports it wants. Adding a type here
-     * makes it declarable; removing one takes it out of both menus. That is the curation Studio's allow-list
-     * used to perform, moved to the plugin that knows which of its types are worth holding.
+     * <h2>Eight are editable and six are not, which is the split that survived {@code SourceSeed}</h2>
      *
-     * <p><b>Every expression is fully qualified.</b> The host writes a seeded declaration with the qualified
-     * type name and has no rewriter to add an import with, so a seed that named {@code Point} would compile
-     * only where something else had already imported it.
+     * <p>{@code SdkTypes.ALL} carries both. The eight answer a real {@code fresh()} and a real editor. The
+     * six — the ambient capture source, a template group and the four vision results — answer
+     * {@code freshSource()} instead, because their honest starting value is a <em>call the bot
+     * re-evaluates</em>: a match is something the bot found a moment ago, not something anyone configures,
+     * and {@link CaptureExpr#projectDefault()} keeps following the project's source when that changes later.
+     * A snapshot would silently freeze a declaration into whatever was true at project open.
      *
-     * <p>Two of the fourteen state a judgement rather than a value. {@code Precision.DEFAULT} rather than a
-     * number for the reason the type exists at all: the constant says what the slot is for, where
-     * {@code new Precision(12.0, …)} states three numbers that each fail silently on their own. And
-     * {@code new ImageTemplate("")} carries an empty path on purpose — it is what opens the per-element
-     * picture picker on the element just added, so the user picks in the editor rather than typing a path.
-     * The three {@code Vision.last…} seeds are the same idea again: a match is something the bot <em>found</em>,
-     * so the honest starting value is the last one it found, not a fabricated hit.
+     * <p>Not cached here: {@link AbstractStudioPlugin} does the caching, and {@code fresh()} is asked every
+     * time a value is seeded so it may read this plugin's live state.
      */
     @Override
-    public List<SourceSeed> sourceSeeds() {
-        String vision = Vision.class.getName();
-        return List.of(
-                SourceSeed.of(CaptureSource.class.getName(), CaptureExpr.projectDefault()),
-                SourceSeed.of(Precision.class.getName(), Precision.class.getName() + ".DEFAULT"),
-                SourceSeed.of(ImageTemplate.class.getName(),
-                        "new " + ImageTemplate.class.getName() + "(\"\")"),
-                SourceSeed.of(ImageTemplateGroup.class.getName(),
-                        ImageTemplateGroup.class.getName() + ".of()"),
-                SourceSeed.of(MatchResult.class.getName(), vision + ".lastMatch()"),
-                SourceSeed.of(Matches.class.getName(), Matches.class.getName() + ".none()"),
-                SourceSeed.of(ColorMatch.class.getName(), vision + ".lastColorMatch()"),
-                SourceSeed.of(TextMatch.class.getName(), vision + ".lastTextMatch()"),
-                SourceSeed.of(Point.class.getName(), "new " + Point.class.getName() + "(0, 0)"),
-                SourceSeed.of(Rect.class.getName(), "new " + Rect.class.getName() + "(0, 0, 0, 0)"),
-                SourceSeed.of(Size.class.getName(), "new " + Size.class.getName() + "(0, 0)"),
-                SourceSeed.of(Direction.class.getName(), Direction.class.getName() + ".NORTH"),
-                SourceSeed.of(Key.class.getName(), Key.class.getName() + ".A"),
-                SourceSeed.of(MouseButton.class.getName(), MouseButton.class.getName() + ".LEFT"));
+    protected List<PluginType<?>> buildTypes() {
+        return SdkTypes.ALL;
     }
 
     /**
@@ -367,18 +293,10 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     // The answer to that is this plugin's own flow window offering to write one, which is a click and one
     // file rather than a host copying text on every bind.
 
-    /**
-     * The seventeen types a project variable could hold before there was a registry to hold them in.
-     *
-     * <p>They are registered through the same builder any plugin uses, and their ids are the constant names
-     * of the enum they used to be, so every project ever written keeps its meaning. That is the whole test
-     * of the surface: the vocabulary that was hard-coded into the host is now contributed by a plugin, and
-     * it had to give up nothing to become contributable.
-     */
-    @Override
-    protected ValueCatalog buildValueTypes() {
-        return SdkValueTypes.CATALOG;
-    }
+    // buildValueTypes() returned SdkValueTypes.CATALOG here until 2026-09-22 -- seventeen, then eight,
+    // ValueType constants each with a ValueCodec beside it. Both the registry and the codec are deleted
+    // from the contract: a type's identity is its Java class, and nothing parses. buildTypes() above is
+    // what replaced it, and SdkTypes is the one file that now names each type.
 
     // buildParameters(), parameterRows(String) and parameterEdited(ParameterEdit) stood here from
     // 2026-09-10 to 2026-09-22, over a ParameterStore held in a field set on bind. The whole surface is
@@ -453,16 +371,16 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                         "Define what this bot does, one card per activity, and wire each outcome to what "
                                 + "runs next — the graph, its loop safety, and which activities are on",
                         ToolbarGroup.AUTHORING, 10, this::openActivityFlow),
-                ToolbarItem.of("capture-targets", "🎯 Capture Targets",
+                ToolbarItem.of("capture-source", "🎯 Capture Source",
                         "Choose what the bot looks at — a monitor, an application window or an emulator "
-                                + "instance — and which of them is the project's default",
-                        ToolbarGroup.PROJECT, 50, this::openCaptureTargets),
+                                + "instance",
+                        ToolbarGroup.PROJECT, 50, this::openCaptureSource),
                 ToolbarItem.of("project-setup", "📋 Project Setup",
                         "What this project still needs before it can run — something to launch, something "
                                 + "to capture, a reference resolution, and the pictures it looks for",
                         ToolbarGroup.PROJECT, 40, this::openProjectSetup),
                 ToolbarItem.of("point-here", "⌖ Point bot here",
-                        "Make the window the overlay is drawn over this project's capture target",
+                        "Make the window the overlay is drawn over this project's capture source",
                         ToolbarGroup.OVERLAY, 10, this::pointCaptureTargetHere),
                 ToolbarItem.of("picture-here", "✂ Picture of this",
                         "Cut a picture out of the window the overlay is drawn over, whatever the project's "
@@ -478,9 +396,12 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      *
      * <p><b>This is the direction the fact travels, and it only travels this way.</b> The host tells the
      * plugin which window its own HUD is drawn over — something only the host can know — and the plugin
-     * writes its own {@code capture.json} in its own vocabulary, through the same path
-     * {@link CaptureTargets}' Apply uses. Studio holds no capture target of its own and never reads this
-     * file; see {@code docs/refactor/28-overlay-items.md}.
+     * writes it into the bot's own Java as the expression {@code Sdk.captureSource()} returns. Studio holds
+     * no capture source of its own; see {@code docs/refactor/28-overlay-items.md}.
+     *
+     * <p>It wrote {@code capture.json} and projected onto {@code botmaker-project.properties} as well until
+     * 2026-09-22. Both files are deleted, and what is left is the one write that was always the real one —
+     * which is why this is now a single call where it was a three-file transaction on a worker thread.
      */
     private void pointCaptureTargetHere(ActionContext context) {
         StudioServices services = context.services();
@@ -489,10 +410,8 @@ public final class SdkPlugin extends AbstractStudioPlugin {
             services.status("Nothing to point at — the overlay is not over a window.");
             return;
         }
-        CaptureTargets.pointDefaultAt(services, CaptureTargetModel.window(title), failure -> {
-            if (failure == null) services.status("Capture target is now \"" + title + "\".");
-            else services.status("Couldn't write the capture target: " + failure);
-        });
+        CaptureValue.point(services, CaptureSource.window(title));
+        services.status("Capture source is now \"" + title + "\".");
     }
 
     /**
@@ -510,8 +429,8 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void capturePictureHere(ActionContext context) {
         StudioServices services = context.services();
-        CaptureTargetModel target = context.overWindowTitle()
-                .map(CaptureTargetModel::window)
+        CaptureSource target = context.overWindowTitle()
+                .map(CaptureSource::window)
                 .orElse(null);
         CaptureTemplates.open(services, services.dialogs().ownerWindow().orElse(null), target, null, () -> {});
     }
@@ -597,18 +516,30 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * Opens the capture-targets manager.
+     * Chooses what the bot reads pixels from, and writes it into the bot's own Java.
      *
-     * <p><b>The label is constant, and it used not to be.</b> Studio's own button read "🎯 " plus the current
-     * default target's short name, because the editor held that list in memory. It no longer holds it — the
-     * targets are {@code capture.json}, which is this plugin's file — and {@link #toolbarItems()} is called
-     * with no {@link StudioServices}, so a label supplier here has no project to read one out of. Giving the
-     * plugin a services field to close over would make the item's <em>label</em> depend on load order, which
-     * is worse than a button that says what it opens.
+     * <p><b>It was a list manager until 2026-09-22.</b> {@code CaptureTargets} kept several configured
+     * targets in {@code capture.json} and marked one of them the default. That file is deleted and a project
+     * has exactly <b>one</b> capture source — the expression {@code Sdk.captureSource()} returns — so what
+     * is left is the pick itself, which {@link SourcePicker} already drew for that window. A list of things
+     * where only one is ever used is a list nobody needed.
+     *
+     * <p><b>The label is constant, and it used not to be.</b> Studio's own button read "🎯 " plus the
+     * current source's short name, because the editor held it in memory. It does not hold it, and
+     * {@link #toolbarItems()} is called with no {@link StudioServices}, so a label supplier here has no
+     * project to read one out of. Giving the plugin a services field to close over would make the item's
+     * <em>label</em> depend on load order, which is worse than a button that says what it opens.
      */
-    private void openCaptureTargets(ActionContext context) {
+    private void openCaptureSource(ActionContext context) {
         StudioServices services = context.services();
-        CaptureTargets.open(services, services.dialogs().ownerWindow().orElse(null));
+        new SourcePicker(services, services.dialogs().ownerWindow().orElse(null), false)
+                .showAndWait()
+                .ifPresent(selection -> {
+                    if (!(selection instanceof SourcePicker.Selection.Concrete concrete)) return;
+                    CaptureValue.point(services, concrete.target(), concrete.region());
+                    services.status("Capture source is now "
+                            + CaptureLabels.shortLabel(concrete.target()) + ".");
+                });
     }
 
     /**

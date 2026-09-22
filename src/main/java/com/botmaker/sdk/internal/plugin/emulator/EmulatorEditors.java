@@ -2,15 +2,15 @@ package com.botmaker.sdk.internal.plugin.emulator;
 
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
-import com.botmaker.plugin.toolkit.Slots;
-import com.botmaker.sdk.authoring.Authoring;
-import com.botmaker.sdk.authoring.CaptureTargetModel;
-import com.botmaker.sdk.authoring.SdkVersion;
+import com.botmaker.plugin.toolkit.Values;
+import com.botmaker.sdk.api.emulator.EmulatorSource;
+import com.botmaker.sdk.internal.plugin.capture.CaptureValue;
+import com.botmaker.shared.config.ProjectFile;
+import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.shared.emulator.EmulatorInstances;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 
-import java.io.IOException;
 import java.nio.file.Path;
 
 /**
@@ -39,12 +39,12 @@ public final class EmulatorEditors {
      * behind it is unknown, and a paired phone reached this editor exactly the way an emulator did.
      */
     public static Node instanceName(ValueContext ctx) {
-        Button pill = Pills.button(label(Slots.stringLiteral(Slots.raw(ctx))), null);
+        Button pill = Pills.button(label(Values.text(ctx, "")), null);
         pill.setOnAction(e ->
                 EmulatorPicker.show(ctx.services(), ctx.services().dialogs().ownerWindow().orElse(null)).ifPresent(chosen -> {
                     String name = chosen.instance().name();
                     if (name == null || name.isBlank()) return;
-                    Slots.writeText(ctx, name);
+                    ctx.set(name);
                     pill.setText(label(name));
                     if (chosen.hasApp()) pointProjectAtApp(ctx, name, chosen.appPackage());
                 }));
@@ -60,22 +60,19 @@ public final class EmulatorEditors {
      * <p>Best effort, and silent on failure — the inline {@code Emulators.use(name)} call the user just wrote
      * stands either way, and an editor that threw here would lose the edit as well as the wiring.
      *
-     * <p>It writes through {@link Authoring} rather than through the host, which is the difference this move
-     * made: {@code botmaker-project.properties} and {@code capture.json} are this module's files, and the
-     * editor that used to do this reached Studio's {@code ProjectCreator} for the first and had no way at all
-     * to say the second.
+     * <p><b>The two halves are written to two different places, and that is the split, not an
+     * inconsistency.</b> What the bot <em>launches</em> is a fact about running this bot on this machine, so
+     * it stays a {@code botmaker-project.properties} key. Where the bot <em>looks</em> is a fact about the
+     * bot, so since 2026-09-22 it is the expression {@code Sdk.captureSource()} returns — Java the user can
+     * read, and the only copy of that answer now that {@code capture.json} and {@code capture.source} are
+     * gone.
      */
     private static void pointProjectAtApp(ValueContext ctx, String instanceName, String appPackage) {
         Path resources = ctx.services().resourcesDir();
         if (resources == null) return;
-        try {
-            Authoring.writeLaunchTarget(SdkVersion.latest(), resources,
-                    "emu-app:" + appPackage + "@" + instanceName);
-            Authoring.writeCaptureSource(SdkVersion.latest(), resources,
-                    CaptureTargetModel.emulator(instanceName).spec());
-        } catch (IOException ignored) {
-            // Best-effort project wiring; the call the user just edited is written either way.
-        }
+        ProjectFile.set(resources, ProjectProperties.KEY_LAUNCH_TARGET,
+                "emu-app:" + appPackage + "@" + instanceName);
+        CaptureValue.point(ctx.services(), new EmulatorSource(instanceName));
     }
 
     private static String label(String instanceName) {

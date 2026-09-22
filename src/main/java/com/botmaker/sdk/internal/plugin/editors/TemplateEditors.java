@@ -13,6 +13,7 @@ import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.authoring.TemplateLibrary;
+import com.botmaker.sdk.authoring.TemplateNames;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.MenuButton;
@@ -46,7 +47,7 @@ import java.util.List;
  * this plugin's, and the one thing only the host could tell it is which project is open. Nothing here reaches
  * the contract for a picture, which is what the deletion of {@code StudioServices.assets()} was about.
  */
-final class TemplateEditors {
+public final class TemplateEditors {
 
     /** The frame a picture is shown in on a block, and twice that is what is decoded for it. */
     private static final double CHIP = 34;
@@ -62,7 +63,7 @@ final class TemplateEditors {
      * in it is a legal state (a freshly inserted block), and an editor that can only ever set one makes the
      * empty state unreachable once it has been left.
      */
-    static Node template(ValueContext ctx) {
+    public static Node template(ValueContext ctx) {
         MenuButton pill = Pills.bare(label(nameOf(ctx)));
         ImageView thumb = new ImageView();
         thumb.setFitWidth(CHIP);
@@ -79,8 +80,7 @@ final class TemplateEditors {
                 })),
                 Pills.separator(),
                 Pills.item("Clear", () -> {
-                    Slots.write(ctx, "new " + ImageTemplate.class.getSimpleName() + "(\"\")",
-                            ImageTemplate.class.getName());
+                    commit(ctx, "");
                     pill.setText(label(""));
                     showPicture(thumb, ctx.services(), "", CHIP);
                 })));
@@ -95,7 +95,7 @@ final class TemplateEditors {
      * longer resolves falls back to {@code null}, which the host draws as the plain label — the honest reading
      * of "this picture was deleted", and the same answer the pill above gives.
      */
-    static Node preview(ValueContext ctx) {
+    public static Node preview(ValueContext ctx) {
         String name = nameOf(ctx);
         Image picture = picture(ctx.services(), name, TILE);
         if (picture == null) return null;
@@ -128,7 +128,7 @@ final class TemplateEditors {
      * there was simply no affordance that added a second one. Handing back the whole list is what fixes that,
      * and it is why {@code SlotRun.replace} takes a list rather than an index.
      */
-    static Node group(ValueContext ctx) {
+    public static Node group(ValueContext ctx) {
         HBox row = new HBox(4);
         row.setAlignment(Pos.CENTER_LEFT);
         rebuild(row, ctx);
@@ -202,9 +202,12 @@ final class TemplateEditors {
         if (run != null) {
             run.replace(elements, ImageTemplate.class.getName());
         } else {
-            ctx.set(ImageTemplateGroup.class.getSimpleName() + ".of("
-                    + String.join(", ", elements) + ")",
-                    ImageTemplateGroup.class.getName(), ImageTemplate.class.getName());
+            // setSource and not set: an element is an expression that NAMES a picture -- Pictures.ORE, a
+            // variable, something this editor could not read and kept verbatim -- so there is no
+            // ImageTemplateGroup value to hand over. Writing one would inline every constant as a path.
+            ctx.setSource(ImageTemplateGroup.class.getSimpleName() + ".of("
+                            + String.join(", ", elements) + ")",
+                    ImageTemplateGroup.class, ImageTemplate.class);
         }
         rebuild(row, ctx);
     }
@@ -229,7 +232,7 @@ final class TemplateEditors {
     }
 
     /** Whether this is one argument of a run of pictures, which is what makes {@link #group} claim it. */
-    static boolean isRunOfPictures(ValueContext ctx) {
+    public static boolean isRunOfPictures(ValueContext ctx) {
         return ctx.type().is(ImageTemplate.class) && runOf(ctx) != null;
     }
 
@@ -344,19 +347,22 @@ final class TemplateEditors {
         if (!s.startsWith("new ") || !s.contains(ImageTemplate.class.getSimpleName())) return null;
         List<String> args = Slots.arguments(s);
         if (args.size() != 1) return null;
-        String path = Slots.stringLiteral(args.getFirst());
+        String path = com.botmaker.sdk.internal.authoring.LiteralWriter.unquote(args.getFirst()).orElse(null);
         return path == null || path.isBlank() ? null : path;
     }
 
     /** Writes the picture called {@code baseName} as the constructor that names its file. */
     static void commit(ValueContext ctx, String baseName) {
-        Slots.write(ctx, literalFor(baseName), ImageTemplate.class.getName());
+        // The value, so the host spells it through this plugin's own ComponentType for ImageTemplate.
+        ctx.set(new ImageTemplate(baseName == null || baseName.isBlank()
+                ? TemplateNames.pathFor("") : TemplateLibrary.pathForName(baseName)));
     }
 
     /** {@code new ImageTemplate("src/main/resources/images/<name>.png")}. */
     static String literalFor(String baseName) {
         return "new " + ImageTemplate.class.getSimpleName() + "("
-               + Slots.quote(baseName == null || baseName.isBlank() ? "" : TemplateLibrary.pathForName(baseName))
+               + com.botmaker.sdk.internal.authoring.LiteralWriter.quote(
+                       baseName == null || baseName.isBlank() ? "" : TemplateLibrary.pathForName(baseName))
                + ")";
     }
 

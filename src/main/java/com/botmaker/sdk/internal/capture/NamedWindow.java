@@ -25,6 +25,19 @@ public final class NamedWindow implements CaptureSource, WindowBacked {
         this.titleSubstring = titleSubstring;
     }
 
+    /**
+     * The title substring this matches on — never resolved, just the text the user chose.
+     *
+     * <p>Here for the same reason {@link Monitor#index()} is: the editor half of this module writes a
+     * capture source as Java and labels one on screen, and both need the argument back. It is deliberately
+     * the <em>pattern</em> rather than the matched window's real title: what a picker shows and what
+     * {@code CaptureExpr} writes must be what the bot will match on, or a window that is not open right now
+     * would be relabelled or rewritten into something else.
+     */
+    public String titleSubstring() {
+        return titleSubstring;
+    }
+
     private Optional<Window> resolve() {
         return Window.find(titleSubstring);
     }

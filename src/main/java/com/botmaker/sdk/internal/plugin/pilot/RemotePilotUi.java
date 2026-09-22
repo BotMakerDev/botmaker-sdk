@@ -84,7 +84,7 @@ public final class RemotePilotUi implements AutoCloseable {
 
     public RemotePilotUi(StudioServices services) {
         this.services = services;
-        this.project = new PilotProject(services.resourcesDir());
+        this.project = new PilotProject(services);
     }
 
     /**

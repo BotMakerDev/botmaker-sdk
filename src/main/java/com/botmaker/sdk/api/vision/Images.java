@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.sdk.authoring.WireText;
+import com.botmaker.sdk.authoring.TemplateNames;
 
 /**
  * This project's own pictures, by file name — {@code Images.named("ore")} is {@code images/ore.png}.
@@ -42,6 +42,6 @@ public final class Images {
      * disk here; an {@link ImageTemplate} loads its pixels the first time a matcher asks for them.
      */
     public static ImageTemplate named(String baseName) {
-        return WireText.template(baseName == null ? "" : baseName);
+        return new ImageTemplate(TemplateNames.pathFor(baseName));
     }
 }

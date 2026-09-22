@@ -4,7 +4,7 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Editors;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
-import com.botmaker.plugin.toolkit.Slots;
+import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.plugin.toolkit.Thumbnail;
 import com.botmaker.shared.game.GameLibraryProvider;
 import com.botmaker.shared.game.InstalledGame;
@@ -30,7 +30,7 @@ import java.util.function.Supplier;
  * offer exactly this, and none of it required asking the host for anything. That is the host-only rule doing
  * its job: the host was never the source of a game, it was only the thing that happened to be written first.
  */
-final class LaunchEditors {
+public final class LaunchEditors {
 
     /** How tall the cover thumbnail on the closed pill is; portrait art keeps its own ratio inside it. */
     private static final double PILL_ART_HEIGHT = 28;
@@ -47,9 +47,9 @@ final class LaunchEditors {
      * @param provider a fresh provider per scan — they are stateless, best-effort readers of a local library,
      *                 and its {@code displayName()} is what every label in the editor is worded around
      */
-    static Node game(ValueContext ctx, Supplier<GameLibraryProvider> provider) {
+    public static Node game(ValueContext ctx, Supplier<GameLibraryProvider> provider) {
         String launcher = provider.get().displayName();
-        String id = Slots.stringLiteral(Slots.raw(ctx));
+        String id = Values.text(ctx, "");
 
         Node[] pill = new Node[1];
         pill[0] = Pills.button(idLabel(launcher, id), () -> Modals.gallery(ctx,
@@ -59,7 +59,7 @@ final class LaunchEditors {
                 () -> covers(provider.get()),
                 chosen -> {
                     if (chosen.value().isBlank()) return;
-                    Slots.writeText(ctx, chosen.value());
+                    ctx.set(chosen.value());
                     relabel(pill[0], chosen.label());
                 }));
         resolveName(pill[0], launcher, id, provider);
@@ -126,7 +126,7 @@ final class LaunchEditors {
      * target is frequently a command that is not a file on this machine at all, and a chooser alone would
      * make those unsayable.
      */
-    static Node program(ValueContext ctx) {
+    public static Node program(ValueContext ctx) {
         return Editors.program(ctx, "Path or command");
     }
 
@@ -139,7 +139,7 @@ final class LaunchEditors {
      * {@link Editors#textSlot}: the example in the prompt is the SDK's knowledge of what its own launch call
      * is passed.
      */
-    static Node option(ValueContext ctx) {
-        return Editors.textSlot(ctx, "launch option (e.g. --fullscreen)", 14);
+    public static Node option(ValueContext ctx) {
+        return Editors.text(ctx, "launch option (e.g. --fullscreen)", 14);
     }
 }

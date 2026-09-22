@@ -7,7 +7,7 @@ import com.botmaker.session.DesktopSession;
 import com.botmaker.shared.emulator.AdbEmulatorSurface;
 import com.botmaker.shared.emulator.EmulatorSurface;
 import com.botmaker.shared.emulator.ScrcpyEmulatorSurface;
-import com.botmaker.sdk.authoring.CaptureTargetModel;
+import com.botmaker.sdk.internal.plugin.capture.CaptureLabels;
 
 import java.nio.file.Path;
 import java.util.function.Function;
@@ -153,22 +153,23 @@ public final class PilotRoutes implements AutoCloseable {
     }
 
     /**
-     * The instance the project points at: {@code capture.source} first (what the bot itself reads), then a
-     * default capture target of the {@code emulator:} kind (what the editor's capture picker sets).
-     * {@code null} when neither names an emulator.
+     * The instance the project points at, or {@code null} when its capture source names no emulator.
+     *
+     * <p>One answer since 2026-09-22, where there were two: {@code botmaker-project.properties}'
+     * {@code capture.source} (what the bot read) and then {@code capture.json}'s default target (what the
+     * editor's picker set). Those were two spellings of one fact, written by one code path, and the
+     * project's capture source is the bot's own Java now — so there is one place to ask and it is the one
+     * the user can read.
      */
     static String configuredInstanceName(PilotProject project) {
         if (project == null) return null;
-        String fromSource = ProjectProperties.emulatorInstanceOf(project.captureSource());
-        if (fromSource != null) return fromSource;
         try {
-            CaptureTargetModel target = project.defaultTarget();
-            if (target != null) return target.emulatorName();
+            return CaptureLabels.emulatorName(project.defaultSource());
         } catch (Exception ignored) {
-            // The project's files can be mid-save (the pilot can be opened at any moment) — the desktop is
-            // the right answer while they cannot be read.
+            // The project's source can be mid-save (the pilot can be opened at any moment) — the desktop is
+            // the right answer while it cannot be read.
+            return null;
         }
-        return null;
     }
 
     /**

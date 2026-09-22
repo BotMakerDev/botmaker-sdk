@@ -231,14 +231,14 @@ public final class MacroTranslator {
         used.add(CaptureSource.class);
         Source.requireMethod(Mouse.class, "click");
         Source.requireMethod(CaptureSource.class, "window");
-        return "Mouse.click(CaptureSource.window(" + Source.string(title).source() + "), "
+        return "Mouse.click(CaptureSource.window(" + Source.string(title) + "), "
                 + relX + ", " + relY + ");";
     }
 
     private static String type(String text, Set<Class<?>> used) {
         used.add(Keyboard.class);
         Source.requireMethod(Keyboard.class, "type");
-        return "Keyboard.type(" + Source.string(text).source() + ");";
+        return "Keyboard.type(" + Source.string(text) + ");";
     }
 
     private static String tap(String keyName, Set<Class<?>> used) {

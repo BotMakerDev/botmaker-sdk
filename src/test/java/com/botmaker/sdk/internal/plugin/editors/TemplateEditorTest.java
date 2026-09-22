@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
 import com.botmaker.plugin.toolkit.testing.TestContexts;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -54,21 +55,31 @@ class TemplateEditorTest {
         assertEquals("", TemplateEditors.nameOfSource("new ImageTemplate(path)"));
     }
 
+    /**
+     * A pick writes the picture itself, and the path it carries is the project-relative one.
+     *
+     * <p>It asserted the spelled constructor — {@code new ImageTemplate("src/…/gold.png")} — until
+     * 2026-09-22. This editor spells nothing now: it hands the host an {@link ImageTemplate} and the host
+     * writes it through this plugin's own {@code ComponentType}, whose one component is the path. So what
+     * is asserted is the path, which is the part this editor decides and the part a wrong answer would send
+     * the bot looking in the wrong place with.
+     */
     @Test
-    void writingASlotSpellsTheProjectRelativePath() {
+    void writingASlotCarriesTheProjectRelativePath() {
         TestContexts.Recording ctx = TestContexts.typedSlot(
                 "com.botmaker.sdk.api.vision.ImageTemplate", "new ImageTemplate(\"\")");
         TemplateEditors.commit(ctx, "gold");
 
-        assertEquals("new ImageTemplate(\"src/main/resources/images/gold.png\")", ctx.written());
-        assertEquals("com.botmaker.sdk.api.vision.ImageTemplate", ctx.imports().getFirst());
+        assertEquals("src/main/resources/images/gold.png",
+                ((ImageTemplate) ctx.value()).filePath());
     }
 
     @Test
-    void writingAValueWithNoCallSiteSpellsTheSamePath() {
-        TestContexts.Recording ctx = TestContexts.row("IMAGE_TEMPLATE", "");
+    void writingAValueWithNoCallSiteCarriesTheSamePath() {
+        TestContexts.Recording ctx = TestContexts.row("com.botmaker.sdk.api.vision.ImageTemplate", "");
         TemplateEditors.commit(ctx, "gold");
-        assertEquals("new ImageTemplate(\"src/main/resources/images/gold.png\")", ctx.written());
+        assertEquals("src/main/resources/images/gold.png",
+                ((ImageTemplate) ctx.value()).filePath());
     }
 
     @Test

@@ -1,10 +1,9 @@
 package com.botmaker.sdk.internal.plugin.capture;
 
-import com.botmaker.sdk.authoring.CaptureTargetModel;
+import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.capture.ScreenCapture;
-import com.botmaker.shared.config.CaptureSourceKind;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstances;
 import com.botmaker.shared.emulator.EmulatorProbe;
@@ -16,40 +15,43 @@ import java.awt.image.BufferedImage;
 import java.util.List;
 
 /**
- * Off-thread live preview and existence probe for one {@link CaptureTargetModel}, shared by the two capture
- * dialogs — the visual source chooser and the targets manager — so both show the same thumbnail and the same
- * "available / not found" badge from one code path.
+ * Off-thread live preview and existence probe for one {@link CaptureSource}, drawn on every tile of the
+ * visual source chooser so each shows the same thumbnail and the same "available / not found" badge from
+ * one code path.
  *
  * <p><b>Existence is a separate answer from the image, and that is the whole reason this is not just
- * {@link EditorFrame}.</b> An editor asking for pixels has nothing to do when a grab fails; a list of
- * configured targets has to say <em>why</em> a row is blank — a window whose application is not running reads
- * differently from one that is running and would not give up its pixels.
+ * {@link EditorFrame}.</b> An editor asking for pixels has nothing to do when a grab fails; a chooser
+ * offering sources has to say <em>why</em> a tile is blank — a window whose application is not running
+ * reads differently from one that is running and would not give up its pixels.
  *
  * <p>Grabs block (native enumeration, a desktop capture, an ADB round trip), so call
- * {@link #grab(CaptureTargetModel)} off the FX thread.
+ * {@link #grab(CaptureSource)} off the FX thread.
  */
 public final class TargetThumbnail {
 
     private TargetThumbnail() {
     }
 
-    /** A probe: the preview {@code image} ({@code null} when unavailable) and whether the target exists now. */
+    /** A probe: the preview {@code image} ({@code null} when unavailable) and whether the source exists now. */
     public record Result(BufferedImage image, boolean exists) {
     }
 
     /**
-     * Probes {@code target}: a window is resolved by title (existence = a matching window is open) and
+     * Probes {@code source}: a window is resolved by title (existence = a matching window is open) and
      * captured; a monitor is cropped out of the virtual desktop (existence = the index is still valid); an
      * emulator answers over ADB; the whole desktop always exists. Never throws — a failure is a
      * {@code Result} with no image.
+     *
+     * <p>A {@code null} source is the whole desktop, which is what it means everywhere else.
      */
-    public static Result grab(CaptureTargetModel target) {
+    public static Result grab(CaptureSource source) {
         try {
-            if (target == null) return new Result(null, false);
-            if (target.windowTitle() != null) return windowResult(target.windowTitle());
-            if (target.is(CaptureSourceKind.MONITOR)) return monitorResult(target.monitorIndex());
-            if (target.emulatorName() != null) return emulatorResult(target.emulatorName());
-            if (target.isDesktop()) return new Result(ScreenCapture.captureDesktop(), true);
+            String title = CaptureLabels.windowTitle(source);
+            if (title != null) return windowResult(title);
+            String emulator = CaptureLabels.emulatorName(source);
+            if (emulator != null) return emulatorResult(emulator);
+            if (CaptureLabels.isDesktop(source)) return new Result(ScreenCapture.captureDesktop(), true);
+            return monitorResult(CaptureLabels.monitorIndex(source));
         } catch (Throwable anything) {
             // A native path can throw as well as fail, and for a badge the two mean the same thing.
         }

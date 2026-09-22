@@ -3,7 +3,6 @@ package com.botmaker.sdk.internal.plugin.capture;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.authoring.CaptureTargetModel;
 
 import java.util.Optional;
 
@@ -43,26 +42,34 @@ public final class CaptureValue {
     }
 
     /**
-     * Points {@code Sdk.captureSource()} at {@code target}, or does nothing when there is no such method to
+     * Points {@code Sdk.captureSource()} at {@code source}, or does nothing when there is no such method to
      * write to. Call it on the JavaFX application thread.
      *
-     * @param target the project's default target, or null for the whole desktop
+     * @param source the project's capture source, or null for the whole desktop
      */
     /*
-     * One target writes an expression the value codec will not read back: an emulator, which is
-     * `new EmulatorSource("…")` rather than one of CaptureSource's three factories. That is deliberate and
-     * harmless — it is correct Java, it compiles, and the bot captures from the emulator. The only
-     * consequence is that a picker shown over it says the value was written by hand, which is the safe way
-     * round: the editor declines to replace an expression it cannot spell rather than replacing it wrongly.
+     * All four shapes CaptureExpr.of writes, CaptureExpr.parse reads back -- including the emulator, which
+     * is `new EmulatorSource("…")` rather than one of CaptureSource's three factories. They are inverses
+     * over everything of() can write, which is what let capture.json go: an expression parse() cannot read
+     * is one the USER wrote, and a picker shown over it says so and declines to replace it.
      */
-    public static void point(StudioServices services, CaptureTargetModel target) {
+    public static void point(StudioServices services, CaptureSource source) {
+        point(services, source, null);
+    }
+
+    /**
+     * As {@link #point(StudioServices, CaptureSource)}, narrowed to {@code region} — a rectangle in the
+     * <em>source's own</em> pixel space, so the narrowing survives the window moving. {@code null} is the
+     * whole source, which is what almost every pick means.
+     */
+    public static void point(StudioServices services, CaptureSource source, java.awt.Rectangle region) {
         // Fully qualified, as every initialiser this platform writes is, so the expression compiles wherever
         // the user has moved the method to and no import has to be added beside it.
-        write(services, CaptureExpr.of(target));
+        write(services, CaptureExpr.of(source, region));
     }
 
     /** Writes {@code expression} — a {@link CaptureSource} factory call — where there is somewhere to write. */
     static void write(StudioServices services, String expression) {
-        open(services).ifPresent(ctx -> ctx.set(expression));
+        open(services).ifPresent(ctx -> ctx.setSource(expression));
     }
 }

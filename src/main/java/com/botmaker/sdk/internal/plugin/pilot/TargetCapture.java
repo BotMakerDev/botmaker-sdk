@@ -9,7 +9,8 @@ import com.botmaker.session.Preview;
 import com.botmaker.session.PreviewFrame;
 import com.botmaker.session.remote.WindowIds;
 import com.botmaker.shared.emulator.EmulatorSurface;
-import com.botmaker.sdk.authoring.CaptureTargetModel;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.plugin.capture.CaptureLabels;
 import com.botmaker.shared.config.CaptureSourceKind;
 import com.botmaker.session.launch.BackgroundLauncher;
 
@@ -137,14 +138,14 @@ public final class TargetCapture {
             Capture c = captureWindowTarget(t.title());
             if (c != null) return c;
         }
-        CaptureTargetModel def = safeDefault();
-        CaptureSourceKind kind = def == null ? null : def.kind();
-        if (kind == CaptureSourceKind.WINDOW && def.windowTitle() != null) {
-            Capture c = captureWindowTarget(def.windowTitle());
+        CaptureSource def = safeDefault();
+        String windowTitle = CaptureLabels.windowTitle(def);
+        if (windowTitle != null) {
+            Capture c = captureWindowTarget(windowTitle);
             if (c != null) return c;
-        } else if (kind == CaptureSourceKind.MONITOR) {
-            return captureBounds(screenBounds(def.monitorIndex()));
-        } else if (kind == CaptureSourceKind.DESKTOP) {
+        } else if (def instanceof com.botmaker.sdk.internal.capture.Monitor) {
+            return captureBounds(screenBounds(CaptureLabels.monitorIndex(def)));
+        } else if (def != null && CaptureLabels.isDesktop(def)) {
             return captureBounds(virtualBounds());
         }
         if (t != null) return captureBounds(virtualBounds()); // whole-screen telemetry target
@@ -301,9 +302,9 @@ public final class TargetCapture {
         }
     }
 
-    private CaptureTargetModel safeDefault() {
+    private CaptureSource safeDefault() {
         try {
-            return project != null ? project.defaultTarget() : null;
+            return project != null ? project.defaultSource() : null;
         } catch (Exception e) {
             return null;
         }

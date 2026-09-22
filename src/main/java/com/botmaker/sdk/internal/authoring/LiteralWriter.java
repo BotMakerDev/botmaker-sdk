@@ -1,13 +1,7 @@
 package com.botmaker.sdk.internal.authoring;
 
-import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.api.value.ValueForm;
-import com.botmaker.plugin.api.value.ValueType;
 
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * The Java source of a stored value — now a thin composition over {@link ValueCatalog}, and worth keeping
@@ -41,32 +35,6 @@ import java.util.Set;
 public final class LiteralWriter {
 
     private LiteralWriter() {}
-
-    /**
-     * The initialiser for a field of this form holding this stored value, or {@code null} when the type is
-     * unknown and the field must be left out — see the class note.
-     */
-    public static String initializer(ValueCatalog catalog, ValueForm form, List<String> value) {
-        return catalog.initializerOfWires(form, value).orElse(null);
-    }
-
-    /** The SDK classes a field of this form has to import — empty for a JDK, primitive or unknown type. */
-    public static Set<String> imports(ValueCatalog catalog, ValueForm form) {
-        return Set.copyOf(catalog.imports(form));
-    }
-
-    /** Every class the given forms need imported, in first-use order. */
-    public static Set<String> imports(ValueCatalog catalog, List<ValueForm> forms) {
-        Set<String> out = new LinkedHashSet<>();
-        for (ValueForm form : forms) out.addAll(catalog.imports(form));
-        return out;
-    }
-
-    /** Whether a field can be emitted for this form at all. */
-    public static boolean canEmit(ValueCatalog catalog, ValueForm form) {
-        ValueType leaf = form == null ? null : form.leaf();
-        return leaf != null && catalog.knows(leaf.id());
-    }
 
     /**
      * A Java string literal.
