@@ -17,7 +17,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -27,8 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The catalog's build gate: <b>a broken entry fails the build, not a menu.</b>
  *
- * <p>The catalog is {@code PaletteCatalog.scan} over this jar: classes and members are both discovered, so
- * nothing in it can go stale against a rename.
+ * <p>The host builds the catalog from every {@code @Palette} class in this jar ({@code botmaker-plugin-host}'s
+ * {@code Palettes}); classes and members are both discovered, so nothing in it can go stale against a
+ * rename. This test finds the same classes with ClassGraph over {@code target/classes} and catalogues them
+ * the same way, since the SDK's tests carry no host.
  *
  * <p>What is still worth checking is everything reflection cannot decide on its own: that every id names a
  * public member of its own facade, that nothing is offered twice, that no simple name is claimed twice (the
@@ -45,33 +46,25 @@ class ApiCatalogTest {
 
     private static final String API_PACKAGE = "com.botmaker.sdk.api.";
 
-    /** Building it is itself half the test: this is the reflection pass the editor will run. */
+    private static final PaletteCatalog CATALOG = discovered();
+
+    /** Every {@code @Palette} class in this module's own classes, catalogued as the host does it. */
+    private static PaletteCatalog discovered() {
+        String classes = SdkPlugin.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+        try (ScanResult scan = new ClassGraph().overrideClasspath(classes).enableAnnotationInfo().scan()) {
+            return PaletteCatalog.of(scan.getClassesWithAnnotation(Palette.class).loadClasses()
+                    .toArray(Class<?>[]::new));
+        }
+    }
+
     private static PaletteCatalog catalog() {
-        return new SdkPlugin().catalog();
+        return CATALOG;
     }
 
     @Test
     @DisplayName("the catalog builds and is not empty")
     void catalogBuilds() {
-        assertFalse(catalog().isEmpty(),
-                "no facade was catalogued: is @Palette missing, or did the scan read the wrong jar?");
-    }
-
-    /**
-     * The scan against a second reader: ClassGraph lists every {@code @Palette} class under
-     * {@code com.botmaker.sdk.api}, and the catalog must hold exactly those. A hand-written list missed two.
-     */
-    @Test
-    @DisplayName("every @Palette class under api is catalogued, and nothing else")
-    void catalogIsEveryAnnotatedApiClass() {
-        Set<String> annotated;
-        try (ScanResult scan = new ClassGraph().enableAnnotationInfo()
-                .acceptPackages(API_PACKAGE.substring(0, API_PACKAGE.length() - 1)).scan()) {
-            annotated = new TreeSet<>(scan.getClassesWithAnnotation(Palette.class).getNames());
-        }
-        Set<String> catalogued = new TreeSet<>();
-        catalog().facades().forEach(f -> catalogued.add(f.qualifiedName()));
-        assertEquals(annotated, catalogued);
+        assertFalse(catalog().isEmpty(), "no class in this module carries @Palette");
     }
 
     @Test
@@ -137,27 +130,6 @@ class ApiCatalogTest {
                 assertTrue(seen.add(member.id()), member.id() + " is offered twice");
             }
         }
-    }
-
-    /**
-     * One catalog, built once.
-     *
-     * <p>It took the bot's pinned version and asserted that every pin — old, dev, newer than this jar,
-     * absent — answered the same object. That argument won: {@code catalog(String)} lost its parameter on
-     * 2026-09-22, because a method whose every input must give one answer is a method with no input. The
-     * narrowing that does matter is unchanged and is not here — {@code SdkSurfaceService} intersects this
-     * catalog with the bot's own resolved jar.
-     *
-     * <p>What survives as an assertion is the memoisation, which is load-bearing: reflecting 52 facades
-     * happens while a project is opening, so a second ask must not do it again.
-     */
-    @Test
-    @DisplayName("the plugin builds its catalog once and answers the same object")
-    void pluginBuildsTheCatalogOnce() {
-        SdkPlugin plugin = new SdkPlugin();
-        PaletteCatalog current = plugin.catalog();
-        assertFalse(current.isEmpty(), "an empty palette is the failure this plugin's surface fails silently with");
-        assertSame(current, plugin.catalog());
     }
 
     // ----------------------------------------------------------------------------------------- helpers

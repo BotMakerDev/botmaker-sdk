@@ -30,7 +30,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -96,14 +95,10 @@ class SdkPluginSurfaceTest {
         assertFalse(plugin.displayName().isBlank());
     }
 
+    /** The palette is the host's to discover from {@code @Palette}; {@link ApiCatalogTest} checks what it finds. */
     @Test
-    void the_palette_builds_with_no_problems_and_is_the_same_object_on_a_second_ask() {
-        assertTrue(plugin.catalog().problems().isEmpty(), () -> plugin.catalog().problems().toString());
-        assertFalse(plugin.catalog().facades().isEmpty());
-
-        // AbstractStudioPlugin memoises, and it matters: reflecting 52 facades happens while a project is
-        // opening, so a second ask must not do it again.
-        assertSame(plugin.catalog(), plugin.catalog());
+    void the_plugin_builds_no_palette_by_hand() {
+        assertTrue(plugin.catalog().isEmpty());
     }
 
     @Test

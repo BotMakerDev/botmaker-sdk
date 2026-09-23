@@ -28,8 +28,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 ### Fixed
 
 - **The palette offers `Activities` and `Flows`.** Both carried `@Palette` but were missing from the
-  plugin's hand-written class list. The list is gone: the plugin now catalogues every `@Palette` class in
-  its jar (`PaletteCatalog.scan`), so an annotated class cannot be left out again.
+  plugin's hand-written class list. The list is gone: the host now catalogues every `@Palette` class in
+  the SDK's jar, so an annotated class cannot be left out again.
 - **An activity with no method yet is written as `ActivityBody.NONE` again**, and reads back as a card with
   no body. Since the codecs went, the flow wrote a blank body as nothing at all, which declined the whole
   flow — so a flow holding a freshly drawn card could not be saved.

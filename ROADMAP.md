@@ -12,13 +12,17 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 **Done**
 
-- **`SdkPlugin.buildCatalog()` is deleted**, with its 54 class literals. The toolkit's default is
-  `PaletteCatalog.scan(getClass())` (studio-api, new): every `@Palette` class in this jar. The hand list had
+- **`SdkPlugin.buildCatalog()` is deleted**, with its 54 class literals. `catalog()` is the contract's
+  default (empty), and the host discovers the palette: `botmaker-plugin-host`'s `Palettes` catalogues every
+  `@Palette` class in this jar, for Studio and for `botmaker plugin validate` alike. The hand list had
   already missed two annotated, offered facades, **`Activities` and `Flows`**, which the palette now shows.
   Four more annotated classes join as catalogued-but-hidden (`ActivityBody`, `ActivityContext`, `Outcome`,
   `Flow`), so the editor recognises their calls.
-- `ApiCatalogTest.catalogIsEveryAnnotatedApiClass` compares the catalog with a ClassGraph listing of
-  `@Palette` under `com.botmaker.sdk.api`, a second reader of the same fact.
+- A first version put the scan in the contract (`PaletteCatalog.scan`) and made the toolkit call it. It was
+  withdrawn the same day: discovery is the host's job, as it will be for `@Records`, and the contract holds
+  no implementation.
+- `ApiCatalogTest` lists `@Palette` classes with ClassGraph over `target/classes` and catalogues them as the
+  host does, since this module's tests carry no host; `SdkPluginSurfaceTest` asserts `catalog()` stays empty.
 
 ---
 
