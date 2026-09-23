@@ -112,7 +112,7 @@ public final class SdkTypes {
     public static final class PointType extends AbstractPluginType<Point> implements ComponentType<Point> {
         public PointType() { super(Point.class); }
         @Override public Point fresh() { return new Point(0, 0); }
-        @Override public Node editor(ValueContext ctx) { return GeometryEditors.point(ctx); }
+        @Override public Node editor(ValueContext ctx) { return GeometryEditors.point(ctx, this); }
 
         @Override public List<Class<?>> componentTypes() { return List.of(int.class, int.class); }
         @Override public List<Object> components(Point p) { return List.of(p.x(), p.y()); }
@@ -125,7 +125,7 @@ public final class SdkTypes {
     public static final class RectType extends AbstractPluginType<Rect> implements ComponentType<Rect> {
         public RectType() { super(Rect.class); }
         @Override public Rect fresh() { return new Rect(0, 0, 0, 0); }
-        @Override public Node editor(ValueContext ctx) { return GeometryEditors.rect(ctx); }
+        @Override public Node editor(ValueContext ctx) { return GeometryEditors.rect(ctx, this); }
 
         @Override public List<Class<?>> componentTypes() {
             return List.of(int.class, int.class, int.class, int.class);
@@ -142,7 +142,7 @@ public final class SdkTypes {
     public static final class SizeType extends AbstractPluginType<Size> implements ComponentType<Size> {
         public SizeType() { super(Size.class); }
         @Override public Size fresh() { return new Size(0, 0); }
-        @Override public Node editor(ValueContext ctx) { return GeometryEditors.size(ctx); }
+        @Override public Node editor(ValueContext ctx) { return GeometryEditors.size(ctx, this); }
 
         @Override public List<Class<?>> componentTypes() { return List.of(int.class, int.class); }
         @Override public List<Object> components(Size s) { return List.of(s.width(), s.height()); }
@@ -184,8 +184,8 @@ public final class SdkTypes {
     }
 
     /**
-     * The three geometry declarations, named so {@code GeometryEditors} can hand one to
-     * {@code Editors.tuplePill} — which is where the arity, the components and the way back from a row of
+     * The three geometry declarations. Each hands itself to its {@code GeometryEditors} editor, which passes
+     * it to {@code Editors.tuplePill} — where the arity, the components and the way back from a row of
      * numbers to a value all come from, so "a Rect has four numbers" is stated once.
      */
     public static final PointType POINT_TYPE = new PointType();

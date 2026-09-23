@@ -8,6 +8,20 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — no package under `plugin` depends on another both ways
+
+**Done**
+
+- `plugin/source/{CaptureValue, CaptureLabels}` moved to `plugin/screen`: `EditorFrame` reads the project's
+  source through them, and `SourcePicker` crops through `EditorFrame`, so `source` now depends on `screen`
+  one way.
+- `GeometryEditors.rect/point/size` (and their labels) take the `ComponentType` they edit, and
+  `SdkTypes`' three geometry types pass `this`: `editors` no longer names `types`.
+- `PluginLayersTest` rule 3: no two packages under `plugin` name each other, counted by the first segment
+  below `plugin`, comments excluded.
+
+**Deferred / next** — the flow editor shows a chained flow read-only.
+
 ## 2026-09-23 — the hand-written chains are read (doc 35, phase 5b)
 
 **Done**

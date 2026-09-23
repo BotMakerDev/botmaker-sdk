@@ -4,7 +4,7 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.sdk.api.emulator.EmulatorSource;
-import com.botmaker.sdk.plugin.source.CaptureValue;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.shared.config.ProjectFile;
 import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.shared.emulator.EmulatorInstances;

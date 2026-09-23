@@ -10,7 +10,7 @@ import com.botmaker.session.PreviewFrame;
 import com.botmaker.session.remote.WindowIds;
 import com.botmaker.shared.emulator.EmulatorSurface;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.plugin.source.CaptureLabels;
+import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.shared.config.CaptureSourceKind;
 import com.botmaker.session.launch.BackgroundLauncher;
 

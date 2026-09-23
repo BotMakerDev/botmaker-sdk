@@ -8,7 +8,7 @@ import com.botmaker.session.launch.BackgroundLauncher;
 import com.botmaker.shared.emulator.AdbEmulatorSurface;
 import com.botmaker.shared.emulator.EmulatorSurface;
 import com.botmaker.shared.emulator.ScrcpyEmulatorSurface;
-import com.botmaker.sdk.plugin.source.CaptureLabels;
+import com.botmaker.sdk.plugin.screen.CaptureLabels;
 
 import java.util.function.Function;
 import java.util.function.Supplier;

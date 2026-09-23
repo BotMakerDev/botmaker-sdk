@@ -5,6 +5,7 @@ import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.plugin.types.SdkTypes;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
@@ -45,35 +46,48 @@ class GeometryLabelTest {
         return TestContexts.typedSlot(typeName, source);
     }
 
+    // Each label is asked with the declaration the plugin hands its editor.
+    private static String pointLabel(ValueContext ctx) {
+        return GeometryEditors.pointLabel(ctx, SdkTypes.POINT_TYPE);
+    }
+
+    private static String rectLabel(ValueContext ctx) {
+        return GeometryEditors.rectLabel(ctx, SdkTypes.RECT_TYPE);
+    }
+
+    private static String sizeLabel(ValueContext ctx) {
+        return GeometryEditors.sizeLabel(ctx, SdkTypes.SIZE_TYPE);
+    }
+
     // --- a value labels as its numbers ---
 
     @Test
     void a_point_is_read_back_as_its_coordinates() {
-        assertEquals("10, 20", GeometryEditors.pointLabel(holding(new Point(10, 20))));
+        assertEquals("10, 20", pointLabel(holding(new Point(10, 20))));
     }
 
     @Test
     void a_rect_is_read_back_as_its_origin_and_size() {
-        assertEquals("10, 20  640×480", GeometryEditors.rectLabel(holding(new Rect(10, 20, 640, 480))));
+        assertEquals("10, 20  640×480", rectLabel(holding(new Rect(10, 20, 640, 480))));
     }
 
     @Test
     void a_size_is_read_back_as_its_two_dimensions() {
-        assertEquals("640 × 480", GeometryEditors.sizeLabel(holding(new Size(640, 480))));
+        assertEquals("640 × 480", sizeLabel(holding(new Size(640, 480))));
     }
 
     @Test
     void negative_coordinates_survive_the_round_trip() {
-        assertEquals("-1920, -50", GeometryEditors.pointLabel(holding(new Point(-1920, -50))),
+        assertEquals("-1920, -50", pointLabel(holding(new Point(-1920, -50))),
                 "a left-hand or upper monitor has negative screen coordinates");
         assertEquals("-1920, 0  100×100",
-                GeometryEditors.rectLabel(holding(new Rect(-1920, 0, 100, 100))));
+                rectLabel(holding(new Rect(-1920, 0, 100, 100))));
     }
 
     @Test
     void the_origin_is_a_value_like_any_other() {
-        assertEquals("0, 0", GeometryEditors.pointLabel(holding(new Point(0, 0))));
-        assertEquals("0, 0  0×0", GeometryEditors.rectLabel(holding(new Rect(0, 0, 0, 0))));
+        assertEquals("0, 0", pointLabel(holding(new Point(0, 0))));
+        assertEquals("0, 0  0×0", rectLabel(holding(new Rect(0, 0, 0, 0))));
     }
 
     // --- an expression nobody decoded is shown as written ---
@@ -89,18 +103,18 @@ class GeometryLabelTest {
     @Test
     void an_expression_the_host_could_not_decode_is_shown_as_the_author_wrote_it() {
         assertEquals("target.center()",
-                GeometryEditors.pointLabel(unreadable(Point.class.getName(), "target.center()")));
+                pointLabel(unreadable(Point.class.getName(), "target.center()")));
         assertEquals("ORIGIN",
-                GeometryEditors.pointLabel(unreadable(Point.class.getName(), "ORIGIN")));
+                pointLabel(unreadable(Point.class.getName(), "ORIGIN")));
         assertEquals("bounds()",
-                GeometryEditors.rectLabel(unreadable(Rect.class.getName(), "bounds()")));
+                rectLabel(unreadable(Rect.class.getName(), "bounds()")));
     }
 
     /** Nothing written yet: the placeholder, which is what a freshly inserted block shows. */
     @Test
     void an_empty_slot_shows_its_placeholder() {
-        assertEquals("Choose point…", GeometryEditors.pointLabel(unreadable(Point.class.getName(), "")));
-        assertEquals("Choose region…", GeometryEditors.rectLabel(unreadable(Rect.class.getName(), "")));
-        assertEquals("Choose size…", GeometryEditors.sizeLabel(unreadable(Size.class.getName(), "")));
+        assertEquals("Choose point…", pointLabel(unreadable(Point.class.getName(), "")));
+        assertEquals("Choose region…", rectLabel(unreadable(Rect.class.getName(), "")));
+        assertEquals("Choose size…", sizeLabel(unreadable(Size.class.getName(), "")));
     }
 }

@@ -2,7 +2,7 @@ package com.botmaker.sdk.plugin.pilot;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.plugin.source.CaptureValue;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
 
 import java.nio.file.Path;
 

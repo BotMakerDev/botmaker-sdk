@@ -2,8 +2,6 @@ package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.plugin.source.CaptureLabels;
-import com.botmaker.sdk.plugin.source.CaptureValue;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;

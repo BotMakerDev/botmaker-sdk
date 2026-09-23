@@ -8,8 +8,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *       must never link the Studio half.</li>
  *   <li><b>Rule 2:</b> only {@code plugin} names JavaFX or {@code botmaker-plugin-toolkit}. A bot has neither on
  *       its classpath at run time.</li>
+ *   <li><b>Rule 3:</b> no two packages under {@code plugin} name each other.</li>
  * </ul>
  *
  * <p>Only code is scanned: a comment line may name anything, so a javadoc explaining why {@code api} does not
@@ -66,6 +71,39 @@ class PluginLayersTest {
         }
         assertEquals(List.of(), offences, "api/ and internal/ run inside a bot; only plugin/ may name these");
     }
+
+    /**
+     * Rule 3: no two packages under {@code plugin} name each other. A package is the first segment below
+     * {@code plugin} ({@code pilot.ui} is {@code pilot}); a pair that depends both ways is one feature in two
+     * places, which is how {@code screen} and {@code source} were until 2026-09-23.
+     */
+    @Test
+    void noTwoPluginPackagesNameEachOther() {
+        Path plugin = ROOT.resolve("plugin");
+        Map<String, Set<String>> uses = new TreeMap<>();
+        for (Path file : sources(plugin)) {
+            Path relative = plugin.relativize(file);
+            if (relative.getNameCount() < 2) continue;
+            String from = relative.getName(0).toString();
+            for (String line : read(file)) {
+                String code = line.strip();
+                if (isComment(code)) continue;
+                Matcher named = PLUGIN_PACKAGE.matcher(code);
+                while (named.find()) {
+                    if (!named.group(1).equals(from)) uses.computeIfAbsent(from, k -> new TreeSet<>()).add(named.group(1));
+                }
+            }
+        }
+        List<String> cycles = new ArrayList<>();
+        uses.forEach((from, targets) -> targets.forEach(to -> {
+            if (from.compareTo(to) < 0 && uses.getOrDefault(to, Set.of()).contains(from)) {
+                cycles.add(from + " <-> " + to);
+            }
+        }));
+        assertEquals(List.of(), cycles, "a package under plugin/ depends one way or not at all");
+    }
+
+    private static final Pattern PLUGIN_PACKAGE = Pattern.compile("com\\.botmaker\\.sdk\\.plugin\\.([a-z][a-z0-9]*)\\.");
 
     private static boolean isComment(String line) {
         return line.startsWith("//") || line.startsWith("*") || line.startsWith("/*");

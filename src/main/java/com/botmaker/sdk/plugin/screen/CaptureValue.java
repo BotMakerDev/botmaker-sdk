@@ -1,4 +1,4 @@
-package com.botmaker.sdk.plugin.source;
+package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;

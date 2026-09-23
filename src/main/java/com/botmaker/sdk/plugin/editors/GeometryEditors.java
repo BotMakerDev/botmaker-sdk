@@ -1,13 +1,13 @@
 package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.toolkit.Editors;
 import com.botmaker.plugin.toolkit.Editors.Pick;
 import com.botmaker.plugin.toolkit.Editors.TupleSpec;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.plugin.types.SdkTypes;
 import javafx.scene.Node;
 
 /**
@@ -41,34 +41,37 @@ public final class GeometryEditors {
             new String[]{"width", "height"}, "Choose size…", Pick.MEASURE,
             v -> v[0] + " × " + v[1]);
 
+    // Each takes the declaration it edits from its caller, the declaration itself: `types` names `editors`,
+    // and `editors` naming `types` back would make the two one package in two places (PluginLayersTest).
+
     /** A {@code Rect}: drag a region on screen, or type {@code x, y, width, height}. */
-    public static Node rect(ValueContext ctx) {
-        return Editors.tuplePill(ctx, SdkTypes.RECT_TYPE, RECT, SdkScreenPicks.get());
+    public static Node rect(ValueContext ctx, ComponentType<Rect> type) {
+        return Editors.tuplePill(ctx, type, RECT, SdkScreenPicks.get());
     }
 
     /** A {@code Point}: click one pixel under a magnifier, or type {@code x, y}. */
-    public static Node point(ValueContext ctx) {
-        return Editors.tuplePill(ctx, SdkTypes.POINT_TYPE, POINT, SdkScreenPicks.get());
+    public static Node point(ValueContext ctx, ComponentType<Point> type) {
+        return Editors.tuplePill(ctx, type, POINT, SdkScreenPicks.get());
     }
 
     /** A {@code Size}: measure by dragging over the thing, or type {@code width, height}. */
-    public static Node size(ValueContext ctx) {
-        return Editors.tuplePill(ctx, SdkTypes.SIZE_TYPE, SIZE, SdkScreenPicks.get());
+    public static Node size(ValueContext ctx, ComponentType<Size> type) {
+        return Editors.tuplePill(ctx, type, SIZE, SdkScreenPicks.get());
     }
 
     // Package-private rather than private: the label is the one piece of these editors that can be asserted
     // without a JavaFX toolkit, and it is the piece worth asserting — the number a user reads off the
     // collapsed pill is read back out of what the last pick wrote, and getting it wrong shows one coordinate
     // while the bot runs another. See GeometryLabelTest.
-    static String rectLabel(ValueContext ctx) {
-        return Editors.tupleLabel(ctx, SdkTypes.RECT_TYPE, RECT);
+    static String rectLabel(ValueContext ctx, ComponentType<Rect> type) {
+        return Editors.tupleLabel(ctx, type, RECT);
     }
 
-    static String pointLabel(ValueContext ctx) {
-        return Editors.tupleLabel(ctx, SdkTypes.POINT_TYPE, POINT);
+    static String pointLabel(ValueContext ctx, ComponentType<Point> type) {
+        return Editors.tupleLabel(ctx, type, POINT);
     }
 
-    static String sizeLabel(ValueContext ctx) {
-        return Editors.tupleLabel(ctx, SdkTypes.SIZE_TYPE, SIZE);
+    static String sizeLabel(ValueContext ctx, ComponentType<Size> type) {
+        return Editors.tupleLabel(ctx, type, SIZE);
     }
 }

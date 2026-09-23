@@ -1,4 +1,4 @@
-package com.botmaker.sdk.plugin.source;
+package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.emulator.EmulatorSource;
