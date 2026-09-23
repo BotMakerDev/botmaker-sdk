@@ -64,6 +64,10 @@ runs them. Move each `run()` into a body method and name it in the flow.
 
 ### Changed
 
+- **Every call a value is written as is looked up as a real method.** `FlowTypes` and `CaptureTypes`
+  hand the host the `Method` (or, for an emulator, the constructor) that writes each value, and derive
+  their parts from its parameters, so the two cannot disagree. A renamed factory now fails this plugin's
+  own tests instead of a bot's build.
 - **The plugin half moved to `com.botmaker.sdk.plugin`.** What was `com.botmaker.sdk.internal.plugin`,
   `com.botmaker.sdk.internal.authoring` and `com.botmaker.sdk.authoring` is now one `plugin` package tree
   (`types`, `editors`, `pictures`, `screen`, `source`, `pilot`, `flow`, …). None of it was under contract

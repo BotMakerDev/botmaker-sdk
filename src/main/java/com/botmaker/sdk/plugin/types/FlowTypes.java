@@ -4,6 +4,8 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.bot.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 
+import java.lang.reflect.Executable;
+import java.lang.reflect.Method;
 import java.util.List;
 
 /**
@@ -61,7 +63,8 @@ public final class FlowTypes {
     // ---- the five containers ---------------------------------------------------------------------------
 
     /** {@code Flow.of(List<Activity>, List<Edge>, List<Preset>, String, Limits)}. */
-    public static final ComponentType<Flow> FLOW_SHAPE = new Fixed<>(Flow.class, "of") {
+    public static final ComponentType<Flow> FLOW_SHAPE = new Fixed<>(Flow.class, SdkTypes.method(Flow.class, "of",
+            List.class, List.class, List.class, String.class, Flow.Limits.class)) {
         @Override
         public List<Object> components(Flow value) {
             return value == null ? componentsOfNone()
@@ -76,11 +79,6 @@ public final class FlowTypes {
                     parts.get(4) instanceof Flow.Limits l ? l : Flow.Limits.DEFAULT);
         }
 
-        @Override
-        public List<Class<?>> componentTypes() {
-            return List.of(List.class, List.class, List.class, String.class, Flow.Limits.class);
-        }
-
         private List<Object> componentsOfNone() {
             return List.of(List.of(), List.of(), List.of(), "", Flow.Limits.DEFAULT);
         }
@@ -88,7 +86,8 @@ public final class FlowTypes {
 
     /** {@code Flow.activity(ActivityBody, String, String, boolean, boolean, boolean, List<String>)}. */
     public static final ComponentType<Flow.Activity> ACTIVITY_SHAPE =
-            new Fixed<>(Flow.Activity.class, "activity", Flow.class) {
+            new Fixed<>(Flow.Activity.class, SdkTypes.method(Flow.class, "activity", ActivityBody.class,
+                    String.class, String.class, boolean.class, boolean.class, boolean.class, List.class)) {
                 @Override
                 public List<Object> components(Flow.Activity value) {
                     return value == null ? List.of("", "", "", true, false, false, List.of())
@@ -118,17 +117,11 @@ public final class FlowTypes {
                             text(parts.get(2)), flag(parts.get(3)), flag(parts.get(4)), flag(parts.get(5)),
                             list(parts.get(6)));
                 }
-
-                @Override
-                public List<Class<?>> componentTypes() {
-                    return List.of(ActivityBody.class, String.class, String.class,
-                            boolean.class, boolean.class, boolean.class, List.class);
-                }
             };
 
     /** {@code Flow.preset(String, List<String>)}. */
     public static final ComponentType<Flow.Preset> PRESET_SHAPE =
-            new Fixed<>(Flow.Preset.class, "preset", Flow.class) {
+            new Fixed<>(Flow.Preset.class, SdkTypes.method(Flow.class, "preset", String.class, List.class)) {
                 @Override
                 public List<Object> components(Flow.Preset value) {
                     return value == null ? List.of("", List.of())
@@ -140,16 +133,11 @@ public final class FlowTypes {
                     return parts.size() != 2 ? null
                             : new Flow.Preset(text(parts.get(0)), list(parts.get(1)));
                 }
-
-                @Override
-                public List<Class<?>> componentTypes() {
-                    return List.of(String.class, List.class);
-                }
             };
 
     /** {@code Flow.edge(String, String, String)}. */
     public static final ComponentType<Flow.Edge> EDGE_SHAPE =
-            new Fixed<>(Flow.Edge.class, "edge", Flow.class) {
+            new Fixed<>(Flow.Edge.class, SdkTypes.method(Flow.class, "edge", String.class, String.class, String.class)) {
                 @Override
                 public List<Object> components(Flow.Edge value) {
                     return value == null ? List.of("", "", "")
@@ -161,16 +149,11 @@ public final class FlowTypes {
                     return parts.size() != 3 ? null
                             : new Flow.Edge(text(parts.get(0)), text(parts.get(1)), text(parts.get(2)));
                 }
-
-                @Override
-                public List<Class<?>> componentTypes() {
-                    return List.of(String.class, String.class, String.class);
-                }
             };
 
     /** {@code Flow.limits(int, int)}. */
     public static final ComponentType<Flow.Limits> LIMITS_SHAPE =
-            new Fixed<>(Flow.Limits.class, "limits", Flow.class) {
+            new Fixed<>(Flow.Limits.class, SdkTypes.method(Flow.class, "limits", int.class, int.class)) {
                 @Override
                 public List<Object> components(Flow.Limits value) {
                     Flow.Limits limits = value == null ? Flow.Limits.DEFAULT : value;
@@ -181,11 +164,6 @@ public final class FlowTypes {
                 public Flow.Limits build(List<Object> parts) {
                     return parts.size() != 2 ? Flow.Limits.DEFAULT
                             : new Flow.Limits(number(parts.get(0)), number(parts.get(1)));
-                }
-
-                @Override
-                public List<Class<?>> componentTypes() {
-                    return List.of(int.class, int.class);
                 }
             };
 
@@ -231,8 +209,8 @@ public final class FlowTypes {
     // ---- plumbing --------------------------------------------------------------------------------------
 
     /**
-     * The three things all five of these say the same way: the record, the factory that writes it, and the
-     * class that factory is declared on.
+     * The two things all five of these say the same way: the record, and the factory that writes it. The
+     * parts are the factory's parameters, so the two cannot drift apart.
      *
      * <p>A call with the wrong number of arguments is <b>not this shape</b>, and every {@code build} below
      * says so by answering the record's own empty value rather than guessing: it is a call to something
@@ -243,17 +221,11 @@ public final class FlowTypes {
     private abstract static class Fixed<C> implements ComponentType<C> {
 
         private final Class<C> type;
-        private final String factory;
-        private final Class<?> owner;
+        private final Method factory;
 
-        Fixed(Class<C> type, String factory) {
-            this(type, factory, type);
-        }
-
-        Fixed(Class<C> type, String factory, Class<?> owner) {
+        Fixed(Class<C> type, Method factory) {
             this.type = type;
             this.factory = factory;
-            this.owner = owner;
         }
 
         @Override
@@ -262,13 +234,13 @@ public final class FlowTypes {
         }
 
         @Override
-        public final Class<?> factoryOwner() {
-            return owner;
+        public final Executable factory() {
+            return factory;
         }
 
         @Override
-        public final String factory() {
-            return factory;
+        public final List<Class<?>> componentTypes() {
+            return SdkTypes.parts(factory);
         }
     }
 

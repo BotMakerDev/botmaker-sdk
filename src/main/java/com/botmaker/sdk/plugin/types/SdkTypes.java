@@ -25,7 +25,11 @@ import com.botmaker.sdk.plugin.editors.PrecisionEditors;
 import com.botmaker.sdk.plugin.editors.TemplateEditors;
 import javafx.scene.Node;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -215,15 +219,35 @@ public final class SdkTypes {
     }
 
     /**
-     * {@code owner.member()}, looked up once. A rename breaks class initialisation here, in this plugin's own
-     * tests, rather than writing a call into a bot's file that no longer compiles.
+     * {@code owner.name(parameters)}, looked up once. A rename breaks class initialisation here, in this
+     * plugin's own tests, rather than writing a call into a bot's file that no longer compiles.
      */
-    private static Method call(Class<?> owner, String member) {
+    static Method method(Class<?> owner, String name, Class<?>... parameters) {
         try {
-            return owner.getMethod(member);
+            return owner.getMethod(name, parameters);
         } catch (NoSuchMethodException e) {
-            throw new IllegalStateException(owner.getName() + "." + member + "() is gone", e);
+            throw new IllegalStateException(owner.getName() + "." + name + " is gone", e);
         }
+    }
+
+    /** {@code new type(parameters)}, looked up once, for the same reason. */
+    static <T> Constructor<T> constructor(Class<T> type, Class<?>... parameters) {
+        try {
+            return type.getConstructor(parameters);
+        } catch (NoSuchMethodException e) {
+            throw new IllegalStateException("new " + type.getName() + "(…) is gone", e);
+        }
+    }
+
+    /**
+     * The parts a factory is written with: its parameters, after the receiver when it is an instance method.
+     * Deriving them is what keeps {@code componentTypes()} and the call from drifting apart.
+     */
+    static List<Class<?>> parts(Executable factory) {
+        List<Class<?>> out = new ArrayList<>();
+        if (factory instanceof Method m && !Modifier.isStatic(m.getModifiers())) out.add(m.getDeclaringClass());
+        out.addAll(List.of(factory.getParameterTypes()));
+        return List.copyOf(out);
     }
 
     /**
@@ -240,7 +264,9 @@ public final class SdkTypes {
         }
         @Override public Node editor(ValueContext ctx) { return null; }
 
-        @Override public String factory() { return "of"; }
+        @Override public Executable factory() {
+            return method(ImageTemplateGroup.class, "of", ImageTemplate[].class);
+        }
         /** One declared part: the host repeats the last part type for every further argument, as varargs. */
         @Override public List<Class<?>> componentTypes() { return List.of(ImageTemplate.class); }
         @Override public List<Object> components(ImageTemplateGroup g) { return List.copyOf(g.templates()); }
@@ -266,8 +292,8 @@ public final class SdkTypes {
             POINT_TYPE, RECT_TYPE, SIZE_TYPE, new DirectionType(),
             new KeyType(), new MouseButtonType(),
             new CaptureTypes.CaptureSourceType(), new ImageTemplateGroupType(),
-            new SeededType<>(MatchResult.class, call(Vision.class, "lastMatch")),
-            new SeededType<>(Matches.class, call(Matches.class, "none")),
-            new SeededType<>(ColorMatch.class, call(Vision.class, "lastColorMatch")),
-            new SeededType<>(TextMatch.class, call(Vision.class, "lastTextMatch")));
+            new SeededType<>(MatchResult.class, method(Vision.class, "lastMatch")),
+            new SeededType<>(Matches.class, method(Matches.class, "none")),
+            new SeededType<>(ColorMatch.class, method(Vision.class, "lastColorMatch")),
+            new SeededType<>(TextMatch.class, method(Vision.class, "lastTextMatch")));
 }

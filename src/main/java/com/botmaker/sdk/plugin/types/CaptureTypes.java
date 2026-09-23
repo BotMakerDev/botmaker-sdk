@@ -14,6 +14,7 @@ import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.RegionSource;
 import javafx.scene.Node;
 
+import java.lang.reflect.Executable;
 import java.util.List;
 
 /**
@@ -46,21 +47,21 @@ public final class CaptureTypes {
 
     /** {@code Source.current()}. */
     public static final ComponentType<CurrentSource> CURRENT =
-            new Shape<>(CurrentSource.class, "current", Source.class, List.of()) {
+            new Shape<>(CurrentSource.class, SdkTypes.method(Source.class, "current")) {
                 @Override public List<Object> components(CurrentSource value) { return List.of(); }
                 @Override public CurrentSource build(List<Object> parts) { return new CurrentSource(); }
             };
 
     /** {@code CaptureSource.desktop()}. */
     public static final ComponentType<Desktop> DESKTOP =
-            new Shape<>(Desktop.class, "desktop", CaptureSource.class, List.of()) {
+            new Shape<>(Desktop.class, SdkTypes.method(CaptureSource.class, "desktop")) {
                 @Override public List<Object> components(Desktop value) { return List.of(); }
                 @Override public Desktop build(List<Object> parts) { return new Desktop(); }
             };
 
     /** {@code CaptureSource.monitor(index)}. */
     public static final ComponentType<Monitor> MONITOR =
-            new Shape<>(Monitor.class, "monitor", CaptureSource.class, List.of(int.class)) {
+            new Shape<>(Monitor.class, SdkTypes.method(CaptureSource.class, "monitor", int.class)) {
                 @Override public List<Object> components(Monitor value) { return List.of(value.index()); }
                 @Override public Monitor build(List<Object> parts) {
                     return new Monitor(parts.getFirst() instanceof Number n ? n.intValue() : 0);
@@ -69,7 +70,7 @@ public final class CaptureTypes {
 
     /** {@code CaptureSource.window("title")}. */
     public static final ComponentType<NamedWindow> WINDOW =
-            new Shape<>(NamedWindow.class, "window", CaptureSource.class, List.of(String.class)) {
+            new Shape<>(NamedWindow.class, SdkTypes.method(CaptureSource.class, "window", String.class)) {
                 @Override public List<Object> components(NamedWindow value) {
                     return List.of(value.titleSubstring());
                 }
@@ -83,7 +84,7 @@ public final class CaptureTypes {
      * {@code CaptureSource}'s factories. It is still correct Java, and the bot captures from the emulator.
      */
     public static final ComponentType<EmulatorSource> EMULATOR =
-            new Shape<>(EmulatorSource.class, "", EmulatorSource.class, List.of(String.class)) {
+            new Shape<>(EmulatorSource.class, SdkTypes.constructor(EmulatorSource.class, String.class)) {
                 @Override public List<Object> components(EmulatorSource value) {
                     return List.of(value.instanceName());
                 }
@@ -97,8 +98,8 @@ public final class CaptureTypes {
      * reads, so it is a value too. A region of a region is written as one call inside the other.
      */
     public static final ComponentType<RegionSource> REGION =
-            new Shape<>(RegionSource.class, "region", CaptureSource.class,
-                    List.of(CaptureSource.class, Rect.class)) {
+            new Shape<>(RegionSource.class,
+                    SdkTypes.method(CaptureSource.class, "region", CaptureSource.class, Rect.class)) {
                 @Override public List<Object> components(RegionSource value) {
                     return List.of(value.parent(), value.sub());
                 }
@@ -111,24 +112,22 @@ public final class CaptureTypes {
     /** Every shape, in the order the host tries them. */
     public static final List<ComponentType<?>> ALL = List.of(CURRENT, DESKTOP, MONITOR, WINDOW, EMULATOR, REGION);
 
-    /** What each of the six shares: the class, the call that writes it, and the types of its parts. */
+    /**
+     * What each of the six shares: the class, and the call that writes it. The types of its parts are the
+     * call's parameters, so the two cannot drift apart.
+     */
     private abstract static class Shape<T> implements ComponentType<T> {
 
         private final Class<T> type;
-        private final String factory;
-        private final Class<?> owner;
-        private final List<Class<?>> parts;
+        private final Executable factory;
 
-        Shape(Class<T> type, String factory, Class<?> owner, List<Class<?>> parts) {
+        Shape(Class<T> type, Executable factory) {
             this.type = type;
             this.factory = factory;
-            this.owner = owner;
-            this.parts = parts;
         }
 
         @Override public final Class<T> type() { return type; }
-        @Override public final String factory() { return factory; }
-        @Override public final Class<?> factoryOwner() { return owner; }
-        @Override public final List<Class<?>> componentTypes() { return parts; }
+        @Override public final Executable factory() { return factory; }
+        @Override public final List<Class<?>> componentTypes() { return SdkTypes.parts(factory); }
     }
 }

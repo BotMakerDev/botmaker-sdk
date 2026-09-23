@@ -15,8 +15,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
  * The six calls a {@link CaptureSource} is written as, each taken apart and put back.
  *
@@ -53,12 +51,14 @@ class CaptureTypesTest {
     }
 
     @Test
-    void eachIsWrittenAsTheCallThatMakesIt() {
-        assertEquals(Source.class, CaptureTypes.CURRENT.factoryOwner());
-        assertEquals("current", CaptureTypes.CURRENT.factory());
-        assertEquals(CaptureSource.class, CaptureTypes.REGION.factoryOwner());
-        assertEquals("region", CaptureTypes.REGION.factory());
-        assertTrue(CaptureTypes.EMULATOR.factory().isEmpty(), "an emulator is a constructor");
+    void eachIsWrittenAsTheCallThatMakesIt() throws NoSuchMethodException {
+        assertEquals(Source.class.getMethod("current"), CaptureTypes.CURRENT.factory());
+        assertEquals(CaptureSource.class.getMethod("region", CaptureSource.class, Rect.class),
+                CaptureTypes.REGION.factory());
+        assertEquals(EmulatorSource.class.getConstructor(String.class), CaptureTypes.EMULATOR.factory(),
+                "an emulator is a constructor");
+        assertEquals(List.of(CaptureSource.class, Rect.class), CaptureTypes.REGION.componentTypes(),
+                "the parts are the factory's parameters");
         assertEquals(Monitor.class, CaptureTypes.MONITOR.type());
     }
 

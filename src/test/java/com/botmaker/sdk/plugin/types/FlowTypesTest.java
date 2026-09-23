@@ -92,11 +92,11 @@ class FlowTypesTest {
         assertEquals(5, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
     }
 
-    /** A flow is one call on {@code Flow} itself, which is the prefix the host identifies it by. */
+    /** A flow is one call on {@code Flow} itself, which is what the host identifies it by. */
     @Test
-    void aFlowIsWrittenAsACallOnFlow() {
-        assertEquals(Flow.class, FlowTypes.FLOW_SHAPE.factoryOwner());
-        assertEquals("of", FlowTypes.FLOW_SHAPE.factory());
+    void aFlowIsWrittenAsACallOnFlow() throws NoSuchMethodException {
+        assertEquals(Flow.class.getMethod("of", List.class, List.class, List.class, String.class,
+                Flow.Limits.class), FlowTypes.FLOW_SHAPE.factory());
     }
 
     /** A body the file writes is kept exactly as written, whatever it is; only the "none yet" constant reads blank. */
