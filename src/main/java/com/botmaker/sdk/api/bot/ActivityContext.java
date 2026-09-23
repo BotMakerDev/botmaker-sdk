@@ -17,11 +17,11 @@ import com.botmaker.sdk.api.flow.Flows;
  * itself on or off.
  *
  * <pre>{@code
- * Activities.define("Mining", ctx -> {
+ * public static Outcome body(ActivityContext ctx) {
  *     if (bagFull()) return ctx.outcome("BAG_FULL");
  *     mineOnce();
  *     return ctx.done();
- * });
+ * }
  * }</pre>
  */
 @Palette(category = "bot", categoryLabel = "Bot", order = 37)
@@ -33,15 +33,8 @@ public final class ActivityContext {
     /**
      * A context for the activity called {@code activity}.
      *
-     * <p><b>Public since 2026-09-21</b>, and the reason is worth stating because it reverses the
-     * {@code @Hidden} note above. It was package-private while the only way to write a body was a lambda
-     * passed to {@code Activities.define}, which nothing outside this package could call with a context of
-     * its own. A body is now a {@code public static Outcome body(ActivityContext ctx)} in the user's own
-     * file, and the flow builds one of these to call it with — so a constructor is needed outside this
-     * package either way, and once it exists, refusing it to the user would be refusing them the one thing
-     * the method-reference design buys: a body is an ordinary static method a plain JUnit test can call.
-     *
-     * <p>It is still not something a bot builds while it is <em>running</em>; the flow hands one in.
+     * <p>Public so a body — an ordinary static method — can be called from a plain JUnit test. A running bot
+     * never builds one; the flow hands one in.
      */
     public ActivityContext(String activity) {
         this.activity = activity;
@@ -86,11 +79,11 @@ public final class ActivityContext {
      * on.
      */
     public void disable() {
-        Activity.setEnabled(activity, false);
+        Activities.disable(activity);
     }
 
     /** Switches this activity back on for the rest of the run. */
     public void enable() {
-        Activity.setEnabled(activity, true);
+        Activities.enable(activity);
     }
 }

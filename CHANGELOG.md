@@ -19,14 +19,41 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+This is **2.0.0**, the one release that removes `api.*` elements. From it on, never-delete applies:
+`api.*` only grows.
+
+### BREAKING
+
+Every older way of writing an activity or a flow is gone. A bot's flow is the `Flow` value its
+`plugins/sdk/Sdk.java` returns, and its `main` is `Bot.run(goHome, Sdk.class)`.
+
+| Removed | Use instead |
+|---|---|
+| `api.bot.Activity<O>` (subclass per activity) | a `public static Outcome body(ActivityContext ctx)`, named in the flow as `Flow.activity(Collect::body, …)` |
+| `Activity.enable/disable/setEnabled(String)` | `Activities.enable/disable/setEnabled(String)` |
+| `Activities.define(name, ctx -> …)` | a body method, named in the flow by method reference |
+| `api.flow.FlowGraph` (`load`, `run`, `walk`, `of`, `node`, `route`, `Node`, `Route`) | `Bot.run(goHome, Sdk.class)` walks the installed `Flow` |
+| `FlowGraph.run(Main.class, goHome)` inside `Bot.start` | `Bot.run(goHome, Sdk.class)` |
+| `api.flow.PopupCheck`, `api.flow.Recovery` | `Flow.Activity.popupCheck()` and `goHome()`, booleans on the activity |
+| `Bot.run(Class<?> anchor, Runnable goHome, Class<?>... values)` | `Bot.run(Runnable goHome, Class<?>... values)`; the anchor found generated activity classes, which no longer exist |
+| `com.botmaker.sdk.api.meta.{ReplacedBy, Replaces, Since}` | `com.botmaker.plugin.api.meta.ReplacedBy` |
+| `BotSettings.defaultCaptureSource()` | `Source.current()` |
+
+A pre-2026-08-29 project whose activities are generated `<package>.activities.<Name>` classes no longer
+runs them. Move each `run()` into a body method and name it in the flow.
+
 ### Added
 
+- **`Activities.enable`, `disable`, `setEnabled`**, beside `active`: switching the flow's activities on
+  and off by name, which `ctx.disable()` also calls.
 - **`Flow.Edge.NEXT` and `Flow.Edge.DISABLED`**, the two outcomes every activity has without declaring them,
   plus `Edge.outcomeOrNext()` and `Edge.isDisabled()`. They were the constants of an editor-only record,
   `FlowEdgeModel`, which is gone: the flow editor now holds the same `Flow.Edge` a bot's `Sdk.java` writes.
 
 ### Fixed
 
+- **`Flow.limits(0, …)` means no step limit, as documented.** The walk treated `0` as "stop before the
+  first activity".
 - **The palette offers `Activities` and `Flows`.** Both carried `@Palette` but were missing from the
   plugin's hand-written class list. The list is gone: the host now catalogues every `@Palette` class in
   the SDK's jar, so an annotated class cannot be left out again.

@@ -88,16 +88,20 @@ final class CallSites {
     static final Predicate<ValueContext> EMULATOR_NAME = ctx -> SlotEditor.onCall(ctx, Emulators.class, 0,
             EMULATOR_METHODS::contains);
 
-    /** The activity named by {@code Activities.define(name, body)}. */
-    static final Predicate<ValueContext> ACTIVITY_NAME = ctx -> SlotEditor.onCall(ctx, Activities.class, 0, "define"::equals);
+    private static final java.util.Set<String> ACTIVITY_METHODS =
+            java.util.Set.of("active", "enable", "disable", "setEnabled");
+
+    /** The activity named by {@code Activities.enable(name)}, {@code disable}, {@code active} or {@code setEnabled}. */
+    static final Predicate<ValueContext> ACTIVITY_NAME = ctx -> SlotEditor.onCall(ctx, Activities.class, 0,
+            ACTIVITY_METHODS::contains);
 
     /**
      * The outcome named by {@code ctx.outcome(name)}.
      *
-     * <p>The receiver is an {@link ActivityContext}, which is a type the user never spells — the parameter of
-     * the lambda they were handed. That is the reason the method takes a context at all rather than the body
-     * returning a bare {@code String}: a call on a typed receiver is one this predicate can recognise, and a
-     * returned string is indistinguishable from every other string in the bot.
+     * <p>The receiver is an {@link ActivityContext}, which is the parameter of the body. That is the reason the
+     * method takes a context at all rather than the body returning a bare {@code String}: a call on a typed
+     * receiver is one this predicate can recognise, and a returned string is indistinguishable from every other
+     * string in the bot.
      */
     static final Predicate<ValueContext> OUTCOME_NAME = ctx -> SlotEditor.onCall(ctx, ActivityContext.class, 0, "outcome"::equals);
 }

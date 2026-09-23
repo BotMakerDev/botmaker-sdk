@@ -6,11 +6,8 @@ import com.botmaker.plugin.api.palette.Palette;
 /**
  * The work one activity does, as a <b>method reference</b> — {@code Collect::body}.
  *
- * <p>This is the type an activity's body has inside a {@code Flow}, and the shape is the whole reason it
- * exists. An activity's body used to be found by <em>name</em>: {@code Activities.define("Collect", …)}
- * matched a string in a JSON file against a string in a Java call, so renaming either one compiled fine and
- * the flow quietly took the {@code DISABLED} wire three screens into a run. A method reference is a token
- * sequence javac resolves, so the same rename is a <b>compile error</b> that names the file it broke.
+ * <p>This is the type an activity's body has inside a {@code Flow}. A method reference is a token sequence
+ * javac resolves, so renaming or deleting the method is a <b>compile error</b> that names the file it broke.
  *
  * <p>It is an ordinary functional interface and nothing about it is special-cased:
  *

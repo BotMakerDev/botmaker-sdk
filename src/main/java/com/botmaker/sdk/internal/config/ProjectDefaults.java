@@ -31,8 +31,7 @@ public final class ProjectDefaults {
     // read in their own Java -- which is the disagreement CaptureTargetModel's javadoc was written to end,
     // solved there by making the editor write both and solved here by there being only one.
     //
-    // Source.resolveDefault is the whole desktop now, and CaptureSource.fromProjectDefault is
-    // Source.current(). Nothing reads capture.source.
+    // Source.resolveDefault is the whole desktop now. Nothing reads capture.source.
 
     /**
      * The raw {@code launch.target} spec, or {@code null} when unset — {@code api.launch.Target} parses it

@@ -3,28 +3,10 @@ package com.botmaker.sdk.api.flow;
 import com.botmaker.plugin.api.palette.Palette;
 
 /**
- * The bot's own flow, handed to the SDK once.
+ * The flow a bot runs.
  *
- * <p>One call, from the file BotMaker gave your project:
- *
- * <pre>{@code
- * public static void install() {
- *     Flows.use(flow());
- * }
- * }</pre>
- *
- * <p>and {@code main} calls {@code Sdk.install()}. That is the whole hand-off, and it is deliberately the
- * dullest thing in this package: an ordinary static call, compile-checked, with no reflection, no service
- * loader and no file. {@link FlowGraph} then walks what was installed.
- *
- * <p><b>Why it is a call rather than something the SDK finds.</b> Anything the SDK discovered — a known
- * class name, an annotation scan, a {@code ServiceLoader} — would be a second way for a bot to be wrong that
- * the compiler could not see. A method that is not called is a method a reader can find with the same
- * search they would use for any other.
- *
- * <p>Nothing is locked: {@code install()} is in your file and is yours to change, call twice, or replace
- * with a flow you build by hand. The editor refuses one thing, which is the body of the
- * {@code @Managed("flow")} method it writes.
+ * <p>{@code Bot.run(goHome, Sdk.class)} installs the value your {@code @Managed("flow")} method returns and
+ * walks it. {@link #use} is the same hand-off for a bot that builds its flow some other way.
  */
 @Palette(category = "flow", categoryLabel = "Flow", icon = "⑃", order = 99)
 public final class Flows {

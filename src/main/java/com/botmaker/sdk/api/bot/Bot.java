@@ -2,10 +2,11 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.basics.managed.ManagedValues;
-import com.botmaker.sdk.api.flow.FlowGraph;
+import com.botmaker.sdk.api.flow.Flows;
 import com.botmaker.sdk.api.launch.Target;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.flow.FlowWalker;
 
 import java.util.function.Consumer;
 
@@ -64,18 +65,14 @@ public class Bot {
      * public final class Gamebot extends Bot {
      *
      *     public static void main(String[] args) {
-     *         run(Gamebot.class, Gamebot::goHome, Sdk.class);
+     *         run(Gamebot::goHome, Sdk.class);
      *     }
      * }
      * }</pre>
      *
-     * <p><b>This replaced a hand-written {@code Sdk.install()}</b> (2026-09-21). The file a plugin ships
-     * carried one, and a bot's {@code main} called it — one line per plugin, written by hand into a file the
-     * user owns, and a bot that lost that line ran with no flow and said nothing. The bot still names each
-     * plugin's values class, which is a fact only it has and one javac checks; what it no longer writes is
-     * what to do with them.
+     * <p>The bot names each plugin's values class, which is a fact only it has and one javac checks; what it
+     * does not write is what to do with them.
      *
-     * @param anchor a class in the bot's own base package — ordinarily the entry point itself
      * @param goHome what gets the game back to a known screen, between activities and after anything
      *               unexpected
      * @param values each plugin's values class in this bot — {@code Sdk.class}, the file that plugin shipped
@@ -83,10 +80,10 @@ public class Bot {
      */
     @Hidden("the entry point a bot's own main calls; a second run() inside an activity body would nest one "
             + "supervised run inside another")
-    public static void run(Class<?> anchor, Runnable goHome, Class<?>... values) {
+    public static void run(Runnable goHome, Class<?>... values) {
         SdkValues.claim();
         ManagedValues.install(values);
-        start(() -> FlowGraph.run(anchor, goHome), goHome);
+        start(() -> FlowWalker.run(Flows.installed(), goHome), goHome);
     }
 
     /**

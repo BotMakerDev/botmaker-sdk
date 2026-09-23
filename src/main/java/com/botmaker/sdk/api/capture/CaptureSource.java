@@ -121,30 +121,6 @@ public interface CaptureSource {
         return new NamedWindow(titleSubstring);
     }
 
-    /**
-     * The project's own capture source — {@link Source#current()}.
-     *
-     * <p><b>Behaviour change, 2026-09-22.</b> This read {@code botmaker-project.properties}'
-     * {@code capture.source} first and fell back to {@link Source#current()}. That key is no longer read
-     * by anything: a project's capture source is the expression {@code Sdk.captureSource()} returns, the
-     * {@code @Managed("capture")} value the user edits in <i>Project ▸ Settings</i>, and {@code Bot.run}
-     * hands it to {@link Source#set} before the bot starts. So the fallback became the answer.
-     *
-     * <p>For a bot whose project had the key set and whose {@code Sdk.java} says the same thing — which is
-     * every project Studio has written since 2026-09-21, because both were written by one code path at one
-     * instant — this returns what it always returned. For a bot that installs no {@code @Managed} values
-     * it now answers the whole desktop rather than the key, which is the honest answer: nothing in that
-     * bot's own source says otherwise.
-     *
-     * <p>Kept rather than deprecated because it still names a real thing, and it is the method a bot
-     * writes when it wants the project's source explicitly rather than ambiently.
-     *
-     * @return the project's capture source
-     */
-    static CaptureSource fromProjectDefault() {
-        return Source.current();
-    }
-
     // --- Region: a Rect that belongs to THIS source ---
 
     /**

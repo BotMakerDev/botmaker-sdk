@@ -65,7 +65,7 @@ public final class FlowRules {
 
     /**
      * The activities a run can reach, breadth-first from {@code start}, falling back to the first placed
-     * card when {@code start} names nothing placed — which is the rule {@code FlowGraph} resolves a start
+     * card when {@code start} names nothing placed — which is the rule {@code FlowWalker} resolves a start
      * with, so what the canvas marks as reachable is what a run actually reaches.
      *
      * <p><b>It walks here rather than delegating, since 2026-09-21.</b> The walk was

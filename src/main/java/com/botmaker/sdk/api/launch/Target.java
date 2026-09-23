@@ -2,7 +2,7 @@ package com.botmaker.sdk.api.launch;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Source;
 
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
@@ -149,7 +149,7 @@ public final class Target {
         }
 
         t.startIfNotRunning();
-        return Game.waitForLaunch(CaptureSource.fromProjectDefault(), BotSettings.defaultLaunchWaitTimeout());
+        return Game.waitForLaunch(Source.current(), BotSettings.defaultLaunchWaitTimeout());
     }
 
     /**
@@ -169,6 +169,6 @@ public final class Target {
             return Game.waitForDefaultSource(timeoutMillis);
         }
 
-        return Game.waitForLaunch(CaptureSource.fromProjectDefault(), timeoutMillis);
+        return Game.waitForLaunch(Source.current(), timeoutMillis);
     }
 }

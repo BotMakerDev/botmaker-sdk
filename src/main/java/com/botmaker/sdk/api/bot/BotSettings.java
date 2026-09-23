@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -126,16 +125,6 @@ public final class BotSettings {
     public static long defaultLaunchWaitTimeout() {
         ensureLoaded();
         return defaultLaunchWaitTimeout;
-    }
-
-    /**
-     * Returns the project's default capture source configuration.
-     * This allows bots to use the same capture source that Studio configured for the project.
-     *
-     * @return the project's default capture source, or the current source if not configured
-     */
-    public static CaptureSource defaultCaptureSource() {
-        return CaptureSource.fromProjectDefault();
     }
 
     // The default timezone is deliberately NOT settings state. It used to be, and the copy here was a second

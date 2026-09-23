@@ -8,6 +8,37 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — SDK 2.0.0 cleanup, phase 4: the API break
+
+**Done**
+
+- **One way to write an activity.** Deleted: `api.bot.Activity`, `internal.bot.{ActivityRegistry,
+  LegacyActivity}`, `internal.flow.{ActivityLoader, FlowBody}`, `Activities.define` and its `Defined`
+  runner, `api.flow.{FlowGraph, PopupCheck, Recovery}`, `api.meta.*`, `BotSettings.defaultCaptureSource`,
+  `CaptureSource.fromProjectDefault`. Three runner kinds and a registry existed so the three ways of
+  writing an activity could reach one `disable(name)`; with one way left, none of it has a job.
+- **`FlowWalker` walks a `Flow` directly** — no intermediate graph, no `Node`, no registry. It resolves the
+  start, follows the first edge whose `outcomeOrNext()` matches, takes `DISABLED` for a switched-off or
+  unwritten activity, and holds the runtime overrides (`active`, `setEnabled`) that `Activities` and
+  `ctx.disable()` call. An override for a name the flow lacks is one console line and a no-op.
+- **`Bot.run(goHome, values…)`** lost its `anchor`: it existed only for `ActivityLoader`'s by-convention
+  class lookup. Never released, so nothing that shipped changes shape here.
+- **`Flow.limits(0, …)` is "no limit"**, as `Flow.Limits` always documented; the walk stopped at once.
+- The activity-name picker claims argument 0 of `Activities.active/enable/disable/setEnabled`.
+- japicmp baseline pinned to **`v2.0.0`** ahead of the tag; `v1.2.0` was never tagged, so the gate had never
+  armed. The sanctioned break is recorded in `../docs/refactor/21-api-compat.md`.
+- Tests: `ActivitiesTest`, `FlowWalkerTest` (moved to `internal/flow`) and `DebugTraceTest` rewritten
+  against `Flow`; `ActivityTest`, `FlowLoadTest` and the `api/flow/activities` fixtures deleted. 499 green.
+
+**Deferred / next**
+
+- **Studio still speaks the old model in two places**, both host code: `project/ActivityBodies` finds a
+  body by regex over `define("…")`, and `OverlayTargetPicker` tells a user with no body to *write
+  Activities.define(…)*. Both should resolve the flow's method reference instead. They cost nothing at
+  compile time (Studio names no SDK type) but give wrong advice against 2.0.0.
+- **The gamebot migration** (`FlowGraph.run` → `Bot.run(Gamebot::goHome, Sdk.class)`, plus the owed
+  `@Param`/`@Managed` imports) lands in the `--sdk 2.0.0 --gamebot` run.
+
 ## 2026-09-23 — SDK 2.0.0 cleanup, phase 3: the palette is discovered
 
 **Done**

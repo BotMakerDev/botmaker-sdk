@@ -1,158 +1,49 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.plugin.api.meta.ReplacedBy;
+import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.sdk.api.flow.Flows;
-import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.internal.bot.ActivityRegistry;
-import com.botmaker.sdk.internal.trace.Trace;
-
-import java.util.function.Function;
+import com.botmaker.sdk.internal.flow.FlowWalker;
 
 /**
- * Where you say what an activity <em>does</em>.
+ * Turning the flow's activities on and off while a bot runs.
  *
- * <p>An activity is created on the Activity Flow canvas, not in code — it lives in the project's own
- * {@code activities.json}, along with the outcomes it can report and where each of them leads. What the
- * canvas cannot hold is the work itself, and this is where that goes:
+ * <p>An activity's switch on the Activity Flow canvas is its default. These calls override it for the rest of
+ * the run, from anywhere — one activity switching another off, or a body switching itself off after doing its
+ * work once ({@code ctx.disable()} is the same call). A disabled activity takes its {@code DISABLED} wire.
  *
  * <pre>{@code
- * public static void main(String[] args) {
- *     Activities.define("Mining", ctx -> {
- *         if (bagFull()) return ctx.outcome("BAG_FULL");
- *         mineOnce();
- *         return ctx.done();
- *     });
- *
- *     Bot.start(() -> FlowGraph.run(Main.class, Main::goHome), Main::goHome);
+ * public static Outcome body(ActivityContext ctx) {
+ *     if (bagFull()) Activities.disable("Mining");
+ *     return ctx.done();
  * }
  * }</pre>
  *
- * <h2>Why a call and not a class</h2>
- *
- * <p>Until 2026-08-29 BotMaker wrote a {@code class Mining extends Activity<Mining.Outcome>} into your
- * project for every activity on the canvas, and then kept editing it — renaming the type when you renamed
- * the activity, adding constants to its enum when you added outcomes. That made a file inside your own
- * source tree one that you could not freely rename, move or delete. **A project's structure belongs to
- * you.** So nothing is written: you write this call wherever you like, in whatever file you like, and it is
- * the only thing that connects the canvas to your code.
- *
- * <p>Two consequences worth knowing. An activity with no {@code define} call is <b>not an error</b> — it
- * behaves exactly as one you switched off, following its {@code DISABLED} wire, so a flow drawn ahead of the
- * code still runs. And an activity's name is a string here: renaming it on the canvas does not rename it in
- * your code, and the two stop matching until you change it. That is the same trade an outcome makes, and it
- * is why the editor draws a dropdown of the project's activities on this call rather than a text box.
- *
- * <h2>The older way still works</h2>
- *
- * <p>Subclassing {@link Activity} does everything it always did, and a bot that has such classes keeps
- * running unchanged. Both kinds land in the same registry, so {@link Activity#disable(String)} finds either.
+ * <p>A name the flow does not have is one line on the console and nothing else, so a typo never stops a
+ * running bot.
  */
 @Palette(category = "bot", categoryLabel = "Bot", icon = "◎", order = 35)
 public final class Activities {
 
     private Activities() {}
 
-    /**
-     * Says what the named activity does.
-     *
-     * <p>Call it before the flow starts — from your bot's {@code main}, above {@code Bot.start}. Defining
-     * the same name twice keeps the later body, which is what constructing the same {@link Activity}
-     * subclass twice has always done.
-     *
-     * @param name the activity's name, exactly as it reads on the Activity Flow canvas
-     * @param body the work, handed the activity's own {@link ActivityContext}; it reports what happened with
-     *             {@code ctx.outcome("…")} or {@code ctx.done()}
-     * @deprecated the flow names an activity's body by <b>method reference</b> now
-     *             ({@link com.botmaker.sdk.api.flow.Flow#activity}), so renaming or deleting the method is a
-     *             compile error instead of a flow that quietly does nothing
-     */
-    @Deprecated(since = "1.2.0", forRemoval = false)
-    @ReplacedBy(value = "com.botmaker.sdk.api.flow.Flow#activity", behaviourChanged = true,
-            note = "An activity is a part of the Flow value in your plugins/sdk/Sdk.java now, and its body "
-                    + "is a method reference: Flow.activity(Collect::body, \"Collect\", …). Move the lambda "
-                    + "into a `public static Outcome body(ActivityContext ctx)` and name it there. This call "
-                    + "still registers a body by name and still works; the two match up by name, which is "
-                    + "the link the method reference exists to replace.")
-    public static void define(String name, Function<ActivityContext, Outcome> body) {
-        if (name == null || name.isBlank()) {
-            Debug.error("[Activity] define: an activity needs a name. Ignoring.");
-            return;
-        }
-        if (body == null) {
-            Debug.error("[Activity] define: '" + name + "' was given no body. Ignoring.");
-            return;
-        }
-        ActivityRegistry.register(new Defined(name, body));
-    }
-
-    /**
-     * Whether the named activity is switched on right now — its switch on the Activity Flow canvas, plus
-     * any {@link Activity#enable(String)} / {@link Activity#disable(String)} made during this run.
-     *
-     * <p>The flow consults this itself before running anything, so a body does not need to. It is here for
-     * the case the flow cannot answer: one activity asking about another.
-     */
+    /** Whether the named activity runs right now: its canvas switch, plus any override made this run. */
     public static boolean active(String name) {
-        ActivityRegistry.Runner runner = ActivityRegistry.get(name);
-        return runner == null ? Flows.enabled(name) : runner.active();
+        return FlowWalker.active(name);
     }
 
-    /**
-     * A defined activity: its name, its body, and whatever a running bot has since said about whether it
-     * should run.
-     *
-     * <p>Not a record, for the one reason a record cannot serve: the override is genuinely mutable state —
-     * the whole point of {@code ctx.disable()} is that a body can switch its own activity off mid-run.
-     *
-     * <p>{@code active()} reads {@link Flows#enabled} rather than caching it, and {@code null} means nothing
-     * has been said, which is a different answer from {@code false}. So the switch this activity has on the
-     * canvas is what it defaults to, and an override made during a run outranks it. It read
-     * {@code Settings.enabled} — that is, {@code activities.json} — until 2026-09-21; the flow the bot
-     * installed is the same answer, in the bot's own source.
-     */
-    private static final class Defined implements ActivityRegistry.Runner {
+    /** Switches the named activity on for the rest of the run. */
+    public static void enable(String name) {
+        FlowWalker.setEnabled(name, true);
+    }
 
-        private final String name;
-        private final Function<ActivityContext, Outcome> body;
-        private Boolean override;
+    /** Switches the named activity off for the rest of the run; the flow takes its {@code DISABLED} wire. */
+    public static void disable(String name) {
+        FlowWalker.setEnabled(name, false);
+    }
 
-        Defined(String name, Function<ActivityContext, Outcome> body) {
-            this.name = name;
-            this.body = body;
-        }
-
-        @Override
-        public String name() {
-            return name;
-        }
-
-        @Override
-        public boolean active() {
-            return override != null ? override : Flows.enabled(name);
-        }
-
-        @Override
-        public void setEnabled(boolean enabled) {
-            this.override = enabled;
-        }
-
-        /**
-         * Runs the body and reports what it said.
-         *
-         * <p>One line on the console per activity, because the activity and its outcome are the coarsest
-         * unit of "what is the bot doing" — it is what makes a debug log read as a story rather than as
-         * vision events. A body that answers {@code null} is treated as {@code ctx.done()}: a lambda whose
-         * last statement fell through has nothing special to report, which is exactly what that means.
-         */
-        @Override
-        public Outcome execute() {
-            long startedAt = System.currentTimeMillis();
-            Outcome outcome = body.apply(new ActivityContext(name));
-            if (outcome == null) outcome = Outcome.of(null);
-            Debug.log("[Activity] " + name + " → " + outcome
-                    + " (" + Trace.elapsed(System.currentTimeMillis() - startedAt) + ")");
-            return outcome;
-        }
+    /** Switches the named activity on or off for the rest of the run. */
+    @Hidden("the boolean picks between enable and disable, which the menu already offers by name")
+    public static void setEnabled(String name, boolean enabled) {
+        FlowWalker.setEnabled(name, enabled);
     }
 }

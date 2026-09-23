@@ -15,7 +15,7 @@ import java.util.Set;
  * The two editors over the names that tie a bot's code to its Activity Flow canvas.
  *
  * <p>Both values are a {@code String}, and both name something the user drew somewhere else:
- * {@code Activities.define("Mining", …)} names an activity of the open project, and {@code ctx.outcome("BAG_FULL")}
+ * {@code Activities.disable("Mining")} names an activity of the open project, and {@code ctx.outcome("BAG_FULL")}
  * names one of the outcomes declared on the canvas. Nothing about the type says either — which is what
  * {@link CallSites} is for — and typing them by hand is the one mistake the platform cannot catch for the
  * user: a name that matches nothing is not an error anywhere, it is an activity that never runs and an
@@ -34,7 +34,7 @@ public final class ActivityEditors {
 
     private ActivityEditors() {}
 
-    /** The activity named by {@code Activities.define("…", body)} — the project's activities, as drawn. */
+    /** The activity named by {@code Activities.disable("…")} and its siblings — the project's activities, as drawn. */
     public static Node activityName(ValueContext ctx) {
         return Editors.choiceSlot(ctx, () -> activityNames(ctx), "Activity name");
     }
@@ -44,8 +44,8 @@ public final class ActivityEditors {
      *
      * <p><b>Every one, not this activity's own</b>, and the difference is worth stating because the narrower
      * answer is the one a reader expects. An editor is told the call it sits in ({@code outcome}, on
-     * {@code ActivityContext}) and no more: the {@code Activities.define("Mining", …)} it is nested inside is
-     * two levels up in a syntax tree the plugin never sees. So the honest set is the union, offered with
+     * {@code ActivityContext}) and no more: which activity's body it sits in is a fact of the flow, not of the
+     * call. So the honest set is the union, offered with
      * duplicates collapsed. The cost is an outcome from a different activity appearing in the list; what it
      * buys is that the common case — the outcome the user just added on the canvas — is one click rather
      * than typed from memory, and a name typed anyway is still accepted.

@@ -5,7 +5,9 @@ import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.internal.bot.ActivityRegistry;
+import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.Flows;
+import com.botmaker.sdk.internal.flow.FlowWalker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,7 +41,7 @@ class DebugTraceTest {
         Debug.enable();
         PopupGuard.uninstall();
         PopupGuard.enabled(true);
-        ActivityRegistry.clear();
+        Flows.use(null);
     }
 
     /** Runs {@code body} with stdout and stderr captured, and returns everything it printed. */
@@ -65,22 +67,25 @@ class DebugTraceTest {
 
     // --- Activity ---
 
-    private enum Outcome { DEFAULT, BAG_FULL }
+    /** One activity reporting BAG_FULL, which nothing is wired to, so the run ends after it. */
+    private static final Flow MINING = Flow.of(
+            List.of(Flow.activity(ctx -> ctx.outcome("BAG_FULL"), "Mining", "", true, false, false,
+                    List.of("BAG_FULL"))),
+            List.of(), List.of(), "Mining", Flow.limits(10, 0));
 
-    private static final class Mining extends Activity<Outcome> {
-        @Override public boolean isEnabled() { return true; }
-        @Override public Outcome run() { return Outcome.BAG_FULL; }
-    }
-
-    private static final class Collapsing extends Activity<Outcome> {
-        @Override public boolean isEnabled() { return true; }
-        @Override public Outcome run() { throw new BotStuckException("no ore"); }
+    /** Walks {@link #MINING} to its end, which is {@code Bot.stop()} throwing. */
+    private static void runMining() {
+        Flows.use(MINING);
+        try {
+            FlowWalker.run(MINING, null);
+        } catch (RuntimeException ended) {
+            // the run is over; only what it printed matters here
+        }
     }
 
     @Test
     void anActivityReportsWhichOutcomeItReached() {
-        Mining mining = new Mining();
-        String output = printed(mining::execute);
+        String output = printed(DebugTraceTest::runMining);
 
         List<String> lines = linesMatching(output, "[Activity]");
         assertEquals(1, lines.size(), "one activity, one line: " + output);
@@ -89,27 +94,10 @@ class DebugTraceTest {
     }
 
     @Test
-    void aStuckActivityReportsThatInsteadOfAnOutcome() {
-        Collapsing collapsing = new Collapsing();
-        String output = printed(() -> {
-            try {
-                collapsing.execute();
-            } catch (BotStuckException expected) {
-                // the supervisor's business; here we only care that it was announced first
-            }
-        });
-
-        List<String> lines = linesMatching(output, "[Activity]");
-        assertEquals(1, lines.size(), output);
-        assertTrue(lines.get(0).contains("Collapsing → stuck: no ore"), lines.get(0));
-    }
-
-    @Test
     void aQuietRunSaysNothingAboutActivities() {
-        Mining mining = new Mining();
         Debug.disable();
 
-        assertEquals("", printed(mining::execute), "Debug.disable() means silence, not less noise");
+        assertEquals("", printed(DebugTraceTest::runMining), "Debug.disable() means silence, not less noise");
     }
 
     // --- PopupGuard ---

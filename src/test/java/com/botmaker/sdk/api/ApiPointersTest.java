@@ -70,15 +70,8 @@ class ApiPointersTest {
      */
     private static final String CONTRACT_PACKAGE = "com.botmaker.plugin.api";
 
-    /**
-     * The pointer annotation, read under both spellings for the length of its move.
-     *
-     * <p>{@code com.botmaker.plugin.api.meta} is where it now lives; {@code com.botmaker.sdk.api.meta} is the
-     * deprecated spelling, which under never-delete stays in the jar rather than being removed after a
-     * window. An element may carry either.
-     */
-    private static final List<String> REPLACED_BY =
-            List.of(ReplacedBy.class.getName(), "com.botmaker.sdk.api.meta.ReplacedBy");
+    /** The pointer annotation. */
+    private static final List<String> REPLACED_BY = List.of(ReplacedBy.class.getName());
     private static final String DEPRECATED = Deprecated.class.getName();
 
     private static ScanResult scan;
@@ -257,7 +250,7 @@ class ApiPointersTest {
 
     /** Where this module's compiled API actually lives — asked of a class that is unambiguously part of it. */
     private static String mainClasses() {
-        return codeSourceOf(com.botmaker.sdk.api.flow.FlowGraph.class, "the compiled api.* output");
+        return codeSourceOf(com.botmaker.sdk.api.flow.Flow.class, "the compiled api.* output");
     }
 
     /** The contract jar, so that a pointer crossing into {@code com.botmaker.plugin.api} resolves. */
