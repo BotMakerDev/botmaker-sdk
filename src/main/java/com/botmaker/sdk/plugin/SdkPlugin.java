@@ -2,7 +2,6 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.toolbar.ActionContext;
@@ -42,22 +41,11 @@ import java.util.stream.Stream;
  * own pom declares the dependency — never a wider API. One implementor proves little about a contract; an
  * implementor that cannot cheat proves rather more.
  *
- * <h2>Why the version is still an argument, though this plugin ignores it</h2>
+ * <h2>The palette</h2>
  *
- * <p>{@link #catalog(String)} takes the version <em>the bot pins</em>, not this jar's, and until 2026-08-26
- * the SDK answered it from a per-version class. It no longer does: there is one catalog, reflected off the
- * facades in <em>this</em> build, and the pin is not consulted.
- *
- * <p>The rule it used to serve is unchanged, and is met somewhere better. What an older pin may be offered
- * is this catalog <b>intersected with the bot's own resolved jar</b>, which {@code SdkSurfaceService}
- * already computes from bytecode — so a member this build added is still absent from an older bot, because
- * that bot's jar does not contain it. A frozen class per version could only restate, by hand, what the jar
- * already says; and it had to be edited whenever a member was deleted, which made it untruthful about the
- * past exactly when it mattered.
- *
- * <p>The parameter stays on the contract regardless. It is not the SDK's to remove — another plugin may
- * ship per-version curation and needs somewhere to read the pin from — and a surface that narrows to fit
- * its only implementor is the back door this class exists to refuse.
+ * <p>Nothing here lists it: the toolkit's {@code buildCatalog()} scans this jar for {@code @Palette}, and
+ * every {@code com.botmaker.sdk.api} class carrying one is catalogued. What an older pin may be offered is
+ * that catalog <b>intersected with the bot's own resolved jar</b>, which the host computes from bytecode.
  *
  * <h2>Where this class may live, and where it may not</h2>
  *
@@ -109,84 +97,6 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     // reached by the one editor that needs it (GeometryEditors, which hands it to Editors.tuplePill as an
     // argument). pickWith held ONE static ScreenPicks for every plugin in the process, last writer wins and
     // nothing said so; passing it removes the shared state rather than relocating it.
-
-    /**
-     * Built once, by reflection over the facades named here. Every member is <em>discovered</em> rather than
-     * named — {@code @Hidden}, {@code @PaletteDefault} and {@code @PaletteLabel} travel with the member they
-     * annotate — so nothing in this list can go stale except a class that no longer exists, and that is a
-     * javac error because these are class literals. Reflection runs exactly once in the editor and never at
-     * all on a bot's classpath, where this class is not loaded.
-     *
-     * <p>The order here is the order the menus fall back to when two facades share a {@code @Palette} order;
-     * {@code PaletteCatalog.of} sorts by that order first, so this list is documentation rather than policy.
-     *
-     * <p>It is a method rather than a {@code static final} field so that the reflection happens the first time
-     * the palette is <em>asked for</em> rather than when {@code ServiceLoader} constructs this class, which
-     * the host does while opening a project. {@link AbstractStudioPlugin} caches the answer.
-     */
-    @Override
-    protected PaletteCatalog buildCatalog() {
-        return PaletteCatalog.of(
-            com.botmaker.sdk.api.interaction.Mouse.class,
-            com.botmaker.sdk.api.interaction.Keyboard.class,
-            com.botmaker.sdk.api.interaction.Wait.class,
-            com.botmaker.sdk.api.vision.ImageFinder.class,
-            com.botmaker.sdk.api.vision.ImageClicker.class,
-            com.botmaker.sdk.api.vision.ImageWaiter.class,
-            com.botmaker.sdk.api.vision.Pixel.class,
-            com.botmaker.sdk.api.vision.Text.class,
-            com.botmaker.sdk.api.vision.Vision.class,
-            com.botmaker.sdk.api.bot.BotSettings.class,
-            com.botmaker.sdk.api.util.Debug.class,
-            com.botmaker.sdk.api.bot.Session.class,
-            com.botmaker.sdk.api.bot.Bot.class,
-            com.botmaker.sdk.api.bot.Watchdog.class,
-            com.botmaker.sdk.api.bot.PopupGuard.class,
-            com.botmaker.sdk.api.bot.Activity.class,
-            // api.config.Settings and api.config.Wire stood here and are deleted (2026-09-11). A bot reads
-            // its parameters through com.botmaker.plugin.basics.store.Settings, which is plugin #2's class
-            // and so plugin #2's to catalogue — this plugin may not offer another plugin's API, which is the
-            // same rule that put the nine JDK value types there. Until it does, no menu offers a settings
-            // read and a bot writes the call itself.
-            com.botmaker.sdk.api.vision.Images.class,
-            com.botmaker.sdk.api.launch.Game.class,
-            com.botmaker.sdk.api.launch.Target.class,
-            com.botmaker.sdk.api.emulator.Emulators.class,
-            com.botmaker.sdk.api.capture.Source.class,
-            com.botmaker.sdk.api.capture.Window.class,
-            com.botmaker.sdk.api.util.Time.class,
-            com.botmaker.sdk.api.util.BotMaker.class,
-            com.botmaker.sdk.api.geometry.Point.class,
-            com.botmaker.sdk.api.geometry.Rect.class,
-            com.botmaker.sdk.api.geometry.Size.class,
-            com.botmaker.sdk.api.bot.BotStuckException.class,
-            com.botmaker.sdk.api.bot.StartMode.class,
-            com.botmaker.sdk.api.capture.CaptureSource.class,
-            com.botmaker.sdk.api.geometry.Direction.class,
-            com.botmaker.sdk.api.emulator.Emulator.class,
-            com.botmaker.sdk.api.emulator.EmulatorRef.class,
-            com.botmaker.sdk.api.emulator.EmulatorSource.class,
-            com.botmaker.sdk.api.interaction.Key.class,
-            com.botmaker.sdk.api.interaction.MouseButton.class,
-            com.botmaker.sdk.api.launch.LaunchTarget.class,
-            com.botmaker.sdk.api.vision.ColorMatch.class,
-            com.botmaker.sdk.api.vision.ImageTemplate.class,
-            com.botmaker.sdk.api.vision.ImageTemplateGroup.class,
-            com.botmaker.sdk.api.vision.Matches.class,
-            com.botmaker.sdk.api.vision.MatchBranch.class,
-            com.botmaker.sdk.api.vision.MatchResult.class,
-            com.botmaker.sdk.api.vision.Precision.class,
-            com.botmaker.sdk.api.vision.TextMatch.class,
-            com.botmaker.sdk.api.vision.OcrOptions.class,
-            com.botmaker.sdk.api.vision.OcrLanguage.class,
-            com.botmaker.sdk.api.vision.TextResult.class,
-            com.botmaker.sdk.api.flow.FlowGraph.class,
-            com.botmaker.sdk.api.flow.PopupCheck.class,
-            com.botmaker.sdk.api.flow.Recovery.class,
-            com.botmaker.sdk.api.meta.Since.class,
-            com.botmaker.sdk.api.meta.ReplacedBy.class,
-            com.botmaker.sdk.api.meta.Replaces.class);
-    }
 
     /**
      * The editors for this plugin's own types — a region dragged on screen instead of

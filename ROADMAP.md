@@ -8,6 +8,20 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — SDK 2.0.0 cleanup, phase 3: the palette is discovered
+
+**Done**
+
+- **`SdkPlugin.buildCatalog()` is deleted**, with its 54 class literals. The toolkit's default is
+  `PaletteCatalog.scan(getClass())` (studio-api, new): every `@Palette` class in this jar. The hand list had
+  already missed two annotated, offered facades, **`Activities` and `Flows`**, which the palette now shows.
+  Four more annotated classes join as catalogued-but-hidden (`ActivityBody`, `ActivityContext`, `Outcome`,
+  `Flow`), so the editor recognises their calls.
+- `ApiCatalogTest.catalogIsEveryAnnotatedApiClass` compares the catalog with a ClassGraph listing of
+  `@Palette` under `com.botmaker.sdk.api`, a second reader of the same fact.
+
+---
+
 ## 2026-09-23 — SDK 2.0.0 cleanup, phase 2: dead code and duplicates
 
 Plan: `~/.claude/plans/analyze-current-botmaker-sdk-i-rippling-taco.md` (nine phases: package tree,

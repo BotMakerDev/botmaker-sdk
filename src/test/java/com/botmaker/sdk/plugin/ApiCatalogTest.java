@@ -6,6 +6,8 @@ import com.botmaker.plugin.api.catalog.MemberId;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ScanResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +17,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -24,11 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The catalog's build gate: <b>a broken entry fails the build, not a menu.</b>
  *
- * <p>Since 2026-08-27 the catalog is not generated at all — {@link SdkPlugin} calls
- * {@code PaletteCatalog.of(Mouse.class, …)} and the members are reflected off those classes. That removes the
- * failure this test was originally written against (a hand-written entry naming a member somebody renamed):
- * members are <em>discovered</em> now, so there is nothing left to go stale, and the class list is javac-checked
- * because it is written as class literals.
+ * <p>The catalog is {@code PaletteCatalog.scan} over this jar: classes and members are both discovered, so
+ * nothing in it can go stale against a rename.
  *
  * <p>What is still worth checking is everything reflection cannot decide on its own: that every id names a
  * public member of its own facade, that nothing is offered twice, that no simple name is claimed twice (the
@@ -54,14 +54,31 @@ class ApiCatalogTest {
     @DisplayName("the catalog builds and is not empty")
     void catalogBuilds() {
         assertFalse(catalog().isEmpty(),
-                "no facade was catalogued: is @Palette missing, or is the class list in SdkPlugin empty?");
+                "no facade was catalogued: is @Palette missing, or did the scan read the wrong jar?");
+    }
+
+    /**
+     * The scan against a second reader: ClassGraph lists every {@code @Palette} class under
+     * {@code com.botmaker.sdk.api}, and the catalog must hold exactly those. A hand-written list missed two.
+     */
+    @Test
+    @DisplayName("every @Palette class under api is catalogued, and nothing else")
+    void catalogIsEveryAnnotatedApiClass() {
+        Set<String> annotated;
+        try (ScanResult scan = new ClassGraph().enableAnnotationInfo()
+                .acceptPackages(API_PACKAGE.substring(0, API_PACKAGE.length() - 1)).scan()) {
+            annotated = new TreeSet<>(scan.getClassesWithAnnotation(Palette.class).getNames());
+        }
+        Set<String> catalogued = new TreeSet<>();
+        catalog().facades().forEach(f -> catalogued.add(f.qualifiedName()));
+        assertEquals(annotated, catalogued);
     }
 
     @Test
     @DisplayName("nothing was reported as malformed")
     void noProblems() {
         assertTrue(catalog().problems().isEmpty(),
-                "PaletteCatalog.of reported: " + String.join("; ", catalog().problems()));
+                "PaletteCatalog.scan reported: " + String.join("; ", catalog().problems()));
     }
 
     @Test
