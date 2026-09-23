@@ -336,7 +336,7 @@ all with one `Sdk.install()` from its own `main`, and `FlowGraph.load`/`run` wal
 - **No editor here reads or writes Java text (2026-09-23).** Where a section below says an editor parses a
   slot (`Slots.arguments`, `settingsOf`, `CaptureExpr`, `LiteralWriter`), writes one with `setSource`, or
   rewrites the enclosing call, read *it reads the value Studio hands it and hands one back*. A capture source
-  is six `ComponentType`s (`internal/authoring/CaptureTypes`); a run of pictures is `SlotRun.Element`s.
+  is six `ComponentType`s (`plugin/types/CaptureTypes`); a run of pictures is `SlotRun.Element`s.
 - **`activities.json` does not exist**, and nothing reads it. `Authoring.readModel`/`writeModel`/`modelJson`/
   `readSchemaVersion`, `ProjectModel`, `FlowModel`, `FlowNodeModel`, `PresetModel`, `ActivityModel`,
   `VariableModel`, `internal.config.ProjectData`, `internal.config.SdkGrammar`, `AuthoringMixins` and
@@ -368,9 +368,9 @@ in this module was `internal/config/ProjectData`, `internal/config/SdkGrammar` a
 
 **The rest went on 2026-09-22, and this section is history now.** A bot reads nothing stored: a
 parameter is a `@Param` field and the flow is a `@Managed` value, both Java. `SdkGrammar`, `ProjectData`,
-`WireText` and `SdkValueTypes`' codecs are deleted. What survived is `authoring/TemplateNames` (the
+`WireText` and `SdkValueTypes`' codecs are deleted. What survived is `TemplateNames` (now `internal/vision`; the
 `img:` prefix `Images.template` still needs) and the spelling of a duration, folded into
-`DurationEditor`. **A type is declared once, in `internal/authoring/SdkTypes`**, as a `PluginType` (and a
+`DurationEditor`. **A type is declared once, in `plugin/types/SdkTypes`**, as a `PluginType` (and a
 `ComponentType` beside it when its Java is a call), and the host writes and reads its Java. Adding a type
 means adding a class there and nothing else. Wherever the text below says *codec*, *`SdkValueTypes`* or
 *`WireText`*, it describes the machinery that went.

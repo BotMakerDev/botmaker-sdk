@@ -12,20 +12,20 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.internal.authoring.CaptureTypes;
-import com.botmaker.sdk.internal.authoring.PictureAt;
-import com.botmaker.sdk.internal.authoring.SdkFlowValues;
-import com.botmaker.sdk.internal.authoring.SdkTypes;
-import com.botmaker.sdk.internal.plugin.capture.CaptureLabels;
-import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
-import com.botmaker.sdk.internal.plugin.capture.CaptureValue;
-import com.botmaker.sdk.internal.plugin.capture.SourcePicker;
-import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
-import com.botmaker.sdk.internal.plugin.flow.ActivityFlowDialog;
-import com.botmaker.sdk.internal.plugin.flow.FlowValue;
-import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
-import com.botmaker.sdk.internal.plugin.setup.ProjectSetup;
-import com.botmaker.sdk.internal.plugin.templates.ResourceManagerDialog;
+import com.botmaker.sdk.plugin.editors.SdkEditors;
+import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
+import com.botmaker.sdk.plugin.flow.FlowValue;
+import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
+import com.botmaker.sdk.plugin.pictures.ResourceManagerDialog;
+import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
+import com.botmaker.sdk.plugin.setup.ProjectSetup;
+import com.botmaker.sdk.plugin.source.CaptureLabels;
+import com.botmaker.sdk.plugin.source.CaptureValue;
+import com.botmaker.sdk.plugin.source.SourcePicker;
+import com.botmaker.sdk.plugin.types.CaptureTypes;
+import com.botmaker.sdk.plugin.types.FlowTypes;
+import com.botmaker.sdk.plugin.types.PictureAt;
+import com.botmaker.sdk.plugin.types.SdkTypes;
 import javafx.scene.paint.Color;
 
 import java.util.List;
@@ -94,7 +94,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     // SdkScreenPicks stood here as a nested class until 2026-09-22, registered process-wide through
-    // Editors.pickWith. Both are deleted. The picker is com.botmaker.sdk.internal.plugin.editors's now,
+    // Editors.pickWith. Both are deleted. The picker is com.botmaker.sdk.plugin.editors's now,
     // reached by the one editor that needs it (GeometryEditors, which hands it to Editors.tuplePill as an
     // argument). pickWith held ONE static ScreenPicks for every plugin in the process, last writer wins and
     // nothing said so; passing it removes the shared state rather than relocating it.
@@ -160,7 +160,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     @Override
     public List<ComponentType<?>> componentTypes() {
-        return Stream.concat(SdkFlowValues.ALL.stream(), CaptureTypes.ALL.stream()).toList();
+        return Stream.concat(FlowTypes.ALL.stream(), CaptureTypes.ALL.stream()).toList();
     }
 
     /**

@@ -64,6 +64,11 @@ runs them. Move each `run()` into a body method and name it in the flow.
 
 ### Changed
 
+- **The plugin half moved to `com.botmaker.sdk.plugin`.** What was `com.botmaker.sdk.internal.plugin`,
+  `com.botmaker.sdk.internal.authoring` and `com.botmaker.sdk.authoring` is now one `plugin` package tree
+  (`types`, `editors`, `pictures`, `screen`, `source`, `pilot`, `flow`, …). None of it was under contract
+  and a bot never needed it. `TemplateNames` moved to `internal.vision`. A bot that imported
+  `com.botmaker.sdk.authoring.TemplateLibrary` must drop that import.
 - **The duration editor edits a length and nothing else.** Its *Random range* toggle rewrote `Wait.time(x)`
   into `Wait.between(a, b)` through the call's Java text, which Studio no longer hands a plugin;
   `Wait.between` is in the palette. The editor reads and writes a `Duration` value, which Studio writes as

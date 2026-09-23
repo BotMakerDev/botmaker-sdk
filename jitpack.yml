@@ -16,20 +16,20 @@ install:
   # a readable message is strictly better than publishing that.
   #
   # STUDIO_API_TAG is the plugin contract (com.botmaker.plugin.api). This SDK is Studio's plugin #1, and its
-  # internal.plugin classes implement that contract — an OPTIONAL dependency, so it never reaches a bot's
-  # classpath, but the build still has to compile against it. Required here for the same reason as the other
-  # two: flatten bakes whatever is injected into the published pom.
+  # plugin/ classes implement that contract, and api/ carries its annotations (@Param, @Managed, @Records), so
+  # it is a compile dependency. Required here for the same reason as the other two: flatten bakes whatever is
+  # injected into the published pom.
   #
-  # There is no PLUGIN_PROCESSOR_TAG any more: the palette catalog is reflected at load time by
-  # PaletteCatalog.of(...) in SdkPlugin, so this module compiles with no annotation processor at all.
+  # There is no PLUGIN_PROCESSOR_TAG any more: the host discovers the palette from @Palette at load time, so
+  # this module compiles with no annotation processor at all.
   #
-  # PLUGIN_TOOLKIT_TAG is the widget kit the slot editors under internal.plugin.editors are built from. It
+  # PLUGIN_TOOLKIT_TAG is the widget kit the slot editors under plugin/editors are built from. It
   # IS an ordinary <dependencies> entry (optional, so it never reaches a bot), which means flatten bakes it
   # into the published pom — so it is required for the same reason SHARED_TAG is, and a stale one would be
   # published rather than merely used.
   #
-  # PLUGIN_BASICS_TAG is plugin #2, which owns the nine JDK value types — com.botmaker.sdk.authoring.WireText
-  # delegates their parsing to it, so this is an ordinary <dependencies> entry at compile scope, transitive
+  # PLUGIN_BASICS_TAG is plugin #2, which owns the nine JDK value types this SDK builds on, so this is an
+  # ordinary <dependencies> entry at compile scope, transitive
   # onto a bot's classpath, and baked into the published pom by flatten. Required for the same reason as the
   # four above, and the reason its own release FORCES an SDK release.
   - . ./.deps.env

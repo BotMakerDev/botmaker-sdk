@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.sdk.authoring.TemplateNames;
+import com.botmaker.sdk.internal.vision.TemplateNames;
 
 /**
  * This project's own pictures, by file name — {@code Images.named("ore")} is {@code images/ore.png}.

@@ -8,6 +8,35 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — SDK 2.0.0 cleanup, phase 8: the package move
+
+**Done**
+
+- **`com.botmaker.sdk` has three children: `api`, `internal`, `plugin`** (`../docs/refactor/34-plugin-package-tree.md`).
+  `internal/plugin/*` moved to `plugin/*`. `internal/authoring` became `plugin/types`, with `SdkFlowValues`
+  renamed `FlowTypes`. `authoring/{TemplateLibrary, TemplateManifest, TagCatalog}` and
+  `internal/plugin/templates/*` became `plugin/pictures`, with `CaptureTemplates`, `TagPicker` and
+  `TemplateNaming`. `authoring/TemplateNames` moved to `internal/vision`, since `api.vision.Images` uses it.
+  `internal/plugin/capture` split into `plugin/screen` (14 classes: grabbing and picking on the screen) and
+  `plugin/source` (`SourcePicker`, `CaptureValue`, `CaptureLabels`). `plugin/pilot/ui` holds the six
+  dialog and widget classes; the server, routes, video, input and telemetry stay in `plugin/pilot`.
+- `flow.css` moved with `FlowStyles`. `META-INF/services` already named `com.botmaker.sdk.plugin.SdkPlugin`.
+- **Visibility changed twice, both on purpose:** `EditorFrame.cropped` is public (the source picker's
+  thumbnails use it), and `RemotePilotFunnelTest` moved to `plugin/pilot/ui` with the class it tests.
+- **New `plugin/PluginLayersTest`**: the root has exactly the three layers, and no `api/` or `internal/`
+  code line names `com.botmaker.sdk.plugin`, `javafx` or the toolkit. 484 tests; `botmaker plugin validate`
+  passes.
+- Comments naming the old paths were fixed in `jitpack.yml`, `ci.yml`, `pom.xml`, Studio's `PickerRegistry`
+  and `PrecisionSeedTest`, the toolkit's `CLAUDE.md` rule, and this module's `CLAUDE.md` where it states the
+  current layout.
+
+**Deferred / next**
+
+- `plugin/screen` and `plugin/source` depend on each other (`EditorFrame` reads the project's source through
+  `CaptureValue`; `SourcePicker` crops through `EditorFrame`). Java allows it; a split that removes it would
+  move the project-source read into `source` and hand `EditorFrame` a value.
+- History sections of both `CLAUDE.md`/`AGENTS.md` files still name `internal/plugin/*`; phase 9's docs pass.
+
 ## 2026-09-23 — SDK 2.0.0 cleanup, phase 7: the pilot, in place
 
 **Done**

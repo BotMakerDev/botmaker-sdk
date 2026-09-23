@@ -646,7 +646,7 @@
             mvn -Ppilot package
 
           The normal build needs no Node: a prebuilt `dist` is committed under src/main/resources/pilot/ and
-          served as-is by internal/plugin/pilot/PilotServer. This profile refreshes those assets from source
+          served as-is by plugin/pilot/PilotServer. This profile refreshes those assets from source
           — it downloads a project-local Node/npm (nothing installed system-wide), runs `npm ci` +
           `npm run build`, then overwrites target/classes/pilot with the fresh dist (after the default
           resource copy, so the fresh build wins).

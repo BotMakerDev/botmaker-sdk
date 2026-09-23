@@ -45,7 +45,7 @@ jobs:
           repository: BotMakerDev/botmaker-studio-api
           path: .deps/botmaker-studio-api
 
-      # The widget kit this module's slot editors (internal/plugin/editors) are built from — an ordinary
+      # The widget kit this module's slot editors (plugin/editors) are built from — an ordinary
       # <dependencies> entry at ${botmaker.plugintoolkit.version}, OPTIONAL so it never reaches a bot.
       # It went into the pom with phase 12a and this checkout list did not follow, which is a class of
       # break the umbrella reactor CANNOT catch: there the toolkit is a sibling module and resolves for
@@ -60,8 +60,8 @@ jobs:
           repository: BotMakerDev/botmaker-plugin-toolkit
           path: .deps/botmaker-plugin-toolkit
 
-      # Plugin #2, which owns the nine JDK value types com.botmaker.sdk.authoring.WireText delegates the
-      # parsing of — an ordinary <dependencies> entry at ${botmaker.pluginbasics.version}, at compile scope
+      # Plugin #2, which owns the nine JDK value types this SDK builds on — an ordinary <dependencies> entry
+      # at ${botmaker.pluginbasics.version}, at compile scope
       # and never optional, so it travels onto a bot's classpath with this jar.
       #
       # After the toolkit, because it declares the toolkit at compile scope and the contract `provided`:
