@@ -430,9 +430,10 @@ public final class PrecisionEditors {
     /**
      * The three values the value holds, or the SDK's own {@code DEFAULT} when the host could not read it.
      *
-     * <p>The host reads {@code new Precision(…)}, which is what this editor writes. A wither chain the user
-     * wrote — {@code Precision.TIGHT.minArea(400)} — is not a call the host reads, so the pill shows it as
-     * written ({@link #pillText}) and the dialog opens on the defaults.
+     * <p>The host reads {@code new Precision(…)}, which is what this editor writes, and since 2026-09-23 the
+     * chains a person writes by hand — {@code Precision.TIGHT.minArea(400)} — through
+     * {@code SdkTypes.PRECISION_WITHERS}. Anything else it cannot read is shown as written ({@link #pillText})
+     * and the dialog opens on the defaults.
      */
     static Settings current(ValueContext ctx) {
         return ctx.value(Precision.class)

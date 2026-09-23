@@ -109,11 +109,29 @@ public final class CaptureTypes {
                 }
             };
 
-    /** Every shape, in the order the host tries them. */
-    public static final List<ComponentType<?>> ALL = List.of(CURRENT, DESKTOP, MONITOR, WINDOW, EMULATOR, REGION);
+    /**
+     * {@code source.region(new Rect(…))}: the chain a person writes, read as the region it builds. It is an
+     * instance factory, so the host never writes it: an edited region is written as {@link #REGION}.
+     */
+    public static final ComponentType<RegionSource> REGION_CHAIN =
+            new Shape<>(RegionSource.class, SdkTypes.method(CaptureSource.class, "region", Rect.class)) {
+                @Override public List<Object> components(RegionSource value) {
+                    return List.of(value.parent(), value.sub());
+                }
+                @Override public RegionSource build(List<Object> parts) {
+                    return REGION.build(parts);
+                }
+            };
 
     /**
-     * What each of the six shares: the class, and the call that writes it. The types of its parts are the
+     * Every shape, in the order the host tries them: the six it writes, then the chained region, which it
+     * only reads.
+     */
+    public static final List<ComponentType<?>> ALL =
+            List.of(CURRENT, DESKTOP, MONITOR, WINDOW, EMULATOR, REGION, REGION_CHAIN);
+
+    /**
+     * What each of the seven shares: the class, and the call that writes it. The types of its parts are the
      * call's parameters, so the two cannot drift apart.
      */
     private abstract static class Shape<T> implements ComponentType<T> {

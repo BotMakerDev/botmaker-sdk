@@ -62,6 +62,22 @@ class CaptureTypesTest {
         assertEquals(Monitor.class, CaptureTypes.MONITOR.type());
     }
 
+    /** {@code window("Game").region(r)} builds what the chained call does; it is read and never written. */
+    @Test
+    void theChainedRegionBuildsWhatTheChainDoes() throws NoSuchMethodException {
+        CaptureSource window = CaptureSource.window("Game");
+        Rect sub = new Rect(1, 2, 30, 40);
+        RegionSource chained = (RegionSource) window.region(sub);
+
+        RegionSource built = CaptureTypes.REGION_CHAIN.build(List.of(window, sub));
+
+        assertEquals(CaptureSource.class.getMethod("region", Rect.class), CaptureTypes.REGION_CHAIN.factory());
+        assertEquals(List.of(CaptureSource.class, Rect.class), CaptureTypes.REGION_CHAIN.componentTypes());
+        assertEquals(chained.sub(), built.sub());
+        assertEquals(CaptureTypes.WINDOW.components((NamedWindow) chained.parent()),
+                CaptureTypes.WINDOW.components((NamedWindow) built.parent()));
+    }
+
     @Test
     void aFreshCaptureSourceIsTheAmbientOne() {
         assertInstanceOf(CurrentSource.class, new CaptureTypes.CaptureSourceType().fresh());

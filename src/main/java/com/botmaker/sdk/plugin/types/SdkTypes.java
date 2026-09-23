@@ -31,6 +31,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
  * The fourteen types the SDK declares ({@link #ALL}): a picture and a group of them, how exactly to match
@@ -296,4 +298,40 @@ public final class SdkTypes {
             new SeededType<>(Matches.class, method(Matches.class, "none")),
             new SeededType<>(ColorMatch.class, method(Vision.class, "lastColorMatch")),
             new SeededType<>(TextMatch.class, method(Vision.class, "lastTextMatch")));
+
+    /**
+     * {@code precision.tolerance(d)}, {@code .minArea(n)} and {@code .minCount(n)}: the chains a person
+     * writes on a named precision ({@code Precision.TIGHT.minArea(400)}), read as the value they build.
+     * Instance factories, so the host never writes them: an edited precision is written as
+     * {@link PrecisionType} writes it.
+     */
+    public static final List<ComponentType<Precision>> PRECISION_WITHERS = List.of(
+            new Wither("tolerance", double.class, Precision::deltaE,
+                    (p, v) -> p.tolerance(((Number) v).doubleValue())),
+            new Wither("minArea", int.class, Precision::minArea, (p, v) -> p.minArea(((Number) v).intValue())),
+            new Wither("minCount", int.class, Precision::minCount, (p, v) -> p.minCount(((Number) v).intValue())));
+
+    /** One of {@link #PRECISION_WITHERS}: the method, and how to read its one part back off a value. */
+    private static final class Wither implements ComponentType<Precision> {
+
+        private final Method method;
+        private final Function<Precision, Object> part;
+        private final BiFunction<Precision, Object, Precision> apply;
+
+        Wither(String name, Class<?> argument, Function<Precision, Object> part,
+               BiFunction<Precision, Object, Precision> apply) {
+            this.method = method(Precision.class, name, argument);
+            this.part = part;
+            this.apply = apply;
+        }
+
+        @Override public Class<Precision> type() { return Precision.class; }
+        @Override public Executable factory() { return method; }
+        @Override public List<Class<?>> componentTypes() { return parts(method); }
+        @Override public List<Object> components(Precision p) { return List.of(p, part.apply(p)); }
+        @Override public Precision build(List<Object> parts) {
+            return parts.size() == 2 && parts.get(0) instanceof Precision on && parts.get(1) instanceof Number
+                    ? apply.apply(on, parts.get(1)) : null;
+        }
+    }
 }

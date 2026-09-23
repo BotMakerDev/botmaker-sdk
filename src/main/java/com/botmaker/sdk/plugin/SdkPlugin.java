@@ -110,13 +110,15 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * The five records a {@code Flow} is written as, and the six calls a {@code CaptureSource} is written as.
-     * None is a type anybody declares on its own; the host reads each back so an editor is handed a value
-     * rather than a string.
+     * The five records a {@code Flow} is written as, the six calls a {@code CaptureSource} is written as, and
+     * the chains a person writes by hand and the host only reads: {@code source.region(r)} and the three
+     * {@code Precision} withers. None is a type anybody declares on its own; the host reads each back so an
+     * editor is handed a value rather than a string.
      */
     @Override
     public List<ComponentType<?>> componentTypes() {
-        return Stream.concat(FlowTypes.ALL.stream(), CaptureTypes.ALL.stream()).toList();
+        return Stream.of(FlowTypes.ALL, CaptureTypes.ALL, SdkTypes.PRECISION_WITHERS)
+                .<ComponentType<?>>flatMap(List::stream).toList();
     }
 
     /**

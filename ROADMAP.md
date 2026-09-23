@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — the hand-written chains are read (doc 35, phase 5b)
+
+**Done**
+
+- `CaptureTypes.REGION_CHAIN` (`CaptureSource.region(Rect)`, an instance method) and
+  `SdkTypes.PRECISION_WITHERS` (`Precision.tolerance/minArea/minCount`, a private `Wither` class) are
+  component types whose factory is an instance method, so Studio's typed reader reads
+  `CaptureSource.window("G").region(r)` and `Precision.TIGHT.minArea(400)` as values; `Precision.TIGHT`
+  itself is read by the host off the declared class. `SdkPlugin.componentTypes()` lists them after the
+  flow and capture shapes. `PrecisionWithersTest`, and a `CaptureTypesTest` case for the chained region.
+- `PrecisionEditors.pillText` keeps its "as written" fallback for anything else it cannot read.
+
+**Deferred / next** — the flow editor shows a chained flow read-only; the `plugin/screen` ↔
+`plugin/source` cycle (phase 6).
+
 ## 2026-09-23 — the four vision results hand over a `Method`, not text
 
 **Done**

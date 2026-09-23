@@ -61,6 +61,11 @@ runs them. Move each `run()` into a body method and name it in the flow.
   the host, so the capture picker, the pilot and the editors' frame grab read the project's source without
   this plugin parsing it, and a recorded click writes `Mouse.click(Source.current(), x, y)` with its import.
   `ImageTemplateGroup.of(…)` is declared the same way.
+- **Studio reads the chains you write by hand.** `CaptureSource.window("Game").region(r)` and
+  `Precision.TIGHT.minArea(400)` (and `.tolerance(d)`, `.minCount(n)`) are declared to the host as
+  instance-method factories (`CaptureTypes.REGION_CHAIN`, `SdkTypes.PRECISION_WITHERS`), so they draw as
+  editable pills. Studio reads them and never writes them: an edit is written as
+  `CaptureSource.region(source, rect)` or `new Precision(…)`.
 
 ### Changed
 
