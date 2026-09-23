@@ -17,6 +17,162 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+No source changes since v1.1.15; re-released for updated upstream pins.
+
+This is **2.0.0**, the one release that removes `api.*` elements. From it on, never-delete applies:
+`api.*` only grows.
+
+### BREAKING
+
+Every older way of writing an activity or a flow is gone. A bot's flow is the `Flow` value its
+`plugins/sdk/Sdk.java` returns, and its `main` is `Bot.run(goHome, Sdk.class)`.
+
+| Removed | Use instead |
+|---|---|
+| `api.bot.Activity<O>` (subclass per activity) | a `public static Outcome body(ActivityContext ctx)`, named in the flow as `Flow.activity(Collect::body, …)` |
+| `Activity.enable/disable/setEnabled(String)` | `Activities.enable/disable/setEnabled(String)` |
+| `Activities.define(name, ctx -> …)` | a body method, named in the flow by method reference |
+| `api.flow.FlowGraph` (`load`, `run`, `walk`, `of`, `node`, `route`, `Node`, `Route`) | `Bot.run(goHome, Sdk.class)` walks the installed `Flow` |
+| `FlowGraph.run(Main.class, goHome)` inside `Bot.start` | `Bot.run(goHome, Sdk.class)` |
+| `api.flow.PopupCheck`, `api.flow.Recovery` | `Flow.Activity.popupCheck()` and `goHome()`, booleans on the activity |
+| `Bot.run(Class<?> anchor, Runnable goHome, Class<?>... values)` | `Bot.run(Runnable goHome, Class<?>... values)`; the anchor found generated activity classes, which no longer exist |
+| `com.botmaker.sdk.api.meta.{ReplacedBy, Replaces, Since}` | `com.botmaker.plugin.api.meta.ReplacedBy` |
+| `BotSettings.defaultCaptureSource()` | `Source.current()` |
+
+A pre-2026-08-29 project whose activities are generated `<package>.activities.<Name>` classes no longer
+runs them. Move each `run()` into a body method and name it in the flow.
+
+### Added
+
+- **`Activities.enable`, `disable`, `setEnabled`**, beside `active`: switching the flow's activities on
+  and off by name, which `ctx.disable()` also calls.
+- **`Mouse.doubleClick`, `rightClick`, `middleClick(CaptureSource, x, y)` and
+  `Mouse.drag(CaptureSource, Point, Point, durationMs)`**: the same gestures as the `Point` forms, relative to
+  a capture source's top-left corner, so a recording made over a window replays wherever the window is.
+- **Studio's recorder writes this SDK's calls.** Twelve methods carry `@Records` — `Mouse.click` and the four
+  above, `scrollUp`/`scrollDown`, `Keyboard.type`/`tap`/`combo`, `Wait.time`, `ImageClicker.click(ImageTemplate)`
+  and `ImageWaiter.waitFor(ImageTemplate, int)` — and a click on one of the project's pictures is recognised
+  as that picture.
+- **`CaptureSource.region(CaptureSource of, Rect sub)`**, the same narrowing as `of.region(sub)` written as
+  one call. It is how Studio writes a picked region, since it writes a value as a factory call, never a
+  chain.
+- **Studio reads a capture source as a value.** `Source.current()`, `CaptureSource.desktop()`,
+  `.monitor(i)`, `.window("t")`, `new EmulatorSource("n")` and `CaptureSource.region(…)` are each declared to
+  the host, so the capture picker, the pilot and the editors' frame grab read the project's source without
+  this plugin parsing it, and a recorded click writes `Mouse.click(Source.current(), x, y)` with its import.
+  `ImageTemplateGroup.of(…)` is declared the same way.
+- **Studio reads the chains you write by hand.** `CaptureSource.window("Game").region(r)` and
+  `Precision.TIGHT.minArea(400)` (and `.tolerance(d)`, `.minCount(n)`) are declared to the host as
+  instance-method factories (`CaptureTypes.REGION_CHAIN`, `SdkTypes.PRECISION_WITHERS`), so they draw as
+  editable pills. Studio reads them and never writes them: an edit is written as
+  `CaptureSource.region(source, rect)` or `new Precision(…)`.
+
+### Changed
+
+- **Every call a value is written as is looked up as a real method.** `FlowTypes` and `CaptureTypes`
+  hand the host the `Method` (or, for an emulator, the constructor) that writes each value, and derive
+  their parts from its parameters, so the two cannot disagree. A renamed factory now fails this plugin's
+  own tests instead of a bot's build.
+- **The plugin half moved to `com.botmaker.sdk.plugin`.** What was `com.botmaker.sdk.internal.plugin`,
+  `com.botmaker.sdk.internal.authoring` and `com.botmaker.sdk.authoring` is now one `plugin` package tree
+  (`types`, `editors`, `pictures`, `screen`, `source`, `pilot`, `flow`, …). None of it was under contract
+  and a bot never needed it. `TemplateNames` moved to `internal.vision`. A bot that imported
+  `com.botmaker.sdk.authoring.TemplateLibrary` must drop that import.
+- **The duration editor edits a length and nothing else.** Its *Random range* toggle rewrote `Wait.time(x)`
+  into `Wait.between(a, b)` through the call's Java text, which Studio no longer hands a plugin;
+  `Wait.between` is in the palette. The editor reads and writes a `Duration` value, which Studio writes as
+  `Duration.ofMillis(n)`.
+- **The precision editor shows a hand-written wither chain as written** (`Precision.TIGHT.minArea(400)`)
+  and opens its dialog on the defaults, rather than parsing the chain. Its preview no longer takes the colour
+  from the call's `new Color(…)` argument; sample one from the game.
+
+### Removed
+
+- **⏺ Record Macro and ⏺ Record at cursor.** Recording is Studio's: its overlay HUD records and inserts at the
+  cursor, writing the calls above.
+- **`Flow.Edge.NEXT` and `Flow.Edge.DISABLED`**, the two outcomes every activity has without declaring them,
+  plus `Edge.outcomeOrNext()` and `Edge.isDisabled()`. They were the constants of an editor-only record,
+  `FlowEdgeModel`, which is gone: the flow editor now holds the same `Flow.Edge` a bot's `Sdk.java` writes.
+
+### Fixed
+
+- **The canvas's "managed value" notes and the 📋 Project Setup tooltip name the right place.** The flow's
+  note pointed at "✂ Activity Flow" (the button is 🔀), the capture source's at "Project ▸ Settings" (it is
+  🎯 Capture Source), and the tooltip still listed a reference resolution the checklist no longer has.
+- **The Remote Pilot no longer drops a message for a window title with a newline or tab in it**, nor a
+  match whose confidence was never computed. Both produced text the phone could not parse, and it
+  discarded the message without a word. A missing confidence is now sent as `0`.
+- **`Flow.limits(0, …)` means no step limit, as documented.** The walk treated `0` as "stop before the
+  first activity".
+- **The palette offers `Activities` and `Flows`.** Both carried `@Palette` but were missing from the
+  plugin's hand-written class list. The list is gone: the host now catalogues every `@Palette` class in
+  the SDK's jar, so an annotated class cannot be left out again.
+- **An activity with no method yet is written as `ActivityBody.NONE` again**, and reads back as a card with
+  no body. Since the codecs went, the flow wrote a blank body as nothing at all, which declined the whole
+  flow — so a flow holding a freshly drawn card could not be saved.
+- **Studio can read the flow at all.** The five records a `Flow` is written as (`Flow.of`,
+  `Flow.activity`, `Flow.edge`, `Flow.preset`, `Flow.limits`) are handed to the host through the
+  contract's new `componentTypes()`; they had no way to reach it.
+
+### Added
+
+- **`Bot.run(anchor, goHome, Sdk.class)` — the whole of a bot's `main`.** It installs every `@Managed` value
+  the classes you name declare, then starts the flow. What it replaces is a hand-written `Sdk.install()`:
+  one line per plugin, in a file you own, and a bot that lost that line ran with no flow and said nothing.
+  Your bot still *names* each plugin's values class — javac checks that — and no longer says what to do with
+  it.
+
+  ```java
+  public final class Gamebot extends Bot {
+
+      public static void main(String[] args) {
+          run(Gamebot.class, Gamebot::goHome, Sdk.class);
+      }
+  }
+  ```
+
+  `Sdk.install()` still works and is not deprecated: it is your file, and `Flows.use` and `Source.set` are
+  unchanged.
+
+### Changed
+
+- **`Bot` is no longer `final`** and has a `protected` constructor, so `extends Bot` lets the entry point
+  above read as one line. `Bot.run(…)` spelled in full does the same thing for a bot that does not extend
+  it. Nothing that compiled before stops compiling.
+- **The SDK no longer ships `Sdk.java` and `Pictures.java` for the host to copy in.** A new project gets
+  them from the template it is created from. Adding the SDK to a project that has neither brings neither —
+  the flow window offering to write one is owed and not in this release.
+- **`SdkPlugin` no longer declares a parameter section**, and no longer answers a parameter row or a
+  parameter edit. The contract surface is deleted: the SDK's group was the only one in existence, it declared
+  no rows, and `botmaker-plugin-basics`' `ParameterStore.declare` had no caller — so what the Parameters
+  window read out of this plugin was a pre-2026-09-17 project's JSON and nothing else. **Nothing changes for
+  a bot**, and nothing is lost in the editor: a parameter is a `@Param` field in your own Java, and one this
+  plugin wants for itself goes in `plugins/sdk/Sdk.java`, which the window already reads.
+- **The plugin contract is a `compile` dependency**, so it reaches your bot rather than stopping at this
+  jar. `@Param` and `@Managed` moved onto the contract and sit on your *own* fields and methods, so your bot
+  needs that jar to compile at all; at `provided` it resolved no copy and failed on its own `@Param` line.
+  Nothing about how a plugin links changes — `PluginLoader` is parent-first for `com.botmaker.plugin.api.**`,
+  so a plugin still links the host's copy and there is one `Class` on both sides. **The one thing to know:**
+  do not declare `botmaker-studio-api` yourself beside a plugin that brings it, or nearest-wins pins you to a
+  contract version your plugin was never built against.
+  **Your bot's imports change with it**: `com.botmaker.plugin.basics.params.Param` is now
+  `com.botmaker.plugin.api.params.Param`, `…basics.managed.Managed` is `…api.managed.Managed`, and
+  `@Param(min, max)` are numbers, so `min = "1"` becomes `min = 1`.
+- **🎯 Capture Targets is 🎯 Capture Source, and it picks one thing.** A project kept a *list* of targets in
+  `capture.json` with one marked default; that file is deleted and a project's capture source is the
+  expression `Sdk.captureSource()` returns, which is one source. So the list manager is the picker it always
+  opened. Nothing read the other entries.
+- **Nothing is snapped to a reference resolution before a capture.** It came from `capture.json` too, and
+  each picture already records the size it was authored at in its own sidecar — which is what the matcher
+  rescales against. *Project Setup* has two required steps rather than three for the same reason.
+
+- **Otherwise nothing changes for a bot.** The SDK's plugin half was recompiled against the plugin
+  contract's new package layout (`com.botmaker.plugin.api.slot`, `.parameters`, `.toolbar`, `.source`,
+  `.value`). No `api.*` type, method or behaviour changed — japicmp holds that — and a bot never writes a
+  contract name down.
+
 ## [1.1.15] — 2026-09-23
 
 This is **2.0.0**, the one release that removes `api.*` elements. From it on, never-delete applies:
