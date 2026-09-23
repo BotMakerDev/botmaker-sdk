@@ -97,7 +97,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * it out of both menus.
      *
      * <p>Ten answer a real {@code fresh()}; the capture source's is the ambient source, which keeps following
-     * the project's source when that changes later. The four vision results answer {@code freshSource()}
+     * the project's source when that changes later. The four vision results answer {@code freshCall()}
      * instead, because their honest starting value is a <em>call the bot re-evaluates</em>: a match is
      * something the bot found a moment ago, not something anyone configures.
      *

@@ -30,6 +30,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -78,7 +79,7 @@ class SdkPluginSurfaceTest {
      * second name to keep in step with the first.
      *
      * <p>The last six are declarable but not editable: their fresh form is a call the bot re-evaluates, so
-     * they answer {@code freshSource()} where the first eight answer {@code fresh()}.
+     * they answer {@code freshCall()} where the first eight answer {@code fresh()}.
      */
     private static final List<Class<?>> DECLARED_TYPES = List.of(
             ImageTemplate.class, Precision.class, Point.class, Rect.class, Size.class,
@@ -120,13 +121,16 @@ class SdkPluginSurfaceTest {
             Object fresh = type.fresh();
             if (fresh != null) {
                 assertTrue(type.type().isInstance(fresh), name + " answered a fresh value of another type");
-                assertTrue(type.freshSource().isBlank(),
-                        name + " answered both a value and an expression; the host would not know which");
+                assertNull(type.freshCall(),
+                        name + " answered both a value and a call; the host would not know which");
             } else {
-                assertFalse(type.freshSource().isBlank(),
-                        name + " answers neither a fresh value nor a fresh expression");
-                assertTrue(type.freshSource().contains("."),
-                        name + "'s fresh expression must be fully qualified: " + type.freshSource());
+                java.lang.reflect.Method call = type.freshCall();
+                assertNotNull(call, name + " answers neither a fresh value nor a fresh call");
+                assertTrue(java.lang.reflect.Modifier.isStatic(call.getModifiers())
+                                && java.lang.reflect.Modifier.isPublic(call.getModifiers()),
+                        name + "'s fresh call must be public static: " + call);
+                assertEquals(0, call.getParameterCount(), name + "'s fresh call takes arguments: " + call);
+                assertEquals(type.type(), call.getReturnType(), name + "'s fresh call returns another type");
             }
         }
     }
@@ -166,7 +170,7 @@ class SdkPluginSurfaceTest {
     // every_source_seed_names_a_type_and_an_expression stood here until 2026-09-22, over
     // plugin.sourceSeeds(). A seed said two things -- this type is declarable, and here is a fresh one as
     // Java text javac never looked at -- and both are now types(): the first by being in the list, the
-    // second by fresh() or freshSource(). The two tests above are what it became.
+    // second by fresh() or freshCall(). The two tests above are what it became.
 
     /**
      * The eight buttons, their sections and their order within them.

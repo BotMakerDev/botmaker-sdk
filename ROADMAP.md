@@ -8,6 +8,22 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — the four vision results hand over a `Method`, not text
+
+**Done**
+
+- `PluginType.freshSource()` became `freshCall()` in the contract. `SdkTypes.SeededType` takes the
+  `Method` — `Vision.lastMatch`, `Matches.none`, `Vision.lastColorMatch`, `Vision.lastTextMatch`, looked up
+  once by `call(owner, name)`, which throws at class initialisation if one is renamed — and Studio writes
+  `Vision.lastMatch()` with its import. No Java text crosses the contract from this plugin any more.
+- `SdkPluginSurfaceTest.every_declared_type_says_what_a_fresh_one_is` checks each call is public static,
+  takes nothing and returns its type.
+
+**Deferred / next** — the earlier list minus this item and the two Studio items phases 1 and 2 of the
+follow-up closed (the recorder tie picker, `ActivityBodies`): the flow editor shows a chained flow
+read-only; `ManagedConstants.Lookup` is not cached and `HostValueContext` does not resolve constants; the
+`plugin/screen` ↔ `plugin/source` cycle; the capture-source and `Precision` chains read-only.
+
 ## 2026-09-23 — SDK 2.0.0 cleanup, phase 9: docs, and the plan closes
 
 **Done**

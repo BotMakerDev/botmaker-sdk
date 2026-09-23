@@ -25,6 +25,7 @@ import com.botmaker.sdk.plugin.editors.PrecisionEditors;
 import com.botmaker.sdk.plugin.editors.TemplateEditors;
 import javafx.scene.Node;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
 /**
@@ -188,8 +189,9 @@ public final class SdkTypes {
     /**
      * A type a bot author may <b>hold</b> but cannot edit, whose fresh form is a call the bot re-evaluates.
      *
-     * <p>{@link #fresh()} answers {@code null} and {@link #freshSource()} carries the expression, which is
-     * the distinction {@code PluginType} grew for these. The difference is not a spelling one:
+     * <p>{@link #fresh()} answers {@code null} and {@link #freshCall()} names the method the host writes a
+     * call to, which is the distinction {@code PluginType} grew for these. The difference is not a spelling
+     * one:
      * {@code Vision.lastMatch()} means <em>the match the bot found a moment ago</em>, and freezing it into a
      * {@code MatchResult} value would change the declaration into a fabricated miss. Calling it to obtain
      * one is worse still — it would run the vision stack inside {@code botmaker plugin validate}.
@@ -199,22 +201,29 @@ public final class SdkTypes {
      */
     private static final class SeededType<T> implements PluginType<T> {
         private final Class<T> type;
-        private final String freshSource;
+        private final Method freshCall;
 
-        SeededType(Class<T> type, String freshSource) {
+        SeededType(Class<T> type, Method freshCall) {
             this.type = type;
-            this.freshSource = freshSource;
+            this.freshCall = freshCall;
         }
 
         @Override public Class<T> type() { return type; }
         @Override public T fresh() { return null; }
-        @Override public String freshSource() { return freshSource; }
+        @Override public Method freshCall() { return freshCall; }
         @Override public Node editor(ValueContext ctx) { return null; }
     }
 
-    /** {@code Owner.member()}, fully qualified — the host writes a declaration with no import rewriter. */
-    private static String call(Class<?> owner, String member) {
-        return owner.getName() + "." + member + "()";
+    /**
+     * {@code owner.member()}, looked up once. A rename breaks class initialisation here, in this plugin's own
+     * tests, rather than writing a call into a bot's file that no longer compiles.
+     */
+    private static Method call(Class<?> owner, String member) {
+        try {
+            return owner.getMethod(member);
+        } catch (NoSuchMethodException e) {
+            throw new IllegalStateException(owner.getName() + "." + member + "() is gone", e);
+        }
     }
 
     /**
