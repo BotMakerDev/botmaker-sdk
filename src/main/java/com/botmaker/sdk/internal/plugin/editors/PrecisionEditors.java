@@ -60,21 +60,16 @@ import java.util.function.Consumer;
  * <p><b>Only the knobs the call can use are shown.</b> The SDK collapsed colour and quantity into one type,
  * which means {@code matchesAt} and {@code coverage} are handed an area and a count they cannot act on, and
  * {@code findInRange} a tolerance it has no target colour to measure from. Their javadoc says so; this editor
- * enforces it, reading {@link SlotContext#enclosingMethod()} so a slot on {@code matchesAt} offers the
+ * enforces it, reading {@link SlotContext#enclosingMethodName()} so a slot on {@code matchesAt} offers the
  * tolerance alone. A knob that cannot change the answer should not be presented as if it could. A Parameters
  * row has no enclosing call at all, so it is offered all three — which is the honest answer there, since the
  * value it holds may be handed to any of them.
  *
- * <p>Commits the shortest exact form: an anchor constant when the tolerance is one
- * ({@code Precision.TIGHT}), plus withers for whatever differs from the anchor's defaults
- * ({@code Precision.TIGHT.minArea(400)}), or {@code Precision.of(d, a, c)} when nothing is standard. A stored
- * row gets the three numbers the SDK's own codec spells, so the two halves of the same value stay one value.
+ * <p>Reads and writes a {@link Precision} value; the host writes it as {@code new Precision(d, a, c)}.
  *
- * <p><b>It arrived from Studio on 2026-08-30</b>, where it read its current value off a JDT syntax tree. The
- * contract hands over source text instead, so the reader here is a walk over the dotted segments of an
- * expression — which is all a wither chain is, and needs no parser. It replaced {@code ValueEditors.PrecisionRow}
- * at the same time: that drew the same value as a preset dropdown and three bare fields, with none of the
- * swatch strip, the blob preview or the frame readout.
+ * <p><b>It arrived from Studio on 2026-08-30</b>, where it read its current value off a JDT syntax tree. It
+ * replaced {@code ValueEditors.PrecisionRow} at the same time: that drew the same value as a preset dropdown
+ * and three bare fields, with none of the swatch strip, the blob preview or the frame readout.
  */
 public final class PrecisionEditors {
 
@@ -142,7 +137,7 @@ public final class PrecisionEditors {
 
     /** The editor: a pill saying the whole setting, opening the dialog that explains each part of it. */
     public static Node precision(ValueContext ctx) {
-        Button button = Styles.on(new Button(label(current(ctx))), Styles.PILL);
+        Button button = Styles.on(new Button(pillText(ctx)), Styles.PILL);
         button.setOnAction(e -> open(ctx, button::setText));
         return button;
     }
@@ -305,7 +300,7 @@ public final class PrecisionEditors {
 
         Preview(ValueContext ctx) {
             this.ctx = ctx;
-            this.target = siblingColor(ctx);
+            this.target = null;
 
             status.setWrapText(true);
 
@@ -417,7 +412,7 @@ public final class PrecisionEditors {
     // reading and writing the value
     // ------------------------------------------------------------------
 
-    // commit, current, settingsOf, literalFor, knobsFor and readoutFor are package-private rather than
+    // commit, current, pillText, knobsFor and readoutFor are package-private rather than
     // private for the reason ColorEditors' pair is: they are the halves of this editor that can be asserted
     // without a JavaFX toolkit, and they are the halves worth asserting — what is written is what the bot
     // compiles, and what is read is what the user sees claimed about a value they may not have set. See
@@ -431,185 +426,42 @@ public final class PrecisionEditors {
      * Java form ({@code Precision.TIGHT.minArea(400)}), and that was the editor and the codec being two
      * writers of one file: a disagreement between them is a value that changes meaning when it is written
      * back. One writer now, and it is the host's.
-     *
-     * <p>{@code literalFor} survives for the dialog's own preview line, which shows what the value would be
-     * written as without writing it.
      */
     static void commit(ValueContext ctx, Settings s) {
         ctx.set(new Precision(s.deltaE(), s.minArea(), s.minCount()));
     }
 
     /**
-     * The three values the value currently holds.
+     * The three values the value holds, or the SDK's own {@code DEFAULT} when the host could not read it.
      *
-     * <p><b>The decoded value first, and {@link #settingsOf} only after it.</b> Everything this editor
-     * writes is a {@code new Precision(…)} the host spells and decodes, so the value is the answer in every
-     * ordinary case and the one that cannot be wrong.
-     *
-     * <p>{@code settingsOf} stays for what the host cannot decode and this plugin can: a <b>wither chain</b>
-     * the user wrote themselves — {@code Precision.TIGHT.minArea(400)} — which is not a factory call and so
-     * has no {@code ComponentType} that reads it. That is the same slot {@code CaptureExpr} sits in, a
-     * plugin reading a shape of its own API, and it is why this one parser survived when the others went:
-     * reading it fills the dialog with the numbers actually in the user's file, where falling through to
-     * {@code Precision.DEFAULT} would show three values they never chose.
+     * <p>The host reads {@code new Precision(…)}, which is what this editor writes. A wither chain the user
+     * wrote — {@code Precision.TIGHT.minArea(400)} — is not a call the host reads, so the pill shows it as
+     * written ({@link #pillText}) and the dialog opens on the defaults. Until 2026-09-23 this plugin parsed
+     * the chain itself.
      */
     static Settings current(ValueContext ctx) {
         return ctx.value(Precision.class)
                 .map(p -> new Settings(p.deltaE(), p.minArea(), p.minCount()))
-                .orElseGet(() -> settingsOf(Slots.raw(ctx)));
+                .orElseGet(PrecisionEditors::defaults);
+    }
+
+    /** The whole setting when the host read one, and the source as written when it did not. */
+    static String pillText(ValueContext ctx) {
+        if (ctx.value(Precision.class).isPresent() || Slots.raw(ctx).isBlank()) return label(current(ctx));
+        return Slots.raw(ctx);
     }
 
     // wireFor(Settings) and wireOf(String) stood here until 2026-09-22 -- the three comma-separated numbers
     // the SDK's own PRECISION codec stored. Both had no caller once a Parameters row stopped holding text,
     // and the codec they spelled for is deleted.
 
-    /**
-     * The three values a slot's Java expression spells, defaulting to the SDK's own {@code DEFAULT} for
-     * anything unreadable.
-     *
-     * <p>Reads an anchor, an {@code of(…)} factory, and any wither chain built on either —
-     * {@code Precision.TIGHT.minArea(400).minCount(2000)} reopens showing exactly what it says, which is the
-     * property that makes the editor safe to open on hand-written code.
-     *
-     * <p>It is a walk over the expression's dotted segments rather than a parse, because that is all a wither
-     * chain is and the toolkit deliberately depends on no parsing library. Applying each segment in turn is
-     * also what makes a leading package name free: {@code com.botmaker.sdk.api.vision.Precision.LOOSE} is six
-     * segments this recognises nothing in, followed by one it does.
-     */
-    static Settings settingsOf(String source) {
-        Settings s = defaults();
-        for (String segment : segments(source)) {
-            int paren = segment.indexOf('(');
-            if (paren < 0) {
-                for (Anchor a : ANCHORS) {
-                    if (segment.equals(a.constant())) s = new Settings(a.deltaE(), DEFAULT_AREA, DEFAULT_COUNT);
-                }
-                continue;
-            }
-            String name = segment.substring(0, paren).trim();
-            List<String> args = Slots.arguments(segment);
-            if ("of".equals(name)) {
-                if (args.size() == 1) {
-                    s = new Settings(numberOr(args.getFirst(), DEFAULT_DELTA_E), DEFAULT_AREA, DEFAULT_COUNT);
-                } else if (args.size() == 3) {
-                    s = new Settings(numberOr(args.get(0), DEFAULT_DELTA_E),
-                            (int) numberOr(args.get(1), DEFAULT_AREA),
-                            (int) numberOr(args.get(2), DEFAULT_COUNT));
-                }
-                continue;
-            }
-            if (args.size() != 1) continue;
-            double v = numberOr(args.getFirst(), Double.NaN);
-            if (Double.isNaN(v)) continue;
-            s = switch (name) {
-                case "tolerance" -> new Settings(v, s.minArea(), s.minCount());
-                case "minArea" -> new Settings(s.deltaE(), Math.max(1, (int) v), s.minCount());
-                case "minCount" -> new Settings(s.deltaE(), s.minArea(), Math.max(0, (int) v));
-                default -> s;
-            };
-        }
-        return s;
-    }
-
-    /**
-     * {@code source} split at its top-level dots — the receiver, then each call in the chain.
-     *
-     * <p>Brace- and quote-aware for the same reason {@link Slots#arguments} is: a dot inside an argument
-     * ({@code Precision.of(12.5)}) belongs to that argument and not to the chain.
-     */
-    private static List<String> segments(String source) {
-        String s = source == null ? "" : source.trim();
-        List<String> out = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        int depth = 0;
-        boolean inString = false;
-        boolean escaped = false;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (escaped) {
-                escaped = false;
-            } else if (c == '\\' && inString) {
-                escaped = true;
-            } else if (c == '"') {
-                inString = !inString;
-            } else if (!inString) {
-                if (c == '(' || c == '[' || c == '{') depth++;
-                else if (c == ')' || c == ']' || c == '}') depth--;
-                else if (c == '.' && depth == 0) {
-                    out.add(current.toString().trim());
-                    current.setLength(0);
-                    continue;
-                }
-            }
-            current.append(c);
-        }
-        String last = current.toString().trim();
-        if (!last.isEmpty()) out.add(last);
-        return out;
-    }
+    // settingsOf(String) walked a wither chain's dotted segments, and siblingColor read the Color argument
+    // out of the enclosing call's text; both went on 2026-09-23 with the last Java this plugin read. The
+    // preview starts with no colour until one is sampled. literalFor, which spelled the shortest Java form
+    // for a preview line that no longer existed, went the same day.
 
     private static Settings defaults() {
         return new Settings(DEFAULT_DELTA_E, DEFAULT_AREA, DEFAULT_COUNT);
-    }
-
-    /** A number as a person or a generator writes one, with digit separators and a type suffix allowed. */
-    private static double numberOr(String token, double fallback) {
-        String t = token == null ? "" : token.trim().replace("_", "");
-        if (!t.isEmpty() && "LlDdFf".indexOf(t.charAt(t.length() - 1)) >= 0) {
-            t = t.substring(0, t.length() - 1);
-        }
-        try {
-            return Double.parseDouble(t);
-        } catch (NumberFormatException ignored) {
-            return fallback;
-        }
-    }
-
-    /**
-     * The {@code new java.awt.Color(r, g, b)} argument of the same call, if there is one — the colour these
-     * thresholds are measured from. Null for a named constant, a variable, or a value with no call around it,
-     * where there is nothing to preview against until the user samples one.
-     */
-    private static java.awt.Color siblingColor(ValueContext ctx) {
-        String enclosing = ctx.slot().flatMap(SlotContext::enclosingCall).orElse(null);
-        if (enclosing == null) return null;
-        for (String argument : Slots.arguments(enclosing)) {
-            String a = argument.trim();
-            int paren = a.indexOf('(');
-            if (!a.startsWith("new ") || paren < 0) continue;
-            if (!a.substring(4, paren).trim().endsWith("Color")) continue;
-            List<String> channels = Slots.arguments(a);
-            if (channels.size() < 3) continue;
-            return new java.awt.Color(channel(channels.get(0)), channel(channels.get(1)),
-                    channel(channels.get(2)));
-        }
-        return null;
-    }
-
-    private static int channel(String token) {
-        return clampChannel((int) numberOr(token, 0));
-    }
-
-    // ------------------------------------------------------------------
-    // committed source text
-    // ------------------------------------------------------------------
-
-    /**
-     * The shortest form that is exactly these three values: an anchor when the tolerance is one, withers for
-     * whatever differs from the anchor's own quantity gates, and the three-argument factory when the tolerance
-     * is off-anchor and both gates are non-standard (which is shorter, and reads no worse, than chaining).
-     */
-    static String literalFor(double deltaE, int minArea, int minCount) {
-        String anchor = anchorFor(deltaE);
-        boolean standardGates = minArea == DEFAULT_AREA && minCount == DEFAULT_COUNT;
-        if (anchor != null) {
-            StringBuilder sb = new StringBuilder("Precision.").append(anchor);
-            if (minArea != DEFAULT_AREA) sb.append(".minArea(").append(minArea).append(')');
-            if (minCount != DEFAULT_COUNT) sb.append(".minCount(").append(minCount).append(')');
-            return sb.toString();
-        }
-        if (standardGates) return "Precision.of(" + trim(deltaE) + ")";
-        return "Precision.of(" + trim(deltaE) + ", " + minArea + ", " + minCount + ")";
     }
 
     private static String anchorFor(double deltaE) {

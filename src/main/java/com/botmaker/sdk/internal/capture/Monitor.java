@@ -24,8 +24,8 @@ public final class Monitor implements CaptureSource {
     /**
      * Which screen this is, 0-based.
      *
-     * <p>Here because the editor half of this module both <em>writes</em> a capture source as Java
-     * ({@code CaptureExpr.of}) and <em>labels</em> one on screen, and both need the number back out. It is
+     * <p>Here because the host writes a capture source through its components and a picker <em>labels</em>
+     * one on screen, and both need the number back out. It is
      * safe to expose for the reason {@code internal} exists: a bot receives a {@code CaptureSource} from
      * {@link com.botmaker.sdk.api.capture.CaptureSource#monitor}, which declares the interface, so no bot
      * can write this type down and nothing here is under contract.

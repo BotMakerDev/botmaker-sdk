@@ -3,6 +3,8 @@ package com.botmaker.sdk.internal.plugin.capture;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.capture.CurrentSource;
 
 import java.util.Optional;
 
@@ -42,16 +44,27 @@ public final class CaptureValue {
     }
 
     /**
+     * The project's capture source, or {@code null} when its Java names none the host can read.
+     *
+     * <p>{@code null} covers an absent {@code Sdk.java}, a body the host will not read, an expression the
+     * user wrote themselves, and {@code Source.current()}, which in the editor names nothing to look at.
+     * Read on every call rather than held: a source changed in another window has to take effect at once.
+     */
+    public static CaptureSource current(StudioServices services) {
+        try {
+            return open(services).flatMap(ctx -> ctx.value(CaptureSource.class))
+                    .filter(source -> !(source instanceof CurrentSource))
+                    .orElse(null);
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+    }
+
+    /**
      * Points {@code Sdk.captureSource()} at {@code source}, or does nothing when there is no such method to
      * write to. Call it on the JavaFX application thread.
      *
      * @param source the project's capture source, or null for the whole desktop
-     */
-    /*
-     * All four shapes CaptureExpr.of writes, CaptureExpr.parse reads back -- including the emulator, which
-     * is `new EmulatorSource("…")` rather than one of CaptureSource's three factories. They are inverses
-     * over everything of() can write, which is what let capture.json go: an expression parse() cannot read
-     * is one the USER wrote, and a picker shown over it says so and declines to replace it.
      */
     public static void point(StudioServices services, CaptureSource source) {
         point(services, source, null);
@@ -63,13 +76,11 @@ public final class CaptureValue {
      * whole source, which is what almost every pick means.
      */
     public static void point(StudioServices services, CaptureSource source, java.awt.Rectangle region) {
-        // Fully qualified, as every initialiser this platform writes is, so the expression compiles wherever
-        // the user has moved the method to and no import has to be added beside it.
-        write(services, CaptureExpr.of(source, region));
-    }
-
-    /** Writes {@code expression} — a {@link CaptureSource} factory call — where there is somewhere to write. */
-    static void write(StudioServices services, String expression) {
-        open(services).ifPresent(ctx -> ctx.setSource(expression));
+        CaptureSource base = source == null ? CaptureSource.desktop() : source;
+        CaptureSource value = region != null && region.width > 0 && region.height > 0
+                ? CaptureSource.region(base, new Rect(region.x, region.y, region.width, region.height))
+                : base;
+        // The value: the host writes it through CaptureTypes, as the call the value is.
+        open(services).ifPresent(ctx -> ctx.set(value));
     }
 }

@@ -333,6 +333,10 @@ all with one `Sdk.install()` from its own `main`, and `FlowGraph.load`/`run` wal
 
 **What is now false below.**
 
+- **No editor here reads or writes Java text (2026-09-23).** Where a section below says an editor parses a
+  slot (`Slots.arguments`, `settingsOf`, `CaptureExpr`, `LiteralWriter`), writes one with `setSource`, or
+  rewrites the enclosing call, read *it reads the value Studio hands it and hands one back*. A capture source
+  is six `ComponentType`s (`internal/authoring/CaptureTypes`); a run of pictures is `SlotRun.Element`s.
 - **`activities.json` does not exist**, and nothing reads it. `Authoring.readModel`/`writeModel`/`modelJson`/
   `readSchemaVersion`, `ProjectModel`, `FlowModel`, `FlowNodeModel`, `PresetModel`, `ActivityModel`,
   `VariableModel`, `internal.config.ProjectData`, `internal.config.SdkGrammar`, `AuthoringMixins` and

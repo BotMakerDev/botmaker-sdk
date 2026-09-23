@@ -1,9 +1,7 @@
 package com.botmaker.sdk.internal.plugin.pilot;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
 import com.botmaker.sdk.internal.plugin.capture.CaptureValue;
 
 import java.nio.file.Path;
@@ -21,8 +19,8 @@ import java.nio.file.Path;
  *
  * <p>It read {@code capture.json} through {@code Authoring} until that file was deleted. The project's
  * capture source is the expression {@code Sdk.captureSource()} returns — the {@code @Managed("capture")}
- * value — so this asks {@link com.botmaker.plugin.api.source.PluginValues} for it and reads it back with
- * {@link CaptureExpr#parse}. One author, and it is the one the user can see in their own editor.
+ * value — so this asks {@link com.botmaker.plugin.api.source.PluginValues} for it, as a value the host
+ * read. One author, and it is the one the user can see in their own editor.
  *
  * <p><b>Read on demand, never cached.</b> The user changes the source in another window while the pilot is
  * streaming, and a cache is how the pilot ends up pointing at the previous one.
@@ -47,17 +45,12 @@ public final class PilotProject {
     /**
      * The project's capture source, or {@code null} when its Java names none this can read.
      *
-     * <p>{@code null} covers three cases the caller treats alike: no {@code Sdk.java}, a body the host will
-     * not read (anything that is not one {@code return}), and an expression {@link CaptureExpr#parse} does
-     * not recognise because the user wrote their own. In all three the honest answer is that the pilot has
-     * nothing configured to point at, and every caller falls back to the whole desktop.
+     * <p>{@code null} covers the cases the caller treats alike: no {@code Sdk.java}, a body the host will not
+     * read (anything that is not one {@code return}), and an expression the host cannot read because the user
+     * wrote their own. In all of them the honest answer is that the pilot has nothing configured to point at,
+     * and every caller falls back to the whole desktop.
      */
     public CaptureSource defaultSource() {
-        return CaptureExpr.parse(sourceExpression());
-    }
-
-    /** The {@code @Managed("capture")} expression exactly as the bot's own file writes it, or {@code null}. */
-    public String sourceExpression() {
-        return CaptureValue.open(services).map(ValueContext::source).orElse(null);
+        return CaptureValue.current(services);
     }
 }

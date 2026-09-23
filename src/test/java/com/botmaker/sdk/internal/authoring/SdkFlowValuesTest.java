@@ -2,16 +2,13 @@ package com.botmaker.sdk.internal.authoring;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.bot.ActivityBody;
-import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -22,9 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * outcomes, a body named by method reference, and three container levels (a flow holding a list of
  * activities each holding a list of outcomes).
  *
- * <p>The other half is what must <b>not</b> read back: an activity whose body is a lambda, or a capture
- * source narrowed with {@code region(…)}. Both are code somebody wrote on purpose, both come back empty, and
- * the editor then shows that value read-only rather than replacing it.
+ * <p>A body is kept exactly as the file writes it, a lambda included: this plugin checks nothing it reads.
  *
  * <h2>It asserted through {@code ValueCatalog} until 2026-09-22, and that was the wrong side of the line</h2>
  *
@@ -104,29 +99,17 @@ class SdkFlowValuesTest {
         assertEquals("of", SdkFlowValues.FLOW_SHAPE.factory());
     }
 
+    /** A body the file writes is kept exactly as written, whatever it is; only the "none yet" constant reads blank. */
     @Test
-    void aBodyIsAMethodReferenceAndNothingElse() {
-        assertTrue(SdkFlowValues.isMethodReference("Collect::body"));
-        assertTrue(SdkFlowValues.isMethodReference("com.mybot.Collect::body"));
-
-        // Code somebody wrote: kept, shown, never replaced.
-        assertFalse(SdkFlowValues.isMethodReference("ctx -> ctx.done()"));
-        assertFalse(SdkFlowValues.isMethodReference("bodyFor(\"Collect\")"));
-        assertFalse(SdkFlowValues.isMethodReference("Collect"));
-    }
-
-    @Test
-    void aCaptureSourceIsOneOfItsOwnFactories() {
-        for (String java : List.of("com.botmaker.sdk.api.capture.CaptureSource.desktop()",
-                "com.botmaker.sdk.api.capture.CaptureSource.monitor(1)",
-                "com.botmaker.sdk.api.capture.CaptureSource.window(\"Game\")")) {
-            CaptureSource read = CaptureExpr.parse(java);
-            assertEquals(java, CaptureExpr.of(read), java);
+    void aBodyIsKeptAsWritten() {
+        for (String written : List.of("Collect::body", "ctx -> ctx.done()")) {
+            Flow.Activity read = SdkFlowValues.ACTIVITY_SHAPE.build(
+                    List.of(written, "Collect", "", true, false, false, List.of()));
+            assertEquals(written, SdkFlowValues.sourceOf(read.body()));
         }
-
-        // Not a factory this plugin writes: read-only is the honest answer.
-        assertNull(CaptureExpr.parse("mySource()"));
-        assertNull(CaptureExpr.parse("CaptureSource.desktop().region(top)"));
+        Flow.Activity none = SdkFlowValues.ACTIVITY_SHAPE.build(
+                List.of("ActivityBody.NONE", "Collect", "", true, false, false, List.of()));
+        assertEquals("", SdkFlowValues.sourceOf(none.body()));
     }
 
     /**

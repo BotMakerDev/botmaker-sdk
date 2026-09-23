@@ -6,7 +6,6 @@ import com.botmaker.plugin.api.slot.SlotRun;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
-import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.plugin.toolkit.Thumbnail;
 import com.botmaker.plugin.toolkit.Values;
@@ -37,11 +36,9 @@ import java.util.List;
  * Both of the host's dispatch arms are gone — the {@code PickerRegistry} entry and the {@code IMAGE_TEMPLATE}
  * case — because <b>a type the host answers is a type no plugin is ever offered</b>.
  *
- * <p><b>The two places disagree about what a picture is called, and that is on purpose.</b> A slot holds Java
- * ({@code new ImageTemplate("src/main/resources/images/gold.png")}) and a project file holds the base name
- * ({@code gold}), because a stored path would break the moment the images folder moved and a stored constructor
- * would be Java in a file that holds none. {@link Slots#write} takes both and picks, so this editor never asks
- * which place it is in.
+ * <p><b>It reads and writes {@link ImageTemplate} values, never Java.</b> The host reads
+ * {@code new ImageTemplate("…")} and a constant of the bot's {@code @Managed} pictures class alike, and writes
+ * a picked picture back as that constant when the bot has one.
  *
  * <p>The pictures come from {@link TemplateLibrary} over {@link StudioServices#resourcesDir()} — the folder is
  * this plugin's, and the one thing only the host could tell it is which project is open. Nothing here reaches
@@ -116,8 +113,8 @@ public final class TemplateEditors {
      *
      * <ul>
      *   <li><b>An {@code ImageTemplateGroup} slot.</b> One slot holding {@code ImageTemplateGroup.of(a, b)},
-     *       whose elements are the arguments of its own expression — read with {@link Slots#arguments} and
-     *       written back as a whole new call. No {@code SlotRun} involved: the slot is one slot.</li>
+     *       read as the group value and written back as a new one. No {@code SlotRun} involved: the slot is
+     *       one slot.</li>
      *   <li><b>A run of {@code ImageTemplate} arguments.</b> {@code found.hasAny(coin, gem)} and a
      *       {@code Matches} case are several sibling slots, and only the host can say so — which is what
      *       {@link SlotContext#run()} answers.</li>
@@ -143,7 +140,7 @@ public final class TemplateEditors {
      * reasoning that makes {@code HostSlotContext} resolve its slot on every call.
      */
     private static void rebuild(HBox row, ValueContext ctx) {
-        List<String> elements = elementsOf(ctx);
+        List<SlotRun.Element> elements = elementsOf(ctx);
         SlotRun run = runOf(ctx);
         int floor = run == null ? 0 : run.minimum();
 
@@ -155,9 +152,11 @@ public final class TemplateEditors {
     }
 
     /** One picture: its thumbnail and name, with a menu to change or remove it. */
-    private static MenuButton chip(HBox row, ValueContext ctx, List<String> elements, int index, int floor) {
-        String name = nameOfSource(elements.get(index));
-        MenuButton pill = Pills.bare(Values.labelOr(name, "?"));
+    private static MenuButton chip(HBox row, ValueContext ctx, List<SlotRun.Element> elements, int index,
+                                   int floor) {
+        SlotRun.Element element = elements.get(index);
+        String name = nameOf(element);
+        MenuButton pill = Pills.bare(Values.labelOr(name, Values.labelOr(element.source(), "?")));
         ImageView thumb = new ImageView();
         thumb.setFitWidth(24);
         thumb.setFitHeight(24);
@@ -167,7 +166,7 @@ public final class TemplateEditors {
 
         Pills.onOpen(pill, () -> {
             MenuItem change = Pills.item("Change…", () -> choose(ctx, picked ->
-                    write(row, ctx, replace(elements, index, literalFor(picked)))));
+                    write(row, ctx, replace(elements, index, templateFor(picked)))));
             // Disabled rather than absent at the floor: the row still shows that removal exists, and the
             // label says why this one cannot go. Silently omitting it reads as a missing feature.
             MenuItem remove = elements.size() <= floor
@@ -187,43 +186,54 @@ public final class TemplateEditors {
     }
 
     /** The trailing add button — {@code Choose pictures…} while the row is empty, {@code ＋} after that. */
-    private static Node addButton(HBox row, ValueContext ctx, List<String> elements) {
+    private static Node addButton(HBox row, ValueContext ctx, List<SlotRun.Element> elements) {
         return Pills.button(elements.isEmpty() ? "Choose pictures…" : "＋",
                 () -> choose(ctx, picked -> {
-                    List<String> next = new ArrayList<>(elements);
-                    next.add(literalFor(picked));
+                    List<Object> next = new ArrayList<>(elements);
+                    next.add(templateFor(picked));
                     write(row, ctx, next);
                 }));
     }
 
-    /** Writes the whole list back — through the run when there is one, as one call when there is not. */
-    private static void write(HBox row, ValueContext ctx, List<String> elements) {
+    /**
+     * Writes the whole list back — through the run when there is one, as one group value when there is not.
+     *
+     * <p>An element this editor could not read goes back as the {@link SlotRun.Element} it came as, which the
+     * host keeps exactly as written.
+     */
+    private static void write(HBox row, ValueContext ctx, List<Object> elements) {
         SlotRun run = runOf(ctx);
         if (run != null) {
-            run.replace(elements, ImageTemplate.class.getName());
+            run.replace(elements);
         } else {
-            // setSource and not set: an element is an expression that NAMES a picture -- Pictures.ORE, a
-            // variable, something this editor could not read and kept verbatim -- so there is no
-            // ImageTemplateGroup value to hand over. Writing one would inline every constant as a path.
-            ctx.setSource(ImageTemplateGroup.class.getSimpleName() + ".of("
-                            + String.join(", ", elements) + ")",
-                    ImageTemplateGroup.class, ImageTemplate.class);
+            List<ImageTemplate> templates = new ArrayList<>();
+            for (Object element : elements) {
+                ImageTemplate template = element instanceof SlotRun.Element e
+                        ? e.value(ImageTemplate.class).orElse(null)
+                        : element instanceof ImageTemplate t ? t : null;
+                // A group read as a value holds only values, so this cannot miss; refusing beats a partial list.
+                if (template == null) return;
+                templates.add(template);
+            }
+            ctx.set(ImageTemplateGroup.of(templates));
         }
         rebuild(row, ctx);
     }
 
     /**
-     * The pictures the value currently names, as the expressions that name them.
+     * The pictures the value currently holds.
      *
-     * <p>An element this editor cannot read is kept exactly as it stands rather than dropped — a group
-     * holding a constant is a real thing to have written, and every write here hands back the whole list, so
-     * dropping one would delete it on the strength of not understanding it.
+     * <p>From the run when there is one. Otherwise from the group value, and none when the host could not read
+     * the group — the editor then offers to start one, and never rewrites what it cannot read element by
+     * element, since a group is written whole.
      */
-    static List<String> elementsOf(ValueContext ctx) {
+    static List<SlotRun.Element> elementsOf(ValueContext ctx) {
         SlotRun run = runOf(ctx);
         if (run != null) return run.elements();
-        String source = Slots.raw(ctx);
-        return source.contains(".of(") ? Slots.arguments(source) : List.of();
+        return ctx.value(ImageTemplateGroup.class)
+                .map(group -> group.templates().stream()
+                        .map(t -> new SlotRun.Element(t, t.filePath())).toList())
+                .orElse(List.of());
     }
 
     /** This slot's run, or {@code null} — the question only a host can answer. */
@@ -236,14 +246,14 @@ public final class TemplateEditors {
         return ctx.type().is(ImageTemplate.class) && runOf(ctx) != null;
     }
 
-    private static List<String> replace(List<String> base, int index, String element) {
-        List<String> copy = new ArrayList<>(base);
+    private static List<Object> replace(List<SlotRun.Element> base, int index, Object element) {
+        List<Object> copy = new ArrayList<>(base);
         copy.set(index, element);
         return copy;
     }
 
-    private static List<String> without(List<String> base, int index) {
-        List<String> copy = new ArrayList<>(base);
+    private static List<Object> without(List<SlotRun.Element> base, int index) {
+        List<Object> copy = new ArrayList<>(base);
         copy.remove(index);
         return copy;
     }
@@ -260,7 +270,7 @@ public final class TemplateEditors {
     private static void choose(ValueContext ctx, java.util.function.Consumer<String> onPicked) {
         StudioServices services = ctx.services();
         SlotRun run = runOf(ctx);
-        List<String> only = run == null ? null : namesOf(run.allowedSources().orElse(null));
+        List<String> only = run == null ? null : namesOf(run.allowed().orElse(null));
         Modals.gallery(ctx,
                 Modals.Gallery.pictures("Choose a picture",
                         only == null || !only.isEmpty()
@@ -276,9 +286,7 @@ public final class TemplateEditors {
      *
      * <p>A {@code Matches} case can only ever test pictures its enclosing find call was given, so offering
      * the whole library there lets somebody write a branch that is dead by construction. The host works the
-     * set out from the code around the run and hands it over as **element sources**, which is the only form
-     * it could hand over without knowing what a picture is; decoding them back to names is this plugin's job
-     * and is exactly what it is qualified to do.
+     * set out from the code around the run and hands it over as values.
      */
     private static List<Thumbnail> narrow(List<Thumbnail> all, List<String> only) {
         if (only == null) return all;
@@ -289,13 +297,12 @@ public final class TemplateEditors {
         return out;
     }
 
-    /** Element sources as the picture names they spell, dropping any that name none. */
-    private static List<String> namesOf(List<String> sources) {
-        if (sources == null) return null;
+    /** The allowed values as the picture names they are, dropping any that is not a picture. */
+    private static List<String> namesOf(List<Object> values) {
+        if (values == null) return null;
         List<String> names = new ArrayList<>();
-        for (String source : sources) {
-            String name = nameOfSource(source);
-            if (!name.isEmpty()) names.add(name);
+        for (Object value : values) {
+            if (value instanceof ImageTemplate template) names.add(baseNameOf(template.filePath()));
         }
         return names;
     }
@@ -323,47 +330,27 @@ public final class TemplateEditors {
     // ── reading and writing the value ───────────────────────────────────────────────────────────────────
 
     /**
-     * The base name the value currently names, or {@code ""}.
-     *
-     * <p>The value holds {@code new ImageTemplate("…/gold.png")}, whose path is read out with
-     * {@link Slots#arguments} and {@link Slots#stringLiteral} rather than with a parser — the contract hands
-     * over source text and the toolkit depends on no parsing library. Anything else (a variable, a constant,
-     * a call) reads as no name, which is right: the editor cannot represent it and must not overwrite it
-     * silently.
+     * The base name of the picture the value holds, or {@code ""} when the host could not read one — a
+     * variable or a call, which the editor must not overwrite silently.
      */
     static String nameOf(ValueContext ctx) {
-        return nameOfSource(Slots.raw(ctx));
+        return ctx.value(ImageTemplate.class).map(t -> baseNameOf(t.filePath())).orElse("");
     }
 
-    /** {@link #nameOf} over one expression, so a run of them can be read the same way. */
-    static String nameOfSource(String source) {
-        String path = pathOf(source);
-        return path == null ? "" : baseNameOf(path);
+    /** {@link #nameOf} for one element of a run. */
+    static String nameOf(SlotRun.Element element) {
+        return element.value(ImageTemplate.class).map(t -> baseNameOf(t.filePath())).orElse("");
     }
 
-    /** The path inside {@code new ImageTemplate("…")}, or {@code null} for any other expression. */
-    static String pathOf(String source) {
-        String s = source == null ? "" : source.trim();
-        if (!s.startsWith("new ") || !s.contains(ImageTemplate.class.getSimpleName())) return null;
-        List<String> args = Slots.arguments(s);
-        if (args.size() != 1) return null;
-        String path = com.botmaker.sdk.internal.authoring.LiteralWriter.unquote(args.getFirst()).orElse(null);
-        return path == null || path.isBlank() ? null : path;
-    }
-
-    /** Writes the picture called {@code baseName} as the constructor that names its file. */
+    /** Writes the picture called {@code baseName}; the host writes it as the bot's constant when there is one. */
     static void commit(ValueContext ctx, String baseName) {
-        // The value, so the host spells it through this plugin's own ComponentType for ImageTemplate.
-        ctx.set(new ImageTemplate(baseName == null || baseName.isBlank()
-                ? TemplateNames.pathFor("") : TemplateLibrary.pathForName(baseName)));
+        ctx.set(templateFor(baseName));
     }
 
-    /** {@code new ImageTemplate("src/main/resources/images/<name>.png")}. */
-    static String literalFor(String baseName) {
-        return "new " + ImageTemplate.class.getSimpleName() + "("
-               + com.botmaker.sdk.internal.authoring.LiteralWriter.quote(
-                       baseName == null || baseName.isBlank() ? "" : TemplateLibrary.pathForName(baseName))
-               + ")";
+    /** The picture called {@code baseName}, in the project's images folder. */
+    static ImageTemplate templateFor(String baseName) {
+        return new ImageTemplate(baseName == null || baseName.isBlank()
+                ? TemplateNames.pathFor("") : TemplateLibrary.pathForName(baseName));
     }
 
     /** The base name in a stored path, whatever folder it names — {@code images/gold.png} is {@code gold}. */

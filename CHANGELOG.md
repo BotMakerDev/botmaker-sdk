@@ -53,6 +53,24 @@ runs them. Move each `run()` into a body method and name it in the flow.
   above, `scrollUp`/`scrollDown`, `Keyboard.type`/`tap`/`combo`, `Wait.time`, `ImageClicker.click(ImageTemplate)`
   and `ImageWaiter.waitFor(ImageTemplate, int)` — and a click on one of the project's pictures is recognised
   as that picture.
+- **`CaptureSource.region(CaptureSource of, Rect sub)`**, the same narrowing as `of.region(sub)` written as
+  one call. It is how Studio writes a picked region, since it writes a value as a factory call, never a
+  chain.
+- **Studio reads a capture source as a value.** `Source.current()`, `CaptureSource.desktop()`,
+  `.monitor(i)`, `.window("t")`, `new EmulatorSource("n")` and `CaptureSource.region(…)` are each declared to
+  the host, so the capture picker, the pilot and the editors' frame grab read the project's source without
+  this plugin parsing it, and a recorded click writes `Mouse.click(Source.current(), x, y)` with its import.
+  `ImageTemplateGroup.of(…)` is declared the same way.
+
+### Changed
+
+- **The duration editor edits a length and nothing else.** Its *Random range* toggle rewrote `Wait.time(x)`
+  into `Wait.between(a, b)` through the call's Java text, which Studio no longer hands a plugin;
+  `Wait.between` is in the palette. The editor reads and writes a `Duration` value, which Studio writes as
+  `Duration.ofMillis(n)`.
+- **The precision editor shows a hand-written wither chain as written** (`Precision.TIGHT.minArea(400)`)
+  and opens its dialog on the defaults, rather than parsing the chain. Its preview no longer takes the colour
+  from the call's `new Color(…)` argument; sample one from the game.
 
 ### Removed
 

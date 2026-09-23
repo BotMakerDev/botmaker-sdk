@@ -12,10 +12,10 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.authoring.CaptureTypes;
 import com.botmaker.sdk.internal.authoring.PictureAt;
 import com.botmaker.sdk.internal.authoring.SdkFlowValues;
 import com.botmaker.sdk.internal.authoring.SdkTypes;
-import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
 import com.botmaker.sdk.internal.plugin.capture.CaptureLabels;
 import com.botmaker.sdk.internal.plugin.capture.CaptureTemplates;
 import com.botmaker.sdk.internal.plugin.capture.CaptureValue;
@@ -138,14 +138,12 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * <p>So being in this list means <em>this type is one a bot author can hold</em>. Adding a type here
      * makes it declarable; removing one takes it out of both menus.
      *
-     * <h2>Eight are editable and six are not, which is the split that survived {@code SourceSeed}</h2>
+     * <h2>Ten are values and four are not, which is the split that survived {@code SourceSeed}</h2>
      *
-     * <p>{@code SdkTypes.ALL} carries both. The eight answer a real {@code fresh()} and a real editor. The
-     * six — the ambient capture source, a template group and the four vision results — answer
-     * {@code freshSource()} instead, because their honest starting value is a <em>call the bot
-     * re-evaluates</em>: a match is something the bot found a moment ago, not something anyone configures,
-     * and {@link CaptureExpr#projectDefault()} keeps following the project's source when that changes later.
-     * A snapshot would silently freeze a declaration into whatever was true at project open.
+     * <p>{@code SdkTypes.ALL} carries both. The ten answer a real {@code fresh()}; the capture source's is the
+     * ambient source, which keeps following the project's source when that changes later. The four vision
+     * results answer {@code freshSource()} instead, because their honest starting value is a <em>call the bot
+     * re-evaluates</em>: a match is something the bot found a moment ago, not something anyone configures.
      *
      * <p>Not cached here: {@link AbstractStudioPlugin} does the caching, and {@code fresh()} is asked every
      * time a value is seeded so it may read this plugin's live state.
@@ -156,13 +154,13 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * The five records a {@code Flow} is written as, none of which is a type anybody declares — they are
-     * parts of the one call that writes a flow, and the host has to read each back to hand the flow editor
-     * a {@code Flow} rather than a string.
+     * The five records a {@code Flow} is written as, and the six calls a {@code CaptureSource} is written as.
+     * None is a type anybody declares on its own; the host reads each back so an editor is handed a value
+     * rather than a string.
      */
     @Override
     public List<ComponentType<?>> componentTypes() {
-        return SdkFlowValues.ALL;
+        return Stream.concat(SdkFlowValues.ALL.stream(), CaptureTypes.ALL.stream()).toList();
     }
 
     /**

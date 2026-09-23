@@ -139,6 +139,14 @@ public interface CaptureSource {
         return region(new Rect(x, y, width, height));
     }
 
+    /**
+     * {@code of.region(sub)}, written as one call: the form BotMaker writes when a picker narrows a source,
+     * because a value is written as a factory call and never as a chain.
+     */
+    static CaptureSource region(CaptureSource of, Rect sub) {
+        return of.region(sub);
+    }
+
     // --- Observability hooks (used by internal.observe to describe the surface + searched region) ---
 
     /**

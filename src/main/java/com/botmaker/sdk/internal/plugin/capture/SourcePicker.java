@@ -52,8 +52,8 @@ import java.util.concurrent.Executors;
  *
  * <p>A tile held a {@code CaptureTargetModel} — a {@code (spec, label)} pair over shared's text grammar —
  * until 2026-09-22. It existed because a chosen source was <em>stored as text</em> in {@code capture.json};
- * with that file deleted, the thing a tile stands for is the source itself, written into the bot's own Java
- * by {@link CaptureExpr}.
+ * with that file deleted, the thing a tile stands for is the source itself, handed to the host as a value
+ * and written into the bot's own Java through {@code CaptureTypes}.
  *
  * <p>Every grab runs off the FX thread and every one of them is best-effort: a tile with no thumbnail is
  * still a tile the user can pick, because a window that refuses its pixels is still the window they mean.

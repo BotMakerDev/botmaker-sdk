@@ -8,6 +8,35 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — SDK 2.0.0 cleanup, phase 6: this plugin reads and writes no Java
+
+**Done**
+
+- **`internal/plugin/capture/CaptureExpr` is deleted.** `internal/authoring/CaptureTypes` declares the six
+  calls a `CaptureSource` is written as — `Source.current()` (as the new `internal/capture/CurrentSource`,
+  the ambient source as a value), `desktop()`, `monitor(i)`, `window("t")`, `new EmulatorSource("n")` and the
+  new static `CaptureSource.region(of, rect)` — plus `CaptureSourceType`, whose fresh value is the ambient
+  source. Studio's grammar reads an interface-typed value as whichever declared call builds one.
+  `CaptureValue.current(services)` is the one reader; `EditorFrame.defaultSource` and
+  `PilotProject.defaultSource` call it (`sourceExpression()` is gone).
+- **`ImageTemplateGroup` is a `ComponentType`** (`ImageTemplateGroup.of(a, b)`), fresh with the placeholder
+  picture, replacing its seeded text.
+- **Editors over values.** `DurationEditor` reads and writes a `Duration` (the *Random range* toggle went
+  with `SlotContext.replaceEnclosingCall`); `PrecisionEditors` lost `settingsOf`, `siblingColor` and the
+  unused `literalFor`; `TemplateEditors` reads `ImageTemplate` values and runs of `SlotRun.Element`s, and
+  writes values — a picked picture comes back as the bot's `Pictures` constant, which Studio resolves.
+- **Deleted:** `internal/authoring/LiteralWriter`, `SdkFlowValues.isMethodReference`/`captureSource`/`closes`
+  (the flow editor's field check moved into `FlowNames`). New `CaptureTypesTest`; the parser cases of
+  `DurationSourceTest`, `PrecisionEditorTest`, `TemplateEditorTest` and `SdkFlowValuesTest` became value
+  cases. 480 tests; `botmaker plugin validate` passes.
+
+**Deferred / next**
+
+- `PluginType.freshSource()` still carries text for the four vision results (`Vision.lastMatch()` and its
+  siblings). A value stand-in would need a class per result type; left as text.
+- A hand-written capture chain (`CaptureSource.window("G").region(r)`) and a `Precision` wither chain are
+  shown read-only. The host writes the one-call forms.
+
 ## 2026-09-23 — SDK 2.0.0 cleanup, phase 5: the recorder is the host's
 
 **Done**

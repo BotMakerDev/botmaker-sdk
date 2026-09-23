@@ -2,11 +2,9 @@ package com.botmaker.sdk.internal.authoring;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.bot.ActivityBody;
-import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Flow;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * The shapes a {@code @Managed} value of this plugin's takes: the flow's five records, as the components
@@ -25,17 +23,12 @@ import java.util.Optional;
  * never picked on their own, so extending it would owe each a {@code fresh()} and an {@code editor()}
  * nothing would ever call.
  *
- * <h2>Two components are names, and they cross as the source they are written as</h2>
+ * <h2>A body is a name, and it crosses as the source it is written as</h2>
  *
- * <p>An activity's body is written {@code Collect::body} and a capture source is written
- * {@code CaptureSource.desktop()}. Neither is parsed into a live object — the editor never runs a bot's
- * code, and has no classpath to resolve one against — so both cross as the {@code String} they are written
- * as, and {@link #isMethodReference} is the whole of what this plugin will accept back. A lambda, a
- * conditional or a call into the user's own code is shown read-only rather than replaced with something
- * somebody did not write.
- *
- * <p>They were two {@code ValueType}s with codecs of their own until 2026-09-22, which is one more layer
- * than the fact needs: a component of a type nothing else declares already crosses as its source.
+ * <p>An activity's body is written {@code Collect::body}. It is not made into a live object — the editor
+ * never runs a bot's code, and has no classpath to resolve one against — so it crosses as the
+ * {@code String} the file writes, and is written back exactly so. The flow editor checks what a person
+ * types into the field ({@code FlowNames.isMethodReference}); this class checks nothing.
  */
 public final class SdkFlowValues {
 
@@ -55,74 +48,14 @@ public final class SdkFlowValues {
         return strip(reference).isEmpty() ? NO_BODY : reference;
     }
 
-    private static Optional<String> methodReference(String java) {
-        String source = strip(java);
-        // The one accepted expression that is not a method reference. It reads back as blank, which is what
-        // the editor draws as a card with no method behind it — and what it writes out again unchanged.
-        if (source.equals(NO_BODY) || source.equals(ActivityBody.class.getSimpleName() + ".NONE")) {
-            return Optional.of("");
-        }
-        return isMethodReference(source) ? Optional.of(source) : Optional.empty();
-    }
-
     /**
-     * Whether {@code source} is a method reference — {@code Collect::body}, or {@code com.mybot.Collect::body}.
-     *
-     * <p>Public because the flow editor asks the same question of what the user types, and one rule about
-     * what may be written into a bot's Java is the difference between a field that refuses a form and a
-     * codec that then declines to read it back.
+     * The body as the editor draws it: blank for the constant that says "not written yet", which is what a
+     * card with no method behind it is, and anything else exactly as written.
      */
-    public static boolean isMethodReference(String source) {
-        if (source == null) return false;
-        int arrow = source.indexOf("::");
-        if (arrow <= 0 || arrow + 2 >= source.length()) return false;
-        for (int i = 0; i < source.length(); i++) {
-            char c = source.charAt(i);
-            if (c != ':' && c != '.' && !Character.isJavaIdentifierPart(c)) return false;
-        }
-        return true;
-    }
-
-    private static Optional<String> captureSource(String java) {
-        String source = strip(java);
-        String simple = CaptureSource.class.getSimpleName() + ".";
-        String qualified = CaptureSource.class.getName() + ".";
-        String rest = source.startsWith(qualified) ? source.substring(qualified.length())
-                : source.startsWith(simple) ? source.substring(simple.length()) : null;
-        if (rest == null || !source.endsWith(")")) return Optional.empty();
-        for (String factory : List.of("desktop(", "monitor(", "window(")) {
-            // The call has to *be* the whole expression: the bracket the factory opens must be closed by
-            // the last character. `desktop().region(top)` starts the same way and is a narrowing, which
-            // composes — a picker showing the first narrowing and not the second would be worse than one
-            // that shows the whole expression read-only.
-            if (rest.startsWith(factory) && closes(rest, factory.length() - 1) == rest.length() - 1) {
-                return Optional.of(source);
-            }
-        }
-        return Optional.empty();
-    }
-
-    /** The index of the {@code )} closing the bracket at {@code open}, or {@code -1}. String-literal aware. */
-    private static int closes(String source, int open) {
-        int depth = 0;
-        boolean inString = false;
-        for (int i = open; i < source.length(); i++) {
-            char c = source.charAt(i);
-            if (inString) {
-                if (c == '\\') i++;
-                else if (c == '"') inString = false;
-                continue;
-            }
-            switch (c) {
-                case '"' -> inString = true;
-                case '(' -> depth++;
-                case ')' -> {
-                    if (--depth == 0) return i;
-                }
-                default -> { }
-            }
-        }
-        return -1;
+    private static String bodyOf(String written) {
+        String source = strip(written);
+        boolean none = source.equals(NO_BODY) || source.equals(ActivityBody.class.getSimpleName() + ".NONE");
+        return none ? "" : written;
     }
 
     // ---- the five containers ---------------------------------------------------------------------------
@@ -181,10 +114,7 @@ public final class SdkFlowValues {
                 @Override
                 public Flow.Activity build(List<Object> parts) {
                     if (parts.size() != 7) return null;
-                    // ActivityBody.NONE reads back as blank — the card with no method behind it — and anything
-                    // that is not a method reference is kept exactly as written.
-                    String written = text(parts.get(0));
-                    return new Flow.Activity(new Named(methodReference(written).orElse(written)), text(parts.get(1)),
+                    return new Flow.Activity(new Named(bodyOf(text(parts.get(0)))), text(parts.get(1)),
                             text(parts.get(2)), flag(parts.get(3)), flag(parts.get(4)), flag(parts.get(5)),
                             list(parts.get(6)));
                 }

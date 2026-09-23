@@ -16,79 +16,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * What the strictness editor writes into each of the two places a value lives, and what it reads back out of
  * them.
  *
- * <p>The reading half is the one that has to be right on code nobody generated: a {@code Precision} is spelled
- * as a named anchor, as a factory call, or as either with a chain of withers on the end, and an editor that
- * silently flattened a chain back to its anchor would quietly reset a setting somebody typed by hand. Studio
- * read that off a JDT syntax tree; this reads it off source text, which is what the contract hands a plugin,
- * so the parse is the part of the 2026-08-30 move most worth pinning.
+ * <p>The editor reads the {@link Precision} the host hands it and hands one back. A value the host could not
+ * read is shown as written and opens on the SDK's defaults.
  *
  * <p>No JavaFX toolkit is needed for any of it.
  */
 @DisplayNameGeneration(ReplaceUnderscores.class)
 class PrecisionEditorTest {
-
-    @Test
-    void the_shortest_exact_form_is_committed() {
-        // An anchor alone when the quantity gates are the ones the anchor already carries…
-        assertEquals("Precision.EXACT", PrecisionEditors.literalFor(0, 4, 0));
-        assertEquals("Precision.TIGHT", PrecisionEditors.literalFor(5, 4, 0));
-        assertEquals("Precision.DEFAULT", PrecisionEditors.literalFor(12, 4, 0));
-        assertEquals("Precision.LOOSE", PrecisionEditors.literalFor(25, 4, 0));
-        // …the anchor plus a wither for whatever differs from it…
-        assertEquals("Precision.TIGHT.minArea(400)", PrecisionEditors.literalFor(5, 400, 0));
-        assertEquals("Precision.DEFAULT.minCount(2000)", PrecisionEditors.literalFor(12, 4, 2000));
-        assertEquals("Precision.LOOSE.minArea(1).minCount(2000)", PrecisionEditors.literalFor(25, 1, 2000));
-        // …and the factory when the tolerance is off-anchor, three-argument when both gates are non-standard.
-        assertEquals("Precision.of(18)", PrecisionEditors.literalFor(18, 4, 0));
-        assertEquals("Precision.of(18, 400, 2000)", PrecisionEditors.literalFor(18, 400, 2000));
-    }
-
-    @Test
-    void every_committed_form_reads_back_as_the_values_it_was_given() {
-        assertEquals(new PrecisionEditors.Settings(5.0, 4, 0), PrecisionEditors.settingsOf("Precision.TIGHT"));
-        assertEquals(new PrecisionEditors.Settings(5.0, 400, 0),
-                PrecisionEditors.settingsOf("Precision.TIGHT.minArea(400)"));
-        assertEquals(new PrecisionEditors.Settings(18.0, 400, 2000),
-                PrecisionEditors.settingsOf("Precision.of(18, 400, 2000)"));
-        assertEquals(new PrecisionEditors.Settings(18.0, 400, 2000),
-                PrecisionEditors.settingsOf("Precision.of(18).minArea(400).minCount(2000)"));
-        assertEquals(new PrecisionEditors.Settings(3.0, 1, 50),
-                PrecisionEditors.settingsOf("Precision.DEFAULT.tolerance(3).minArea(1).minCount(50)"));
-    }
-
-    /**
-     * A leading package name costs nothing, because the reader applies each dotted segment in turn and simply
-     * recognises none of these. A hand-written file may well spell it this way, and so may a file whose
-     * {@code Precision} import was shadowed.
-     */
-    @Test
-    void a_fully_qualified_spelling_reads_the_same() {
-        assertEquals(new PrecisionEditors.Settings(25.0, 40, 0),
-                PrecisionEditors.settingsOf("com.botmaker.sdk.api.vision.Precision.LOOSE.minArea(40)"));
-    }
-
-    /**
-     * A dot inside an argument belongs to that argument. The chain walk splits at top-level dots only, so an
-     * off-anchor tolerance survives — and it is the one value a naive split would turn into two segments and
-     * then fail to read, silently resetting the setting to {@code DEFAULT}.
-     */
-    @Test
-    void a_decimal_tolerance_is_not_mistaken_for_a_link_in_the_chain() {
-        assertEquals(new PrecisionEditors.Settings(12.5, 4, 0), PrecisionEditors.settingsOf("Precision.of(12.5)"));
-        assertEquals(new PrecisionEditors.Settings(7.5, 400, 0),
-                PrecisionEditors.settingsOf("Precision.of(7.5).minArea(400)"));
-    }
-
-    /**
-     * Something the editor cannot read falls back to the SDK's own {@code DEFAULT} rather than to zeroes,
-     * which would be a tolerance of "exact" and an area of "any" — the two most damaging values to invent.
-     */
-    @Test
-    void anything_unreadable_reads_as_the_sdk_default() {
-        assertEquals(new PrecisionEditors.Settings(12.0, 4, 0), PrecisionEditors.settingsOf("someVariable"));
-        assertEquals(new PrecisionEditors.Settings(12.0, 4, 0), PrecisionEditors.settingsOf(""));
-        assertEquals(new PrecisionEditors.Settings(12.0, 4, 0), PrecisionEditors.settingsOf("config.precision()"));
-    }
 
     @Test
     void only_the_knobs_the_call_can_act_on_are_offered() {
@@ -124,9 +58,9 @@ class PrecisionEditorTest {
      * A pick writes the three numbers as a {@link Precision}, not as an expression for one.
      *
      * <p>It asserted {@code "Precision.TIGHT.minArea(400)"} until 2026-09-22 — the shortest exact Java
-     * form, spelled by this editor. The host spells it now, through this plugin's own {@code ComponentType},
-     * and {@code literalFor} survives only for the dialog's own preview line. One writer means the editor
-     * and the reader cannot disagree, which is the whole property the old assertion was protecting.
+     * form, spelled by this editor. The host spells it now, through this plugin's own {@code ComponentType}.
+     * One writer means the editor and the reader cannot disagree, which is the whole property the old
+     * assertion was protecting.
      */
     @Test
     void a_slot_gets_the_three_numbers_themselves() {
@@ -169,17 +103,24 @@ class PrecisionEditorTest {
     }
 
     /**
-     * A wither chain the user wrote is still read, which is the one parser this editor kept.
-     *
-     * <p>The host cannot decode it — it is not a factory call, so no {@code ComponentType} describes it —
-     * and falling through to {@code Precision.DEFAULT} would open the dialog on three values the user never
-     * chose. See {@code PrecisionEditors.current}.
+     * A wither chain the user wrote is not a call the host reads, so the pill shows it as written and the
+     * dialog opens on the defaults. This plugin parsed the chain until 2026-09-23.
      */
     @Test
-    void a_wither_chain_the_host_cannot_decode_is_still_read() {
-        assertEquals(new PrecisionEditors.Settings(5.0, 400, 0), PrecisionEditors.current(
-                TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision",
-                        "Precision.TIGHT.minArea(400)")));
+    void a_wither_chain_the_host_cannot_read_is_shown_as_written() {
+        TestContexts.Recording chain = TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision",
+                "Precision.TIGHT.minArea(400)");
+
+        assertEquals("Precision.TIGHT.minArea(400)", PrecisionEditors.pillText(chain));
+        assertEquals(new PrecisionEditors.Settings(12.0, 4, 0), PrecisionEditors.current(chain));
+    }
+
+    @Test
+    void a_value_the_host_read_is_labelled_by_what_it_means() {
+        TestContexts.Recording read = TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision",
+                "new Precision(5.0, 4, 0)").withValue(new Precision(5.0, 4, 0));
+
+        assertTrue(PrecisionEditors.pillText(read).startsWith("TIGHT"), PrecisionEditors.pillText(read));
     }
 
     /**

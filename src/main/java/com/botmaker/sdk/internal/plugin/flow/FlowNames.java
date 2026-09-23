@@ -36,12 +36,18 @@ public final class FlowNames {
      * shape are javac's to answer, in the user's own file. What this stops is a text that could not be a
      * reference at all going into that file and breaking the build in a way nobody typed.
      *
-     * <p>Deliberately the <em>same</em> rule the value codec reads back with, and not a second copy of it: a
-     * field that accepted what the codec then declined would leave the user with a flow shown read-only the
-     * moment it was saved.
+     * <p>It checks what a person types into the field, never what the file holds: the host reads a body
+     * back as whatever the file writes.
      */
     public static boolean isMethodReference(String s) {
-        return com.botmaker.sdk.internal.authoring.SdkFlowValues.isMethodReference(s);
+        if (s == null) return false;
+        int arrow = s.indexOf("::");
+        if (arrow <= 0 || arrow + 2 >= s.length()) return false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c != ':' && c != '.' && !Character.isJavaIdentifierPart(c)) return false;
+        }
+        return true;
     }
 
     /**

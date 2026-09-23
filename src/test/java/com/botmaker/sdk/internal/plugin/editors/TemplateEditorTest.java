@@ -1,58 +1,61 @@
 package com.botmaker.sdk.internal.plugin.editors;
 
+import com.botmaker.plugin.api.slot.SlotRun;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * What the picture editor reads out of a value and what it writes back — the half that needs no JavaFX
  * toolkit, and the half a wrong answer in would silently rewrite somebody's bot.
  *
- * <p>The reader is the part the port had to rebuild: Studio read the current value off a JDT syntax tree, and
- * the contract hands a plugin source text, so it is a brace-and-quote-aware read of the constructor's one
- * argument instead.
+ * <p>The host reads the Java and hands the editor an {@link ImageTemplate}, or nothing.
  */
 class TemplateEditorTest {
 
     @Test
-    void aSlotReadsItsPictureOutOfTheConstructor() {
+    void aSlotIsNamedByThePictureTheHostRead() {
         assertEquals("gold", TemplateEditors.nameOf(
-                TestContexts.typedSlot("com.botmaker.sdk.api.vision.ImageTemplate",
-                        "new ImageTemplate(\"src/main/resources/images/gold.png\")")));
+                TestContexts.typedSlot("com.botmaker.sdk.api.vision.ImageTemplate", "Pictures.GOLD")
+                        .withValue(new ImageTemplate("src/main/resources/images/gold.png"))));
     }
 
     @Test
-    void aValueWithNoCallSiteIsReadAsJavaToo() {
-        // It held the bare name "gold" until 2026-09-20, when a Parameters row stopped being a stored string
-        // and became the same expression a slot holds. One shape to write, one shape to read.
-        assertEquals("gold", TemplateEditors.nameOf(
-                TestContexts.row("IMAGE_TEMPLATE", "new ImageTemplate(\"images/gold.png\")")));
+    void somethingTheHostCouldNotReadIsNoPicture() {
+        // A variable or a call is a reference the editor cannot represent — and must not overwrite.
+        assertEquals("", TemplateEditors.nameOf(
+                TestContexts.typedSlot("com.botmaker.sdk.api.vision.ImageTemplate", "chooseTemplate()")));
         assertEquals("", TemplateEditors.nameOf(TestContexts.row("IMAGE_TEMPLATE", "")));
     }
 
     @Test
-    void aFullyQualifiedConstructorIsStillRead() {
-        assertEquals("ore", TemplateEditors.nameOfSource(
-                "new com.botmaker.sdk.api.vision.ImageTemplate(\"src/main/resources/images/ore.png\")"));
+    void aRunElementIsNamedByItsValueAndHasNoNameWithout() {
+        assertEquals("ore", TemplateEditors.nameOf(
+                new SlotRun.Element(new ImageTemplate("images/ore.png"), "Pictures.ORE")));
+        assertEquals("", TemplateEditors.nameOf(new SlotRun.Element(null, "somePicture")));
     }
 
     @Test
-    void anythingButAConstructorReadsAsNoPicture() {
-        // A variable, a constant or a call is a reference the editor cannot represent — and must not
-        // overwrite. Reading it as "no picture" is what keeps the pill from claiming a value nobody set.
-        assertEquals("", TemplateEditors.nameOfSource("TEMPLATES.gold"));
-        assertEquals("", TemplateEditors.nameOfSource("chooseTemplate()"));
-        assertEquals("", TemplateEditors.nameOfSource(""));
-        assertNull(TemplateEditors.pathOf("ImageTemplate.of(\"gold.png\")"));
+    void aGroupSlotListsTheGroupsPictures() {
+        TestContexts.Recording group = TestContexts.typedSlot("com.botmaker.sdk.api.vision.ImageTemplateGroup",
+                "ImageTemplateGroup.of(…)").withValue(ImageTemplateGroup.of(
+                new ImageTemplate("images/gold.png"), new ImageTemplate("images/ore.png")));
+
+        List<SlotRun.Element> elements = TemplateEditors.elementsOf(group);
+
+        assertEquals(List.of("gold", "ore"), elements.stream().map(TemplateEditors::nameOf).toList());
     }
 
     @Test
-    void aConstructorWithNoPathReadsAsNoPicture() {
-        assertEquals("", TemplateEditors.nameOfSource("new ImageTemplate(\"\")"));
-        assertEquals("", TemplateEditors.nameOfSource("new ImageTemplate(path)"));
+    void aGroupTheHostCouldNotReadListsNothing() {
+        assertTrue(TemplateEditors.elementsOf(TestContexts.typedSlot(
+                "com.botmaker.sdk.api.vision.ImageTemplateGroup", "myGroup()")).isEmpty());
     }
 
     /**
@@ -84,8 +87,8 @@ class TemplateEditorTest {
 
     @Test
     void aNameSurvivesTheRoundTrip() {
-        String literal = TemplateEditors.literalFor("gold_ore 2");
-        assertEquals("gold_ore 2", TemplateEditors.nameOfSource(literal));
+        ImageTemplate picked = TemplateEditors.templateFor("gold_ore 2");
+        assertEquals("gold_ore 2", TemplateEditors.baseNameOf(picked.filePath()));
     }
 
     @Test

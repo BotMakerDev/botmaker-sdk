@@ -4,7 +4,6 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractPluginType;
-import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -20,7 +19,6 @@ import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.TextMatch;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.authoring.TemplateNames;
-import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
 import com.botmaker.sdk.internal.plugin.editors.GeometryEditors;
 import com.botmaker.sdk.internal.plugin.editors.InputEditors;
 import com.botmaker.sdk.internal.plugin.editors.PrecisionEditors;
@@ -218,7 +216,8 @@ public final class SdkTypes {
      * read-only. That is the honest control: there is nothing here anyone configures.
      *
      * <p>These were {@code SourceSeed}s until 2026-09-22 and are the reason the seed's one irreplaceable
-     * fact survived the deletion. Six of the SDK's fourteen declarable types are in this list.
+     * fact survived the deletion. Four of the SDK's fourteen declarable types are in this list; the capture
+     * source and the picture group left it on 2026-09-23, when each became a value the host reads.
      */
     private static final class SeededType<T> implements PluginType<T> {
         private final Class<T> type;
@@ -241,8 +240,36 @@ public final class SdkTypes {
     }
 
     /**
+     * Several pictures, written {@code ImageTemplateGroup.of(a, b)}. A fresh one holds the placeholder
+     * picture, for the reason a fresh {@code ImageTemplate} is it: an empty group is a value the bot cannot
+     * match anything with. Nobody edits one on its own: the picture-row editor claims a run of pictures, not
+     * this slot.
+     */
+    public static final class ImageTemplateGroupType extends AbstractPluginType<ImageTemplateGroup>
+            implements ComponentType<ImageTemplateGroup> {
+        public ImageTemplateGroupType() { super(ImageTemplateGroup.class); }
+        @Override public ImageTemplateGroup fresh() {
+            return ImageTemplateGroup.of(new ImageTemplate(TemplateNames.pathFor(TemplateNames.DEFAULT_TEMPLATE_NAME)));
+        }
+        @Override public Node editor(ValueContext ctx) { return null; }
+
+        @Override public String factory() { return "of"; }
+        /** One declared part: the host repeats the last part type for every further argument, as varargs. */
+        @Override public List<Class<?>> componentTypes() { return List.of(ImageTemplate.class); }
+        @Override public List<Object> components(ImageTemplateGroup g) { return List.copyOf(g.templates()); }
+        @Override public ImageTemplateGroup build(List<Object> parts) {
+            List<ImageTemplate> templates = new java.util.ArrayList<>();
+            for (Object part : parts) {
+                if (!(part instanceof ImageTemplate template)) return null;
+                templates.add(template);
+            }
+            return ImageTemplateGroup.of(templates);
+        }
+    }
+
+    /**
      * The fourteen, in the order a menu should offer them: the vision types, the geometry ones, the two
-     * input enums, then the six a bot holds but nobody edits.
+     * input enums, the capture source and the picture group, then the four a bot holds but nobody edits.
      *
      * <p>A host offers plugin-basics' nine before them, which is what puts the literals a bot mostly counts
      * and labels with at the top of the list.
@@ -251,10 +278,7 @@ public final class SdkTypes {
             new ImageTemplateType(), new PrecisionType(),
             POINT_TYPE, RECT_TYPE, SIZE_TYPE, new DirectionType(),
             new KeyType(), new MouseButtonType(),
-            // The ambient capture source, tracking whatever the project points at when the bot runs — never
-            // a frozen CaptureSource, which is the bug CaptureExpr.projectDefault()'s own note is about.
-            new SeededType<>(CaptureSource.class, CaptureExpr.projectDefault()),
-            new SeededType<>(ImageTemplateGroup.class, call(ImageTemplateGroup.class, "of")),
+            new CaptureTypes.CaptureSourceType(), new ImageTemplateGroupType(),
             new SeededType<>(MatchResult.class, call(Vision.class, "lastMatch")),
             new SeededType<>(Matches.class, call(Matches.class, "none")),
             new SeededType<>(ColorMatch.class, call(Vision.class, "lastColorMatch")),

@@ -27,6 +27,16 @@ public final class RegionSource implements CaptureSource, WindowBacked {
         this.sub = sub;
     }
 
+    /** The source this narrows, one level up — the first component the host writes. */
+    public CaptureSource parent() {
+        return parent;
+    }
+
+    /** The rectangle in {@link #parent()}'s own pixel space, as it was asked for, unclamped. */
+    public Rect sub() {
+        return sub;
+    }
+
     @Override
     public BufferedImage capture() {
         BufferedImage img = parent.capture();

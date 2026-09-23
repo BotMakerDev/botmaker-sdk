@@ -1,7 +1,6 @@
 package com.botmaker.sdk.internal.plugin.capture;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
@@ -155,17 +154,12 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
     /**
      * The project's capture source, or {@code null} when its Java names none this can read.
      *
-     * <p>Read on every call rather than held: a source changed in another window has to take effect here
-     * without anything being rebuilt. An absent {@code Sdk.java}, a body the host will not read and an
-     * expression {@link CaptureExpr#parse} does not recognise all read as "no source", which is the same
-     * thing to everyone downstream and keeps a mid-save project from throwing at an editor.
+     * <p>{@link CaptureValue#current}: an absent {@code Sdk.java}, a body the host will not read and an
+     * expression the host cannot read all answer "no source", which keeps a mid-save project from throwing
+     * at an editor.
      */
     public static CaptureSource defaultSource(StudioServices services) {
-        try {
-            return CaptureExpr.parse(CaptureValue.open(services).map(ValueContext::source).orElse(null));
-        } catch (Exception unreadable) {
-            return null;
-        }
+        return CaptureValue.current(services);
     }
 
     /** The pixels of {@code source}, or {@code null} when the grab failed or came back blank. */
