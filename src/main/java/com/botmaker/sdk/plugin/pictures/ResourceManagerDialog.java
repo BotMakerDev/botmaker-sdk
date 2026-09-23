@@ -60,13 +60,10 @@ import java.util.TreeSet;
  *
  * <h2>Why it is here and not in the editor</h2>
  *
- * <p>It was Studio's until 2026-09-01, and the sentence that kept it there said the rename and delete guards
- * "run through {@code TemplateReferences}, which reads the editor's open buffers and writes
- * {@code @NeedsReview}, both host work by construction". That was true and it was only half the story: the
- * other half — that {@code ore.png} is spelled {@code Templates.ORE} — is this plugin's alone, and the editor
- * was carrying it. Splitting the two at {@link Sources} leaves the host with the rewrite and this module with
- * the vocabulary, which is where each of them belongs, and a second plugin renaming a concept of its own now
- * has the same service.
+ * <p>The rename and delete guards read the editor's open buffers and write {@code @NeedsReview}, which is
+ * host work; knowing how a picture is spelled in a bot's Java is this plugin's alone. Splitting the two at
+ * {@link Sources} leaves the host with the rewrite and this module with the vocabulary, and a second plugin
+ * renaming a concept of its own has the same service.
  *
  * <p>The listing itself is {@link TemplateGallery} — the same component a template slot opens as a picker, so
  * "which templates exist and how are they filed" has one rendering. Organisation comes from
@@ -482,10 +479,9 @@ public final class ResourceManagerDialog {
     // Capture, replace
     // -------------------------------------------------------------------------
 
-    // "Capture new..." stood here until 2026-08-31. It went to this plugin's ✂ Capture Templates toolbar
-    // item, and this window has no handle on a toolbar item, so the button goes and the toolbar is the one
-    // way in. What stays is everything about pictures that already exist, including the per-picture
-    // "Capture a new picture…", which is a region crop this window runs itself.
+    // A new picture is captured through the ✂ Capture Templates toolbar item. What is here is everything
+    // about pictures that already exist, including the per-picture "Capture a new picture…", which is a
+    // region crop this window runs itself.
 
     /** Recaptures a template's picture from the screen, keeping everything else about it. */
     private void replaceByCapture(Path file) {
@@ -844,12 +840,8 @@ public final class ResourceManagerDialog {
     }
 
     /**
-     * Clears the status line after a change went through.
-     *
-     * <p>It used to publish a {@code ResourcesChangedEvent} as well, so that "open template pickers can
-     * refresh". Nothing ever subscribed to it — the event was deleted on 2026-08-31 along with its three
-     * other publishers — and no picker ever refreshed: every one of them re-reads the library when it opens
-     * its gallery, which is why the gap was never noticed.
+     * Clears the status line after a change went through. No picker needs telling: every one re-reads the
+     * library when it opens its gallery.
      */
     private void published() {
         statusLabel.setText("");

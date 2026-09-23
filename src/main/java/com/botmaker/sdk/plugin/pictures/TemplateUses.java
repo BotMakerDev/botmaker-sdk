@@ -14,14 +14,9 @@ import java.util.Map;
  *
  * <h2>Why this is the plugin's half and {@link Sources} is the host's</h2>
  *
- * <p>Until 2026-09-01 all of this was one class in the editor, {@code TemplateReferences}, and it had to be:
- * the walk it ran reaches the editor's open buffers, snapshots the project's history and writes
- * {@code @NeedsReview}, none of which a plugin can do. But it also knew that {@code ore.png} is written
- * {@code Templates.ORE}, which is a fact about this plugin's generated class and about nobody else's — so the
- * editor was holding one plugin's vocabulary on its behalf, and no second plugin could have had the same
- * service for a concept of its own.
- *
- * <p>The split is exactly the platform's capability/vocabulary line. The host takes needles and rewrites
+ * <p>The walk reaches the editor's open buffers, snapshots the project's history and writes
+ * {@code @NeedsReview}, none of which a plugin can do; how a picture is spelled in a bot's Java is this
+ * plugin's vocabulary and nobody else's. The split is exactly the platform's capability/vocabulary line. The host takes needles and rewrites
  * source; this class is where the needles come from.
  *
  * <h2>The two spellings</h2>

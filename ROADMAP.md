@@ -8,6 +8,41 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — SDK 2.0.0 cleanup, phase 9: docs, and the plan closes
+
+**Done**
+
+- **Javadocs say what is true, not how it got there.** Every dated "stood here until…" tombstone and
+  "it was Studio's until…" paragraph under `src/main/java` is gone (46 files; `grep` for a date finds none).
+  Rationale that still binds stayed, restated in the present. Docs that described deleted files as live —
+  `capture.json`, `activities.json`, `ValueCatalog`, `Authoring`, the properties key `CaptureValue` no longer
+  writes — now describe the bot's own Java. `FlowValue` lost an orphan doc comment with no member under it.
+- **Three user-visible strings were wrong and are fixed**: the flow's managed-value note named ✂ instead of
+  🔀 Activity Flow, the capture source's named *Project ▸ Settings* instead of 🎯 Capture Source, and the
+  Project Setup tooltip listed the deleted reference-resolution row.
+- **`CLAUDE.md`'s architecture section is current**: the three-package tree, the scanned palette, recording
+  as a host feature with `@Records`, never-delete from 2.0.0, `@ReplacedBy`/`ApiPointersTest` in brief. The
+  gate history (`api-surface.txt`, `@Replaces`, `@Since`, `@Scaffolding`, the processor) is cut to a pointer
+  here and to `../docs/refactor/31-umbrella-history.md`. The dated sections below it stay as snapshots, with
+  the *What is now false below* list extended: old paths, the legacy activity model, the macro recorder,
+  `capture.json`. `AGENTS.md` carries a header saying `CLAUDE.md` is current and what changed.
+- Outside this module: Studio's `CLAUDE.md` header (new package paths; the recorder is Studio's
+  `plugin/record/`), studio-api's pom comment (named the deleted `AuthoringMixins`), umbrella `CLAUDE.md`'s
+  SDK row, and `docs/refactor/34` marked done.
+
+**Deferred / next**
+
+- **A plugin event bus is not built.** Nothing needs one: every picker re-reads on open, and the host's
+  value writes already reach every editor. Revisit per fact, when a second real consumer of that fact exists.
+- Still open from earlier phases: `freshSource()` is text for the four vision results; the flow editor shows
+  a chained flow read-only; Studio's `ManagedConstants.Lookup` is not cached and `HostValueContext` does not
+  resolve constants; no tie picker when two plugins' `@Records` rank equally; Studio's `ActivityBodies` and
+  `OverlayTargetPicker` still mention `define`; the `plugin/screen` ↔ `plugin/source` cycle.
+- The dated sections of both `CLAUDE.md` files still use pre-2.0 paths in their prose; the header notes map
+  them. A rewrite of each section is not worth its cost while the notes are accurate.
+- Owed with the release: `--studio-api 0.2.0 --sdk 2.0.0 --gamebot …` with the gamebot migrated (imports of
+  `@Param`/`@Managed`, `double` bounds, `Bot.run`). `TemplateGate` refuses the run until it is.
+
 ## 2026-09-23 — SDK 2.0.0 cleanup, phase 8: the package move
 
 **Done**
@@ -35,7 +70,6 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 - `plugin/screen` and `plugin/source` depend on each other (`EditorFrame` reads the project's source through
   `CaptureValue`; `SourcePicker` crops through `EditorFrame`). Java allows it; a split that removes it would
   move the project-source read into `source` and hand `EditorFrame` a value.
-- History sections of both `CLAUDE.md`/`AGENTS.md` files still name `internal/plugin/*`; phase 9's docs pass.
 
 ## 2026-09-23 — SDK 2.0.0 cleanup, phase 7: the pilot, in place
 

@@ -69,7 +69,7 @@ import java.util.function.Consumer;
  * <p>This class owns only topology and presentation. The activity data itself lives in the shared
  * {@link ActivityDraft}s, so edits made in the dialog's side panel show up on the cards immediately.
  *
- * <p><b>It is this plugin's since 2026-09-11, and its look travelled with it.</b> The {@code .flow-*} classes
+ * <p><b>Its look is this plugin's too.</b> The {@code .flow-*} classes
  * every node here carries are defined in {@code flow.css} beside this class, over the {@code -bm-*} colour
  * tokens the host's theme publishes on the scene root — so the canvas follows the editor's theme without the
  * host having to know a flow exists.

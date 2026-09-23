@@ -25,9 +25,6 @@ import java.util.List;
  * {@code new EmulatorSource("n")} and {@code CaptureSource.region(source, rect)}. The host reads a
  * {@code CaptureSource} slot as whichever of them the Java is, and writes a value back through the one
  * matching its class.
- *
- * <p>Until 2026-09-23 this was {@code CaptureExpr}, which wrote and read the same six shapes as text in
- * this plugin, and a seeded type whose fresh value was the text {@code Source.current()}.
  */
 public final class CaptureTypes {
 

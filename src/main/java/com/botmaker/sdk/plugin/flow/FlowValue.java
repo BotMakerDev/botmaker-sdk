@@ -9,19 +9,9 @@ import java.util.Optional;
 /**
  * The {@code @Managed("flow")} value, read and written as a {@link Flow}.
  *
- * <h2>The whole of what replaced {@code activities.json}</h2>
- *
- * <p>The flow editor used to read a file, parse it into a {@code ProjectModel} and write the file back. It
- * now opens one value through {@link com.botmaker.plugin.api.source.PluginValues}, reads the expression that value
- * holds and writes one expression back. Everything between — which file, which package, which buffer is
- * unsaved, how the write becomes one undo step — is the host's, and this class is the two lines of
- * translation left over.
- *
- * <h2>Why the catalog is merged here</h2>
- *
- * <p>{@link ValueCatalog#valueOf} resolves a container <em>by id, in the catalog it is called on</em>, so a
- * catalog must know every container the form mentions. A flow's form mentions plugin-basics' {@code LIST}
- * and text and yes/no leaves as well as this plugin's five shapes, which is why the merge is the same one
+ * <p>The flow editor opens one value through {@link com.botmaker.plugin.api.source.PluginValues}, reads the
+ * {@link Flow} the host decoded and hands one back. Everything between — which file, which package, which
+ * buffer is unsaved, how the write becomes one undo step — is the host's.
  *
  * <p><b>Reading may answer nothing, and that is ordinary.</b> A hand-written {@code flow()} body, a call to
  * something other than {@code Flow.of}, an activity whose body is a lambda rather than a method reference —
@@ -33,15 +23,12 @@ public final class FlowValue {
     /** The id the plugin declares and the shipped {@code Sdk.java} annotates its method with. */
     public static final String ID = "flow";
 
-    /** Every container and codec a flow's parts can mention: plugin-basics' vocabulary and this plugin's. */
-
     /**
      * The open project's host services, or {@code null} between projects.
      *
      * <p>Held because two readers of the flow have no {@link ValueContext} to ask through and no business
      * growing one: the tag picklist behind Capture Templates takes a resources directory, and so does the
-     * template library under it. While a flow was a file, a path was enough to read it; a value in the bot's
-     * own Java is the host's to open, so the host has to be reachable from somewhere that is not a value
+     * template library under it. A value in the bot's own Java is the host's to open, so the host has to be reachable from somewhere that is not a value
      * cell. This is that somewhere, written and cleared by {@code SdkPlugin} on the two lifecycle methods
      * the contract already has for it.
      *
@@ -82,9 +69,8 @@ public final class FlowValue {
      * plugin wrote.
      */
     public static Flow read(ValueContext ctx) {
-        // The host decodes it, through the ComponentTypes this plugin declares in FlowTypes. It went
-        // through a ValueCatalog of this plugin's own until 2026-09-22, which meant the plugin held a second
-        // reader of the same Java the host also read — and the two could disagree about one expression.
+        // The host decodes it, through the ComponentTypes this plugin declares in FlowTypes, so there is
+        // one reader of this Java and it cannot disagree with itself.
         return ctx == null ? Flow.NONE : ctx.value(Flow.class).orElse(Flow.NONE);
     }
 

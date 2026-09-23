@@ -24,11 +24,8 @@ import java.util.List;
  * <p><b>It reads and writes a {@link Duration}, and nothing else.</b> The host reads the slot through
  * plugin-basics' {@code Duration} type and writes the value back the same way. A slot the host cannot read —
  * a variable, {@code Duration.ZERO}, a factory other than the one the host writes — keeps its own source as
- * the label, and opening the editor on it starts from one second.
- *
- * <p>Until 2026-09-23 it also offered <i>Random range</i>, which rewrote {@code Wait.time(x)} into
- * {@code Wait.between(a, b)} as Java text through the enclosing call. The contract no longer hands a plugin
- * the call as text, so the toggle went; {@code Wait.between} is in the palette.
+ * the label, and opening the editor on it starts from one second. A random wait is {@code Wait.between},
+ * a different call, which is in the palette.
  */
 public final class DurationEditor {
 

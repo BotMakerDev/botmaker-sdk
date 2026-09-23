@@ -67,11 +67,6 @@ public final class FlowRules {
      * The activities a run can reach, breadth-first from {@code start}, falling back to the first placed
      * card when {@code start} names nothing placed — which is the rule {@code FlowWalker} resolves a start
      * with, so what the canvas marks as reachable is what a run actually reaches.
-     *
-     * <p><b>It walks here rather than delegating, since 2026-09-21.</b> The walk was
-     * {@code FlowModel.reachableFrom}, shared so that the canvas and the code generator could not disagree
-     * about it. There is no generator, and there is no {@code FlowModel}: the flow is a value in the bot's
-     * own Java. What is left is one canvas asking one question about its own wires.
      */
     public static List<String> reachable(List<String> placed, List<Flow.Edge> edges, String start) {
         String from = placed.contains(start) ? start : (placed.isEmpty() ? "" : placed.getFirst());

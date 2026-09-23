@@ -28,41 +28,25 @@ import javafx.scene.Node;
 import java.util.List;
 
 /**
- * The eight types the SDK declares — a picture, how exactly to match it, three geometry shapes and three
- * enums.
+ * The fourteen types the SDK declares ({@link #ALL}): a picture and a group of them, how exactly to match
+ * one, three geometry shapes, three enums, the capture source, and four vision results a bot holds but
+ * nobody edits.
  *
- * <h2>This was an enum, then four declarations, and now it is one</h2>
+ * <p>Each type is declared once. javac asks for what it is, what a fresh one is and how a person edits it in
+ * one class, and the type is named once — in {@code type()}. The host writes and reads the Java; a type
+ * whose Java is a call also implements {@link ComponentType}, so the host can hand an editor a value.
  *
- * <p>{@code ValueType} was seventeen constants in {@code api.authoring} and two exhaustive {@code switch}es
- * over them — right for as long as there is one plugin, wrong the moment there are two: a Discord plugin
- * wanting a {@code Channel} value would have needed a constant granted to it in the SDK's enum.
- *
- * <p>What replaced it in 2026-08-27 was an open registry, and it asked for a type to be described four
- * times: a {@code ValueType} carrying a persisted id, a {@code ValueCodec} with
- * {@code parse}/{@code store}/{@code literal}/{@code valueOfLiteral}, a {@code SourceSeed} carrying the
- * fresh value as Java <em>text</em>, and a {@code SlotEditor} predicate naming the type a third time. For
- * {@code Point} those lived in three files and agreed only because somebody kept them agreeing. Here javac
- * asks for all of it at once, and the type is named once — in {@code type()}.
- *
- * <h2>Nine of the seventeen left on 2026-09-09, and the eight that stayed are the test</h2>
- *
- * <p>Text, a flag, two numbers, a character, a colour, a date, a time of day and a duration are
- * {@code com.botmaker.plugin.basics.values.BasicsTypes}' now — plugin #2's. Nothing about a whole number is
- * about automating a game; they were here only because the SDK was written first, which made having a
- * duration value plugin #1's privilege. What is left is what a bot's own API actually names.
- *
- * <p>What is absent is absent for one reason: it has no value anyone writes down. {@code void}; a group of
- * templates (a {@code List<ImageTemplate>} says it better); and the vision <em>results</em> — a match is
- * something the bot found a moment ago, not something anyone configures.
+ * <p>The JDK's own values — text, a flag, numbers, a colour, a date, a duration — are plugin-basics'
+ * ({@code com.botmaker.plugin.basics.values.BasicsTypes}). What is here is what a bot's own API names.
  *
  * <h2>The identity is the class, so a rename in {@code api.*} breaks this file</h2>
  *
- * <p>Every one of these names a real {@link Class}, which is the whole of what the host indexes on. The
- * persisted ids ({@code POINT}, {@code IMAGE_TEMPLATE}, …) are deleted with {@code ValueType}: a project's
- * file says {@code com.botmaker.sdk.api.geometry.Point} because that is what the field is declared as, and
- * has done since a parameter became a {@code @Param} field.
+ * <p>Every one of these names a real {@link Class}, which is the whole of what the host indexes on: a
+ * project's file says {@code com.botmaker.sdk.api.geometry.Point} because that is what the field is declared
+ * as.
  *
  * @see FlowTypes the five shapes a {@code Flow} is written as, which are composites and never picked
+ * @see CaptureTypes the six calls a {@code CaptureSource} is written as
  */
 public final class SdkTypes {
 
@@ -97,7 +81,6 @@ public final class SdkTypes {
      *
      * <p>{@code Precision.DEFAULT} rather than {@code new Precision(0, 0, 0)}: a zero tolerance matches
      * nothing and a zero minimum area matches everything, so neither end of the range is a sensible start.
-     * That is what the deleted {@code SourceSeed} said in text, and what this says in Java.
      */
     public static final class PrecisionType extends AbstractPluginType<Precision>
             implements ComponentType<Precision> {
@@ -196,8 +179,7 @@ public final class SdkTypes {
     /**
      * The three geometry declarations, named so {@code GeometryEditors} can hand one to
      * {@code Editors.tuplePill} — which is where the arity, the components and the way back from a row of
-     * numbers to a value all come from. Three independent statements of "a Rect has four numbers" became
-     * one on 2026-09-22.
+     * numbers to a value all come from, so "a Rect has four numbers" is stated once.
      */
     public static final PointType POINT_TYPE = new PointType();
     public static final RectType RECT_TYPE = new RectType();
@@ -207,17 +189,13 @@ public final class SdkTypes {
      * A type a bot author may <b>hold</b> but cannot edit, whose fresh form is a call the bot re-evaluates.
      *
      * <p>{@link #fresh()} answers {@code null} and {@link #freshSource()} carries the expression, which is
-     * the distinction {@code PluginType} grew for these six. The difference is not a spelling one:
+     * the distinction {@code PluginType} grew for these. The difference is not a spelling one:
      * {@code Vision.lastMatch()} means <em>the match the bot found a moment ago</em>, and freezing it into a
      * {@code MatchResult} value would change the declaration into a fabricated miss. Calling it to obtain
      * one is worse still — it would run the vision stack inside {@code botmaker plugin validate}.
      *
      * <p>{@link #editor(ValueContext)} answers {@code null}, so the host shows the expression as written and
      * read-only. That is the honest control: there is nothing here anyone configures.
-     *
-     * <p>These were {@code SourceSeed}s until 2026-09-22 and are the reason the seed's one irreplaceable
-     * fact survived the deletion. Four of the SDK's fourteen declarable types are in this list; the capture
-     * source and the picture group left it on 2026-09-23, when each became a value the host reads.
      */
     private static final class SeededType<T> implements PluginType<T> {
         private final Class<T> type;

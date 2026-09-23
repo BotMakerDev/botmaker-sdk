@@ -97,11 +97,10 @@ public class ImageTemplate implements AutoCloseable {
      * tests; no bot has ever had a reason to hold a {@code Mat}. A bot that genuinely needs the pixels should
      * be given an SDK-owned type instead, which stays possible as an addition at any time.
      *
-     * <p><b>The OpenCV native is loaded here rather than in a {@code static {}} block</b> (moved 2026-09-09).
-     * This class links {@code Mat} in exactly one method, and holding a template is now something a bot does
-     * without ever asking for its pixels: {@code Settings}' value grammar builds one as the fallback for an
-     * unreadable image variable, so a class-initialiser load would make every bot that reads <em>any</em>
-     * setting extract and link the native library. {@link OpenCvNative#ensureLoaded()} is idempotent and
+     * <p><b>The OpenCV native is loaded here rather than in a {@code static {}} block.</b> This class links
+     * {@code Mat} in exactly one method, and holding a template is something a bot does without ever asking
+     * for its pixels, so a class-initialiser load would make every bot that merely names a picture extract
+     * and link the native library. {@link OpenCvNative#ensureLoaded()} is idempotent and
      * synchronized, so paying it per call costs a volatile read after the first one.
      */
     Mat getMat() {

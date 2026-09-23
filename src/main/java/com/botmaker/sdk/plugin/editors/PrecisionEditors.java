@@ -66,10 +66,6 @@ import java.util.function.Consumer;
  * value it holds may be handed to any of them.
  *
  * <p>Reads and writes a {@link Precision} value; the host writes it as {@code new Precision(d, a, c)}.
- *
- * <p><b>It arrived from Studio on 2026-08-30</b>, where it read its current value off a JDT syntax tree. It
- * replaced {@code ValueEditors.PrecisionRow} at the same time: that drew the same value as a preset dropdown
- * and three bare fields, with none of the swatch strip, the blob preview or the frame readout.
  */
 public final class PrecisionEditors {
 
@@ -436,8 +432,7 @@ public final class PrecisionEditors {
      *
      * <p>The host reads {@code new Precision(…)}, which is what this editor writes. A wither chain the user
      * wrote — {@code Precision.TIGHT.minArea(400)} — is not a call the host reads, so the pill shows it as
-     * written ({@link #pillText}) and the dialog opens on the defaults. Until 2026-09-23 this plugin parsed
-     * the chain itself.
+     * written ({@link #pillText}) and the dialog opens on the defaults.
      */
     static Settings current(ValueContext ctx) {
         return ctx.value(Precision.class)
@@ -450,15 +445,6 @@ public final class PrecisionEditors {
         if (ctx.value(Precision.class).isPresent() || Slots.raw(ctx).isBlank()) return label(current(ctx));
         return Slots.raw(ctx);
     }
-
-    // wireFor(Settings) and wireOf(String) stood here until 2026-09-22 -- the three comma-separated numbers
-    // the SDK's own PRECISION codec stored. Both had no caller once a Parameters row stopped holding text,
-    // and the codec they spelled for is deleted.
-
-    // settingsOf(String) walked a wither chain's dotted segments, and siblingColor read the Color argument
-    // out of the enclosing call's text; both went on 2026-09-23 with the last Java this plugin read. The
-    // preview starts with no colour until one is sampled. literalFor, which spelled the shortest Java form
-    // for a preview line that no longer existed, went the same day.
 
     private static Settings defaults() {
         return new Settings(DEFAULT_DELTA_E, DEFAULT_AREA, DEFAULT_COUNT);

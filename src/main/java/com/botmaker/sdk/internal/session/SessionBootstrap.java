@@ -105,15 +105,9 @@ public final class SessionBootstrap {
     /**
      * The nested display size, which is {@link SessionBackends}' own default.
      *
-     * <p>It read the project's authored resolution until 2026-09-22 — {@code capture.width} /
-     * {@code capture.height} through {@code ProjectDefaults.defaultResolution} — and the branch is deleted
-     * rather than kept because <b>nothing in any module ever wrote either key</b>. Every bot that has ever
-     * run took the default here; {@link #launchIsolated} carried a "sized to your templates / sized to a
-     * default" distinction that only ever had one side.
-     *
      * <p>The shape is kept rather than inlined at the call site, because a display size a bot did choose is
-     * a plausible thing to want back — as a {@code @Managed} value beside the capture source, which is where
-     * the rest of this file's facts went. It would then have exactly one author.
+     * a plausible thing to want — as a {@code @Managed} value beside the capture source, so it would have
+     * exactly one author.
      */
     static SessionBackends.DisplaySize size() {
         return SessionBackends.sizeFor(0, 0);

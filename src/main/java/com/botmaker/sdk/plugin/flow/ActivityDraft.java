@@ -50,11 +50,9 @@ public final class ActivityDraft {
     /**
      * The activity's work, as the method reference it is written as — {@code Collect::body}.
      *
-     * <p><b>This is the draft's identity, and it replaced a generated id on 2026-09-20.</b> While a flow was
-     * JSON, an activity needed a stable key of its own so that renaming the card on the canvas did not read
-     * as a delete plus a create; the key was a string nothing else in the project mentioned. The work is now
-     * named by a method reference javac resolves, so the identity is the same token that links the card to
-     * the code — one fact, checked by the compiler, instead of two kept in step by hand.
+     * <p><b>This is the draft's identity.</b> Renaming the card on the canvas must not read as a delete plus
+     * a create, and the method reference javac resolves is the same token that links the card to the code —
+     * one fact, checked by the compiler, instead of a second key kept in step by hand.
      *
      * <p>Blank for a card added on the canvas whose method has not been written yet, which is an ordinary
      * way to work: it is written as {@code ActivityBody.NONE}, the flow walks through the card, and the card

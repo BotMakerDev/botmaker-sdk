@@ -29,7 +29,7 @@ import java.util.Optional;
  *
  * <p>It shows both kinds together because the useful question is "what can I file a template under", and the
  * answer is one list. What differs is what may be done to a row: a <b>custom</b> tag is the user's, so it can
- * be renamed or deleted here; an <b>activity</b> tag is a rendering of {@code activities.json} and has no
+ * be renamed or deleted here; an <b>activity</b> tag is a rendering of the bot's flow and has no
  * independent existence, so it is shown with its origin and both buttons refuse it. Renaming one means
  * renaming the activity, which is the flow editor's job — offering it here would be offering an edit that
  * either lies (the tag comes back on reload) or reaches across into a different model.

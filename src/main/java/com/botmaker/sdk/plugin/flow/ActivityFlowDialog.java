@@ -45,32 +45,23 @@ import java.util.Set;
  * without touching the wiring. Parameters themselves are <em>defined</em> in the editor's own Parameters
  * window, not here: this dialog is about the graph.
  *
- * <h2>Why this one window moved and the other two did not (2026-09-11)</h2>
+ * <h2>Why this window is the plugin's</h2>
  *
- * <p>The rule the maintainer settled on is that the host draws every window frame and a plugin supplies
- * sections as data — which is why the Parameters window and the Runner stayed in Studio, rendering
- * {@code ParameterRow}s from whatever plugin owns them. <b>A flow does not reduce to a row.</b> Its nodes,
- * edges, ports and outcomes are a vocabulary of this plugin's own, so either the contract learns what a
- * branch is — vocabulary, which the platform refuses — or the editor comes here. It came here.
+ * <p>The host draws every window frame and a plugin supplies sections as data — which is why the Parameters
+ * window and the Runner are Studio's. <b>A flow does not reduce to a row.</b> Its nodes, edges, ports and
+ * outcomes are a vocabulary of this plugin's own, so either the contract learns what a branch is —
+ * vocabulary, which the platform refuses — or the editor is the plugin's.
  *
- * <p><b>It owns the file it writes, and that is what made the move safe to do in one commit.</b> While this
- * was Studio's, {@code activities.json} had a host-side owner that also cached the parsed model and published
- * an event on every write; a plugin writing the same file behind it would have left that cache stale and
- * fired nothing. So the editor and its host original could never both be alive, and the Studio one is deleted
- * in the same commit this arrived in.
+ * <h2>What it writes</h2>
  *
- * <h2>What it writes, since 2026-09-20</h2>
- *
- * <p>It no longer writes a file at all. The graph is one expression — the one {@code Sdk.flow()} returns —
+ * <p>No file. The graph is one expression — the one {@code Sdk.flow()} returns —
  * written through {@link com.botmaker.plugin.api.source.PluginValues}, so it lands in the bot's own Java, in the
  * open buffer as well as on disk, as one entry in the project's history. The card positions go to the
  * gitignored {@link FlowLayout} sidecar, because dragging a node is not a change to the bot.
  *
- * <p>Two consequences worth stating. A flow whose expression the plugin cannot read — hand-written, or a
- * call to something else — is <b>shown empty and refused</b> rather than overwritten, which is the same rule
- * every other value editor follows. And the variables this window never showed are no longer carried
- * through a save, because there is nothing to carry: a user parameter is a {@code @Param} field in the bot's
- * own Java and has not been in this file since 2026-09-17.
+ * <p>A flow whose expression the plugin cannot read — hand-written, or a call to something else — is
+ * <b>shown empty and refused</b> rather than overwritten, which is the same rule every other value editor
+ * follows.
  */
 public final class ActivityFlowDialog {
 
@@ -853,9 +844,8 @@ public final class ActivityFlowDialog {
     /**
      * Writes the flow, if there is anything to write and nothing already in flight.
      *
-     * <p><b>On the FX thread</b>, which is a reversal. It used to be a daemon thread, because writing
-     * {@code activities.json} was this window's own file I/O; the flow is now one expression handed to the
-     * host, which is what every slot editor on the canvas does on every keystroke and which
+     * <p><b>On the FX thread</b>: the flow is one expression handed to the host, which is what every slot
+     * editor on the canvas does on every keystroke and which
      * {@link com.botmaker.plugin.api.slot.ValueContext#set} requires. The layout sidecar goes with it rather than
      * behind it, so a save is one thing that either happened or did not.
      *

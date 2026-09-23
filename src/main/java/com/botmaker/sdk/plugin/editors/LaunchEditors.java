@@ -117,8 +117,8 @@ public final class LaunchEditors {
     /**
      * The program a launch call runs — the OS file chooser, or a typed path.
      *
-     * <p>The whole of it is {@link Editors#program}, which moved to the toolkit on 2026-08-28 because
-     * nothing in it named a game, a store or the SDK: browsing for an executable is a shape, and the only
+     * <p>The whole of it is {@link Editors#program}, which is the toolkit's because nothing in it names a
+     * game, a store or the SDK: browsing for an executable is a shape, and the only
      * SDK knowledge left here is <em>which argument of which call</em> gets this editor, which is
      * {@link CallSites#LAUNCH_PROGRAM}.
      *

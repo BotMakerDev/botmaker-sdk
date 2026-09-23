@@ -15,10 +15,9 @@ import java.nio.file.Path;
  * contract deliberately does not grow a service for it: <b>the host is only the only possible source of
  * which project is open</b>, and the answers themselves are in the project.
  *
- * <h2>It reads the bot's own Java now (2026-09-22)</h2>
+ * <h2>It reads the bot's own Java</h2>
  *
- * <p>It read {@code capture.json} through {@code Authoring} until that file was deleted. The project's
- * capture source is the expression {@code Sdk.captureSource()} returns — the {@code @Managed("capture")}
+ * <p>The project's capture source is the expression {@code Sdk.captureSource()} returns — the {@code @Managed("capture")}
  * value — so this asks {@link com.botmaker.plugin.api.source.PluginValues} for it, as a value the host
  * read. One author, and it is the one the user can see in their own editor.
  *

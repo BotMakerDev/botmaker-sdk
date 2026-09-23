@@ -93,43 +93,20 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   implementations (`Desktop`, `Monitor`, `NamedWindow`, `SessionSource`), which only ever arrive from
   `CaptureSource.desktop()/monitor()/window()` and `Source.current()` — all of which declare the *interface*
   as their return type — and the whole observation stack (`Bots`, `BotObserver`, `Surface`, `ClickEvent`,
-  `MatchEvent`, `SwipeEvent`), whose only consumer was ever `internal.observe.IpcObserver`. `Screen` was
-  deleted outright: no callers, and not even a `CaptureSource`. **The generated catalog is the mirror** of
-  this decision, not a second one — a class that leaves `api` leaves the catalog, which is how the palette
-  stops offering it. (Until phase 7 the mirror was Studio's hand-written `palette/SdkType` enum; it is
-  deleted, and the SDK now *serves* the answer instead of Studio keeping a copy.)
+  `MatchEvent`, `SwipeEvent`), whose only consumer was ever `internal.observe.IpcObserver`. **The catalog
+  mirrors this decision**: a class that leaves `api` leaves the palette.
 
-- **The class-classification rule was retracted on 2026-08-27, hours after it landed, with the processor that
-  enforced it.** What stood here described `@Internal` as *not versioned surface*, marked once per package by
-  eleven `package-info.java` files, and three javac errors from `PluginSurfaceProcessor` switched on by
-  `-Abotmaker.surface=com.botmaker.sdk`. All of it is gone: the twelve `package-info.java` files, the
-  `-A` options, `<annotationProcessorPaths>`, and `botmaker-plugin-processor` itself. The reasons are worth
-  keeping, because each is a decision and not a cleanup:
-
-  - **All sixteen real `@Internal` sites were methods of `@Facade` classes** — not one was on a type. So the
-    annotation's entire actual job was *hide this member from the palette*, which is what `@NotInPalette` had
-    been before phase 8c widened it. The widening bought a rule nobody used and cost the weld below.
-  - **The weld is dissolved rather than paid for.** `@Internal` made *not-surface* and *not-offered* one bit,
-    so a type that is versioned but should not be proposed had to take `@Facade(role = "VALUE")`. Two
-    annotations now say two things: **`@Palette` = catalogued** (the recognition set — imports, "does `Point`
-    mean ours or `java.awt`'s"), **`@Hidden` on the type = not offered in an insert menu**. `FacadeRole`'s
-    third state was read by nothing; `FacadeEntry.role` is a `boolean offered`.
-  - **The catalog is reflected, not generated.** `SdkPlugin` calls
-    `PaletteCatalog.of(Mouse.class, …)` — 52 class literals — and members are **discovered**. The generator's
-    one defended property was *a catalog naming a renamed member does not compile*; nothing names a member any
-    more, so nothing can go stale, and the class list stays javac-checked because it is class literals. What
-    the processor also cost was unpayable by anyone outside this repo: a third-party pom omitting
-    `<annotationProcessorPaths>` got no catalog and no diagnostic.
-
-  The switch was verified by diffing the last generated `Catalog.java` against the reflected catalog: **same
-  52 facades, same order, same member names, and every `.order(…)` prefix reproduced** — because
-  `PaletteCatalog` reads the class file's own `methods` table for declaration order (`SourceOrder`), which is
-  the one thing reflection alone cannot supply. Every failure path there falls back to alphabetical, so the
-  worst case is a cosmetic menu order and never a project that will not open.
-
-  One deliberate narrowing: **constructors are not catalogued.** Reflecting them put an `<init>` entry under
-  seven offered static facades whose public constructor exists only because nobody wrote a private one, and a
-  palette entry inserts a *call*. `MemberId` keeps its constructor support for a plugin that wants one.
+- **The palette is discovered, never listed.** `@Palette` on an `api` class = catalogued (the recognition
+  set — imports, "does `Point` mean ours or `java.awt`'s"); `@Hidden` on a type = not offered in an insert
+  menu. The toolkit's `AbstractStudioPlugin.buildCatalog()` defaults to `PaletteCatalog.scan(getClass())`,
+  which reflects every `@Palette` class under this jar's `api` root; members are discovered, in the class
+  file's own declaration order (`SourceOrder`, alphabetical on any failure). **Constructors are not
+  catalogued**: a palette entry inserts a *call*.
+- **Recording is the host's; the SDK annotates.** `@Records(Gesture, rank)` on a public static `api` method
+  (`Mouse.click`, `Keyboard.type/tap/combo`, `Wait.time`, `ImageClicker.click` at rank 10, `ImageWaiter.waitFor`
+  for `AWAIT`, …) says which call writes a gesture. The host fills parameters by type; the one type it cannot
+  fill is `plugin/types/PictureAt`, a `RecordedValue` (the project picture under the click). This module
+  writes no Java for a recording.
 
 - **A second rule, from the 1.1.0 method audit: no `api` signature may name a type the SDK does not version.**
   `botmaker-shared` and OpenCV are *freely breakable* by design while `api.*` is under contract, so a public
@@ -147,174 +124,36 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
   were near-misses, and the additions it deliberately deferred.
 
 - **`com.botmaker.sdk.api.*`** is the API generated bots compile against, and every class in it sits in a
-  sub-package that says what it is: `api.geometry` (`Point`, `Rect`, `Size`, `Direction`), `api.meta` (the
-  three pointer annotations — **deprecated shims since 1.2.0**; the vocabulary itself is
-  `com.botmaker.plugin.api.meta` now, see below), `api.bot`, `api.capture`, `api.emulator`, `api.interaction`, `api.launch`,
-  `api.util` (`Time`, `BotMaker`, `Debug`), `api.vision`. **The `api` root holds no classes** — it was a
-  junk drawer of annotations, geometry and five facades until 1.1.0, and a name landing there again means
-  somebody skipped the question above. It is under a **compatibility convention** — real semver, and a removal announced by one full minor marked
-  `@Deprecated(since = "x.y.z", forRemoval = true)` whose Javadoc `@deprecated` line names the replacement.
-  A member added after 1.1.0 carries `@since`; the 1.1.0 surface itself carries none, because comparing two
-  published jars already yields the exact per-version added/removed set and 818 identical tags would not.
-  The full picture is **`../docs/refactor/21-api-compat.md`**.
+  sub-package that says what it is: `api.bot`, `api.capture`, `api.emulator`, `api.flow`, `api.geometry`
+  (`Point`, `Rect`, `Size`, `Direction`), `api.interaction`, `api.launch`, `api.util` (`Time`, `BotMaker`,
+  `Debug`), `api.vision`. **The `api` root holds no classes**; a name landing there means somebody skipped
+  the question above. The full picture is **`../docs/refactor/21-api-compat.md`**.
 
-  **Convention, not enforcement, and that is a deliberate 2026-08-22 decision.** There was a gate here:
-  japicmp against the previously published jar, `ApiRulesCheck` in `src/api-check/java`, an `api-check`
-  profile, and `release.sh` refusing a version number the diff did not justify. All of it is deleted. It
-  existed to protect a repair model where a break was carried across by **pointing one member at another**
-  — the old `fix` kinds — and there, a wrong or missing declaration produced a bot that compiled and
-  behaved differently, so the declarations had to be checkable. What it costs is stated plainly in
-  `release.sh`: nothing now refuses a breaking change released as a patch, and nothing sizes the bump.
+- **The package tree is `api` / `internal` / `plugin`, and nothing else** (`../docs/refactor/34-plugin-package-tree.md`,
+  enforced by `plugin/PluginLayersTest`). `api` and `internal` are what a bot links: no JavaFX, no toolkit, no
+  `com.botmaker.sdk.plugin` name. `plugin/` is the Studio half: `SdkPlugin` (wiring only), `types/`
+  (`SdkTypes`, `FlowTypes`, `CaptureTypes`, `PictureAt`), `editors/`, and one package per toolbar feature —
+  `flow`, `pictures`, `screen`, `source`, `pilot` (+ `pilot/ui`), `emulator`, `launch`, `setup`. **No class
+  under `plugin/` reads or writes Java text**: an editor reads the value the host hands it and hands one back.
 
-  **japicmp is back, in one line: `com.botmaker.sdk.api.**` never removes anything** (2026-08-27). That
-  reverses the paragraph above, and the reversal is legitimate for a reason worth stating rather than
-  asserting. The 2026-08-22 gate died because **CI cannot tell an intended break from an accident, since it
-  cannot see the version** — a statement about a *conditional* rule, where a major release may legitimately
-  remove. Never-delete is **unconditional**: there is no legitimate removal, so there is nothing to
-  distinguish, and the objection evaporates. Hence no ignore list, no exemption annotation and no verdict
-  file — an escape hatch is what killed the last one. It is bound to `verify`, scoped to `api.**` so
-  `internal.**` stays freely breakable, and its baseline is `botmaker.japicmp.baseline` in the pom: **v1.2.0,
-  the release the rule begins at**, because v1.1.0 → now already removed `api.config.Wire`, `@Palette`,
-  `@Scaffolding` and `Text`'s nine shared-`OcrOptions` overloads, every one a recorded decision taken while
-  `api.*` was still freely breakable.
+- **`api.*` never deletes, starting at 2.0.0.** SDK 2.0.0 is the one sanctioned break (`Activity`,
+  `Activities.define`, `FlowGraph`, `PopupCheck`/`Recovery`, `api.meta`, `BotSettings.defaultCaptureSource`,
+  `CaptureSource.fromProjectDefault` — the CHANGELOG's BREAKING list names each replacement). From then on a
+  public `api.*` element is deprecated and kept, never removed: japicmp in `mvn verify` against
+  `botmaker.japicmp.baseline` (`v2.0.0`, pinned ahead of the tag) makes a removal fatal, with no ignore list.
+  `internal.**` and `plugin.**` are free. The accepted cost: **`api` only grows.**
 
-  **The last of those removals is inside v1.2.0 itself (2026-09-11): `api.config.Settings` and
-  `api.config.Wire`, deleted rather than deprecated** — decision 8 of the settings-becomes-a-plugin plan, the
-  maintainer's explicit call. It passes this gate without an exemption for one reason, and it is the reason
-  the baseline is a release rather than a tag-of-the-day: the baseline is the release that *contains* the
-  deletion, so the jar compared against already lacks both classes. Nothing is skipped, ignored or
-  annotated; the rule simply begins one release after those two classes ended. What a bot gets is a compile
-  error naming the type — there is no migrator for a deletion, and the replacement is one import away
-  (`com.botmaker.plugin.basics.store.Settings`).
+- **A rename carries `@ReplacedBy`** (contract's `com.botmaker.plugin.api.meta`) on the deprecated element:
+  targets `fqn`, `fqn#member` or `fqn#<init>`; an empty value is an explicit "nothing takes my place";
+  several values are a split, with a parallel `whens()` sentence per candidate; `note` is shown verbatim;
+  `behaviourChanged = true` forces a review mark and needs a `note`. Pointers compose into a chain, because
+  never-delete keeps every old element and its pointer in the newest jar. **`ApiPointersTest`** is the gate
+  (four rules: every deprecated element has a pointer, every target resolves, a behaviour change has its
+  note, a split says when). It is not a coverage rule. `first(…)` filters with `directOnly()`, because these
+  annotations annotate each other.
 
-  The accepted cost, stated plainly: **`com.botmaker.sdk.api` only ever grows.** That is the trade, and it is
-  the same policy the JDK runs.
-
-  **What carries a rename is `@ReplacedBy`, written on the deprecated element** (2026-08-23; it replaced
-  `@ApiId` and `META-INF/botmaker/migrations.json`, both deleted). A jar diff sees `ImageClicker#click` go and
-  `IClicker#tap` arrive and cannot see that one became the other; read as a removal, that is hundreds of calls
-  replaced by default values in someone's bot. It is read out of the bot's **own** jar — the bot still spells
-  the element the old way, so that is where the forward pointer has to be. Each target is `fqn`, `fqn#member`
-  or `fqn#<init>`, no arity (it sits on one overload). **An empty value is an explicit "nothing takes my
-  place"**, not an omission — which is why it is *required* on every deprecated public element.
-
-  **`@Replaces` — the back edge, written on the survivor — was deleted on 2026-08-27, and japicmp is what
-  makes that safe.** It existed for one case: Studio holds only two jars at upgrade, the bot's pin and the
-  target, so a bot on 1.0 jumping to 3.0 could not see a pointer added in 2.0 on an element 3.0 deleted, and
-  the answer had to survive on the survivor. **Under never-delete the target jar still carries the deprecated
-  element and its own `@ReplacedBy`**, so the forward pointer alone answers every upgrade including a skipped
-  one. A rename is now: add the new name, deprecate the old, keep both, point one at the other. `@Since` went
-  the same day, for the reason this repo applies to every gate — *the question a check answers must not
-  already be answered by bytecode*, and the release an element first shipped in is answerable from the jar the
-  bot resolves.
-
-  **`@ReplacedBy.value()` is a `String[]`, and that is the split.** One old member can become two, and
-  *which* one a given call meant is a property of **that call**, not of the member — `Mouse.scroll(int)`,
-  whose sign decides `scrollUp` from `scrollDown`, is the worked example, and no annotation can know a sign.
-  So the SDK does not resolve a split, it **offers** one: the targets in preference order (first preferred)
-  plus a parallel **`whens()`** carrying one sentence per candidate (*"when notches is positive"*), and
-  Studio puts the choice to the user once per call site. `@ReplacedBy("…#tap")` is unchanged in source and
-  in bytecode — a single value is already a one-element array — so the ordinary one-target pointer is the
-  degenerate case of all of it.
-
-  **Pointers compose into a chain** — `a`→`b` in 2.0 and `b`→`c` in 3.0 land a bot still spelling it `a` on
-  `c`, with the 2.0 jar never fetched, because never-delete keeps `a` and its pointer in the 3.0 jar. Write
-  the pointer **in the release that makes the change**, while both ends are compilable: that is what lets the
-  gate below verify the link from a single build. A pointer is an ordinary annotation — correct a wrong one in
-  a later release.
-
-  **`ApiPointersTest` is the gate, and it is not the one that was deleted.** One offline ClassGraph scan of
-  `target/classes` plus the contract's, run by CI on every build and by `release.sh check_api_pointers`.
-  **Four rules** since the back edge went (2026-08-27), each wrong at every version: every deprecated element
-  carries a pointer (1); **every** target resolves (2); a `behaviourChanged` move carries its sentence (8); a
-  split says when each candidate applies (11). Rules 3–7 read `@Replaces` or `@Since` and went with them —
-  with them went `-Dbotmaker.api.maxVersion`, so nothing here is version-aware any more. **It is not a
-  coverage rule**: an uncovered break is a supported outcome (default value plus review mark), and these four
-  only ask that a link somebody *did* declare is complete.
-
-  **`api-surface.txt` was the second gate, and it was deleted on 2026-08-25 — a deliberate reversal of the
-  decision recorded here the day before, and the second one this month.** It was a committed, generated file
-  at the module root holding the *previous* release's public `api.*` surface, one sorted line per element
-  (`type#member(paramTypes):returnType [deprecated] [since=…]`), which `ApiSurfaceTest` diffed this build
-  against: an element that left had to have carried `[deprecated]` (the announced window), an element in both
-  kept the exact `@Since` it had, and a new element had to carry one. It went with `ApiSurfaceTest`,
-  `release.sh`'s `check_api_surface` / `refresh_api_surface` and `--allow-removal`
-  (`-Dbotmaker.api.allowUndeprecatedRemoval`).
-
-  Why: it was a **second, hand-maintained record of what the SDK offers**, kept in a text file beside the
-  code, and the inversion is about to build the real one — an explicit per-version catalog in
-  `api.authoring`, written in code, keyed by `SdkVersion`, which answers *what did 1.2 offer* rather than
-  only *what did the last build offer*. Two records of the same fact is exactly the shape this teardown
-  keeps removing. The catalog subsumes the gate, and until it exists the window is a **convention** again:
-  `@Deprecated(since, forRemoval = true)` one full minor ahead, with a pointer, still the rule — nothing
-  mechanically refuses an undeprecated removal.
-
-  **What survives is `@ReplacedBy` and `ApiPointersTest`.** `ApiPointerProcessor` — the same rules again as
-  javac errors, red in the IDE while the annotation is being typed — moved into `botmaker-plugin-processor` on
-  2026-08-27 (phase 8c) and was **deleted with that module the same day**, when the catalog stopped being
-  generated and the processor had nothing left to do that a test does not do. The ergonomic loss is real and
-  accepted: a bad pointer is now a red test rather than a red line. The test was always the authority — *if
-  the two ever disagreed the test was right* — so nothing that decided anything went with it.
-
-  **The vocabulary itself left this module in 1.2.0 (phase 8c.4).** `@ReplacedBy` is
-  `com.botmaker.plugin.api.meta` now: it describes how any library keeps faith with the code that calls it,
-  and a second plugin renaming its own types wants the same machinery rather than a copy of it. What is left
-  in `com.botmaker.sdk.api.meta` is three `@Deprecated(since = "1.2.0", forRemoval = true)` shims —
-  **the pointer's first use was its own move**, which is the fairest test it could have had. Under
-  never-delete those shims stay in the jar rather than being removed after a window; `Since` and `Replaces`
-  now carry `@ReplacedBy({})`, "nothing takes my place", because their contract-side targets are gone too.
-  Two things worth knowing:
-
-  - **A pointer may cross modules**, and rule 2 resolves against `com.botmaker.sdk.api` ∪
-    `com.botmaker.plugin.api` for exactly that reason — a carve-out exempting contract targets would have
-    had to be removed again later, where a wider universe is simply the truth.
-  - **`ApiPointersTest.first(…)` filters with `directOnly()`, and that is load-bearing rather than tidy.**
-    ClassGraph folds meta-annotations into a class's annotation list, and these annotations annotate *each
-    other* — so without the filter every element that merely *uses* one reads as carrying whatever that
-    annotation's own declaration carries. A redirect is a statement about the element it is written on;
-    nothing here ever wanted an inherited one.
-
-  **Two elements sit on the pointer itself**, `@Retention(CLASS)`, read from the jar by the same scan
-  (2026-08-23). Each records something that is cheap while both ends of a move still exist and impossible
-  afterwards:
-
-  - **`@ReplacedBy(note = "…")`** — the author's own sentence, shown to the user **verbatim**. The pointer
-    says *what*; nothing else can say *why*. (It is what `migrations.json`'s deleted `summary` used to be.)
-  - **`@ReplacedBy(behaviourChanged = true)`** — the replacement *does something different*. This is the one
-    gap the redirect model cannot see: Studio takes a pointer by comparing **shapes**, so "same shape,
-    different meaning" is exactly a silent, successful rename, and the bot compiles and misbehaves. Setting it
-    forces a review mark on every redirected site, with the note as its text — hence rule 8: `true` with a
-    blank `note` is refused, since a mark that says nothing costs a hand review and answers nothing.
-
-  **`@Since` was the third and was deleted on 2026-08-27**, with rule 7. It recorded the release an element
-  first shipped in, so the upgrade dialog could group additions by version — and that is answerable from the
-  bot's own resolved jar, which is the test this repository applies to every gate. Twenty sites carried it;
-  the pre-1.1.0 surface deliberately never did.
-  **Two more lived here and were deleted on 2026-08-25 — `@Scaffolding` and `@Palette`.** Both existed to let
-  **two repositories agree about something neither could read in the other**, and the maintainer's decision is
-  to remove the disagreement rather than manage it: the SDK becomes the generator and the palette, so there is
-  no second author left to inform. Worth knowing they existed, because both left visible holes:
-
-  - **`@Scaffolding`** said *Studio writes this element into the files it generates*, so renaming it broke
-    bots that never mentioned it. `ApiPointersTest` rule 9 refused a `@Deprecated` `@Scaffolding` element with
-    an empty `@ReplacedBy`, and `ScaffoldTemplatesTest` read the templates' own constant pools to require the
-    annotation on every `com.botmaker.sdk.*` member they reached. (It had been reconciled through a committed
-    `scaffolding-surface.txt` written by Studio's own test, until the scaffold moved into
-    `src/templates/java` on 2026-08-24 and made the file unnecessary — the same argument, one step further
-    along, is why the annotation itself is gone.) Both rules went with it.
-  - **`@Palette`** said *Studio offers this in its block palette* — a strict, per-overload whitelist, where
-    **hiding was not deprecating**: an unannotated method stayed public, supported and under contract, simply
-    not proposed. It was the answer to the wall the method audit kept hitting
-    (`docs/refactor/22-api-audit.md` §3, §5), where a method could only leave the menu by leaving the API.
-    Deleting it **widens Studio's menus** — `SdkSurfaceService` treats a jar with no `Palette` class as
-    uncurated and offers everything public — until the SDK serves the palette itself. That is a known interim
-    cost, not a regression. The maintainer's per-facade curation *prose* survives in each facade's Javadoc
-    (*"Curated for the palette: …"*); the per-member verdicts lived only in the annotations and are gone.
-
-  Both were public `api.meta` types removed after 1.1.0 shipped, i.e. an undeprecated removal, taken
-  deliberately via `release.sh --allow-removal` with `api-surface.txt` regenerated in the same commit — the
-  last use of a switch and a file that were themselves deleted hours later (above). Neither was a name a bot
-  could write down.
+  The history of every gate that came and went here (`api-surface.txt`, `@Replaces`, `@Since`,
+  `@Scaffolding`, the processor) is in `ROADMAP.md` and `../docs/refactor/31-umbrella-history.md`.
 
 ## A plugin's values are Java this plugin ships (2026-09-21) — read this before the sections below
 
@@ -322,16 +161,28 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 over seven phases on 2026-09-20/21. **`ROADMAP.md` is the live log; the dated sections below this one are
 snapshots and several of them are now wrong.** This section says which.
 
-**What is true now.** `SdkPlugin.pluginSources()` ships two files, copied once into
+**What is true now (SDK 2.0.0).** A project gets two files from its template, in
 `src/main/java/<bot package>/plugins/sdk/`: `Sdk.java`, with a `@Managed("flow")` method returning a
 `com.botmaker.sdk.api.flow.Flow` and a `@Managed("capture")` method returning a `CaptureSource`; and
-`Pictures.java`, `@Managed("pictures")` on the type. From the copy on they are the user's — the host
-rewrites the expression a `@Managed` method returns and nothing else, and a body that is not exactly
-`return <expr>;` is read-only with a reason. An activity's work is a **method reference**,
-`Flow.activity(Collect::body, …)`, so renaming it is a compile error naming `Sdk.java`. A bot installs it
-all with one `Sdk.install()` from its own `main`, and `FlowGraph.load`/`run` walk `Flows.installed()`.
+`Pictures.java`, `@Managed("pictures")` on the type. They are the user's — the host rewrites the expression
+a `@Managed` method returns and nothing else, and a body that is not exactly `return <expr>;` is read-only
+with a reason. An activity's work is a **method reference**, `Flow.activity(Collect::body, …)`, so renaming
+it is a compile error naming `Sdk.java`. A bot's whole `main` is `Bot.run(Gamebot::goHome, Sdk.class)`,
+which installs every `@Managed` value it is handed and walks the flow (`internal/flow/FlowWalker`).
 
 **What is now false below.**
+
+- **Paths below name the pre-2.0 tree.** Read `internal/plugin/X` as `plugin/X`; `internal/plugin/capture`
+  as `plugin/screen` (overlay, grabs, samplers, `EditorFrame`) or `plugin/source` (`SourcePicker`,
+  `CaptureValue`, `CaptureLabels`); `internal/plugin/templates` and `authoring/{TemplateLibrary,
+  TemplateManifest, TagCatalog}` as `plugin/pictures`; `internal/authoring` as `plugin/types` (`SdkFlowValues`
+  is `FlowTypes`); `authoring/TemplateNames` as `internal/vision`. `internal/plugin/record`, `seeds`,
+  `CaptureExpr`, `TargetThumbnail`, `LiteralWriter` and `PilotSession` are deleted.
+- **The legacy activity model is deleted (2.0.0).** `Activity`, `Activities.define`, `ActivityEditors`'
+  `define` half, `FlowGraph`, `ActivityLoader`, `PopupCheck`/`Recovery` and `api.meta` are gone. Wherever a
+  section below says an activity is a lambda passed to `define`, read *a method reference in the flow*.
+- **The recorder is the host's.** `MacroRecorderDialog`, `MacroTranslator` and the Record toolbar items are
+  deleted; see *Recording is the host's* above.
 
 - **No editor here reads or writes Java text (2026-09-23).** Where a section below says an editor parses a
   slot (`Slots.arguments`, `settingsOf`, `CaptureExpr`, `LiteralWriter`), writes one with `setSource`, or
@@ -346,15 +197,12 @@ all with one `Sdk.install()` from its own `main`, and `FlowGraph.load`/`run` wal
 - **`ProjectWriter` no longer writes `activities.json`** when it creates a project (*The SDK writes no
   `.java`*). It writes the project properties, the placeholder image and the `src/` directories; the flow
   arrives as `Sdk.java`, from the plugin, through the host.
-- **`capture.json`'s "no schema stamp, the ledger's one entry point is `activities.json`" is stale** (*The
-  capture targets are authoring data*). `Authoring.SCHEMA_FIELD` survives **for `capture.json` itself**,
-  which is now the only file carrying it. The rest of that section holds: a target's identity is still its
-  spec text, and `botmaker-project.properties`' `capture.source` is still what a running bot resolves —
-  retiring that key is a step of its own, still owed.
-- **`ActivityEditors`' activity list comes from `FlowValue.current()`**, not `Authoring.readModel` (*The two
-  pickers the lambda was built for*). Everything else in that section stands, `Activities.define` included:
-  it is deprecated with a `@ReplacedBy` to `Flow#activity`, still works, and its `CallSites.ACTIVITY_NAME`
-  editor is still why `outcome` takes a context.
+- **`capture.json`, `CaptureTargets` and `capture.source` are deleted** (*The capture targets are authoring
+  data*, *…managed here…*). A project has one capture source, the expression `Sdk.captureSource()` returns;
+  `Source.current()` resolves to what `Bot.run` installed, or the whole desktop.
+- **`ActivityEditors`' activity list comes from `FlowValue.current()`** (*The two pickers the lambda was
+  built for*). `Activities.define` is deleted; the outcome-name editor is still why `outcome` takes a
+  context.
 - **A bot's enable flag is `Flow.Activity.enabled()`**, read through `Flows.enabled(name)`.
   `Settings.enabled` is deleted rather than deprecated — it read `activities.json`, so with that file gone
   it could only ever have answered `false`, switching every activity off.

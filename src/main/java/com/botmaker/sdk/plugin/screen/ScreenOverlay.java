@@ -38,7 +38,7 @@ import java.util.function.Consumer;
 import java.util.prefs.Preferences;
 
 /**
- * <b>What the user does with the pixels</b> — one half of editor-time capture, and Studio's until 2026-08-31.
+ * <b>What the user does with the pixels</b> — one half of editor-time capture.
  *
  * <p>Given a frame, it shows a borderless overlay of it and lets the user rubber-band a region, click a
  * point, or sample a colour under a magnifier; it also runs the multi-monitor screen chooser, refuses to

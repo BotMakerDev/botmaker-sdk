@@ -43,7 +43,7 @@ import java.util.TreeSet;
  *
  * <p><b>Assignments here, declarations elsewhere.</b> This file records which tags a template carries and
  * which <em>custom</em> tags the project has declared. It does not know about activity tags — those are
- * derived from {@code activities.json}, so they exist and vanish with the activity itself. {@link TagCatalog}
+ * derived from the bot's flow, so they exist and vanish with the activity itself. {@link TagCatalog}
  * is what puts the two halves together, and it is the authority on which tags exist: an assignment naming a
  * tag the catalog doesn't declare is inert rather than an error, which is what makes renaming an activity
  * lossless. Rename it back and its templates are filed under it again.

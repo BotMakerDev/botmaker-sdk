@@ -9,10 +9,7 @@ import java.util.List;
 /**
  * The monitor geometry both halves of capture need.
  *
- * <p>It was extracted because both halves of capture used it: the target half cropped a desktop grab to the
- * monitor a project named, the overlay half crops the same grab to the monitor a user picked in the chooser.
- * The target half is the SDK plugin's since 2026-08-31 and took its own copy of this arithmetic with it —
- * the fair price for not sharing a utility class across a module boundary — so the two callers left are
+ * <p>It crops a desktop grab to the monitor a user picked in the chooser; its callers are
  * {@link ScreenOverlay} and {@link DesktopSource}.
  *
  * <p>It stays its own class rather than folding into either, because it is the one piece of arithmetic in

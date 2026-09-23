@@ -172,10 +172,7 @@ public final class PilotRoutes implements AutoCloseable {
     /**
      * The instance the project points at, or {@code null} when its capture source names no emulator.
      *
-     * <p>One answer since 2026-09-22, where there were two: {@code botmaker-project.properties}'
-     * {@code capture.source} (what the bot read) and then {@code capture.json}'s default target (what the
-     * editor's picker set). Those were two spellings of one fact, written by one code path, and the
-     * project's capture source is the bot's own Java now — so there is one place to ask and it is the one
+     * <p>The project's capture source is the bot's own Java, so there is one place to ask and it is the one
      * the user can read.
      */
     static String configuredInstanceName(PilotProject project) {

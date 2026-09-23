@@ -90,15 +90,10 @@ public final class Source {
     /**
      * What the source is before anything sets it: the whole {@link Desktop}.
      *
-     * <p>It read {@code botmaker-project.properties}' {@code capture.source} until 2026-09-22, through
-     * {@code ProjectDefaults.source()}. That key was the bot's half of a fact the editor also kept in
-     * {@code capture.json}, and the projection between them is what {@code @Managed("capture")} replaced:
-     * the bot's capture source is the expression {@code Sdk.captureSource()} returns, which
-     * {@code Bot.run} hands to {@link #set} before the bot starts. A properties key read here as well
-     * would be a second author of the same answer, racing the one the user can see in their own Java.
-     *
-     * <p>So a bot that installs its {@code @Managed} values captures what its Java says, and a bot that
-     * does not captures the whole desktop — which is what a project with no key configured already did.
+     * <p>The bot's capture source is the expression {@code Sdk.captureSource()} returns, which
+     * {@code Bot.run} hands to {@link #set} before the bot starts. Nothing else is read here: a second
+     * source of the answer would race the one the user can see in their own Java. So a bot that installs its
+     * {@code @Managed} values captures what its Java says, and a bot that does not captures the whole desktop.
      */
     private static CaptureSource resolveDefault() {
         CaptureSource resolved = CaptureSource.desktop();

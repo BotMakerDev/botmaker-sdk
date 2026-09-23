@@ -11,8 +11,8 @@ import com.botmaker.sdk.plugin.types.SdkTypes;
 import javafx.scene.Node;
 
 /**
- * The three editors for the SDK's geometry types, which are one editor three times — so since 2026-08-28
- * they are one editor three times <em>literally</em>: {@link Editors#tuplePill} is the shape, and what is
+ * The three editors for the SDK's geometry types, which are one editor three times
+ * <em>literally</em>: {@link Editors#tuplePill} is the shape, and what is
  * left here is the three tables that say which numbers each type has and how a person reads them.
  *
  * <p>That split is the toolkit's rule 4 doing its job. A pill over a few whole numbers with a way to take

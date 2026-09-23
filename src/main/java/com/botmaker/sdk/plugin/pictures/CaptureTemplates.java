@@ -50,12 +50,10 @@ import java.util.function.Consumer;
  *
  * <h2>Why this is a plugin's tool and not the host's</h2>
  *
- * <p>Everything it touches is this plugin's: it reads the capture target and the capture size out of
- * {@code capture.json}, grabs the pixels through {@code botmaker-shared}, and writes an
- * {@code ImageTemplate} into the project's picture folder. The host answers one question —
- * {@link StudioServices#resourcesDir() which project is open} — plus the ordinary furniture of theming and a
- * parent window. Nothing was added to the contract to bring it across, which is the standing condition on
- * this whole direction.
+ * <p>Everything it touches is this plugin's: it reads the project's capture source, grabs the pixels through
+ * {@code botmaker-shared}, and writes an {@code ImageTemplate} into the project's picture folder. The host
+ * answers one question — {@link StudioServices#resourcesDir() which project is open} — plus the ordinary
+ * furniture of theming and a parent window.
  *
  * <p><b>The pixels are re-grabbed at save time, never taken from the frame the user drew on.</b> That is
  * what keeps the overlay's own chrome out of a saved picture, and the drawn selection (overlay-logical
@@ -69,12 +67,6 @@ public final class CaptureTemplates {
 
     private final StudioServices services;
     private final Window owner;
-
-    // referenceSize stood here until 2026-09-22: the size a window target was snapped to before every grab,
-    // read out of capture.json. Both that file and EditorFrame's snap are deleted, so a session captures the
-    // window at whatever size it is and the readout below states that size alone. What the snap was for --
-    // every picture in a project authored at one canonical size -- is answered by each picture's own sidecar
-    // and the matcher's rescale, which is where an authored size has always really been recorded.
 
     /**
      * The source every grab in this session reads, or {@code null} to read the project's own each time.
@@ -227,10 +219,8 @@ public final class CaptureTemplates {
     /**
      * {@code "▧ 1600×900"} — the size these pixels are actually being captured at.
      *
-     * <p>It carried a {@code · ref 1920×1080 ⚠} mismatch warning until 2026-09-22, against the reference
-     * resolution in {@code capture.json}. There is no project-wide reference any more, so there is nothing
-     * to disagree with: each picture records the size it was authored at in its own sidecar and the matcher
-     * rescales against that.
+     * <p>There is no project-wide reference size to compare it with: each picture records the size it was
+     * authored at in its own sidecar and the matcher rescales against that.
      */
     private String readout(java.awt.Rectangle bounds) {
         return "▧ " + bounds.width + "×" + bounds.height;

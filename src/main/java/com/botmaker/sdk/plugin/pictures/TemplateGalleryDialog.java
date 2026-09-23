@@ -28,8 +28,7 @@ import java.util.function.Predicate;
  * a {@code showAndWait} would have returned. Handing back a list keeps the single- and multi-select callers on
  * one path — a single-select dialog simply never yields more than one.
  *
- * <p>It was Studio's until 2026-09-01 and it was never Studio's subject: everything it shows is this plugin's
- * picture folder, read through this plugin's {@link TemplateLibrary}. What it takes
+ * <p>Everything it shows is this plugin's picture folder, read through this plugin's {@link TemplateLibrary}. What it takes
  * from the host is a theme and an owner window, which is all the contract offers and all it needs.
  */
 public final class TemplateGalleryDialog {

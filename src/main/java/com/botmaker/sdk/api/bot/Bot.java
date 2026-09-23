@@ -52,9 +52,6 @@ public class Bot {
      * For {@code extends Bot} alone — see {@link #run}. There is nothing to construct here and nothing to
      * override; the class is extendable so a bot's entry point can call {@code run(…)} unqualified, and so
      * that <em>this class is a bot's entry point</em> is a fact javac knows rather than a convention.
-     *
-     * <p>The class was {@code final} with a private constructor until 2026-09-21. Removing {@code final} is
-     * a widening, so nothing a bot could already write stops compiling and never-delete is untouched.
      */
     protected Bot() {}
 

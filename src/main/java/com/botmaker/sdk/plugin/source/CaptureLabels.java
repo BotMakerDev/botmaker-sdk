@@ -16,17 +16,8 @@ import com.botmaker.shared.emulator.EmulatorInstances;
  * editor's business. Putting {@code longLabel()} on the interface would put three English sentences under
  * the SDK's never-delete contract and on every bot's classpath, for a question no bot asks.
  *
- * <p>It replaced {@code CaptureTargetModel}'s label half on 2026-09-22. That record was a
- * {@code (spec, label)} pair over shared's {@code CaptureSourceKind} grammar — {@code desktop},
- * {@code monitor:0}, {@code window:Diablo IV} — which existed because a project's capture source was
- * <em>stored as text</em>, in {@code capture.json} and in {@code botmaker-project.properties}. Both are
- * deleted: the source is the expression {@code Sdk.captureSource()} returns, so a third spelling of a type
- * the SDK already publishes had nothing left to keep in step with.
- *
- * <p><b>What went with it is the user's own label</b>, the {@code label} component a target carried. A
- * source is named by what it is now, because there is no file left to keep a nickname in and the bot's own
- * Java has nowhere to put one. Every label below is derived, so two surfaces cannot disagree about how a
- * source is named.
+ * <p><b>A source is named by what it is</b>: the bot's own Java has nowhere to put a nickname. Every label
+ * below is derived, so two surfaces cannot disagree about how a source is named.
  *
  * <h2>Both label methods are total, and absent means the desktop</h2>
  *

@@ -26,16 +26,15 @@ import java.nio.file.Path;
 
 /**
  * The <b>Project Setup</b> checklist — one window that says, for a project as it stands right now, whether it
- * has something to launch, something to capture, a reference resolution and any pictures, and what to do
+ * has something to launch, something to capture and any pictures, and what to do
  * about each answer that is no.
  *
  * <h2>Why this is the plugin's</h2>
  *
- * <p>Every one of the four rows reads a fact that belongs to this module. The launch target and the capture
- * size are {@code botmaker-project.properties}, read through shared's {@link ProjectFile}; the capture target
- * and the reference resolution are {@code capture.json}, read through {@link Authoring}; the pictures are the
- * images folder, read through {@link TemplateLibrary}. The host holds none of it, which is what made this a
- * checklist the editor could only answer by asking the SDK anyway. What the host supplies is the three things
+ * <p>Every row reads a fact that belongs to this module. The launch target is
+ * {@code botmaker-project.properties}, read through shared's {@link ProjectFile}; the capture source is
+ * {@code Sdk.captureSource()} in the bot's own Java; the pictures are the images folder, read through
+ * {@link TemplateLibrary}. The host holds none of it. What the host supplies is the three things
  * nobody else can: which project is open, the current look, and the window this modal is owned by.
  *
  * <h2>Every row is a statement, not a button</h2>
@@ -166,12 +165,6 @@ public final class ProjectSetup {
                                 : templateCount + (templateCount == 1 ? " picture saved." : " pictures saved."),
                         null));
     }
-
-    // The "Reference resolution" row stood here until 2026-09-22 -- the size pictures were captured at, read
-    // from capture.json's CaptureModel.reference. Both the file and the field are deleted, and a project's
-    // capture source is an expression in the bot's own Java with nowhere to put a second number. So the
-    // checklist has two required steps rather than three. Nothing is lost that a bot depended on: the matcher
-    // rescales against each picture's own sidecar, which is where an authored size has always really lived.
 
     /**
      * The launch row's control: start the configured target <em>without</em> running the bot, so the user can

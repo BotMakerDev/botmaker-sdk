@@ -5,9 +5,8 @@ import javafx.scene.Scene;
 /**
  * The flow editor's own stylesheet, and the one line that puts it on a scene.
  *
- * <p>The {@code .flow-*} rules were in the host's {@code blocks.css} until 2026-09-11, which is where they
- * had to be while the canvas was Studio's. They are this plugin's now, for the same reason the canvas is: a
- * host stylesheet naming one plugin's concepts is a look a second plugin could never have.
+ * <p>The {@code .flow-*} rules are this plugin's for the same reason the canvas is: a host stylesheet naming
+ * one plugin's concepts is a look a second plugin could never have.
  *
  * <p>What it does <em>not</em> carry is a palette. Every colour in it resolves a {@code -bm-*} token the
  * host's theme publishes on the scene root, so the canvas follows the editor into a dark theme without

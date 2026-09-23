@@ -18,8 +18,7 @@ import java.util.function.BooleanSupplier;
 /**
  * Keeps a plugin's own overlay stage stacked above a fullscreen game.
  *
- * <p>Moved out of Studio's {@code ui/app/overlay/OverlayToolbars} on 2026-08-30 with the two capture
- * surfaces that call it. It is here rather than in {@code botmaker-plugin-toolkit} because the raise itself
+ * <p>It is here rather than in {@code botmaker-plugin-toolkit} because the raise itself
  * is {@code botmaker-shared}'s — {@link NativeControllerFactory} — and the toolkit may not name a BotMaker
  * upstream other than the contract. It is not on the contract either, and deliberately: any plugin can
  * depend on shared and do this for itself, so the host is not the only possible source.

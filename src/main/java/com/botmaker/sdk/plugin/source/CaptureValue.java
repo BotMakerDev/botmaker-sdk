@@ -12,24 +12,14 @@ import java.util.Optional;
  * The {@code @Managed("capture")} value — where a bot reads pixels from, written as the one expression
  * {@code Sdk.captureSource()} returns.
  *
- * <h2>Why the properties file is still written too</h2>
- *
- * <p>Making a target the project's default has always written two places: {@code capture.json}, which is the
- * list of targets and belongs to the Capture Targets window, and {@code botmaker-project.properties}'
- * {@code capture.source}, which is the bot's side of the same question. This adds a third, and it is the one
- * that matters: {@code Sdk.captureSource()} is Java the bot compiles, so a developer with no BotMaker
- * installed can read it, change it and see the change take effect.
- *
- * <p>The properties key is not a second answer either. Both are written by this one code path at one
- * instant, from the same target, and the Remote Pilot and the host's own tooling still read the key. What
- * retires it is the phase that stops a bot reading it, not this one.
+ * <p>This is the only copy of the answer. {@code Sdk.captureSource()} is Java the bot compiles, so a
+ * developer with no BotMaker installed can read it, change it and see the change take effect.
  *
  * <h2>It is allowed to fail quietly</h2>
  *
- * <p>A project may have no {@code Sdk.java} — the SDK was added before this file existed, or the user
- * deleted it — and a user may have written {@code captureSource()} by hand. In both cases there is nothing
- * to write and nothing has gone wrong: the target is still set, the properties key still says so, and the
- * Java the user wrote is still theirs. Saying "couldn't point the bot at that window" would be false.
+ * <p>A project may have no {@code Sdk.java}, and a user may have written {@code captureSource()} by hand in a
+ * shape the host does not read. In both cases there is nothing to write and nothing has gone wrong: the Java
+ * the user wrote is still theirs.
  */
 public final class CaptureValue {
 

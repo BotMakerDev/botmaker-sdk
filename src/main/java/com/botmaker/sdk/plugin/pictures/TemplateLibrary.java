@@ -33,26 +33,16 @@ import java.util.stream.Stream;
  * root at run time), so the path embedded in code is relative to the project root, e.g.
  * {@code "src/main/resources/images/accept_button.png"} — always forward-slashed for cross-platform use.
  *
- * <p><b>Adding a picture writes no Java.</b> There was a generated {@code Templates.java} holding one
- * {@code public static final String} per file in the images folder, rewritten after every add, rename and
- * delete, so a bot could name a picture and have a typo be a compile error. A picture is named by its file
- * now, so there is no constant to keep in step. The lineage went the long way round — Studio emitted the
- * file, then the SDK did (a second emitter being a second author of one file), then it stopped being emitted
- * at all — and {@code regenerateTemplatesClass} outlived the file it wrote by three days.
+ * <p><b>Adding a picture writes no Java.</b> Nothing is generated per file, so there is no constant to keep
+ * in step with the folder.
  *
- * <p><b>It was Studio's {@code services.ImageTemplateLibrary} until 2026-08-30</b>, and it is here for the
- * reason {@code capture.json} is: a <em>named picture</em> is {@code ImageTemplate}'s own concept, not an
- * editor's, so the plugin that offers the type has to be the one that owns the folder. Two readers of one
- * folder is the drift the capture-target work spent a whole phase deleting.
+ * <p>A <em>named picture</em> is {@code ImageTemplate}'s own concept, not an editor's, so the plugin that
+ * offers the type is the one that owns the folder.
  *
- * <p><b>It is keyed on the resources directory</b>, which is {@link Authoring}'s idiom and, not by accident,
- * exactly what the plugin contract's {@code StudioServices.resourcesDir()} hands over — so a plugin can reach
- * its own pictures with nothing added to the contract. Studio's {@code ProjectConfig} answered three
- * questions here (the images folder, the project root to relativize against, the activities file) and every
- * one of them is derivable from that single path.
- *
- * <p>The one method that did <b>not</b> come along is {@code openActivityTag}: it reads the editor's active
- * file, which is host state and nobody else's. It stayed in Studio.
+ * <p><b>It is keyed on the resources directory</b>, which is exactly what the plugin contract's
+ * {@code StudioServices.resourcesDir()} hands over — so a plugin can reach its own pictures with nothing
+ * added to the contract. The images folder and the project root to relativize against are both derivable
+ * from that single path.
  */
 public final class TemplateLibrary {
 
@@ -79,8 +69,8 @@ public final class TemplateLibrary {
     /**
      * File name of the built-in default template.
      *
-     * <p>The SDK's, since it is the SDK that makes the file — at creation until 2026-09-01, and now on the
-     * first look at a project's picture folder ({@link #ensurePlaceholder}). Three questions are asked about
+     * <p>The SDK's, since it is the SDK that makes the file, on the first look at a project's picture folder
+     * ({@link #ensurePlaceholder}). Three questions are asked about
      * it — <em>is this the placeholder?</em> (rename/delete protection), <em>is it still untouched?</em>
      * (export) and <em>is it there at all?</em> — and all three have to be asking about the same file.
      */
@@ -114,8 +104,7 @@ public final class TemplateLibrary {
     /**
      * The placeholder in {@code resourcesDir}'s images folder, made if it is not there.
      *
-     * <p><b>Creation stopped writing it on 2026-09-01</b> and this is what replaced it. A placeholder picture
-     * is only meaningful to whoever offers {@code ImageTemplate}, so a project created in an editor that
+     * <p><b>Project creation does not write it.</b> A placeholder picture is only meaningful to whoever offers {@code ImageTemplate}, so a project created in an editor that
      * never loaded this plugin has no business being given one — and the surfaces that <em>do</em> need it
      * (the gallery, the picture pickers, a value seeded with {@code default_template}) all hold a resources
      * directory at the moment they need it. Calling this when a picture folder is first looked at is both

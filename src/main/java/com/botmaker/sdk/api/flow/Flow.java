@@ -10,10 +10,8 @@ import java.util.List;
  * A bot's activity flow, as a value: what its activities are, how they are wired, where a run starts, and
  * what stops it.
  *
- * <p><b>This is where {@code activities.json} went</b> (2026-09-20). A flow lived in a JSON file the editor
- * wrote and the bot read back by name, which is the arrangement {@code docs/refactor/33-plugin-java.md}
- * exists to remove: a name renamed in Java was a silently empty value three screens into a run, while the
- * same rename here is a compile error. It is written in the file BotMaker gave your project —
+ * <p><b>A flow is Java, so a renamed activity method is a compile error</b> rather than a silently empty
+ * value three screens into a run. It is written in the file BotMaker gave your project —
  * {@code plugins/sdk/Sdk.java} — and the editor rewrites the one expression the {@code @Managed("flow")}
  * method returns, leaving everything around it exactly as you wrote it.
  *

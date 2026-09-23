@@ -39,7 +39,7 @@ import java.util.function.Consumer;
  * <p>The frame is re-grabbed on every open rather than cached: it should show the game as it is now, and the
  * grab is off-thread anyway.
  *
- * <h2>Two components the capture overlay added (2026-08-31)</h2>
+ * <h2>Two components the capture overlay needs</h2>
  *
  * <p>{@code bounds} is where on the virtual desktop these pixels are — what a rubber-band surface has to be
  * placed over, and what a drawn selection is mapped back through. A pixel editor ignores it; an overlay
@@ -126,12 +126,8 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
      * project at it is a separate, explicit action ({@link CaptureValue#point}). A button that takes a
      * picture must not silently re-point the bot.
      *
-     * <h2>Nothing is snapped to a reference size any more (2026-09-22)</h2>
-     *
-     * <p>A capture used to resize the window to the resolution {@code capture.json} named, so every picture
-     * was authored at one canonical size. That file is deleted and the project's capture source is now an
-     * expression in the bot's own Java, which has nowhere to put a second number — and the matcher rescales
-     * anyway, which is what made the snap a convenience rather than a correctness rule.
+     * <p>The window is captured at whatever size it is: the matcher rescales against each picture's own
+     * sidecar, so there is no canonical size to snap to.
      */
     public static void grabAsync(StudioServices services, CaptureSource source,
                                  Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {

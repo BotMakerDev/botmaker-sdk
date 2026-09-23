@@ -17,9 +17,8 @@ import java.util.function.Predicate;
  *
  * <p>Eight constants and nothing else. The matching itself — declining a Parameters row, comparing an
  * argument index, tolerating a qualified or a simple class name — is
- * {@link SlotEditor#onCall}'s. It was the toolkit's {@code CallSites} from 2026-08-28 and is the
- * <b>contract's</b> from 2026-09-22: not a line of it drew anything, and <em>which slot an editor claims</em>
- * is contract vocabulary, the same argument that put {@code SlotEditor.of} there.
+ * {@link SlotEditor#onCall}'s, in the contract: <em>which slot an editor claims</em> is contract
+ * vocabulary, the same argument that put {@code SlotEditor.of} there.
  *
  * <p>What is left is the part that is genuinely this plugin's, and it is the part a reader wants: a Steam app
  * id, an Epic app name, a program path, a launch flag and a bounded setting are all {@code String} or all

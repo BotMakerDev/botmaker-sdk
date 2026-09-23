@@ -15,20 +15,11 @@ import java.util.function.Consumer;
  * The screen overlay, over this machine's monitors — <b>one object for the picks that have no project behind
  * them.</b>
  *
- * <p>This is Studio's {@code ScreenCaptureService}, which arrived here on 2026-08-31 with the overlay itself.
- * The history is worth one paragraph, because three separate things were once this class. It began as 1,324
- * lines in which resolving <em>which pixels</em> and deciding <em>what the user does with them</em> were one
- * flow; the split made the first half a {@code TargetCapture} and the second a {@link ScreenOverlay}, with a
- * {@link ScreenShot} between them. The target half moved here first, because a window to look at is what a
- * bot's own {@code CaptureSource} names. Then the overlay followed, on the maintainer's ruling that
- * <i>the overlay and the desktop grab do not belong to Studio either</i> — which is right for the same reason
- * the pilot was: putting a full-screen surface over a running game and asking the user to point at something
- * in it is entirely about what a bot sees, and the editor's part in it was only ever that the editor happened
- * to be written first.
- *
- * <p>So {@code Capture} and {@code StudioServices.capture()} left the plugin contract in the same step. A
- * plugin draws its own overlay, over pixels it grabbed itself through {@code botmaker-shared}, which is
- * published. The contract keeps what only a host can answer.
+ * <p>Resolving <em>which pixels</em> is a {@link ShotSource}; deciding <em>what the user does with them</em>
+ * is a {@link ScreenOverlay}, with a {@link ScreenShot} between them. Putting a full-screen surface over a
+ * running game and asking the user to point at something in it is entirely about what a bot sees, so it is
+ * this plugin's: a plugin draws its own overlay, over pixels it grabbed itself through
+ * {@code botmaker-shared}, which is published. The contract keeps what only a host can answer.
  *
  * <p><b>Add nothing here</b> — a new overlay behaviour belongs on {@link ScreenOverlay}, and anything that
  * has to know what a capture target is belongs on {@link EditorFrame}. This class exists so that the callers

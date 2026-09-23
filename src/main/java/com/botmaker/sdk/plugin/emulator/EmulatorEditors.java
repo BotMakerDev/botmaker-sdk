@@ -19,11 +19,8 @@ import java.nio.file.Path;
  * instance (or a paired phone) from a list with its brand, a running dot and, for a running instance, its
  * installed apps.
  *
- * <p><b>This was the last call-site-matched editor the host still owned.</b> Every other one moved on
- * 2026-08-28; this one stayed because the dialog behind it reached Studio's own emulator probe, app cache and
- * phone-pairing dialog. All three came here with it — and the reason they could is the one this whole
- * direction rests on: {@code botmaker-shared} is published, so scanning for emulator instances was never a
- * host privilege, only something the host happened to be written to do first.
+ * <p>The emulator probe, the app cache and the phone-pairing dialog behind it are this plugin's too:
+ * {@code botmaker-shared} is published, so scanning for emulator instances is not a host privilege.
  *
  * <p>Matched by the call rather than by the type, like the launch editors, because nothing about
  * {@code String} says it holds an emulator instance name. So it is absent from the Parameters window by
@@ -63,9 +60,8 @@ public final class EmulatorEditors {
      * <p><b>The two halves are written to two different places, and that is the split, not an
      * inconsistency.</b> What the bot <em>launches</em> is a fact about running this bot on this machine, so
      * it stays a {@code botmaker-project.properties} key. Where the bot <em>looks</em> is a fact about the
-     * bot, so since 2026-09-22 it is the expression {@code Sdk.captureSource()} returns — Java the user can
-     * read, and the only copy of that answer now that {@code capture.json} and {@code capture.source} are
-     * gone.
+     * bot, so it is the expression {@code Sdk.captureSource()} returns — Java the user can read, and the
+     * only copy of that answer.
      */
     private static void pointProjectAtApp(ValueContext ctx, String instanceName, String appPackage) {
         Path resources = ctx.services().resourcesDir();

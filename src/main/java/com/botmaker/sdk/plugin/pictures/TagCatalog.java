@@ -19,7 +19,7 @@ import java.util.TreeSet;
  * field, so a tag cannot be invented by a typo and cannot vanish by accident.
  *
  * <p><b>Two kinds, one of them managed.</b> An {@link Kind#ACTIVITY} tag is not stored anywhere — it is the
- * name of an activity in {@code activities.json}, derived on every read. It appears when the activity is
+ * name of an activity in the bot's flow, derived on every read. It appears when the activity is
  * created and is gone when the activity is, which is exactly the lifecycle a hand-managed copy would fail to
  * keep. It cannot be renamed or deleted here; rename the activity. A {@link Kind#CUSTOM} tag is the user's
  * own, declared in {@link TemplateManifest#customTags()} and edited in one place.
@@ -54,16 +54,14 @@ public record TagCatalog(List<Tag> tags) {
     }
 
     /**
-     * The catalog for a project: one tag per activity (in the order {@code activities.json} lists them, which
-     * is the order the flow editor shows), then the declared custom tags alphabetically.
+     * The catalog for a project: one tag per activity (in the order the flow lists them, which is the order
+     * the flow editor shows), then the declared custom tags alphabetically.
      *
      * <p>A custom tag that collides with an activity name is dropped rather than listed twice — the activity
      * owns the name, and the user's copy would be the one that couldn't be kept in step.
      *
-     * <p>It takes the activity <em>names</em> rather than the parsed activities file, which is what let this
-     * class leave Studio on 2026-08-30: the only thing it ever wanted from an {@code ActivitiesConfig} was
-     * {@code a.name()} in file order, and asking for that directly means the caller may read the file with
-     * whichever reader it already has — {@link Authoring#readModel} here, an editor's own parse there.
+     * <p>It takes the activity <em>names</em>, in flow order, rather than the flow itself, so a caller may
+     * read them whichever way it already does.
      */
     public static TagCatalog of(List<String> activityNames, Collection<String> customTags) {
         Set<String> taken = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);

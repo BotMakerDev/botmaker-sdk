@@ -311,7 +311,7 @@ public final class TemplateEditors {
     static List<Thumbnail> items(StudioServices services) {
         Path resources = resourcesDir(services);
         if (resources == null) return List.of();
-        // The placeholder is made here rather than at project creation (2026-09-01): a project created in an
+        // The placeholder is made here rather than at project creation: a project created in an
         // editor that never loaded this plugin has no use for a picture, and this is the first moment one is
         // asked for. Best-effort — an unwritable folder is a gallery with one fewer cell, not a refusal.
         try {

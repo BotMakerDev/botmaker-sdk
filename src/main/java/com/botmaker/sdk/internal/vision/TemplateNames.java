@@ -62,10 +62,6 @@ public final class TemplateNames {
      * <p>The editor's own template manager puts the files there; this is the half of that agreement every
      * reader needs, so that a picture named {@code ore} resolves to
      * {@code src/main/resources/images/ore.png}.
-     *
-     * <p>It was {@code WireText.IMAGE_PREFIX} until 2026-09-22, and it is here now because this class was
-     * already the file↔constant bijection and {@code WireText} was the stored-text reader, which is
-     * deleted. Nothing about a folder path was ever about wire text.
      */
     public static final String IMAGE_PREFIX = "src/main/resources/images/";
 

@@ -242,11 +242,8 @@ final class BackgroundModeBox {
      * line could not say why the display is the size it is.
      */
     private static SessionBackends.DisplaySize referenceSize(PilotProject project) {
-        // The authored size is gone and it was never there: capture.width / capture.height were read by
-        // ProjectDefaults and capture.json's `reference` by the editor, and NOTHING in any module ever
-        // wrote either, so this branch answered null on every call since it was written (2026-08-31) and
-        // the backend default was always what came back. Both keys and that field are deleted, and the
-        // status line still says which of the two sizes it is because sizeFor carries that.
+        // A project authors no display size, so this is always the backend default; the status line still
+        // says which of the two sizes it is because sizeFor carries that.
         return SessionBackends.sizeFor(0, 0);
     }
 }

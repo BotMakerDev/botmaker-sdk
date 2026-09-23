@@ -87,6 +87,9 @@ runs them. Move each `run()` into a body method and name it in the flow.
 
 ### Fixed
 
+- **The canvas's "managed value" notes and the 📋 Project Setup tooltip name the right place.** The flow's
+  note pointed at "✂ Activity Flow" (the button is 🔀), the capture source's at "Project ▸ Settings" (it is
+  🎯 Capture Source), and the tooltip still listed a reference resolution the checklist no longer has.
 - **The Remote Pilot no longer drops a message for a window title with a newline or tab in it**, nor a
   match whose confidence was never computed. Both produced text the phone could not parse, and it
   discarded the message without a word. A missing confidence is now sent as `0`.

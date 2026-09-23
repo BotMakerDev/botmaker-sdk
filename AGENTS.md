@@ -2,6 +2,14 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+> **Read `CLAUDE.md` first; where the two differ, `CLAUDE.md` is current.** This copy lags it. As of SDK
+> 2.0.0: the package tree is `api` / `internal` / `plugin` (`internal/plugin/X` below means `plugin/X`;
+> capture split into `plugin/screen` and `plugin/source`, templates into `plugin/pictures`,
+> `internal/authoring` into `plugin/types`); `Activity`, `Activities.define`, `FlowGraph`, `api.meta`,
+> `CaptureExpr` and the macro recorder are deleted; `api.*` never deletes from 2.0.0 on (japicmp baseline
+> `v2.0.0`); the palette is scanned from `@Palette`; recording is the host's and the SDK annotates with
+> `@Records`; no class under `plugin/` reads or writes Java text.
+
 The **BotMaker SDK** is the runtime library that user bots compile against. The sibling
 **botmaker-studio** app (`../botmaker-studio`) generates user projects that depend on this SDK and
 call its public `com.botmaker.sdk.api.*` facades. The SDK itself depends on **botmaker-shared**

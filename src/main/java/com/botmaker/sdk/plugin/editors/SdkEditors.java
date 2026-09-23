@@ -36,20 +36,15 @@ public final class SdkEditors {
             SlotEditor.of(CallSites.LAUNCH_PROGRAM, LaunchEditors::program),
             SlotEditor.of(CallSites.LAUNCH_OPTION, LaunchEditors::option),
             SlotEditor.of(CallSites.BOT_SETTING, SettingsEditors::setting),
-            // The emulator instance name, and the last call-site editor the host still owned. It stayed
-            // behind on 2026-08-28 because the dialog under it reached Studio's emulator probe, app cache and
-            // phone-pairing dialog; all three came here on 2026-08-31, since none of them ever needed the
-            // host — botmaker-shared is published, and scanning for emulators was only ever something the
-            // editor happened to be written to do first.
+            // The emulator instance name, scanned through botmaker-shared.
             SlotEditor.of(CallSites.EMULATOR_NAME, EmulatorEditors::instanceName),
             // The two names that tie a bot's code to its Activity Flow canvas. Both are a String and both
             // name something drawn elsewhere, so nothing but the call could choose these.
             SlotEditor.of(CallSites.ACTIVITY_NAME, ActivityEditors::activityName),
             SlotEditor.of(CallSites.OUTCOME_NAME, ActivityEditors::outcomeName),
 
-            // Rect, Point, Size, Precision and a single ImageTemplate stood here until 2026-09-23. They are
-            // this plugin's own types, so their editors are PluginType.editor in SdkTypes and the host draws
-            // them from there; listing them here as well made this plugin claim each type twice.
+            // Rect, Point, Size, Precision and a single ImageTemplate are not here: they are this plugin's
+            // own types, so their editors are PluginType.editor in SdkTypes.
 
             // Several named pictures, and it comes ahead of SdkTypes' single-picture editor because it claims
             // a subset of what that one would: an ImageTemplate argument that the host says is one of a run.

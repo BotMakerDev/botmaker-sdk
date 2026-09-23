@@ -93,9 +93,8 @@ public final class EmulatorPicker {
      *
      * <p>A static is safe here for one reason and it is worth stating rather than assuming: this dialog is
      * {@code APPLICATION_MODAL}, so there is never a second showing to overwrite it — the same property that
-     * lets {@code windowOf(dialog)} stand in for an owner everywhere. It was {@code ThemedWindows}, a Studio
-     * singleton, until this class moved out of the editor on 2026-08-31; a plugin has no singleton to reach,
-     * only the services it was handed.
+     * lets {@code windowOf(dialog)} stand in for an owner everywhere. A plugin has no host singleton to
+     * reach, only the services it was handed.
      */
     private static StudioServices host;
 

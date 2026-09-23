@@ -35,8 +35,8 @@ import java.util.Deque;
  * <p><b>Output contract (unchanged):</b> {@link #extract} returns a {@code TYPE_INT_ARGB} crop whose alpha
  * channel is the object mask. That alpha is what a running bot later turns into an OpenCV
  * {@code matchTemplate} mask, so the shape of what this class emits is load-bearing for runtime matching —
- * see {@code OpencvManager.extractAlphaMask}, which since this class moved out of Studio on 2026-08-30 is
- * in the same module, and is the reason it could: both ends of that alpha channel are the SDK's own.
+ * see {@code OpencvManager.extractAlphaMask}, in this same module: both ends of that alpha channel are the
+ * SDK's own.
  * Unlike the previous flood-fill implementation, the boundary alpha
  * is <em>feathered</em> rather than forced opaque: a hard rim would bake background-blended pixels into the
  * template and guarantee a mismatch exactly where correlation matters most.

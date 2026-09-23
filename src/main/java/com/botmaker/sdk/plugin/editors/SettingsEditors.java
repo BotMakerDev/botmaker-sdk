@@ -15,9 +15,9 @@ import javafx.scene.Node;
  * neither, and accepts {@code 80} for a confidence — a value the SDK will clamp and the author will never
  * find out about.
  *
- * <p><b>This file is now the table and nothing else.</b> The pill, the dialog, the spinner-or-slider
- * division, the clamping and the label all moved to {@link Editors#boundedPill} and {@link Editors#flag} on
- * 2026-08-28, because none of them knows what a confidence is — they know what a bounded number is. What
+ * <p><b>This file is the table and nothing else.</b> The pill, the dialog, the spinner-or-slider
+ * division, the clamping and the label are the toolkit's {@link Editors#boundedPill} and {@link Editors#flag},
+ * because none of them knows what a confidence is — they know what a bounded number is. What
  * cannot move is which setters have a range and what each range is: that is the SDK's own knowledge about its
  * own API, and it is exactly the kind of thing the toolkit's purity rule keeps out of the toolkit.
  *

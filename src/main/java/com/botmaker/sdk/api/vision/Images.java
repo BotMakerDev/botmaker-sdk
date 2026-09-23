@@ -21,11 +21,6 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
  * up is the same thing given up everywhere a name became text — {@code Templates.ORE} stopped compiling once
  * the file was renamed, and {@code Images.named("ore")} does not. What is bought is that a project's pictures
  * stop being a compiled artefact of the project at all, so adding one is no longer a source edit.
- *
- * <p><b>It lived on {@code com.botmaker.sdk.api.config.Wire} until 2026-09-09</b> — a class deleted outright
- * on 2026-09-11, so this is now the only place the member exists — as {@code Wire.image}, and
- * moving it is most of why that class looked like it did too much: everything else there read a
- * <em>variable</em>, and this reads a file. A picture is vision's business.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "🖼", order = 96)
 public final class Images {
