@@ -331,23 +331,17 @@ public final class TemplateLibrary {
      * repair pass, and a cache here would be another of them to invalidate.
      */
     public static TagCatalog tagCatalog(Path resourcesDir) {
-        return TagCatalog.of(activityNames(resourcesDir), manifest(resourcesDir).customTags());
+        return TagCatalog.of(activityNames(), manifest(resourcesDir).customTags());
     }
 
     /**
-     * The project's activity names in the order the flow lists them, or none.
+     * The open project's activity names in the order its flow lists them, or none.
      *
-     * <p><b>The argument is ignored, and it is kept deliberately.</b> The names used to come out of
-     * {@code activities.json} beside the templates, so a resources directory was the whole question; they
-     * now come out of the bot's own {@code Sdk.flow()}, which only the host can open, and the open project
-     * is what {@code FlowValue} holds. Every caller here passes the open project's directory anyway, so
-     * dropping the parameter would be a signature churn through six dialogs to say the same thing.
-     *
-     * <p>Degrading rather than throwing is the difference between a tag picklist that is short and one that
-     * will not open. A {@code flow()} nobody can read is a real problem and the flow editor is where the
-     * user meets it; a template's tag menu is not the place to report it.
+     * <p>Read from the flow value the open project holds, never from a file: the flow is the bot's own Java.
+     * Degrading rather than throwing is the difference between a tag picklist that is short and one that
+     * will not open — an unreadable flow is reported by the flow editor, not by a tag menu.
      */
-    private static List<String> activityNames(Path resourcesDir) {
+    private static List<String> activityNames() {
         return com.botmaker.sdk.internal.plugin.flow.FlowValue.current().activities().stream()
                 .map(com.botmaker.sdk.api.flow.Flow.Activity::name)
                 .filter(name -> !name.isBlank())

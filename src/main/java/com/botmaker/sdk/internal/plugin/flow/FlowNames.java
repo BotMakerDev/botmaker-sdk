@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
-import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.sdk.api.flow.Flow;
 
 import java.util.Collection;
 import java.util.List;
@@ -58,18 +58,11 @@ public final class FlowNames {
 
     /**
      * How an outcome is written for the user — a port chip, a tooltip, a dialog row. It is the constant
-     * itself, always: {@link FlowEdgeModel#NEXT_OUTCOME} for the implicit one, its own name for a declared
-     * one.
-     *
-     * <p>The implicit outcome used to read {@code "then"} on a wire and {@code "then (NEXT)"} in the forms,
-     * while the return block's picker showed the bare constant — one outcome with three spellings, so the
-     * user had to work out that the word on the wire and the constant in their Java were the same thing.
-     * There is one name now, and it is the one that appears in the generated source. It is here rather than
-     * on {@link FlowEdgeModel} because it is a sentence for a screen, and that record is read by things with
-     * no screen.
+     * itself, always: {@link Flow.Edge#NEXT} for the implicit one, its own name for a declared one. One
+     * spelling, so the word on a wire and the word in the bot's Java are visibly the same thing.
      */
     public static String outcomeLabel(String outcome) {
-        return outcome == null || outcome.isBlank() ? FlowEdgeModel.NEXT_OUTCOME : outcome;
+        return outcome == null || outcome.isBlank() ? Flow.Edge.NEXT : outcome;
     }
 
     /**
@@ -81,10 +74,10 @@ public final class FlowNames {
         if (!isValidIdentifier(candidate)) {
             return "'" + candidate + "' isn't a valid name — it becomes an enum constant in Java.";
         }
-        if (FlowEdgeModel.NEXT_OUTCOME.equals(candidate)) {
+        if (Flow.Edge.NEXT.equals(candidate)) {
             return "Every activity already has a NEXT outcome — it is always there.";
         }
-        if (FlowEdgeModel.DISABLED_OUTCOME.equals(candidate)) {
+        if (Flow.Edge.DISABLED.equals(candidate)) {
             return "DISABLED is the port for this activity being switched off — it is always there, "
                     + "and an activity can't report it because it didn't run.";
         }

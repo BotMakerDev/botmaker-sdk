@@ -1,6 +1,5 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
-import com.botmaker.sdk.authoring.FlowEdgeModel;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.authoring.SdkFlowValues;
 import javafx.beans.property.BooleanProperty;
@@ -33,7 +32,7 @@ public final class ActivityDraft {
 
     /**
      * The named outcomes this activity can report, excluding the implicit
-     * {@link FlowEdgeModel#NEXT_OUTCOME}. Observable because the card grows one output port per outcome —
+     * {@link Flow.Edge#NEXT}. Observable because the card grows one output port per outcome —
      * adding one in the side panel has to put a port on the card immediately, or there is nothing to drag a
      * wire from.
      */
@@ -107,9 +106,9 @@ public final class ActivityDraft {
      */
     public List<String> allOutcomes() {
         List<String> all = new ArrayList<>(outcomes.size() + 1);
-        all.add(FlowEdgeModel.NEXT_OUTCOME);
+        all.add(Flow.Edge.NEXT);
         for (String o : outcomes) {
-            if (FlowEdgeModel.DISABLED_OUTCOME.equals(o)) continue; // a port, never an Outcome constant
+            if (Flow.Edge.DISABLED.equals(o)) continue; // a port, never an Outcome constant
             if (!all.contains(o)) all.add(o);
         }
         return all;
@@ -117,14 +116,14 @@ public final class ActivityDraft {
 
     /**
      * Every outcome this activity's card has a port for: {@link #allOutcomes()}, then
-     * {@link FlowEdgeModel#DISABLED_OUTCOME} last.
+     * {@link Flow.Edge#DISABLED} last.
      *
      * <p>This is the list the canvas draws ports from <em>and</em> the list it prunes wires against, which is
      * what stops a {@code DISABLED} wire from being deleted the moment it is drawn.
      */
     public List<String> flowPorts() {
         List<String> ports = new ArrayList<>(allOutcomes());
-        ports.add(FlowEdgeModel.DISABLED_OUTCOME);
+        ports.add(Flow.Edge.DISABLED);
         return ports;
     }
 

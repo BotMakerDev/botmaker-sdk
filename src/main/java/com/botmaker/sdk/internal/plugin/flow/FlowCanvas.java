@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
-import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.sdk.api.flow.Flow;
 import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -109,7 +109,7 @@ public final class FlowCanvas extends StackPane {
     private final Rectangle rubberBand = new Rectangle();
 
     private final ObservableList<ActivityDraft> drafts = FXCollections.observableArrayList();
-    private final ObservableList<FlowEdgeModel> edges = FXCollections.observableArrayList();
+    private final ObservableList<Flow.Edge> edges = FXCollections.observableArrayList();
 
     /** Every card by activity name. */
     private final Map<String, NodeCard> cards = new LinkedHashMap<>();
@@ -250,7 +250,7 @@ public final class FlowCanvas extends StackPane {
 
     public ObservableList<ActivityDraft> drafts() { return drafts; }
 
-    public ObservableList<FlowEdgeModel> edges() { return edges; }
+    public ObservableList<Flow.Edge> edges() { return edges; }
 
     /** The single selected activity — null when nothing, or more than one, is selected. */
     public ObjectProperty<ActivityDraft> selectedProperty() { return selected; }
@@ -436,7 +436,7 @@ public final class FlowCanvas extends StackPane {
         for (String name : chain()) {
             boolean continues = false;
             boolean disabledWired = false;
-            for (FlowEdgeModel e : edges) {
+            for (Flow.Edge e : edges) {
                 if (!e.from().equals(name)) continue;
                 if (e.isDisabled()) disabledWired = true;
                 else continues = true;
@@ -652,7 +652,7 @@ public final class FlowCanvas extends StackPane {
     private double barycenter(String name, Map<String, Integer> rowOf) {
         double total = 0;
         int count = 0;
-        for (FlowEdgeModel e : edges) {
+        for (Flow.Edge e : edges) {
             Integer row = e.to().equals(name) ? rowOf.get(e.from()) : null;
             if (row != null) {
                 total += row;
@@ -691,7 +691,7 @@ public final class FlowCanvas extends StackPane {
     /** The wiring with cycles broken: every edge except the ones a depth-first walk finds leading backwards. */
     private Map<String, List<String>> forwardEdges(Set<String> known) {
         Map<String, List<String>> all = new LinkedHashMap<>();
-        for (FlowEdgeModel e : edges) {
+        for (Flow.Edge e : edges) {
             if (known.contains(e.from()) && known.contains(e.to()) && !e.from().equals(e.to())) {
                 all.computeIfAbsent(e.from(), k -> new ArrayList<>()).add(e.to());
             }
@@ -884,7 +884,7 @@ public final class FlowCanvas extends StackPane {
             return;
         }
         history.mutate("wire " + from.name() + " to " + to, () -> {
-            edges.add(new FlowEdgeModel(from.name(), to, outcome));
+            edges.add(new Flow.Edge(from.name(), to, outcome));
             onMessage.accept("");
             refresh();
         });
@@ -892,7 +892,7 @@ public final class FlowCanvas extends StackPane {
 
     private void redrawWires() {
         wires.getChildren().clear();
-        for (FlowEdgeModel e : edges) {
+        for (Flow.Edge e : edges) {
             NodeCard from = cards.get(e.from());
             NodeCard to = cards.get(e.to());
             if (from == null || to == null) continue; // stale wire; save() drops it
@@ -900,7 +900,7 @@ public final class FlowCanvas extends StackPane {
         }
     }
 
-    private Node buildWire(FlowEdgeModel edge, NodeCard from, NodeCard to) {
+    private Node buildWire(Flow.Edge edge, NodeCard from, NodeCard to) {
         Point2D start = from.outPortCenter(edge.outcomeOrNext());
         Point2D end = to.inPortCenter();
         CubicCurve curve = styledCurve();
@@ -959,7 +959,7 @@ public final class FlowCanvas extends StackPane {
         return wire;
     }
 
-    private void removeEdge(FlowEdgeModel edge) {
+    private void removeEdge(Flow.Edge edge) {
         history.mutate("remove the wire from " + edge.from(), () -> {
             edges.remove(edge);
             onMessage.accept("Wire removed: " + edge.from() + " — " + edge.outcomeOrNext() + " → " + edge.to()
@@ -1175,7 +1175,7 @@ public final class FlowCanvas extends StackPane {
                 Circle circle = port("flow-port-out");
                 // A modifier, not a replacement: the base class carries the stroke that punches the dot out
                 // of the card's edge, and DISABLED only recolours the fill.
-                if (FlowEdgeModel.DISABLED_OUTCOME.equals(outcome)) {
+                if (Flow.Edge.DISABLED.equals(outcome)) {
                     circle.getStyleClass().add("flow-port-out-disabled");
                 }
                 installPortHandlers(circle, outcome);
@@ -1215,10 +1215,10 @@ public final class FlowCanvas extends StackPane {
             cards.remove(oldName);
             cards.put(newName, this);
             if (oldName.equals(start)) start = newName;
-            List<FlowEdgeModel> rewired = new ArrayList<>(edges.size());
-            for (FlowEdgeModel e : edges) {
-                rewired.add(e.rewired(e.from().equals(oldName) ? newName : e.from(),
-                        e.to().equals(oldName) ? newName : e.to()));
+            List<Flow.Edge> rewired = new ArrayList<>(edges.size());
+            for (Flow.Edge e : edges) {
+                rewired.add(new Flow.Edge(e.from().equals(oldName) ? newName : e.from(),
+                        e.to().equals(oldName) ? newName : e.to(), e.outcome()));
             }
             edges.setAll(rewired);
             refresh();
@@ -1268,10 +1268,10 @@ public final class FlowCanvas extends StackPane {
 
         /** What one output port promises, in the user's terms rather than the enum's. */
         private String portTooltip(String outcome) {
-            if (FlowEdgeModel.NEXT_OUTCOME.equals(outcome)) {
+            if (Flow.Edge.NEXT.equals(outcome)) {
                 return "Drag to the activity that runs next when there's nothing special to report";
             }
-            if (FlowEdgeModel.DISABLED_OUTCOME.equals(outcome)) {
+            if (Flow.Edge.DISABLED.equals(outcome)) {
                 return "Drag to the activity that runs next when " + draft.name() + " is switched off. "
                         + "Leave it unwired and the run stops there.";
             }

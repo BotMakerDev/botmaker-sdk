@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
 import com.botmaker.plugin.api.Theme;
-import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.sdk.api.flow.Flow;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -35,8 +35,8 @@ import java.util.Optional;
  * <p>Opened from the "Add activity" button and from a double-click on empty canvas; the caller supplies the
  * point the card should land on, so a double-click drops it under the cursor.
  *
- * <p>The two implicit outcomes — {@link FlowEdgeModel#NEXT_OUTCOME} first and
- * {@link FlowEdgeModel#DISABLED_OUTCOME} last, the order their ports appear in — are shown as fixed rows that
+ * <p>The two implicit outcomes — {@link Flow.Edge#NEXT} first and
+ * {@link Flow.Edge#DISABLED} last, the order their ports appear in — are shown as fixed rows that
  * can't be edited or removed. Neither is part of the declared outcome list ({@link ActivityDraft#outcomes()}
  * excludes them and {@link ActivityDraft#flowPorts()} puts them back), so showing either as an ordinary row
  * would lose it on save or duplicate it — but hiding them makes the card grow ports the dialog never
@@ -161,7 +161,7 @@ public final class NewActivityDialog {
     /** The fixed NEXT row, one removable row per declared outcome, then the fixed DISABLED row. */
     private void rebuildOutcomeRows() {
         outcomeRows.getChildren().clear();
-        outcomeRows.getChildren().add(fixedRow(FlowEdgeModel.NEXT_OUTCOME, "always present"));
+        outcomeRows.getChildren().add(fixedRow(Flow.Edge.NEXT, "always present"));
 
         for (String outcome : List.copyOf(outcomes)) {
             Label label = new Label(outcome);
@@ -178,7 +178,7 @@ public final class NewActivityDialog {
         }
 
         outcomeRows.getChildren().add(
-                fixedRow(FlowEdgeModel.DISABLED_OUTCOME, "always present — where to go when it's switched off"));
+                fixedRow(Flow.Edge.DISABLED, "always present — where to go when it's switched off"));
     }
 
     /** A row for an outcome the user neither adds nor removes, in the order its port appears on the card. */

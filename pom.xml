@@ -131,120 +131,36 @@
             <version>${botmaker.session.version}</version>
         </dependency>
 
-        <!-- The Studio plugin contract. This SDK is Studio's plugin #1 — a privileged default plugin, but a
-             plugin: it contributes its own palette catalog and its own value-slot editors through this
-             contract rather than through a back door. See ../docs/refactor/24-plugin-platform.md.
+        <!-- The Studio plugin contract, at `compile`: a bot's own code carries @Param and @Managed, so it
+             needs the contract jar to compile. PluginLoader is parent-first for com.botmaker.plugin.api.**,
+             so a plugin still links the host's copy. Nothing may declare the contract directly beside this
+             SDK in a bot's pom (nearest-wins would pin a version this jar was not built against). -->
 
-             `provided` is what keeps it off a generated bot's classpath. A bot compiles against api.* and
-             never names a plugin type; the classes in this jar that DO implement the contract (under
-             internal.plugin) are simply never linked in a bot's JVM, exactly as an SLF4J binding is never
-             linked by code that only calls the logger. Nothing under com.botmaker.sdk.api may reference a
-             com.botmaker.plugin.api type — that is what makes the absent dependency safe rather than a
-             NoClassDefFoundError waiting for its first caller.
-
-             IT WAS <optional>true</optional> AT compile SCOPE UNTIL 2026-09-02, and the change is not
-             cosmetic even though both are non-transitive and a bot's classpath is identical either way.
-             `botmaker-cli`'s `pom-scopes` check — the gate the plugin registry runs on every submission —
-             refuses a plugin declaring the contract at any scope but `provided`, with the reason in its own
-             message: the host has the contract already, and a second copy makes a contract class two
-             different Class objects, which is precisely what PluginLoader's parent-first arm for
-             com.botmaker.plugin.api.** exists to prevent. Running that validator against this module was
-             the first time anyone had, and it failed on this line.
-
-             The SDK is plugin #1 and a *privileged default* plugin, but a plugin, with no back door — so
-             the one module that must not be exempt from the platform's own gate is this one. `provided`
-             also states the intent where `optional` merely achieves it: drop the `<optional>` flag by
-             accident and the contract silently goes transitive, while a `provided` dependency cannot.
-
-             IT IS `compile` SINCE 2026-09-22, AND THE PARAGRAPH ABOVE IS WHY THAT TOOK AN ARGUMENT.
-
-             @Param and @Managed moved to the contract (com.botmaker.plugin.api.params / .managed). They sit
-             on a BOT's own fields and methods (`@Param static int minHealth` in Parameters.java, `@Managed
-             static Flow flow()` in plugins/sdk/Sdk.java), so a bot needs the contract jar to compile at
-             all. `provided` is not transitive, and plugin-basics (where both annotations lived, and which
-             this module brings at `compile`) declares the contract `provided` too, so a bot would resolve
-             no copy of it and fail on its own @Param line.
-
-             THE THING THE OLD SCOPE PROTECTED IS UNAFFECTED, and it is worth being precise about why,
-             because `two Class objects for one contract class` is a real failure and not a theoretical one.
-             PluginLoader is PARENT-FIRST for com.botmaker.plugin.api.**: whatever copy is on the project's
-             classpath, a plugin links against the HOST's. One Class on both sides, unchanged. What a second
-             copy on a bot's classpath is for is the bot's own compilation, where there is no host at all.
-
-             THE RESIDUAL RISK IS MEDIATION, not scope: nothing may declare botmaker-studio-api directly
-             beside a plugin that brings it, or nearest-wins pins the bot to a contract version its plugin
-             was never built against. Same landmine as TOOLKIT_FALLBACK_VERSION and the gamebot's toolkit
-             pin (2026-09-21), and the same rule answers it: whoever puts a plugin on a classpath supplies
-             what it needs, once.
-
-             `botmaker-cli`'s `pom-scopes` STILL REFUSES a `compile` contract, so `botmaker plugin validate`
-             refuses this module until that check is relaxed to accept one. That is owed and is phase 6 of
-             this change; the reactor is unaffected, since nothing in it runs the validator against the SDK.
-             The check's own reasoning (a second contract copy makes two Class objects) is answered by
-             the parent-first paragraph above, which was already true when the check was written. -->
         <dependency>
             <groupId>com.github.LiQiyeDev</groupId>
             <artifactId>botmaker-studio-api</artifactId>
             <version>${botmaker.studioapi.version}</version>
         </dependency>
 
-        <!-- The plugin widget toolkit: what internal.plugin.editors is built from, and the superclass of
-             SdkPlugin itself (AbstractStudioPlugin).
-
-             NOT <optional>true</optional>, and it was until 2026-09-04. `optional` means NOT TRANSITIVE,
-             not "not present" — so anything that resolves botmaker-sdk as a dependency got this jar's
-             plugin half without the classes it extends. Studio loads every plugin off the open project's
-             own resolved classpath, so a bot that adds the SDK through Project ▸ Manage Plugins hit
-             NoClassDefFoundError while ServiceLoader was constructing SdkPlugin, PluginHost.discover
-             caught it — correctly; a classpath with no plugin on it is an ordinary state — and the user
-             got one line on stderr and an empty palette. That is the same failure Studio itself hit on
-             2026-08-28 while it still bundled the SDK; it was fixed there by giving Studio the toolkit,
-             and it escaped into user projects when Studio stopped bundling a plugin at all.
-
-             The toolkit cannot come from the host: PluginLoader is parent-first only for
-             com.botmaker.plugin.api.** and the platform namespaces, and CHILD-FIRST for the toolkit,
-             deliberately, so two plugins may hold two versions of it. A plugin must therefore bring its
-             own — which is what botmaker-plugin-archetype generates and what botmaker-cli's `pom-scopes`
-             check enforces by refusing a `provided` toolkit. This module is a plugin. It brings its own.
-
-             The cost, stated rather than hidden: a headless bot that uses no editor now resolves 106 KB
-             it never links. The toolkit has no dependencies of its own and its javafx is `provided`, so
-             nothing follows it onto a bot's classpath — which is why this is the cheap side of the trade
-             and an unloadable plugin is the expensive one.
-
-             JavaFX below stays optional, and the difference is exactly the loader: javafx.* IS
-             parent-first, so the host supplies it and a plugin that declared it would be handed the
-             host's classes anyway. A generated bot must not drag it in — it is a headless program, and on
-             a machine with no JavaFX distribution for its platform the resolve fails outright. -->
+        <!-- The plugin toolkit, at plain `compile` and never `optional`: PluginLoader is child-first for it,
+             so a plugin brings its own, and `optional` (not transitive) would leave SdkPlugin unloadable in a
+             project that adds the SDK. It has no dependencies, so a bot pays only its own jar. -->
         <dependency>
             <groupId>com.github.LiQiyeDev</groupId>
             <artifactId>botmaker-plugin-toolkit</artifactId>
             <version>${botmaker.plugintoolkit.version}</version>
         </dependency>
 
-        <!-- PLUGIN #2, and the first time this project has one plugin depending on another (2026-09-09).
-             It owns the nine JDK value types — TEXT, YES_NO, WHOLE_NUMBER, DECIMAL_NUMBER, CHARACTER,
-             COLOR, DATE, TIME_OF_DAY, DURATION — and this module's WireText delegates their parsing to it,
-             so there is one grammar rather than two.
-
-             `compile`, and never `optional`: com.botmaker.sdk.authoring.WireText is the SDK's LIBRARY half,
-             reached by a running bot, so plugin-basics travels onto a bot's classpath exactly as the
-             toolkit does. Only its bot-safe half is named from here — JdkText, which imports nothing but
-             the JDK. BasicsValueTypes names the contract and is reached only by an editor.
-
-             What makes this resolvable at all is PluginLoader: one URLClassLoader over the whole resolved
-             project classpath, so plugin A sees plugin B's classes and Maven has already mediated B to one
-             version. The price is that plugin-basics stops being freely breakable — it owes never-delete
-             the way com.botmaker.sdk.api does — and the trap is Maven's NEAREST-WINS mediation: nothing may
-             declare botmaker-plugin-basics directly in a bot's pom beside this SDK, or the direct entry
-             wins and the bot runs a version this jar was never built against. That is the landmine
-             MavenService.TOOLKIT_FALLBACK_VERSION was. -->
+        <!-- Plugin #2 (the JDK value types, Settings, PluginData), at `compile`: an ordinary plugin-to-plugin
+             dependency. Nothing may declare it directly beside this SDK in a bot's pom (nearest-wins). -->
         <dependency>
             <groupId>com.github.LiQiyeDev</groupId>
             <artifactId>botmaker-plugin-basics</artifactId>
             <version>${botmaker.pluginbasics.version}</version>
         </dependency>
 
+        <!-- JavaFX, Javalin and ZXing are `optional`: only the plugin half (Studio-side) links them, and a
+             headless bot must resolve none of them. javafx.* is parent-first, so the host supplies it. -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
@@ -258,10 +174,7 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Javalin: embedded Jetty serving the Remote Pilot's static client, its HTTP routes and its
-             WebSocket on one port (internal/plugin/pilot/PilotServer). Optional, alongside JavaFX and the
-             toolkit and for the same reason: the pilot is a plugin feature with a window, so a headless bot
-             resolves none of it. Arrived here with the pilot itself in 2026-08-30. -->
+        <!-- Javalin: the Remote Pilot's server (static client, routes, WebSocket). -->
         <dependency>
             <groupId>io.javalin</groupId>
             <artifactId>javalin</artifactId>
@@ -269,9 +182,7 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- ZXing core: the pilot's pairing URL and APK-download URL as QR codes. Pure Java, core only —
-             the BitMatrix is written straight into a JavaFX WritableImage, so no zxing-javase, no
-             javafx-swing and no AWT image path. Optional, like Javalin above. -->
+        <!-- ZXing core: the pilot's pairing QR codes, drawn straight into a JavaFX WritableImage. -->
         <dependency>
             <groupId>com.google.zxing</groupId>
             <artifactId>core</artifactId>
@@ -286,11 +197,8 @@
             <version>4.9.0-0</version>
         </dependency>
 
-        <!-- Tess4J: the JNA wrapper over Tesseract, behind internal.ocr.OcrEngine and the api.vision.Text
-             facade. It bundles the Windows natives; the Linux ones are staged into this jar by <build>
-             below. It lived in botmaker-shared until SDK 1.2.0, where it made every consumer of shared —
-             Studio and botmaker-session included — resolve an OCR engine none of them ever called. Pulls
-             JNA, already present below. See the version-pinning note in <properties>. -->
+        <!-- Tess4J: Tesseract behind internal.ocr and api.vision.Text. Windows natives are bundled; Linux
+             ones are staged by <build>. Pinned together with lept4j/bytedeco — see <properties>. -->
         <dependency>
             <groupId>net.sourceforge.tess4j</groupId>
             <artifactId>tess4j</artifactId>
@@ -316,16 +224,6 @@
             <version>2.17.0</version>
         </dependency>
 
-        <!-- There is deliberately no maven-model here (2026-08-26, a one-day reversal). The SDK does not
-             write a generated bot's pom.xml: the pom is what *names* the SDK, and — the maintainer's
-             framing — the SDK is only the default plugin of the editor. A plugin cannot enumerate its
-             siblings, so a pom it wrote would silently omit every other plugin's dependency. The editor
-             composes it; see Authoring.createProject's `callerFiles`. -->
-
-        <!-- The Android-emulator transport (dadb) lives in botmaker-shared now, so it arrives transitively
-             via the shared dependency above — the SDK's api.emulator facade compiles against
-             com.botmaker.shared.emulator.{AdbDevice, Platforms, EmulatorInstance}. -->
-
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -346,12 +244,8 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- ClassGraph, TEST SCOPE ONLY — it must never reach a bot's classpath; this is a library a bot
-             compiles against, not an application. It exists here for ApiPointersTest, which reads the
-             @ReplacedBy / @Replaces pointers straight out of this build's own target/classes and refuses a
-             link that is incomplete. Same version Studio pins, deliberately: Studio reads the very same
-             annotations out of a resolved SDK jar at upgrade time, so the gate and the consumer agree on
-             how a CLASS-retention annotation is parsed rather than agreeing by coincidence. -->
+        <!-- ClassGraph, test only: ApiPointersTest reads @ReplacedBy out of target/classes. Same version as
+             Studio, which reads the same annotations out of a resolved SDK jar. -->
         <dependency>
             <groupId>io.github.classgraph</groupId>
             <artifactId>classgraph</artifactId>

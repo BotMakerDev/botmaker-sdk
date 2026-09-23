@@ -3,7 +3,6 @@ package com.botmaker.sdk.internal.plugin.flow;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.authoring.FlowEdgeModel;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
@@ -205,7 +204,7 @@ public final class ActivityFlowDialog {
         // With the sidecar gitignored this is now the ordinary state of a fresh clone, rather than the state
         // of a flow nobody has opened — which is exactly why auto-arrange has to be good enough to land on.
         arrangeOnOpen = !anyPlaced && !flow.activities().isEmpty();
-        canvas.edges().setAll(edgesOf(flow));
+        canvas.edges().setAll(flow.edges());
         canvas.setStart(flow.start());
         maxSteps = flow.limits().maxSteps();
         stepDelayMs = flow.limits().stepDelayMs();
@@ -245,13 +244,6 @@ public final class ActivityFlowDialog {
     private void readOnly(String reason) {
         readOnlyReason = reason;
         error(reason);
-    }
-
-    /** The flow's wires as the canvas holds them. */
-    private static List<FlowEdgeModel> edgesOf(Flow flow) {
-        List<FlowEdgeModel> edges = new ArrayList<>(flow.edges().size());
-        for (Flow.Edge e : flow.edges()) edges.add(new FlowEdgeModel(e.from(), e.to(), e.outcome()));
-        return edges;
     }
 
     // --- top bar: presets + add activity ---
@@ -578,10 +570,10 @@ public final class ActivityFlowDialog {
         if (at < 0) return;
         draft.outcomes().set(at, candidate);
         field.setText(candidate);
-        List<FlowEdgeModel> rewired = new ArrayList<>(canvas.edges().size());
-        for (FlowEdgeModel e : canvas.edges()) {
+        List<Flow.Edge> rewired = new ArrayList<>(canvas.edges().size());
+        for (Flow.Edge e : canvas.edges()) {
             boolean mine = e.from().equals(draft.name()) && e.outcomeOrNext().equals(oldName);
-            rewired.add(mine ? e.withOutcome(candidate) : e);
+            rewired.add(mine ? new Flow.Edge(e.from(), e.to(), candidate) : e);
         }
         canvas.edges().setAll(rewired);
         error("");
@@ -845,9 +837,7 @@ public final class ActivityFlowDialog {
     private Flow currentFlow() {
         List<Flow.Activity> activities = new ArrayList<>();
         for (ActivityDraft d : canvas.drafts()) activities.add(d.toActivity());
-        List<Flow.Edge> edges = new ArrayList<>(canvas.edges().size());
-        for (FlowEdgeModel e : canvas.edges()) edges.add(new Flow.Edge(e.from(), e.to(), e.outcome()));
-        return Flow.of(activities, edges, List.copyOf(presets), canvas.start(),
+        return Flow.of(activities, List.copyOf(canvas.edges()), List.copyOf(presets), canvas.start(),
                 Flow.limits(maxSteps, stepDelayMs));
     }
 
@@ -978,17 +968,17 @@ public final class ActivityFlowDialog {
             // validating it would report a clash as clean and leave the user with an outcome that silently
             // has no port.
             Set<String> outcomeNames = new HashSet<>();
-            outcomeNames.add(FlowEdgeModel.NEXT_OUTCOME);
-            outcomeNames.add(FlowEdgeModel.DISABLED_OUTCOME);
+            outcomeNames.add(Flow.Edge.NEXT);
+            outcomeNames.add(Flow.Edge.DISABLED);
             for (String outcome : a.outcomes()) {
                 if (!FlowNames.isValidIdentifier(outcome)) {
                     return "Invalid outcome in " + a.name() + ": '" + outcome + "'.";
                 }
                 if (!outcomeNames.add(outcome)) {
-                    if (FlowEdgeModel.NEXT_OUTCOME.equals(outcome)) {
+                    if (Flow.Edge.NEXT.equals(outcome)) {
                         return a.name() + " already has a NEXT outcome — every activity does.";
                     }
-                    if (FlowEdgeModel.DISABLED_OUTCOME.equals(outcome)) {
+                    if (Flow.Edge.DISABLED.equals(outcome)) {
                         return a.name() + " can't declare a DISABLED outcome — that port is always there, "
                                 + "and an activity can't report it because it didn't run.";
                     }

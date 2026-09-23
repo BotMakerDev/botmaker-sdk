@@ -8,6 +8,33 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — SDK 2.0.0 cleanup, phase 2: dead code and duplicates
+
+Plan: `~/.claude/plans/analyze-current-botmaker-sdk-i-rippling-taco.md` (nine phases: package tree,
+dead code, discovered catalog, the 2.0.0 break, the recorder as a host feature, no Java parsing in the
+plugin, the pilot, the package move, the javadoc sweep). The tree is `../docs/refactor/34-plugin-package-tree.md`.
+
+**Done**
+
+- **`authoring/FlowEdgeModel` is deleted.** It was a second record for `Flow.Edge`, converted in both
+  directions by the flow dialog. The canvas, `FlowRules`, `FlowSnapshot` and the dialogs hold `Flow.Edge`,
+  which gained `NEXT`, `DISABLED`, `outcomeOrNext()` and `isDisabled()` (additive; japicmp green).
+  `FlowGraph` stops naming an `authoring` class from `api`, and loses a comment calling it a contract type.
+- **`capture/TargetThumbnail` is deleted** (no reference anywhere), and an empty untracked
+  `src/test/java/…/api/launch/botmaker-shared/` tree with it.
+- **`TemplateLibrary.activityNames` takes no argument.** It ignored the one it had.
+- **The dependency comments in `pom.xml` state the current rule in one or two lines each.** The removed
+  paragraphs were history (and one named the deleted `WireText`); the history is here and in the umbrella's
+  `31-umbrella-history.md`.
+
+**Deferred / next**
+
+- **`LiteralWriter` stays until phase 6.** Its one live use is `unquote` inside `TemplateEditors.pathOf`,
+  which reads `new ImageTemplate("…")` as text — the parsing phase 6 deletes. The toolkit has `Source.string`
+  but no inverse, so swapping callers now would only move the parser.
+
+---
+
 ## 2026-09-22 (last) — the plugin's parameter half is deleted: `@Param` is the only source of a row
 
 **Done**

@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.plugin.flow;
 
-import com.botmaker.sdk.authoring.FlowEdgeModel;
+import com.botmaker.sdk.api.flow.Flow;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -37,9 +37,9 @@ public final class FlowRules {
      * Why {@code from —outcome→ to} may not be wired, or {@code null} when it is allowed. The message is
      * written for the user and shown inline on the canvas.
      */
-    public static String rejectionFor(List<FlowEdgeModel> edges, String from, String outcome, String to) {
-        String label = outcome == null || outcome.isBlank() ? FlowEdgeModel.NEXT_OUTCOME : outcome;
-        for (FlowEdgeModel e : edges) {
+    public static String rejectionFor(List<Flow.Edge> edges, String from, String outcome, String to) {
+        String label = outcome == null || outcome.isBlank() ? Flow.Edge.NEXT : outcome;
+        for (Flow.Edge e : edges) {
             if (e.from().equals(from) && e.outcomeOrNext().equals(label)) {
                 return from + " already goes somewhere when it reports " + label
                         + " — remove that wire first, or use a different outcome.";
@@ -53,7 +53,7 @@ public final class FlowRules {
      * all nothing is wired yet, so nothing is an orphan — a flow with no wires runs its activities in the
      * order they are listed.
      */
-    public static List<String> orphans(List<String> placed, List<FlowEdgeModel> edges, String start) {
+    public static List<String> orphans(List<String> placed, List<Flow.Edge> edges, String start) {
         if (edges.isEmpty()) return List.of();
         Set<String> live = new HashSet<>(reachable(placed, edges, start));
         List<String> out = new ArrayList<>();
@@ -73,13 +73,13 @@ public final class FlowRules {
      * about it. There is no generator, and there is no {@code FlowModel}: the flow is a value in the bot's
      * own Java. What is left is one canvas asking one question about its own wires.
      */
-    public static List<String> reachable(List<String> placed, List<FlowEdgeModel> edges, String start) {
+    public static List<String> reachable(List<String> placed, List<Flow.Edge> edges, String start) {
         String from = placed.contains(start) ? start : (placed.isEmpty() ? "" : placed.getFirst());
         Set<String> known = new HashSet<>(placed);
         if (!known.contains(from)) return List.of();
 
         Map<String, List<String>> successors = new LinkedHashMap<>();
-        for (FlowEdgeModel edge : edges) {
+        for (Flow.Edge edge : edges) {
             // A wire naming something that is not placed is stale — a card that has been deleted — and is
             // dropped rather than making a node of a name nothing draws.
             if (!known.contains(edge.from()) || !known.contains(edge.to())) continue;

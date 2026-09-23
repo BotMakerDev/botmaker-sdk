@@ -181,10 +181,33 @@ public record Flow(List<Activity> activities, List<Edge> edges, List<Preset> pre
      */
     public record Edge(String from, String to, String outcome) {
 
+        /**
+         * The outcome every activity has without declaring it: "nothing special to report, carry on". An edge
+         * stores it <b>blank</b>, never as this word, so renaming the word would cost no project anything.
+         */
+        public static final String NEXT = "NEXT";
+
+        /**
+         * The other outcome every activity has without declaring it: "this activity is switched off, go here
+         * instead". An activity can never <em>report</em> it — it did not run — so the walk reads it as the
+         * node's one disabled slot rather than as a route. An unwired {@code DISABLED} ends the run.
+         */
+        public static final String DISABLED = "DISABLED";
+
         public Edge {
             from = from == null ? "" : from;
             to = to == null ? "" : to;
             outcome = outcome == null ? "" : outcome;
+        }
+
+        /** The outcome this edge routes, with blank read as {@link #NEXT}. */
+        public String outcomeOrNext() {
+            return outcome.isBlank() ? NEXT : outcome;
+        }
+
+        /** Whether this is the "switched off, go here instead" edge. */
+        public boolean isDisabled() {
+            return DISABLED.equals(outcome);
         }
     }
 
