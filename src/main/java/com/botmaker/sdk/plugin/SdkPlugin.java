@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.record.RecordedValue;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.toolbar.ActionContext;
@@ -11,6 +12,7 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.authoring.PictureAt;
 import com.botmaker.sdk.internal.authoring.SdkFlowValues;
 import com.botmaker.sdk.internal.authoring.SdkTypes;
 import com.botmaker.sdk.internal.plugin.capture.CaptureExpr;
@@ -22,7 +24,6 @@ import com.botmaker.sdk.internal.plugin.editors.SdkEditors;
 import com.botmaker.sdk.internal.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.internal.plugin.flow.FlowValue;
 import com.botmaker.sdk.internal.plugin.pilot.RemotePilotUi;
-import com.botmaker.sdk.internal.plugin.record.MacroRecorderDialog;
 import com.botmaker.sdk.internal.plugin.setup.ProjectSetup;
 import com.botmaker.sdk.internal.plugin.templates.ResourceManagerDialog;
 import javafx.scene.paint.Color;
@@ -281,10 +282,6 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                         "Draw regions over the game and save them as pictures the bot can look for — "
                                 + "one at a time, several in a pass, or an object cut out of its background",
                         ToolbarGroup.TOOLS, 20, this::openCaptureTemplates),
-                ToolbarItem.of("record-macro", "⏺ Record Macro",
-                        "Watch what you click and type in the game, and write it back out as the Java "
-                                + "that would have done the same thing",
-                        ToolbarGroup.TOOLS, 25, this::openMacroRecorder),
                 ToolbarItem.of("manage-templates", "🖼 Manage Pictures",
                         "Rename, retag, replace, delete, import and export the pictures the bot looks for — "
                                 + "a rename carries every block that uses it",
@@ -307,10 +304,17 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                 ToolbarItem.of("picture-here", "✂ Picture of this",
                         "Cut a picture out of the window the overlay is drawn over, whatever the project's "
                                 + "capture target is",
-                        ToolbarGroup.OVERLAY, 20, this::capturePictureHere),
-                ToolbarItem.of("record-here", "⏺ Record at cursor",
-                        "Record clicks and keys, and place them at the overlay's insertion cursor",
-                        ToolbarGroup.OVERLAY, 30, this::recordAtCursor));
+                        ToolbarGroup.OVERLAY, 20, this::capturePictureHere));
+    }
+
+    /**
+     * The one parameter type of this plugin's {@code @Records} methods the host cannot fill: the picture under
+     * a recorded click. Everything else a recording writes — coordinates, keys, text, durations, the capture
+     * source — the host fills by type.
+     */
+    @Override
+    public List<RecordedValue<?>> recordedValues() {
+        return List.of(new PictureAt());
     }
 
     /**
@@ -358,18 +362,6 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * Records clicks and keys, and places the translated statements at the overlay's cursor.
-     *
-     * <p>This is the capability the recorder lost when it became a plugin: it hands back source the user has
-     * to paste, because there was no way to say "insert these statements here". {@code insertAtCursor} is
-     * that way, and the recorder is one consumer of it rather than the reason it exists.
-     */
-    private void recordAtCursor(ActionContext context) {
-        StudioServices services = context.services();
-        MacroRecorderDialog.open(services, services.dialogs().ownerWindow().orElse(null), context::insertAtCursor);
-    }
-
-    /**
      * Opens the capture tool over the project's target.
      *
      * <p>The tag is not pre-filled, and that is the one thing this lost on the way out of the host. Studio's
@@ -383,31 +375,6 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         CaptureTemplates.open(services, services.dialogs().ownerWindow().orElse(null), null);
     }
 
-    /**
-     * Opens the picture library.
-     *
-     * <p>It sits beside Capture Templates at order 30, because the two are the same subject from either end:
-     * that one makes pictures, this one manages the ones that exist. It was Studio's <i>Resource Manager</i>
-     * until 2026-09-01, and the reason it stayed there so much longer than the rest of the picture stack is
-     * worth remembering: its rename and delete guards rewrite the user's own Java, which is host work no
-     * plugin can do. What unblocked it was {@link com.botmaker.plugin.api.Sources} — the host keeps the
-     * rewrite, this module keeps knowing that {@code ore.png} is spelled {@code Templates.ORE}.
-     *
-     * <p>Single-instance is not enforced, unlike the pilot: this window owns no port and no display, so a
-     * second one is a second view of the same folder rather than a conflict.
-     */
-    /**
-     * Opens the macro recorder.
-     *
-     * <p>It sits between the two picture tools at order 25 because it is the third way to get a bot to do
-     * something without typing it: cut a picture, manage the pictures, or record the clicks themselves.
-     *
-     * <p>It was <i>Record Macro</i> on Studio's toolbar until 2026-09-02, and it recorded straight into the
-     * program-shape overlay's cursor. Losing that insertion point is the price of the move and it is a real
-     * one — see {@link MacroRecorderDialog} for why it was paid rather than bought off with a contract
-     * surface. What the editor was holding to make it work was five SDK class literals deciding that a click
-     * is a {@code Mouse}, which is this plugin's sentence to write.
-     */
     /**
      * Opens the flow editor.
      *
@@ -427,11 +394,11 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         new ActivityFlowDialog(services, services.dialogs().ownerWindow().orElse(null)).show();
     }
 
-    private void openMacroRecorder(ActionContext context) {
-        StudioServices services = context.services();
-        MacroRecorderDialog.open(services, services.dialogs().ownerWindow().orElse(null));
-    }
-
+    /**
+     * Opens the picture library: the other end of Capture Templates, managing the pictures that exist. Its
+     * rename and delete guards rewrite the user's Java through {@link com.botmaker.plugin.api.Sources}. Not
+     * single-instance: it owns no port and no display.
+     */
     private void openResourceManager(ActionContext context) {
         StudioServices services = context.services();
         ResourceManagerDialog.open(services, services.dialogs().ownerWindow().orElse(null));

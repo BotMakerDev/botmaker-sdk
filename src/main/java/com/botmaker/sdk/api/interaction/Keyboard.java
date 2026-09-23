@@ -1,6 +1,8 @@
 package com.botmaker.sdk.api.interaction;
 
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.record.Gesture;
+import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -61,6 +63,7 @@ public class Keyboard {
     }
 
     /** Press then release a key. */
+    @Records(Gesture.KEY)
     public static void tap(Key key) {
         Debug.log("[Keyboard] tap " + key);
         press(key);
@@ -71,6 +74,7 @@ public class Keyboard {
      * Press a chord: hold every key in order, then release them in reverse order — e.g.
      * {@code Keyboard.combo(Key.CTRL, Key.C)} for copy.
      */
+    @Records(Gesture.COMBO)
     public static void combo(Key... keys) {
         Debug.log("[Keyboard] combo " + java.util.Arrays.toString(keys));
         for (Key key : keys) {
@@ -85,6 +89,7 @@ public class Keyboard {
      * Type a string on the ambient {@link Source}, handling shifting for uppercase / shifted characters. Best
      * effort for non-ASCII input (falls back to the platform's keysym/VK mapping).
      */
+    @Records(Gesture.TYPE)
     public static void type(String text) {
         type(Source.current(), text);
     }

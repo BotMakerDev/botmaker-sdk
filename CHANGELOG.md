@@ -46,6 +46,18 @@ runs them. Move each `run()` into a body method and name it in the flow.
 
 - **`Activities.enable`, `disable`, `setEnabled`**, beside `active`: switching the flow's activities on
   and off by name, which `ctx.disable()` also calls.
+- **`Mouse.doubleClick`, `rightClick`, `middleClick(CaptureSource, x, y)` and
+  `Mouse.drag(CaptureSource, Point, Point, durationMs)`**: the same gestures as the `Point` forms, relative to
+  a capture source's top-left corner, so a recording made over a window replays wherever the window is.
+- **Studio's recorder writes this SDK's calls.** Twelve methods carry `@Records` — `Mouse.click` and the four
+  above, `scrollUp`/`scrollDown`, `Keyboard.type`/`tap`/`combo`, `Wait.time`, `ImageClicker.click(ImageTemplate)`
+  and `ImageWaiter.waitFor(ImageTemplate, int)` — and a click on one of the project's pictures is recognised
+  as that picture.
+
+### Removed
+
+- **⏺ Record Macro and ⏺ Record at cursor.** Recording is Studio's: its overlay HUD records and inserts at the
+  cursor, writing the calls above.
 - **`Flow.Edge.NEXT` and `Flow.Edge.DISABLED`**, the two outcomes every activity has without declaring them,
   plus `Edge.outcomeOrNext()` and `Edge.isDisabled()`. They were the constants of an editor-only record,
   `FlowEdgeModel`, which is gone: the flow editor now holds the same `Flow.Edge` a bot's `Sdk.java` writes.

@@ -2,6 +2,8 @@ package com.botmaker.sdk.api.interaction;
 
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteDefault;
+import com.botmaker.plugin.api.record.Gesture;
+import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.util.Debug;
 
 import java.time.Duration;
@@ -52,6 +54,7 @@ public class Wait {
      *
      * @param duration how long to wait; null, zero or negative returns immediately
      */
+    @Records(Gesture.PAUSE)
     public static void time(Duration duration) {
         if (duration == null) return;
         long ms = duration.toMillis();

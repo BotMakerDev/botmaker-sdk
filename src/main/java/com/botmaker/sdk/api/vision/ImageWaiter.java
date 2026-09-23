@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.record.Gesture;
+import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.util.Debug;
 
 import com.botmaker.sdk.api.bot.BotSettings;
@@ -42,6 +44,7 @@ public class ImageWaiter {
      * @see #waitFor(ImageTemplate, CaptureSource, int)
      * @see #waitFor(ImageTemplate, CaptureSource, int, double)
      */
+    @Records(Gesture.AWAIT)
     public static boolean waitFor(ImageTemplate template, int timeoutSeconds) {
         return waitFor(template, Source.current(), timeoutSeconds, BotSettings.confidence());
     }

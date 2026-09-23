@@ -8,6 +8,29 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — SDK 2.0.0 cleanup, phase 5: the recorder is the host's
+
+**Done**
+
+- `internal/plugin/record/` is deleted (`MacroRecorderDialog`, `MacroTranslator`, `RecordingSession`,
+  `RecordHotkey`, `MacroTranslatorTest`) with the ⏺ Record Macro and ⏺ Record at cursor toolbar items. The
+  translator wrote Java by string concatenation that javac never checked, hard-coded
+  `CaptureSource.window("title")` into every click, and lost its imports on the way to the cursor.
+- **`@Records` on twelve api methods** says which call writes each gesture; Studio records, recognises and
+  writes the call through its grammar. New source-relative `doubleClick`/`rightClick`/`middleClick(CaptureSource,
+  x, y)` and `drag(CaptureSource, Point, Point, long)` give every pointer gesture a writer.
+- **`internal/authoring/PictureAt`** is `recordedValues()`: the project picture whose best match (≥ 0.9) holds
+  the click, matched in the frame Studio grabbed at the press. `ImageClicker.click(ImageTemplate)` ranks 10
+  over `Mouse.click`, so a click on a picture is written as that picture; Studio writes it as the bot's
+  `Pictures` constant when one equals it.
+- `botmaker plugin validate`'s new `records` check passes: 12 method(s).
+- `SdkOverlayItemsTest`/`SdkPluginSurfaceTest` updated for the two removed items. 490 tests.
+
+**Deferred / next**
+
+- A recorded click's capture source is written `com.botmaker.sdk.api.capture.Source.current()` — the fresh
+  source, fully qualified. Phase 6 (`CaptureTypes`) makes the capture source a value type the grammar spells.
+
 ## 2026-09-23 — SDK 2.0.0 cleanup, phase 4: the API break
 
 **Done**
