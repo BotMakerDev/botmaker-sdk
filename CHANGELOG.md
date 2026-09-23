@@ -82,6 +82,9 @@ runs them. Move each `run()` into a body method and name it in the flow.
 
 ### Fixed
 
+- **The Remote Pilot no longer drops a message for a window title with a newline or tab in it**, nor a
+  match whose confidence was never computed. Both produced text the phone could not parse, and it
+  discarded the message without a word. A missing confidence is now sent as `0`.
 - **`Flow.limits(0, …)` means no step limit, as documented.** The walk treated `0` as "stop before the
   first activity".
 - **The palette offers `Activities` and `Flows`.** Both carried `@Palette` but were missing from the

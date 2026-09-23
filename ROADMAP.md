@@ -8,6 +8,29 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-23 — SDK 2.0.0 cleanup, phase 7: the pilot, in place
+
+**Done**
+
+- **`PilotSession` is deleted; `PilotRoutes` is the one class that decides the route.** It takes the live
+  session as a `Supplier<DesktopSession>` and guards it as `PilotSession.get` did (a holder that throws is no
+  session). `PilotRoutes.forProject(project)` wires the project's `BackgroundLauncher` itself, so
+  `PilotServer` holds one route field where it held two. `PilotRoute` stays the sealed answer type.
+  `NestedSessionLauncher` stays: it decides nothing and is the Background-mode box's Start/Stop.
+- **`TelemetrySerializer` writes records through Jackson.** One record per message (`Telemetry`, `State`,
+  `Video`, `VideoStopped`) and one per event kind, with the client's short keys. The wire is unchanged:
+  `wire-golden.json` and its digest are untouched, and every corpus case still passes. Two B18
+  characterisations flipped: a control character in a title is escaped, and a non-finite confidence is sent
+  as `0` (it was the bare token `NaN`). Confidence is still rounded to four places.
+- **`TelemetrySerializer.RunState`** (`RUNNING`/`PAUSED`/`STOPPED`, `id()` is the wire token) replaces the
+  bare string in `PilotServer`.
+- 482 tests (new: a throwing session holder, confidence rounding).
+
+**Deferred / next**
+
+- **The `pilot/ui` split moves to phase 8.** It is a package move, and phase 8 moves the whole package to
+  `plugin/pilot`; splitting now would move each UI file twice.
+
 ## 2026-09-23 — SDK 2.0.0 cleanup, phase 6: this plugin reads and writes no Java
 
 **Done**

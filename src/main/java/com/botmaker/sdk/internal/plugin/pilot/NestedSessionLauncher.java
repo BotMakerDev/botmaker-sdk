@@ -22,7 +22,7 @@ import java.nio.file.Path;
  * nothing. It used to also register a started/stopped listener that pushed the session into {@link PilotServer}
  * — which made the pilot's knowledge of {@code :N} depend on this object existing, and it is created lazily on
  * first use of the Background-mode box, so a game launched from the ▶ Launch toolbar was invisible to the
- * pilot. The server asks {@link BackgroundLauncher} itself now (see {@link PilotSession#forProject}).
+ * pilot. The server asks {@link BackgroundLauncher} itself now (see {@link PilotRoutes#forProject}).
  *
  * <p>A nested session <em>owns the single window it launches</em> (see {@link NestedSession}), so there is no
  * capture <em>target</em> to pick — the launched game is the target.

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.plugin.pilot;
 
+import com.botmaker.sdk.internal.plugin.pilot.TelemetrySerializer.RunState;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -19,12 +20,11 @@ import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The Studio half of the pilot wire contract. {@code types.ts} names every field of every message; this
- * side concatenates strings, and the only thing that has ever claimed the two agree is a javadoc sentence.
+ * side writes records, and without this test the only thing claiming the two agree would be a javadoc sentence.
  *
  * <p>Both halves read the <em>same</em> corpus — {@code pilot-wire/wire-golden.json} here,
  * {@code web/src/wire-golden.json} in the pilot repo — and both assert its SHA-256. Neither test can see
@@ -114,16 +114,16 @@ class TelemetryWireContractTest {
 
     @Test
     void theRunStateMessageCarriesTheStateAndWhetherInputStaysOffTheHostsCursor() {
-        assertWire("state.running.background", TelemetrySerializer.stateJson("running", true));
-        assertWire("state.paused.foreground", TelemetrySerializer.stateJson("paused", false));
-        assertWire("state.stopped.background", TelemetrySerializer.stateJson("stopped", true));
+        assertWire("state.running.background", TelemetrySerializer.stateJson(RunState.RUNNING, true));
+        assertWire("state.paused.foreground", TelemetrySerializer.stateJson(RunState.PAUSED, false));
+        assertWire("state.stopped.background", TelemetrySerializer.stateJson(RunState.STOPPED, true));
     }
 
     @Test
     void aStateMessageCarriesAReasonOnlyWhenThereIsOne() {
         // The key is omitted rather than sent as null when there is no reason — which is why the three cases
         // above and this one are separate corpus entries rather than one shape with a nullable field.
-        assertWire("state.stopped.reason", TelemetrySerializer.stateJson("stopped", true,
+        assertWire("state.stopped.reason", TelemetrySerializer.stateJson(RunState.STOPPED, true,
                 "The background session is not showing any pixels on its X display."));
     }
 
@@ -165,25 +165,33 @@ class TelemetryWireContractTest {
     }
 
     @Test
-    void aTitleWithAControlCharacterProducesJsonTheClientCannotParse() {
-        // B18. jsonStr escapes backslash and quote and stops there, but JSON forbids raw U+0000..U+001F in
-        // a string. A title with a newline in it therefore takes the whole message out — the client's
-        // JSON.parse throws and usePilot's catch drops it silently. Red-by-design would be wrong here:
-        // this is what the code does today, and Phase 4 flips the assertion.
-        TelemetryEvent.Target broken = new TelemetryEvent.Target("Game\nWindow", 0, 0, 10, 10);
-        String json = TelemetrySerializer.telemetryJson(new TelemetryEvent.Click(broken, 1, 2, 1));
-        assertThrows(JsonProcessingException.class, () -> JSON.readTree(json),
-                "a raw control character in a title makes the message unparseable");
+    void aTitleWithAControlCharacterIsEscapedRatherThanBreakingTheMessage() {
+        // B18, fixed by writing through Jackson: the hand-built writer escaped backslash and quote and
+        // stopped there, and JSON forbids raw U+0000..U+001F in a string, so a newline in a title took the
+        // whole message out — the client's JSON.parse threw and usePilot's catch dropped it silently.
+        TelemetryEvent.Target titled = new TelemetryEvent.Target("Game\nWindow", 0, 0, 10, 10);
+        JsonNode event = parse(TelemetrySerializer.telemetryJson(new TelemetryEvent.Click(titled, 1, 2, 1)))
+                .get("event");
+        assertEquals("Game\nWindow", event.get("target").get("title").asText());
     }
 
     @Test
-    void aNonFiniteConfidenceProducesJsonTheClientCannotParse() {
-        // B18 again, other half: %.4f of NaN is the bare token NaN, which is not JSON. A miss whose
-        // confidence never got computed would take its own message down.
-        String json = TelemetrySerializer.telemetryJson(
-                new TelemetryEvent.Match(TARGET, null, null, Double.NaN, false));
-        assertTrue(json.contains("\"confidence\":NaN"), "the raw token is what gets written: " + json);
-        assertThrows(JsonProcessingException.class, () -> JSON.readTree(json));
+    void aNonFiniteConfidenceIsSentAsZero() {
+        // B18's other half: %.4f of NaN was the bare token NaN, which is not JSON. A confidence that never
+        // got computed is a miss's 0, which is a number the client can format.
+        JsonNode event = parse(TelemetrySerializer.telemetryJson(
+                new TelemetryEvent.Match(TARGET, null, null, Double.NaN, false))).get("event");
+        assertEquals(0.0, event.get("confidence").asDouble());
+        assertTrue(event.get("confidence").isNumber());
+    }
+
+    @Test
+    void aConfidenceIsRoundedToFourPlaces() {
+        // What the old %.4f did, kept: the client shows four places, and fifteen digits of a float's
+        // representation error are bytes on every match.
+        JsonNode event = parse(TelemetrySerializer.telemetryJson(
+                new TelemetryEvent.Match(TARGET, null, null, 0.912345678, true))).get("event");
+        assertEquals("0.9123", event.get("confidence").asText());
     }
 
     // --- The corpus itself ---

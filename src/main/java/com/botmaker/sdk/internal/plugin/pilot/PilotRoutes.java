@@ -4,12 +4,12 @@ import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstances;
 import com.botmaker.session.DesktopSession;
+import com.botmaker.session.launch.BackgroundLauncher;
 import com.botmaker.shared.emulator.AdbEmulatorSurface;
 import com.botmaker.shared.emulator.EmulatorSurface;
 import com.botmaker.shared.emulator.ScrcpyEmulatorSurface;
 import com.botmaker.sdk.internal.plugin.capture.CaptureLabels;
 
-import java.nio.file.Path;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -49,13 +49,17 @@ import java.util.function.Supplier;
  * a full {@code Platforms.discoverAll()} scan (registry reads, console-tool calls) and the caller is a frame
  * loop, so doing it per frame would cost more than the frame.
  *
- * <p>Constructed with its two effects injected — where the instance name comes from, and how a surface is
- * opened — so the ordering above can be tested without a project on disk or an emulator on the machine.
- * {@link #forProject} is the production wiring.
+ * <p><b>The session is asked, never pushed.</b> There is exactly one nested session per project
+ * ({@link BackgroundLauncher#forProject}), and it is read on every frame, so a game started from Studio's
+ * ▶ Launch toolbar is found as surely as one started from the pilot's own Background-mode box.
+ *
+ * <p>Constructed with its three effects injected — which session is live, where the instance name comes from,
+ * and how a surface is opened — so the ordering above can be tested without a project on disk or an emulator
+ * on the machine. {@link #forProject} is the production wiring.
  */
 public final class PilotRoutes implements AutoCloseable {
 
-    private final PilotSession session;
+    private final Supplier<DesktopSession> session;
     private final Supplier<String> instanceName;
     private final Function<String, EmulatorSurface> open;
 
@@ -63,7 +67,7 @@ public final class PilotRoutes implements AutoCloseable {
     private EmulatorSurface surface;
     private String openedFor;
 
-    public PilotRoutes(PilotSession session, Supplier<String> instanceName,
+    public PilotRoutes(Supplier<DesktopSession> session, Supplier<String> instanceName,
                        Function<String, EmulatorSurface> open) {
         this.session = session;
         this.instanceName = instanceName;
@@ -71,10 +75,14 @@ public final class PilotRoutes implements AutoCloseable {
     }
 
     /**
-     * The production wiring: the instance name comes from the project's {@code capture.source} and then its
-     * default capture target, and a surface is one ADB connection to the discovered instance of that name.
+     * The production wiring: the session is the one {@link BackgroundLauncher} holds for the project, the
+     * instance name comes from the project's capture source, and a surface is one ADB connection to the
+     * discovered instance of that name. A server stood up without a project (tests) has no session to ask.
      */
-    public static PilotRoutes forProject(PilotSession session, PilotProject project) {
+    public static PilotRoutes forProject(PilotProject project) {
+        Supplier<DesktopSession> session = project == null
+                ? () -> null
+                : BackgroundLauncher.forProject(project.resourcesDir())::session;
         return new PilotRoutes(session,
                 () -> configuredInstanceName(project),
                 PilotRoutes::openAdbSurface);
@@ -82,7 +90,7 @@ public final class PilotRoutes implements AutoCloseable {
 
     /** The route to stream and drive right now. Cheap enough for a frame: a field read plus, at most, a scan. */
     public synchronized PilotRoute current() {
-        DesktopSession live = session != null ? session.get() : null;
+        DesktopSession live = safeSession();
         if (live != null && safeX11Capturable(live)) {
             releaseSurface(); // a nested session outranks the emulator; don't hold ADB open behind it
             return new PilotRoute.Session(live);
@@ -140,6 +148,15 @@ public final class PilotRoutes implements AutoCloseable {
             surface = null;
         }
         openedFor = null;
+    }
+
+    /** A holder that answers badly is no session: the frame loop must not die of it, and the rungs go on. */
+    private DesktopSession safeSession() {
+        try {
+            return session.get();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** The supplier is project I/O; a failing read must degrade to the desktop, not take the frame loop down. */

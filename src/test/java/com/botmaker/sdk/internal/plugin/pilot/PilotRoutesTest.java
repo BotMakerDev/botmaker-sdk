@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -35,20 +36,32 @@ class PilotRoutesTest {
         }
     }
 
-    private static PilotRoutes routes(PilotSession session, String[] name, Opener opener) {
+    private static PilotRoutes routes(Supplier<DesktopSession> session, String[] name, Opener opener) {
         return new PilotRoutes(session, () -> name[0], opener);
     }
 
     /** A holder standing in for the project's {@code BackgroundLauncher}: the pilot asks it on every read. */
     private static final class SessionHolder extends AtomicReference<DesktopSession> {
-        PilotSession asked() {
-            return new PilotSession(this::get);
+        Supplier<DesktopSession> asked() {
+            return this::get;
         }
     }
 
     /** No session live — the common case for the emulator/desktop rungs below. */
-    private static PilotSession noSession() {
+    private static Supplier<DesktopSession> noSession() {
         return new SessionHolder().asked();
+    }
+
+    /** A holder that throws is no session — the rungs below it still decide, and the frame loop lives. */
+    @Test
+    void aSessionHolderThatThrowsIsNoSession() {
+        Opener opener = new Opener();
+        Supplier<DesktopSession> broken = () -> {
+            throw new IllegalStateException("launcher not ready");
+        };
+
+        assertInstanceOf(PilotRoute.Emulator.class, routes(broken, new String[]{"Waydroid"}, opener).current());
+        assertInstanceOf(PilotRoute.Desktop.class, routes(broken, new String[]{null}, opener).current());
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.botmaker.session.video.VideoPacket;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import com.botmaker.plugin.api.Runs;
+import com.botmaker.sdk.internal.plugin.pilot.TelemetrySerializer.RunState;
 import com.botmaker.shared.ipc.TelemetryFrame;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -86,8 +87,6 @@ public final class PilotServer implements AutoCloseable {
     private final Runs runs;
     /** The subscriptions taken on {@link #runs}, closed with the server so a rebound pilot is not fed twice. */
     private final java.util.List<AutoCloseable> subscriptions = new java.util.ArrayList<>();
-    /** Answers which bot-owned {@code :N} session is live — the highest-priority {@link PilotRoute}. */
-    private final PilotSession session;
     /** Decides which surface is streamed and driven ({@code :0} / {@code :N} / an emulator) and owns its connection. */
     private final PilotRoutes routes;
     private final TargetCapture capture;
@@ -149,7 +148,7 @@ public final class PilotServer implements AutoCloseable {
      */
     private volatile PilotRoute lastRoute = PilotRoute.DESKTOP;
     private volatile String token;
-    private volatile String runState = "stopped";
+    private volatile RunState runState = RunState.STOPPED;
     /**
      * How many ticks in a row produced no frame, and whether that has already been said. Both are touched only
      * from the single {@code pilot-frame} thread, so they need no synchronization; {@link #emptyReason} is
@@ -164,8 +163,7 @@ public final class PilotServer implements AutoCloseable {
         this.runs = runs == null ? Runs.NONE : runs;
         // The project's one nested session, read live — whether the host's own Launch button or the pilot's
         // Background-mode box started it. Nobody has to remember to tell this server about it.
-        this.session = PilotSession.forProject(project == null ? null : project.resourcesDir());
-        this.routes = PilotRoutes.forProject(session, project);
+        this.routes = PilotRoutes.forProject(project);
         this.capture = TargetCapture.forProject(project);
         this.control = control;
     }
@@ -247,10 +245,10 @@ public final class PilotServer implements AutoCloseable {
             subscriptions.add(runs.onTelemetry(this::onTelemetryFrame));
             subscriptions.add(runs.onStateChanged(running -> {
                 if (running) {
-                    setRunState("running");
+                    setRunState(RunState.RUNNING);
                 } else {
                     control.onRunStopped();
-                    setRunState("stopped");
+                    setRunState(RunState.STOPPED);
                 }
             }));
         }
@@ -410,8 +408,8 @@ public final class PilotServer implements AutoCloseable {
 
     /** After a pause/resume, reflect it in run-state (only meaningful while a run is active). */
     private void refreshPausedState() {
-        if ("stopped".equals(runState)) return;
-        setRunState(control.isPaused() ? "paused" : "running");
+        if (runState == RunState.STOPPED) return;
+        setRunState(control.isPaused() ? RunState.PAUSED : RunState.RUNNING);
     }
 
     // --- Telemetry + state fan-out (text messages) ---
@@ -438,7 +436,7 @@ public final class PilotServer implements AutoCloseable {
         }
     }
 
-    private void setRunState(String state) {
+    private void setRunState(RunState state) {
         runState = state;
         broadcastText(stateJson());
     }
