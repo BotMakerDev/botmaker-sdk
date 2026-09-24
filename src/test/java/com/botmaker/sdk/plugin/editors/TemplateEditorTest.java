@@ -22,7 +22,7 @@ class TemplateEditorTest {
     @Test
     void aSlotIsNamedByThePictureTheHostRead() {
         assertEquals("gold", TemplateEditors.nameOf(
-                TestContexts.typedSlot("com.botmaker.sdk.api.vision.ImageTemplate", "Pictures.GOLD")
+                TestContexts.typedSlot(ImageTemplate.class, "Pictures.GOLD")
                         .withValue(new ImageTemplate("src/main/resources/images/gold.png"))));
     }
 
@@ -30,8 +30,8 @@ class TemplateEditorTest {
     void somethingTheHostCouldNotReadIsNoPicture() {
         // A variable or a call is a reference the editor cannot represent — and must not overwrite.
         assertEquals("", TemplateEditors.nameOf(
-                TestContexts.typedSlot("com.botmaker.sdk.api.vision.ImageTemplate", "chooseTemplate()")));
-        assertEquals("", TemplateEditors.nameOf(TestContexts.row("IMAGE_TEMPLATE", "")));
+                TestContexts.typedSlot(ImageTemplate.class, "chooseTemplate()")));
+        assertEquals("", TemplateEditors.nameOf(TestContexts.row(null, "")));
     }
 
     @Test
@@ -43,7 +43,7 @@ class TemplateEditorTest {
 
     @Test
     void aGroupSlotListsTheGroupsPictures() {
-        TestContexts.Recording group = TestContexts.typedSlot("com.botmaker.sdk.api.vision.ImageTemplateGroup",
+        TestContexts.Recording group = TestContexts.typedSlot(ImageTemplateGroup.class,
                 "ImageTemplateGroup.of(…)").withValue(ImageTemplateGroup.of(
                 new ImageTemplate("images/gold.png"), new ImageTemplate("images/ore.png")));
 
@@ -55,7 +55,7 @@ class TemplateEditorTest {
     @Test
     void aGroupTheHostCouldNotReadListsNothing() {
         assertTrue(TemplateEditors.elementsOf(TestContexts.typedSlot(
-                "com.botmaker.sdk.api.vision.ImageTemplateGroup", "myGroup()")).isEmpty());
+                ImageTemplateGroup.class, "myGroup()")).isEmpty());
     }
 
     /**
@@ -70,7 +70,7 @@ class TemplateEditorTest {
     @Test
     void writingASlotCarriesTheProjectRelativePath() {
         TestContexts.Recording ctx = TestContexts.typedSlot(
-                "com.botmaker.sdk.api.vision.ImageTemplate", "new ImageTemplate(\"\")");
+                ImageTemplate.class, "new ImageTemplate(\"\")");
         TemplateEditors.commit(ctx, "gold");
 
         assertEquals("src/main/resources/images/gold.png",
@@ -79,7 +79,7 @@ class TemplateEditorTest {
 
     @Test
     void writingAValueWithNoCallSiteCarriesTheSamePath() {
-        TestContexts.Recording ctx = TestContexts.row("com.botmaker.sdk.api.vision.ImageTemplate", "");
+        TestContexts.Recording ctx = TestContexts.row(ImageTemplate.class, "");
         TemplateEditors.commit(ctx, "gold");
         assertEquals("src/main/resources/images/gold.png",
                 ((ImageTemplate) ctx.value()).filePath());

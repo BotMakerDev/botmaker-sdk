@@ -38,12 +38,12 @@ class GeometryLabelTest {
 
     /** A slot holding {@code value}, which is what the host hands an editor once it has decoded one. */
     private static ValueContext holding(Object value) {
-        return TestContexts.typedSlot(value.getClass().getName(), "").withValue(value);
+        return TestContexts.typedSlot(value.getClass(), "").withValue(value);
     }
 
     /** A slot holding an expression nothing decoded — a variable, a call, something hand-written. */
-    private static ValueContext unreadable(String typeName, String source) {
-        return TestContexts.typedSlot(typeName, source);
+    private static ValueContext unreadable(Class<?> type, String source) {
+        return TestContexts.typedSlot(type, source);
     }
 
     // Each label is asked with the declaration the plugin hands its editor.
@@ -103,18 +103,18 @@ class GeometryLabelTest {
     @Test
     void an_expression_the_host_could_not_decode_is_shown_as_the_author_wrote_it() {
         assertEquals("target.center()",
-                pointLabel(unreadable(Point.class.getName(), "target.center()")));
+                pointLabel(unreadable(Point.class,"target.center()")));
         assertEquals("ORIGIN",
-                pointLabel(unreadable(Point.class.getName(), "ORIGIN")));
+                pointLabel(unreadable(Point.class,"ORIGIN")));
         assertEquals("bounds()",
-                rectLabel(unreadable(Rect.class.getName(), "bounds()")));
+                rectLabel(unreadable(Rect.class,"bounds()")));
     }
 
     /** Nothing written yet: the placeholder, which is what a freshly inserted block shows. */
     @Test
     void an_empty_slot_shows_its_placeholder() {
-        assertEquals("Choose point…", pointLabel(unreadable(Point.class.getName(), "")));
-        assertEquals("Choose region…", rectLabel(unreadable(Rect.class.getName(), "")));
-        assertEquals("Choose size…", sizeLabel(unreadable(Size.class.getName(), "")));
+        assertEquals("Choose point…", pointLabel(unreadable(Point.class,"")));
+        assertEquals("Choose region…", rectLabel(unreadable(Rect.class,"")));
+        assertEquals("Choose size…", sizeLabel(unreadable(Size.class,"")));
     }
 }

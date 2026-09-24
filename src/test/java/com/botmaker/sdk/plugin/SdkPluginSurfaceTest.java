@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.launch.Game;
 import com.botmaker.sdk.api.interaction.MouseButton;
 import com.botmaker.sdk.api.vision.ColorMatch;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -236,11 +237,14 @@ class SdkPluginSurfaceTest {
         List<String> failures = new ArrayList<>();
         for (SlotEditor editor : editors) {
             ask(editor, "a value with no call site",
-                    () -> editor.matches(TestContexts.row("TEXT", "")), failures);
+                    () -> editor.matches(TestContexts.row(null, "")), failures);
             ask(editor, "a typed slot",
-                    () -> editor.matches(TestContexts.typedSlot("java.lang.String", "\"\"")), failures);
+                    () -> editor.matches(TestContexts.typedSlot(String.class, "\"\"")), failures);
             ask(editor, "a call site",
-                    () -> editor.matches(TestContexts.slot("Game", "steam", 0, "\"\"")), failures);
+                    () -> editor.matches(TestContexts.slot(
+                            TestContexts.method(Game.class, "launchSteam", String.class), 0, "\"\"")), failures);
+            ask(editor, "an unresolved call",
+                    () -> editor.matches(TestContexts.slot(null, 0, "\"\"")), failures);
         }
         if (!failures.isEmpty()) fail(String.join("\n", failures));
     }

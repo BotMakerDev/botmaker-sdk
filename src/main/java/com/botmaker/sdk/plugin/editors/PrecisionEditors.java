@@ -31,6 +31,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
 
 import java.awt.image.BufferedImage;
+import java.lang.reflect.Executable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -60,7 +61,7 @@ import java.util.function.Consumer;
  * <p><b>Only the knobs the call can use are shown.</b> The SDK collapsed colour and quantity into one type,
  * which means {@code matchesAt} and {@code coverage} are handed an area and a count they cannot act on, and
  * {@code findInRange} a tolerance it has no target colour to measure from. Their javadoc says so; this editor
- * enforces it, reading {@link SlotContext#enclosingMethodName()} so a slot on {@code matchesAt} offers the
+ * enforces it, reading {@link SlotContext#enclosingExecutable()} so a slot on {@code matchesAt} offers the
  * tolerance alone. A knob that cannot change the answer should not be presented as if it could. A Parameters
  * row has no enclosing call at all, so it is offered all three — which is the honest answer there, since the
  * value it holds may be handed to any of them.
@@ -140,7 +141,8 @@ public final class PrecisionEditors {
 
     private static void open(ValueContext ctx, Consumer<String> relabel) {
         Settings current = current(ctx);
-        String methodName = ctx.slot().flatMap(SlotContext::enclosingMethodName).orElse(null);
+        String methodName = ctx.slot().flatMap(SlotContext::enclosingExecutable)
+                .map(Executable::getName).orElse(null);
         Knobs knobs = knobsFor(methodName);
 
         Slider slider = new Slider(0, MAX_DELTA_E, clamp(current.deltaE()));

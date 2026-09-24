@@ -24,6 +24,16 @@ No source changes since v1.1.15; re-released for updated upstream pins.
 This is **2.0.0**, the one release that removes `api.*` elements. From it on, never-delete applies:
 `api.*` only grows.
 
+**Built against studio-api 0.3.0** (`TypeRef` asks by class, a slot's call is an `Executable`), so it needs
+a Studio released with that contract. Nothing under `api.*` changes for it:
+
+- **Call-site editors claim the resolved call, and type editors the class.** The Steam, Epic, launch,
+  setting, emulator, activity and outcome editors match the method Studio resolved, so a namesake `Game` in
+  another package is no longer claimed and `game.launch(…)` on a variable is. A launch flag starts at the
+  overload's own varargs rather than at a per-name table. The `Duration` and `Color` editors match
+  `java.time.Duration` and `java.awt.Color` by class; a bot class called `Duration` is not theirs. Every
+  method name is checked against its class when the editors load (`CallSitesTest`).
+
 ### BREAKING
 
 Every older way of writing an activity or a flow is gone. A bot's flow is the `Flow` value its

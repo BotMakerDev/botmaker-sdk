@@ -64,7 +64,7 @@ class PrecisionEditorTest {
      */
     @Test
     void a_slot_gets_the_three_numbers_themselves() {
-        TestContexts.Recording slot = TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision",
+        TestContexts.Recording slot = TestContexts.typedSlot(Precision.class,
                 "Precision.DEFAULT");
 
         PrecisionEditors.commit(slot, new PrecisionEditors.Settings(5.0, 400, 0));
@@ -82,7 +82,7 @@ class PrecisionEditorTest {
      */
     @Test
     void a_value_with_no_call_site_gets_the_same_three_numbers() {
-        TestContexts.Recording row = TestContexts.row("com.botmaker.sdk.api.vision.Precision", "");
+        TestContexts.Recording row = TestContexts.row(Precision.class, "");
 
         PrecisionEditors.commit(row, new PrecisionEditors.Settings(18.0, 400, 2000));
 
@@ -93,11 +93,11 @@ class PrecisionEditorTest {
     void the_round_trip_holds_wherever_the_value_is() {
         PrecisionEditors.Settings picked = new PrecisionEditors.Settings(5.0, 400, 2000);
 
-        TestContexts.Recording slot = TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision", "");
+        TestContexts.Recording slot = TestContexts.typedSlot(Precision.class, "");
         PrecisionEditors.commit(slot, picked);
         assertEquals(picked, PrecisionEditors.current(slot));
 
-        TestContexts.Recording row = TestContexts.row("com.botmaker.sdk.api.vision.Precision", "");
+        TestContexts.Recording row = TestContexts.row(Precision.class, "");
         PrecisionEditors.commit(row, picked);
         assertEquals(picked, PrecisionEditors.current(row));
     }
@@ -108,7 +108,7 @@ class PrecisionEditorTest {
      */
     @Test
     void a_wither_chain_the_host_cannot_read_is_shown_as_written() {
-        TestContexts.Recording chain = TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision",
+        TestContexts.Recording chain = TestContexts.typedSlot(Precision.class,
                 "Precision.TIGHT.minArea(400)");
 
         assertEquals("Precision.TIGHT.minArea(400)", PrecisionEditors.pillText(chain));
@@ -117,7 +117,7 @@ class PrecisionEditorTest {
 
     @Test
     void a_value_the_host_read_is_labelled_by_what_it_means() {
-        TestContexts.Recording read = TestContexts.typedSlot("com.botmaker.sdk.api.vision.Precision",
+        TestContexts.Recording read = TestContexts.typedSlot(Precision.class,
                 "new Precision(5.0, 4, 0)").withValue(new Precision(5.0, 4, 0));
 
         assertTrue(PrecisionEditors.pillText(read).startsWith("TIGHT"), PrecisionEditors.pillText(read));
@@ -134,8 +134,8 @@ class PrecisionEditorTest {
     @Test
     void a_value_that_says_nothing_reads_as_the_sdk_default() {
         assertEquals(new PrecisionEditors.Settings(12.0, 4, 0),
-                PrecisionEditors.current(TestContexts.row("com.botmaker.sdk.api.vision.Precision", "")));
+                PrecisionEditors.current(TestContexts.row(Precision.class, "")));
         assertEquals(new PrecisionEditors.Settings(12.0, 4, 0), PrecisionEditors.current(
-                TestContexts.row("com.botmaker.sdk.api.vision.Precision", "somebodysPrecision")));
+                TestContexts.row(Precision.class, "somebodysPrecision")));
     }
 }

@@ -5,6 +5,8 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Editors;
 import javafx.scene.Node;
 
+import java.lang.reflect.Executable;
+
 /**
  * The editor for a {@code BotSettings} setter's one argument — a number that has a range, shown as that
  * range instead of as a place to type any number at all.
@@ -71,7 +73,8 @@ public final class SettingsEditors {
 
     /** The editor for whichever setter this slot sits in. */
     public static Node setting(ValueContext ctx) {
-        Setting bound = bounds(ctx.slot().flatMap(SlotContext::enclosingMethodName).orElse(null));
+        Setting bound = bounds(ctx.slot().flatMap(SlotContext::enclosingExecutable)
+                .map(Executable::getName).orElse(null));
         if (bound == null) return null;
         return bound.flagLabel() != null
                 ? Editors.flag(ctx, bound.flagLabel())

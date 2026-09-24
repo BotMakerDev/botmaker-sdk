@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DurationSourceTest {
 
     private static TestContexts.Recording slot(String source, Duration value) {
-        return TestContexts.slot("Wait", "time", 0, source).withType("java.time.Duration").withValue(value);
+        return TestContexts.slot(null, 0, source).withType(Duration.class).withValue(value);
     }
 
     @Test

@@ -39,13 +39,13 @@ class ColorEditorTest {
 
     /** A slot holding {@code awt}, which is what the host hands an editor once it has decoded one. */
     private static TestContexts.Recording slotHolding(java.awt.Color awt) {
-        return TestContexts.typedSlot("java.awt.Color", "new java.awt.Color("
+        return TestContexts.typedSlot(java.awt.Color.class,"new java.awt.Color("
                 + awt.getRed() + ", " + awt.getGreen() + ", " + awt.getBlue() + ")").withValue(awt);
     }
 
     @Test
     void a_slot_gets_the_colour_itself_and_not_an_expression_for_it() {
-        TestContexts.Recording slot = TestContexts.typedSlot("java.awt.Color", "null");
+        TestContexts.Recording slot = TestContexts.typedSlot(java.awt.Color.class,"null");
 
         ColorEditors.commit(slot, Color.rgb(255, 128, 0));
 
@@ -63,7 +63,7 @@ class ColorEditorTest {
      */
     @Test
     void a_value_with_no_call_site_gets_the_same_colour() {
-        TestContexts.Recording row = TestContexts.row("java.awt.Color", "");
+        TestContexts.Recording row = TestContexts.row(java.awt.Color.class,"");
 
         ColorEditors.commit(row, Color.rgb(255, 128, 0));
 
@@ -73,7 +73,7 @@ class ColorEditorTest {
     /** Each channel is clamped and rounded once, where the colour is made, rather than at each reader. */
     @Test
     void the_channels_are_rounded_to_whole_bytes() {
-        TestContexts.Recording slot = TestContexts.typedSlot("java.awt.Color", "null");
+        TestContexts.Recording slot = TestContexts.typedSlot(java.awt.Color.class,"null");
 
         ColorEditors.commit(slot, Color.BLACK);
         assertEquals(new java.awt.Color(0, 0, 0), slot.value());
@@ -95,9 +95,9 @@ class ColorEditorTest {
      */
     @Test
     void a_slot_holding_anything_else_claims_no_colour() {
-        assertNull(ColorEditors.current(TestContexts.typedSlot("java.awt.Color", "Color.RED")));
-        assertNull(ColorEditors.current(TestContexts.typedSlot("java.awt.Color", "healthBarColour")));
-        assertNull(ColorEditors.current(TestContexts.typedSlot("java.awt.Color", "")));
+        assertNull(ColorEditors.current(TestContexts.typedSlot(java.awt.Color.class,"Color.RED")));
+        assertNull(ColorEditors.current(TestContexts.typedSlot(java.awt.Color.class,"healthBarColour")));
+        assertNull(ColorEditors.current(TestContexts.typedSlot(java.awt.Color.class,"")));
     }
 
     /**
@@ -110,20 +110,20 @@ class ColorEditorTest {
     @Test
     void a_value_with_no_call_site_declines_what_it_cannot_write_back() {
         assertEquals(Color.rgb(255, 128, 0),
-                ColorEditors.current(TestContexts.row("java.awt.Color", "")
+                ColorEditors.current(TestContexts.row(java.awt.Color.class,"")
                         .withValue(new java.awt.Color(255, 128, 0))));
-        assertNull(ColorEditors.current(TestContexts.row("java.awt.Color", "Color.RED")));
-        assertNull(ColorEditors.current(TestContexts.row("java.awt.Color", "")));
+        assertNull(ColorEditors.current(TestContexts.row(java.awt.Color.class,"Color.RED")));
+        assertNull(ColorEditors.current(TestContexts.row(java.awt.Color.class,"")));
     }
 
     /** What a pick writes, read straight back, is the colour that was picked — wherever the value is. */
     @Test
     void the_round_trip_holds_wherever_the_value_is() {
-        TestContexts.Recording slot = TestContexts.typedSlot("java.awt.Color", "null");
+        TestContexts.Recording slot = TestContexts.typedSlot(java.awt.Color.class,"null");
         ColorEditors.commit(slot, Color.rgb(9, 200, 77));
         assertEquals(Color.rgb(9, 200, 77), ColorEditors.current(slot));
 
-        TestContexts.Recording row = TestContexts.row("java.awt.Color", "");
+        TestContexts.Recording row = TestContexts.row(java.awt.Color.class,"");
         ColorEditors.commit(row, Color.rgb(9, 200, 77));
         assertEquals(Color.rgb(9, 200, 77), ColorEditors.current(row));
     }

@@ -9,62 +9,70 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.emulator.Emulators;
 import com.botmaker.sdk.api.launch.Game;
 
-import java.util.Map;
+import java.lang.reflect.Executable;
 import java.util.function.Predicate;
 
 /**
  * Which of this plugin's calls each call-site editor belongs to.
  *
  * <p>Eight constants and nothing else. The matching itself — declining a Parameters row, comparing an
- * argument index, tolerating a qualified or a simple class name — is
- * {@link SlotEditor#onCall}'s, in the contract: <em>which slot an editor claims</em> is contract
- * vocabulary, the same argument that put {@code SlotEditor.of} there.
+ * argument index, comparing the resolved call's declaring class — is {@link SlotEditor#onCall}'s, in the
+ * contract: <em>which slot an editor claims</em> is contract vocabulary, the same argument that put
+ * {@code SlotEditor.of} there.
  *
  * <p>What is left is the part that is genuinely this plugin's, and it is the part a reader wants: a Steam app
  * id, an Epic app name, a program path, a launch flag and a bounded setting are all {@code String} or all
  * {@code double}, and only the call says which. Every one of these declines a row of the Parameters window,
- * because a row has no call behind it — see the toolkit class for why that is the honest answer rather than a
- * limitation.
+ * because a row has no call behind it.
+ *
+ * <p><b>Each set of methods is checked when this class loads</b> ({@link SlotEditor#calls}): a renamed
+ * method fails every test that touches an editor, instead of leaving an editor that never appears.
  */
 final class CallSites {
 
     private CallSites() {}
 
-    /** Where the varargs begin, per overload — the one shape {@link SlotEditor#onCall} cannot state alone. */
-    private static final Map<String, Integer> LAUNCH_VARARGS =
-            Map.of("launch", 1, "launchIfNotRunning", 2, "launchAndWait", 3);
+    /** {@code launch}, {@code launchIfNotRunning} and {@code launchAndWait}: a program path, then flags. */
+    private static final Predicate<Executable> LAUNCHES =
+            SlotEditor.calls(Game.class, "launch", "launchIfNotRunning", "launchAndWait");
 
-    private static final java.util.Set<String> EMULATOR_METHODS =
-            java.util.Set.of("use", "named", "launch", "stop");
+    private static final Predicate<Executable> STEAM_LAUNCHES =
+            SlotEditor.calls(Game.class, "launchSteam", "launchSteamIfNotRunning");
+    private static final Predicate<Executable> EPIC_LAUNCHES =
+            SlotEditor.calls(Game.class, "launchEpic", "launchEpicIfNotRunning");
+    private static final Predicate<Executable> BOUNDED_SETTERS = SlotEditor.declaredOn(BotSettings.class)
+            .and(setter -> SettingsEditors.bounds(setter.getName()) != null);
+    private static final Predicate<Executable> EMULATOR_CALLS =
+            SlotEditor.calls(Emulators.class, "use", "named", "launch", "stop");
+    private static final Predicate<Executable> ACTIVITY_CALLS =
+            SlotEditor.calls(Activities.class, "active", "enable", "disable", "setEnabled");
+    private static final Predicate<Executable> OUTCOME = SlotEditor.calls(ActivityContext.class, "outcome");
 
     /** The Steam app id of {@code Game.launchSteam(id)} / {@code launchSteamIfNotRunning(id, source)}. */
-    static final Predicate<ValueContext> STEAM_APP_ID = ctx -> SlotEditor.onCall(ctx, Game.class, 0,
-            name -> "launchSteam".equals(name) || "launchSteamIfNotRunning".equals(name));
+    static final Predicate<ValueContext> STEAM_APP_ID = ctx -> SlotEditor.onCall(ctx, STEAM_LAUNCHES, 0);
 
     /** The Epic app name of {@code Game.launchEpic(name)} / {@code launchEpicIfNotRunning(name, source)}. */
-    static final Predicate<ValueContext> EPIC_APP_NAME = ctx -> SlotEditor.onCall(ctx, Game.class, 0,
-            name -> "launchEpic".equals(name) || "launchEpicIfNotRunning".equals(name));
+    static final Predicate<ValueContext> EPIC_APP_NAME = ctx -> SlotEditor.onCall(ctx, EPIC_LAUNCHES, 0);
 
     /**
      * The program path of {@code Game.launch(path, …)}, {@code launchIfNotRunning(path, source, …)} or
-     * {@code launchAndWait(path, source, timeout, …)} — always argument 0.
+     * {@code launchAndWait(path, …)} — always argument 0.
      */
-    static final Predicate<ValueContext> LAUNCH_PROGRAM = ctx -> SlotEditor.onCall(ctx, Game.class, 0, LAUNCH_VARARGS::containsKey);
+    static final Predicate<ValueContext> LAUNCH_PROGRAM = ctx -> SlotEditor.onCall(ctx, LAUNCHES, 0);
 
     /**
      * A trailing command-line argument of the same three methods.
      *
-     * <p>Where the varargs start differs per overload, because the fixed parameters do: {@code launch(path,
-     * …)} from index 1, {@code launchIfNotRunning(path, source, …)} from 2, and {@code launchAndWait(path,
-     * source, timeout, …)} from 3. Below those indices the argument is the path, the capture source or the
-     * timeout, and each of those has an editor of its own.
+     * <p>Where the flags start differs per overload, because the fixed parameters do — {@code launch(path,
+     * …)} from index 1, {@code launchIfNotRunning(path, source, …)} from 2. The resolved overload says so
+     * itself: the flags are its varargs tail. Below that index the argument is the path, the capture source or
+     * the timeout, and each of those has an editor of its own.
      */
     static final Predicate<ValueContext> LAUNCH_OPTION = ctx -> {
         SlotContext slot = ctx.slot().orElse(null);
         if (slot == null) return false;
-        Integer from = LAUNCH_VARARGS.get(slot.enclosingMethodName().orElse(""));
-        return from != null && slot.argIndex() >= from
-                && SlotEditor.onCall(ctx, Game.class, slot.argIndex(), LAUNCH_VARARGS::containsKey);
+        Executable call = slot.enclosingExecutable().filter(LAUNCHES).orElse(null);
+        return call != null && call.isVarArgs() && slot.argIndex() >= call.getParameterCount() - 1;
     };
 
     /**
@@ -74,8 +82,7 @@ final class CallSites {
      * predicate claimed and that table had no entry for would be offered an editor with no idea what range to
      * enforce, which is the free-typed number the editor exists to replace.
      */
-    static final Predicate<ValueContext> BOT_SETTING = ctx -> SlotEditor.onCall(ctx, BotSettings.class, 0,
-            setter -> SettingsEditors.bounds(setter) != null);
+    static final Predicate<ValueContext> BOT_SETTING = ctx -> SlotEditor.onCall(ctx, BOUNDED_SETTERS, 0);
 
     /**
      * The instance name of {@code Emulators.use(name)}, {@code named(name)}, {@code launch(name)} or
@@ -84,15 +91,10 @@ final class CallSites {
      * <p>{@code use()} with no argument is not matched and cannot be: there is no slot. That overload means
      * <i>the project's default emulator</i>, which is a capture target rather than a name typed into code.
      */
-    static final Predicate<ValueContext> EMULATOR_NAME = ctx -> SlotEditor.onCall(ctx, Emulators.class, 0,
-            EMULATOR_METHODS::contains);
-
-    private static final java.util.Set<String> ACTIVITY_METHODS =
-            java.util.Set.of("active", "enable", "disable", "setEnabled");
+    static final Predicate<ValueContext> EMULATOR_NAME = ctx -> SlotEditor.onCall(ctx, EMULATOR_CALLS, 0);
 
     /** The activity named by {@code Activities.enable(name)}, {@code disable}, {@code active} or {@code setEnabled}. */
-    static final Predicate<ValueContext> ACTIVITY_NAME = ctx -> SlotEditor.onCall(ctx, Activities.class, 0,
-            ACTIVITY_METHODS::contains);
+    static final Predicate<ValueContext> ACTIVITY_NAME = ctx -> SlotEditor.onCall(ctx, ACTIVITY_CALLS, 0);
 
     /**
      * The outcome named by {@code ctx.outcome(name)}.
@@ -102,5 +104,5 @@ final class CallSites {
      * receiver is one this predicate can recognise, and a returned string is indistinguishable from every other
      * string in the bot.
      */
-    static final Predicate<ValueContext> OUTCOME_NAME = ctx -> SlotEditor.onCall(ctx, ActivityContext.class, 0, "outcome"::equals);
+    static final Predicate<ValueContext> OUTCOME_NAME = ctx -> SlotEditor.onCall(ctx, OUTCOME, 0);
 }

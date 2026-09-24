@@ -5,6 +5,8 @@ import com.botmaker.sdk.plugin.emulator.EmulatorEditors;
 import com.botmaker.shared.game.EpicLibraryScanner;
 import com.botmaker.shared.game.SteamLibraryScanner;
 
+import java.awt.Color;
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -60,15 +62,9 @@ public final class SdkEditors {
             // overrides, and the host asks the user which editor to use when both are loaded.
             //
             // A wait length: the unit is invisible in a bare number, and this is the type that carries the
-            // random range the humanized wait needs. Both spellings are accepted, and that is not belt and
-            // braces — the Parameters window knows this type by the fully-qualified name its vocabulary
-            // records, while a slot in source often knows it only as "Duration", because java.time is not in
-            // the bot's own type index and so never resolves to a package.
-            SlotEditor.of(ctx -> ctx.type().isNamed("java.time.Duration") || ctx.type().isNamed("Duration"),
-                    DurationEditor::duration),
-            // A colour, and both spellings for the same reason as Duration above: the Parameters window knows
-            // this type by the fully-qualified name its vocabulary records, while a slot in source usually
-            // knows it only as "Color" — java.awt is not in a bot's own type index either.
-            SlotEditor.of(ctx -> ctx.type().isNamed("java.awt.Color") || ctx.type().isNamed("Color"),
-                    ColorEditors::color));
+            // random range the humanized wait needs. By class since contract 0.3.0: the bare "Duration" this
+            // accepted until then also claimed a bot's own class of that name.
+            SlotEditor.forType(Duration.class, DurationEditor::duration),
+            // A colour, by class for the same reason.
+            SlotEditor.forType(Color.class, ColorEditors::color));
 }
