@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 No source changes since v1.1.15; re-released for updated upstream pins.
 
+- **Fixed: the Activity Flow window can always be closed.** When the flow cannot be saved (the project has no
+  `Sdk.java`, or its flow was written by hand), Close asks whether to close without saving. Before, the
+  window refused to close. The message about a missing `Sdk.java` no longer promises that adding the SDK
+  creates the file.
+
 This is **2.0.0**, the one release that removes `api.*` elements. From it on, never-delete applies:
 `api.*` only grows.
 
