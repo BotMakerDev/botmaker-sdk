@@ -51,8 +51,9 @@ public final class CaptureValue {
     }
 
     /**
-     * Points {@code Sdk.captureSource()} at {@code source}, or does nothing when there is no such method to
-     * write to. Call it on the JavaFX application thread.
+     * Points {@code Sdk.captureSource()} at {@code source}, asking the host to create {@code Sdk.java} first
+     * when the project has none; does nothing when there is still no such method to write to. Call it on the
+     * JavaFX application thread.
      *
      * @param source the project's capture source, or null for the whole desktop
      */
@@ -70,6 +71,9 @@ public final class CaptureValue {
         CaptureSource value = region != null && region.width > 0 && region.height > 0
                 ? CaptureSource.region(base, new Rect(region.x, region.y, region.width, region.height))
                 : base;
+        // A pick is the user asking for a source to be kept, so a project with no Sdk.java gets one first —
+        // written by the host, once (PluginValues.create) — rather than a pick that silently goes nowhere.
+        if (services != null && open(services).isEmpty()) services.pluginValues().create(ID);
         // The value: the host writes it through CaptureTypes, as the call the value is.
         open(services).ifPresent(ctx -> ctx.set(value));
     }

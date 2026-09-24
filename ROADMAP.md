@@ -8,6 +8,26 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-25 — Studio creates a missing Sdk.java on request
+
+**Done**
+- `SdkPlugin.managedValues()` declares where each value lives: `flow` and `capture` in `SDK_HOLDER`
+  (`"Sdk"`), typed `Flow` / `CaptureSource`, starting as `Flow.NONE` / `CaptureSource.desktop()` (the
+  template's); `pictures` in `"Pictures"`, type-level. `Flow` needs its `initial`: it is a `ComponentType`
+  only, so the host grammar has no fresh value for it.
+- `ActivityFlowDialog`: a *Create Sdk.java* button while the project has no flow value. It calls
+  `pluginValues().create(FlowValue.ID)`, reopens the value, lifts the read-only state and says to add
+  `Sdk.class` to `Bot.run(…)` in `main` (the host never edits `main`).
+- `CaptureValue.point` creates the holder first when the project has none, so a pick is never dropped.
+- `AGENTS.md`'s "what is true now" no longer says `pluginSources()` ships the files or that `main` calls
+  `Sdk.install()`.
+- Checked by hand: the generated `Sdk.java` (host grammar bound to this SDK) compiles against the
+  gamebot's classpath. `SdkPluginSurfaceTest` checks the declarations.
+
+**Deferred / next**
+- The Capture Source dialog has no empty-state message of its own; a pick creates the file silently apart
+  from the history entry.
+
 ## 2026-09-24 — the flow window closes when its save is refused
 
 **Done**

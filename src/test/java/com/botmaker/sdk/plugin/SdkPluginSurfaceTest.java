@@ -97,6 +97,28 @@ class SdkPluginSurfaceTest {
         assertFalse(plugin.displayName().isBlank());
     }
 
+    /**
+     * A project with no {@code Sdk.java} can be given one: the flow and the capture source share the
+     * {@code Sdk} holder, each typed with what its method returns and starting as the template's does; the
+     * pictures are an open set, an empty {@code Pictures} class.
+     */
+    @Test
+    void each_managed_value_says_where_the_host_creates_it() {
+        var byId = new java.util.HashMap<String, com.botmaker.plugin.api.source.ManagedValue>();
+        plugin.managedValues().forEach(v -> byId.put(v.id(), v));
+        var flow = byId.get(SdkPlugin.FLOW);
+        assertEquals(SdkPlugin.SDK_HOLDER, flow.holder());
+        assertEquals(com.botmaker.sdk.api.flow.Flow.class, flow.valueType());
+        assertEquals(com.botmaker.sdk.api.flow.Flow.NONE, flow.initial());
+        var capture = byId.get(SdkPlugin.CAPTURE);
+        assertEquals(SdkPlugin.SDK_HOLDER, capture.holder());
+        assertEquals(CaptureSource.class, capture.valueType());
+        assertEquals(CaptureSource.desktop().getClass(), capture.initial().getClass());
+        var pictures = byId.get(SdkPlugin.PICTURES);
+        assertEquals("Pictures", pictures.holder());
+        assertNull(pictures.valueType());
+    }
+
     /** The palette is the host's to discover from {@code @Palette}; {@link ApiCatalogTest} checks what it finds. */
     @Test
     void the_plugin_builds_no_palette_by_hand() {

@@ -12,6 +12,7 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.plugin.flow.FlowValue;
@@ -135,13 +136,22 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         return List.of(
                 new ManagedValue(FLOW,
                         "This is the bot's activity flow. Draw it in 🔀 Activity Flow, which keeps the"
-                                + " activities, the wires and the layout in step."),
+                                + " activities, the wires and the layout in step.",
+                        SDK_HOLDER, Flow.class, Flow.NONE),
                 new ManagedValue(CAPTURE,
-                        "This is where the bot reads pixels from. Choose it in 🎯 Capture Source."),
+                        "This is where the bot reads pixels from. Choose it in 🎯 Capture Source.",
+                        SDK_HOLDER, CaptureSource.class, CaptureSource.desktop()),
                 new ManagedValue(PICTURES,
                         "Picture constants are managed in 🖼 Manage Pictures, which renames the picture and"
-                                + " every use of it together."));
+                                + " every use of it together.",
+                        "Pictures", null));
     }
+
+    /**
+     * The class the flow and the capture source live in — {@code plugins/sdk/Sdk.java}, which the host
+     * writes when a project has none — and the one a bot's {@code main} names in {@code Bot.run(…, Sdk.class)}.
+     */
+    public static final String SDK_HOLDER = "Sdk";
 
     /** The {@code @Managed} id on the method holding this bot's flow. */
     public static final String FLOW = "flow";

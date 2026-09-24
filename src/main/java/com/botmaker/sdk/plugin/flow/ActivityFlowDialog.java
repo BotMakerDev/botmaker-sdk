@@ -220,7 +220,7 @@ public final class ActivityFlowDialog {
     private Flow readFlow() {
         if (value.isEmpty()) {
             readOnly("This project has no Sdk.java with a @Managed(\"flow\") method, so there is nothing to "
-                    + "save the flow into. A project made from the Game Bot template has one.");
+                    + "save the flow into. Create Sdk.java below to add one.");
             return Flow.NONE;
         }
         if (!FlowValue.readable(value.get())) {
@@ -773,9 +773,32 @@ public final class ActivityFlowDialog {
         closeButton.setDefaultButton(true);
         closeButton.setOnAction(e -> closeRequested());
 
+        // A project with no Sdk.java has nowhere to save a flow, and nothing else would ever write one: the host
+        // does, once, when asked (PluginValues.create), and from then on the file is the user's.
+        Button createHolder = new Button("Create Sdk.java");
+        createHolder.setTooltip(new javafx.scene.control.Tooltip(
+                "Adds plugins/sdk/Sdk.java to this project, with an empty flow and the default capture source."));
+        createHolder.setVisible(value.isEmpty());
+        createHolder.managedProperty().bind(createHolder.visibleProperty());
+        createHolder.setOnAction(e -> {
+            Optional<String> refused = services.pluginValues().create(FlowValue.ID);
+            if (refused.isPresent()) {
+                error(refused.get());
+                return;
+            }
+            value = FlowValue.open(services);
+            if (value.isEmpty()) {
+                error("Sdk.java was written but its flow could not be opened. Reopen this window.");
+                return;
+            }
+            readOnlyReason = null;
+            createHolder.setVisible(false);
+            error("Created plugins/sdk/Sdk.java. Add Sdk.class to Bot.run(…) in main so the bot uses it.");
+        });
+
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox buttons = new HBox(10, progress, savedLabel, statusLabel, spacer, closeButton);
+        HBox buttons = new HBox(10, progress, savedLabel, statusLabel, spacer, createHolder, closeButton);
         buttons.setAlignment(Pos.CENTER_LEFT);
 
         VBox bar = new VBox(6, orderLabel, buttons);

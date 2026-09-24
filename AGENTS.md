@@ -330,14 +330,18 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 over seven phases on 2026-09-20/21. **`ROADMAP.md` is the live log; the dated sections below this one are
 snapshots and several of them are now wrong.** This section says which.
 
-**What is true now.** `SdkPlugin.pluginSources()` ships two files, copied once into
-`src/main/java/<bot package>/plugins/sdk/`: `Sdk.java`, with a `@Managed("flow")` method returning a
-`com.botmaker.sdk.api.flow.Flow` and a `@Managed("capture")` method returning a `CaptureSource`; and
-`Pictures.java`, `@Managed("pictures")` on the type. From the copy on they are the user's — the host
+**What is true now** (2026-09-25). Two files live in `src/main/java/<bot package>/plugins/sdk/`:
+`Sdk.java`, with a `@Managed("flow")` method returning a `com.botmaker.sdk.api.flow.Flow` and a
+`@Managed("capture")` method returning a `CaptureSource`; and `Pictures.java`, `@Managed("pictures")` on the
+type. A project gets them from its template (`pluginSources()` went on 2026-09-21); one that has none gets
+them from the **host**, once, when this plugin asks — `PluginValues.create(id)`, from *Create Sdk.java* in
+the flow window or from a capture-source pick — using the `holder`, `valueType` and `initial` each
+`ManagedValue` in `SdkPlugin.managedValues()` declares. From then on they are the user's — the host
 rewrites the expression a `@Managed` method returns and nothing else, and a body that is not exactly
 `return <expr>;` is read-only with a reason. An activity's work is a **method reference**,
-`Flow.activity(Collect::body, …)`, so renaming it is a compile error naming `Sdk.java`. A bot installs it
-all with one `Sdk.install()` from its own `main`, and `FlowGraph.load`/`run` walk `Flows.installed()`.
+`Flow.activity(Collect::body, …)`, so renaming it is a compile error naming `Sdk.java`. A bot's `main` names
+the holder — `Bot.run(Gamebot::goHome, Sdk.class)` (`Sdk.install()` went with SDK 2.0.0) — and the host
+never edits `main`: the flow window's status line says to add it.
 
 **What is now false below.**
 
