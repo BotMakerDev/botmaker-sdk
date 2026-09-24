@@ -8,6 +8,20 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-24 — the flow window closes when its save is refused
+
+**Done**
+- `ActivityFlowDialog.refused(reason)` replaces `releaseClose()` at the three places a save is refused:
+  read-only, validation, and a `FlowValue.write` refusal. When a close was pending, it asks whether to close
+  without saving.
+- Before this, `setOnCloseRequest` consumed every ✕ while the window was `dirty`. A save that could never
+  land (no `Sdk.java`) therefore kept the window open for good.
+- The missing-`Sdk.java` message no longer claims that adding the SDK writes the file.
+
+**Deferred / next**
+- The host creates the missing holder (`PluginValues.create`, `ManagedValue` holder and type). This is
+  phase 6 of Studio's blocks round 2.
+
 ## 2026-09-23 — no package under `plugin` depends on another both ways
 
 **Done**

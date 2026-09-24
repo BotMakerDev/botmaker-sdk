@@ -220,7 +220,7 @@ public final class ActivityFlowDialog {
     private Flow readFlow() {
         if (value.isEmpty()) {
             readOnly("This project has no Sdk.java with a @Managed(\"flow\") method, so there is nothing to "
-                    + "draw into. Add the BotMaker SDK to the project and it will be put there.");
+                    + "save the flow into. A project made from the Game Bot template has one.");
             return Flow.NONE;
         }
         if (!FlowValue.readable(value.get())) {
@@ -858,17 +858,17 @@ public final class ActivityFlowDialog {
             // Nothing to fix and nothing to retry: the value is one the user wrote, and it stays theirs.
             error(readOnlyReason);
             savedLabel.setText("Not saved");
-            releaseClose();
+            refused(readOnlyReason);
             return;
         }
         Flow flow = currentFlow();
         String problem = validate(flow);
         if (problem != null) {
             // Refused, not failed — a duplicate name or a bad identifier. Stay dirty so the fix saves it, and
-            // let go of any pending close: closing now would leave the edit only in the window.
+            // let go of any pending close unless the user says to drop the edit (see refused).
             error(problem);
             savedLabel.setText("Not saved");
-            releaseClose();
+            refused(problem);
             return;
         }
         error("");
@@ -899,7 +899,7 @@ public final class ActivityFlowDialog {
             dirty = true;   // the next edit, or Close, tries again
             error(refused);
             savedLabel.setText("Not saved");
-            releaseClose();
+            refused(refused);
             return;
         }
         if (err != null) {
@@ -924,6 +924,27 @@ public final class ActivityFlowDialog {
         closeWhenSaved = true;
         closeButton.setDisable(true);
         flush();
+    }
+
+    /**
+     * A save did not land. If the user was closing, ask whether to close anyway. Otherwise a save that can never
+     * succeed (no {@code Sdk.java}, a hand-written flow) consumed every ✕ and sealed the window. Not closing gives
+     * the Close button back, so the user can fix the problem and try again.
+     */
+    private void refused(String reason) {
+        boolean closing = closeWhenSaved;
+        releaseClose();
+        if (!closing) return;
+        Alert confirm = services.theme().alert(Alert.AlertType.CONFIRMATION,
+                reason + "\n\nClosing now drops the changes made in this window.",
+                ButtonType.CANCEL, ButtonType.OK);
+        confirm.initOwner(stage);
+        confirm.setTitle("Close without saving");
+        confirm.setHeaderText("The flow could not be saved. Close anyway?");
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+            dirty = false;
+            stage.close();
+        }
     }
 
     /** Gives the Close button back after a save that didn't land, so the window is never sealed shut. */
