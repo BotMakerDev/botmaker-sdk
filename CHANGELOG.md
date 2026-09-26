@@ -32,6 +32,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   call that takes a capture source is written relative to the chosen surface, so it survives the window moving;
   one in a call that takes desktop pixels (`Mouse.click(Point)`) is written in desktop pixels. A Parameters row's
   pill says "in window". The eyedropper's magnifier and ΔE spread work on every surface.
+- **Precision shows what it matches.** The dialog opens on a frozen frame (switchable to any window or screen;
+  Ctrl+scroll zooms, middle-drag pans) with every pixel within ΔE of the target tinted and each blob boxed —
+  solid when it is big enough, dashed grey when it is too small — and the coverage against `minCount` under it.
+  The target is the `Color` passed beside the precision, read by the host; an eyedropper stands in where that
+  cannot be read. The tolerance is shown as the darkest and lightest colours it accepts, and *Should match* /
+  *Should not* pins set ΔE to the smallest value that takes every good pin, naming a bad one it cannot keep
+  out. ΔE is now kept to a tenth rather than a whole number.
 
 ## [1.1.16] — 2026-09-26
 

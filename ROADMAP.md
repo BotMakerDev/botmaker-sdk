@@ -20,8 +20,16 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 - `SdkScreenPicks.forSlot(ctx)` joins them for `GeometryEditors`; `ColorEditors.pick` goes through the same
   menu to `ColorSampler`. A row's Point/Rect pill ends "in window" (`GeometryEditors.spec`).
 
+- Part C: `PrecisionEditors` opens on a frozen frame (`framePane`): `MatchOverlay` tints
+  `ColorMatcher.matchMask` (built off the FX thread), boxes `findClusters` blobs kept / too small, reads coverage
+  against `minCount`, zooms through the toolkit's `ZoomPan`. `targetOf` reads the call's `Color` via
+  `SlotContext.argumentValue`; `ToleranceTeacher` turns pins into ΔE (farthest good + 0.5, to 0.1) and names
+  conflicts; the tolerance pane shows `boundary` swatches. `Preview` and its swatch strip are gone; `round` keeps
+  a tenth.
+
 **Deferred / next**
-- Part C: the Precision dialog's live overlay and teaching by clicks.
+- Pins are not remembered between openings. The eyedropper's colour previews only; it is never written.
+- Picker phases 6b–6e (input, time, pictures, results and basics).
 
 ## 2026-09-26 — `Sound.miaou()`
 

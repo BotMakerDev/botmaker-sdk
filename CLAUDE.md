@@ -514,6 +514,13 @@ the question in front of them — which matters because the capture-targets dial
 moment `ObjectCaptureSurface` — its second caller, and the reason it could not go earlier, since Studio
 source may not name a toolkit type — arrived here too. What the SDK keeps is the two surfaces that use it.
 
+**Since 2026-09-26 every pick asks where first.** Point, Rect, Size and the eyedropper go through
+`plugin/source/SurfaceMenu` (bot's source, another window or screen, whole desktop) and a frozen frame
+(`plugin/screen/FrameShotSource`), and `plugin/screen/PickSpace` decides from the call whether the numbers are
+relative to that surface or desktop pixels. The Precision dialog draws its matches on that frame
+(`MatchOverlay`, from shared's `ColorMatcher.matchMask`), reads its target colour from the call
+(`SlotContext.argumentValue`), and learns ΔE from pins (`ToleranceTeacher`).
+
 ## The capture surfaces are this plugin's (2026-08-30)
 
 `internal/plugin/capture/{CaptureSurface, ObjectCaptureSurface, MagicWand, OverlayStage}`, out of Studio's
