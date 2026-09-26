@@ -5,6 +5,7 @@ import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.interaction.Mouse;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
@@ -116,5 +117,36 @@ class GeometryLabelTest {
         assertEquals("Choose point…", pointLabel(unreadable(Point.class,"")));
         assertEquals("Choose region…", rectLabel(unreadable(Rect.class,"")));
         assertEquals("Choose size…", sizeLabel(unreadable(Size.class,"")));
+    }
+
+    // --- a row's numbers are inside the surface it was picked on (2026-09-26) ---
+
+    /** A Parameters row holding {@code value}: a value with no call site. */
+    private static ValueContext row(Object value) {
+        return TestContexts.row(value.getClass(), "").withValue(value);
+    }
+
+    @Test
+    void a_row_says_its_numbers_are_inside_the_surface() {
+        assertEquals("120, 48 in window", pointLabel(row(new Point(120, 48))));
+        assertEquals("10, 20  640×480 in window", rectLabel(row(new Rect(10, 20, 640, 480))));
+    }
+
+    @Test
+    void a_size_is_the_same_everywhere_so_its_row_says_nothing() {
+        assertEquals("640 × 480", sizeLabel(row(new Size(640, 480))));
+    }
+
+    @Test
+    void a_slot_label_is_unchanged() throws Exception {
+        var slot = TestContexts.slot(Mouse.class.getMethod("click", Point.class), 0, "new Point(120, 48)")
+                .withValue(new Point(120, 48));
+
+        assertEquals("120, 48", pointLabel(slot));
+    }
+
+    @Test
+    void an_empty_row_still_asks_to_choose() {
+        assertEquals("Choose point…", pointLabel(TestContexts.row(Point.class, "")));
     }
 }

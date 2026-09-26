@@ -46,17 +46,28 @@ public final class GeometryEditors {
 
     /** A {@code Rect}: drag a region on screen, or type {@code x, y, width, height}. */
     public static Node rect(ValueContext ctx, ComponentType<Rect> type) {
-        return Editors.tuplePill(ctx, type, RECT, SdkScreenPicks.get());
+        return Editors.tuplePill(ctx, type, spec(RECT, ctx), SdkScreenPicks.forSlot(ctx));
     }
 
     /** A {@code Point}: click one pixel under a magnifier, or type {@code x, y}. */
     public static Node point(ValueContext ctx, ComponentType<Point> type) {
-        return Editors.tuplePill(ctx, type, POINT, SdkScreenPicks.get());
+        return Editors.tuplePill(ctx, type, spec(POINT, ctx), SdkScreenPicks.forSlot(ctx));
     }
 
     /** A {@code Size}: measure by dragging over the thing, or type {@code width, height}. */
     public static Node size(ValueContext ctx, ComponentType<Size> type) {
-        return Editors.tuplePill(ctx, type, SIZE, SdkScreenPicks.get());
+        // SIZE, never spec(SIZE, …): a size is the same inside a window and on the desktop.
+        return Editors.tuplePill(ctx, type, SIZE, SdkScreenPicks.forSlot(ctx));
+    }
+
+    /**
+     * A row's numbers are inside the surface it was picked on, and its pill says so; a slot's say nothing,
+     * because the call it sits in already says which (2026-09-26, {@code PickSpace}).
+     */
+    static TupleSpec spec(TupleSpec base, ValueContext ctx) {
+        if (ctx.slot().isPresent()) return base;
+        return new TupleSpec(base.title(), base.labels(), base.placeholder(), base.pick(),
+                v -> base.label().apply(v) + " in window");
     }
 
     // Package-private rather than private: the label is the one piece of these editors that can be asserted
@@ -64,11 +75,11 @@ public final class GeometryEditors {
     // collapsed pill is read back out of what the last pick wrote, and getting it wrong shows one coordinate
     // while the bot runs another. See GeometryLabelTest.
     static String rectLabel(ValueContext ctx, ComponentType<Rect> type) {
-        return Editors.tupleLabel(ctx, type, RECT);
+        return Editors.tupleLabel(ctx, type, spec(RECT, ctx));
     }
 
     static String pointLabel(ValueContext ctx, ComponentType<Point> type) {
-        return Editors.tupleLabel(ctx, type, POINT);
+        return Editors.tupleLabel(ctx, type, spec(POINT, ctx));
     }
 
     static String sizeLabel(ValueContext ctx, ComponentType<Size> type) {

@@ -1,10 +1,21 @@
 package com.botmaker.sdk.plugin.editors;
 
+import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.slot.SlotContext;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Region;
 import com.botmaker.plugin.toolkit.ScreenPicks;
+import com.botmaker.sdk.plugin.screen.DesktopSource;
+import com.botmaker.sdk.plugin.screen.EditorFrame;
+import com.botmaker.sdk.plugin.screen.FrameShotSource;
+import com.botmaker.sdk.plugin.screen.PickSpace;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
+import com.botmaker.sdk.plugin.screen.ScreenOverlay;
+import com.botmaker.sdk.plugin.source.SurfaceMenu;
 import javafx.scene.paint.Color;
+import javafx.stage.Window;
 
+import java.awt.Rectangle;
 import java.util.function.Consumer;
 
 /**
@@ -14,6 +25,10 @@ import java.util.function.Consumer;
  * widget makes with nothing but a slot in hand — a region, a coordinate, a colour — and a slot does not say
  * which project it belongs to. An editor that wants the bot's own frame asks {@code EditorFrame} for it by
  * name, which is what the colour and picture editors do.
+ *
+ * <p>That is still true of {@link #get()}. Since 2026-09-26 an editor holding a context asks
+ * {@link #forSlot} instead: the context has services, so the user chooses the surface per pick, and the call
+ * the slot sits in decides whether the numbers are relative to it.
  *
  * <h2>Why it is a class of its own, and why it is reached through {@link #get()}</h2>
  *
@@ -47,6 +62,68 @@ public final class SdkScreenPicks implements ScreenPicks {
             instance = local;
         }
         return local;
+    }
+
+    /**
+     * The picker for one slot or row (2026-09-26): asks where to pick ({@link SurfaceMenu}), grabs a frozen
+     * frame of that surface, runs the overlay on it, and hands the result back in the space the call reads
+     * ({@link PickSpace}). A context with no services — a headless test — falls back to {@link #get()}.
+     */
+    public static ScreenPicks forSlot(ValueContext ctx) {
+        StudioServices services = ctx.services();
+        if (services == null) return get();
+        PickSpace space = PickSpace.of(ctx.slot().flatMap(SlotContext::enclosingExecutable), ctx.slot().isPresent());
+        return new ScreenPicks() {
+            @Override
+            public void region(Consumer<Region> onSelected) {
+                onFrame(services, space, (overlay, bounds, owner) -> overlay.selectRegion(owner, r -> {
+                    int[] v = space.region(r, bounds);
+                    onSelected.accept(new Region(v[0], v[1], v[2], v[3]));
+                }));
+            }
+
+            @Override
+            public void point(Consumer<Region> onPicked) {
+                onFrame(services, space, (overlay, bounds, owner) -> overlay.pickPoint(owner, p -> {
+                    int[] v = space.point(p, bounds);
+                    onPicked.accept(new Region(v[0], v[1], 0, 0));
+                }));
+            }
+
+            @Override
+            public void color(Consumer<Color> onSampled) {
+                onFrame(services, space, (overlay, bounds, owner) -> overlay.pickColor(owner, pick -> {
+                    java.awt.Color c = pick.color();
+                    onSampled.accept(Color.rgb(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha() / 255.0));
+                }));
+            }
+        };
+    }
+
+    /** An overlay ready to pick on, the frame's desktop bounds ({@code null} for a live desktop pick), its owner. */
+    private interface OnFrame {
+        void run(ScreenOverlay overlay, Rectangle bounds, Window owner);
+    }
+
+    /**
+     * Menu, grab, overlay. A grab that fails says why once, then picks on the live desktop — and, when the
+     * slot reads relative numbers, says in the status line that these are desktop pixels.
+     */
+    private static void onFrame(StudioServices services, PickSpace space, OnFrame then) {
+        Window owner = services.dialogs().ownerWindow().orElse(null);
+        SurfaceMenu.choose(services, surface -> {
+            Consumer<EditorFrame> onGrab = frame ->
+                    then.run(new ScreenOverlay(new FrameShotSource(frame)), frame.bounds(), owner);
+            Consumer<EditorFrame.Failure> onFail = failure -> {
+                services.status(space == PickSpace.RELATIVE
+                        ? failure.headline() + " Picked on the desktop instead of " + surface.label()
+                          + ": these are desktop pixels."
+                        : failure.headline() + " Picking on the desktop instead.");
+                then.run(new ScreenOverlay(new DesktopSource()), null, owner);
+            };
+            if (surface.botsOwn()) EditorFrame.grabAsync(services, onGrab, onFail);
+            else EditorFrame.grabAsync(services, surface.source(), onGrab, onFail);
+        });
     }
 
     @Override
