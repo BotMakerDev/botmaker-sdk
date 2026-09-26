@@ -125,7 +125,7 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 
 - **`com.botmaker.sdk.api.*`** is the API generated bots compile against, and every class in it sits in a
   sub-package that says what it is: `api.bot`, `api.capture`, `api.emulator`, `api.flow`, `api.geometry`
-  (`Point`, `Rect`, `Size`, `Direction`), `api.interaction`, `api.launch`, `api.util` (`Time`, `BotMaker`,
+  (`Point`, `Rect`, `Size`, `Direction`), `api.interaction`, `api.launch`, `api.sound` (`Sound`), `api.util` (`Time`, `BotMaker`,
   `Debug`), `api.vision`. **The `api` root holds no classes**; a name landing there means somebody skipped
   the question above. The full picture is **`../docs/refactor/21-api-compat.md`**.
 

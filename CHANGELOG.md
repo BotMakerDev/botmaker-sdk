@@ -17,6 +17,14 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Added
+
+- **`Sound.miaou()`** (`api.sound`, palette category *Sound*): meows like the Scratch cat and waits until it
+  is done. The sound is synthesised, so nothing is recorded or bundled; on a machine with no audio output it
+  plays nothing and says so once.
+
 ## [1.1.16] — 2026-09-26
 
 No source changes since v1.1.15; re-released for updated upstream pins.

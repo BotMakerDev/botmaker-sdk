@@ -8,6 +8,17 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-26 — `Sound.miaou()`
+
+**Done**
+- `api/sound/Sound` (`@Palette(category = "sound")`): `miaou()` plays until done over a `SourceDataLine`
+  (44.1 kHz mono); no audio line prints one line and returns. The waveform is `internal/sound/Meow`, pure: a
+  band-limited sawtooth sweeping 500 → 900 → 450 Hz through two gliding formants ("m" → "i" → "ao" → "u").
+  `MeowTest` checks length, peak, silent ends and the pitch contour.
+
+**Deferred / next**
+- Tune by ear against Scratch's meow. Other sounds (`play(file)`, a beep) would sit on the same facade.
+
 ## 2026-09-26 — Studio writes a missing Sdk.java on its own
 
 **Done**
