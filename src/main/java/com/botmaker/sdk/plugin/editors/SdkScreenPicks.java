@@ -5,7 +5,8 @@ import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Region;
 import com.botmaker.plugin.toolkit.ScreenPicks;
-import com.botmaker.sdk.plugin.screen.DesktopSource;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
 import com.botmaker.sdk.plugin.screen.FrameShotSource;
 import com.botmaker.sdk.plugin.screen.PickSpace;
@@ -100,26 +101,42 @@ public final class SdkScreenPicks implements ScreenPicks {
         };
     }
 
-    /** An overlay ready to pick on, the frame's desktop bounds ({@code null} for a live desktop pick), its owner. */
+    /**
+     * An overlay ready to pick on, where its frame's top-left is on the desktop ({@code null} when nowhere —
+     * {@link PickSpace#origin}), and its owner.
+     */
     private interface OnFrame {
-        void run(ScreenOverlay overlay, Rectangle bounds, Window owner);
+        void run(ScreenOverlay overlay, Rectangle origin, Window owner);
     }
 
     /**
-     * Menu, grab, overlay. A grab that fails says why once, then picks on the live desktop — and, when the
-     * slot reads relative numbers, says in the status line that these are desktop pixels.
+     * Menu, grab, overlay. A grab that fails says why, then grabs the whole virtual desktop instead — a frame
+     * whose origin is the desktop's, so an absolute pick on any monitor still adds the right offset (the live
+     * desktop pick crops to one monitor and reports inside it, which no origin here could correct). An
+     * emulator's frame has no desktop origin at all, and an absolute slot is told so.
      */
     private static void onFrame(StudioServices services, PickSpace space, OnFrame then) {
         Window owner = services.dialogs().ownerWindow().orElse(null);
         SurfaceMenu.choose(services, surface -> {
-            Consumer<EditorFrame> onGrab = frame ->
-                    then.run(new ScreenOverlay(new FrameShotSource(frame)), frame.bounds(), owner);
+            Consumer<EditorFrame> onGrab = frame -> {
+                Rectangle origin = PickSpace.origin(frame);
+                if (origin == null && space == PickSpace.ABSOLUTE) {
+                    services.status(frame.label() + " is not on the desktop: these are its own pixels, "
+                            + "and this call reads desktop pixels.");
+                }
+                then.run(new ScreenOverlay(new FrameShotSource(frame)), origin, owner);
+            };
+            Consumer<EditorFrame.Failure> gaveUp = failure -> services.status(failure.headline());
             Consumer<EditorFrame.Failure> onFail = failure -> {
+                if (CaptureLabels.isDesktop(surface.source())) {
+                    gaveUp.accept(failure);
+                    return;
+                }
                 services.status(space == PickSpace.RELATIVE
-                        ? failure.headline() + " Picked on the desktop instead of " + surface.label()
+                        ? failure.headline() + " Picking on the whole desktop instead of " + surface.label()
                           + ": these are desktop pixels."
-                        : failure.headline() + " Picking on the desktop instead.");
-                then.run(new ScreenOverlay(new DesktopSource()), null, owner);
+                        : failure.headline() + " Picking on the whole desktop instead.");
+                EditorFrame.grabAsync(services, CaptureSource.desktop(), onGrab, gaveUp);
             };
             if (surface.botsOwn()) EditorFrame.grabAsync(services, onGrab, onFail);
             else EditorFrame.grabAsync(services, surface.source(), onGrab, onFail);

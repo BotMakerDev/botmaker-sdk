@@ -47,6 +47,44 @@ class ToleranceTeacherTest {
         assertEquals(12.5, none.deltaE());
     }
 
+    /** With nothing to take, nothing is asked of the tolerance, so a red pin inside it is no conflict of the pins'. */
+    @Test
+    void redPinsAloneAreNeverAConflict() {
+        Color near = new Color(195, 55, 52);
+
+        ToleranceTeacher.Lesson lesson = ToleranceTeacher.teach(TARGET, List.of(), List.of(near), 12);
+
+        assertEquals(12, lesson.deltaE());
+        assertTrue(lesson.conflicts().isEmpty());
+    }
+
+    /** The margin gives way to a red pin just past the farthest green one: the two are separable, so separate them. */
+    @Test
+    void theMarginStopsShortOfARedPinJustBeyondTheGreenOnes() {
+        Color good = new Color(185, 60, 60);
+        double farthest = ColorMatcher.deltaE(TARGET, good);
+        Color bad = nearestShadeBeyond(farthest + 0.25);
+        double badDistance = ColorMatcher.deltaE(TARGET, bad);
+
+        ToleranceTeacher.Lesson lesson = ToleranceTeacher.teach(TARGET, List.of(good), List.of(bad), 3);
+
+        assertTrue(lesson.deltaE() >= farthest, "the green pin still matches: " + lesson.deltaE());
+        assertTrue(lesson.deltaE() < badDistance, "the red pin is kept out: " + lesson.deltaE());
+        assertTrue(lesson.conflicts().isEmpty());
+    }
+
+    /** A grey-shifted shade of the target whose ΔE lies in (lower, lower + 0.4). */
+    private static Color nearestShadeBeyond(double lower) {
+        for (int r = 200; r >= 0; r--) {
+            for (int g = 50; g <= 120; g++) {
+                Color c = new Color(r, g, 50);
+                double d = ColorMatcher.deltaE(TARGET, c);
+                if (d > lower && d < lower + 0.4) return c;
+            }
+        }
+        throw new AssertionError("no shade just beyond " + lower);
+    }
+
     @Test
     void theBoundaryColoursSitAtTheToleranceFromTheTarget() {
         Color[] edges = ToleranceTeacher.boundary(TARGET, 12);

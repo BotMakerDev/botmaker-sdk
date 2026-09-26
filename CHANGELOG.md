@@ -38,7 +38,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   The target is the `Color` passed beside the precision, read by the host; an eyedropper stands in where that
   cannot be read. The tolerance is shown as the darkest and lightest colours it accepts, and *Should match* /
   *Should not* pins set ΔE to the smallest value that takes every good pin, naming a bad one it cannot keep
-  out. ΔE is now kept to a tenth rather than a whole number.
+  out. A taught ΔE keeps its tenth; a dragged one still lands on a whole number.
 
 ## [1.1.16] — 2026-09-26
 

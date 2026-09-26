@@ -137,7 +137,7 @@ public final class PrecisionEditors {
                 .map(Executable::getName).orElse(null);
         Knobs knobs = knobsFor(methodName);
 
-        Slider slider = new Slider(0, MAX_DELTA_E, clamp(current.deltaE()));
+        Slider slider = toleranceSlider(current.deltaE());
         Spinner<Integer> areaSpinner = new Spinner<>(new SpinnerValueFactory.IntegerSpinnerValueFactory(
                 1, 1_000_000, current.minArea(), 4));
         Spinner<Integer> countSpinner = new Spinner<>(new SpinnerValueFactory.IntegerSpinnerValueFactory(
@@ -184,7 +184,7 @@ public final class PrecisionEditors {
      */
     private static Settings read(Slider slider, Spinner<Integer> area, Spinner<Integer> count,
                                  Settings current, Knobs knobs) {
-        double deltaE = knobs.tolerance() ? round(slider.getValue()) : current.deltaE();
+        double deltaE = knobs.tolerance() ? tolerance(slider) : current.deltaE();
         int a = knobs.quantity() ? Math.max(1, valueOf(area, current.minArea())) : current.minArea();
         int c = knobs.quantity() ? Math.max(0, valueOf(count, current.minCount())) : current.minCount();
         return new Settings(deltaE, a, c);
@@ -199,12 +199,43 @@ public final class PrecisionEditors {
      * the current ΔE still takes ({@link ToleranceTeacher#boundary}). Re-drawn on every slider move and every
      * change of target ({@code onTarget}).
      */
-    private static Node tolerancePane(Slider slider, Supplier<java.awt.Color> target, List<Runnable> onTarget) {
+    static Slider toleranceSlider(double deltaE) {
+        Slider slider = new Slider(0, MAX_DELTA_E, clamp(deltaE));
         slider.setPrefWidth(420);
         slider.setShowTickMarks(true);
         slider.setShowTickLabels(true);
         slider.setMajorTickUnit(5);
         slider.setMinorTickCount(4);
+        slider.getProperties().put(EXACT, slider.getValue());
+        return slider;
+    }
+
+    /** The slider's key for the value it was last set to exactly — opened with, or taught. */
+    private static final String EXACT = "precision.exact";
+
+    /** What the slider means now: {@link #tolerance} against the value it was last set to exactly. */
+    private static double tolerance(Slider slider) {
+        Object exact = slider.getProperties().get(EXACT);
+        return tolerance(slider.getValue(), exact instanceof Double d ? d : Double.NaN);
+    }
+
+    /** Moves the slider to a value a lesson taught, keeping its tenth. */
+    private static void teach(Slider slider, double deltaE) {
+        double placed = clamp(deltaE);
+        slider.getProperties().put(EXACT, placed);
+        slider.setValue(placed);
+    }
+
+    /**
+     * The tolerance a slider position means: {@code exact} — the value the dialog opened with, or the last one
+     * a lesson set — keeps its tenth; anything else was dragged or clicked and lands on a whole number, so a
+     * drag near an anchor is the anchor ({@code TIGHT} is 5, not 5.4).
+     */
+    static double tolerance(double sliderValue, double exact) {
+        return Math.abs(sliderValue - exact) < 1e-9 ? round(sliderValue) : Math.round(sliderValue);
+    }
+
+    private static Node tolerancePane(Slider slider, Supplier<java.awt.Color> target, List<Runnable> onTarget) {
 
         Label reading = Styles.on(new Label(), Styles.CAPTION_STRONG);
         Label meaning = Styles.on(new Label(), Styles.CAPTION);
@@ -213,7 +244,7 @@ public final class PrecisionEditors {
         edges.setAlignment(Pos.CENTER_LEFT);
 
         Runnable refresh = () -> {
-            double v = round(slider.getValue());
+            double v = tolerance(slider);
             reading.setText("Colour tolerance: " + label(v));
             meaning.setText(meaningOf(v));
             renderEdges(edges, target.get(), v);
@@ -303,8 +334,8 @@ public final class PrecisionEditors {
                 return;
             }
             (isGood ? good : bad).add(colour);
-            ToleranceTeacher.Lesson taught = ToleranceTeacher.teach(target[0], good, bad, round(slider.getValue()));
-            slider.setValue(taught.deltaE());
+            ToleranceTeacher.Lesson taught = ToleranceTeacher.teach(target[0], good, bad, tolerance(slider));
+            teach(slider, taught.deltaE());
             lesson.setText(lessonText(taught));
         });
 

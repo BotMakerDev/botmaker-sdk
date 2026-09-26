@@ -22,19 +22,30 @@ public enum PickSpace {
     ABSOLUTE;
 
     /**
-     * {@link #RELATIVE} when the call takes a {@link CaptureSource} or is a method of one; {@link #ABSOLUTE} for
-     * any other call, and for a slot whose call did not resolve (a bare {@code Point} with nothing to be
-     * relative to is a desktop point). A value with no slot — a Parameters row — is {@link #RELATIVE}: the
-     * field is read by whatever the bot hands it to, and the row's label says which surface it was picked on.
+     * {@link #RELATIVE} when the call takes a {@link CaptureSource} ({@code Mouse.click(source, x, y)}) or cuts
+     * a sub-region out of one ({@code source.region(rect)}); {@link #ABSOLUTE} for any other call, and for a
+     * slot whose call did not resolve (a bare {@code Point} with nothing to be relative to is a desktop point).
+     * Being declared on {@code CaptureSource} is not enough: {@code source.click(p)} takes the absolute point a
+     * matcher produced. A value with no slot — a Parameters row — is {@link #RELATIVE}: the field is read by
+     * whatever the bot hands it to, and the row's label says which surface it was picked on.
      */
     public static PickSpace of(Optional<Executable> call, boolean isSlot) {
         if (!isSlot) return RELATIVE;
         if (call.isEmpty()) return ABSOLUTE;
         Executable executable = call.get();
-        boolean onSource = CaptureSource.class.isAssignableFrom(executable.getDeclaringClass());
+        boolean subRegion = CaptureSource.class.isAssignableFrom(executable.getDeclaringClass())
+                && executable.getName().equals("region");
         boolean takesSource = Arrays.stream(executable.getParameterTypes())
                 .anyMatch(CaptureSource.class::isAssignableFrom);
-        return onSource || takesSource ? RELATIVE : ABSOLUTE;
+        return subRegion || takesSource ? RELATIVE : ABSOLUTE;
+    }
+
+    /**
+     * Where {@code frame}'s top-left is on the desktop, or {@code null} when it is nowhere: an emulator's frame
+     * arrives over ADB and its bounds only say where to draw it, so there is no desktop origin to add.
+     */
+    public static Rectangle origin(EditorFrame frame) {
+        return frame.onScreen() ? frame.bounds() : null;
     }
 
     /** {@code [x, y]} picked inside the frame, in this space. */

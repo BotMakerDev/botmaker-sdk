@@ -23,17 +23,29 @@ final class ToleranceTeacher {
     private ToleranceTeacher() {}
 
     /**
-     * The tolerance {@code good} asks for — the farthest good pin plus {@link #MARGIN}, rounded to 0.1 — or
-     * {@code current} when there are no good pins; and every bad pin within that tolerance.
+     * The tolerance {@code good} asks for — the farthest good pin plus {@link #MARGIN}, rounded to 0.1, the
+     * margin giving way to a bad pin just beyond it so the two stay separable — and every bad pin within that
+     * tolerance. With no good pins nothing is asked: {@code current} stands and nothing conflicts, because a
+     * bad pin inside a tolerance nobody taught says only "lower the slider", not "these cannot be told apart".
      */
     static Lesson teach(Color target, List<Color> good, List<Color> bad, double current) {
-        double deltaE = good.isEmpty() ? current : Math.round((good.stream()
-                .mapToDouble(c -> ColorMatcher.deltaE(target, c)).max().orElse(0) + MARGIN) * 10) / 10.0;
+        if (good.isEmpty()) return new Lesson(current, List.of());
+        double farthest = good.stream().mapToDouble(c -> ColorMatcher.deltaE(target, c)).max().orElse(0);
+        double deltaE = Math.round((farthest + MARGIN) * 10) / 10.0;
+        double takesEveryGood = Math.ceil(farthest * 10) / 10.0;
+        double nearestBadBeyond = bad.stream().mapToDouble(c -> ColorMatcher.deltaE(target, c))
+                .filter(d -> d > farthest).min().orElse(Double.MAX_VALUE);
+        if (nearestBadBeyond <= deltaE) {
+            double below = Math.floor(nearestBadBeyond * 10) / 10.0;
+            if (below >= nearestBadBeyond) below -= 0.1;
+            if (below >= takesEveryGood) deltaE = Math.round(below * 10) / 10.0;
+        }
+        double taught = deltaE;
         List<Conflict> conflicts = bad.stream()
                 .map(c -> new Conflict(c, ColorMatcher.deltaE(target, c)))
-                .filter(c -> c.distance() <= deltaE)
+                .filter(c -> c.distance() <= taught)
                 .toList();
-        return new Lesson(deltaE, conflicts);
+        return new Lesson(taught, conflicts);
     }
 
     /**

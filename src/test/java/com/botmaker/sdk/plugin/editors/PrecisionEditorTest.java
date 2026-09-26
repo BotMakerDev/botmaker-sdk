@@ -165,6 +165,14 @@ class PrecisionEditorTest {
         assertEquals("Target #FF0000", PrecisionEditors.TargetColor.describe(java.awt.Color.RED));
     }
 
+    /** A drag lands on whole numbers, so the anchors (TIGHT is 5) stay reachable; only a lesson sets a tenth. */
+    @Test
+    void a_dragged_tolerance_lands_on_whole_numbers() {
+        assertEquals(5.0, PrecisionEditors.tolerance(5.37, 12.3), "a drag near TIGHT is TIGHT");
+        assertEquals(12.3, PrecisionEditors.tolerance(12.3, 12.3), "the value it opened with, or was taught, keeps its tenth");
+        assertEquals(9.4, PrecisionEditors.tolerance(9.4, 9.4));
+    }
+
     @Test
     void a_taught_tolerance_keeps_its_tenth() {
         assertEquals(9.4, PrecisionEditors.round(9.43));
