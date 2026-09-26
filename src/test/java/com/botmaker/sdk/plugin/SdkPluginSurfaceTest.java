@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -270,6 +271,23 @@ class SdkPluginSurfaceTest {
                     () -> editor.matches(TestContexts.slot(null, 0, "\"\"")), failures);
         }
         if (!failures.isEmpty()) fail(String.join("\n", failures));
+    }
+
+    /**
+     * Which SDK types draw themselves (6f). The six others have no picker yet — 6d and 6e give them one — so
+     * `plugin validate` fails the SDK until then, by design.
+     */
+    @Test
+    void exactly_nine_sdk_types_draw_themselves() {
+        List<String> editable = new ArrayList<>();
+        List<String> plain = new ArrayList<>();
+        for (PluginType<?> type : plugin.types()) {
+            (type instanceof EditableType<?> ? editable : plain).add(type.type().getSimpleName());
+        }
+        assertEquals(List.of("ImageTemplate", "Precision", "Point", "Rect", "Size", "Direction", "Key",
+                "MouseButton", "Combo").stream().sorted().toList(), editable.stream().sorted().toList());
+        assertEquals(List.of("ImageTemplateGroup", "CaptureSource", "MatchResult", "Matches", "ColorMatch",
+                "TextMatch").stream().sorted().toList(), plain.stream().sorted().toList());
     }
 
     /**

@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin.types;
 
-import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.toolkit.AbstractPluginType;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -12,7 +11,6 @@ import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.RegionSource;
-import javafx.scene.Node;
 
 import java.lang.reflect.Executable;
 import java.util.List;
@@ -42,7 +40,6 @@ public final class CaptureTypes {
     public static final class CaptureSourceType extends AbstractPluginType<CaptureSource> {
         public CaptureSourceType() { super(CaptureSource.class); }
         @Override public CaptureSource fresh() { return new CurrentSource(); }
-        @Override public Node editor(ValueContext ctx) { return null; }
     }
 
     /** {@code Source.current()}. */

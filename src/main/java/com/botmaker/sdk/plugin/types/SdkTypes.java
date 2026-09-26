@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractPluginType;
 import com.botmaker.sdk.api.geometry.Direction;
@@ -69,7 +70,7 @@ public final class SdkTypes {
      * on and no amount of reasoning about an empty {@code ImageTemplate} discovers that.
      */
     public static final class ImageTemplateType extends AbstractPluginType<ImageTemplate>
-            implements ComponentType<ImageTemplate> {
+            implements EditableType<ImageTemplate>, ComponentType<ImageTemplate> {
         public ImageTemplateType() { super(ImageTemplate.class); }
         @Override public ImageTemplate fresh() {
             return new ImageTemplate(TemplateNames.pathFor(TemplateNames.DEFAULT_TEMPLATE_NAME));
@@ -91,7 +92,7 @@ public final class SdkTypes {
      * nothing and a zero minimum area matches everything, so neither end of the range is a sensible start.
      */
     public static final class PrecisionType extends AbstractPluginType<Precision>
-            implements ComponentType<Precision> {
+            implements EditableType<Precision>, ComponentType<Precision> {
         public PrecisionType() { super(Precision.class); }
         @Override public Precision fresh() { return Precision.DEFAULT; }
         @Override public Node editor(ValueContext ctx) { return PrecisionEditors.precision(ctx); }
@@ -110,7 +111,8 @@ public final class SdkTypes {
     }
 
     /** A point on the screen. */
-    public static final class PointType extends AbstractPluginType<Point> implements ComponentType<Point> {
+    public static final class PointType extends AbstractPluginType<Point>
+            implements EditableType<Point>, ComponentType<Point> {
         public PointType() { super(Point.class); }
         @Override public Point fresh() { return new Point(0, 0); }
         @Override public Node editor(ValueContext ctx) { return GeometryEditors.point(ctx, this); }
@@ -123,7 +125,8 @@ public final class SdkTypes {
     }
 
     /** A rectangle on the screen: where it is, then how big it is. */
-    public static final class RectType extends AbstractPluginType<Rect> implements ComponentType<Rect> {
+    public static final class RectType extends AbstractPluginType<Rect>
+            implements EditableType<Rect>, ComponentType<Rect> {
         public RectType() { super(Rect.class); }
         @Override public Rect fresh() { return new Rect(0, 0, 0, 0); }
         @Override public Node editor(ValueContext ctx) { return GeometryEditors.rect(ctx, this); }
@@ -140,7 +143,8 @@ public final class SdkTypes {
     }
 
     /** A width and a height, with no position. */
-    public static final class SizeType extends AbstractPluginType<Size> implements ComponentType<Size> {
+    public static final class SizeType extends AbstractPluginType<Size>
+            implements EditableType<Size>, ComponentType<Size> {
         public SizeType() { super(Size.class); }
         @Override public Size fresh() { return new Size(0, 0); }
         @Override public Node editor(ValueContext ctx) { return GeometryEditors.size(ctx, this); }
@@ -161,7 +165,8 @@ public final class SdkTypes {
      *
      * @param <E> the enum
      */
-    private abstract static class EnumType<E extends Enum<E>> extends AbstractPluginType<E> {
+    private abstract static class EnumType<E extends Enum<E>> extends AbstractPluginType<E>
+            implements EditableType<E> {
         EnumType(Class<E> type) { super(type); }
         @Override public E fresh() { return type().getEnumConstants()[0]; }
     }
@@ -189,7 +194,8 @@ public final class SdkTypes {
      * as {@link ImageTemplateGroupType} is. A fresh one is Ctrl+S, the combination a recorded bot most often
      * starts with.
      */
-    public static final class ComboType extends AbstractPluginType<Combo> implements ComponentType<Combo> {
+    public static final class ComboType extends AbstractPluginType<Combo>
+            implements EditableType<Combo>, ComponentType<Combo> {
         public ComboType() { super(Combo.class); }
         @Override public Combo fresh() { return Combo.of(Key.CTRL, Key.S); }
         @Override public Node editor(ValueContext ctx) { return InputEditors.combo(ctx); }
@@ -241,7 +247,6 @@ public final class SdkTypes {
         @Override public Class<T> type() { return type; }
         @Override public T fresh() { return null; }
         @Override public Method freshCall() { return freshCall; }
-        @Override public Node editor(ValueContext ctx) { return null; }
     }
 
     /**
@@ -288,7 +293,6 @@ public final class SdkTypes {
         @Override public ImageTemplateGroup fresh() {
             return ImageTemplateGroup.of(new ImageTemplate(TemplateNames.pathFor(TemplateNames.DEFAULT_TEMPLATE_NAME)));
         }
-        @Override public Node editor(ValueContext ctx) { return null; }
 
         @Override public Executable factory() {
             return method(ImageTemplateGroup.class, "of", ImageTemplate[].class);

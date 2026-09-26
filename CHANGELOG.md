@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Changed
+
+- **Nine types implement `EditableType`** (contract 0.3.0): `ImageTemplate`, `Precision`, `Point`, `Rect`,
+  `Size`, `Direction`, `Key`, `MouseButton`, `Combo`. `ImageTemplateGroup`, `CaptureSource` and the four vision
+  results are plain `PluginType` and have no picker until picker phases 6d/6e, so `plugin validate` refuses
+  the SDK until then.
+
 ### Removed
 
 - **The SDK's own Duration editor.** Basics draws the JDK types; a Duration slot gets basics' picker (presets,
