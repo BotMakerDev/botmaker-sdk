@@ -35,5 +35,17 @@ public enum Direction {
      * Right to left (largest X to smallest X).
      * First match will be the rightmost one.
      */
-    WEST
+    WEST,
+
+    /** Top-right first: the match furthest up and to the right (largest x − y). */
+    NORTH_EAST,
+
+    /** Top-left first: the match furthest up and to the left (smallest x + y). */
+    NORTH_WEST,
+
+    /** Bottom-right first: the match furthest down and to the right (largest x + y). */
+    SOUTH_EAST,
+
+    /** Bottom-left first: the match furthest down and to the left (smallest x − y). */
+    SOUTH_WEST
 }
