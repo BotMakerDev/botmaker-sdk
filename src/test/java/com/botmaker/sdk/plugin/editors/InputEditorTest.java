@@ -28,4 +28,18 @@ class InputEditorTest {
         assertEquals(Chord.of(Combo.of(Key.CTRL, Key.S)), InputEditors.chordOf(
                 TestContexts.typedSlot(Combo.class, "x").withValue(Combo.of(Key.CTRL, Key.S))));
     }
+
+    /**
+     * A combo the keyboard cannot hold — two ordinary keys, or modifiers after the key — opens empty, so OK
+     * writes nothing. Opening it on the nearest chord made OK silently drop a key or change the press order.
+     */
+    @Test
+    void a_combo_the_keyboard_cannot_hold_opens_empty() {
+        assertEquals(Chord.EMPTY, InputEditors.chordOf(
+                TestContexts.typedSlot(Combo.class, "x").withValue(Combo.of(Key.W, Key.D))));
+        assertEquals(Chord.EMPTY, InputEditors.chordOf(
+                TestContexts.typedSlot(Combo.class, "x").withValue(Combo.of(Key.S, Key.CTRL))));
+        assertEquals(Chord.EMPTY, InputEditors.chordOf(
+                TestContexts.typedSlot(Combo.class, "x").withValue(Combo.of(Key.CTRL, Key.CTRL, Key.S))));
+    }
 }

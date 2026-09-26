@@ -212,9 +212,16 @@ public final class InputEditors {
                 .orElseGet(() -> Slots.raw(ctx).isBlank() ? "Choose keys…" : Slots.raw(ctx));
     }
 
-    /** The chord the popup opens on: the value's, or nothing — never a guess at an expression the host could not read. */
+    /**
+     * The chord the popup opens on: the value's, or nothing — never a guess at an expression the host could not
+     * read, nor at a combo the keyboard cannot hold (two ordinary keys, modifiers after the key), which OK would
+     * otherwise rewrite with a key dropped or the press order changed.
+     */
     static Chord chordOf(ValueContext ctx) {
-        return ctx.value(Combo.class).map(Chord::of).orElse(Chord.EMPTY);
+        return ctx.value(Combo.class)
+                .filter(combo -> Chord.of(combo).combo().filter(combo::equals).isPresent())
+                .map(Chord::of)
+                .orElse(Chord.EMPTY);
     }
 
     /**
