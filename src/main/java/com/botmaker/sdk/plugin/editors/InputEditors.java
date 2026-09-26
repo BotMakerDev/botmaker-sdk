@@ -1,14 +1,15 @@
 package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.plugin.toolkit.Pills;
+import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.sdk.api.geometry.Direction;
+import com.botmaker.sdk.api.interaction.Combo;
 import com.botmaker.sdk.api.interaction.Key;
 import com.botmaker.sdk.api.interaction.MouseButton;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.collections.transformation.FilteredList;
 import javafx.scene.Node;
-import javafx.scene.control.ComboBox;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleButton;
@@ -17,15 +18,16 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 /**
  * The three input enums a bot's own API names — a {@link Direction}, a {@link Key}, a {@link MouseButton} —
- * drawn as the shapes they are rather than as three dropdowns.
+ * drawn as the shapes they are rather than as three dropdowns. A {@link Combo} (2026-09-26) shares the key's
+ * drawn keyboard, in chord mode.
  *
  * <h2>They were Studio's, and that was the back door this platform exists to close</h2>
  *
@@ -167,76 +169,62 @@ public final class InputEditors {
         }
     }
 
-    // --- key -------------------------------------------------------------------------------------------
+    // --- key and combination ---------------------------------------------------------------------------
+
+    /** The key pill: the cap, else the source as written, else an invitation. */
+    static String keyPill(ValueContext ctx) {
+        return ctx.value(Key.class).map(Key::label)
+                .orElseGet(() -> Slots.raw(ctx).isBlank() ? "Choose a key…" : Slots.raw(ctx));
+    }
+
+    /** The combination pill: {@code Ctrl+Shift+S}, else the source as written, else an invitation. */
+    static String comboPill(ValueContext ctx) {
+        return ctx.value(Combo.class).map(Combo::toString)
+                .orElseGet(() -> Slots.raw(ctx).isBlank() ? "Choose keys…" : Slots.raw(ctx));
+    }
+
+    /** The chord the popup opens on: the value's, or nothing — never a guess at an expression the host could not read. */
+    static Chord chordOf(ValueContext ctx) {
+        return ctx.value(Combo.class).map(Chord::of).orElse(Chord.EMPTY);
+    }
 
     /**
-     * A key as a type-to-search box over every constant the SDK has.
-     *
-     * <p>A pad is out of the question — there are well over a hundred keys — and a plain dropdown of them
-     * is unusable, so this filters as the user types.
-     *
-     * <p>The filter keeps the current selection visible whatever the needle is: an item filtered out from
-     * under the selection clears it, and a cleared selection blanks the field. The popup is shown only
-     * while the user is actually narrowing, because showing it on the programmatic text change that follows
-     * a pick reopens the list the pick just closed.
-     *
-     * <p><b>A name that matches no constant writes nothing.</b> Half a key is not a key, and the old
-     * version normalising {@code "esca"} through the value registry is how a typo became a stored value.
+     * A key, picked on a drawn keyboard ({@link KeyboardView}): click the cap, press the key, or search. The
+     * choice is the answer, so the window closes on it. It was a type-to-search dropdown of constant names
+     * until 2026-09-26; the search stays, and a name that matches no key still writes nothing.
      */
     public static Node key(ValueContext ctx) {
-        Key current = ctx.value(Key.class).orElse(null);
-        List<String> names = names(Key.values());
-
-        ObservableList<String> all = FXCollections.observableArrayList(names);
-        FilteredList<String> shown = new FilteredList<>(all, key -> true);
-
-        ComboBox<String> box = new ComboBox<>();
-        box.setItems(shown);
-        box.setEditable(true);
-        box.setVisibleRowCount(12);
-        box.setPromptText("Type to search…");
-        if (current != null) box.setValue(current.name());
-
-        box.getEditor().textProperty().addListener((o, was, is) -> {
-            String needle = is == null ? "" : is.trim().toUpperCase(Locale.ROOT);
-            String chosen = box.getValue();
-            shown.setPredicate(key -> needle.isEmpty()
-                    || key.toUpperCase(Locale.ROOT).contains(needle)
-                    || key.equals(chosen));
-            if (!needle.isEmpty() && !needle.equalsIgnoreCase(chosen) && !box.isShowing()) box.show();
+        Button[] pill = new Button[1];
+        pill[0] = Pills.button(keyPill(ctx), () -> {
+            Chord initial = ctx.value(Key.class).map(k -> new Chord(Set.of(), k)).orElse(Chord.EMPTY);
+            Stage[] stage = new Stage[1];
+            KeyboardView view = new KeyboardView(false, initial, chord -> {
+                if (chord.main() == null) return;
+                ctx.set(chord.main());
+                pill[0].setText(chord.main().label());
+                if (stage[0] != null) stage[0].close();
+            });
+            stage[0] = Modals.form(ctx, "Choose a key", view.node(), null);
         });
-        // Committed on a pick and on the field losing focus, never per keystroke: a value written while
-        // "ESC" is half-typed is a different key from the one being reached for.
-        box.setOnAction(e -> commitKey(ctx, box));
-        box.getEditor().focusedProperty().addListener((o, had, has) -> {
-            if (!has) commitKey(ctx, box);
-        });
-        return box;
+        return pill[0];
     }
 
-    /** The constant the typed text names exactly (case-insensitively), else the one last picked, else none. */
-    private static void commitKey(ValueContext ctx, ComboBox<String> box) {
-        String typed = box.getEditor().getText();
-        for (Key constant : Key.values()) {
-            if (constant.name().equalsIgnoreCase(typed == null ? "" : typed.trim())) {
-                ctx.set(constant);
-                return;
-            }
-        }
-        String chosen = box.getValue();
-        for (Key constant : Key.values()) {
-            if (constant.name().equals(chosen)) {
-                ctx.set(constant);
-                return;
-            }
-        }
-    }
-
-    // --- combination -----------------------------------------------------------------------------------
-
-    /** A combination of keys. Drawn in picker phase 6b's phase C; until then the host shows the source as written. */
+    /**
+     * A combination, picked on the same keyboard in chord mode: Ctrl, Alt, Shift and Meta toggle and one other
+     * key is kept, or the whole chord is pressed at once. Written on OK, modifiers first; a dialog left with
+     * nothing chosen writes nothing.
+     */
     public static Node combo(ValueContext ctx) {
-        return null;
+        Button[] pill = new Button[1];
+        pill[0] = Pills.button(comboPill(ctx), () -> {
+            Chord[] held = {chordOf(ctx)};
+            KeyboardView view = new KeyboardView(true, held[0], chord -> held[0] = chord);
+            Modals.form(ctx, "Choose a key combination", view.node(), () -> held[0].combo().ifPresent(combo -> {
+                ctx.set(combo);
+                pill[0].setText(combo.toString());
+            }));
+        });
+        return pill[0];
     }
 
     // --- shared ----------------------------------------------------------------------------------------
@@ -258,9 +246,5 @@ public final class InputEditors {
             else button.setSelected(true);       // a toggle group must not be emptied by clicking the pick
         });
         return button;
-    }
-
-    private static <E extends Enum<E>> List<String> names(E[] constants) {
-        return java.util.Arrays.stream(constants).map(Enum::name).toList();
     }
 }

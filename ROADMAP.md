@@ -8,6 +8,20 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-26 — the drawn keyboard (picker phase 6b, phase C)
+
+**Done**
+- Pure, headless-tested: `plugin/editors/KeyboardLayout` (a full-size US board as rows of caps; a test fails
+  if a `Key` is missing or drawn twice; an unplaced constant gets a spare row), `KeyCodes` (JavaFX `KeyCode` →
+  `Key`; every key but `NUMPAD_ENTER`, which JavaFX reports as `ENTER`, is reachable by pressing it), `Chord`
+  (modifiers toggle, one other key, written Ctrl/Alt/Shift/Meta first).
+- `KeyboardView` draws it (caps are `mouse-diagram-key` toggles, so both themes come from the host), captures
+  keystrokes on the board, dims non-matches for the search. `InputEditors.key` opens it and closes on the
+  pick; `InputEditors.combo` (was the phase-A `null` stub) opens it in chord mode and writes on OK. A value the
+  host could not read opens empty (`chordOf`).
+- The board takes Esc and Enter as keys while it has focus, so they cannot also close the dialog; Cancel/OK
+  (or the search field) do.
+
 ## 2026-09-26 — input values: every key, diagonals, `Combo` (picker phase 6b, phase A)
 
 **Done**

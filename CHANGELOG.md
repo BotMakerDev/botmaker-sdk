@@ -35,6 +35,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A `Key` is picked on a drawn keyboard**: click a cap, press the key, or search ("page", "num 5"). It was a
+  dropdown of constant names. A **`Combo`** is picked on the same keyboard: Ctrl, Alt, Shift and Meta toggle
+  beside one other key, or press the whole combination at once; it is written modifiers first.
+
 - **Screen picks ask where to pick.** Point, Rect, Size and the colour eyedropper open a small menu — the bot's
   own source, another window or screen, or the whole desktop — and pick on a frozen frame of it. A value in a
   call that takes a capture source is written relative to the chosen surface, so it survives the window moving;
