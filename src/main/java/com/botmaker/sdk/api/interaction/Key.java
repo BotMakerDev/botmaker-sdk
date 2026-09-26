@@ -12,6 +12,9 @@ import com.sun.jna.Platform;
  * <p>Letter keys map to the physical key (lowercase keysym on Linux, VK letter on Windows); use
  * {@link Keyboard#type(String)} when you need shifted/uppercase characters produced for you.
  *
+ * <p>Since 2026-09-26 it also has the US punctuation keys, Home/End/Page Up/Page Down/Insert, Caps and Num Lock
+ * and the numpad, appended after the first sixty-two so no earlier constant changes place.
+ *
  * <p><b>Curated for the palette</b> (see {@code @Palette}): <b>no methods offered</b> — the only one there is,
  * {@link #nativeCode()}, is the platform translation this enum exists to spare a bot from doing, so a menu
  * entry handing back {@code 0xFFBE} would be an invitation to write exactly the hard-coded key code the class
@@ -49,7 +52,29 @@ public enum Key {
     SHIFT(0xFFE1, 0x10), CTRL(0xFFE3, 0x11), ALT(0xFFE9, 0x12), META(0xFFEB, 0x5B),
 
     // Arrows
-    LEFT(0xFF51, 0x25), UP(0xFF52, 0x26), RIGHT(0xFF53, 0x27), DOWN(0xFF54, 0x28);
+    LEFT(0xFF51, 0x25), UP(0xFF52, 0x26), RIGHT(0xFF53, 0x27), DOWN(0xFF54, 0x28),
+
+    // Punctuation, US layout (Linux keysym == ASCII; Windows VK_OEM_*). Appended: no earlier ordinal moves.
+    BACKQUOTE(0x60, 0xC0), MINUS(0x2D, 0xBD), EQUALS(0x3D, 0xBB), LEFT_BRACKET(0x5B, 0xDB),
+    RIGHT_BRACKET(0x5D, 0xDD), BACKSLASH(0x5C, 0xDC), SEMICOLON(0x3B, 0xBA), QUOTE(0x27, 0xDE),
+    COMMA(0x2C, 0xBC), PERIOD(0x2E, 0xBE), SLASH(0x2F, 0xBF),
+
+    // Navigation and locks
+    HOME(0xFF50, 0x24), END(0xFF57, 0x23), PAGE_UP(0xFF55, 0x21), PAGE_DOWN(0xFF56, 0x22),
+    INSERT(0xFF63, 0x2D), CAPS_LOCK(0xFFE5, 0x14), NUM_LOCK(0xFF7F, 0x90),
+
+    // Numpad (Linux XK_KP_0=0xFFB0..; Windows VK_NUMPAD0=0x60..)
+    NUMPAD_0(0xFFB0, 0x60), NUMPAD_1(0xFFB1, 0x61), NUMPAD_2(0xFFB2, 0x62), NUMPAD_3(0xFFB3, 0x63),
+    NUMPAD_4(0xFFB4, 0x64), NUMPAD_5(0xFFB5, 0x65), NUMPAD_6(0xFFB6, 0x66), NUMPAD_7(0xFFB7, 0x67),
+    NUMPAD_8(0xFFB8, 0x68), NUMPAD_9(0xFFB9, 0x69),
+    NUMPAD_ADD(0xFFAB, 0x6B), NUMPAD_SUBTRACT(0xFFAD, 0x6D), NUMPAD_MULTIPLY(0xFFAA, 0x6A),
+    NUMPAD_DIVIDE(0xFFAF, 0x6F), NUMPAD_DECIMAL(0xFFAE, 0x6E),
+    /**
+     * The numpad's Enter. Linux has a keysym of its own for it; <b>Windows has no virtual key for it</b> — the
+     * two Enters differ only by an extended-key flag this SDK does not send — so on Windows this is
+     * {@link #ENTER}.
+     */
+    NUMPAD_ENTER(0xFF8D, 0x0D);
 
     private final int linuxKeySym;
     private final int windowsVk;
@@ -64,5 +89,57 @@ public enum Key {
             + "invites a bot to reason about key codes, which is exactly what Key removes")
     public int nativeCode() {
         return Platform.isWindows() ? windowsVk : linuxKeySym;
+    }
+
+    int linuxKeySym() {
+        return linuxKeySym;
+    }
+
+    int windowsVk() {
+        return windowsVk;
+    }
+
+    /**
+     * The key as it is printed on the cap: {@code Ctrl}, {@code F5}, {@code Page Up}, {@code [}, {@code Num 5}.
+     * What an editor shows, and what {@link Combo#toString()} joins with {@code +}.
+     */
+    @Hidden("display text for an editor; a bot compares keys, never their labels")
+    public String label() {
+        return switch (this) {
+            case ESCAPE -> "Esc";
+            case BACKQUOTE -> "`";
+            case MINUS -> "-";
+            case EQUALS -> "=";
+            case LEFT_BRACKET -> "[";
+            case RIGHT_BRACKET -> "]";
+            case BACKSLASH -> "\\";
+            case SEMICOLON -> ";";
+            case QUOTE -> "'";
+            case COMMA -> ",";
+            case PERIOD -> ".";
+            case SLASH -> "/";
+            case NUMPAD_ADD -> "Num +";
+            case NUMPAD_SUBTRACT -> "Num -";
+            case NUMPAD_MULTIPLY -> "Num *";
+            case NUMPAD_DIVIDE -> "Num /";
+            case NUMPAD_DECIMAL -> "Num .";
+            case NUMPAD_ENTER -> "Num Enter";
+            default -> {
+                String name = name();
+                if (name.startsWith("NUMPAD_")) yield "Num " + name.substring(7);
+                if (name.length() == 4 && name.startsWith("NUM")) yield name.substring(3);
+                yield words(name);
+            }
+        };
+    }
+
+    /** {@code PAGE_UP} → {@code Page Up}; a one-letter or F-key name stays as it is. */
+    private static String words(String name) {
+        StringBuilder out = new StringBuilder();
+        for (String word : name.split("_")) {
+            if (!out.isEmpty()) out.append(' ');
+            out.append(word.charAt(0)).append(word.substring(1).toLowerCase(java.util.Locale.ROOT));
+        }
+        return out.toString();
     }
 }
