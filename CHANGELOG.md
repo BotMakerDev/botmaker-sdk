@@ -24,6 +24,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **`Sound.miaou()`** (`api.sound`, palette category *Sound*): meows like the Scratch cat and waits until it
   is done. The sound is synthesised, so nothing is recorded or bundled; on a machine with no audio output it
   plays nothing and says so once.
+- **Every key a keyboard has.** `Key` gains the US punctuation keys (`BACKQUOTE` … `SLASH`), `HOME`, `END`,
+  `PAGE_UP`, `PAGE_DOWN`, `INSERT`, `CAPS_LOCK`, `NUM_LOCK` and the numpad (`NUMPAD_0` … `NUMPAD_9`, the four
+  operators, `NUMPAD_DECIMAL`, `NUMPAD_ENTER`), appended so no existing constant moves. Windows has no key code
+  of its own for the numpad's Enter, so there `NUMPAD_ENTER` is `ENTER`. `Key.label()` is the text on the cap.
+- **`Direction` diagonals**: `NORTH_EAST`, `NORTH_WEST`, `SOUTH_EAST`, `SOUTH_WEST`.
+- **`Combo`**, keys pressed together as one value (`Combo.of(Key.CTRL, Key.S)`, read as `Ctrl+S`), and
+  `Keyboard.combo(Combo)` / `combo(CaptureSource, Combo)`. Recording Ctrl+S writes it. `combo(Key...)` is kept
+  and still works; the palette leads with the `Combo` shape.
 
 ### Changed
 

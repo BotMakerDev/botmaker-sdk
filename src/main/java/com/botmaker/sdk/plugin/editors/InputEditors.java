@@ -232,6 +232,13 @@ public final class InputEditors {
         }
     }
 
+    // --- combination -----------------------------------------------------------------------------------
+
+    /** A combination of keys. Drawn in picker phase 6b's phase C; until then the host shows the source as written. */
+    public static Node combo(ValueContext ctx) {
+        return null;
+    }
+
     // --- shared ----------------------------------------------------------------------------------------
 
     private static <E extends Enum<E>> ToggleButton toggle(ValueContext ctx, ToggleGroup group, E constant,

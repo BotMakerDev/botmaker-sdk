@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.interaction.Combo;
 import com.botmaker.sdk.api.interaction.Key;
 import com.botmaker.sdk.api.launch.Game;
 import com.botmaker.sdk.api.interaction.MouseButton;
@@ -71,7 +72,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 class SdkPluginSurfaceTest {
 
     /**
-     * The fourteen types <b>this plugin</b> declares, in declaration order, which is the order a "what type
+     * The fifteen types <b>this plugin</b> declares, in declaration order, which is the order a "what type
      * is this variable" dropdown offers them in after plugin-basics' nine. Written out rather than derived
      * from {@code SdkTypes.ALL}, because a test that reads its expectation from its subject asserts nothing.
      *
@@ -80,11 +81,11 @@ class SdkPluginSurfaceTest {
      * second name to keep in step with the first.
      *
      * <p>The last six are declarable but not editable: their fresh form is a call the bot re-evaluates, so
-     * they answer {@code freshCall()} where the first eight answer {@code fresh()}.
+     * they answer {@code freshCall()} where the first nine answer {@code fresh()}.
      */
     private static final List<Class<?>> DECLARED_TYPES = List.of(
             ImageTemplate.class, Precision.class, Point.class, Rect.class, Size.class,
-            Direction.class, Key.class, MouseButton.class,
+            Direction.class, Key.class, MouseButton.class, Combo.class,
             CaptureSource.class, ImageTemplateGroup.class, MatchResult.class, Matches.class,
             ColorMatch.class, TextMatch.class);
 

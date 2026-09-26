@@ -8,6 +8,22 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-26 — input values: every key, diagonals, `Combo` (picker phase 6b, phase A)
+
+**Done**
+- `Key` gains 34 constants (punctuation, navigation, locks, numpad), appended after the first 62; `label()`
+  (`@Hidden`) is the cap text. `botmaker-shared`'s uinput keymap gained the same keysyms in the same turn, or
+  each would do nothing under real input on Linux.
+- `Direction` gains the four diagonals, appended (`NORTH` stays the scaffolding fallback).
+- `api.interaction.Combo` (record, `Combo.of(Key...)`, empty refused, `toString` = `Ctrl+Shift+S`);
+  `Keyboard.combo(Combo)` carries `@Records(COMBO, rank = 1)` and `@PaletteDefault`. `@Hidden` could not be
+  used on `combo(Key...)`: it hides a member *name*, every overload with it.
+- `SdkTypes.ComboType` (varargs factory, part `Key.class`), in `ALL` after `MouseButton`. Its editor is a stub
+  (`null`, source shown as written) until phase C.
+
+**Deferred / next** — phase B (plugin-host `KeyParts`, Studio records `Combo`), C (drawn keyboard), D (mouse,
+direction pad): `docs/superpowers/plans/2026-09-26-input-picks.md` in the umbrella.
+
 ## 2026-09-26 — screen picks on a chosen surface (picker phase 6a, part B)
 
 **Done**

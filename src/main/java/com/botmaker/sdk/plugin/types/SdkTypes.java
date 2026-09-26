@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.interaction.Combo;
 import com.botmaker.sdk.api.interaction.Key;
 import com.botmaker.sdk.api.interaction.MouseButton;
 import com.botmaker.sdk.api.vision.ColorMatch;
@@ -35,8 +36,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
- * The fourteen types the SDK declares ({@link #ALL}): a picture and a group of them, how exactly to match
- * one, three geometry shapes, three enums, the capture source, and four vision results a bot holds but
+ * The fifteen types the SDK declares ({@link #ALL}): a picture and a group of them, how exactly to match
+ * one, three geometry shapes, three enums and a key combination, the capture source, and four vision results a bot holds but
  * nobody edits.
  *
  * <p>Each type is declared once. javac asks for what it is, what a fresh one is and how a person edits it in
@@ -184,6 +185,29 @@ public final class SdkTypes {
     }
 
     /**
+     * Keys pressed together, written {@code Combo.of(Key.CTRL, Key.S)}: one declared part, repeated as varargs,
+     * as {@link ImageTemplateGroupType} is. A fresh one is Ctrl+S, the combination a recorded bot most often
+     * starts with.
+     */
+    public static final class ComboType extends AbstractPluginType<Combo> implements ComponentType<Combo> {
+        public ComboType() { super(Combo.class); }
+        @Override public Combo fresh() { return Combo.of(Key.CTRL, Key.S); }
+        @Override public Node editor(ValueContext ctx) { return InputEditors.combo(ctx); }
+
+        @Override public Executable factory() { return method(Combo.class, "of", Key[].class); }
+        @Override public List<Class<?>> componentTypes() { return List.of(Key.class); }
+        @Override public List<Object> components(Combo c) { return List.copyOf(c.keys()); }
+        @Override public Combo build(List<Object> parts) {
+            List<Key> keys = new ArrayList<>();
+            for (Object part : parts) {
+                if (!(part instanceof Key key)) return null;
+                keys.add(key);
+            }
+            return keys.isEmpty() ? null : new Combo(keys);
+        }
+    }
+
+    /**
      * The three geometry declarations. Each hands itself to its {@code GeometryEditors} editor, which passes
      * it to {@code Editors.tuplePill} — where the arity, the components and the way back from a row of
      * numbers to a value all come from, so "a Rect has four numbers" is stated once.
@@ -283,8 +307,8 @@ public final class SdkTypes {
     }
 
     /**
-     * The fourteen, in the order a menu should offer them: the vision types, the geometry ones, the two
-     * input enums, the capture source and the picture group, then the four a bot holds but nobody edits.
+     * The fifteen, in the order a menu should offer them: the vision types, the geometry ones, the two
+     * input enums and a key combination, the capture source and the picture group, then the four a bot holds but nobody edits.
      *
      * <p>A host offers plugin-basics' nine before them, which is what puts the literals a bot mostly counts
      * and labels with at the top of the list.
@@ -292,7 +316,7 @@ public final class SdkTypes {
     public static final List<PluginType<?>> ALL = List.of(
             new ImageTemplateType(), new PrecisionType(),
             POINT_TYPE, RECT_TYPE, SIZE_TYPE, new DirectionType(),
-            new KeyType(), new MouseButtonType(),
+            new KeyType(), new MouseButtonType(), new ComboType(),
             new CaptureTypes.CaptureSourceType(), new ImageTemplateGroupType(),
             new SeededType<>(MatchResult.class, method(Vision.class, "lastMatch")),
             new SeededType<>(Matches.class, method(Matches.class, "none")),
