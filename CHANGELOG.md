@@ -25,6 +25,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   is done. The sound is synthesised, so nothing is recorded or bundled; on a machine with no audio output it
   plays nothing and says so once.
 
+### Changed
+
+- **Screen picks ask where to pick.** Point, Rect, Size and the colour eyedropper open a small menu — the bot's
+  own source, another window or screen, or the whole desktop — and pick on a frozen frame of it. A value in a
+  call that takes a capture source is written relative to the chosen surface, so it survives the window moving;
+  one in a call that takes desktop pixels (`Mouse.click(Point)`) is written in desktop pixels. A Parameters row's
+  pill says "in window". The eyedropper's magnifier and ΔE spread work on every surface.
+
 ## [1.1.16] — 2026-09-26
 
 No source changes since v1.1.15; re-released for updated upstream pins.

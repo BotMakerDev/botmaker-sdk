@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-26 — screen picks on a chosen surface (picker phase 6a, part B)
+
+**Done**
+- `plugin/screen/PickSpace`: `RELATIVE` when the slot's call takes or is on a `CaptureSource`, `ABSOLUTE` for
+  any other call and for one that did not resolve, `RELATIVE` for a Parameters row; `point`/`region` add the
+  frame's desktop origin (negative on a monitor left of the primary) when absolute.
+- `plugin/source/SurfaceMenu` (in `source`, since `source` already depends on `screen`): bot's source, another
+  window or screen (`SourcePicker`), whole desktop; the last other surface is offered again, per project, in
+  memory. `plugin/screen/FrameShotSource` puts a grabbed `EditorFrame` under the overlay.
+- `SdkScreenPicks.forSlot(ctx)` joins them for `GeometryEditors`; `ColorEditors.pick` goes through the same
+  menu to `ColorSampler`. A row's Point/Rect pill ends "in window" (`GeometryEditors.spec`).
+
+**Deferred / next**
+- Part C: the Precision dialog's live overlay and teaching by clicks.
+
 ## 2026-09-26 — `Sound.miaou()`
 
 **Done**

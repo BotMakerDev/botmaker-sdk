@@ -6,6 +6,7 @@ import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.sdk.plugin.screen.ColorSampler;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
+import com.botmaker.sdk.plugin.source.SurfaceMenu;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
@@ -54,7 +55,7 @@ public final class ColorEditors {
             picker.setValue(picked);
             commit(ctx, picked);
         }));
-        eyedropper.setTooltip(new Tooltip("Pick a colour off a frame of the game"));
+        eyedropper.setTooltip(new Tooltip("Pick a colour off a window, a screen or the desktop"));
         eyedropper.getStyleClass().add("color-eyedropper");
 
         HBox box = new HBox(4, picker, eyedropper);
@@ -71,10 +72,16 @@ public final class ColorEditors {
      */
     private static void pick(ValueContext ctx, java.util.function.Consumer<Color> onPicked) {
         StudioServices services = ctx.services();
-        EditorFrame.grabAsync(services,
-                frame -> ColorSampler.openOn(services, frame,
-                        sample -> onPicked.accept(fx(sample.color()))),
-                failure -> fallBackToTheScreen(services, failure, onPicked));
+        // Since 2026-09-26 the user says where first (SurfaceMenu), so the loupe and the patch's ΔE spread
+        // work on any window, screen or the desktop, not only on the bot's own source.
+        SurfaceMenu.choose(services, surface -> {
+            java.util.function.Consumer<EditorFrame> sample = frame -> ColorSampler.openOn(services, frame,
+                    s -> onPicked.accept(fx(s.color())));
+            java.util.function.Consumer<EditorFrame.Failure> fail =
+                    failure -> fallBackToTheScreen(services, failure, onPicked);
+            if (surface.botsOwn()) EditorFrame.grabAsync(services, sample, fail);
+            else EditorFrame.grabAsync(services, surface.source(), sample, fail);
+        });
     }
 
     /**
