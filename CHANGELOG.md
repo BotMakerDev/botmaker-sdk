@@ -17,6 +17,14 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Removed
+
+- **The SDK's own Duration editor.** Basics draws the JDK types; a Duration slot gets basics' picker (presets,
+  spinners that carry, the length in words), so a slot no longer asks which of two editors to use. `Color`'s
+  eyedropper stays, as an alternative to basics' swatch.
+
 ## [1.1.17] — 2026-09-27
 
 ### Added

@@ -6,7 +6,6 @@ import com.botmaker.shared.game.EpicLibraryScanner;
 import com.botmaker.shared.game.SteamLibraryScanner;
 
 import java.awt.Color;
-import java.time.Duration;
 import java.util.List;
 
 /**
@@ -58,13 +57,7 @@ public final class SdkEditors {
             // Matches switch, and that seeding emits this API from the host — the thing the generation
             // phase exists to move. Claiming the slot now would silently delete the seed.
             SlotEditor.of(TemplateEditors::isRunOfPictures, TemplateEditors::group),
-            // Duration and Color are plugin-basics' types, so this plugin cannot declare them: these two are
-            // overrides, and the host asks the user which editor to use when both are loaded.
-            //
-            // A wait length: the unit is invisible in a bare number, and this is the type that carries the
-            // random range the humanized wait needs. By class since contract 0.3.0: the bare "Duration" this
-            // accepted until then also claimed a bot's own class of that name.
-            SlotEditor.forType(Duration.class, DurationEditor::duration),
-            // A colour, by class for the same reason.
+            // Color is plugin-basics' type, so this is an alternative editor, not a declaration: the host asks
+            // the user which to use. Duration was one too until 2026-09-27; basics draws it now. By class.
             SlotEditor.forType(Color.class, ColorEditors::color));
 }

@@ -8,6 +8,18 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — Duration leaves the SDK (picker phase 6c, phase A)
+
+**Done**
+- `plugin/editors/DurationEditor` and `DurationSourceTest` deleted with their `SlotEditor.forType(Duration.class,
+  …)`: the user's rule is that basics draws the JDK types and the SDK only its own, and basics' new picker
+  (presets, carrying spinners, words) replaces both. `SdkPluginSurfaceTest.no_sdk_editor_claims_a_duration`
+  fails if an SDK editor claims one again.
+
+**Deferred / next**
+- `Color` is the recorded exception: its eyedropper needs screen capture, which basics does not have. Decide
+  its home with 6f (every type gets a picker).
+
 ## 2026-09-27 — the drawn mouse and the diagonal pad (picker phase 6b, phase D)
 
 **Done**

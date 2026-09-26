@@ -272,6 +272,18 @@ class SdkPluginSurfaceTest {
         if (!failures.isEmpty()) fail(String.join("\n", failures));
     }
 
+    /**
+     * Basics draws the JDK types and the SDK only its own (2026-09-27): no SDK editor claims a Duration.
+     * Color is the one recorded exception, drawn here as an alternative, not tested here.
+     */
+    @Test
+    void no_sdk_editor_claims_a_duration() {
+        var slot = TestContexts.typedSlot(java.time.Duration.class, "java.time.Duration.ofMillis(1000L)");
+        for (SlotEditor editor : plugin.slotEditors()) {
+            assertFalse(editor.matches(slot), () -> editor + " claims a Duration slot");
+        }
+    }
+
     private static void ask(SlotEditor editor, String shape, Runnable call, List<String> failures) {
         try {
             call.run();
