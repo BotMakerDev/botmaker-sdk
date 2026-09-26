@@ -138,4 +138,57 @@ class PrecisionEditorTest {
         assertEquals(new PrecisionEditors.Settings(12.0, 4, 0), PrecisionEditors.current(
                 TestContexts.row(Precision.class, "somebodysPrecision")));
     }
+
+    // --- the colour a precision is a tolerance around (2026-09-26) ---
+
+    @Test
+    void the_target_is_the_colour_beside_the_precision() {
+        var slot = TestContexts.slot(findWithColourAndPrecision(), 1, "Precision.TIGHT")
+                .withArgument(0, java.awt.Color.RED);
+
+        assertEquals(java.awt.Color.RED, PrecisionEditors.targetOf(slot).orElseThrow());
+    }
+
+    @Test
+    void a_row_or_an_unreadable_neighbour_has_no_target() {
+        var row = TestContexts.row(Precision.class, "Precision.TIGHT");
+        var unread = TestContexts.slot(findWithColourAndPrecision(), 1, "Precision.TIGHT");
+
+        assertTrue(PrecisionEditors.targetOf(row).isEmpty());
+        assertTrue(PrecisionEditors.targetOf(unread).isEmpty());
+    }
+
+    @Test
+    void the_overlay_says_what_it_previews_against() {
+        assertEquals("No colour to preview against: pick one with the eyedropper.",
+                PrecisionEditors.TargetColor.describe(null));
+        assertEquals("Target #FF0000", PrecisionEditors.TargetColor.describe(java.awt.Color.RED));
+    }
+
+    @Test
+    void a_taught_tolerance_keeps_its_tenth() {
+        assertEquals(9.4, PrecisionEditors.round(9.43));
+        assertEquals(12.0, PrecisionEditors.round(12.0));
+    }
+
+    @Test
+    void the_lesson_names_the_red_pin_it_cannot_keep_out() {
+        var conflict = new ToleranceTeacher.Lesson(9.4,
+                List.of(new ToleranceTeacher.Conflict(java.awt.Color.RED, 7.1)));
+
+        assertEquals("Can't separate: needs ΔE ≥ 9.4 to match, but a red pin is at 7.1.",
+                PrecisionEditors.lessonText(conflict));
+        assertEquals("ΔE 9.4 takes every green pin.",
+                PrecisionEditors.lessonText(new ToleranceTeacher.Lesson(9.4, List.of())));
+        assertTrue(PrecisionEditors.lessonText(new ToleranceTeacher.Lesson(55, List.of())).contains("past the slider"));
+    }
+
+    /** Any public SDK method taking (Color, Precision); found rather than named so a rename does not break this. */
+    private static java.lang.reflect.Method findWithColourAndPrecision() {
+        for (java.lang.reflect.Method m : com.botmaker.sdk.api.vision.Pixel.class.getMethods()) {
+            Class<?>[] p = m.getParameterTypes();
+            if (p.length == 2 && p[0] == java.awt.Color.class && p[1] == Precision.class) return m;
+        }
+        throw new AssertionError("no (Color, Precision) method on Pixel");
+    }
 }

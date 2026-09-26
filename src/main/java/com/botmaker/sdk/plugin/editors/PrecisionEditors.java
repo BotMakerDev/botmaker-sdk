@@ -9,35 +9,32 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.plugin.screen.ColorSampler;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
-import com.botmaker.shared.opencv.ColorMatcher;
-import com.botmaker.shared.opencv.RawColorMatch;
-import javafx.animation.PauseTransition;
-import javafx.application.Platform;
+import com.botmaker.sdk.plugin.source.SurfaceMenu;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Slider;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
-import javafx.util.Duration;
 
-import java.awt.image.BufferedImage;
 import java.lang.reflect.Executable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Editor for a {@code Precision} — every knob that decides whether the {@code Pixel} facade calls something a
@@ -50,13 +47,12 @@ import java.util.function.Consumer;
  * present at all, clustered or not, which sounds like the same question as the area and is not.
  *
  * <p>So the editor answers each of them by showing rather than telling: the ΔE slider is laid out against the
- * SDK's own named anchors with a strip of swatches at increasing distance from the target colour, marking
- * which ones the current tolerance would let through; the area spinner draws the blob <b>to scale</b> over a
- * 1:1 grid (drawing it as a radius would teach exactly the wrong model); and <b>Sample from game</b> grabs a
- * frozen frame of the project's capture target and reports what the current settings actually do to it — how
- * many blobs match, how big the largest is, and how much of the colour is in the frame at all. That last one
- * is the real answer to "what should I put here", and it is why the sampler exists: without a frame these are
- * all abstractions.
+ * SDK's own named anchors, with the darkest and lightest shades it still accepts drawn beside the target; the
+ * area spinner draws the blob <b>to scale</b> over a 1:1 grid (drawing it as a radius would teach exactly the
+ * wrong model); and since 2026-09-26 the dialog opens on a frozen frame of the bot's source with every match
+ * drawn on it ({@link MatchOverlay}) — the target colour read from the call itself
+ * ({@link SlotContext#argumentValue}) — and learns the tolerance from pins the user drops on pixels that should
+ * and should not match ({@link ToleranceTeacher}). Without a frame these are all abstractions.
  *
  * <p><b>Only the knobs the call can use are shown.</b> The SDK collapsed colour and quantity into one type,
  * which means {@code matchesAt} and {@code coverage} are handed an area and a count they cannot act on, and
@@ -82,12 +78,8 @@ public final class PrecisionEditors {
 
     /** Past LOOSE the match is mostly noise, but leave headroom so the slider isn't a wall at the last anchor. */
     private static final double MAX_DELTA_E = 40.0;
-    /** ΔE distances the preview strip samples — spanning the anchors so the cut-off is visible as it moves. */
-    private static final double[] SAMPLE_DISTANCES = {0, 3, 5, 8, 12, 18, 25, 33};
     /** The blob preview canvas is square; a blob larger than this is drawn clipped rather than scaled down. */
     private static final int PREVIEW_SIDE = 180;
-    /** Quiet time before a slider/spinner change triggers an OpenCV pass over the frame. */
-    private static final Duration DEBOUNCE = Duration.millis(150);
 
     /** Kept in step with the SDK's {@code Precision} constants — the anchors the slider is laid out against. */
     private record Anchor(String constant, double deltaE, String meaning) {}
@@ -151,23 +143,30 @@ public final class PrecisionEditors {
         Spinner<Integer> countSpinner = new Spinner<>(new SpinnerValueFactory.IntegerSpinnerValueFactory(
                 0, 10_000_000, current.minCount(), 50));
 
-        Preview preview = new Preview(ctx);
+        java.awt.Color[] target = {targetOf(ctx).orElse(null)};
+        List<Runnable> onTarget = new ArrayList<>();
         VBox content = new VBox(12);
 
         String note = knobs.note(methodName);
         if (note != null) content.getChildren().add(hint(note));
 
-        if (knobs.tolerance()) content.getChildren().add(tolerancePane(slider, preview));
+        if (knobs.tolerance()) content.getChildren().add(tolerancePane(slider, () -> target[0], onTarget));
         if (knobs.tolerance() && knobs.quantity()) content.getChildren().add(new Separator());
         if (knobs.quantity()) content.getChildren().add(quantityPane(areaSpinner, countSpinner));
 
-        content.getChildren().addAll(new Separator(), preview.pane());
-
-        Runnable read = () -> preview.update(read(slider, areaSpinner, countSpinner, current, knobs));
-        slider.valueProperty().addListener((o, a, b) -> read.run());
-        areaSpinner.valueProperty().addListener((o, a, b) -> read.run());
-        countSpinner.valueProperty().addListener((o, a, b) -> read.run());
-        read.run();
+        // The frame half needs a colour to measure from, so a call that takes a colour band (findInRange) has
+        // no overlay; and it needs a host to grab through, which a headless context does not have.
+        if (knobs.tolerance() && ctx.services() != null) {
+            MatchOverlay overlay = new MatchOverlay();
+            Runnable read = () -> overlay.update(target[0], read(slider, areaSpinner, countSpinner, current, knobs));
+            onTarget.add(read);
+            slider.valueProperty().addListener((o, a, b) -> read.run());
+            areaSpinner.valueProperty().addListener((o, a, b) -> read.run());
+            countSpinner.valueProperty().addListener((o, a, b) -> read.run());
+            content.getChildren().addAll(new Separator(), framePane(ctx.services(), overlay, slider, target,
+                    () -> onTarget.forEach(Runnable::run)));
+            read.run();
+        }
 
         Modals.form(ctx, "How exact should the match be?", content, () -> {
             commitEditor(areaSpinner);
@@ -195,7 +194,12 @@ public final class PrecisionEditors {
     // panes
     // ------------------------------------------------------------------
 
-    private static Node tolerancePane(Slider slider, Preview preview) {
+    /**
+     * The tolerance, and what it accepts shown as colours: the target between the darkest and lightest shades
+     * the current ΔE still takes ({@link ToleranceTeacher#boundary}). Re-drawn on every slider move and every
+     * change of target ({@code onTarget}).
+     */
+    private static Node tolerancePane(Slider slider, Supplier<java.awt.Color> target, List<Runnable> onTarget) {
         slider.setPrefWidth(420);
         slider.setShowTickMarks(true);
         slider.setShowTickLabels(true);
@@ -205,25 +209,122 @@ public final class PrecisionEditors {
         Label reading = Styles.on(new Label(), Styles.CAPTION_STRONG);
         Label meaning = Styles.on(new Label(), Styles.CAPTION);
 
-        HBox swatches = new HBox(6);
-        swatches.setAlignment(Pos.CENTER_LEFT);
-        Label swatchNote = hint("Shades at increasing distance from the colour — solid ones match at this "
-                + "tolerance. Pick the tolerance by looking at what it lets through.");
+        HBox edges = new HBox(12);
+        edges.setAlignment(Pos.CENTER_LEFT);
 
         Runnable refresh = () -> {
             double v = round(slider.getValue());
             reading.setText("Colour tolerance: " + label(v));
             meaning.setText(meaningOf(v));
-            java.awt.Color target = preview.targetColor();
-            swatches.setVisible(target != null);
-            swatchNote.setVisible(target != null);
-            if (target != null) renderSwatches(swatches, target, v);
+            renderEdges(edges, target.get(), v);
         };
         slider.valueProperty().addListener((o, a, b) -> refresh.run());
-        preview.onTargetChanged(refresh);
+        onTarget.add(refresh);
         refresh.run();
 
-        return new VBox(8, reading, slider, meaning, swatchNote, swatches);
+        return new VBox(8, reading, slider, meaning, edges);
+    }
+
+    private static void renderEdges(HBox edges, java.awt.Color target, double deltaE) {
+        edges.getChildren().clear();
+        if (target == null) return;
+        java.awt.Color[] bounds = ToleranceTeacher.boundary(target, deltaE);
+        edges.getChildren().addAll(swatch(bounds[0], "darkest accepted"), swatch(target, "target"),
+                swatch(bounds[1], "lightest accepted"));
+    }
+
+    private static Node swatch(java.awt.Color c, String caption) {
+        Rectangle r = new Rectangle(28, 28, Color.rgb(c.getRed(), c.getGreen(), c.getBlue()));
+        r.setArcWidth(6);
+        r.setArcHeight(6);
+        r.setStroke(Color.web("#9aa0a6"));
+        Label text = Styles.on(new Label(String.format("%s%n#%02X%02X%02X", caption,
+                c.getRed(), c.getGreen(), c.getBlue())), Styles.CAPTION);
+        VBox cell = new VBox(4, r, text);
+        cell.setAlignment(Pos.CENTER_LEFT);
+        return cell;
+    }
+
+    /**
+     * The frame half: a frozen frame with the matches drawn on it ({@link MatchOverlay}), a way to pick another
+     * surface or another target colour, and the two pin modes that teach the tolerance by example
+     * ({@link ToleranceTeacher}). Opens on the bot's own source, grabbed without raising.
+     */
+    private static Node framePane(StudioServices services, MatchOverlay overlay, Slider slider,
+                                  java.awt.Color[] target, Runnable targetChanged) {
+        List<java.awt.Color> good = new ArrayList<>();
+        List<java.awt.Color> bad = new ArrayList<>();
+        Label lesson = Styles.on(new Label(), Styles.CAPTION);
+        lesson.setWrapText(true);
+        lesson.setMaxWidth(720);
+
+        Consumer<EditorFrame.Failure> failed =
+                f -> lesson.setText(f.headline() + " Frame… picks another window, a screen or the desktop.");
+        Button frameButton = new Button("Frame…");
+        frameButton.setOnAction(e -> SurfaceMenu.choose(services, surface -> {
+            Consumer<EditorFrame> onFrame = f -> {
+                good.clear();
+                bad.clear();
+                lesson.setText("");
+                overlay.show(f);
+            };
+            if (surface.botsOwn()) EditorFrame.grabAsync(services, onFrame, failed);
+            else EditorFrame.grabAsync(services, surface.source(), onFrame, failed);
+        }));
+
+        Button eyedropper = new Button("Target colour…");
+        eyedropper.setTooltip(new javafx.scene.control.Tooltip(
+                "Preview against a colour of your choosing; it is not written into the call."));
+        Consumer<EditorFrame> sampleOn = f -> ColorSampler.openOn(services, f, s -> {
+            target[0] = s.color();
+            targetChanged.run();
+        });
+        eyedropper.setOnAction(e -> overlay.frame().ifPresentOrElse(sampleOn,
+                () -> EditorFrame.grabAsync(services, sampleOn, failed)));
+
+        ToggleGroup pinMode = new ToggleGroup();
+        ToggleButton shouldMatch = new ToggleButton("+ Should match");
+        ToggleButton shouldNot = new ToggleButton("− Should not");
+        shouldMatch.setToggleGroup(pinMode);
+        shouldNot.setToggleGroup(pinMode);
+        pinMode.selectedToggleProperty().addListener((o, was, now) ->
+                overlay.mode(now == shouldMatch ? Boolean.TRUE : now == shouldNot ? Boolean.FALSE : null));
+        Button clear = new Button("Clear pins");
+        clear.setOnAction(e -> {
+            good.clear();
+            bad.clear();
+            overlay.clearPins();
+            lesson.setText("");
+        });
+
+        overlay.onPin((colour, isGood) -> {
+            if (target[0] == null) {
+                lesson.setText(TargetColor.describe(null));
+                return;
+            }
+            (isGood ? good : bad).add(colour);
+            ToleranceTeacher.Lesson taught = ToleranceTeacher.teach(target[0], good, bad, round(slider.getValue()));
+            slider.setValue(taught.deltaE());
+            lesson.setText(lessonText(taught));
+        });
+
+        EditorFrame.grabAsync(services, overlay::show, failed);
+        HBox tools = new HBox(8, frameButton, eyedropper, shouldMatch, shouldNot, clear);
+        tools.setAlignment(Pos.CENTER_LEFT);
+        return new VBox(8, tools, overlay.node(), lesson);
+    }
+
+    /** What the pins taught, in a sentence: the tolerance they ask for, or the red pin it cannot keep out. */
+    static String lessonText(ToleranceTeacher.Lesson taught) {
+        if (!taught.conflicts().isEmpty()) {
+            return String.format("Can't separate: needs ΔE ≥ %s to match, but a red pin is at %s.",
+                    trim(taught.deltaE()), trim(taught.conflicts().getFirst().distance()));
+        }
+        if (taught.deltaE() > MAX_DELTA_E) {
+            return "The green pins need ΔE " + trim(taught.deltaE()) + ", past the slider's "
+                    + trim(MAX_DELTA_E) + ": they are not really one colour.";
+        }
+        return "ΔE " + trim(taught.deltaE()) + " takes every green pin.";
     }
 
     private static Node quantityPane(Spinner<Integer> area, Spinner<Integer> count) {
@@ -272,137 +373,31 @@ public final class PrecisionEditors {
         return l;
     }
 
+    // The Preview class (a "Sample from game" button and a numbers-only readout) was deleted on 2026-09-26: the
+    // frame pane above draws the same pass on the frame itself, and takes the target from the call.
+
     // ------------------------------------------------------------------
-    // the frame preview
+    // the colour it is a tolerance around
     // ------------------------------------------------------------------
 
-    /**
-     * The "what does this actually do to my game" half of the dialog: a frozen frame, and a readout of what
-     * the current settings would find in it. Every recompute is debounced and run off the FX thread —
-     * {@code findClusters} over a 4K frame is real OpenCV work, and doing it on a slider tick is the
-     * difference between a dialog that responds and one that stutters while you drag.
-     */
-    private static final class Preview {
-
-        private final ValueContext ctx;
-        private final VBox pane = new VBox(8);
-        private final Label status = Styles.on(new Label(), Styles.CAPTION);
-        private final Label result = Styles.on(new Label(), Styles.CAPTION_STRONG);
-        private final PauseTransition debounce = new PauseTransition(DEBOUNCE);
-        private final AtomicLong generation = new AtomicLong();
-
-        private EditorFrame frame;
-        private java.awt.Color target;
-        private Settings pending;
-        private Runnable onTargetChanged = () -> {};
-
-        Preview(ValueContext ctx) {
-            this.ctx = ctx;
-            this.target = null;
-
-            status.setWrapText(true);
-
-            Button sample = new Button("Sample from game…");
-            sample.setOnAction(e -> withFrame(f -> ColorSampler.openOn(ctx.services(), f, s -> {
-                frame = s.frame();
-                target = s.color();
-                onTargetChanged.run();
-                status.setText("Sampled from " + frame.label() + " — previewing against that colour.");
-                schedule();
-            })));
-
-            Button grab = new Button("Use current frame");
-            grab.setOnAction(e -> withFrame(f -> {
-                frame = f;
-                status.setText("Frame from " + f.label() + ".");
-                schedule();
-            }));
-
-            pane.getChildren().addAll(new HBox(8, sample, grab), status, result);
-            status.setText(target == null
-                    ? "No colour set yet. Sample one from the game to see what these settings would match."
-                    : "Grab a frame to see how many blobs of this colour these settings would find.");
-            debounce.setOnFinished(e -> run());
-        }
-
-        VBox pane() { return pane; }
-
-        java.awt.Color targetColor() { return target; }
-
-        void onTargetChanged(Runnable r) { this.onTargetChanged = r; }
-
-        void update(Settings s) {
-            pending = s;
-            schedule();
-        }
-
-        private void schedule() {
-            if (frame == null || target == null || pending == null) return;
-            debounce.playFromStart();
-        }
-
-        /**
-         * Runs {@code onFrame} with a frozen frame of the project's capture target, or explains why there is
-         * none. Unlike the colour editor there is no screen-pick fallback here: what these settings are being
-         * previewed against has to be a frame of the thing the bot will look at, and the desktop behind the
-         * dialog is not it.
-         */
-        private void withFrame(Consumer<EditorFrame> onFrame) {
-            StudioServices services = ctx.services();
-            EditorFrame.grabAsync(services, onFrame, failure -> {
-                Alert alert = services.theme().alert(Alert.AlertType.WARNING);
-                alert.setTitle("No frame to preview against");
-                alert.setHeaderText(failure.headline());
-                alert.setContentText(failure.detail());
-                alert.showAndWait();
-            });
-        }
-
-        /** Runs the same search the bot would, off the FX thread; a stale result is dropped by generation. */
-        private void run() {
-            BufferedImage image = frame.image();
-            java.awt.Color c = target;
-            Settings s = pending;
-            long gen = generation.incrementAndGet();
-            Thread t = new Thread(() -> {
-                String text;
-                try {
-                    List<RawColorMatch> hits =
-                            ColorMatcher.findClusters(image, c, s.deltaE(), s.minArea(), s.minCount());
-                    int present = ColorMatcher.matchCount(image, c, s.deltaE());
-                    text = describe(hits, present, s);
-                } catch (RuntimeException | LinkageError ex) {
-                    text = "Could not search this frame: " + ex.getMessage();
-                }
-                String done = text;
-                Platform.runLater(() -> {
-                    if (generation.get() == gen) result.setText(done);
-                });
-            }, "precision-preview");
-            t.setDaemon(true);
-            t.start();
-        }
-
-        /**
-         * Says what happened <em>and</em>, on a miss, which of the two gates rejected it. "Nothing matched" is
-         * the answer that sends a user round in circles; "the colour is there, but the biggest patch is 60 px²"
-         * tells them which number to move.
-         */
-        private static String describe(List<RawColorMatch> hits, int present, Settings s) {
-            if (!hits.isEmpty()) {
-                int largest = hits.getFirst().pixelCount();
-                return String.format("%d blob%s match, largest %,d px² — %,d px of this colour in the frame.",
-                        hits.size(), hits.size() == 1 ? "" : "s", largest, present);
+    /** The colour this precision is a tolerance around: the call's first {@code Color} argument, when readable. */
+    static Optional<java.awt.Color> targetOf(ValueContext ctx) {
+        return ctx.slot().flatMap(slot -> slot.enclosingExecutable().flatMap(call -> {
+            Class<?>[] parameters = call.getParameterTypes();
+            for (int i = 0; i < parameters.length; i++) {
+                if (parameters[i] == java.awt.Color.class) return slot.argumentValue(i, java.awt.Color.class);
             }
-            if (present == 0) {
-                return "Nothing in this frame is within ΔE " + trim(s.deltaE()) + " of the colour.";
-            }
-            if (s.minCount() > present) {
-                return String.format("No match: %,d px of the colour are present, below the %,d you asked for.",
-                        present, s.minCount());
-            }
-            return String.format("No match: %,d px of the colour are present, but no single patch reaches "
-                    + "%,d px². Lower the patch size, or ask for a total instead.", present, s.minArea());
+            return Optional.empty();
+        }));
+    }
+
+    /** The line under the overlay that says what it is previewing against. */
+    static final class TargetColor {
+        private TargetColor() {}
+
+        static String describe(java.awt.Color target) {
+            return target == null ? "No colour to preview against: pick one with the eyedropper."
+                    : String.format("Target #%02X%02X%02X", target.getRed(), target.getGreen(), target.getBlue());
         }
     }
 
@@ -470,51 +465,6 @@ public final class PrecisionEditors {
     // ------------------------------------------------------------------
     // drawing / labels
     // ------------------------------------------------------------------
-
-    private static void renderSwatches(HBox box, java.awt.Color target, double tolerance) {
-        box.getChildren().clear();
-        for (double d : SAMPLE_DISTANCES) {
-            java.awt.Color shade = shifted(target, d);
-            Rectangle r = new Rectangle(34, 34,
-                    Color.rgb(shade.getRed(), shade.getGreen(), shade.getBlue()));
-            r.setArcWidth(6);
-            r.setArcHeight(6);
-            boolean matches = d <= tolerance;
-            r.setStroke(matches ? Color.web("#2d7d46") : Color.web("#b0b0b0"));
-            r.setStrokeWidth(matches ? 3 : 1);
-            r.setOpacity(matches ? 1.0 : 0.45);
-            Label caption = Styles.on(new Label(trim(d)), matches ? Styles.CAPTION_STRONG : Styles.CAPTION);
-            VBox cell = new VBox(3, r, caption);
-            cell.setAlignment(Pos.CENTER);
-            box.getChildren().add(cell);
-        }
-    }
-
-    /**
-     * A colour approximately {@code deltaE} away from {@code base}, found by walking towards a lighter/darker
-     * variant until {@link ColorMatcher#deltaE} says we have gone far enough. Searching against the real metric
-     * rather than computing an offset in Lab keeps the preview honest for any hue — including the ones where a
-     * fixed RGB step is a much bigger perceptual jump than it looks.
-     */
-    private static java.awt.Color shifted(java.awt.Color base, double deltaE) {
-        if (deltaE <= 0) return base;
-        // Move away from mid-grey so the walk has somewhere to go for both dark and light targets.
-        int dir = (base.getRed() + base.getGreen() + base.getBlue()) / 3 > 127 ? -1 : 1;
-        java.awt.Color best = base;
-        for (int step = 1; step <= 255; step++) {
-            java.awt.Color candidate = new java.awt.Color(
-                    clampChannel(base.getRed() + dir * step),
-                    clampChannel(base.getGreen() + dir * (step / 2)),
-                    clampChannel(base.getBlue() + dir * step));
-            best = candidate;
-            if (ColorMatcher.deltaE(base, candidate) >= deltaE) break;
-        }
-        return best;
-    }
-
-    private static int clampChannel(int v) {
-        return Math.max(0, Math.min(255, v));
-    }
 
     /**
      * Draws the area at 1:1 over a pixel grid: a filled circle of exactly {@code pixels} area, with the
@@ -601,8 +551,12 @@ public final class PrecisionEditors {
         return Math.max(0, Math.min(MAX_DELTA_E, v));
     }
 
-    private static double round(double v) {
-        return Math.round(v);
+    /**
+     * To a tenth, the step a taught tolerance is set in (2026-09-26; whole numbers before). Rounding a taught
+     * 9.4 down to 9 would drop the green pin the lesson was made to take.
+     */
+    static double round(double v) {
+        return Math.round(v * 10) / 10.0;
     }
 
     private static String trim(double v) {
