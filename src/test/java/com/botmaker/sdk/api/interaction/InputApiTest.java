@@ -77,6 +77,17 @@ class InputApiTest {
     }
 
     @Test
+    void aComboValuePressesLikeTheVarargsCall() {
+        Keyboard.combo(Combo.of(Key.CTRL, Key.C));
+        assertEquals(List.of(
+                "keyDown(" + Key.CTRL.nativeCode() + ")",
+                "keyDown(" + Key.C.nativeCode() + ")",
+                "keyUp(" + Key.C.nativeCode() + ")",
+                "keyUp(" + Key.CTRL.nativeCode() + ")"
+        ), fake.events);
+    }
+
+    @Test
     void tapPressesThenReleases() {
         Keyboard.tap(Key.ENTER);
         assertEquals(List.of(

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.interaction;
 
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.plugin.api.record.Gesture;
 import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.util.Debug;
@@ -35,9 +36,11 @@ import com.botmaker.session.DesktopSession;
  * type</em>. Keys therefore reach the game, but the game is brought to the foreground first. There is no
  * mechanism on X11 that is both background and accepted by a game; that trade is the whole choice.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): all ten are offered. The shape is exactly the one
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): all twelve are offered. The shape is exactly the one
  * {@code ImageFinder}'s rule keeps — five operations, each in the plain form and the {@link CaptureSource} form
  * — with no third variant carrying a value a property already holds, so there is nothing here to trim.
+ * {@code combo} leads with its {@link Combo} shape (2026-09-26); the varargs one is in its submenu, and is what
+ * a recording falls back to on a host that cannot fill a {@code Combo}.
  */
 @Palette(category = "interaction", categoryLabel = "Interaction", icon = "⌨", order = 11)
 public class Keyboard {
@@ -83,6 +86,16 @@ public class Keyboard {
         for (int i = keys.length - 1; i >= 0; i--) {
             release(keys[i]);
         }
+    }
+
+    /**
+     * Press {@code combo}: hold every key in order, then release them in reverse — e.g.
+     * {@code Keyboard.combo(Combo.of(Key.CTRL, Key.C))} for copy.
+     */
+    @PaletteDefault   // ties with combo(Key...) on width; the value is what the editor and the recorder write
+    @Records(value = Gesture.COMBO, rank = 1)
+    public static void combo(Combo combo) {
+        combo(combo.keys().toArray(Key[]::new));
     }
 
     /**
@@ -134,6 +147,11 @@ public class Keyboard {
         for (int i = keys.length - 1; i >= 0; i--) {
             release(source, keys[i]);
         }
+    }
+
+    /** Press {@code combo} on {@code source}'s window: hold each key in order, release in reverse. */
+    public static void combo(CaptureSource source, Combo combo) {
+        combo(source, combo.keys().toArray(Key[]::new));
     }
 
     /** Type {@code text} into {@code source}'s window (see {@link #type(String)}). */
