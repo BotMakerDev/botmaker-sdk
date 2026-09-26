@@ -25,10 +25,11 @@ No source changes since v1.1.15; re-released for updated upstream pins.
   `Sdk.java`, or its flow was written by hand), Close asks whether to close without saving. Before, the
   window refused to close. The message about a missing `Sdk.java` no longer promises that adding the SDK
   creates the file.
-- **A project with no `Sdk.java` can get one.** The Activity Flow window offers *Create Sdk.java*, which
-  asks Studio to write `plugins/sdk/Sdk.java` with an empty flow and the whole desktop as the capture source;
-  the status line then says to add `Sdk.class` to `Bot.run(…)` in `main`. Picking a capture source in such
-  a project creates the file the same way, instead of the pick going nowhere. Needs studio-api 0.3.0.
+- **A project with no `Sdk.java` gets one.** Studio writes `plugins/sdk/Sdk.java` (an empty flow, the whole
+  desktop as the capture source) and `plugins/sdk/Pictures.java` as soon as the SDK is in a project that has
+  neither, so the Activity Flow window no longer carries a *Create Sdk.java* button. Add `Sdk.class` to
+  `Bot.run(…)` in `main` yourself; Studio never edits `main`. Picking a capture source in a project without
+  the file still creates it, instead of the pick going nowhere. Needs studio-api 0.3.0.
 
 This is **2.0.0**, the one release that removes `api.*` elements. From it on, never-delete applies:
 `api.*` only grows.

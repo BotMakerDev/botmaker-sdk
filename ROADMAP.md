@@ -8,6 +8,14 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-26 — Studio writes a missing Sdk.java on its own
+
+**Done**
+- `ActivityFlowDialog`: the *Create Sdk.java* button is deleted. Studio writes every holder a project lacks
+  on each bind (`HostPluginValues.createMissing`), so the window's empty state is now only reachable when
+  the user deleted the file mid-session or keeps an `Sdk` class Studio cannot read; its message says to
+  reopen the project.
+
 ## 2026-09-25 — Studio creates a missing Sdk.java on request
 
 **Done**
