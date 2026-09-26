@@ -8,6 +8,16 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — the drawn mouse and the diagonal pad (picker phase 6b, phase D)
+
+**Done**
+- `plugin/editors/MouseButtons` (pure): each `MouseButton`'s part on a 120×160 drawing (an SVG `-fx-shape` on a
+  themed toggle) and the SDK button a JavaFX press is. `InputEditors.mouseButton` draws them over an outlined
+  body, plus a capture strip that takes the pressing button (its context menu consumed); the old row layout is
+  gone. `MouseButtonsTest` fails if a button has no part.
+- `InputEditors.padCells()` (extracted from `direction`) places the compass diagonals; `DirectionPadTest` fails
+  if a `Direction` falls to the spare row or two share a square.
+
 ## 2026-09-26 — the drawn keyboard (picker phase 6b, phase C)
 
 **Done**

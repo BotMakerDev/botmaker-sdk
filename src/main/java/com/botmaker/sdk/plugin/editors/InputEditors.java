@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.interaction.Combo;
 import com.botmaker.sdk.api.interaction.Key;
 import com.botmaker.sdk.api.interaction.MouseButton;
+import javafx.event.Event;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -17,11 +18,15 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -62,7 +67,9 @@ public final class InputEditors {
             new Cell("LEFT", "←", 0, 1), new Cell("RIGHT", "→", 2, 1),
             new Cell("DOWN_LEFT", "↙", 0, 2), new Cell("DOWN", "↓", 1, 2), new Cell("DOWN_RIGHT", "↘", 2, 2),
             new Cell("NORTH", "↑", 1, 0), new Cell("SOUTH", "↓", 1, 2),
-            new Cell("WEST", "←", 0, 1), new Cell("EAST", "→", 2, 1));
+            new Cell("WEST", "←", 0, 1), new Cell("EAST", "→", 2, 1),
+            new Cell("NORTH_WEST", "↖", 0, 0), new Cell("NORTH_EAST", "↗", 2, 0),
+            new Cell("SOUTH_WEST", "↙", 0, 2), new Cell("SOUTH_EAST", "↘", 2, 2));
 
     /**
      * A direction as a pad of arrows.
@@ -78,18 +85,10 @@ public final class InputEditors {
         GridPane pad = new GridPane();
         pad.setHgap(2);
         pad.setVgap(2);
-        // One button per square. The two spellings share squares, and a Direction holding both would
-        // otherwise stack two buttons on one cell, the second painting over the first.
-        Set<String> taken = new HashSet<>();
-        Set<String> placed = new HashSet<>();
-        for (Cell cell : CELLS) {
-            Direction constant = constantNamed(cell.name());
-            if (constant == null) continue;
-            if (!taken.add(cell.column() + "," + cell.row())) continue;
-            placed.add(cell.name());
-            pad.add(toggle(ctx, group, constant, cell.arrow(), constant.name(), current, "direction-pad-key"),
-                    cell.column(), cell.row());
-        }
+        Map<Direction, int[]> cells = padCells();
+        cells.forEach((constant, square) -> pad.add(
+                toggle(ctx, group, constant, arrowOf(constant), constant.name(), current, "direction-pad-key"),
+                square[0], square[1]));
 
         VBox box = new VBox(4, pad);
         box.getStyleClass().add("direction-pad");
@@ -98,12 +97,34 @@ public final class InputEditors {
         // button rather than quietly disappearing from the editor.
         HBox spare = new HBox(2);
         for (Direction constant : Direction.values()) {
-            if (placed.contains(constant.name())) continue;
+            if (cells.containsKey(constant)) continue;
             spare.getChildren().add(
                     toggle(ctx, group, constant, constant.name(), constant.name(), current, "direction-pad-key"));
         }
         if (!spare.getChildren().isEmpty()) box.getChildren().add(spare);
         return box;
+    }
+
+    /**
+     * Where each constant lands, as {@code {column, row}}: one button per square. The two spellings share
+     * squares, and a Direction holding both would otherwise stack two buttons on one cell, the second painting
+     * over the first — so the first cell per square wins.
+     */
+    static Map<Direction, int[]> padCells() {
+        Map<Direction, int[]> out = new EnumMap<>(Direction.class);
+        Set<String> taken = new HashSet<>();
+        for (Cell cell : CELLS) {
+            Direction constant = constantNamed(cell.name());
+            if (constant == null || out.containsKey(constant)) continue;
+            if (!taken.add(cell.column() + "," + cell.row())) continue;
+            out.put(constant, new int[]{cell.column(), cell.row()});
+        }
+        return out;
+    }
+
+    private static String arrowOf(Direction constant) {
+        return CELLS.stream().filter(c -> c.name().equals(constant.name())).map(Cell::arrow)
+                .findFirst().orElse(constant.name());
     }
 
     private static Direction constantNamed(String name) {
@@ -115,14 +136,9 @@ public final class InputEditors {
 
     // --- mouse button ----------------------------------------------------------------------------------
 
-    private static final List<String[]> TOP = List.of(
-            new String[]{"LEFT", "Left"}, new String[]{"MIDDLE", "Wheel"}, new String[]{"RIGHT", "Right"});
-    private static final List<String[]> SIDE = List.of(
-            new String[]{"BACK", "Back"}, new String[]{"FORWARD", "Forward"});
-
     /**
-     * The mouse buttons as a labelled diagram: the two main buttons and the wheel across the top, the side
-     * buttons under them.
+     * The mouse buttons on a drawn mouse ({@link MouseButtons}): click the part, or click the strip under it
+     * with the button you mean — a right click there is the answer, never a menu.
      *
      * <p><b>What this names is what the button does, never where it sits.</b> A mouse with two thumb
      * buttons, a left-handed mouse, a mouse the vendor's driver has remapped — in all of them the OS
@@ -132,41 +148,54 @@ public final class InputEditors {
     public static Node mouseButton(ValueContext ctx) {
         MouseButton current = ctx.value(MouseButton.class).orElse(null);
         ToggleGroup group = new ToggleGroup();
+        Map<MouseButton, ToggleButton> buttons = new EnumMap<>(MouseButton.class);
 
-        HBox top = new HBox(2);
-        HBox side = new HBox(2);
-        Set<String> placed = new HashSet<>();
-        for (String[] entry : TOP) addButton(ctx, group, top, entry, current, placed);
-        for (String[] entry : SIDE) addButton(ctx, group, side, entry, current, placed);
-
-        VBox box = new VBox(4, top);
-        box.getStyleClass().add("mouse-diagram");
-        if (!side.getChildren().isEmpty()) {
-            Label hint = new Label("side buttons");
-            hint.getStyleClass().add("dialog-hint-text");
-            box.getChildren().addAll(side, hint);
+        Pane drawing = new Pane();
+        drawing.setMinSize(120, 160);
+        drawing.setPrefSize(120, 160);
+        // The body under the buttons: a plain outline, drawn first so the buttons sit on it.
+        Region body = new Region();
+        body.setStyle("-fx-shape: \"M0 40 Q0 0 50 0 Q100 0 100 40 L100 110 Q100 150 50 150 Q0 150 0 110 Z\";"
+                + " -fx-border-color: -bm-divider; -fx-border-width: 1;");
+        // A Pane autosizes its children to their pref size, so the size is set as one, not by resize().
+        body.setPrefSize(100, 150);
+        body.relocate(10, 6);
+        drawing.getChildren().add(body);
+        for (MouseButtons.Part part : MouseButtons.parts()) {
+            ToggleButton button = toggle(ctx, group, part.button(), "", part.label(), current, "mouse-diagram-key");
+            button.setStyle("-fx-shape: \"" + part.shape() + "\"; -fx-padding: 0;");
+            button.setMinSize(part.w(), part.h());
+            button.setPrefSize(part.w(), part.h());
+            button.setMaxSize(part.w(), part.h());
+            button.relocate(part.x(), part.y());
+            drawing.getChildren().add(button);
+            buttons.put(part.button(), button);
         }
 
-        // A button this diagram has no place for is still reachable, for the reason the direction pad's
+        Label capture = new Label("Click here with the button you mean");
+        capture.getStyleClass().add("dialog-hint-text");
+        capture.setStyle("-fx-border-color: -bm-divider; -fx-border-style: dashed; -fx-padding: 6;");
+        capture.setOnMousePressed(e -> MouseButtons.of(e.getButton()).ifPresent(chosen -> {
+            e.consume();
+            ctx.set(chosen);
+            ToggleButton button = buttons.get(chosen);
+            if (button != null) button.setSelected(true);
+        }));
+        capture.setOnContextMenuRequested(Event::consume);   // a right click is an answer here
+
+        VBox box = new VBox(6, drawing, capture);
+        box.getStyleClass().add("mouse-diagram");
+
+        // A button this drawing has no part for is still reachable, for the reason the direction pad's
         // spare row exists: an editor that cannot express a value the type has is worse than an ugly one.
         HBox spare = new HBox(2);
         for (MouseButton constant : MouseButton.values()) {
-            if (placed.contains(constant.name())) continue;
+            if (buttons.containsKey(constant)) continue;
             spare.getChildren().add(
                     toggle(ctx, group, constant, constant.name(), constant.name(), current, "mouse-diagram-key"));
         }
         if (!spare.getChildren().isEmpty()) box.getChildren().add(spare);
         return box;
-    }
-
-    private static void addButton(ValueContext ctx, ToggleGroup group, HBox into, String[] entry,
-                                  MouseButton current, Set<String> placed) {
-        for (MouseButton constant : MouseButton.values()) {
-            if (!constant.name().equals(entry[0])) continue;
-            placed.add(constant.name());
-            into.getChildren().add(
-                    toggle(ctx, group, constant, entry[1], constant.name(), current, "mouse-diagram-key"));
-        }
     }
 
     // --- key and combination ---------------------------------------------------------------------------

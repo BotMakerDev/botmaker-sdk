@@ -38,6 +38,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **A `Key` is picked on a drawn keyboard**: click a cap, press the key, or search ("page", "num 5"). It was a
   dropdown of constant names. A **`Combo`** is picked on the same keyboard: Ctrl, Alt, Shift and Meta toggle
   beside one other key, or press the whole combination at once; it is written modifiers first.
+- **A `MouseButton` is picked on a drawn mouse**: click the left or right button, the wheel or a side button, or
+  click the strip under it with the button you mean. **The direction pad has its diagonals**, one square each.
 
 - **Screen picks ask where to pick.** Point, Rect, Size and the colour eyedropper open a small menu — the bot's
   own source, another window or screen, or the whole desktop — and pick on a frozen frame of it. A value in a
