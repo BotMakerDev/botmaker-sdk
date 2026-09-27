@@ -88,9 +88,13 @@ public final class CaptureTemplates {
 
     /**
      * Run once when the tool is finished with the screen, however it ends — closed, or never opened because
-     * there was no target. A caller that got out of the way to make room for it uses this to come back.
+     * there was no target. A caller that got out of the way to make room for it uses this to come back, and
+     * it is handed the names saved meanwhile, so the picture chooser can select what was just captured.
      */
-    private final Runnable onClosed;
+    private final Consumer<List<String>> onClosed;
+
+    /** The names of the pictures saved while the tool was open, in the order they were saved. */
+    private final List<String> saved = new ArrayList<>();
 
     private Stage toolbarStage;
     private CaptureSurface surface;
@@ -103,7 +107,7 @@ public final class CaptureTemplates {
     private boolean closed;
 
     private CaptureTemplates(StudioServices services, Window owner,
-                             CaptureSource target, String suggestedTag, Runnable onClosed) {
+                             CaptureSource target, String suggestedTag, Consumer<List<String>> onClosed) {
         this.services = services;
         this.owner = owner;
         this.target = target;
@@ -135,10 +139,21 @@ public final class CaptureTemplates {
     public static void open(StudioServices services, Window owner, CaptureSource target,
                             String suggestedTag, Runnable onClosed) {
         Runnable done = onClosed == null ? () -> {} : onClosed;
+        open(services, owner, target, suggestedTag, names -> done.run());
+    }
+
+    /**
+     * As {@link #open(StudioServices, Window, CaptureSource, String, Runnable)}, handing {@code onSaved} the
+     * names of the pictures saved while the tool was open — {@code []} when it never opened (no capture
+     * target, or one already up) or nothing was saved. The picture chooser's Capture new… is the caller.
+     */
+    public static void open(StudioServices services, Window owner, CaptureSource target,
+                            String suggestedTag, Consumer<List<String>> onSaved) {
+        Consumer<List<String>> done = onSaved == null ? names -> {} : onSaved;
         // Single-instance: focus the live tool instead of stacking another one.
         if (active != null && active.toolbarStage != null && active.toolbarStage.isShowing()) {
             active.toolbarStage.toFront();
-            done.run();
+            done.accept(List.of());
             return;
         }
         new CaptureTemplates(services, owner, target, suggestedTag, done).start();
@@ -381,11 +396,12 @@ public final class CaptureTemplates {
         if (closed) return;
         closed = true;
         if (active == this) active = null;
-        onClosed.run();
+        onClosed.accept(List.copyOf(saved));
     }
 
     private void save(BufferedImage picture, String name, int frameWidth, int frameHeight) throws Exception {
         TemplateLibrary.saveTemplate(resources(), picture, name, frameWidth, frameHeight, windowTitle());
+        saved.add(name);
     }
 
     private Path resources() {
