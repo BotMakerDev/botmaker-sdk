@@ -317,7 +317,7 @@ public final class SdkTypes {
      * The fifteen, in the order a menu should offer them: the vision types, the geometry ones, the two
      * input enums and a key combination, the capture source and the picture group, then the four a bot holds but nobody edits.
      *
-     * <p>A host offers plugin-basics' nine before them, which is what puts the literals a bot mostly counts
+     * <p>A host offers plugin-basics' eleven before them, which is what puts the literals a bot mostly counts
      * and labels with at the top of the list.
      */
     public static final List<PluginType<?>> ALL = List.of(
