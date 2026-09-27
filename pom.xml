@@ -41,8 +41,8 @@
              below stopped being: `optional` means not transitive, so a host resolving botmaker-sdk got a
              jar whose SdkPlugin could not resolve its own superclass. See the dependency's own comment. -->
         <botmaker.plugintoolkit.version>0.0.0-SNAPSHOT</botmaker.plugintoolkit.version>
-        <!-- botmaker-plugin-basics version: PLUGIN #2, which owns the nine JDK value types this module's
-             WireText delegates the parsing of. Same 0.0.0-SNAPSHOT contract as the four above and the same
+        <!-- botmaker-plugin-basics version: PLUGIN #2, which owns the JDK value types and their editors.
+             Same 0.0.0-SNAPSHOT contract as the four above and the same
              flatten reason — it is an ordinary <dependencies> entry, so the published pom must carry a
              resolvable version, and cutting plugin-basics therefore forces an SDK release. -->
         <botmaker.pluginbasics.version>0.0.0-SNAPSHOT</botmaker.pluginbasics.version>
@@ -140,8 +140,10 @@
             <version>${botmaker.plugintoolkit.version}</version>
         </dependency>
 
-        <!-- Plugin #2 (the JDK value types, Settings, PluginData), at `compile`: an ordinary plugin-to-plugin
-             dependency. Nothing may declare it directly beside this SDK in a bot's pom (nearest-wins). -->
+        <!-- Plugin #2 (the JDK value types and their editors), at `compile`: an ordinary plugin-to-plugin
+             dependency, so a project with the SDK can edit a String or a Duration. No SDK code names it since
+             2026-09-28 (the @Managed runtime is the contract's); in a bot it is one inert jar. Nothing may
+             declare it directly beside this SDK in a bot's pom (nearest-wins). -->
         <dependency>
             <groupId>com.github.LiQiyeDev</groupId>
             <artifactId>botmaker-plugin-basics</artifactId>

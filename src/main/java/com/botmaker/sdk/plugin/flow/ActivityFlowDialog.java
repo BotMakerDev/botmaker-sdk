@@ -187,7 +187,7 @@ public final class ActivityFlowDialog {
 
     /** Seeds the canvas from the stored flow: a card per activity, at its stored spot or a fresh one. */
     private void loadCurrent() {
-        value = FlowValue.open(services);
+        value = FlowValue.FLOW.open(services);
         Flow flow = readFlow();
         FlowLayout layout = loadLayout();
         boolean anyPlaced = false;
@@ -228,7 +228,7 @@ public final class ActivityFlowDialog {
                     + "no Sdk class anywhere; reopen the project to get it.");
             return Flow.NONE;
         }
-        if (!FlowValue.readable(value.get())) {
+        if (!FlowValue.FLOW.readable(value.get())) {
             readOnly("The flow in Sdk.flow() isn't one this editor wrote, so it is shown empty and left "
                     + "alone. Edit it in Sdk.java, or replace it with Flow.of(…) to draw it here.");
             return Flow.NONE;
@@ -846,8 +846,8 @@ public final class ActivityFlowDialog {
      * this plugin did not write, opens arranged, and the status line says the positions will not be kept.
      */
     private FlowLayout loadLayout() {
-        layoutValue = FlowValue.openLayout(services);
-        Optional<FlowLayout> read = layoutValue.flatMap(FlowValue::readLayout);
+        layoutValue = FlowValue.LAYOUT.open(services);
+        Optional<FlowLayout> read = layoutValue.flatMap(FlowValue.LAYOUT::read);
         if (read.isEmpty()) {
             layoutValue = Optional.empty();
             // The flow's own reason, when it has one, is the one worth reading.

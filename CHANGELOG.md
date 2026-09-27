@@ -78,6 +78,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   vision results. A result (`MatchResult`, `Matches`, `ColorMatch`, `TextMatch`) is a pill in plain words —
   *Last picture match*, *Pictures found*, *Last colour match*, *Last text read* — with its Java in the
   tooltip: the bot fills it in, so there is nothing to set.
+- **Each `@Managed` value is declared once** (`internal.bot.SdkValues`: `FLOW`, `FLOW_LAYOUT`, `CAPTURE`,
+  `SETTINGS`, `PICTURES`, typed `ManagedValue<T>` constants). The plugin lists them, `Bot.run` claims them
+  through the contract's `ManagedValues`, and the windows read and write them through the toolkit's
+  `ManagedHandle`. `SdkPlugin.FLOW`/`CAPTURE`/…, `FlowValue.ID`/`LAYOUT_ID`, `CaptureValue.ID`/`open` and
+  `BotSettingsWindow.ID` are gone. No SDK code names plugin-basics any more; the dependency stays for the JDK
+  value editors.
 
 ### Fixed
 

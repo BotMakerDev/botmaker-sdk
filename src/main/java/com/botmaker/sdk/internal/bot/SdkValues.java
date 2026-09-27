@@ -1,37 +1,71 @@
 package com.botmaker.sdk.internal.bot;
 
-import com.botmaker.plugin.basics.managed.ManagedValues;
+import com.botmaker.plugin.api.managed.ManagedValues;
+import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Flows;
 
+import java.util.List;
+
 /**
- * Which of a bot's {@code @Managed} values are this plugin's, and what happens to each one.
+ * The SDK's {@code @Managed} values, each declared once, and what a run does with each one.
  *
- * <p>Four ids, and they are the four the SDK ships a declaration for in {@code Sdk.java}: {@code "flow"} is
- * the activity flow, {@code "capture"} is where pixels are read from, {@code "settings"} is how it clicks and
- * looks, and {@code "flow.layout"} is where the flow editor draws each card, which a run ignores (2026-09-27). A bot's own file declares them; this says what {@code Flows}, {@code Source} and
- * {@code BotSettings} do with what it declared.
+ * <p>Five declarations, and every id is spelled here and nowhere else (2026-09-28): the plugin lists
+ * {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
+ * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code "flow"} is the activity
+ * flow, {@code "flow.layout"} where the flow editor draws each card (a run ignores it), {@code "capture"} where
+ * pixels are read from, {@code "settings"} how it clicks and looks, and {@code "pictures"} the class of picture
+ * constants the bot grows.
  *
- * <p><b>It is {@code internal} because a bot never names it.</b> {@link com.botmaker.sdk.api.bot.Bot#run}
- * calls {@link #claim()} before installing, which is the only ordering anyone has to get right — and the
- * only reason it is a call rather than a static initialiser is that a static initialiser would need
- * something to have loaded this class first, and nothing would have.
- *
- * <p>A cast that fails here cannot happen from a file the editor wrote: the id and the method's declared
- * return type are paired by the same plugin. A hand-edited {@code @Managed("flow") String flow()} would,
- * and {@code ManagedValues} reports it by name rather than taking the bot down.
+ * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract
+ * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#run} calls
+ * {@link #claim()} before installing, which is the only ordering anyone has to get right.
  */
 public final class SdkValues {
+
+    /** The class the method-shaped values live in: {@code plugins/sdk/Sdk.java}, named by the bot's {@code main}. */
+    public static final String HOLDER = "Sdk";
+
+    public static final ManagedValue<Flow> FLOW = ManagedValue.of("flow", HOLDER, Flow.class, Flow.NONE,
+            "This is the bot's activity flow. Draw it in 🔀 Activity Flow, which keeps the activities, the wires"
+                    + " and the layout in step.");
+
+    public static final ManagedValue<FlowLayout> FLOW_LAYOUT = ManagedValue.of("flow.layout", HOLDER,
+            FlowLayout.class, FlowLayout.NONE,
+            "These are where the Activity Flow's cards sit. Drag them in 🔀 Activity Flow, which keeps them in"
+                    + " step with the activities' names.");
+
+    public static final ManagedValue<CaptureSource> CAPTURE = ManagedValue.of("capture", HOLDER,
+            CaptureSource.class, CaptureSource.desktop(),
+            "This is where the bot reads pixels from. Choose it in 🎯 Capture Source.");
+
+    public static final ManagedValue<BotSettings> SETTINGS = ManagedValue.of("settings", HOLDER,
+            BotSettings.class, BotSettings.DEFAULTS,
+            "These are the bot's settings — delays, confidence, input and its private display. Change them in"
+                    + " ⚙ Bot Settings.");
+
+    /**
+     * The picture constants — {@code static final ImageTemplate COLLECT = new ImageTemplate(…)}. 🖼 Manage
+     * Pictures renames the file, the constant and every use of it together; the canvas can only rename the one
+     * it is looking at, which would leave the bot calling a name that is gone.
+     */
+    public static final ManagedValue<Void> PICTURES = ManagedValue.openSet("pictures", "Pictures",
+            "Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every use of it"
+                    + " together.");
+
+    /** All five, in the order the plugin declares them. */
+    public static final List<ManagedValue<?>> ALL = List.of(FLOW, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES);
 
     private static boolean claimed;
 
     private SdkValues() {}
 
     /**
-     * Registers this plugin's ids with {@link ManagedValues}. Idempotent, and cheap enough to be called on
+     * Registers this plugin's values with {@link ManagedValues}. Idempotent, and cheap enough to be called on
      * every {@code Bot.run} rather than guarded by its caller.
      */
     public static synchronized void claim() {
@@ -39,11 +73,11 @@ public final class SdkValues {
             return;
         }
         claimed = true;
-        ManagedValues.claim("flow", value -> Flows.use((Flow) value));
-        ManagedValues.claim("capture", value -> Source.set((CaptureSource) value));
-        ManagedValues.claim("settings", value -> BotSettings.use((BotSettings) value));
+        ManagedValues.claim(FLOW, Flows::use);
+        ManagedValues.claim(CAPTURE, Source::set);
+        ManagedValues.claim(SETTINGS, BotSettings::use);
         // Where the flow editor's cards sit: the editor's, and nothing at runtime reads it. Claimed so a run
         // does not report it as a value nobody takes.
-        ManagedValues.claim("flow.layout", value -> { });
+        ManagedValues.claim(FLOW_LAYOUT, layout -> { });
     }
 }

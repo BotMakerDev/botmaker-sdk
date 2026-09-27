@@ -106,23 +106,26 @@ class SdkPluginSurfaceTest {
      */
     @Test
     void each_managed_value_says_where_the_host_creates_it() {
-        var byId = new java.util.HashMap<String, com.botmaker.plugin.api.source.ManagedValue>();
+        var byId = new java.util.HashMap<String, com.botmaker.plugin.api.source.ManagedValue<?>>();
         plugin.managedValues().forEach(v -> byId.put(v.id(), v));
-        var flow = byId.get(SdkPlugin.FLOW);
-        assertEquals(SdkPlugin.SDK_HOLDER, flow.holder());
-        assertEquals(com.botmaker.sdk.api.flow.Flow.class, flow.valueType());
+        var flow = byId.get("flow");
+        assertEquals("Sdk", flow.holder());
+        assertEquals(com.botmaker.sdk.api.flow.Flow.class, flow.type());
         assertEquals(com.botmaker.sdk.api.flow.Flow.NONE, flow.initial());
-        var layout = byId.get(SdkPlugin.FLOW_LAYOUT);
-        assertEquals(SdkPlugin.SDK_HOLDER, layout.holder());
-        assertEquals(com.botmaker.sdk.api.flow.FlowLayout.class, layout.valueType());
+        var layout = byId.get("flow.layout");
+        assertEquals("Sdk", layout.holder());
+        assertEquals(com.botmaker.sdk.api.flow.FlowLayout.class, layout.type());
         assertEquals(com.botmaker.sdk.api.flow.FlowLayout.NONE, layout.initial());
-        var capture = byId.get(SdkPlugin.CAPTURE);
-        assertEquals(SdkPlugin.SDK_HOLDER, capture.holder());
-        assertEquals(CaptureSource.class, capture.valueType());
+        var capture = byId.get("capture");
+        assertEquals("Sdk", capture.holder());
+        assertEquals(CaptureSource.class, capture.type());
         assertEquals(CaptureSource.desktop().getClass(), capture.initial().getClass());
-        var pictures = byId.get(SdkPlugin.PICTURES);
+        var settings = byId.get("settings");
+        assertEquals(com.botmaker.sdk.api.bot.BotSettings.class, settings.type());
+        var pictures = byId.get("pictures");
         assertEquals("Pictures", pictures.holder());
-        assertNull(pictures.valueType());
+        assertNull(pictures.type());
+        assertEquals(5, byId.size());
     }
 
     /** The palette is the host's to discover from {@code @Palette}; {@link ApiCatalogTest} checks what it finds. */

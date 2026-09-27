@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.managed.Managed;
-import com.botmaker.plugin.basics.managed.ManagedValues;
+import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.internal.config.ProjectDefaults;

@@ -84,6 +84,6 @@ public final class ActivityEditors {
      * them answers {@link Flow#NONE}, which is why there is no {@code try} here any more.
      */
     private static Flow flow(ValueContext ctx) {
-        return FlowValue.open(ctx.services()).map(FlowValue::read).orElse(Flow.NONE);
+        return FlowValue.read(ctx.services());
     }
 }

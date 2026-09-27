@@ -1,12 +1,11 @@
 package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.CurrentSource;
-
-import java.util.Optional;
 
 /**
  * The {@code @Managed("capture")} value — where a bot reads pixels from, written as the one expression
@@ -23,15 +22,10 @@ import java.util.Optional;
  */
 public final class CaptureValue {
 
-    /** The id the plugin declares and the shipped {@code Sdk.java} annotates its method with. */
-    public static final String ID = "capture";
+    /** The value, declared once in {@link SdkValues}. */
+    public static final ManagedHandle<CaptureSource> CAPTURE = ManagedHandle.of(SdkValues.CAPTURE);
 
     private CaptureValue() {}
-
-    /** The value behind {@code capture}, or empty when the project has none to edit. */
-    public static Optional<ValueContext> open(StudioServices services) {
-        return services == null ? Optional.empty() : services.pluginValues().open(ID);
-    }
 
     /**
      * The project's capture source, or {@code null} when its Java names none the host can read.
@@ -41,13 +35,7 @@ public final class CaptureValue {
      * Read on every call rather than held: a source changed in another window has to take effect at once.
      */
     public static CaptureSource current(StudioServices services) {
-        try {
-            return open(services).flatMap(ctx -> ctx.value(CaptureSource.class))
-                    .filter(source -> !(source instanceof CurrentSource))
-                    .orElse(null);
-        } catch (RuntimeException unreadable) {
-            return null;
-        }
+        return CAPTURE.read(services).filter(source -> !(source instanceof CurrentSource)).orElse(null);
     }
 
     /**
@@ -71,10 +59,7 @@ public final class CaptureValue {
         CaptureSource value = region != null && region.width > 0 && region.height > 0
                 ? CaptureSource.region(base, new Rect(region.x, region.y, region.width, region.height))
                 : base;
-        // A pick is the user asking for a source to be kept, so a project with no Sdk.java gets one first —
-        // written by the host, once (PluginValues.create) — rather than a pick that silently goes nowhere.
-        if (services != null && open(services).isEmpty()) services.pluginValues().create(ID);
-        // The value: the host writes it through CaptureTypes, as the call the value is.
-        open(services).ifPresent(ctx -> ctx.set(value));
+        // A pick is the user asking for a source to be kept, so a project with no Sdk.java gets one first.
+        CAPTURE.write(services, value);
     }
 }

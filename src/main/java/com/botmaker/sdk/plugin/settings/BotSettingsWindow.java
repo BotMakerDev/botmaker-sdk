@@ -2,7 +2,9 @@ package com.botmaker.sdk.plugin.settings;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -43,8 +45,8 @@ import java.util.Optional;
  */
 public final class BotSettingsWindow {
 
-    /** The id the plugin declares and the shipped {@code Sdk.java} annotates its method with. */
-    public static final String ID = "settings";
+    /** The value, declared once in {@link SdkValues}. */
+    public static final ManagedHandle<BotSettings> SETTINGS = ManagedHandle.of(SdkValues.SETTINGS);
 
     private final StudioServices services;
     private final Window owner;
@@ -76,28 +78,13 @@ public final class BotSettingsWindow {
      * read — what the bot would run with. Never writes anything.
      */
     public static BotSettings current(StudioServices services) {
-        try {
-            return services == null ? BotSettings.DEFAULTS : services.pluginValues().open(ID)
-                    .flatMap(ctx -> ctx.value(BotSettings.class)).orElse(BotSettings.DEFAULTS);
-        } catch (RuntimeException unreadable) {
-            return BotSettings.DEFAULTS;
-        }
-    }
-
-    /**
-     * The value behind {@code settings}, asking the host to write {@code Sdk.java} first when the project has
-     * none; empty when there is still no method to edit.
-     */
-    static Optional<ValueContext> value(StudioServices services) {
-        Optional<ValueContext> found = services.pluginValues().open(ID);
-        if (found.isPresent()) return found;
-        services.pluginValues().create(ID);
-        return services.pluginValues().open(ID);
+        return SETTINGS.read(services).orElse(BotSettings.DEFAULTS);
     }
 
     private void show() {
-        Optional<ValueContext> ctx = value(services);
-        BotSettings current = ctx.flatMap(c -> c.value(BotSettings.class)).orElse(BotSettings.DEFAULTS);
+        // Asks the host to write Sdk.java first when the project has none; empty when there is still no method.
+        Optional<ValueContext> ctx = SETTINGS.openOrCreate(services);
+        BotSettings current = ctx.flatMap(SETTINGS::read).orElse(BotSettings.DEFAULTS);
         seed(current);
 
         Label heading = new Label("How this bot clicks and looks");
@@ -124,7 +111,7 @@ public final class BotSettingsWindow {
         if (ctx.isEmpty()) {
             save.setDisable(true);
             body.getChildren().add(missing());
-        } else if (ctx.get().value(BotSettings.class).isEmpty()) {
+        } else if (!SETTINGS.readable(ctx.get())) {
             save.setDisable(true);
             body.getChildren().add(note("Sdk.settings() is not a single `return BotSettings.of(…);`, so this "
                     + "window cannot rewrite it — it is your code, and stays as you wrote it. The defaults are "

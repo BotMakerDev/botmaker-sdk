@@ -11,10 +11,8 @@ import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
-import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.flow.FlowLayout;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.plugin.flow.FlowValue;
@@ -129,58 +127,13 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * The five values this plugin's windows keep in step, each read-only on the canvas with a reason.
-     *
-     * <p>The picture constants — {@code static final ImageTemplate COLLECT = new ImageTemplate(…)} — are the
-     * reason for the last. 🖼 Manage Pictures renames the file, the constant and every use of it together
-     * (through the host's {@code Sources}); the canvas can only rename the one it is looking at, which leaves
-     * the bot calling a name that is gone. The class says so itself, with {@code @Managed("pictures")} on the
-     * file the bot holds, so it is a statement rather than an inference about shape.
+     * The five values this plugin's windows keep in step, each read-only on the canvas with a reason. Declared
+     * once, in {@link SdkValues}, where the runtime half claims the same constants.
      */
     @Override
-    public List<ManagedValue> managedValues() {
-        return List.of(
-                new ManagedValue(FLOW,
-                        "This is the bot's activity flow. Draw it in 🔀 Activity Flow, which keeps the"
-                                + " activities, the wires and the layout in step.",
-                        SDK_HOLDER, Flow.class, Flow.NONE),
-                new ManagedValue(FLOW_LAYOUT,
-                        "These are where the Activity Flow's cards sit. Drag them in 🔀 Activity Flow, which"
-                                + " keeps them in step with the activities' names.",
-                        SDK_HOLDER, FlowLayout.class, FlowLayout.NONE),
-                new ManagedValue(CAPTURE,
-                        "This is where the bot reads pixels from. Choose it in 🎯 Capture Source.",
-                        SDK_HOLDER, CaptureSource.class, CaptureSource.desktop()),
-                new ManagedValue(SETTINGS,
-                        "These are the bot's settings — delays, confidence, input and its private display."
-                                + " Change them in ⚙ Bot Settings.",
-                        SDK_HOLDER, BotSettings.class, BotSettings.DEFAULTS),
-                new ManagedValue(PICTURES,
-                        "Picture constants are managed in 🖼 Manage Pictures, which renames the picture and"
-                                + " every use of it together.",
-                        "Pictures", null));
+    public List<ManagedValue<?>> managedValues() {
+        return SdkValues.ALL;
     }
-
-    /**
-     * The class the flow and the capture source live in — {@code plugins/sdk/Sdk.java}, which the host
-     * writes when a project has none — and the one a bot's {@code main} names in {@code Bot.run(…, Sdk.class)}.
-     */
-    public static final String SDK_HOLDER = "Sdk";
-
-    /** The {@code @Managed} id on the method holding this bot's flow. */
-    public static final String FLOW = "flow";
-
-    /** The {@code @Managed} id on the method holding where the flow's cards sit (2026-09-27). */
-    public static final String FLOW_LAYOUT = "flow.layout";
-
-    /** The {@code @Managed} id on the method holding this bot's capture source. */
-    public static final String CAPTURE = "capture";
-
-    /** The {@code @Managed} id on the method holding this bot's settings (2026-09-27). */
-    public static final String SETTINGS = BotSettingsWindow.ID;
-
-    /** The {@code @Managed} id on the class of picture constants this plugin's window keeps in step. */
-    public static final String PICTURES = "pictures";
 
     /**
      * Takes the project being bound.

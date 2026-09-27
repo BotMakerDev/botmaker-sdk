@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.bot;
+import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.plugin.basics.managed.ManagedValues;
 import com.botmaker.sdk.api.flow.Flows;
 import com.botmaker.sdk.api.launch.Target;
 import com.botmaker.sdk.api.util.Debug;

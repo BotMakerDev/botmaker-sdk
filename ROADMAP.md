@@ -8,6 +8,13 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — each managed value declared once (plugin authoring cleanup, phase 2)
+
+`internal.bot.SdkValues` holds the five typed `ManagedValue<T>` constants and `ALL`; `SdkPlugin.managedValues()`
+returns `ALL`, `claim()` hands each to the contract's `ManagedValues` with method references (`Flows::use`,
+`Source::set`, `BotSettings::use`), and `FlowValue`/`CaptureValue`/`BotSettingsWindow` hold toolkit
+`ManagedHandle`s instead of id strings and hand-written open/create/set. No SDK source names plugin-basics now.
+
 ## 2026-09-27 — card positions are `Sdk.flowLayout()` (studio cleanup, phase 7b)
 
 **Done**
