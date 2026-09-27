@@ -7,11 +7,17 @@ import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.interaction.Combo;
 import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.interaction.KeySequence;
 import com.botmaker.sdk.api.interaction.MouseButton;
 import javafx.event.Event;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
 import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
@@ -23,11 +29,14 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * The three input enums a bot's own API names — a {@link Direction}, a {@link Key}, a {@link MouseButton} —
@@ -219,10 +228,44 @@ public final class InputEditors {
      * with a key dropped. Since 2026-09-27 any other combo is held as written, in its own order.
      */
     static Chord chordOf(ValueContext ctx) {
-        return ctx.value(Combo.class)
-                .filter(combo -> Chord.of(combo).combo().filter(combo::equals).isPresent())
-                .map(Chord::of)
-                .orElse(Chord.EMPTY);
+        return ctx.value(Combo.class).map(InputEditors::chordOf).orElse(Chord.EMPTY);
+    }
+
+    /** {@code combo}'s keys as a chord, or nothing when one repeats; the hold is not the chord's. */
+    private static Chord chordOf(Combo combo) {
+        return Chord.of(combo).combo().filter(held -> held.keys().equals(combo.keys())).isPresent()
+                ? Chord.of(combo) : Chord.EMPTY;
+    }
+
+    /**
+     * A hold or a wait as typed: whole milliseconds, a trailing "ms" allowed, blank for none. {@code null} for
+     * anything else, a negative number included, so the field can say it is wrong rather than write a guess.
+     */
+    static Duration holdOf(String text) {
+        String t = text == null ? "" : text.strip();
+        if (t.endsWith("ms")) t = t.substring(0, t.length() - 2).strip();
+        if (t.isEmpty()) return Duration.ZERO;
+        try {
+            long ms = Long.parseLong(t);
+            return ms < 0 ? null : Duration.ofMillis(ms);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** The sequence pill: {@code Ctrl+A → 100 ms → Ctrl+C}, else the source as written, else an invitation. */
+    static String sequencePill(ValueContext ctx) {
+        return ctx.value(KeySequence.class).map(KeySequence::toString)
+                .orElseGet(() -> Slots.raw(ctx).isBlank() ? "Choose key steps…" : Slots.raw(ctx));
+    }
+
+    /** {@code items} with the one at {@code from} taken out and put back at {@code to}; unchanged for a bad index. */
+    static <T> List<T> moved(List<T> items, int from, int to) {
+        if (from < 0 || from >= items.size()) return items;
+        List<T> next = new ArrayList<>(items);
+        T item = next.remove(from);
+        next.add(Math.clamp(to, 0, next.size()), item);
+        return List.copyOf(next);
     }
 
     /**
@@ -254,15 +297,154 @@ public final class InputEditors {
      */
     public static Node combo(ValueContext ctx) {
         Button[] pill = new Button[1];
-        pill[0] = Pills.button(comboPill(ctx), () -> {
-            Chord[] held = {chordOf(ctx)};
-            KeyboardView view = new KeyboardView(true, held[0], chord -> held[0] = chord);
-            Modals.form(ctx, "Choose a key combination", view.node(), () -> held[0].combo().ifPresent(combo -> {
-                ctx.set(combo);
-                pill[0].setText(combo.toString());
+        pill[0] = Pills.button(comboPill(ctx), () -> chooseCombo(ctx, ctx.value(Combo.class).orElse(null), combo -> {
+            ctx.set(combo);
+            pill[0].setText(combo.toString());
+        }));
+        return pill[0];
+    }
+
+    /**
+     * The combination window: the keyboard in chord mode, and under it how long the keys are held (2026-09-27),
+     * typed in milliseconds or set with a preset. OK hands {@code onChosen} the combo; nothing chosen, or a hold
+     * that is not a number, hands it nothing.
+     */
+    private static void chooseCombo(ValueContext ctx, Combo initial, Consumer<Combo> onChosen) {
+        Chord[] held = {initial == null ? Chord.EMPTY : chordOf(initial)};
+        KeyboardView view = new KeyboardView(true, held[0], chord -> held[0] = chord);
+        TextField hold = msField(initial == null ? Duration.ZERO : initial.hold());
+        HBox presets = new HBox(4);
+        for (long ms : new long[] {0, 50, 200, 1000}) {
+            Button preset = new Button(ms + " ms");
+            preset.setFocusTraversable(false);
+            preset.setOnAction(e -> hold.setText(Long.toString(ms)));
+            presets.getChildren().add(preset);
+        }
+        Label holdLabel = new Label("Hold");
+        holdLabel.setTooltip(new Tooltip("How long every key stays down before they are released. 0 presses "
+                + "and releases at once; a game that misses short presses needs 50 ms or more."));
+        HBox holdRow = new HBox(8, holdLabel, hold, new Label("ms"), presets);
+        holdRow.setAlignment(Pos.CENTER_LEFT);
+        VBox body = new VBox(10, view.node(), holdRow);
+        Modals.form(ctx, "Choose a key combination", body, () -> {
+            Duration wait = holdOf(hold.getText());
+            if (wait == null) return;
+            held[0].combo().ifPresent(combo -> onChosen.accept(combo.held(wait)));
+        });
+    }
+
+    /** A whole-millisecond field, marked while what it holds is not one. */
+    private static TextField msField(Duration initial) {
+        TextField field = new TextField(Long.toString(initial.toMillis()));
+        field.setPrefColumnCount(5);
+        field.textProperty().addListener((o, was, is) ->
+                field.setStyle(holdOf(is) == null ? "-fx-border-color: -bm-danger;" : ""));
+        return field;
+    }
+
+    /**
+     * A key sequence (2026-09-27): a row per step — its combination as a pill that opens the combination
+     * window, the wait after it in milliseconds, ✕ — dragged by ⠿ to change the order, and <i>Add step</i>.
+     * Written on OK; a sequence left with no step writes nothing.
+     */
+    public static Node sequence(ValueContext ctx) {
+        Button[] pill = new Button[1];
+        pill[0] = Pills.button(sequencePill(ctx), () -> {
+            List<KeySequence.Step>[] steps = sequenceSteps(ctx);
+            VBox rows = new VBox(4);
+            Runnable[] redraw = new Runnable[1];
+            redraw[0] = () -> {
+                rows.getChildren().clear();
+                for (int i = 0; i < steps[0].size(); i++) rows.getChildren().add(stepRow(ctx, steps, i, redraw[0]));
+                if (steps[0].isEmpty()) rows.getChildren().add(new Label("No steps yet"));
+            };
+            redraw[0].run();
+            Button add = new Button("Add step");
+            add.setOnAction(e -> chooseCombo(ctx, null, combo -> {
+                List<KeySequence.Step> next = new ArrayList<>(steps[0]);
+                next.add(KeySequence.step(combo, Duration.ZERO));
+                steps[0] = List.copyOf(next);
+                redraw[0].run();
             }));
+            Label hint = new Label("Each combination is pressed, then the wait after it passes. Drag ⠿ to change "
+                    + "the order.");
+            hint.getStyleClass().add("dialog-hint-text");
+            hint.setWrapText(true);
+            VBox body = new VBox(8, rows, add, hint);
+            body.setPrefWidth(460);
+            Modals.form(ctx, "Choose a key sequence", body, () -> {
+                if (steps[0].isEmpty()) return;
+                KeySequence sequence = new KeySequence(steps[0]);
+                ctx.set(sequence);
+                pill[0].setText(sequence.toString());
+            });
         });
         return pill[0];
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<KeySequence.Step>[] sequenceSteps(ValueContext ctx) {
+        return new List[] {ctx.value(KeySequence.class).map(KeySequence::steps).orElse(List.of())};
+    }
+
+    /** One step's row; every change replaces {@code steps[0]} and, where the row count changes, redraws. */
+    private static Node stepRow(ValueContext ctx, List<KeySequence.Step>[] steps, int at, Runnable redraw) {
+        KeySequence.Step step = steps[0].get(at);
+        Button combo = new Button(step.combo().toString());
+        combo.setOnAction(e -> chooseCombo(ctx, steps[0].get(at).combo(), chosen -> {
+            steps[0] = replaced(steps[0], at, KeySequence.step(chosen, steps[0].get(at).after()));
+            combo.setText(chosen.toString());
+        }));
+        TextField wait = msField(step.after());
+        wait.textProperty().addListener((o, was, is) -> {
+            Duration after = holdOf(is);
+            if (after != null) steps[0] = replaced(steps[0], at, KeySequence.step(steps[0].get(at).combo(), after));
+        });
+        Button remove = new Button("✕");
+        remove.getStyleClass().add("row-icon-button");
+        remove.setTooltip(new Tooltip("Take this step out"));
+        remove.setOnAction(e -> {
+            List<KeySequence.Step> next = new ArrayList<>(steps[0]);
+            next.remove(at);
+            steps[0] = List.copyOf(next);
+            redraw.run();
+        });
+        Label handle = new Label("⠿");
+        handle.setTooltip(new Tooltip("Drag to change when this step runs"));
+        HBox row = new HBox(8, handle, combo, new Label("then wait"), wait, new Label("ms"), remove);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setOnDragDetected(e -> {
+            Dragboard drag = row.startDragAndDrop(TransferMode.MOVE);
+            ClipboardContent content = new ClipboardContent();
+            content.putString(Integer.toString(at));
+            drag.setContent(content);
+            e.consume();
+        });
+        row.setOnDragOver(e -> {
+            if (e.getGestureSource() instanceof Node source && source.getParent() == row.getParent()) {
+                e.acceptTransferModes(TransferMode.MOVE);
+            }
+            e.consume();
+        });
+        row.setOnDragDropped(e -> {
+            boolean done = false;
+            try {
+                steps[0] = moved(steps[0], Integer.parseInt(e.getDragboard().getString()), at);
+                done = true;
+            } catch (RuntimeException ignored) {
+                // Not one of these rows: nothing moves.
+            }
+            e.setDropCompleted(done);
+            e.consume();
+            if (done) redraw.run();
+        });
+        return row;
+    }
+
+    private static <T> List<T> replaced(List<T> items, int at, T item) {
+        List<T> next = new ArrayList<>(items);
+        next.set(at, item);
+        return List.copyOf(next);
     }
 
     // --- shared ----------------------------------------------------------------------------------------

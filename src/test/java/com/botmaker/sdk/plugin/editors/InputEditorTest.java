@@ -42,4 +42,45 @@ class InputEditorTest {
         assertEquals(Chord.EMPTY, InputEditors.chordOf(
                 TestContexts.typedSlot(Combo.class, "x").withValue(Combo.of(Key.CTRL, Key.CTRL, Key.S))));
     }
+
+    /** A held combo opens on its keys; the hold is a separate field, so it is no reason to open empty. */
+    @Test
+    void a_held_combo_opens_on_its_keys_and_its_pill_says_the_hold() {
+        Combo held = Combo.of(Key.CTRL, Key.S).held(java.time.Duration.ofMillis(200));
+        assertEquals(Chord.of(Combo.of(Key.CTRL, Key.S)), InputEditors.chordOf(
+                TestContexts.typedSlot(Combo.class, "x").withValue(held)));
+        assertEquals("Ctrl+S (hold 200 ms)", InputEditors.comboPill(
+                TestContexts.typedSlot(Combo.class, "x").withValue(held)));
+    }
+
+    @Test
+    void a_hold_is_read_as_whole_milliseconds() {
+        assertEquals(java.time.Duration.ofMillis(200), InputEditors.holdOf("200"));
+        assertEquals(java.time.Duration.ofMillis(200), InputEditors.holdOf(" 200 ms "));
+        assertEquals(java.time.Duration.ZERO, InputEditors.holdOf(""));
+        assertEquals(null, InputEditors.holdOf("-5"));
+        assertEquals(null, InputEditors.holdOf("abc"));
+    }
+
+    @Test
+    void a_step_dragged_onto_another_takes_its_place() {
+        assertEquals(java.util.List.of("b", "a", "c"), InputEditors.moved(java.util.List.of("a", "b", "c"), 0, 1));
+        assertEquals(java.util.List.of("c", "a", "b"), InputEditors.moved(java.util.List.of("a", "b", "c"), 2, 0));
+        assertEquals(java.util.List.of("a", "b", "c"), InputEditors.moved(java.util.List.of("a", "b", "c"), 5, 0));
+    }
+
+    @Test
+    void a_sequence_pill_shows_its_steps_or_the_source_as_written() {
+        com.botmaker.sdk.api.interaction.KeySequence sequence = com.botmaker.sdk.api.interaction.KeySequence.of(
+                com.botmaker.sdk.api.interaction.KeySequence.step(Combo.of(Key.CTRL, Key.A),
+                        java.time.Duration.ofMillis(100)),
+                com.botmaker.sdk.api.interaction.KeySequence.step(Combo.of(Key.CTRL, Key.C),
+                        java.time.Duration.ZERO));
+        assertEquals("Ctrl+A → 100 ms → Ctrl+C", InputEditors.sequencePill(TestContexts.typedSlot(
+                com.botmaker.sdk.api.interaction.KeySequence.class, "x").withValue(sequence)));
+        assertEquals("steps", InputEditors.sequencePill(TestContexts.typedSlot(
+                com.botmaker.sdk.api.interaction.KeySequence.class, "steps")));
+        assertEquals("Choose key steps…", InputEditors.sequencePill(TestContexts.typedSlot(
+                com.botmaker.sdk.api.interaction.KeySequence.class, "")));
+    }
 }

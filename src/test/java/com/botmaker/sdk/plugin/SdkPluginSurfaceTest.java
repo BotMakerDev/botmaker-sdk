@@ -87,7 +87,7 @@ class SdkPluginSurfaceTest {
     private static final List<Class<?>> DECLARED_TYPES = List.of(
             ImageTemplate.class, Precision.class, Point.class, Rect.class, Size.class,
             Direction.class, Key.class, MouseButton.class, Combo.class,
-            CaptureSource.class, ImageTemplateGroup.class, MatchResult.class, Matches.class,
+            com.botmaker.sdk.api.interaction.KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, MatchResult.class, Matches.class,
             ColorMatch.class, TextMatch.class);
 
     private final SdkPlugin plugin = new SdkPlugin();
@@ -284,7 +284,7 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(15, plugin.types().size());
+        assertEquals(16, plugin.types().size());
     }
 
     /**

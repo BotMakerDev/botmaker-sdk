@@ -14,6 +14,9 @@ import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.session.ActiveSession;
 import com.botmaker.session.DesktopSession;
 
+import java.time.Duration;
+import java.util.function.Consumer;
+
 /**
  * Simulated keyboard input. Keys are expressed with the OS-neutral {@link Key} enum; combos and
  * typing are provided for convenience. Backed per-OS by a pluggable input backend on Linux
@@ -36,9 +39,10 @@ import com.botmaker.session.DesktopSession;
  * type</em>. Keys therefore reach the game, but the game is brought to the foreground first. There is no
  * mechanism on X11 that is both background and accepted by a game; that trade is the whole choice.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): all twelve are offered. The shape is exactly the one
- * {@code ImageFinder}'s rule keeps — five operations, each in the plain form and the {@link CaptureSource} form
- * — with no third variant carrying a value a property already holds, so there is nothing here to trim.
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): all fourteen are offered. The shape is exactly the
+ * one {@code ImageFinder}'s rule keeps — six operations, each in the plain form and the {@link CaptureSource}
+ * form — with no third variant carrying a value a property already holds, so there is nothing here to trim.
+ * {@code sequence} (2026-09-27) presses a {@link KeySequence}: combos with a wait after each.
  * {@code combo} leads with its {@link Combo} shape (2026-09-26); the varargs one is in its submenu, and is what
  * a recording falls back to on a host that cannot fill a {@code Combo}.
  */
@@ -50,6 +54,18 @@ public class Keyboard {
      * an isolated session is registered, else the process-wide {@code :0} singleton (today's behaviour). See
      * {@link Mouse}'s equivalent choke point.
      */
+    /**
+     * How a hold or a step's wait is spent: asleep, the interrupt flag restored so a stop request is kept. A
+     * seam for the tests, which record the wait instead; package-private, so no bot sees it.
+     */
+    static Consumer<Duration> pause = wait -> {
+        try {
+            Thread.sleep(wait);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    };
+
     private static NativeController controller() {
         DesktopSession session = ActiveSession.get();
         return session != null ? session.controller() : NativeControllerFactory.get();
@@ -89,13 +105,21 @@ public class Keyboard {
     }
 
     /**
-     * Press {@code combo}: hold every key in order, then release them in reverse — e.g.
-     * {@code Keyboard.combo(Combo.of(Key.CTRL, Key.C))} for copy.
+     * Press {@code combo}: hold every key in order, wait its {@link Combo#hold() hold}, then release them in
+     * reverse — e.g. {@code Keyboard.combo(Combo.of(Key.CTRL, Key.C))} for copy.
      */
     @PaletteDefault   // ties with combo(Key...) on width; the value is what the editor and the recorder write
     @Records(value = Gesture.COMBO, rank = 1)
     public static void combo(Combo combo) {
-        combo(combo.keys().toArray(Key[]::new));
+        combo(Source.current(), combo);
+    }
+
+    /**
+     * Press each step's combo in turn, waiting the step's {@code after} once it is released — e.g. select all,
+     * wait 100 ms, copy.
+     */
+    public static void sequence(KeySequence sequence) {
+        sequence(Source.current(), sequence);
     }
 
     /**
@@ -149,9 +173,29 @@ public class Keyboard {
         }
     }
 
-    /** Press {@code combo} on {@code source}'s window: hold each key in order, release in reverse. */
+    /**
+     * Press {@code combo} on {@code source}'s window: hold each key in order, wait its hold, release in
+     * reverse.
+     */
     public static void combo(CaptureSource source, Combo combo) {
-        combo(source, combo.keys().toArray(Key[]::new));
+        Debug.log("[Keyboard] combo " + combo + " on " + source);
+        java.util.List<Key> keys = combo.keys();
+        for (Key key : keys) {
+            press(source, key);
+        }
+        if (!combo.hold().isZero()) pause.accept(combo.hold());
+        for (int i = keys.size() - 1; i >= 0; i--) {
+            release(source, keys.get(i));
+        }
+    }
+
+    /** Press each step's combo on {@code source}'s window, waiting the step's {@code after} after each. */
+    public static void sequence(CaptureSource source, KeySequence sequence) {
+        Debug.log("[Keyboard] sequence " + sequence + " on " + source);
+        for (KeySequence.Step step : sequence.steps()) {
+            combo(source, step.combo());
+            if (!step.after().isZero()) pause.accept(step.after());
+        }
     }
 
     /** Type {@code text} into {@code source}'s window (see {@link #type(String)}). */

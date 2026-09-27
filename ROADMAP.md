@@ -8,6 +8,19 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — combo hold and key sequences (picker feedback 3, phase 5)
+
+**Done**
+- `Combo(List<Key> keys, Duration hold)`, with `Combo(List<Key>)` and `of(…)` meaning no hold; `held(Duration)`
+  copies; a negative hold is refused; `toString` adds ` (hold N ms)`. `Keyboard.combo` waits the hold between
+  the presses and the releases through a package-private `pause` seam (`KeyboardTimingTest` records it).
+- `KeySequence(List<Step>)`, `Step(Combo combo, Duration after)`, `of(Step...)`, `step(Combo, Duration)`;
+  `Keyboard.sequence` in both forms. `SdkTypes.KeySequenceType` (varargs of `STEP`, a component only) joins
+  `ALL` (sixteen); `COMBO_HELD` is the `held` chain, which Studio writes because `ComboType`'s `of` loses the
+  hold (Studio `ValueWriter.call`, same day).
+- `InputEditors`: the combination window's *Hold* field and presets; `sequence` — a row per step, ⠿ drag
+  (`moved`), ✕, *Add step*. `chordOf` compares keys, so a held combo opens on its keys.
+
 ## 2026-09-27 — keyboard faces, layouts, chip order (picker feedback 3, phase 4)
 
 **Done**

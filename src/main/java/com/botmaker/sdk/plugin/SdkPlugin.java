@@ -114,11 +114,13 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * The five records a {@code Flow} is written as, the six calls a {@code CaptureSource} is written as, and
      * the chains a person writes by hand and the host only reads: {@code source.region(r)} and the three
      * {@code Precision} withers. None is a type anybody declares on its own; the host reads each back so an
-     * editor is handed a value rather than a string.
+     * editor is handed a value rather than a string. Then a key sequence's step, and {@code combo.held(d)} —
+     * the one chain the host also writes, because the declaration that owns {@code Combo} has no hold.
      */
     @Override
     public List<ComponentType<?>> componentTypes() {
-        return Stream.of(FlowTypes.ALL, CaptureTypes.ALL, SdkTypes.PRECISION_WITHERS)
+        return Stream.of(FlowTypes.ALL, CaptureTypes.ALL, SdkTypes.PRECISION_WITHERS,
+                        List.of(SdkTypes.COMBO_HELD, SdkTypes.STEP))
                 .<ComponentType<?>>flatMap(List::stream).toList();
     }
 

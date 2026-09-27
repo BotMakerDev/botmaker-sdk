@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.interaction.Combo;
 import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.interaction.KeySequence;
 import com.botmaker.sdk.api.interaction.MouseButton;
 import com.botmaker.sdk.api.vision.ColorMatch;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -32,15 +33,16 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
- * The fifteen types the SDK declares ({@link #ALL}): a picture and a group of them, how exactly to match
- * one, three geometry shapes, three enums and a key combination, the capture source, and four vision results a bot holds but
- * nobody edits.
+ * The sixteen types the SDK declares ({@link #ALL}): a picture and a group of them, how exactly to match
+ * one, three geometry shapes, three enums, a key combination and a key sequence, the capture source, and four
+ * vision results a bot holds but nobody edits.
  *
  * <p>Each type is declared once. javac asks for what it is, what a fresh one is and how a person edits it in
  * one class, and the type is named once — in {@code type()}. The host writes and reads the Java; a type
@@ -215,6 +217,66 @@ public final class SdkTypes {
     }
 
     /**
+     * {@code combo.held(d)}: a held combo, written on the combo without its hold. {@link ComboType}'s factory
+     * has no hold, so a held combo does not survive it, and that is when the host writes this chain instead.
+     */
+    public static final ComponentType<Combo> COMBO_HELD = new ComponentType<>() {
+        private final Method held = method(Combo.class, "held", Duration.class);
+
+        @Override public Class<Combo> type() { return Combo.class; }
+        @Override public Executable factory() { return held; }
+        @Override public List<Class<?>> componentTypes() { return parts(held); }
+        @Override public List<Object> components(Combo c) { return List.of(c.held(Duration.ZERO), c.hold()); }
+        @Override public Combo build(List<Object> parts) {
+            return parts.size() == 2 && parts.get(0) instanceof Combo on && parts.get(1) instanceof Duration hold
+                    && !hold.isNegative() ? on.held(hold) : null;
+        }
+    };
+
+    /**
+     * Combos one after another, written {@code KeySequence.of(step(…), step(…))}: one declared part, the
+     * {@link #STEP}, repeated as varargs. A fresh one is select all, wait 100 ms, copy — two steps, so the
+     * editor opens on what a sequence is for.
+     */
+    public static final class KeySequenceType extends AbstractPluginType<KeySequence>
+            implements EditableType<KeySequence>, ComponentType<KeySequence> {
+        public KeySequenceType() { super(KeySequence.class); }
+        @Override public KeySequence fresh() {
+            return KeySequence.of(KeySequence.step(Combo.of(Key.CTRL, Key.A), Duration.ofMillis(100)),
+                    KeySequence.step(Combo.of(Key.CTRL, Key.C), Duration.ZERO));
+        }
+        @Override public Node editor(ValueContext ctx) { return InputEditors.sequence(ctx); }
+
+        @Override public Executable factory() {
+            return method(KeySequence.class, "of", KeySequence.Step[].class);
+        }
+        @Override public List<Class<?>> componentTypes() { return List.of(KeySequence.Step.class); }
+        @Override public List<Object> components(KeySequence s) { return List.copyOf(s.steps()); }
+        @Override public KeySequence build(List<Object> parts) {
+            List<KeySequence.Step> steps = new ArrayList<>();
+            for (Object part : parts) {
+                if (!(part instanceof KeySequence.Step step)) return null;
+                steps.add(step);
+            }
+            return steps.isEmpty() ? null : new KeySequence(steps);
+        }
+    }
+
+    /** {@code KeySequence.step(combo, after)}: one step of a sequence, never declared or picked on its own. */
+    public static final ComponentType<KeySequence.Step> STEP = new ComponentType<>() {
+        private final Method step = method(KeySequence.class, "step", Combo.class, Duration.class);
+
+        @Override public Class<KeySequence.Step> type() { return KeySequence.Step.class; }
+        @Override public Executable factory() { return step; }
+        @Override public List<Class<?>> componentTypes() { return parts(step); }
+        @Override public List<Object> components(KeySequence.Step s) { return List.of(s.combo(), s.after()); }
+        @Override public KeySequence.Step build(List<Object> parts) {
+            return parts.size() == 2 && parts.get(0) instanceof Combo combo && parts.get(1) instanceof Duration after
+                    && !after.isNegative() ? KeySequence.step(combo, after) : null;
+        }
+    };
+
+    /**
      * The three geometry declarations. Each hands itself to its {@code GeometryEditors} editor, which passes
      * it to {@code Editors.tuplePill} — where the arity, the components and the way back from a row of
      * numbers to a value all come from, so "a Rect has four numbers" is stated once.
@@ -314,8 +376,9 @@ public final class SdkTypes {
     }
 
     /**
-     * The fifteen, in the order a menu should offer them: the vision types, the geometry ones, the two
-     * input enums and a key combination, the capture source and the picture group, then the four a bot holds but nobody edits.
+     * The sixteen, in the order a menu should offer them: the vision types, the geometry ones, the two
+     * input enums, a key combination and a key sequence, the capture source and the picture group, then the four
+     * a bot holds but nobody edits.
      *
      * <p>A host offers plugin-basics' eleven before them, which is what puts the literals a bot mostly counts
      * and labels with at the top of the list.
@@ -323,7 +386,7 @@ public final class SdkTypes {
     public static final List<PluginType<?>> ALL = List.of(
             new ImageTemplateType(), new PrecisionType(),
             POINT_TYPE, RECT_TYPE, SIZE_TYPE, new DirectionType(),
-            new KeyType(), new MouseButtonType(), new ComboType(),
+            new KeyType(), new MouseButtonType(), new ComboType(), new KeySequenceType(),
             new CaptureTypes.CaptureSourceType(), new ImageTemplateGroupType(),
             new SeededType<>(MatchResult.class, method(Vision.class, "lastMatch")),
             new SeededType<>(Matches.class, method(Matches.class, "none")),

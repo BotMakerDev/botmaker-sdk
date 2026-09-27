@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A combo can be held.** `Combo.of(Key.CTRL, Key.S).held(Duration.ofMillis(200))` presses every key, waits
+  200 ms, then releases them in reverse; a game that misses a press shorter than a frame now sees it. It reads
+  `Ctrl+S (hold 200 ms)`, and the combination window has a *Hold* field in milliseconds with 0, 50, 200 and
+  1000 presets. `Combo` gains a `hold` component; `new Combo(keys)` and `Combo.of(…)` still mean no hold.
+- **`KeySequence` and `Keyboard.sequence`.** Combos one after another, each followed by a wait —
+  `KeySequence.of(KeySequence.step(Combo.of(Key.CTRL, Key.A), Duration.ofMillis(100)), …)`, read as
+  `Ctrl+A → 100 ms → Ctrl+C`. `Keyboard.sequence(sequence)` and `Keyboard.sequence(source, sequence)` press
+  it, and both are in the palette. Its editor is a row per step (the combination, the wait after it, ✕),
+  dragged by ⠿ to reorder, with *Add step*.
 - **`Direction.CENTER`**: the match closest to the centre of the frame, the ⊙ in the middle of the direction
   pad. Added after every other constant, so none moves.
 - **Every picture picker is the Resource Manager's gallery** (tags, search, large tiles) with *Capture new…*:

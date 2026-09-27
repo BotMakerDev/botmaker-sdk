@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.interaction;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,5 +36,33 @@ class ComboTest {
         Combo combo = new Combo(keys);
         keys.add(Key.V);
         assertEquals(List.of(Key.CTRL, Key.C), combo.keys());
+    }
+
+    @Test
+    void a_combo_without_a_hold_is_held_for_no_time() {
+        assertEquals(Duration.ZERO, Combo.of(Key.CTRL, Key.S).hold());
+        assertEquals(Duration.ZERO, new Combo(List.of(Key.CTRL, Key.S)).hold());
+    }
+
+    @Test
+    void held_is_a_copy_with_the_hold() {
+        Combo plain = Combo.of(Key.CTRL, Key.S);
+        Combo held = plain.held(Duration.ofMillis(200));
+        assertEquals(Duration.ofMillis(200), held.hold());
+        assertEquals(plain.keys(), held.keys());
+        assertEquals(Duration.ZERO, plain.hold());
+        assertEquals(plain, held.held(Duration.ZERO));
+    }
+
+    @Test
+    void a_hold_reads_after_the_caps() {
+        assertEquals("Ctrl+S (hold 200 ms)", Combo.of(Key.CTRL, Key.S).held(Duration.ofMillis(200)).toString());
+        assertEquals("Ctrl+S", Combo.of(Key.CTRL, Key.S).held(Duration.ZERO).toString());
+    }
+
+    @Test
+    void a_null_or_negative_hold_is_refused() {
+        assertThrows(NullPointerException.class, () -> Combo.of(Key.CTRL).held(null));
+        assertThrows(IllegalArgumentException.class, () -> Combo.of(Key.CTRL).held(Duration.ofMillis(-1)));
     }
 }
