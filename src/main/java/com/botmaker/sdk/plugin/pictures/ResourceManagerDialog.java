@@ -1,7 +1,7 @@
 package com.botmaker.sdk.plugin.pictures;
 
-import com.botmaker.plugin.api.Sources;
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -51,19 +52,18 @@ import java.util.TreeSet;
  * no picture, duplicating in the worst possible form what the chip row now does one tag at a time with the
  * template in view.
  *
- * <p><b>Renaming and deleting are compile-safe.</b> Both go through {@link TemplateUses}, which knows every
- * way a template is named in the bot's own source — the generated {@code Templates} constant and the raw path
- * literal alike — and through the host's {@link Sources}, which is what actually rewrites the code. So a
- * rename carries its use sites with it and a delete either finds none or offers to point them at another
- * template first. Before that, renaming an old-style template silently broke it at run time and deleting a
- * used one always did.
+ * <p><b>Renaming and deleting are compile-safe.</b> A picture is a constant of the bot's {@code Pictures}
+ * class, and both go through {@link TemplateUses} to the host's {@link PluginValues}, which renames, repoints
+ * and removes that constant by binding and refuses anything that would stop the bot compiling. So a rename
+ * carries its uses with it — the declaration included, which the token find-and-replace before 2026-09-28
+ * missed — and a delete either finds none or offers to point them at another template first.
  *
  * <h2>Why it is here and not in the editor</h2>
  *
  * <p>The rename and delete guards read the editor's open buffers and write {@code @Refactor}, which is
- * host work; knowing how a picture is spelled in a bot's Java is this plugin's alone. Splitting the two at
- * {@link Sources} leaves the host with the rewrite and this module with the vocabulary, and a second plugin
- * renaming a concept of its own has the same service.
+ * host work; knowing which constant a picture is, is this plugin's alone. {@link PluginValues} leaves the
+ * host with the rewrite and this module with the vocabulary, and any plugin with an open set of its own has
+ * the same service.
  *
  * <p>The listing itself is {@link TemplateGallery} — the same component a template slot opens as a picker, so
  * "which templates exist and how are they filed" has one rendering. Organisation comes from
@@ -109,9 +109,9 @@ public final class ResourceManagerDialog {
         return services.resourcesDir();
     }
 
-    /** The bot's own sources, or the total no-op between projects. */
-    private Sources sources() {
-        return services.sources();
+    /** The bot's {@code Pictures} constants, or the total no-op between projects. */
+    private PluginValues values() {
+        return services.pluginValues();
     }
 
     public void show() {
@@ -340,21 +340,22 @@ public final class ResourceManagerDialog {
         String current = TemplateLibrary.baseName(file);
         String wanted = TemplateLibrary.sanitizeName(nameField.getText());
         if (renameProblem(current, wanted) != null) return;
+        // The Java first: the host refuses a rename that would stop the bot compiling, and then the file has
+        // not moved either. Unmarked: every block still points at the same picture, under a new name.
+        TemplateUses.Scan scan = TemplateUses.find(values(), current);
+        Optional<String> refused = TemplateUses.rename(values(), current, wanted);
+        if (refused.isPresent()) {
+            statusLabel.setText("Not renamed: " + refused.get());
+            return;
+        }
         try {
             TemplateLibrary.renameTemplate(resources(), file, wanted);
-            // After the file has moved, so a failure to rewrite leaves the sources naming a template that is
-            // gone (a compile error) rather than one that no longer exists under that name (a silent miss).
-            // Every file this touches is one the user is not looking at, so the history label is the only
-            // undo. Unmarked: every block still points at the same picture, under a new name.
-            List<Path> touched = TemplateUses.repoint(sources(), current, wanted,
-                    "Before renaming the template \"" + current + "\"", null);
             published();
             reload();
             gallery.setSelection(List.of(TemplateLibrary.fileForName(resources(), wanted)));
-            statusLabel.setText(touched.isEmpty()
+            statusLabel.setText(scan.isEmpty()
                     ? "Renamed to " + wanted + "."
-                    : "Renamed to " + wanted + " and updated " + touched.size()
-                            + (touched.size() == 1 ? " file" : " files") + " that used it.");
+                    : "Renamed to " + wanted + " and updated " + scan.describe() + ".");
         } catch (IOException e) {
             statusLabel.setText("Failed to rename: " + e.getMessage());
         }
@@ -562,7 +563,7 @@ public final class ResourceManagerDialog {
         Map<String, TemplateUses.Scan> used = new LinkedHashMap<>();
         for (Path file : files) {
             String name = TemplateLibrary.baseName(file);
-            TemplateUses.Scan scan = TemplateUses.find(sources(), name);
+            TemplateUses.Scan scan = TemplateUses.find(values(), name);
             if (!scan.isEmpty()) used.put(name, scan);
         }
         if (used.isEmpty()) {
@@ -577,7 +578,7 @@ public final class ResourceManagerDialog {
         StringBuilder detail = new StringBuilder();
         for (TemplateUses.Scan scan : used.values()) {
             detail.append(scan.baseName()).append(" — ").append(scan.describe()).append('\n');
-            for (Sources.Use use : scan.uses()) {
+            for (PluginValues.Use use : scan.uses()) {
                 detail.append("    ").append(use.file().getFileName()).append(':').append(use.line())
                         .append("  ").append(use.text()).append('\n');
             }
@@ -611,19 +612,29 @@ public final class ResourceManagerDialog {
         TemplateGalleryDialog.open(services, stage, options, picked -> {
             if (picked.isEmpty()) return;
             String replacement = TemplateLibrary.baseName(picked.getFirst());
-            int rewritten = 0;
             for (String name : used.keySet()) {
-                rewritten += TemplateUses.repoint(sources(), name, replacement,
-                        "Before deleting templates used by the bot",
-                        TemplateUses.repointNote(name, replacement)).size();
+                Optional<String> refused = TemplateUses.repoint(values(), name, replacement);
+                if (refused.isPresent()) {
+                    statusLabel.setText("Nothing was deleted: " + refused.get());
+                    return;
+                }
             }
-            deleteAll(files, skippedDefault, rewritten);
+            deleteAll(files, skippedDefault, used.size());
         });
     }
 
+    /**
+     * Deletes each file after its constant. A constant the host will not remove — something still uses it —
+     * keeps its file too, so no {@code Pictures} constant is ever left naming a file that is gone.
+     */
     private void deleteAll(List<Path> files, boolean skippedDefault, int rewritten) {
         int deleted = 0;
         for (Path file : files) {
+            Optional<String> kept = TemplateUses.forget(values(), TemplateLibrary.baseName(file));
+            if (kept.isPresent()) {
+                statusLabel.setText("Stopped before " + TemplateLibrary.baseName(file) + ": " + kept.get());
+                break;
+            }
             try {
                 TemplateLibrary.deleteTemplate(resources(), file);
                 deleted++;
@@ -636,7 +647,8 @@ public final class ResourceManagerDialog {
         reload();
         String note = "Deleted " + deleted + (deleted == 1 ? " template" : " templates");
         if (rewritten > 0) {
-            note += ", after pointing " + rewritten + (rewritten == 1 ? " file" : " files") + " elsewhere";
+            note += ", after pointing the uses of " + rewritten + (rewritten == 1 ? " template" : " templates")
+                    + " elsewhere";
         }
         if (skippedDefault) note += ". The default template was left alone";
         statusLabel.setText(note + ".");
@@ -686,6 +698,7 @@ public final class ResourceManagerDialog {
         if (source == null) return;
         try {
             TemplateArchive.ImportResult result = TemplateArchive.importInto(resources(), source.toPath());
+            for (String name : result.imported()) TemplateUses.declare(values(), name).ifPresent(services::status);
             reload();
             gallery.setSelection(result.imported().stream()
                     .map(name -> TemplateLibrary.fileForName(resources(), name)).toList());
@@ -773,7 +786,7 @@ public final class ResourceManagerDialog {
 
         Map<String, TemplateUses.Scan> used = new LinkedHashMap<>();
         for (String name : missing) {
-            TemplateUses.Scan scan = TemplateUses.find(sources(), name);
+            TemplateUses.Scan scan = TemplateUses.find(values(), name);
             if (!scan.isEmpty()) used.put(name, scan);
         }
 
@@ -810,9 +823,11 @@ public final class ResourceManagerDialog {
                         if (picked.isEmpty()) return;
                         String replacement = TemplateLibrary.baseName(picked.getFirst());
                         for (String name : used.keySet()) {
-                            TemplateUses.repoint(sources(), name, replacement,
-                                    "Before repointing templates whose file was gone",
-                                    TemplateUses.repointNote(name, replacement));
+                            Optional<String> refused = TemplateUses.repoint(values(), name, replacement);
+                            if (refused.isPresent()) {
+                                statusLabel.setText("Nothing was forgotten: " + refused.get());
+                                return;
+                            }
                         }
                         forgetMissing(missing);
                     });
@@ -822,7 +837,12 @@ public final class ResourceManagerDialog {
     /** Drops the manifest entries of templates that no longer have a file, and regenerates the constants. */
     private void forgetMissing(List<String> missing) {
         TemplateManifest manifest = TemplateLibrary.manifest(resources());
-        for (String name : missing) manifest = manifest.without(name);
+        for (String name : missing) {
+            manifest = manifest.without(name);
+            // Its constant goes too, unless something still reads it: the host refuses that, and a constant
+            // naming a missing file is the user's to see in the Errors tab rather than ours to guess about.
+            TemplateUses.forget(values(), name);
+        }
         TemplateLibrary.saveManifest(resources(), manifest);
         published();
         reload();

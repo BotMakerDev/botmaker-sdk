@@ -399,9 +399,15 @@ public final class CaptureTemplates {
         onClosed.accept(List.copyOf(saved));
     }
 
+    /**
+     * Writes the picture and declares its {@code Pictures} constant when it has none, so a block that picks it
+     * reads {@code Pictures.ORE} rather than the path. A constant the host would not add is reported, never
+     * fatal: the picture is saved either way.
+     */
     private void save(BufferedImage picture, String name, int frameWidth, int frameHeight) throws Exception {
         TemplateLibrary.saveTemplate(resources(), picture, name, frameWidth, frameHeight, windowTitle());
         saved.add(name);
+        TemplateUses.declare(services.pluginValues(), name).ifPresent(services::status);
     }
 
     private Path resources() {

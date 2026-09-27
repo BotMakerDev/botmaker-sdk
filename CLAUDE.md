@@ -660,6 +660,13 @@ capability.
 
 ## The picture library is a toolbar item, and its rewrite is a host capability (2026-09-01)
 
+> **Since 2026-09-28 the rewrite is by binding, and `Sources` is deleted.** Read the needles, `needlesFor`,
+> `repointing` and `HostSources` below as history. `TemplateUses` maps a picture's file name to its
+> `Pictures` constant and calls the contract's `PluginValues` open-set operations on `SdkValues.PICTURES`
+> (`uses`, `add`, `rename`, `repoint`, `remove`); Studio resolves the constant, compiles each change as the
+> whole bot, and refuses one that breaks it. A capture or an import declares the picture's constant. A path
+> literal a user wrote is not rewritten.
+
 `internal/plugin/templates/{ResourceManagerDialog, TemplateGalleryDialog, TemplateUses}` — Studio's
 *Resource Manager*, reaching the bar as **🖼 Manage Pictures**, `ToolbarGroup.TOOLS` at order 30, beside the
 ✂ Capture Templates this file's previous section describes. It is the third whole feature to leave the editor

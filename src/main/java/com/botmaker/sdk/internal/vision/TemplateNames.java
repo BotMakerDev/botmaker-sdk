@@ -40,10 +40,8 @@ public final class TemplateNames {
      * ({@code SdkPlugin.pluginSources()}), which is what makes matching {@code Pictures.COLLECT} a fact
      * rather than a hope.
      *
-     * <p>It is still only used to build <em>needles</em> — what to search a bot's source for when a picture
-     * is renamed. A user who renames the class themselves is renaming a class they own, and their uses stop
-     * being found; that is the residual cost of matching source text, and it is bounded by the annotation,
-     * which tells the canvas not to let them do it from there.
+     * <p>It is only a name for sentences now. The class is found by its {@code @Managed("pictures")}, and a
+     * picture's uses by binding (2026-09-28), so a user who renames the class loses nothing.
      */
     public static final String CLASS_NAME = "Pictures";
 

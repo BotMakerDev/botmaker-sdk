@@ -280,8 +280,9 @@ public final class SdkPlugin extends AbstractStudioPlugin {
 
     /**
      * Opens the picture library: the other end of Capture Templates, managing the pictures that exist. Its
-     * rename and delete guards rewrite the user's Java through {@link com.botmaker.plugin.api.Sources}. Not
-     * single-instance: it owns no port and no display.
+     * rename and delete change the bot's {@code Pictures} constants through
+     * {@link com.botmaker.plugin.api.source.PluginValues}, by binding. Not single-instance: it owns no port and
+     * no display.
      */
     private void openResourceManager(ActionContext context) {
         StudioServices services = context.services();

@@ -8,6 +8,24 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — pictures renamed by binding (plugin authoring cleanup, phase 4)
+
+**Done**
+- `plugin/pictures/TemplateUses` is a layer over the contract's `PluginValues` open-set operations on
+  `SdkValues.PICTURES`: `find` (uses of the picture's constant), `declare` (add `Pictures.X` when missing),
+  `rename` (constant renamed with every use, then its initialiser pointed at the new file), `repoint`
+  (declares the replacement first, marks with `repointNote`), `forget` (removes the constant). The needles,
+  `needlesFor` and `repointing` are deleted with `Sources`.
+- `ResourceManagerDialog`: rename asks the host first and moves the file only when the Java change went
+  through; delete repoints and then removes each constant before its file; the missing-file repair does the
+  same; an import declares each imported picture. `CaptureTemplates.save` declares a captured picture.
+- Fixed: a rename left the declaration named after the old picture, so the bot stopped compiling.
+
+**Deferred / next**
+- A path literal a user typed (`new ImageTemplate("…/ore.png")`) is no longer rewritten on rename, by rule
+  (nothing matched by spelling). A picture named before the constant rule (mixed case, a dash) has no constant
+  and so no uses to find.
+
 ## 2026-09-28 — types declared with the toolkit's `Types` (plugin authoring cleanup, phase 3)
 
 `SdkTypes`, `FlowTypes`, `SettingsTypes` and `CaptureTypes` are constants built with `Types`: the geometry

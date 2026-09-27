@@ -93,6 +93,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every
+  use and left the constant itself called `ORE`, so the bot stopped compiling. The constant and every use are
+  renamed together now, and a rename that would not compile is refused before the file moves. Deleting a
+  used picture points its uses elsewhere and then removes its constant; a static import of a picture is
+  found too.
+- **A captured or imported picture gets its `Pictures` constant**, so a block that picks it reads
+  `Pictures.ORE` rather than the path. A path you typed in your own code is yours and is no longer rewritten.
 - **Picking a colour on screen sets it.** A click on the frozen frame threw and changed nothing: closing the
   sampler forgot the pixel under the pointer before it was read.
 

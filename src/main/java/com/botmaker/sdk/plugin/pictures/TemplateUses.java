@@ -1,48 +1,45 @@
 package com.botmaker.sdk.plugin.pictures;
 
-import com.botmaker.plugin.api.Sources;
+import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
-import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 /**
- * How a template is spelled in a bot's own source, and therefore what to search for when one is renamed,
- * deleted or found to be missing.
+ * A picture as the bot's Java names it — the constant {@code Pictures.ORE} in the open set
+ * {@code @Managed("pictures")} — and the four changes the picture library makes to it.
  *
- * <h2>Why this is the plugin's half and {@link Sources} is the host's</h2>
+ * <h2>The host changes the Java, by binding; this class says which constant</h2>
  *
- * <p>The walk reaches the editor's open buffers, snapshots the project's history and writes
- * {@code @Refactor}, none of which a plugin can do; how a picture is spelled in a bot's Java is this
- * plugin's vocabulary and nobody else's. The split is exactly the platform's capability/vocabulary line. The host takes needles and rewrites
- * source; this class is where the needles come from.
+ * <p>Until 2026-09-28 this built token needles ({@code Pictures.ORE} and the path literal) and handed them to
+ * the contract's {@code Sources}, a find-and-replace. That renamed each use and left the declaration named
+ * {@code ORE}, so a picture rename stopped the bot compiling; and a use it could not spell — a static import,
+ * a class the user renamed — was missed. Now a picture's uses are what javac resolves to its constant
+ * ({@link PluginValues#uses}), and a rename, repoint or remove is the host's, compiled as the whole bot before
+ * it lands. What stays here is the mapping from a file name to a constant ({@link TemplateNames#constantFor})
+ * and the order of steps.
  *
- * <h2>The two spellings</h2>
- *
- * <p>A template is named either by the generated constant ({@code Templates.ORE}, possibly package-qualified)
- * or, when its name predates the lowercase rule and so has no constant, by its project-relative path as a
- * whole string literal ({@code "src/main/resources/images/ore.png"}). Both are searched, because the two kinds
- * coexist in one project — see {@link TemplateNames} for why a name that cannot be a constant simply has none
- * rather than being sanitised into one.
- *
- * <p><b>A repoint replaces each spelling with the same spelling</b>, so a qualified use keeps its qualifier
- * and a path literal stays a path literal. The one asymmetry: a template whose <em>new</em> name has no
- * constant has its constant uses rewritten to the path literal instead, which is the only thing left to write.
+ * <p><b>A path literal the user wrote in their own code is theirs</b>: nothing matches it any more. A
+ * picture whose name predates the constant rule has no constant, so it has no uses to find — and every
+ * picture captured or imported since is {@linkplain #declare declared} as one.
  */
 public final class TemplateUses {
+
+    /** The open set the pictures are: {@code Pictures.java}. */
+    static final String SET = SdkValues.PICTURES.id();
 
     private TemplateUses() {}
 
     /**
      * Everything found for one template. Empty means it can be deleted with nothing to fix.
      *
-     * <p>The {@link Sources.Use}s inside are the host's own record, passed through rather than re-wrapped:
-     * a file and a line are not this plugin's vocabulary, and copying them into a parallel record would be one
-     * more thing to keep in step for no gain.
+     * <p>The {@link PluginValues.Use}s inside are the host's own record, passed through rather than re-wrapped:
+     * a file and a line are not this plugin's vocabulary.
      */
-    public record Scan(String baseName, List<Sources.Use> uses) {
+    public record Scan(String baseName, List<PluginValues.Use> uses) {
 
         public boolean isEmpty() {
             return uses.isEmpty();
@@ -50,7 +47,7 @@ public final class TemplateUses {
 
         /** How many distinct files use it — what a refusal message leads with. */
         public int fileCount() {
-            return (int) uses.stream().map(Sources.Use::file).distinct().count();
+            return (int) uses.stream().map(PluginValues.Use::file).distinct().count();
         }
 
         /** "3 uses in 2 files" — the phrase both the delete refusal and the rename report open with. */
@@ -60,53 +57,69 @@ public final class TemplateUses {
         }
     }
 
+    /** Every use of the template called {@code baseName}'s constant; empty when it has none. */
+    public static Scan find(PluginValues values, String baseName) {
+        String constant = declared(values, baseName);
+        return new Scan(baseName, constant == null ? List.of() : List.copyOf(values.uses(SET, constant)));
+    }
+
     /**
-     * Both spellings of {@code baseName}, as needles the host can match.
+     * Declares {@code Pictures.<NAME>} for a picture that can have a constant and has none yet — what a
+     * capture and an import do, so the canvas writes {@code Pictures.ORE} rather than the path.
      *
-     * <p>One entry for a name with no constant, two otherwise. Never empty: every template has a path.
+     * @return empty when it is declared now or cannot be; else the host's sentence
      */
-    public static List<String> needlesFor(String baseName) {
+    public static Optional<String> declare(PluginValues values, String baseName) {
         String constant = TemplateNames.constantFor(baseName);
-        String literal = literalFor(baseName);
-        return constant == null ? List.of(literal)
-                : List.of(TemplateNames.CLASS_NAME + "." + constant, literal);
+        if (constant == null || values.members(SET).contains(constant)) return Optional.empty();
+        return values.add(SET, constant, picture(baseName));
     }
 
     /**
-     * What each spelling of {@code oldName} becomes when the template is repointed at {@code newName}.
+     * Renames {@code oldName}'s constant and every use to {@code newName}'s, then points it at the new file.
+     * Lossless — the same picture under a new name — so nothing is marked. A picture with no constant yet is
+     * declared under the new name instead.
      *
-     * <p>Ordered, and the order matters to the host: replacements are applied in iteration order and the first
-     * to match a line wins. The constant leads because it is the spelling that can contain the other's — a
-     * line holding {@code Templates.ORE} has no path literal in it, but a rewrite that ran the path first
-     * would be looking at already-rewritten text.
+     * @return empty when done; else why nothing was renamed
      */
-    public static Map<String, String> repointing(String oldName, String newName) {
-        Map<String, String> replacements = new LinkedHashMap<>();
-        String oldConstant = TemplateNames.constantFor(oldName);
-        String newConstant = TemplateNames.constantFor(newName);
-        if (oldConstant != null) {
-            replacements.put(TemplateNames.CLASS_NAME + "." + oldConstant,
-                    newConstant == null ? literalFor(newName) : TemplateNames.CLASS_NAME + "." + newConstant);
-        }
-        replacements.put(literalFor(oldName), literalFor(newName));
-        return replacements;
-    }
-
-    /** Every use of the template called {@code baseName}, through {@code sources}. */
-    public static Scan find(Sources sources, String baseName) {
-        return new Scan(baseName, List.copyOf(sources.find(needlesFor(baseName))));
+    public static Optional<String> rename(PluginValues values, String oldName, String newName) {
+        String from = declared(values, oldName);
+        if (from == null) return declare(values, newName);
+        String to = TemplateNames.constantFor(newName);
+        if (to == null) return Optional.of("\"" + newName + "\" cannot be a constant's name, so "
+                + TemplateNames.CLASS_NAME + "." + from + " cannot follow it.");
+        Optional<String> refused = values.rename(SET, from, to);
+        if (refused.isPresent()) return refused;
+        return values.open(SET, to).map(value -> {
+            value.set(picture(newName));
+            return Optional.<String>empty();
+        }).orElse(Optional.of(TemplateNames.CLASS_NAME + "." + to + " was renamed, but its path could not be "
+                + "rewritten."));
     }
 
     /**
-     * Points every use of {@code oldName} at {@code newName} and returns the files that changed.
-     *
-     * <p>{@code reviewNote} is the caller's judgement and this class does not make it: a <b>rename</b> is
-     * lossless — the same picture under a new name — and passes null, while pointing blocks at a
-     * <em>different</em> picture changes what the bot watches for and must say so.
+     * Points every use of {@code oldName}'s constant at {@code replacement}'s, declaring that one first when
+     * it has none. A guess — the bot now watches for a different picture — so each function it touched is
+     * marked with {@link #repointNote}. Empty when there was nothing to point.
      */
-    public static List<Path> repoint(Sources sources, String oldName, String newName,
-                                     String historyLabel, String reviewNote) {
-        return sources.replace(repointing(oldName, newName), historyLabel, reviewNote);
+    public static Optional<String> repoint(PluginValues values, String oldName, String replacement) {
+        String from = declared(values, oldName);
+        if (from == null || values.uses(SET, from).isEmpty()) return Optional.empty();
+        Optional<String> undeclared = declare(values, replacement);
+        if (undeclared.isPresent()) return undeclared;
+        String to = TemplateNames.constantFor(replacement);
+        if (to == null) return Optional.of("\"" + replacement + "\" has no constant to point "
+                + TemplateNames.CLASS_NAME + "." + from + "'s uses at.");
+        return values.repoint(SET, from, to, repointNote(oldName, replacement));
+    }
+
+    /**
+     * Removes {@code baseName}'s constant, as its file goes. Refused by the host while anything uses it; empty
+     * when it has none.
+     */
+    public static Optional<String> forget(PluginValues values, String baseName) {
+        String constant = declared(values, baseName);
+        return constant == null ? Optional.empty() : values.remove(SET, constant);
     }
 
     /**
@@ -121,8 +134,13 @@ public final class TemplateUses {
                 + replacement + "\", which may not be what it should be watching for.";
     }
 
-    /** The path literal, quotes included, so the host matches it as one token rather than as a dotted name. */
-    private static String literalFor(String baseName) {
-        return '"' + TemplateLibrary.pathForName(baseName) + '"';
+    /** {@code baseName}'s constant when the open set declares it, else null. */
+    private static String declared(PluginValues values, String baseName) {
+        String constant = TemplateNames.constantFor(baseName);
+        return constant != null && values.members(SET).contains(constant) ? constant : null;
+    }
+
+    private static ImageTemplate picture(String baseName) {
+        return new ImageTemplate(TemplateLibrary.pathForName(baseName));
     }
 }
