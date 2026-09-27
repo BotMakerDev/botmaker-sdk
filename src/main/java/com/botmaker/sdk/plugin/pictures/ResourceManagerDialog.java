@@ -60,7 +60,7 @@ import java.util.TreeSet;
  *
  * <h2>Why it is here and not in the editor</h2>
  *
- * <p>The rename and delete guards read the editor's open buffers and write {@code @NeedsReview}, which is
+ * <p>The rename and delete guards read the editor's open buffers and write {@code @Refactor}, which is
  * host work; knowing how a picture is spelled in a bot's Java is this plugin's alone. Splitting the two at
  * {@link Sources} leaves the host with the rewrite and this module with the vocabulary, and a second plugin
  * renaming a concept of its own has the same service.
