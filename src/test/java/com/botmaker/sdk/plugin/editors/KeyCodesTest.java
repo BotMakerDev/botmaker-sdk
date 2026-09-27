@@ -23,6 +23,15 @@ class KeyCodesTest {
         assertEquals(Optional.of(Key.BACKSPACE), KeyCodes.toKey(KeyCode.BACK_SPACE));
     }
 
+    /** The keypad's arrows, Num Lock off, are the arrows (feedback 3). */
+    @Test
+    void the_keypad_arrows_are_the_arrows() {
+        assertEquals(Optional.of(Key.UP), KeyCodes.toKey(KeyCode.KP_UP));
+        assertEquals(Optional.of(Key.DOWN), KeyCodes.toKey(KeyCode.KP_DOWN));
+        assertEquals(Optional.of(Key.LEFT), KeyCodes.toKey(KeyCode.KP_LEFT));
+        assertEquals(Optional.of(Key.RIGHT), KeyCodes.toKey(KeyCode.KP_RIGHT));
+    }
+
     /** A key the SDK lacks writes nothing. */
     @Test
     void a_key_the_sdk_lacks_is_nothing() {

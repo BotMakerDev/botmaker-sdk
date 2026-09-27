@@ -8,6 +8,18 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — keyboard faces, layouts, chip order (picker feedback 3, phase 4)
+
+**Done**
+- `KeyboardLayout.face` (numpad without "Num", two words on two lines, Back/space, Ins, Del) and `fontFor`
+  (the unit's size, shrunk for a longer line or a second line, never under 7 px); `KeyboardView` sizes each
+  cap's font off its narrower side and clips rather than ellipsises.
+- `KeyboardLayout.Board` QWERTY/AZERTY/QWERTZ: only the three letter rows differ (12/11/10 keys each, so
+  every board is one shape); AZERTY's ^ $ ù * < ! have no `Key`, so US punctuation fills those places. The
+  choice is a `java.util.prefs` entry beside the view. A cap writes its own `Key` on every board.
+- `Chord.move(from, to)`; chips are ⠿ name ✕ and drag onto each other. `KeyCodes` maps `KP_UP/DOWN/LEFT/RIGHT`.
+  `Key` has no Print Screen, Pause or Menu, so `KeyCodesTest`'s one exception is still `NUMPAD_ENTER`.
+
 ## 2026-09-27 — Direction.CENTER (picker feedback 3, phase 2)
 
 **Done**

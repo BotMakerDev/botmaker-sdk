@@ -54,6 +54,18 @@ record Chord(List<Key> keys) {
         return new Chord(next);
     }
 
+    /**
+     * The key at {@code from} put at {@code to} — a chip dragged to a new place, since the order is the press
+     * order (feedback 3). A {@code from} that is not there moves nothing; a {@code to} past the end is the end.
+     */
+    Chord move(int from, int to) {
+        if (from < 0 || from >= keys.size()) return this;
+        List<Key> next = new ArrayList<>(keys);
+        Key moved = next.remove(from);
+        next.add(Math.clamp(to, 0, next.size()), moved);
+        return new Chord(next);
+    }
+
     /** The last key chosen, or null — what the one-key editor answers. */
     Key last() {
         return keys.isEmpty() ? null : keys.getLast();

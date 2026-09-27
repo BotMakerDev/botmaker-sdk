@@ -49,6 +49,11 @@ final class KeyCodes {
         m.put(KeyCode.MULTIPLY, Key.NUMPAD_MULTIPLY);
         m.put(KeyCode.DIVIDE, Key.NUMPAD_DIVIDE);
         m.put(KeyCode.DECIMAL, Key.NUMPAD_DECIMAL);
+        // The keypad's arrows with Num Lock off send the arrows a bot presses.
+        m.put(KeyCode.KP_UP, Key.UP);
+        m.put(KeyCode.KP_DOWN, Key.DOWN);
+        m.put(KeyCode.KP_LEFT, Key.LEFT);
+        m.put(KeyCode.KP_RIGHT, Key.RIGHT);
         return m;
     }
 }

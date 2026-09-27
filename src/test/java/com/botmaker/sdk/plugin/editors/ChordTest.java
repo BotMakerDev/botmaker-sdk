@@ -46,6 +46,17 @@ class ChordTest {
         assertEquals(Optional.of(Combo.of(Key.S, Key.CTRL, Key.A)), chord.combo());
     }
 
+    /** A chip dragged to a new place: the order is the press order (feedback 3). */
+    @Test
+    void a_key_moves_to_where_it_is_dropped() {
+        Chord chord = new Chord(List.of(Key.CTRL, Key.SHIFT, Key.S));
+        assertEquals(List.of(Key.S, Key.CTRL, Key.SHIFT), chord.move(2, 0).keys());
+        assertEquals(List.of(Key.SHIFT, Key.S, Key.CTRL), chord.move(0, 2).keys());
+        assertEquals(chord, chord.move(1, 1));
+        assertEquals(chord, chord.move(5, 0), "a place that is not there moves nothing");
+        assertEquals(List.of(Key.SHIFT, Key.S, Key.CTRL), chord.move(0, 9).keys(), "past the end is the end");
+    }
+
     @Test
     void a_repeated_key_is_held_once() {
         assertEquals(List.of(Key.A, Key.B), Chord.of(Combo.of(Key.A, Key.B, Key.A)).keys());

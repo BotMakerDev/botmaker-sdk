@@ -31,6 +31,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The keyboard picker fits its labels and knows your layout.** Numpad caps read "7", "+", "Enter" (the chip
+  and tooltip still say "Num 7"), two-word caps take two lines, and a long label shrinks its font instead of
+  being cut to "N…". **QWERTY / AZERTY / QWERTZ** above the board moves the letters to where your keyboard has
+  them and is remembered; the cap labelled A still writes `Key.A`, which your system presses as its A.
+- **A combination's keys can be reordered**: drag a chip to where it should be pressed; ✕ takes it out. The
+  keypad's arrows (Num Lock off) are recorded as the arrows.
 - **A point, size or rectangle's menu lists where to pick directly**: *Edit values…*, then the bot's source,
   another window or screen, and the whole desktop — no second menu after the first. *Edit values…* has
   steppers, a drawing to scale, a rectangle's right and bottom, and takes a pasted `x, y`.
