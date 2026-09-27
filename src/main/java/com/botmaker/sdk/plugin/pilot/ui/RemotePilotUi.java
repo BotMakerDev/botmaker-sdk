@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.pilot.ui;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.pilot.NestedSessionLauncher;
 import com.botmaker.sdk.plugin.pilot.PilotControlService;
 import com.botmaker.sdk.plugin.pilot.PilotProject;
@@ -236,7 +237,7 @@ public final class RemotePilotUi implements AutoCloseable {
     /** Indeterminate spinner shown while the (possibly multi-second) Tailscale bring-up runs off-thread. */
     private Alert progressDialog(AtomicBoolean cancelled) {
         Alert a = services.theme().alert(Alert.AlertType.NONE);
-        a.initOwner(services.dialogs().ownerWindow().orElse(null));
+        a.initOwner(Modals.owner(services));
         a.setTitle("Remote Pilot");
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setPrefSize(30, 30);

@@ -80,6 +80,6 @@ class CaptureTypesTest {
 
     @Test
     void aFreshCaptureSourceIsTheAmbientOne() {
-        assertInstanceOf(CurrentSource.class, new CaptureTypes.CaptureSourceType().fresh());
+        assertInstanceOf(CurrentSource.class, CaptureTypes.CAPTURE_SOURCE.fresh());
     }
 }

@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Region;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.ScreenPicks;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
@@ -135,7 +136,7 @@ public final class SdkScreenPicks implements ScreenPicks {
      */
     private static void onFrame(StudioServices services, PickSpace space,
                                 Consumer<Consumer<SurfaceMenu.Surface>> chooser, OnFrame then) {
-        Window owner = services.dialogs().ownerWindow().orElse(null);
+        Window owner = Modals.owner(services);
         chooser.accept(surface -> {
             Consumer<EditorFrame> onGrab = frame -> {
                 Rectangle origin = PickSpace.origin(frame);

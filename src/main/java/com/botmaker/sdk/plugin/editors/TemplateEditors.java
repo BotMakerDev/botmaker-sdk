@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.slot.SlotRun;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
@@ -291,7 +292,7 @@ public final class TemplateEditors {
                             : "This branch can only test pictures its find call was given; a picture "
                               + "captured here is saved but cannot be picked for it.");
         }
-        TemplateGalleryDialog.open(services, services.dialogs().ownerWindow().orElse(null), options,
+        TemplateGalleryDialog.open(services, Modals.owner(services), options,
                 files -> onPicked.accept(files.stream().map(TemplateLibrary::baseName).toList()));
     }
 

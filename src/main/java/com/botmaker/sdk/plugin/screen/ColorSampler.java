@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.ZoomPan;
 import com.botmaker.shared.opencv.ColorMatcher;
 import javafx.geometry.Insets;
@@ -145,7 +146,7 @@ public final class ColorSampler {
             this.frame = frame;
             this.image = frame.image();
             this.onPicked = onPicked;
-            Window owner = services.dialogs().ownerWindow().orElse(null);
+            Window owner = Modals.owner(services);
 
             Rectangle2D screen = Screen.getPrimary().getVisualBounds();
             double fit = Math.min(1.0, Math.min(screen.getWidth() * 0.85 / image.getWidth(),

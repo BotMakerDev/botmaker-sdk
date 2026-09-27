@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.types;
 
+import com.botmaker.plugin.toolkit.Types;
 import com.botmaker.sdk.api.interaction.Combo;
 import com.botmaker.sdk.api.interaction.Key;
 import com.botmaker.sdk.api.interaction.KeySequence;
@@ -15,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class KeySequenceTypeTest {
 
-    private final SdkTypes.KeySequenceType type = new SdkTypes.KeySequenceType();
+    private final Types.DeclaredCall<KeySequence> type = SdkTypes.KEY_SEQUENCE;
     private final KeySequence copyAll = KeySequence.of(
             KeySequence.step(Combo.of(Key.CTRL, Key.A), Duration.ofMillis(100)),
             KeySequence.step(Combo.of(Key.CTRL, Key.C), Duration.ZERO));

@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.interaction.Key;
 import org.junit.jupiter.api.Test;
 
 import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.plugin.toolkit.Types;
 
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -16,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ComboTypeTest {
 
-    private final SdkTypes.ComboType type = new SdkTypes.ComboType();
+    private final Types.DeclaredCall<Combo> type = SdkTypes.COMBO;
 
     @Test
     void a_combo_is_written_as_the_varargs_factory() {

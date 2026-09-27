@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.source;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
@@ -49,7 +50,7 @@ public final class SurfaceMenu {
      * there instead (feedback 2, 2026-09-27). A choice is remembered as it resolves.
      */
     public static List<Entry> entries(StudioServices services) {
-        Window owner = services.dialogs().ownerWindow().orElse(null);
+        Window owner = Modals.owner(services);
         Surface bots = botsOwn(services);
         List<Entry> entries = new ArrayList<>();
         Surface last = LAST.get(key(services));
@@ -71,7 +72,7 @@ public final class SurfaceMenu {
 
     /** Shows the menu and hands the choice over on the FX thread; a dismissed menu calls nothing. */
     public static void choose(StudioServices services, Consumer<Surface> onChosen) {
-        Window owner = services.dialogs().ownerWindow().orElse(null);
+        Window owner = Modals.owner(services);
         if (owner == null) {
             // No window to put a menu on: the bot's own source when there is one, else the desktop.
             Surface bots = botsOwn(services);

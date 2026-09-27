@@ -8,6 +8,15 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — types declared with the toolkit's `Types` (plugin authoring cleanup, phase 3)
+
+`SdkTypes`, `FlowTypes`, `SettingsTypes` and `CaptureTypes` are constants built with `Types`: the geometry
+records and `Precision` are `Types.record`, every other call `Types.call`, the enums `Types.enumType`. The
+private `method`/`constructor`/`parts` copies and the `Fixed`/`Shape`/`EnumType`/`SeededType`/`Wither` bases
+are gone. `SdkPlugin` uses `buildComponentTypes`/`buildManagedValues`; seventeen `ownerWindow().orElse(null)`
+are `Modals.owner`. `SdkPluginHeadlessTest` caught the first cut (editor method references linked JavaFX while
+building `types()`), hence `() -> X::editor`.
+
 ## 2026-09-28 — each managed value declared once (plugin authoring cleanup, phase 2)
 
 `internal.bot.SdkValues` holds the five typed `ManagedValue<T>` constants and `ALL`; `SdkPlugin.managedValues()`

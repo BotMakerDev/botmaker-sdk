@@ -11,6 +11,7 @@ import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
@@ -120,7 +121,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * the one chain the host also writes, because the declaration that owns {@code Combo} has no hold.
      */
     @Override
-    public List<ComponentType<?>> componentTypes() {
+    protected List<ComponentType<?>> buildComponentTypes() {
         return Stream.of(FlowTypes.ALL, CaptureTypes.ALL, SettingsTypes.ALL, SdkTypes.PRECISION_WITHERS,
                         List.of(SdkTypes.COMBO_HELD, SdkTypes.STEP))
                 .<ComponentType<?>>flatMap(List::stream).toList();
@@ -131,7 +132,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      * once, in {@link SdkValues}, where the runtime half claims the same constants.
      */
     @Override
-    public List<ManagedValue<?>> managedValues() {
+    protected List<ManagedValue<?>> buildManagedValues() {
         return SdkValues.ALL;
     }
 
@@ -189,7 +190,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                         "How the bot clicks and looks — delays, match confidence, real input for games, and "
                                 + "whether it runs on a private display",
                         ToolbarGroup.PROJECT, 60, context -> BotSettingsWindow.open(context.services(),
-                                context.services().dialogs().ownerWindow().orElse(null))),
+                                Modals.owner(context.services()))),
                 ToolbarItem.of("project-setup", "📋 Project Setup",
                         "What this project still needs before it can run — something to launch, something "
                                 + "to capture, and the pictures it looks for",
@@ -249,7 +250,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
         CaptureSource target = context.overWindowTitle()
                 .map(CaptureSource::window)
                 .orElse(null);
-        CaptureTemplates.open(services, services.dialogs().ownerWindow().orElse(null), target, null, () -> {});
+        CaptureTemplates.open(services, Modals.owner(services), target, null, () -> {});
     }
 
     /**
@@ -261,7 +262,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void openCaptureTemplates(ActionContext context) {
         StudioServices services = context.services();
-        CaptureTemplates.open(services, services.dialogs().ownerWindow().orElse(null), null);
+        CaptureTemplates.open(services, Modals.owner(services), null);
     }
 
     /**
@@ -274,7 +275,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void openActivityFlow(ActionContext context) {
         StudioServices services = context.services();
-        new ActivityFlowDialog(services, services.dialogs().ownerWindow().orElse(null)).show();
+        new ActivityFlowDialog(services, Modals.owner(services)).show();
     }
 
     /**
@@ -284,7 +285,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void openResourceManager(ActionContext context) {
         StudioServices services = context.services();
-        ResourceManagerDialog.open(services, services.dialogs().ownerWindow().orElse(null));
+        ResourceManagerDialog.open(services, Modals.owner(services));
     }
 
     /**
@@ -298,7 +299,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void openCaptureSource(ActionContext context) {
         StudioServices services = context.services();
-        new SourcePicker(services, services.dialogs().ownerWindow().orElse(null), false)
+        new SourcePicker(services, Modals.owner(services), false)
                 .showAndWait()
                 .ifPresent(selection -> {
                     if (!(selection instanceof SourcePicker.Selection.Concrete concrete)) return;
@@ -314,7 +315,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     private void openProjectSetup(ActionContext context) {
         StudioServices services = context.services();
-        ProjectSetup.open(services, services.dialogs().ownerWindow().orElse(null));
+        ProjectSetup.open(services, Modals.owner(services));
     }
 
     /**

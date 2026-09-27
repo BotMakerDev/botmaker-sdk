@@ -1,9 +1,7 @@
 package com.botmaker.sdk.plugin.types;
 
-import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.value.ComponentType;
-import com.botmaker.plugin.api.value.EditableType;
-import com.botmaker.plugin.toolkit.AbstractPluginType;
+import com.botmaker.plugin.toolkit.Types;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.emulator.EmulatorSource;
@@ -14,10 +12,10 @@ import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.RegionSource;
 import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
-import javafx.scene.Node;
 
-import java.lang.reflect.Executable;
 import java.util.List;
+
+import static com.botmaker.plugin.toolkit.Types.method;
 
 /**
  * A {@link CaptureSource} as values: the type itself, and the six calls one is written as.
@@ -27,7 +25,8 @@ import java.util.List;
  * {@code CaptureSource.desktop()}, {@code .monitor(i)}, {@code .window("t")},
  * {@code new EmulatorSource("n")} and {@code CaptureSource.region(source, rect)}. The host reads a
  * {@code CaptureSource} slot as whichever of them the Java is, and writes a value back through the one
- * matching its class.
+ * matching its class. Each call's parts are its factory's parameters ({@link Types#call}), so the two cannot
+ * drift apart.
  */
 public final class CaptureTypes {
 
@@ -41,91 +40,56 @@ public final class CaptureTypes {
      * <p>Drawn as a pill opening the source tiles ({@link CaptureSourceEditors}), the same picker as the
      * toolbar's Capture Source.
      */
-    public static final class CaptureSourceType extends AbstractPluginType<CaptureSource>
-            implements EditableType<CaptureSource> {
-        public CaptureSourceType() { super(CaptureSource.class); }
-        @Override public CaptureSource fresh() { return new CurrentSource(); }
-        @Override public Node editor(ValueContext ctx) { return CaptureSourceEditors.source(ctx); }
-        @Override public Node preview(ValueContext ctx) { return CaptureSourceEditors.preview(ctx); }
-    }
+    public static final Types.Declared<CaptureSource> CAPTURE_SOURCE =
+            Types.editable(CaptureSource.class, CurrentSource::new, () -> CaptureSourceEditors::source)
+                    .preview(() -> CaptureSourceEditors::preview);
 
     /** {@code Source.current()}. */
-    public static final ComponentType<CurrentSource> CURRENT =
-            new Shape<>(CurrentSource.class, SdkTypes.method(Source.class, "current")) {
-                @Override public List<Object> components(CurrentSource value) { return List.of(); }
-                @Override public CurrentSource build(List<Object> parts) { return new CurrentSource(); }
-            };
+    public static final ComponentType<CurrentSource> CURRENT = Types.call(CurrentSource.class,
+            method(Source.class, "current"), value -> List.of(), parts -> new CurrentSource());
 
     /** {@code CaptureSource.desktop()}. */
-    public static final ComponentType<Desktop> DESKTOP =
-            new Shape<>(Desktop.class, SdkTypes.method(CaptureSource.class, "desktop")) {
-                @Override public List<Object> components(Desktop value) { return List.of(); }
-                @Override public Desktop build(List<Object> parts) { return new Desktop(); }
-            };
+    public static final ComponentType<Desktop> DESKTOP = Types.call(Desktop.class,
+            method(CaptureSource.class, "desktop"), value -> List.of(), parts -> new Desktop());
 
     /** {@code CaptureSource.monitor(index)}. */
-    public static final ComponentType<Monitor> MONITOR =
-            new Shape<>(Monitor.class, SdkTypes.method(CaptureSource.class, "monitor", int.class)) {
-                @Override public List<Object> components(Monitor value) { return List.of(value.index()); }
-                @Override public Monitor build(List<Object> parts) {
-                    return new Monitor(parts.getFirst() instanceof Number n ? n.intValue() : 0);
-                }
-            };
+    public static final ComponentType<Monitor> MONITOR = Types.call(Monitor.class,
+            method(CaptureSource.class, "monitor", int.class),
+            value -> List.of(value.index()), parts -> new Monitor(Types.whole(parts, 0)));
 
     /** {@code CaptureSource.window("title")}. */
-    public static final ComponentType<NamedWindow> WINDOW =
-            new Shape<>(NamedWindow.class, SdkTypes.method(CaptureSource.class, "window", String.class)) {
-                @Override public List<Object> components(NamedWindow value) {
-                    return List.of(value.titleSubstring());
-                }
-                @Override public NamedWindow build(List<Object> parts) {
-                    return new NamedWindow(parts.getFirst() instanceof String s ? s : "");
-                }
-            };
+    public static final ComponentType<NamedWindow> WINDOW = Types.call(NamedWindow.class,
+            method(CaptureSource.class, "window", String.class),
+            value -> List.of(value.titleSubstring()), parts -> new NamedWindow(Types.text(parts, 0)));
 
     /**
      * {@code new EmulatorSource("name")}: a constructor, since {@code EmulatorSource} is not one of
      * {@code CaptureSource}'s factories. It is still correct Java, and the bot captures from the emulator.
      */
-    public static final ComponentType<EmulatorSource> EMULATOR =
-            new Shape<>(EmulatorSource.class, SdkTypes.constructor(EmulatorSource.class, String.class)) {
-                @Override public List<Object> components(EmulatorSource value) {
-                    return List.of(value.instanceName());
-                }
-                @Override public EmulatorSource build(List<Object> parts) {
-                    return new EmulatorSource(parts.getFirst() instanceof String s ? s : "");
-                }
-            };
+    public static final ComponentType<EmulatorSource> EMULATOR = Types.call(EmulatorSource.class,
+            Types.constructor(EmulatorSource.class, String.class),
+            value -> List.of(value.instanceName()), parts -> new EmulatorSource(Types.text(parts, 0)));
 
     /**
      * {@code CaptureSource.region(source, new Rect(x, y, w, h))}: a region is a part of which pixels the bot
      * reads, so it is a value too. A region of a region is written as one call inside the other.
      */
-    public static final ComponentType<RegionSource> REGION =
-            new Shape<>(RegionSource.class,
-                    SdkTypes.method(CaptureSource.class, "region", CaptureSource.class, Rect.class)) {
-                @Override public List<Object> components(RegionSource value) {
-                    return List.of(value.parent(), value.sub());
-                }
-                @Override public RegionSource build(List<Object> parts) {
-                    return parts.size() == 2 && parts.get(0) instanceof CaptureSource of
-                                   && parts.get(1) instanceof Rect sub ? new RegionSource(of, sub) : null;
-                }
-            };
+    public static final ComponentType<RegionSource> REGION = Types.call(RegionSource.class,
+            method(CaptureSource.class, "region", CaptureSource.class, Rect.class),
+            value -> List.of(value.parent(), value.sub()), CaptureTypes::region);
 
     /**
      * {@code source.region(new Rect(…))}: the chain a person writes, read as the region it builds. It is an
      * instance factory, so the host never writes it: an edited region is written as {@link #REGION}.
      */
-    public static final ComponentType<RegionSource> REGION_CHAIN =
-            new Shape<>(RegionSource.class, SdkTypes.method(CaptureSource.class, "region", Rect.class)) {
-                @Override public List<Object> components(RegionSource value) {
-                    return List.of(value.parent(), value.sub());
-                }
-                @Override public RegionSource build(List<Object> parts) {
-                    return REGION.build(parts);
-                }
-            };
+    public static final ComponentType<RegionSource> REGION_CHAIN = Types.call(RegionSource.class,
+            method(CaptureSource.class, "region", Rect.class),
+            value -> List.of(value.parent(), value.sub()), CaptureTypes::region);
+
+    private static RegionSource region(List<Object> parts) {
+        return parts.size() == 2 && parts.get(0) instanceof CaptureSource of && parts.get(1) instanceof Rect sub
+                ? new RegionSource(of, sub) : null;
+    }
 
     /**
      * Every shape, in the order the host tries them: the six it writes, then the chained region, which it
@@ -133,23 +97,4 @@ public final class CaptureTypes {
      */
     public static final List<ComponentType<?>> ALL =
             List.of(CURRENT, DESKTOP, MONITOR, WINDOW, EMULATOR, REGION, REGION_CHAIN);
-
-    /**
-     * What each of the seven shares: the class, and the call that writes it. The types of its parts are the
-     * call's parameters, so the two cannot drift apart.
-     */
-    private abstract static class Shape<T> implements ComponentType<T> {
-
-        private final Class<T> type;
-        private final Executable factory;
-
-        Shape(Class<T> type, Executable factory) {
-            this.type = type;
-            this.factory = factory;
-        }
-
-        @Override public final Class<T> type() { return type; }
-        @Override public final Executable factory() { return factory; }
-        @Override public final List<Class<?>> componentTypes() { return SdkTypes.parts(factory); }
-    }
 }

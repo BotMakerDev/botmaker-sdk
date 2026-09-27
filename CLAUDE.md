@@ -222,7 +222,9 @@ parameter is a `@Param` field and the flow is a `@Managed` value, both Java. `Sd
 `img:` prefix `Images.template` still needs) and the spelling of a duration, folded into
 `DurationEditor`. **A type is declared once, in `plugin/types/SdkTypes`**, as a `PluginType` (and a
 `ComponentType` beside it when its Java is a call), and the host writes and reads its Java. Adding a type
-means adding a class there and nothing else. Wherever the text below says *codec*, *`SdkValueTypes`* or
+means adding one constant there and nothing else — since 2026-09-28 a toolkit `Types` expression
+(`editable(…).writtenAs(Types.record(…))`, `enumType`, `call`), with the editor passed as `() -> X::editor`
+so `SdkPluginHeadlessTest` stays green. Wherever the text below says *codec*, *`SdkValueTypes`* or
 *`WireText`*, it describes the machinery that went.
 
 The runtime half of *derived files stop being Java*, and the precondition for deleting `SourceEmitter`. A

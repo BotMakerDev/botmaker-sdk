@@ -1,10 +1,8 @@
 package com.botmaker.sdk.plugin.types;
 
-import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.value.ComponentType;
-import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
-import com.botmaker.plugin.toolkit.AbstractPluginType;
+import com.botmaker.plugin.toolkit.Types;
 import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -27,26 +25,24 @@ import com.botmaker.sdk.plugin.editors.InputEditors;
 import com.botmaker.sdk.plugin.editors.PrecisionEditors;
 import com.botmaker.sdk.plugin.editors.ResultEditors;
 import com.botmaker.sdk.plugin.editors.TemplateEditors;
-import javafx.scene.Node;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+
+import static com.botmaker.plugin.toolkit.Types.method;
 
 /**
  * The sixteen types the SDK declares ({@link #ALL}): a picture and a group of them, how exactly to match
  * one, three geometry shapes, three enums, a key combination and a key sequence, the capture source, and four
  * vision results a bot holds but nobody edits.
  *
- * <p>Each type is declared once. javac asks for what it is, what a fresh one is and how a person edits it in
- * one class, and the type is named once — in {@code type()}. The host writes and reads the Java; a type
- * whose Java is a call also implements {@link ComponentType}, so the host can hand an editor a value.
+ * <p>Each type is declared once, as one {@link Types} expression: what it is, what a fresh one is, how a
+ * person edits it, and — when its Java is a call — the call, as the same object. The host writes and reads
+ * the Java. A record's call is its canonical constructor ({@link Types#record}), so the geometry types and
+ * {@link Precision} state nothing about their parts at all.
  *
  * <p>The JDK's own values — text, a flag, numbers, a colour, a date, a duration — are plugin-basics'
  * ({@code com.botmaker.plugin.basics.values.BasicsTypes}). What is here is what a bot's own API names.
@@ -55,7 +51,8 @@ import java.util.function.Function;
  *
  * <p>Every one of these names a real {@link Class}, which is the whole of what the host indexes on: a
  * project's file says {@code com.botmaker.sdk.api.geometry.Point} because that is what the field is declared
- * as.
+ * as. Every factory is looked up once, in a {@code static final} field, so a renamed method breaks this
+ * plugin's class initialisation and its own tests rather than a bot's file.
  *
  * @see FlowTypes the five shapes a {@code Flow} is written as, which are composites and never picked
  * @see CaptureTypes the six calls a {@code CaptureSource} is written as
@@ -65,314 +62,147 @@ public final class SdkTypes {
     private SdkTypes() {
     }
 
+    private static ImageTemplate placeholder() {
+        return new ImageTemplate(TemplateNames.pathFor(TemplateNames.DEFAULT_TEMPLATE_NAME));
+    }
+
     /**
-     * A named picture.
+     * A named picture, {@code new ImageTemplate("images/ore.png")}.
      *
      * <p><b>The one type whose fresh value is a choice rather than a fallback.</b> A new picture value
      * points at the placeholder every project ships, because an empty chip is a value the bot cannot run
      * on and no amount of reasoning about an empty {@code ImageTemplate} discovers that.
      */
-    public static final class ImageTemplateType extends AbstractPluginType<ImageTemplate>
-            implements EditableType<ImageTemplate>, ComponentType<ImageTemplate> {
-        public ImageTemplateType() { super(ImageTemplate.class); }
-        @Override public ImageTemplate fresh() {
-            return new ImageTemplate(TemplateNames.pathFor(TemplateNames.DEFAULT_TEMPLATE_NAME));
-        }
-        @Override public Node editor(ValueContext ctx) { return TemplateEditors.template(ctx); }
-        @Override public Node preview(ValueContext ctx) { return TemplateEditors.preview(ctx); }
-
-        @Override public List<Class<?>> componentTypes() { return List.of(String.class); }
-        @Override public List<Object> components(ImageTemplate t) { return List.of(t.filePath()); }
-        @Override public ImageTemplate build(List<Object> parts) {
-            return new ImageTemplate(text(parts, 0));
-        }
-    }
+    public static final Types.DeclaredCall<ImageTemplate> IMAGE_TEMPLATE =
+            Types.editable(ImageTemplate.class, SdkTypes::placeholder, () -> TemplateEditors::template)
+                    .preview(() -> TemplateEditors::preview)
+                    .writtenAs(Types.call(ImageTemplate.class, Types.constructor(ImageTemplate.class, String.class),
+                            t -> List.of(t.filePath()), parts -> new ImageTemplate(Types.text(parts, 0))));
 
     /**
      * How exact a pixel match has to be.
      *
      * <p>{@code Precision.DEFAULT} rather than {@code new Precision(0, 0, 0)}: a zero tolerance matches
      * nothing and a zero minimum area matches everything, so neither end of the range is a sensible start.
+     * Built through the record's own canonical constructor, which is where the clamping to what a match can
+     * actually use lives — so a hand-edited number is clamped exactly as a picked one is.
      */
-    public static final class PrecisionType extends AbstractPluginType<Precision>
-            implements EditableType<Precision>, ComponentType<Precision> {
-        public PrecisionType() { super(Precision.class); }
-        @Override public Precision fresh() { return Precision.DEFAULT; }
-        @Override public Node editor(ValueContext ctx) { return PrecisionEditors.precision(ctx); }
-
-        @Override public List<Class<?>> componentTypes() {
-            return List.of(double.class, int.class, int.class);
-        }
-        @Override public List<Object> components(Precision p) {
-            return List.of(p.deltaE(), p.minArea(), p.minCount());
-        }
-        @Override public Precision build(List<Object> parts) {
-            // Through the record's own canonical constructor, which is where the clamping to what a match
-            // can actually use lives — so a hand-edited number is clamped exactly as a picked one is.
-            return new Precision(number(parts, 0), whole(parts, 1), whole(parts, 2));
-        }
-    }
-
-    /** A point on the screen. */
-    public static final class PointType extends AbstractPluginType<Point>
-            implements EditableType<Point>, ComponentType<Point> {
-        public PointType() { super(Point.class); }
-        @Override public Point fresh() { return new Point(0, 0); }
-        @Override public Node editor(ValueContext ctx) { return GeometryEditors.point(ctx, this); }
-
-        @Override public List<Class<?>> componentTypes() { return List.of(int.class, int.class); }
-        @Override public List<Object> components(Point p) { return List.of(p.x(), p.y()); }
-        @Override public Point build(List<Object> parts) {
-            return new Point(whole(parts, 0), whole(parts, 1));
-        }
-    }
-
-    /** A rectangle on the screen: where it is, then how big it is. */
-    public static final class RectType extends AbstractPluginType<Rect>
-            implements EditableType<Rect>, ComponentType<Rect> {
-        public RectType() { super(Rect.class); }
-        @Override public Rect fresh() { return new Rect(0, 0, 0, 0); }
-        @Override public Node editor(ValueContext ctx) { return GeometryEditors.rect(ctx, this); }
-
-        @Override public List<Class<?>> componentTypes() {
-            return List.of(int.class, int.class, int.class, int.class);
-        }
-        @Override public List<Object> components(Rect r) {
-            return List.of(r.x(), r.y(), r.width(), r.height());
-        }
-        @Override public Rect build(List<Object> parts) {
-            return new Rect(whole(parts, 0), whole(parts, 1), whole(parts, 2), whole(parts, 3));
-        }
-    }
-
-    /** A width and a height, with no position. */
-    public static final class SizeType extends AbstractPluginType<Size>
-            implements EditableType<Size>, ComponentType<Size> {
-        public SizeType() { super(Size.class); }
-        @Override public Size fresh() { return new Size(0, 0); }
-        @Override public Node editor(ValueContext ctx) { return GeometryEditors.size(ctx, this); }
-
-        @Override public List<Class<?>> componentTypes() { return List.of(int.class, int.class); }
-        @Override public List<Object> components(Size s) { return List.of(s.width(), s.height()); }
-        @Override public Size build(List<Object> parts) {
-            return new Size(whole(parts, 0), whole(parts, 1));
-        }
-    }
+    public static final Types.DeclaredCall<Precision> PRECISION =
+            Types.editable(Precision.class, () -> Precision.DEFAULT, () -> PrecisionEditors::precision)
+                    .writtenAs(Types.record(Precision.class));
 
     /**
-     * An enum constant, which needs no {@link ComponentType}.
-     *
-     * <p>Its Java is the constant's own name, which the host writes and reads without help — the case that
-     * proves the two interfaces had to stay independent. The fresh value is the first constant, which is
-     * what an enum with no obvious default means by "unset".
-     *
-     * @param <E> the enum
+     * The three geometry calls. Each is handed to its {@code GeometryEditors} editor, which passes it to
+     * {@code Editors.tuplePill} — where the arity, the components and the way back from a row of numbers to a
+     * value all come from, so "a Rect has four numbers" is stated once, by the record.
      */
-    private abstract static class EnumType<E extends Enum<E>> extends AbstractPluginType<E>
-            implements EditableType<E> {
-        EnumType(Class<E> type) { super(type); }
-        @Override public E fresh() { return type().getEnumConstants()[0]; }
-    }
+    private static final ComponentType<Point> POINT = Types.record(Point.class);
+    private static final ComponentType<Rect> RECT = Types.record(Rect.class);
+    private static final ComponentType<Size> SIZE = Types.record(Size.class);
 
-    /** Which way something moves or faces. */
-    public static final class DirectionType extends EnumType<Direction> {
-        public DirectionType() { super(Direction.class); }
-        @Override public Node editor(ValueContext ctx) { return InputEditors.direction(ctx); }
-    }
+    /** A point on the screen. */
+    public static final Types.DeclaredCall<Point> POINT_TYPE =
+            Types.editable(Point.class, () -> new Point(0, 0), () -> ctx -> GeometryEditors.point(ctx, POINT))
+                    .writtenAs(POINT);
+
+    /** A rectangle on the screen: where it is, then how big it is. */
+    public static final Types.DeclaredCall<Rect> RECT_TYPE =
+            Types.editable(Rect.class, () -> new Rect(0, 0, 0, 0), () -> ctx -> GeometryEditors.rect(ctx, RECT))
+                    .writtenAs(RECT);
+
+    /** A width and a height, with no position. */
+    public static final Types.DeclaredCall<Size> SIZE_TYPE =
+            Types.editable(Size.class, () -> new Size(0, 0), () -> ctx -> GeometryEditors.size(ctx, SIZE))
+                    .writtenAs(SIZE);
+
+    /** Which way something moves or faces. An enum's Java is its constant, so it needs no call. */
+    public static final PluginType<Direction> DIRECTION = Types.enumType(Direction.class, () -> InputEditors::direction);
 
     /** A key on the keyboard. */
-    public static final class KeyType extends EnumType<Key> {
-        public KeyType() { super(Key.class); }
-        @Override public Node editor(ValueContext ctx) { return InputEditors.key(ctx); }
-    }
+    public static final PluginType<Key> KEY = Types.enumType(Key.class, () -> InputEditors::key);
 
     /** A mouse button. */
-    public static final class MouseButtonType extends EnumType<MouseButton> {
-        public MouseButtonType() { super(MouseButton.class); }
-        @Override public Node editor(ValueContext ctx) { return InputEditors.mouseButton(ctx); }
-    }
+    public static final PluginType<MouseButton> MOUSE_BUTTON =
+            Types.enumType(MouseButton.class, () -> InputEditors::mouseButton);
 
     /**
      * Keys pressed together, written {@code Combo.of(Key.CTRL, Key.S)}: one declared part, repeated as varargs,
-     * as {@link ImageTemplateGroupType} is. A fresh one is Ctrl+S, the combination a recorded bot most often
+     * as {@link #IMAGE_TEMPLATE_GROUP} is. A fresh one is Ctrl+S, the combination a recorded bot most often
      * starts with.
      */
-    public static final class ComboType extends AbstractPluginType<Combo>
-            implements EditableType<Combo>, ComponentType<Combo> {
-        public ComboType() { super(Combo.class); }
-        @Override public Combo fresh() { return Combo.of(Key.CTRL, Key.S); }
-        @Override public Node editor(ValueContext ctx) { return InputEditors.combo(ctx); }
-
-        @Override public Executable factory() { return method(Combo.class, "of", Key[].class); }
-        @Override public List<Class<?>> componentTypes() { return List.of(Key.class); }
-        @Override public List<Object> components(Combo c) { return List.copyOf(c.keys()); }
-        @Override public Combo build(List<Object> parts) {
-            List<Key> keys = new ArrayList<>();
-            for (Object part : parts) {
-                if (!(part instanceof Key key)) return null;
-                keys.add(key);
-            }
-            return keys.isEmpty() ? null : new Combo(keys);
-        }
-    }
+    public static final Types.DeclaredCall<Combo> COMBO =
+            Types.editable(Combo.class, () -> Combo.of(Key.CTRL, Key.S), () -> InputEditors::combo)
+                    .writtenAs(Types.call(Combo.class, method(Combo.class, "of", Key[].class),
+                            c -> List.copyOf(c.keys()), parts -> {
+                                List<Key> keys = Types.each(parts, Key.class);
+                                return keys == null ? null : new Combo(keys);
+                            }));
 
     /**
-     * {@code combo.held(d)}: a held combo, written on the combo without its hold. {@link ComboType}'s factory
+     * {@code combo.held(d)}: a held combo, written on the combo without its hold. {@link #COMBO}'s factory
      * has no hold, so a held combo does not survive it, and that is when the host writes this chain instead.
      */
-    public static final ComponentType<Combo> COMBO_HELD = new ComponentType<>() {
-        private final Method held = method(Combo.class, "held", Duration.class);
+    public static final ComponentType<Combo> COMBO_HELD = Types.call(Combo.class,
+            method(Combo.class, "held", Duration.class),
+            c -> List.of(c.held(Duration.ZERO), c.hold()),
+            parts -> parts.size() == 2 && parts.get(0) instanceof Combo on && parts.get(1) instanceof Duration hold
+                    && !hold.isNegative() ? on.held(hold) : null);
 
-        @Override public Class<Combo> type() { return Combo.class; }
-        @Override public Executable factory() { return held; }
-        @Override public List<Class<?>> componentTypes() { return parts(held); }
-        @Override public List<Object> components(Combo c) { return List.of(c.held(Duration.ZERO), c.hold()); }
-        @Override public Combo build(List<Object> parts) {
-            return parts.size() == 2 && parts.get(0) instanceof Combo on && parts.get(1) instanceof Duration hold
-                    && !hold.isNegative() ? on.held(hold) : null;
-        }
-    };
+    /** {@code KeySequence.step(combo, after)}: one step of a sequence, never declared or picked on its own. */
+    public static final ComponentType<KeySequence.Step> STEP = Types.call(KeySequence.Step.class,
+            method(KeySequence.class, "step", Combo.class, Duration.class),
+            s -> List.of(s.combo(), s.after()),
+            parts -> parts.size() == 2 && parts.get(0) instanceof Combo combo && parts.get(1) instanceof Duration after
+                    && !after.isNegative() ? KeySequence.step(combo, after) : null);
 
     /**
      * Combos one after another, written {@code KeySequence.of(step(…), step(…))}: one declared part, the
      * {@link #STEP}, repeated as varargs. A fresh one is select all, wait 100 ms, copy — two steps, so the
      * editor opens on what a sequence is for.
      */
-    public static final class KeySequenceType extends AbstractPluginType<KeySequence>
-            implements EditableType<KeySequence>, ComponentType<KeySequence> {
-        public KeySequenceType() { super(KeySequence.class); }
-        @Override public KeySequence fresh() {
-            return KeySequence.of(KeySequence.step(Combo.of(Key.CTRL, Key.A), Duration.ofMillis(100)),
-                    KeySequence.step(Combo.of(Key.CTRL, Key.C), Duration.ZERO));
-        }
-        @Override public Node editor(ValueContext ctx) { return InputEditors.sequence(ctx); }
-
-        @Override public Executable factory() {
-            return method(KeySequence.class, "of", KeySequence.Step[].class);
-        }
-        @Override public List<Class<?>> componentTypes() { return List.of(KeySequence.Step.class); }
-        @Override public List<Object> components(KeySequence s) { return List.copyOf(s.steps()); }
-        @Override public KeySequence build(List<Object> parts) {
-            List<KeySequence.Step> steps = new ArrayList<>();
-            for (Object part : parts) {
-                if (!(part instanceof KeySequence.Step step)) return null;
-                steps.add(step);
-            }
-            return steps.isEmpty() ? null : new KeySequence(steps);
-        }
-    }
-
-    /** {@code KeySequence.step(combo, after)}: one step of a sequence, never declared or picked on its own. */
-    public static final ComponentType<KeySequence.Step> STEP = new ComponentType<>() {
-        private final Method step = method(KeySequence.class, "step", Combo.class, Duration.class);
-
-        @Override public Class<KeySequence.Step> type() { return KeySequence.Step.class; }
-        @Override public Executable factory() { return step; }
-        @Override public List<Class<?>> componentTypes() { return parts(step); }
-        @Override public List<Object> components(KeySequence.Step s) { return List.of(s.combo(), s.after()); }
-        @Override public KeySequence.Step build(List<Object> parts) {
-            return parts.size() == 2 && parts.get(0) instanceof Combo combo && parts.get(1) instanceof Duration after
-                    && !after.isNegative() ? KeySequence.step(combo, after) : null;
-        }
-    };
-
-    /**
-     * The three geometry declarations. Each hands itself to its {@code GeometryEditors} editor, which passes
-     * it to {@code Editors.tuplePill} — where the arity, the components and the way back from a row of
-     * numbers to a value all come from, so "a Rect has four numbers" is stated once.
-     */
-    public static final PointType POINT_TYPE = new PointType();
-    public static final RectType RECT_TYPE = new RectType();
-    public static final SizeType SIZE_TYPE = new SizeType();
-
-    /**
-     * A type a bot author may <b>hold</b> but cannot edit, whose fresh form is a call the bot re-evaluates.
-     *
-     * <p>{@link #fresh()} answers {@code null} and {@link #freshCall()} names the method the host writes a
-     * call to, which is the distinction {@code PluginType} grew for these. The difference is not a spelling
-     * one:
-     * {@code Vision.lastMatch()} means <em>the match the bot found a moment ago</em>, and freezing it into a
-     * {@code MatchResult} value would change the declaration into a fabricated miss. Calling it to obtain
-     * one is worse still — it would run the vision stack inside {@code botmaker plugin validate}.
-     *
-     * <p>{@link #editor(ValueContext)} is a pill saying in plain words what the bot fills in, with the Java in
-     * its tooltip ({@link ResultEditors}). That is the honest control: there is nothing here anyone configures.
-     */
-    private static final class SeededType<T> implements EditableType<T> {
-        private final Class<T> type;
-        private final Method freshCall;
-
-        SeededType(Class<T> type, Method freshCall) {
-            this.type = type;
-            this.freshCall = freshCall;
-        }
-
-        @Override public Class<T> type() { return type; }
-        @Override public T fresh() { return null; }
-        @Override public Method freshCall() { return freshCall; }
-        @Override public Node editor(ValueContext ctx) { return ResultEditors.pill(ctx, type); }
-        @Override public Node preview(ValueContext ctx) { return ResultEditors.pill(ctx, type); }
-    }
-
-    /**
-     * {@code owner.name(parameters)}, looked up once. A rename breaks class initialisation here, in this
-     * plugin's own tests, rather than writing a call into a bot's file that no longer compiles.
-     */
-    static Method method(Class<?> owner, String name, Class<?>... parameters) {
-        try {
-            return owner.getMethod(name, parameters);
-        } catch (NoSuchMethodException e) {
-            throw new IllegalStateException(owner.getName() + "." + name + " is gone", e);
-        }
-    }
-
-    /** {@code new type(parameters)}, looked up once, for the same reason. */
-    static <T> Constructor<T> constructor(Class<T> type, Class<?>... parameters) {
-        try {
-            return type.getConstructor(parameters);
-        } catch (NoSuchMethodException e) {
-            throw new IllegalStateException("new " + type.getName() + "(…) is gone", e);
-        }
-    }
-
-    /**
-     * The parts a factory is written with: its parameters, after the receiver when it is an instance method.
-     * Deriving them is what keeps {@code componentTypes()} and the call from drifting apart.
-     */
-    static List<Class<?>> parts(Executable factory) {
-        List<Class<?>> out = new ArrayList<>();
-        if (factory instanceof Method m && !Modifier.isStatic(m.getModifiers())) out.add(m.getDeclaringClass());
-        out.addAll(List.of(factory.getParameterTypes()));
-        return List.copyOf(out);
-    }
+    public static final Types.DeclaredCall<KeySequence> KEY_SEQUENCE =
+            Types.editable(KeySequence.class,
+                            () -> KeySequence.of(KeySequence.step(Combo.of(Key.CTRL, Key.A), Duration.ofMillis(100)),
+                                    KeySequence.step(Combo.of(Key.CTRL, Key.C), Duration.ZERO)),
+                            () -> InputEditors::sequence)
+                    .writtenAs(Types.call(KeySequence.class, method(KeySequence.class, "of", KeySequence.Step[].class),
+                            s -> List.copyOf(s.steps()), parts -> {
+                                List<KeySequence.Step> steps = Types.each(parts, KeySequence.Step.class);
+                                return steps == null ? null : new KeySequence(steps);
+                            }));
 
     /**
      * Several pictures, written {@code ImageTemplateGroup.of(a, b)}. A fresh one holds the placeholder
      * picture, for the reason a fresh {@code ImageTemplate} is it: an empty group is a value the bot cannot
      * match anything with. Drawn by the same picture row as a run of picture arguments.
      */
-    public static final class ImageTemplateGroupType extends AbstractPluginType<ImageTemplateGroup>
-            implements EditableType<ImageTemplateGroup>, ComponentType<ImageTemplateGroup> {
-        public ImageTemplateGroupType() { super(ImageTemplateGroup.class); }
-        @Override public Node editor(ValueContext ctx) { return TemplateEditors.group(ctx); }
-        @Override public ImageTemplateGroup fresh() {
-            return ImageTemplateGroup.of(new ImageTemplate(TemplateNames.pathFor(TemplateNames.DEFAULT_TEMPLATE_NAME)));
-        }
+    public static final Types.DeclaredCall<ImageTemplateGroup> IMAGE_TEMPLATE_GROUP =
+            Types.editable(ImageTemplateGroup.class, () -> ImageTemplateGroup.of(placeholder()), () -> TemplateEditors::group)
+                    .writtenAs(Types.call(ImageTemplateGroup.class,
+                            method(ImageTemplateGroup.class, "of", ImageTemplate[].class),
+                            g -> List.copyOf(g.templates()), parts -> {
+                                // An empty group is still a group the bot can hold, unlike an empty combo.
+                                if (parts.isEmpty()) return ImageTemplateGroup.of(List.of());
+                                List<ImageTemplate> templates = Types.each(parts, ImageTemplate.class);
+                                return templates == null ? null : ImageTemplateGroup.of(templates);
+                            }));
 
-        @Override public Executable factory() {
-            return method(ImageTemplateGroup.class, "of", ImageTemplate[].class);
-        }
-        /** One declared part: the host repeats the last part type for every further argument, as varargs. */
-        @Override public List<Class<?>> componentTypes() { return List.of(ImageTemplate.class); }
-        @Override public List<Object> components(ImageTemplateGroup g) { return List.copyOf(g.templates()); }
-        @Override public ImageTemplateGroup build(List<Object> parts) {
-            List<ImageTemplate> templates = new java.util.ArrayList<>();
-            for (Object part : parts) {
-                if (!(part instanceof ImageTemplate template)) return null;
-                templates.add(template);
-            }
-            return ImageTemplateGroup.of(templates);
-        }
+    /**
+     * A type a bot author may <b>hold</b> but cannot edit, whose fresh form is a call the bot re-evaluates.
+     *
+     * <p>{@code fresh()} answers {@code null} and {@code freshCall()} names the method the host writes a
+     * call to, which is the distinction {@code PluginType} grew for these. The difference is not a spelling
+     * one: {@code Vision.lastMatch()} means <em>the match the bot found a moment ago</em>, and freezing it into
+     * a {@code MatchResult} value would change the declaration into a fabricated miss. Calling it to obtain
+     * one is worse still — it would run the vision stack inside {@code botmaker plugin validate}.
+     *
+     * <p>The editor is a pill saying in plain words what the bot fills in, with the Java in its tooltip
+     * ({@link ResultEditors}). That is the honest control: there is nothing here anyone configures.
+     */
+    private static <T> PluginType<T> seeded(Class<T> type, Method freshCall) {
+        return Types.editable(type, () -> null, () -> ctx -> ResultEditors.pill(ctx, type))
+                .preview(() -> ctx -> ResultEditors.pill(ctx, type))
+                .freshCall(freshCall);
     }
 
     /**
@@ -384,48 +214,32 @@ public final class SdkTypes {
      * and labels with at the top of the list.
      */
     public static final List<PluginType<?>> ALL = List.of(
-            new ImageTemplateType(), new PrecisionType(),
-            POINT_TYPE, RECT_TYPE, SIZE_TYPE, new DirectionType(),
-            new KeyType(), new MouseButtonType(), new ComboType(), new KeySequenceType(),
-            new CaptureTypes.CaptureSourceType(), new ImageTemplateGroupType(),
-            new SeededType<>(MatchResult.class, method(Vision.class, "lastMatch")),
-            new SeededType<>(Matches.class, method(Matches.class, "none")),
-            new SeededType<>(ColorMatch.class, method(Vision.class, "lastColorMatch")),
-            new SeededType<>(TextMatch.class, method(Vision.class, "lastTextMatch")));
+            IMAGE_TEMPLATE, PRECISION,
+            POINT_TYPE, RECT_TYPE, SIZE_TYPE, DIRECTION,
+            KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE,
+            CaptureTypes.CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP,
+            seeded(MatchResult.class, method(Vision.class, "lastMatch")),
+            seeded(Matches.class, method(Matches.class, "none")),
+            seeded(ColorMatch.class, method(Vision.class, "lastColorMatch")),
+            seeded(TextMatch.class, method(Vision.class, "lastTextMatch")));
 
     /**
      * {@code precision.tolerance(d)}, {@code .minArea(n)} and {@code .minCount(n)}: the chains a person
      * writes on a named precision ({@code Precision.TIGHT.minArea(400)}), read as the value they build.
      * Instance factories, so the host never writes them: an edited precision is written as
-     * {@link PrecisionType} writes it.
+     * {@link #PRECISION} writes it.
      */
     public static final List<ComponentType<Precision>> PRECISION_WITHERS = List.of(
-            new Wither("tolerance", double.class, Precision::deltaE,
-                    (p, v) -> p.tolerance(((Number) v).doubleValue())),
-            new Wither("minArea", int.class, Precision::minArea, (p, v) -> p.minArea(((Number) v).intValue())),
-            new Wither("minCount", int.class, Precision::minCount, (p, v) -> p.minCount(((Number) v).intValue())));
+            wither("tolerance", double.class, Precision::deltaE, (p, v) -> p.tolerance(v.doubleValue())),
+            wither("minArea", int.class, Precision::minArea, (p, v) -> p.minArea(v.intValue())),
+            wither("minCount", int.class, Precision::minCount, (p, v) -> p.minCount(v.intValue())));
 
     /** One of {@link #PRECISION_WITHERS}: the method, and how to read its one part back off a value. */
-    private static final class Wither implements ComponentType<Precision> {
-
-        private final Method method;
-        private final Function<Precision, Object> part;
-        private final BiFunction<Precision, Object, Precision> apply;
-
-        Wither(String name, Class<?> argument, Function<Precision, Object> part,
-               BiFunction<Precision, Object, Precision> apply) {
-            this.method = method(Precision.class, name, argument);
-            this.part = part;
-            this.apply = apply;
-        }
-
-        @Override public Class<Precision> type() { return Precision.class; }
-        @Override public Executable factory() { return method; }
-        @Override public List<Class<?>> componentTypes() { return parts(method); }
-        @Override public List<Object> components(Precision p) { return List.of(p, part.apply(p)); }
-        @Override public Precision build(List<Object> parts) {
-            return parts.size() == 2 && parts.get(0) instanceof Precision on && parts.get(1) instanceof Number
-                    ? apply.apply(on, parts.get(1)) : null;
-        }
+    private static ComponentType<Precision> wither(String name, Class<?> argument, Function<Precision, Object> part,
+                                                   BiFunction<Precision, Number, Precision> apply) {
+        return Types.call(Precision.class, method(Precision.class, name, argument),
+                p -> List.of(p, part.apply(p)),
+                parts -> parts.size() == 2 && parts.get(0) instanceof Precision on && parts.get(1) instanceof Number n
+                        ? apply.apply(on, n) : null);
     }
 }

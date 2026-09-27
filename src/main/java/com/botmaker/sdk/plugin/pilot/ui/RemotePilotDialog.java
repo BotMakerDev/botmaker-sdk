@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.pilot.ui;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.PilotMode;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.PilotOutcome;
 import javafx.geometry.Pos;
@@ -62,7 +63,7 @@ final class RemotePilotDialog {
         boolean funnelLive = mode == PilotMode.FUNNEL_HTTPS;
 
         Alert alert = services.theme().alert(Alert.AlertType.INFORMATION);
-        alert.initOwner(services.dialogs().ownerWindow().orElse(null));
+        alert.initOwner(Modals.owner(services));
         alert.setTitle("Remote Pilot");
         alert.setHeaderText(switch (mode) {
             case FUNNEL_HTTPS -> "Remote Pilot is live over HTTPS — your phone needs nothing installed.";

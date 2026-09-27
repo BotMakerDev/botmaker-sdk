@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.sdk.plugin.screen.ColorSampler;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
@@ -100,7 +101,7 @@ public final class ColorEditors {
         alert.setContentText(failure.detail() + "\n\nPicking off the screen instead — the game has to be "
                 + "visible, and there is no magnifier or tolerance reading on this path.");
         alert.showAndWait();
-        new ScreenCapture().pickColor(services.dialogs().ownerWindow().orElse(null), pick -> {
+        new ScreenCapture().pickColor(Modals.owner(services), pick -> {
             java.awt.Color c = pick.color();
             onPicked.accept(Color.rgb(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha() / 255.0));
         });

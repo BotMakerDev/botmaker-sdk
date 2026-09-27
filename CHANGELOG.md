@@ -56,6 +56,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The plugin's types are declared with the toolkit's `Types`.** `SdkTypes`' nested `…Type` classes are
+  constants (`IMAGE_TEMPLATE`, `PRECISION`, `POINT_TYPE`, `COMBO`, …); `Point`, `Rect`, `Size` and
+  `Precision` are `Types.record`, so their parts are the records' own. The copied `method`/`constructor`/
+  `parts` helpers and the `Fixed`/`Shape`/`EnumType`/`SeededType`/`Wither` bases in `SdkTypes`, `FlowTypes`,
+  `SettingsTypes` and `CaptureTypes` are deleted. `SdkPlugin` overrides the toolkit's `buildComponentTypes`/
+  `buildManagedValues`, and every plugin window takes its owner from `Modals.owner`. No behaviour changes.
 - **The keyboard picker fits its labels and knows your layout.** Numpad caps read "7", "+", "Enter" (the chip
   and tooltip still say "Num 7"), two-word caps take two lines, and a long label shrinks its font instead of
   being cut to "N…". **QWERTY / AZERTY / QWERTZ** above the board moves the letters to where your keyboard has

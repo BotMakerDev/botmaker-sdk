@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.emulator;
 
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.sdk.api.emulator.EmulatorSource;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
@@ -35,7 +36,7 @@ public final class EmulatorEditors {
     public static Node instanceName(ValueContext ctx) {
         Button pill = Pills.button(label(Values.text(ctx, "")), null);
         pill.setOnAction(e ->
-                EmulatorPicker.show(ctx.services(), ctx.services().dialogs().ownerWindow().orElse(null)).ifPresent(chosen -> {
+                EmulatorPicker.show(ctx.services(), Modals.owner(ctx.services())).ifPresent(chosen -> {
                     String name = chosen.instance().name();
                     if (name == null || name.isBlank()) return;
                     ctx.set(name);
