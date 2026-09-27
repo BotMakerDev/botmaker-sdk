@@ -51,11 +51,7 @@ public final class SdkEditors {
             // a subset of what that one would: an ImageTemplate argument that the host says is one of a run.
             // The host consults a plugin's slot editors before its types' editors, and here the order is the
             // whole difference between "found.hasAny(coin, gem)" drawn as one row and drawn as two pickers.
-            //
-            // It does NOT yet claim an ImageTemplateGroup slot, though the editor draws that shape too.
-            // Filling one is the second of the two edits that let the host seed a group find's body with a
-            // Matches switch, and that seeding emits this API from the host — the thing the generation
-            // phase exists to move. Claiming the slot now would silently delete the seed.
+            // An ImageTemplateGroup slot is drawn by the same row, as that type's own editor (SdkTypes).
             SlotEditor.of(TemplateEditors::isRunOfPictures, TemplateEditors::group),
             // Color is plugin-basics' type, so this is an alternative editor, not a declaration: the host asks
             // the user which to use. Duration was one too until 2026-09-27; basics draws it now. By class.

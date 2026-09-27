@@ -274,19 +274,20 @@ class SdkPluginSurfaceTest {
     }
 
     /**
-     * Which SDK types draw themselves (6f). The six others have no picker yet — 6d and 6e give them one — so
-     * `plugin validate` fails the SDK until then, by design.
+     * Which SDK types draw themselves (6f, 6d). The five others have no picker yet — 6d and 6e give them one —
+     * so `plugin validate` fails the SDK until then, by design.
      */
     @Test
-    void exactly_nine_sdk_types_draw_themselves() {
+    void exactly_ten_sdk_types_draw_themselves() {
         List<String> editable = new ArrayList<>();
         List<String> plain = new ArrayList<>();
         for (PluginType<?> type : plugin.types()) {
             (type instanceof EditableType<?> ? editable : plain).add(type.type().getSimpleName());
         }
-        assertEquals(List.of("ImageTemplate", "Precision", "Point", "Rect", "Size", "Direction", "Key",
-                "MouseButton", "Combo").stream().sorted().toList(), editable.stream().sorted().toList());
-        assertEquals(List.of("ImageTemplateGroup", "CaptureSource", "MatchResult", "Matches", "ColorMatch",
+        assertEquals(List.of("ImageTemplate", "ImageTemplateGroup", "Precision", "Point", "Rect", "Size",
+                "Direction", "Key", "MouseButton", "Combo").stream().sorted().toList(),
+                editable.stream().sorted().toList());
+        assertEquals(List.of("CaptureSource", "MatchResult", "Matches", "ColorMatch",
                 "TextMatch").stream().sorted().toList(), plain.stream().sorted().toList());
     }
 

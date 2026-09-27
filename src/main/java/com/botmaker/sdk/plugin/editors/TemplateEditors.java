@@ -4,14 +4,14 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.SlotRun;
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Styles;
-import com.botmaker.plugin.toolkit.Thumbnail;
 import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.internal.vision.TemplateNames;
+import com.botmaker.sdk.plugin.pictures.ChooserSelection;
+import com.botmaker.sdk.plugin.pictures.TemplateGalleryDialog;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * The editors for a <b>named picture</b> — this plugin's {@code ImageTemplate}, in both places the host edits
@@ -188,9 +189,9 @@ public final class TemplateEditors {
     /** The trailing add button — {@code Choose pictures…} while the row is empty, {@code ＋} after that. */
     private static Node addButton(HBox row, ValueContext ctx, List<SlotRun.Element> elements) {
         return Pills.button(elements.isEmpty() ? "Choose pictures…" : "＋",
-                () -> choose(ctx, picked -> {
+                () -> choose(ctx, true, picked -> {
                     List<Object> next = new ArrayList<>(elements);
-                    next.add(templateFor(picked));
+                    for (String name : picked) next.add(templateFor(name));
                     write(row, ctx, next);
                 }));
     }
@@ -260,41 +261,38 @@ public final class TemplateEditors {
 
     // ── the gallery ─────────────────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Opens the project's pictures and hands back the base name of the one chosen.
-     *
-     * <p>The listing runs off the JavaFX thread, which {@link Modals#gallery} arranges: walking the images
-     * folder and decoding every picture in it is proportional to how much the user has captured, so doing it
-     * while drawing freezes the editor for exactly the people with the most templates.
-     */
-    private static void choose(ValueContext ctx, java.util.function.Consumer<String> onPicked) {
-        StudioServices services = ctx.services();
-        SlotRun run = runOf(ctx);
-        List<String> only = run == null ? null : namesOf(run.allowed().orElse(null));
-        Modals.gallery(ctx,
-                Modals.Gallery.pictures("Choose a picture",
-                        only == null || !only.isEmpty()
-                                ? "No pictures yet — capture some with the toolbar's Capture Templates."
-                                : "This branch can only test pictures its find call was given, and none of "
-                                  + "them can be read from the code around it."),
-                () -> narrow(items(services), only),
-                picked -> onPicked.accept(picked.value()));
+    /** Opens the project's pictures and hands back the base name of the one chosen. */
+    private static void choose(ValueContext ctx, Consumer<String> onPicked) {
+        choose(ctx, false, picked -> onPicked.accept(picked.get(picked.size() - 1)));
     }
 
     /**
-     * The pictures a narrowed row may offer, or all of them when {@code only} is {@code null}.
+     * Opens the project's pictures — the Resource Manager's gallery with Capture new… — and hands back the
+     * base names chosen: one, or several when {@code multi}.
      *
      * <p>A {@code Matches} case can only ever test pictures its enclosing find call was given, so offering
      * the whole library there lets somebody write a branch that is dead by construction. The host works the
-     * set out from the code around the run and hands it over as values.
+     * set out from the code around the run and hands it over as values; the gallery offers only those.
      */
-    private static List<Thumbnail> narrow(List<Thumbnail> all, List<String> only) {
-        if (only == null) return all;
-        List<Thumbnail> out = new ArrayList<>();
-        for (Thumbnail item : all) {
-            if (only.contains(item.value())) out.add(item);
+    private static void choose(ValueContext ctx, boolean multi, Consumer<List<String>> onPicked) {
+        StudioServices services = ctx.services();
+        SlotRun run = runOf(ctx);
+        List<String> only = run == null ? null : namesOf(run.allowed().orElse(null));
+        TemplateGalleryDialog.Options options = TemplateGalleryDialog.Options
+                .pickOne(multi ? "Choose pictures" : "Choose a picture")
+                .withCapture();
+        if (multi) options = options.multi();
+        if (only != null) {
+            options = options
+                    .withFilter(file -> ChooserSelection.pickable(TemplateLibrary.baseName(file), only))
+                    .withNote(only.isEmpty()
+                            ? "This branch can only test pictures its find call was given, and none of them "
+                              + "can be read from the code around it."
+                            : "This branch can only test pictures its find call was given; a picture "
+                              + "captured here is saved but cannot be picked for it.");
         }
-        return out;
+        TemplateGalleryDialog.open(services, services.dialogs().ownerWindow().orElse(null), options,
+                files -> onPicked.accept(files.stream().map(TemplateLibrary::baseName).toList()));
     }
 
     /** The allowed values as the picture names they are, dropping any that is not a picture. */
@@ -307,25 +305,6 @@ public final class TemplateEditors {
         return names;
     }
 
-    /** Every picture in the project, as gallery cells keyed by base name. Called off the FX thread. */
-    static List<Thumbnail> items(StudioServices services) {
-        Path resources = resourcesDir(services);
-        if (resources == null) return List.of();
-        // The placeholder is made here rather than at project creation: a project created in an
-        // editor that never loaded this plugin has no use for a picture, and this is the first moment one is
-        // asked for. Best-effort — an unwritable folder is a gallery with one fewer cell, not a refusal.
-        try {
-            TemplateLibrary.ensurePlaceholder(resources);
-        } catch (java.io.IOException ignored) {
-            // nothing to say: the list below simply will not include it
-        }
-        List<Thumbnail> out = new ArrayList<>();
-        for (Path file : TemplateLibrary.list(resources)) {
-            String name = TemplateLibrary.baseName(file);
-            out.add(new Thumbnail(name, name, decode(file, 96)));
-        }
-        return out;
-    }
 
     // ── reading and writing the value ───────────────────────────────────────────────────────────────────
 

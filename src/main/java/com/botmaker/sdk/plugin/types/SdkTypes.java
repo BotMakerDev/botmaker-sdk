@@ -284,12 +284,12 @@ public final class SdkTypes {
     /**
      * Several pictures, written {@code ImageTemplateGroup.of(a, b)}. A fresh one holds the placeholder
      * picture, for the reason a fresh {@code ImageTemplate} is it: an empty group is a value the bot cannot
-     * match anything with. Nobody edits one on its own: the picture-row editor claims a run of pictures, not
-     * this slot.
+     * match anything with. Drawn by the same picture row as a run of picture arguments.
      */
     public static final class ImageTemplateGroupType extends AbstractPluginType<ImageTemplateGroup>
-            implements ComponentType<ImageTemplateGroup> {
+            implements EditableType<ImageTemplateGroup>, ComponentType<ImageTemplateGroup> {
         public ImageTemplateGroupType() { super(ImageTemplateGroup.class); }
+        @Override public Node editor(ValueContext ctx) { return TemplateEditors.group(ctx); }
         @Override public ImageTemplateGroup fresh() {
             return ImageTemplateGroup.of(new ImageTemplate(TemplateNames.pathFor(TemplateNames.DEFAULT_TEMPLATE_NAME)));
         }

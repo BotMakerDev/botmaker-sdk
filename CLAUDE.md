@@ -576,10 +576,10 @@ a variable on the strength of not understanding it. And *Remove* is **disabled**
 than hidden, with the reason in its label: a `Matches` branch with no pictures is unconditional and would not
 compile.
 
-**It does not claim an `ImageTemplateGroup` slot yet**, though it draws that shape. Filling one is the second
-of the two edits that let the host seed a group find's body with a `Matches` switch, and that seeding emits
-this API *from the host* — the thing the generation phase exists to move. Claiming the slot now would silently
-delete the seed.
+**It claims an `ImageTemplateGroup` slot since 2026-09-27 (picker 6d)**, as that type's `EditableType`
+editor — the host no longer seeds a `Matches` switch, which is what held it back. Its ＋ opens the gallery
+multi-select; every picture chooser is `TemplateGalleryDialog` with *Capture new…*, which comes back with what
+Capture Templates saved selected.
 
 **`preview` is not `create` with the controls removed.** It is asked with an inert context (a declared choice
 has nothing to write back to) and returns `null` for a name that no longer resolves, which the host draws as
