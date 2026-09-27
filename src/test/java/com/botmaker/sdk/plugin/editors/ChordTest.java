@@ -4,8 +4,8 @@ import com.botmaker.sdk.api.interaction.Combo;
 import com.botmaker.sdk.api.interaction.Key;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,12 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ChordTest {
 
     @Test
-    void modifiers_toggle_and_one_other_key_is_kept() {
+    void clicked_keys_are_kept_in_the_order_clicked_and_a_second_click_takes_one_out() {
         Chord chord = Chord.EMPTY.click(Key.SHIFT).click(Key.CTRL).click(Key.S).click(Key.A);
-        assertEquals(Optional.of(Combo.of(Key.CTRL, Key.SHIFT, Key.A)), chord.combo());
-        assertEquals(Optional.of(Combo.of(Key.CTRL, Key.A)), chord.click(Key.SHIFT).combo());
-        assertEquals(Optional.of(Combo.of(Key.CTRL)), chord.click(Key.SHIFT).click(Key.A).combo(),
-                "clicking the main key again clears it; modifiers alone are a combo");
+        assertEquals(Optional.of(Combo.of(Key.SHIFT, Key.CTRL, Key.S, Key.A)), chord.combo(),
+                "any number of keys, modifiers anywhere");
+        assertEquals(Optional.of(Combo.of(Key.SHIFT, Key.CTRL, Key.A)), chord.click(Key.S).combo());
     }
 
     @Test
@@ -28,18 +27,27 @@ class ChordTest {
     }
 
     @Test
-    void a_pressed_chord_is_taken_whole_in_press_order() {
+    void a_pressed_key_is_appended_with_the_modifiers_held_for_it() {
+        Chord chord = Chord.EMPTY.press(true, false, false, false, Key.S);
+        assertEquals(Optional.of(Combo.of(Key.CTRL, Key.S)), chord.combo());
+        // Recording on: the next key joins the combination, and Ctrl is not written twice.
+        assertEquals(Optional.of(Combo.of(Key.CTRL, Key.S, Key.A)),
+                chord.press(true, false, false, false, Key.A).combo());
         assertEquals(Optional.of(Combo.of(Key.CTRL, Key.ALT, Key.SHIFT, Key.META, Key.DELETE)),
-                Chord.pressed(true, true, true, true, Key.DELETE).combo());
-        assertEquals(Optional.of(Combo.of(Key.CTRL)), Chord.pressed(true, false, false, false, Key.CTRL).combo(),
+                Chord.EMPTY.press(true, true, true, true, Key.DELETE).combo(), "held modifiers in press order");
+        assertEquals(Optional.of(Combo.of(Key.CTRL)), Chord.EMPTY.press(true, false, false, false, Key.CTRL).combo(),
                 "pressing Ctrl alone is Ctrl");
     }
 
     @Test
-    void a_combo_opens_as_its_chord() {
-        Chord chord = Chord.of(Combo.of(Key.S, Key.CTRL));
-        assertEquals(Set.of(Key.CTRL), chord.modifiers());
-        assertEquals(Key.S, chord.main());
-        assertEquals(Optional.of(Combo.of(Key.CTRL, Key.S)), chord.combo());
+    void a_combo_opens_as_its_keys_in_order() {
+        Chord chord = Chord.of(Combo.of(Key.S, Key.CTRL, Key.A));
+        assertEquals(List.of(Key.S, Key.CTRL, Key.A), chord.keys());
+        assertEquals(Optional.of(Combo.of(Key.S, Key.CTRL, Key.A)), chord.combo());
+    }
+
+    @Test
+    void a_repeated_key_is_held_once() {
+        assertEquals(List.of(Key.A, Key.B), Chord.of(Combo.of(Key.A, Key.B, Key.A)).keys());
     }
 }

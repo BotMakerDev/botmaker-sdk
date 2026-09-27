@@ -214,8 +214,8 @@ public final class InputEditors {
 
     /**
      * The chord the popup opens on: the value's, or nothing — never a guess at an expression the host could not
-     * read, nor at a combo the keyboard cannot hold (two ordinary keys, modifiers after the key), which OK would
-     * otherwise rewrite with a key dropped or the press order changed.
+     * read, nor at a combo the keyboard cannot hold (one that repeats a key), which OK would otherwise rewrite
+     * with a key dropped. Since 2026-09-27 any other combo is held as written, in its own order.
      */
     static Chord chordOf(ValueContext ctx) {
         return ctx.value(Combo.class)
@@ -232,12 +232,13 @@ public final class InputEditors {
     public static Node key(ValueContext ctx) {
         Button[] pill = new Button[1];
         pill[0] = Pills.button(keyPill(ctx), () -> {
-            Chord initial = ctx.value(Key.class).map(k -> new Chord(Set.of(), k)).orElse(Chord.EMPTY);
+            Chord initial = ctx.value(Key.class).map(Chord::single).orElse(Chord.EMPTY);
             Stage[] stage = new Stage[1];
             KeyboardView view = new KeyboardView(false, initial, chord -> {
-                if (chord.main() == null) return;
-                ctx.set(chord.main());
-                pill[0].setText(chord.main().label());
+                Key key = chord.last();
+                if (key == null) return;
+                ctx.set(key);
+                pill[0].setText(key.label());
                 if (stage[0] != null) stage[0].close();
             });
             stage[0] = Modals.form(ctx, "Choose a key", view.node(), null);
@@ -246,9 +247,9 @@ public final class InputEditors {
     }
 
     /**
-     * A combination, picked on the same keyboard in chord mode: Ctrl, Alt, Shift and Meta toggle and one other
-     * key is kept, or the whole chord is pressed at once. Written on OK, modifiers first; a dialog left with
-     * nothing chosen writes nothing.
+     * A combination, picked on the same keyboard in chord mode: any keys, in the order clicked or pressed —
+     * shown as chips, each removable, with Clear (2026-09-27; modifiers plus one key until then). Written on OK
+     * in that order; a dialog left with nothing chosen writes nothing.
      */
     public static Node combo(ValueContext ctx) {
         Button[] pill = new Button[1];

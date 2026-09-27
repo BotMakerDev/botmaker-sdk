@@ -8,6 +8,18 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — keyboard and combos (picker feedback 2, phase 3)
+
+**Done**
+- `Chord` is an ordered, distinct `List<Key>` — `click` toggles in/out at the end, `press` appends the held
+  modifiers then the key — mapping 1:1 to `Combo.of`; `InputEditors.chordOf` opens any combo but a repeating one.
+- `KeyboardView` sizes caps from the root's width (`KeyboardLayout.unitFor`, 22–48 px), makes its window
+  resizable with a minimum, and shows chord mode as chips + Clear. `KeyboardLayout` wraps the spare keys at
+  `WIDTH` units.
+
+**Deferred / next**
+- No FX test drives `KeyboardView`; its scaling is checked by hand (narrow and wide window).
+
 ## 2026-09-27 — the vision results explain themselves (picker phase 6e1)
 
 **Done**

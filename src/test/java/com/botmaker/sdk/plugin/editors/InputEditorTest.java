@@ -30,15 +30,15 @@ class InputEditorTest {
     }
 
     /**
-     * A combo the keyboard cannot hold — two ordinary keys, or modifiers after the key — opens empty, so OK
-     * writes nothing. Opening it on the nearest chord made OK silently drop a key or change the press order.
+     * Any combo opens as written since 2026-09-27 — two ordinary keys, modifiers after the key — and only one
+     * that repeats a key opens empty, since holding it would make OK silently drop the repeat.
      */
     @Test
-    void a_combo_the_keyboard_cannot_hold_opens_empty() {
-        assertEquals(Chord.EMPTY, InputEditors.chordOf(
+    void every_combo_opens_as_written_but_one_that_repeats_a_key() {
+        assertEquals(Chord.of(Combo.of(Key.W, Key.D)), InputEditors.chordOf(
                 TestContexts.typedSlot(Combo.class, "x").withValue(Combo.of(Key.W, Key.D))));
-        assertEquals(Chord.EMPTY, InputEditors.chordOf(
-                TestContexts.typedSlot(Combo.class, "x").withValue(Combo.of(Key.S, Key.CTRL))));
+        assertEquals(java.util.List.of(Key.S, Key.CTRL), InputEditors.chordOf(
+                TestContexts.typedSlot(Combo.class, "x").withValue(Combo.of(Key.S, Key.CTRL))).keys());
         assertEquals(Chord.EMPTY, InputEditors.chordOf(
                 TestContexts.typedSlot(Combo.class, "x").withValue(Combo.of(Key.CTRL, Key.CTRL, Key.S))));
     }

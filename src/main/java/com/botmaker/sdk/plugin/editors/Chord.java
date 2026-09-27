@@ -4,71 +4,66 @@ import com.botmaker.sdk.api.interaction.Combo;
 import com.botmaker.sdk.api.interaction.Key;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
- * What the combination editor holds while it is open: modifiers that toggle, and at most one other key. Written
- * back modifiers first, in the order a person presses them (Ctrl, Alt, Shift, Meta), so every combo this editor
- * writes reads the same way. Pure: no JavaFX.
+ * What the combination editor holds while it is open: keys in the order they were chosen, each once — which
+ * is exactly what {@link Combo#of} writes, so a combo reads back as it was written. Any number of keys and
+ * modifiers anywhere (feedback 2, 2026-09-27): it held modifiers plus one other key until then, and a combo of
+ * two ordinary keys could not be picked at all. Pure: no JavaFX.
  */
-record Chord(Set<Key> modifiers, Key main) {
+record Chord(List<Key> keys) {
 
     static final List<Key> MODIFIER_ORDER = List.of(Key.CTRL, Key.ALT, Key.SHIFT, Key.META);
-    static final Chord EMPTY = new Chord(Set.of(), null);
+    static final Chord EMPTY = new Chord(List.of());
 
     Chord {
-        modifiers = Set.copyOf(modifiers);
+        keys = List.copyOf(new LinkedHashSet<>(keys));
     }
 
-    static boolean modifier(Key key) {
-        return MODIFIER_ORDER.contains(key);
+    /** One key alone — what the one-key editor holds. */
+    static Chord single(Key key) {
+        return new Chord(List.of(key));
     }
 
-    /** A combo read back: its modifiers, and its last other key (a hand-written combo may hold several). */
+    /** A combo read back, in its own order; a key it repeats is held once. */
     static Chord of(Combo combo) {
-        Set<Key> mods = EnumSet.noneOf(Key.class);
-        Key main = null;
-        for (Key key : combo.keys()) {
-            if (modifier(key)) mods.add(key);
-            else main = key;
-        }
-        return new Chord(mods, main);
+        return new Chord(combo.keys());
     }
 
-    /** A click on a cap: a modifier toggles; another key replaces the main one, or clears it if it is that one. */
+    /** A click on a cap or a chip: a key not in the combination joins it at the end; one in it leaves. */
     Chord click(Key key) {
-        if (modifier(key)) {
-            Set<Key> mods = EnumSet.noneOf(Key.class);
-            mods.addAll(modifiers);
-            if (!mods.remove(key)) mods.add(key);
-            return new Chord(mods, main);
-        }
-        return new Chord(modifiers, key == main ? null : key);
+        List<Key> next = new ArrayList<>(keys);
+        if (!next.remove(key)) next.add(key);
+        return new Chord(next);
     }
 
-    /** A real keystroke, with the modifiers held while it was pressed: the whole chord at once. */
-    static Chord pressed(boolean ctrl, boolean alt, boolean shift, boolean meta, Key key) {
-        Set<Key> mods = EnumSet.noneOf(Key.class);
-        if (ctrl) mods.add(Key.CTRL);
-        if (alt) mods.add(Key.ALT);
-        if (shift) mods.add(Key.SHIFT);
-        if (meta) mods.add(Key.META);
-        if (modifier(key)) {
-            mods.add(key);
-            return new Chord(mods, null);
+    /**
+     * A real keystroke: the modifiers held for it that are not already in the combination, in the order a
+     * person presses them, then the key. Appended, so a combination is recorded one keystroke at a time.
+     */
+    Chord press(boolean ctrl, boolean alt, boolean shift, boolean meta, Key key) {
+        List<Key> next = new ArrayList<>(keys);
+        boolean[] held = {ctrl, alt, shift, meta};
+        for (int i = 0; i < held.length; i++) {
+            if (held[i]) next.add(MODIFIER_ORDER.get(i));
         }
-        return new Chord(mods, key);
+        next.add(key);
+        return new Chord(next);
+    }
+
+    /** The last key chosen, or null — what the one-key editor answers. */
+    Key last() {
+        return keys.isEmpty() ? null : keys.getLast();
+    }
+
+    boolean contains(Key key) {
+        return keys.contains(key);
     }
 
     Optional<Combo> combo() {
-        List<Key> keys = new ArrayList<>();
-        for (Key m : MODIFIER_ORDER) {
-            if (modifiers.contains(m)) keys.add(m);
-        }
-        if (main != null) keys.add(main);
         return keys.isEmpty() ? Optional.empty() : Optional.of(new Combo(keys));
     }
 }

@@ -20,12 +20,28 @@ final class KeyboardLayout {
     /** A cap, or a gap when {@code key} is null. */
     record Cap(Key key, double width) {}
 
+    /** The width of the widest row, in key units: the number row, from ` to the numpad's −. */
+    static final double WIDTH = 23;
+
+    /** The smallest and largest a one-unit cap is drawn, in pixels. */
+    static final double MIN_UNIT = 22;
+    static final double MAX_UNIT = 48;
+
     private static final List<List<Cap>> ROWS = build();
 
     private KeyboardLayout() {}
 
     static List<List<Cap>> rows() {
         return ROWS;
+    }
+
+    /**
+     * How wide a one-unit cap is on a board {@code width} pixels wide: the whole keyboard fits, within
+     * {@link #MIN_UNIT} and {@link #MAX_UNIT} (feedback 2, 2026-09-27 — it was a fixed 34 px, so a small window
+     * cut caps off and a large one left the board small).
+     */
+    static double unitFor(double width) {
+        return Math.max(MIN_UNIT, Math.min(MAX_UNIT, width / WIDTH));
     }
 
     /** The keys whose cap or constant name contains {@code needle}, ignoring case; every key for a blank one. */
@@ -78,9 +94,16 @@ final class KeyboardLayout {
         rows.forEach(row -> row.forEach(cap -> {
             if (cap.key() != null) placed.add(cap.key());
         }));
+        // The keys with no place on a US board, as many rows as they need: one long row was wider than the
+        // keyboard and pushed its last caps out of the window.
         List<Cap> spare = new ArrayList<>();
         for (Key key : Key.values()) {
-            if (!placed.contains(key)) spare.add(k(key));
+            if (placed.contains(key)) continue;
+            spare.add(k(key));
+            if (spare.size() == (int) WIDTH) {
+                rows.add(List.copyOf(spare));
+                spare.clear();
+            }
         }
         if (!spare.isEmpty()) rows.add(List.copyOf(spare));
         return List.copyOf(rows);

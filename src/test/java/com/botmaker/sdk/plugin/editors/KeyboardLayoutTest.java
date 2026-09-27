@@ -23,6 +23,21 @@ class KeyboardLayoutTest {
     }
 
     @Test
+    void no_row_is_wider_than_the_keyboard_so_no_cap_is_pushed_out_of_the_window() {
+        for (List<KeyboardLayout.Cap> row : KeyboardLayout.rows()) {
+            double width = row.stream().mapToDouble(KeyboardLayout.Cap::width).sum();
+            assertTrue(width <= KeyboardLayout.WIDTH, row + " is " + width + " units");
+        }
+    }
+
+    @Test
+    void the_cap_size_follows_the_window_between_two_limits() {
+        assertEquals(30, KeyboardLayout.unitFor(30 * KeyboardLayout.WIDTH));
+        assertEquals(KeyboardLayout.MIN_UNIT, KeyboardLayout.unitFor(100));
+        assertEquals(KeyboardLayout.MAX_UNIT, KeyboardLayout.unitFor(10_000));
+    }
+
+    @Test
     void a_search_matches_the_cap_or_the_constant_name() {
         assertEquals(Set.of(Key.PAGE_UP, Key.PAGE_DOWN), KeyboardLayout.matching("page"));
         assertTrue(KeyboardLayout.matching("num 5").contains(Key.NUMPAD_5));

@@ -29,6 +29,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A key combination takes any keys, in order.** Click or press keys and each is added — two ordinary keys,
+  a modifier anywhere — shown as chips beneath the keyboard, each removable, with Clear. It held modifiers plus
+  one key before, and opened empty on any other combo.
+- **The drawn keyboard grows with its window**, so every cap shows in a small window and the board fills a
+  large one; the keys with no place on a US board wrap onto rows of their own instead of one long row.
 - **Every type implements `EditableType`** (contract 0.3.0): `ImageTemplate`, `ImageTemplateGroup`,
   `CaptureSource`, `Precision`, `Point`, `Rect`, `Size`, `Direction`, `Key`, `MouseButton`, `Combo`, and the four
   vision results. A result (`MatchResult`, `Matches`, `ColorMatch`, `TextMatch`) is a pill in plain words —
