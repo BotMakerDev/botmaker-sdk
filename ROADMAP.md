@@ -8,6 +8,22 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — card positions are `Sdk.flowLayout()` (studio cleanup, phase 7b)
+
+**Done**
+- `api.flow.FlowLayout` is a record `(Map<String, Spot> spots, boolean goHomeByDefault)` with `of`, `at(int,
+  int)`, `NONE` and `spot(name)`; the map keeps the order it was given, so the written Java does not reshuffle.
+  `Spot` is whole canvas pixels. Nothing at runtime reads it; `SdkValues` claims `"flow.layout"` with a no-op
+  so a run does not report it as nobody's.
+- `FlowTypes` grows `LAYOUT_SHAPE` (`FlowLayout.of(Map, boolean)`, `NONE` as a constant) and `SPOT_SHAPE`
+  (`FlowLayout.at`); the host writes the map as `Map.ofEntries(Map.entry(…))`. `SdkPlugin` declares
+  `ManagedValue("flow.layout", …, "Sdk", FlowLayout.class, NONE)`.
+- `ActivityFlowDialog` opens `flow.layout` beside `flow` (`FlowValue.openLayout/readLayout`) and writes it after
+  the flow, in the same save, only when a card moved or was renamed. No method, or a hand-written one: the
+  canvas is arranged and the status line says positions are not kept.
+- Deleted: `plugin/flow/FlowLayout` (the sidecar reader/writer, `FILE`, `IGNORED_PATH`) and `FlowLayoutTest`.
+  An old `flow-layout.json` is read by nothing.
+
 ## 2026-09-27 — the bot's settings are its own Java (studio cleanup, phase 7a)
 
 **Done**

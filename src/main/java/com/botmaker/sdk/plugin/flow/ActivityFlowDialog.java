@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.flow;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.FlowLayout;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
@@ -27,7 +28,6 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -56,8 +56,9 @@ import java.util.Set;
  *
  * <p>No file. The graph is one expression — the one {@code Sdk.flow()} returns —
  * written through {@link com.botmaker.plugin.api.source.PluginValues}, so it lands in the bot's own Java, in the
- * open buffer as well as on disk, as one entry in the project's history. The card positions go to the
- * gitignored {@link FlowLayout} sidecar, because dragging a node is not a change to the bot.
+ * open buffer as well as on disk, as one entry in the project's history. The card positions are the
+ * {@link FlowLayout} {@code Sdk.flowLayout()} returns, written after the flow and only when they moved, so a
+ * renamed card keeps its place.
  *
  * <p>A flow whose expression the plugin cannot read — hand-written, or a call to something else — is
  * <b>shown empty and refused</b> rather than overwritten, which is the same rule every other value editor
@@ -67,9 +68,6 @@ public final class ActivityFlowDialog {
 
     private final Window owner;
     private final StudioServices services;
-
-    /** The project's resources directory — where the gitignored {@link FlowLayout} sidecar lives. */
-    private final Path resourcesDir;
 
     private final FlowCanvas canvas = new FlowCanvas();
     private final List<Flow.Preset> presets = new ArrayList<>();
@@ -82,6 +80,15 @@ public final class ActivityFlowDialog {
 
     /** Why the flow cannot be edited, or {@code null} when it can. Shown once, on the status line. */
     private String readOnlyReason;
+
+    /**
+     * The {@code @Managed("flow.layout")} value, or empty when the project has no {@code flowLayout()} or one
+     * somebody wrote by hand — the cards are then placed for the session and their positions are not kept.
+     */
+    private Optional<ValueContext> layoutValue = Optional.empty();
+
+    /** The layout last read or written, so a save that moved no card leaves {@code flowLayout()} alone. */
+    private FlowLayout written = FlowLayout.NONE;
 
     private final Label statusLabel = new Label();
 
@@ -129,7 +136,6 @@ public final class ActivityFlowDialog {
     public ActivityFlowDialog(StudioServices services, Window owner) {
         this.services = services;
         this.owner = owner;
-        this.resourcesDir = services.resourcesDir();
     }
 
     public void show() {
@@ -183,7 +189,7 @@ public final class ActivityFlowDialog {
     private void loadCurrent() {
         value = FlowValue.open(services);
         Flow flow = readFlow();
-        FlowLayout.Layout layout = FlowLayout.read(resourcesDir);
+        FlowLayout layout = loadLayout();
         boolean anyPlaced = false;
         for (Flow.Activity a : flow.activities()) {
             FlowLayout.Spot placed = layout.spot(a.name());
@@ -192,8 +198,6 @@ public final class ActivityFlowDialog {
             canvas.add(ActivityDraft.of(a, at.getX(), at.getY()));
         }
         // Only when nothing at all was placed: one saved position is enough to mean someone laid this out.
-        // With the sidecar gitignored this is now the ordinary state of a fresh clone, rather than the state
-        // of a flow nobody has opened — which is exactly why auto-arrange has to be good enough to land on.
         arrangeOnOpen = !anyPlaced && !flow.activities().isEmpty();
         canvas.edges().setAll(flow.edges());
         canvas.setStart(flow.start());
@@ -837,13 +841,29 @@ public final class ActivityFlowDialog {
                 Flow.limits(maxSteps, stepDelayMs));
     }
 
+    /**
+     * The saved layout, or {@link FlowLayout#NONE}. A project with no {@code flowLayout()}, or one whose body
+     * this plugin did not write, opens arranged, and the status line says the positions will not be kept.
+     */
+    private FlowLayout loadLayout() {
+        layoutValue = FlowValue.openLayout(services);
+        Optional<FlowLayout> read = layoutValue.flatMap(FlowValue::readLayout);
+        if (read.isEmpty()) {
+            layoutValue = Optional.empty();
+            // The flow's own reason, when it has one, is the one worth reading.
+            if (readOnlyReason == null && value.isPresent()) error("Card positions aren't kept: Sdk.java has no flowLayout() BotMaker can write.");
+        }
+        written = read.orElse(FlowLayout.NONE);
+        return written;
+    }
+
     /** Where every card sits, plus the one editor preference that rides along with them. */
-    private FlowLayout.Layout currentLayout() {
+    private FlowLayout currentLayout() {
         Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
         for (ActivityDraft d : canvas.drafts()) {
-            spots.put(d.name(), new FlowLayout.Spot(d.x(), d.y()));
+            spots.put(d.name(), FlowLayout.at((int) Math.round(d.x()), (int) Math.round(d.y())));
         }
-        return new FlowLayout.Layout(spots, goHomeByDefault);
+        return FlowLayout.of(spots, goHomeByDefault);
     }
 
     /**
@@ -851,8 +871,8 @@ public final class ActivityFlowDialog {
      *
      * <p><b>On the FX thread</b>: the flow is one expression handed to the host, which is what every slot
      * editor on the canvas does on every keystroke and which
-     * {@link com.botmaker.plugin.api.slot.ValueContext#set} requires. The layout sidecar goes with it rather than
-     * behind it, so a save is one thing that either happened or did not.
+     * {@link com.botmaker.plugin.api.slot.ValueContext#set} requires. The layout goes with it rather than
+     * behind it, so a renamed card is written under its new name in the same save as the flow that renamed it.
      *
      * <p>{@link #saving} is still honoured, because the write can re-enter: the host's write lands in the
      * open buffer, and anything listening to that must not start a second save underneath this one.
@@ -884,11 +904,13 @@ public final class ActivityFlowDialog {
 
         String refused = FlowValue.write(value.orElse(null), flow);
         Throwable failure = null;
-        if (refused == null) {
+        FlowLayout layout = currentLayout();
+        if (refused == null && layoutValue.isPresent() && !layout.equals(written)) {
             try {
                 // After the flow, never before: a layout for a card the saved flow does not have is the one
                 // way round that is merely untidy.
-                FlowLayout.write(resourcesDir, currentLayout());
+                layoutValue.get().set(layout);
+                written = layout;
             } catch (Exception | LinkageError e) {
                 failure = e;
             }

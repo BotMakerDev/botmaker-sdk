@@ -14,6 +14,7 @@ import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.plugin.flow.FlowValue;
@@ -128,7 +129,7 @@ public final class SdkPlugin extends AbstractStudioPlugin {
     }
 
     /**
-     * The four values this plugin's windows keep in step, each read-only on the canvas with a reason.
+     * The five values this plugin's windows keep in step, each read-only on the canvas with a reason.
      *
      * <p>The picture constants — {@code static final ImageTemplate COLLECT = new ImageTemplate(…)} — are the
      * reason for the last. 🖼 Manage Pictures renames the file, the constant and every use of it together
@@ -143,6 +144,10 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                         "This is the bot's activity flow. Draw it in 🔀 Activity Flow, which keeps the"
                                 + " activities, the wires and the layout in step.",
                         SDK_HOLDER, Flow.class, Flow.NONE),
+                new ManagedValue(FLOW_LAYOUT,
+                        "These are where the Activity Flow's cards sit. Drag them in 🔀 Activity Flow, which"
+                                + " keeps them in step with the activities' names.",
+                        SDK_HOLDER, FlowLayout.class, FlowLayout.NONE),
                 new ManagedValue(CAPTURE,
                         "This is where the bot reads pixels from. Choose it in 🎯 Capture Source.",
                         SDK_HOLDER, CaptureSource.class, CaptureSource.desktop()),
@@ -164,6 +169,9 @@ public final class SdkPlugin extends AbstractStudioPlugin {
 
     /** The {@code @Managed} id on the method holding this bot's flow. */
     public static final String FLOW = "flow";
+
+    /** The {@code @Managed} id on the method holding where the flow's cards sit (2026-09-27). */
+    public static final String FLOW_LAYOUT = "flow.layout";
 
     /** The {@code @Managed} id on the method holding this bot's capture source. */
     public static final String CAPTURE = "capture";

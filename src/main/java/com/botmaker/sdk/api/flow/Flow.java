@@ -49,9 +49,8 @@ import java.util.List;
  * flags, so it is about the same fact this record already carries; keeping it beside them is what stops a
  * saved selection from being lost the moment a project is cloned.
  *
- * <p><b>Card positions are not here.</b> They are the one thing that changes without the bot changing, and a
- * node dragged two pixels must not show up in {@code git diff}. The editor keeps them in a gitignored
- * sidecar beside the plugin's other project files and lays the flow out itself when there is none.
+ * <p><b>Card positions are not here.</b> They change without the bot changing, so they are a value of their
+ * own, the {@link FlowLayout} {@code Sdk.flowLayout()} returns, which nothing at runtime reads.
  *
  * <p>Nesting is unbounded and deliberately so: a list of activities each holding a list of outcomes is three
  * levels, which is ordinary, and nothing in the editor caps what it may read out of your file.

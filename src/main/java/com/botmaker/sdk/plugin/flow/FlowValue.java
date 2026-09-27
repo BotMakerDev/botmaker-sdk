@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.flow;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.FlowLayout;
 
 import java.util.Optional;
 
@@ -22,6 +23,9 @@ public final class FlowValue {
 
     /** The id the plugin declares and the shipped {@code Sdk.java} annotates its method with. */
     public static final String ID = "flow";
+
+    /** The id of the card positions beside it, {@code Sdk.flowLayout()} (2026-09-27). */
+    public static final String LAYOUT_ID = "flow.layout";
 
     /**
      * The open project's host services, or {@code null} between projects.
@@ -80,6 +84,16 @@ public final class FlowValue {
      */
     public static boolean readable(ValueContext ctx) {
         return ctx != null && ctx.value(Flow.class).isPresent();
+    }
+
+    /** The value behind {@code flow.layout} — where each card sits — or empty when the project has none. */
+    public static Optional<ValueContext> openLayout(StudioServices services) {
+        return services == null ? Optional.empty() : services.pluginValues().open(LAYOUT_ID);
+    }
+
+    /** The layout {@code ctx} holds, or empty when its expression is not one this plugin wrote. */
+    public static Optional<FlowLayout> readLayout(ValueContext ctx) {
+        return ctx == null ? Optional.empty() : ctx.value(FlowLayout.class);
     }
 
     /**

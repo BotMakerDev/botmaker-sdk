@@ -164,7 +164,8 @@ snapshots and several of them are now wrong.** This section says which.
 **What is true now (SDK 2.0.0).** A project gets two files from its template, in
 `src/main/java/<bot package>/plugins/sdk/`: `Sdk.java`, with a `@Managed("flow")` method returning a
 `com.botmaker.sdk.api.flow.Flow`, a `@Managed("capture")` method returning a `CaptureSource` and (since
-2026-09-27) a `@Managed("settings")` method returning a `BotSettings`; and
+2026-09-27) a `@Managed("settings")` method returning a `BotSettings` and a `@Managed("flow.layout")` method
+returning the flow editor's card positions as an `api.flow.FlowLayout`, which a run ignores; and
 `Pictures.java`, `@Managed("pictures")` on the type. They are the user's — the host rewrites the expression
 a `@Managed` method returns and nothing else, and a body that is not exactly `return <expr>;` is read-only
 with a reason. An activity's work is a **method reference**, `Flow.activity(Collect::body, …)`, so renaming

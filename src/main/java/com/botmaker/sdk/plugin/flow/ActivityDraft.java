@@ -16,8 +16,8 @@ import java.util.List;
  * One activity while it is being edited on the Activity Flow canvas: its name, description and outcomes,
  * whether it is enabled, and where its card sits. Mutable and observable — the node card, the side panel and
  * the preset bar all bind to the same draft, so a change in one is visible in the others immediately. On
- * save it splits in two: a {@link Flow.Activity} written into the bot's own Java, and a position written
- * into the gitignored {@link FlowLayout} sidecar.
+ * save it splits in two: a {@link Flow.Activity} for {@code Sdk.flow()}, and a position for
+ * {@code Sdk.flowLayout()}.
  *
  * <p><b>It carries no parameters.</b> The Studio class this was ported from held an observable list of the
  * activity's variables, left over from the day values were edited in this dialog's side panel; nothing has

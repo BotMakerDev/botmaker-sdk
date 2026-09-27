@@ -3,9 +3,12 @@ package com.botmaker.sdk.plugin.types;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.bot.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.FlowLayout;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -162,5 +165,40 @@ class FlowTypesTest {
         assertEquals("Gathering only", read.presets().getFirst().name());
         assertTrue(read.presets().getFirst().enables("Collect"));
         assertFalse(read.presets().getFirst().enables("Rest"));
+    }
+
+    /**
+     * The card positions come back as they were written, in the order the cards were given, so the Java the
+     * editor writes does not reshuffle on every save.
+     */
+    @Test
+    void aLayoutRoundTripsInItsOwnOrder() {
+        Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
+        spots.put("Rest", FlowLayout.at(320, 80));
+        spots.put("Collect", FlowLayout.at(40, 120));
+        FlowLayout layout = FlowLayout.of(spots, false);
+
+        FlowLayout read = FlowTypes.LAYOUT_SHAPE.build(FlowTypes.LAYOUT_SHAPE.components(layout).stream()
+                .map(part -> part instanceof Map<?, ?> m ? rebuiltSpots(m) : part).toList());
+        assertEquals(layout, read);
+        assertEquals(List.of("Rest", "Collect"), List.copyOf(read.spots().keySet()));
+        assertFalse(read.goHomeByDefault());
+        assertEquals(FlowLayout.at(40, 120), read.spot("Collect"));
+    }
+
+    /** A layout nobody drew is written as the constant that says so. */
+    @Test
+    void anEmptyLayoutIsWrittenAsNone() throws ReflectiveOperationException {
+        assertEquals(List.of(FlowLayout.class.getField("NONE")), FlowTypes.LAYOUT_SHAPE.constants());
+        assertTrue(FlowLayout.NONE.spots().isEmpty());
+        assertTrue(FlowLayout.NONE.goHomeByDefault());
+    }
+
+    /** Each spot through its own declaration, as the host takes a map's values apart. */
+    private static Map<String, FlowLayout.Spot> rebuiltSpots(Map<?, ?> written) {
+        Map<String, FlowLayout.Spot> out = new LinkedHashMap<>();
+        written.forEach((name, spot) -> out.put((String) name,
+                FlowTypes.SPOT_SHAPE.build(FlowTypes.SPOT_SHAPE.components((FlowLayout.Spot) spot))));
+        return out;
     }
 }

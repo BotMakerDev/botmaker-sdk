@@ -32,6 +32,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **BREAKING: nothing reads `botmaker-project.properties`.** What a bot launches is a fact about this
   computer: the `botmaker.launch.target` system property, which Studio passes to every run and keeps out of
   the project. Debug output and the private display come from the settings above.
+- **The Activity Flow's card positions are Java too.** `Sdk.java` gains `@Managed("flow.layout") public
+  static FlowLayout flowLayout()`, returning `FlowLayout.of(Map.ofEntries(Map.entry("Collect",
+  FlowLayout.at(80, 80)), …), true)`, and 🔀 Activity Flow rewrites it when a card moves or is renamed, so a
+  clone opens on its author's canvas. A run ignores it. `flow-layout.json` is no longer written or read; a
+  project without the method opens on an arranged canvas and says its positions are not kept.
 - **A combo can be held.** `Combo.of(Key.CTRL, Key.S).held(Duration.ofMillis(200))` presses every key, waits
   200 ms, then releases them in reverse; a game that misses a press shorter than a frame now sees it. It reads
   `Ctrl+S (hold 200 ms)`, and the combination window has a *Hold* field in milliseconds with 0, 50, 200 and

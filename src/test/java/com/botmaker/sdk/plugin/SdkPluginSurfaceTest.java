@@ -112,6 +112,10 @@ class SdkPluginSurfaceTest {
         assertEquals(SdkPlugin.SDK_HOLDER, flow.holder());
         assertEquals(com.botmaker.sdk.api.flow.Flow.class, flow.valueType());
         assertEquals(com.botmaker.sdk.api.flow.Flow.NONE, flow.initial());
+        var layout = byId.get(SdkPlugin.FLOW_LAYOUT);
+        assertEquals(SdkPlugin.SDK_HOLDER, layout.holder());
+        assertEquals(com.botmaker.sdk.api.flow.FlowLayout.class, layout.valueType());
+        assertEquals(com.botmaker.sdk.api.flow.FlowLayout.NONE, layout.initial());
         var capture = byId.get(SdkPlugin.CAPTURE);
         assertEquals(SdkPlugin.SDK_HOLDER, capture.holder());
         assertEquals(CaptureSource.class, capture.valueType());

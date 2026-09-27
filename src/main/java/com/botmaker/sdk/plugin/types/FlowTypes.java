@@ -3,10 +3,14 @@ package com.botmaker.sdk.plugin.types;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.bot.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.FlowLayout;
 
 import java.lang.reflect.Executable;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The shapes a {@code @Managed} value of this plugin's takes: the flow's five records, as the components
@@ -167,9 +171,60 @@ public final class FlowTypes {
                 }
             };
 
-    /** All five, which is what {@code SdkPlugin.componentTypes()} hands the host. */
-    public static final List<ComponentType<?>> ALL =
-            List.of(FLOW_SHAPE, ACTIVITY_SHAPE, PRESET_SHAPE, EDGE_SHAPE, LIMITS_SHAPE);
+    /**
+     * {@code FlowLayout.of(Map<String, Spot>, boolean)}: the card positions, the {@code @Managed("flow.layout")}
+     * value beside the flow (2026-09-27). The map is the host's to write ({@code Map.ofEntries}); its values
+     * are {@link #SPOT_SHAPE}s.
+     */
+    public static final ComponentType<FlowLayout> LAYOUT_SHAPE = new Fixed<>(FlowLayout.class,
+            SdkTypes.method(FlowLayout.class, "of", Map.class, boolean.class)) {
+        @Override
+        public List<Object> components(FlowLayout value) {
+            FlowLayout layout = value == null ? FlowLayout.NONE : value;
+            return List.of(layout.spots(), layout.goHomeByDefault());
+        }
+
+        @Override
+        public FlowLayout build(List<Object> parts) {
+            if (parts.size() != 2) return null;
+            Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
+            if (parts.get(0) instanceof Map<?, ?> map) {
+                map.forEach((name, spot) -> {
+                    if (name instanceof String n && spot instanceof FlowLayout.Spot s) spots.put(n, s);
+                });
+            }
+            return FlowLayout.of(spots, !(parts.get(1) instanceof Boolean b) || b);
+        }
+
+        /** {@code FlowLayout.NONE}: a flow nobody has laid out says so. */
+        @Override
+        public List<Field> constants() {
+            try {
+                return List.of(FlowLayout.class.getField("NONE"));
+            } catch (NoSuchFieldException e) {
+                throw new IllegalStateException("FlowLayout.NONE is gone", e);
+            }
+        }
+    };
+
+    /** {@code FlowLayout.at(int, int)}. */
+    public static final ComponentType<FlowLayout.Spot> SPOT_SHAPE = new Fixed<>(FlowLayout.Spot.class,
+            SdkTypes.method(FlowLayout.class, "at", int.class, int.class)) {
+        @Override
+        public List<Object> components(FlowLayout.Spot value) {
+            FlowLayout.Spot spot = value == null ? new FlowLayout.Spot(0, 0) : value;
+            return List.of(spot.x(), spot.y());
+        }
+
+        @Override
+        public FlowLayout.Spot build(List<Object> parts) {
+            return parts.size() != 2 ? null : FlowLayout.at(number(parts.get(0)), number(parts.get(1)));
+        }
+    };
+
+    /** The flow's five and the layout's two, which is what {@code SdkPlugin.componentTypes()} hands the host. */
+    public static final List<ComponentType<?>> ALL = List.of(FLOW_SHAPE, ACTIVITY_SHAPE, PRESET_SHAPE,
+            EDGE_SHAPE, LIMITS_SHAPE, LAYOUT_SHAPE, SPOT_SHAPE);
 
     /**
      * An {@link ActivityBody} that is a <em>name</em> and not a body.
