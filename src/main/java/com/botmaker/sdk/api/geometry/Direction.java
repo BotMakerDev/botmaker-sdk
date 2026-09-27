@@ -47,5 +47,11 @@ public enum Direction {
     SOUTH_EAST,
 
     /** Bottom-left first: the match furthest down and to the left (smallest x − y). */
-    SOUTH_WEST
+    SOUTH_WEST,
+
+    /**
+     * Centre first: the match closest to the centre of the frame (smallest distance from its middle).
+     * Added last, since 2.0.0, so every earlier constant keeps its place.
+     */
+    CENTER
 }

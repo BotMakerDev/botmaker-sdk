@@ -8,6 +8,12 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — Direction.CENTER (picker feedback 3, phase 2)
+
+**Done**
+- `Direction.CENTER`, appended last (never-delete allows an added constant; NORTH stays the scaffolding
+  fallback). `InputEditors.CELLS` puts it at (1, 1) as ⊙. `DirectionTest`, `DirectionPadTest`.
+
 ## 2026-09-27 — colour pick crash (picker feedback 3, phase 1)
 
 **Done**

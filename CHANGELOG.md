@@ -21,6 +21,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **`Direction.CENTER`**: the match closest to the centre of the frame, the ⊙ in the middle of the direction
+  pad. Added after every other constant, so none moves.
 - **Every picture picker is the Resource Manager's gallery** (tags, search, large tiles) with *Capture new…*:
   the pictures a capture saves come back selected, ready to confirm. A picture row's ＋ picks several at once.
 - **`ImageTemplateGroup` and `CaptureSource` draw themselves.** A group is the picture row; a source is a pill

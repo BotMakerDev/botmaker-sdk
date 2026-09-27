@@ -17,6 +17,7 @@ class DirectionPadTest {
         assertArrayEquals(new int[]{0, 0}, cells.get(Direction.NORTH_WEST));
         assertArrayEquals(new int[]{2, 2}, cells.get(Direction.SOUTH_EAST));
         assertArrayEquals(new int[]{0, 2}, cells.get(Direction.SOUTH_WEST));
+        assertArrayEquals(new int[]{1, 1}, cells.get(Direction.CENTER));
         assertEquals(cells.size(), cells.values().stream().map(java.util.Arrays::toString).distinct().count());
     }
 }

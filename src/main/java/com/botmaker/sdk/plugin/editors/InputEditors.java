@@ -69,7 +69,8 @@ public final class InputEditors {
             new Cell("NORTH", "↑", 1, 0), new Cell("SOUTH", "↓", 1, 2),
             new Cell("WEST", "←", 0, 1), new Cell("EAST", "→", 2, 1),
             new Cell("NORTH_WEST", "↖", 0, 0), new Cell("NORTH_EAST", "↗", 2, 0),
-            new Cell("SOUTH_WEST", "↙", 0, 2), new Cell("SOUTH_EAST", "↘", 2, 2));
+            new Cell("SOUTH_WEST", "↙", 0, 2), new Cell("SOUTH_EAST", "↘", 2, 2),
+            new Cell("CENTER", "⊙", 1, 1));
 
     /**
      * A direction as a pad of arrows.
