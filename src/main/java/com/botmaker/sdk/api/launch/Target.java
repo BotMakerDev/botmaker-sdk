@@ -14,8 +14,8 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * Runnable)} calls them for you — so the supervisor (re)launches whatever the project is configured to run
  * without the user hand-editing any launch code.
  *
- * <p>On first use the current target initialises from the <strong>project default</strong> — the
- * {@code launch.target} key Studio bakes into {@code botmaker-project.properties} (see {@link ProjectDefaults}).
+ * <p>On first use the current target initialises from <strong>this machine's</strong> — the
+ * {@code botmaker.launch.target} system property Studio starts the bot with (see {@link ProjectDefaults}).
  * When none is configured the target is {@code null} and {@link #start()} is a no-op: an empty game-bot scaffold
  * that hasn't picked a game yet simply doesn't launch anything. Override at runtime with
  * {@link #set(LaunchTarget)}.
@@ -145,11 +145,11 @@ public final class Target {
 
         if (SessionBootstrap.launchIsolated(t.launchSpec())) {
             // For isolated sessions, we need to wait for the session window
-            return Game.waitForDefaultSource(BotSettings.defaultLaunchWaitTimeout());
+            return Game.waitForDefaultSource(BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
         }
 
         t.startIfNotRunning();
-        return Game.waitForLaunch(Source.current(), BotSettings.defaultLaunchWaitTimeout());
+        return Game.waitForLaunch(Source.current(), BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
     }
 
     /**

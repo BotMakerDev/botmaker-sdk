@@ -164,7 +164,7 @@ public final class RemotePilotUi implements AutoCloseable {
      */
     NestedSessionLauncher launcher() {
         if (nestedLauncher == null) {
-            nestedLauncher = new NestedSessionLauncher(project.resourcesDir());
+            nestedLauncher = new NestedSessionLauncher(project.resourcesDir(), project::launchTarget);
         }
         return nestedLauncher;
     }

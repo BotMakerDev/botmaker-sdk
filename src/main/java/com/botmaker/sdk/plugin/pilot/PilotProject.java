@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.pilot;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 
 import java.nio.file.Path;
@@ -51,5 +52,10 @@ public final class PilotProject {
      */
     public CaptureSource defaultSource() {
         return CaptureValue.current(services);
+    }
+
+    /** What this machine launches for the bot, or {@code null} when none is set. */
+    public String launchTarget() {
+        return LaunchTargetValue.current(services);
     }
 }

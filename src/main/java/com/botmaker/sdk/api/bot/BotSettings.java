@@ -1,38 +1,49 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.shared.capture.NativeControllerFactory;
-import com.botmaker.shared.config.ProjectProperties;
 
 /**
- * The bot's runtime tuning — how long it pauses around a match, how sure it has to be, and whether it drives
- * the real mouse and keyboard. The counterpart to {@link Source} for behaviour rather than "where to look":
- * one ambient value, seeded from the project on first use and overridable at runtime.
+ * The bot's runtime tuning — how long it pauses around a match, how sure it has to be, whether it drives the
+ * real mouse and keyboard, and whether it runs on a private display of its own. One value, written in the
+ * bot's own Java:
  *
- * <p>It reads its defaults from the project's {@code botmaker-project.properties} (the keys shared owns as
- * {@link ProjectProperties#KEY_CLICKS_FOUND_DELAY} and friends), so what Studio's <b>Input &amp; Clicks</b>
- * dialog saves is what a bot runs with — from the Studio, from the command line, or on someone else's
- * machine. A bot that wants to override one at runtime just calls the setter.
+ * <pre>{@code
+ * @Managed("settings")
+ * public static BotSettings settings() {
+ *     return BotSettings.of(
+ *             BotSettings.clicks(500, 200, true),
+ *             BotSettings.vision(0.8, 0.05),
+ *             BotSettings.input(false, BotSettings.InputBackend.AUTO),
+ *             BotSettings.session(true, BotSettings.DisplayBackend.AUTO),
+ *             20, true);
+ * }
+ * }</pre>
  *
- * <p><b>This replaces the generated {@code BotSettings.java}</b> Studio used to write into each project, whose
- * {@code apply()} was called at the top of {@code main}. The generated class stored the same values as Java
- * source that Studio read back with a per-statement regex; the properties file it now uses is the format
- * Studio and the SDK already share for everything else. Nothing calls {@code apply()} any more — see
- * {@link #useRealInput} for the one ordering constraint that made an explicit call look necessary, and why it
- * isn't.
+ * <p>{@code Bot.run(…, Sdk.class)} hands it to {@link #use} before anything runs, so a click never happens on
+ * the defaults and then on the bot's own values. Studio's ⚙ Bot Settings window edits the expression; a bot
+ * that wants another value for a while calls {@code BotSettings.use(BotSettings.current().confidence(0.9))}.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): all nineteen are offered, and this is the one facade
- * where that is a load-bearing decision rather than an absence of one. The sweep's rule elsewhere is <em>hide
- * the parameter whose question a property already answers</em> — {@code ImageClicker}'s bare {@code confidence}
- * and {@code delayMs} arguments are hidden because {@link #confidence()} and {@link #foundDelay()} are where
- * they belong. This class <em>is</em> that destination. Hiding any of it, readers included, would make the
- * justification false in the only place the user can act on it: the editor would have taken the per-call knob
- * away and then not shown the knob that replaced it.
+ * <h2>What this replaced (2026-09-27)</h2>
+ *
+ * <p>Until then this class was a set of static setters seeded from eight keys in a
+ * {@code botmaker-project.properties} Studio wrote beside the bot's sources — a second file, in a second
+ * format, that nothing but those two readers knew about, and that the compiler could not check. The settings
+ * are a {@code @Managed} value now, like the flow and the capture source: Java the bot compiles, which a
+ * developer with no BotMaker installed can read and change. A project without the method runs on
+ * {@link #DEFAULTS}. What the bot <em>launches</em> is not here: that is a fact about this machine, and it
+ * arrives as the {@code botmaker.launch.target} system property.
+ *
+ * @param clicks           the pauses around a match and where a click lands
+ * @param vision           how sure a match has to be
+ * @param input            real device input, and which Linux backend delivers it
+ * @param session          whether the bot runs on a private display, and which kind
+ * @param maxRetryAttempts how many no-progress checks {@link Watchdog} tolerates before the bot is stuck; at
+ *                         least 1
+ * @param debug            whether the SDK's debug output starts on
  */
-@Palette(category = "bot", categoryLabel = "Bot", icon = "⚙", order = 30)
-public final class BotSettings {
+public record BotSettings(Clicks clicks, Vision vision, Input input, Session session, int maxRetryAttempts,
+                          boolean debug) {
 
     /** Pause after a successful match, in ms — long enough for a game's animation to settle. */
     public static final int DEFAULT_FOUND_DELAY = 500;
@@ -55,293 +66,262 @@ public final class BotSettings {
     public static final double DEFAULT_COMPARE_MARGIN = 0.05;
 
     /**
-     * How many consecutive no-progress checks {@link com.botmaker.sdk.api.bot.Watchdog} tolerates before it
-     * throws {@link com.botmaker.sdk.api.bot.BotStuckException} at the next {@code checkpoint()} — how long a
-     * frozen screen or a repeated no-op click may run before the bot counts as stuck and is restarted.
+     * How many consecutive no-progress checks {@link Watchdog} tolerates before it throws
+     * {@link BotStuckException} at the next {@code checkpoint()} — how long a frozen screen or a repeated no-op
+     * click may run before the bot counts as stuck and is restarted.
      */
     public static final int DEFAULT_MAX_RETRY_ATTEMPTS = 20;
 
-    /** Default timeout for waiting for game launch/window to appear, in milliseconds. */
+    /** How long to wait for a launched game's window to appear, in milliseconds. */
     public static final long DEFAULT_LAUNCH_WAIT_TIMEOUT = 60000;
 
-    private static volatile int foundDelay = DEFAULT_FOUND_DELAY;
-    private static volatile int notFoundDelay = DEFAULT_NOT_FOUND_DELAY;
-    private static volatile boolean randomizeClicks = DEFAULT_RANDOMIZE_CLICKS;
-    private static volatile double confidence = DEFAULT_CONFIDENCE;
-    private static volatile double compareMargin = DEFAULT_COMPARE_MARGIN;
-    private static volatile int maxRetryAttempts = DEFAULT_MAX_RETRY_ATTEMPTS;
-    private static volatile boolean realInput;
-    private static volatile long defaultLaunchWaitTimeout = DEFAULT_LAUNCH_WAIT_TIMEOUT;
+    /** The pauses around a match, and whether a click lands on a random point of it rather than its centre. */
+    public record Clicks(int foundDelay, int notFoundDelay, boolean randomize) {
+        /** A negative pause is none. */
+        public Clicks {
+            foundDelay = Math.max(0, foundDelay);
+            notFoundDelay = Math.max(0, notFoundDelay);
+        }
+    }
+
+    /** The template-match confidence every call without its own uses, and the compare margin. Both 0..1. */
+    public record Vision(double confidence, double compareMargin) {
+        public Vision {
+            confidence = unit(confidence, DEFAULT_CONFIDENCE);
+            compareMargin = unit(compareMargin, DEFAULT_COMPARE_MARGIN);
+        }
+    }
+
+    /** Whether the bot drives the real mouse and keyboard, and which Linux backend delivers it. */
+    public record Input(boolean real, InputBackend linuxBackend) {
+        public Input {
+            linuxBackend = linuxBackend == null ? InputBackend.AUTO : linuxBackend;
+        }
+    }
+
+    /** Whether the bot runs on a private display of its own, and which kind hosts it. */
+    public record Session(boolean isolated, DisplayBackend backend) {
+        public Session {
+            backend = backend == null ? DisplayBackend.AUTO : backend;
+        }
+    }
 
     /**
-     * Whether the project defaults have been folded in yet. Every read goes through {@link #ensureLoaded()},
-     * which is what makes the values <em>accessors</em> rather than the public mutable fields the old
-     * {@code ClickConfig} had: a bare field read cannot trigger a lazy load, so the project's values would
-     * apply only if something happened to call a method first.
+     * Which Linux backend delivers real input. {@link #AUTO} lets the controller choose; the others pin one,
+     * for a machine that only works with a particular one. Ignored on Windows.
      */
-    private static volatile boolean loaded;
+    public enum InputBackend {
+        AUTO("auto", "Automatic"),
+        XSENDEVENT("xsendevent", "xsendevent — sent to the window, leaves your cursor alone"),
+        XTEST("xtest", "XTest — X11's own synthetic input; moves the shared cursor"),
+        XDOTOOL("xdotool", "xdotool — XTest via the xdotool command; moves the shared cursor"),
+        UINPUT("uinput", "uinput — a kernel virtual device the system reports as real");
 
-    private BotSettings() {}
+        private final String id;
+        private final String label;
 
-    // --- reads ---
+        InputBackend(String id, String label) {
+            this.id = id;
+            this.label = label;
+        }
+
+        /** The {@code botmaker.linux.input} value the controller reads. */
+        public String id() {
+            return id;
+        }
+
+        public String label() {
+            return label;
+        }
+    }
+
+    /**
+     * Which private display hosts an isolated bot. {@link #AUTO} is right almost always: a game gets gamescope,
+     * a plain command the lighter Xephyr.
+     */
+    public enum DisplayBackend {
+        AUTO("auto", "Automatic (gamescope for games, Xephyr for commands)"),
+        GAMESCOPE("gamescope", "gamescope — a real GPU in the private display (3D games)"),
+        XEPHYR("xephyr", "Xephyr — software-rendered 2D (crashes 3D games)");
+
+        private final String id;
+        private final String label;
+
+        DisplayBackend(String id, String label) {
+            this.id = id;
+            this.label = label;
+        }
+
+        /** The session module's backend id; {@code auto} names none and lets the launch kind pick. */
+        public String id() {
+            return id;
+        }
+
+        public String label() {
+            return label;
+        }
+    }
+
+    /** What a bot runs with when it declares no settings. */
+    public static final BotSettings DEFAULTS = of(
+            clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS),
+            vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN),
+            input(false, InputBackend.AUTO),
+            session(true, DisplayBackend.AUTO),
+            DEFAULT_MAX_RETRY_ATTEMPTS, true);
+
+    /** A missing part is its default, and fewer than one retry is one. */
+    public BotSettings {
+        clicks = clicks == null ? new Clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS)
+                : clicks;
+        vision = vision == null ? new Vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN) : vision;
+        input = input == null ? new Input(false, InputBackend.AUTO) : input;
+        session = session == null ? new Session(true, DisplayBackend.AUTO) : session;
+        maxRetryAttempts = Math.max(1, maxRetryAttempts);
+    }
+
+    // --- how the bot's Java writes it ---
+
+    public static BotSettings of(Clicks clicks, Vision vision, Input input, Session session, int maxRetryAttempts,
+                                 boolean debug) {
+        return new BotSettings(clicks, vision, input, session, maxRetryAttempts, debug);
+    }
+
+    public static Clicks clicks(int foundDelay, int notFoundDelay, boolean randomize) {
+        return new Clicks(foundDelay, notFoundDelay, randomize);
+    }
+
+    public static Vision vision(double confidence, double compareMargin) {
+        return new Vision(confidence, compareMargin);
+    }
+
+    public static Input input(boolean real, InputBackend linuxBackend) {
+        return new Input(real, linuxBackend);
+    }
+
+    public static Session session(boolean isolated, DisplayBackend backend) {
+        return new Session(isolated, backend);
+    }
+
+    // --- the settings in force ---
+
+    private static volatile BotSettings current = DEFAULTS;
+
+    /** The settings the bot is running with: its own once {@code Bot.run} has installed them. */
+    public static BotSettings current() {
+        return current;
+    }
+
+    /**
+     * Makes {@code settings} the ones in force, from the next click on.
+     *
+     * <p><b>Real input is one-way.</b> On Linux turning it on swaps the process-wide input backend, which cannot
+     * be swapped back, so a later value with {@code real = false} only stops a future escalation. That is why
+     * {@code Bot.run} installs the bot's settings before anything else runs: the swap has to precede the first
+     * click, or the click is dropped silently. For the same reason the Linux backend is pinned only when nothing
+     * has pinned it yet — an explicit {@code -Dbotmaker.linux.input} on the command line wins.
+     */
+    public static void use(BotSettings settings) {
+        BotSettings next = settings == null ? DEFAULTS : settings;
+        synchronized (BotSettings.class) {
+            BotSettings was = current;
+            current = next;
+            if (next.input.linuxBackend != InputBackend.AUTO && System.getProperty(LINUX_INPUT) == null) {
+                System.setProperty(LINUX_INPUT, next.input.linuxBackend.id());
+            }
+            if (next.input.real && !was.input.real) {
+                boolean ok = NativeControllerFactory.get().useReliableInput();
+                Debug.log("[Input] real device input " + (ok ? "active" : "UNAVAILABLE — clicks may not register"));
+            } else if (was.input.real && !next.input.real) {
+                // Kept on: the backend it swapped in cannot be swapped back, and saying otherwise would lie.
+                current = next.realInput(true);
+            }
+        }
+        Debug.set(next.debug);
+    }
+
+    /** The system property {@code LinuxController} reads its backend from. */
+    private static final String LINUX_INPUT = "botmaker.linux.input";
+
+    /** Test seam: back to {@link #DEFAULTS} without touching the input backend or the debug switch. */
+    static void resetForTesting() {
+        current = DEFAULTS;
+    }
+
+    // --- reading one setting ---
 
     /** Pause after a successful match, in ms. */
-    public static int foundDelay() {
-        ensureLoaded();
-        return foundDelay;
+    public int foundDelay() {
+        return clicks.foundDelay;
     }
 
     /** Pause after a failed match, in ms. */
-    public static int notFoundDelay() {
-        ensureLoaded();
-        return notFoundDelay;
+    public int notFoundDelay() {
+        return clicks.notFoundDelay;
     }
 
     /** Whether clicks land on a random point inside the match rather than its centre. */
-    public static boolean randomizeClicks() {
-        ensureLoaded();
-        return randomizeClicks;
+    public boolean randomizeClicks() {
+        return clicks.randomize;
     }
 
     /** The default template-match confidence (0..1) every no-confidence vision call uses. */
-    public static double confidence() {
-        ensureLoaded();
-        return confidence;
+    public double confidence() {
+        return vision.confidence;
     }
 
     /** The default margin a good template must beat a distractor by. See {@link #DEFAULT_COMPARE_MARGIN}. */
-    public static double compareMargin() {
-        ensureLoaded();
-        return compareMargin;
+    public double compareMargin() {
+        return vision.compareMargin;
     }
 
-    /** How many no-progress checks the watchdog tolerates before declaring the bot stuck. */
-    public static int maxRetryAttempts() {
-        ensureLoaded();
-        return maxRetryAttempts;
+    /** Whether this bot drives the real mouse and keyboard. */
+    public boolean realInput() {
+        return input.real;
     }
 
-    /** The default timeout for waiting for game launch/window to appear, in milliseconds. */
-    public static long defaultLaunchWaitTimeout() {
-        ensureLoaded();
-        return defaultLaunchWaitTimeout;
+    // --- one setting changed: a copy ---
+
+    public BotSettings foundDelay(int milliseconds) {
+        return withClicks(new Clicks(milliseconds, clicks.notFoundDelay, clicks.randomize));
     }
 
-    // The default timezone is deliberately NOT settings state. It used to be, and the copy here was a second
-    // field that only synced one way: BotSettings.setDefaultTimeZone pushed into Time, but Time.setDefaultTimeZone
-    // — the one Time.now() actually reads — never pushed back, so after a bot called Time.setDefaultTimeZone(...)
-    // the two disagreed and BotSettings.defaultTimeZone() answered a zone nothing was using. There is one owner
-    // now, com.botmaker.sdk.api.util.Time, and no project-properties key ever seeded this one anyway. Removed
-    // in 1.1.0; use Time.getDefaultTimeZone() / Time.setDefaultTimeZone(...).
-
-    /**
-     * Whether this bot drives the <b>real</b> mouse and keyboard instead of posting quiet synthetic events to
-     * the target window. Read-only mirror of the project setting and of the last {@link #useRealInput} call.
-     */
-    public static boolean realInput() {
-        ensureLoaded();
-        return realInput;
+    public BotSettings notFoundDelay(int milliseconds) {
+        return withClicks(new Clicks(clicks.foundDelay, milliseconds, clicks.randomize));
     }
 
-    // --- writes ---
-
-    public static void setFoundDelay(int milliseconds) {
-        ensureLoaded();
-        if (milliseconds < 0) {
-            throw new IllegalArgumentException("Delay cannot be negative");
-        }
-        foundDelay = milliseconds;
+    public BotSettings randomizeClicks(boolean randomize) {
+        return withClicks(new Clicks(clicks.foundDelay, clicks.notFoundDelay, randomize));
     }
 
-    public static void setNotFoundDelay(int milliseconds) {
-        ensureLoaded();
-        if (milliseconds < 0) {
-            throw new IllegalArgumentException("Delay cannot be negative");
-        }
-        notFoundDelay = milliseconds;
+    public BotSettings confidence(double confidence) {
+        return new BotSettings(clicks, new Vision(confidence, vision.compareMargin), input, session,
+                maxRetryAttempts, debug);
     }
 
-    public static void enableRandomClicks(boolean enable) {
-        ensureLoaded();
-        randomizeClicks = enable;
+    public BotSettings compareMargin(double margin) {
+        return new BotSettings(clicks, new Vision(vision.confidence, margin), input, session, maxRetryAttempts,
+                debug);
     }
 
-    public static void setDefaultConfidence(double value) {
-        ensureLoaded();
-        if (value < 0.0 || value > 1.0) {
-            throw new IllegalArgumentException("Confidence must be between 0.0 and 1.0");
-        }
-        confidence = value;
+    public BotSettings maxRetryAttempts(int attempts) {
+        return new BotSettings(clicks, vision, input, session, attempts, debug);
     }
 
-    public static void setCompareMargin(double value) {
-        ensureLoaded();
-        if (value < 0.0 || value > 1.0) {
-            throw new IllegalArgumentException("Compare margin must be between 0.0 and 1.0");
-        }
-        compareMargin = value;
+    public BotSettings realInput(boolean real) {
+        return new BotSettings(clicks, vision, new Input(real, input.linuxBackend), session, maxRetryAttempts,
+                debug);
     }
 
-    public static void setMaxRetryAttempts(int attempts) {
-        ensureLoaded();
-        if (attempts < 1) {
-            throw new IllegalArgumentException("Max attempts must be at least 1");
-        }
-        maxRetryAttempts = attempts;
+    public BotSettings debug(boolean on) {
+        return new BotSettings(clicks, vision, input, session, maxRetryAttempts, on);
     }
 
-    /**
-     * Sets the default timeout for waiting for game launch/window to appear.
-     *
-     * @param timeoutMillis timeout in milliseconds, must be positive
-     */
-    public static void setDefaultLaunchWaitTimeout(long timeoutMillis) {
-        ensureLoaded();
-        if (timeoutMillis <= 0) {
-            throw new IllegalArgumentException("Launch wait timeout must be positive");
-        }
-        defaultLaunchWaitTimeout = timeoutMillis;
+    private BotSettings withClicks(Clicks next) {
+        return new BotSettings(next, vision, input, session, maxRetryAttempts, debug);
     }
 
-    /**
-     * Toggles the SDK's global debug output. Kept here for discoverability alongside the other tuning knobs,
-     * but it is a thin delegate to the single global switch {@link Debug} — vision, lifecycle and launch traces
-     * all share one flag.
-     */
-    public static void enableDebugMode(boolean enable) {
-        Debug.set(enable);
-    }
-
-    /**
-     * Switch to real device input — turn this on when the target is a <b>game</b>.
-     *
-     * <p>By default BotMaker delivers synthetic events straight to the target window, which clicks a background
-     * window without ever moving the cursor. Games (and anything else reading raw input) ignore those events by
-     * design: on X11 they carry a {@code send_event} flag the client rejects, and on Windows they land in a
-     * message queue a raw-input game never reads. The click is dropped silently — neither OS reports
-     * delivery — which is why nothing can auto-detect this and why it is a setting.
-     *
-     * <p>Turning it on trades background operation for the click landing: the pointer moves to each target and
-     * returns to where it was, and the target window is raised, because real input goes to whatever is topmost.
-     *
-     * <p><b>One-way, and it must happen before the first click.</b> On Linux this swaps the process-wide input
-     * backend, which cannot be swapped back, so {@code useRealInput(false)} only prevents a future escalation
-     * rather than undoing one. That ordering is why the project's own {@code input.real} is applied inside
-     * {@link #ensureLoaded()} rather than left to a generated call: every click path reads a setting from this
-     * class first, so the load — and the swap — is always ahead of the click that needs it.
-     */
-    public static void useRealInput(boolean enable) {
-        ensureLoaded();
-        applyRealInput(enable);
-    }
-
-    /**
-     * Resets the click/vision tuning to the SDK's own defaults, discarding both the project's values and any
-     * runtime override. Does not touch the global {@link Debug} switch — that has its own lifecycle (project
-     * default plus runtime toggle) — and does not un-swap real input, which is one-way.
-     */
-    public static void resetToDefaults() {
-        synchronized (BotSettings.class) {
-            // Marked loaded first: the point of a reset is to end up on the SDK defaults, so a later read must
-            // not re-seed the project's values over the top of them.
-            loaded = true;
-            foundDelay = DEFAULT_FOUND_DELAY;
-            notFoundDelay = DEFAULT_NOT_FOUND_DELAY;
-            randomizeClicks = DEFAULT_RANDOMIZE_CLICKS;
-            confidence = DEFAULT_CONFIDENCE;
-            compareMargin = DEFAULT_COMPARE_MARGIN;
-            maxRetryAttempts = DEFAULT_MAX_RETRY_ATTEMPTS;
-            // realInput is deliberately not reset: the backend swap it caused is one-way, so clearing the flag
-            // would only make it lie about how input is actually being delivered.
-        }
-    }
-
-    /**
-     * Test seam: forget that the project defaults were ever read, so the next accessor loads them again.
-     * {@link #resetToDefaults()} deliberately does the opposite (it pins the SDK defaults), which is why a test
-     * that wants to observe the <em>load</em> cannot use it.
-     */
-    static void resetForTesting() {
-        synchronized (BotSettings.class) {
-            foundDelay = DEFAULT_FOUND_DELAY;
-            notFoundDelay = DEFAULT_NOT_FOUND_DELAY;
-            randomizeClicks = DEFAULT_RANDOMIZE_CLICKS;
-            confidence = DEFAULT_CONFIDENCE;
-            compareMargin = DEFAULT_COMPARE_MARGIN;
-            maxRetryAttempts = DEFAULT_MAX_RETRY_ATTEMPTS;
-            realInput = false;
-            loaded = false;
-        }
-    }
-
-    // --- project defaults ---
-
-    /**
-     * Folds the project's configured values in, once. Every accessor calls this, so the project's tuning is in
-     * force by the time anything can observe a setting — including the real-input swap, which has to precede
-     * the first click.
-     */
-    private static void ensureLoaded() {
-        if (loaded) {
-            return;
-        }
-        synchronized (BotSettings.class) {
-            if (loaded) {
-                return;
-            }
-            Integer configuredFoundDelay = ProjectProperties.clicksFoundDelay();
-            if (configuredFoundDelay != null) {
-                foundDelay = configuredFoundDelay;
-            }
-            Integer configuredNotFoundDelay = ProjectProperties.clicksNotFoundDelay();
-            if (configuredNotFoundDelay != null) {
-                notFoundDelay = configuredNotFoundDelay;
-            }
-            Boolean configuredRandomize = ProjectProperties.clicksRandomize();
-            if (configuredRandomize != null) {
-                randomizeClicks = configuredRandomize;
-            }
-            Double configuredConfidence = ProjectProperties.visionConfidence();
-            if (configuredConfidence != null) {
-                confidence = configuredConfidence;
-            }
-            Double configuredMargin = ProjectProperties.visionCompareMargin();
-            if (configuredMargin != null) {
-                compareMargin = configuredMargin;
-            }
-            Integer configuredRetries = ProjectProperties.botMaxRetryAttempts();
-            if (configuredRetries != null) {
-                maxRetryAttempts = configuredRetries;
-            }
-            // Launch wait timeout: uses SDK default (60000 ms). Can be extended to read from project properties later.
-            // Set before the real-input swap below, not after: that swap reaches into the native controller,
-            // and anything it touches which reads a setting back must find the load already done rather than
-            // re-entering this block.
-            loaded = true;
-            applyLinuxBackend();
-            if (Boolean.TRUE.equals(ProjectProperties.inputReal())) {
-                applyRealInput(true);
-            }
-        }
-    }
-
-    /**
-     * Pins the Linux input backend the project chose, via the {@code botmaker.linux.input} property
-     * {@code LinuxController} reads. An explicit {@code -D} on the command line wins — someone debugging one
-     * run should not have to edit the project to do it.
-     */
-    private static void applyLinuxBackend() {
-        String backend = ProjectProperties.inputLinuxBackend();
-        if (backend != null && System.getProperty("botmaker.linux.input") == null) {
-            System.setProperty("botmaker.linux.input", backend);
-        }
-    }
-
-    private static void applyRealInput(boolean enable) {
-        realInput = enable;
-        if (enable) {
-            boolean ok = NativeControllerFactory.get().useReliableInput();
-            Debug.log("[Input] real device input " + (ok ? "active" : "UNAVAILABLE — clicks may not register"));
-        }
+    private static double unit(double value, double fallback) {
+        return Double.isFinite(value) ? Math.max(0.0, Math.min(1.0, value)) : fallback;
     }
 }

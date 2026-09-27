@@ -1,54 +1,58 @@
 package com.botmaker.sdk.internal.config;
 
-import com.botmaker.shared.config.ProjectProperties;
+import com.botmaker.sdk.api.bot.BotSettings;
 
 /**
- * Typed view of the per-project defaults Studio bakes into a generated bot.
+ * What a running bot was told about itself from outside its own code: the launch target this machine gave it,
+ * and the session half of its {@link BotSettings}.
  *
- * <p>The file itself — its classpath location, its key names, the caching and the best-effort parsing —
- * belongs to shared's {@link ProjectProperties}, because Studio <em>writes</em> those very keys and two
- * hand-kept copies of a key set do not stay identical.
- *
- * <p>What is here is the SDK-shaped face of four of those keys. What they have in common is that <b>no
- * {@code @Managed} value says them</b>: whether a bot isolates itself, which backend it uses, whether debug
- * output is on, and what to launch are facts about running this bot on this machine rather than facts about
- * the bot. The capture source is not one of them: it is {@code @Managed("capture")}, in the bot's own Java.
- *
- * <p>Still best-effort throughout: a missing file, missing key or unparseable value yields {@code null} so
- * callers fall back to their own defaults.
+ * <p>Until 2026-09-27 every answer here came out of {@code botmaker-project.properties}, a file Studio wrote
+ * beside the bot's sources. The session answers are the bot's {@code @Managed("settings")} value now, which
+ * {@code Bot.run} installs before anything reads them; the launch target is a fact about <em>this machine</em>
+ * rather than the bot, so it is never in the bot's files at all — Studio starts the bot with
+ * {@code -D}{@value #LAUNCH_TARGET}, and a bot run by hand passes its own.
  */
 public final class ProjectDefaults {
+
+    /** The system property carrying what this machine launches, in the {@code launch.target} spec grammar. */
+    public static final String LAUNCH_TARGET = "botmaker.launch.target";
 
     private ProjectDefaults() {}
 
     /**
-     * The raw {@code launch.target} spec, or {@code null} when unset — {@code api.launch.Target} parses it
-     * via {@code api.launch.LaunchTarget}. Kept as a raw string so this reader stays free of the launch
-     * facade.
+     * The raw launch-target spec, or {@code null} when none was given — {@code api.launch.Target} parses it via
+     * {@code api.launch.LaunchTarget}. Kept as a raw string so this reader stays free of the launch facade.
      */
     public static String launchTarget() {
-        return ProjectProperties.launchTarget();
+        String spec = System.getProperty(LAUNCH_TARGET);
+        return spec == null || spec.isBlank() ? null : spec.trim();
     }
 
-    /**
-     * The configured debug-output default, or {@code null} when the key is absent/unparseable so
-     * {@link com.botmaker.sdk.api.util.Debug} keeps its default (on).
-     */
-    public static Boolean debug() {
-        return ProjectProperties.debug();
-    }
-
-    /**
-     * Whether the project wants the bot to run isolated on a private nested display — <b>default true</b>
-     * (see {@link ProjectProperties#sessionIsolated()}), so a bot run anywhere with its project file on the
-     * classpath isolates unless it explicitly opts out with {@code session.isolated=false}. Never {@code null}.
-     */
+    /** Whether the bot's settings ask for a private display — {@code true} unless they say otherwise. */
     public static boolean sessionIsolated() {
-        return ProjectProperties.sessionIsolated();
+        return BotSettings.current().session().isolated();
     }
 
-    /** The explicit backend override ({@code gamescope}/{@code xephyr}), or {@code null} to let the kind pick. */
+    /** The pinned display backend's id, or {@code null} when the settings let the launch kind pick. */
     public static String sessionBackend() {
-        return ProjectProperties.sessionBackend();
+        BotSettings.DisplayBackend backend = BotSettings.current().session().backend();
+        return backend == BotSettings.DisplayBackend.AUTO ? null : backend.id();
+    }
+
+    /**
+     * The lenient boolean every BotMaker on/off switch accepts: {@code true}/{@code 1}/{@code yes}/{@code on}
+     * and {@code false}/{@code 0}/{@code no}/{@code off}; {@code null} for blank or anything else, meaning
+     * "unset", so the caller keeps its own default. For the switches that arrive as a system property or an
+     * environment variable.
+     */
+    public static Boolean parseBoolean(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return switch (value.trim().toLowerCase()) {
+            case "true", "1", "yes", "on" -> Boolean.TRUE;
+            case "false", "0", "no", "off" -> Boolean.FALSE;
+            default -> null;
+        };
     }
 }

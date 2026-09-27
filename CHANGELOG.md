@@ -21,6 +21,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **BREAKING: the bot's settings are its own Java.** `BotSettings` is a value now, declared in `Sdk.java` as
+  `@Managed("settings") public static BotSettings settings()` —
+  `BotSettings.of(BotSettings.clicks(500, 200, true), BotSettings.vision(0.8, 0.05), BotSettings.input(false,
+  InputBackend.AUTO), BotSettings.session(true, DisplayBackend.AUTO), 20, true)`, or `BotSettings.DEFAULTS` —
+  installed by `Bot.run` before the first click. **⚙ Bot Settings** on the toolbar edits it. The static
+  setters (`setFoundDelay`, `setDefaultConfidence`, `useRealInput`, `enableDebugMode`, …) are gone: read
+  `BotSettings.current()`, and change one for a while with
+  `BotSettings.use(BotSettings.current().confidence(0.9))`. A project without the method runs on the defaults.
+- **BREAKING: nothing reads `botmaker-project.properties`.** What a bot launches is a fact about this
+  computer: the `botmaker.launch.target` system property, which Studio passes to every run and keeps out of
+  the project. Debug output and the private display come from the settings above.
 - **A combo can be held.** `Combo.of(Key.CTRL, Key.S).held(Duration.ofMillis(200))` presses every key, waits
   200 ms, then releases them in reverse; a game that misses a press shorter than a frame now sees it. It reads
   `Ctrl+S (hold 200 ms)`, and the combination window has a *Hold* field in milliseconds with 0, 50, 200 and

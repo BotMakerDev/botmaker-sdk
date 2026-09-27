@@ -2,7 +2,6 @@ package com.botmaker.sdk.api.util;
 
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.Diag;
 
 /**
@@ -12,13 +11,13 @@ import com.botmaker.shared.Diag;
  *   <li>the lifecycle/launch traces — {@code [Bot]}, {@code [Game]}, {@code [Target]}, {@code [Activity]}
  *       — that used to print unconditionally, and</li>
  *   <li>the vision traces (find/click/wait/pixel/text) that used to be gated by the separate
- *       {@code ClickConfig.DEBUG_MODE}; {@code BotSettings.enableDebugMode(...)} now delegates here.</li>
+ *       {@code ClickConfig.DEBUG_MODE}.</li>
  * </ul>
  *
  * <p><b>Default: on.</b> A bot prints its trace out of the box so a first run is legible; turn it off for a
- * quiet production run with {@link #disable()} (or the Studio "Debug output" toggle). The initial state is
- * seeded from the project's {@code debug} key in {@code botmaker-project.properties} (see
- * {@link ProjectDefaults#debug()}) — absent/unparseable leaves it on — and can be overridden at runtime.
+ * quiet production run with {@link #disable()}, or for good in the bot's settings (⚙ Bot Settings, the
+ * {@code debug} of its {@code @Managed("settings")} value), which {@code Bot.run} applies before anything
+ * prints.
  *
  * <p>Emit your own trace through {@link #log(String)} / {@link #error(String)}: they print only when debugging
  * is enabled, so bot code never has to wrap prints in an {@code if}.
@@ -45,12 +44,6 @@ import com.botmaker.shared.Diag;
 public final class Debug {
 
     private Debug() {}
-
-    static {
-        // Seed the shared flag from the project's `debug` key; absent/unparseable leaves it on.
-        Boolean configured = ProjectDefaults.debug();
-        Diag.set(configured == null || configured);
-    }
 
     /** Whether debug output is currently on. All SDK diagnostic prints consult this. */
     public static boolean isEnabled() {

@@ -3,10 +3,10 @@ package com.botmaker.sdk.plugin.setup;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
+import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
-import com.botmaker.shared.config.ProjectFile;
 import com.botmaker.shared.launch.LaunchSpec;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -31,8 +31,8 @@ import java.nio.file.Path;
  *
  * <h2>Why this is the plugin's</h2>
  *
- * <p>Every row reads a fact that belongs to this module. The launch target is
- * {@code botmaker-project.properties}, read through shared's {@link ProjectFile}; the capture source is
+ * <p>Every row reads a fact that belongs to this module. The launch target is this machine's
+ * {@code botmaker.launch.target} run property ({@link LaunchTargetValue}); the capture source is
  * {@code Sdk.captureSource()} in the bot's own Java; the pictures are the images folder, read through
  * {@link TemplateLibrary}. The host holds none of it. What the host supplies is the three things
  * nobody else can: which project is open, the current look, and the window this modal is owned by.
@@ -138,7 +138,7 @@ public final class ProjectSetup {
         Path resources = services.resourcesDir();
         CaptureSource source = EditorFrame.defaultSource(services);
 
-        String launchSpec = ProjectFile.launchTarget(resources);
+        String launchSpec = LaunchTargetValue.current(services);
         boolean launchDone = launchSpec != null && !launchSpec.isBlank();
         boolean captureDone = captureConfigured(source);
         int templateCount = TemplateLibrary.list(resources).size();
@@ -152,9 +152,9 @@ public final class ProjectSetup {
                 row(launchDone, false, "Launch target",
                         launchDone
                                 ? LaunchSpec.describe(launchSpec)
-                                : "Not set — pick what the bot should open, with the Launch Target button on "
-                                        + "the toolbar.",
-                        quickLaunchButton(resources)),
+                                : "Not set on this computer — pick an emulator app in an Emulators block, "
+                                        + "or have the bot open its game itself with a Target.set block.",
+                        quickLaunchButton()),
                 row(captureDone, false, "Capture source",
                         describeCapture(source) + " Choose it with 🎯 Capture Source on the toolbar.",
                         null),
@@ -174,8 +174,8 @@ public final class ProjectSetup {
      * <p>Rebuilt on every {@link #refresh()} rather than kept and re-bound; {@link QuickLaunch#button} re-reads
      * the target each time, so the button cannot go stale.
      */
-    private Button quickLaunchButton(Path resources) {
-        return QuickLaunch.button(resources, (ok, message) -> {
+    private Button quickLaunchButton() {
+        return QuickLaunch.button(services, (ok, message) -> {
             launchStatus.setText(message);
             launchStatus.setStyle("-fx-font-size: 11px; -fx-text-fill: " + (ok ? "gray" : "#c0392b") + ";");
         });

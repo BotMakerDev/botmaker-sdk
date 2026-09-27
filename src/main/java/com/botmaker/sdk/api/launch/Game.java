@@ -313,7 +313,7 @@ public class Game {
      * @return true if the game's window was present within the timeout, false if it timed out
      */
     public static boolean launchAndWait(String executablePath, String... args) {
-        return launchAndWait(executablePath, Source.current(), BotSettings.defaultLaunchWaitTimeout(), args);
+        return launchAndWait(executablePath, Source.current(), BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT, args);
     }
 
     /**

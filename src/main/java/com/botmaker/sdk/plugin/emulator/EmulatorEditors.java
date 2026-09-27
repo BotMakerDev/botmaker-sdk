@@ -4,14 +4,11 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.sdk.api.emulator.EmulatorSource;
+import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
-import com.botmaker.shared.config.ProjectFile;
-import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.shared.emulator.EmulatorInstances;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-
-import java.nio.file.Path;
 
 /**
  * The editor for the instance name of {@code Emulators.use("…")} and {@code Emulators.named("…")} — a pill
@@ -59,15 +56,12 @@ public final class EmulatorEditors {
      *
      * <p><b>The two halves are written to two different places, and that is the split, not an
      * inconsistency.</b> What the bot <em>launches</em> is a fact about running this bot on this machine, so
-     * it stays a {@code botmaker-project.properties} key. Where the bot <em>looks</em> is a fact about the
+     * it is this machine's run property ({@link LaunchTargetValue}). Where the bot <em>looks</em> is a fact about the
      * bot, so it is the expression {@code Sdk.captureSource()} returns — Java the user can read, and the
      * only copy of that answer.
      */
     private static void pointProjectAtApp(ValueContext ctx, String instanceName, String appPackage) {
-        Path resources = ctx.services().resourcesDir();
-        if (resources == null) return;
-        ProjectFile.set(resources, ProjectProperties.KEY_LAUNCH_TARGET,
-                "emu-app:" + appPackage + "@" + instanceName);
+        LaunchTargetValue.set(ctx.services(), "emu-app:" + appPackage + "@" + instanceName);
         CaptureValue.point(ctx.services(), new EmulatorSource(instanceName));
     }
 

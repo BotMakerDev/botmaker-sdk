@@ -24,7 +24,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  *   <li>an explicit {@link #enable()} / {@link #disable()} / {@link #set(boolean)} call in bot code;</li>
  *   <li>the {@code botmaker.session.isolated} system property;</li>
  *   <li>the {@code BOTMAKER_SESSION_ISOLATED} environment variable;</li>
- *   <li>the project's {@code session.isolated} key in {@code botmaker-project.properties};</li>
+ *   <li>the bot's settings ({@code BotSettings.session(isolated, …)});</li>
  *   <li>{@code true}.</li>
  * </ol>
  * {@link #useBackend(String)} follows the same ladder against {@code botmaker.session.backend} /

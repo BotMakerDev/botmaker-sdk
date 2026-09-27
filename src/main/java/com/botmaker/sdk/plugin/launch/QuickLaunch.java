@@ -3,7 +3,9 @@ package com.botmaker.sdk.plugin.launch;
 import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.impl.NestedSession;
 import com.botmaker.session.launch.BackgroundLauncher;
-import com.botmaker.shared.config.ProjectFile;
+import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
+import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
 import javafx.application.Platform;
@@ -39,9 +41,9 @@ import java.util.Optional;
  * yields a <b>disabled</b> button that says why in its tooltip, rather than an enabled one that silently does
  * nothing.
  *
- * <p><b>It reads the project's files and nothing of the host's.</b> The launch target, the isolation flag and
- * the capture size all come out of {@code botmaker-project.properties} through shared's {@link ProjectFile},
- * which is what let this move out of the editor with the dialog it serves.
+ * <p><b>Where its two answers come from (2026-09-27).</b> The launch target is this machine's run property
+ * ({@link LaunchTargetValue}), the isolation flag is the bot's own {@code Sdk.settings()}. Both were keys of a
+ * {@code botmaker-project.properties} until then.
  */
 public final class QuickLaunch {
 
@@ -55,39 +57,33 @@ public final class QuickLaunch {
     }
 
     /**
-     * A button that launches the target configured in {@code resourcesDir}, reporting through {@code report}
+     * A button that launches the target this machine has for the open bot, reporting through {@code report}
      * (always on the FX thread). Disabled with an explanatory tooltip when no target is configured.
      */
-    public static Button button(Path resourcesDir, Report report) {
+    public static Button button(StudioServices services, Report report) {
         Button button = new Button("▶ Launch now");
-        bind(button, resourcesDir, report);
+        bind(button, services, report);
         return button;
     }
 
     /**
-     * (Re)points an existing button at whatever {@code resourcesDir} currently configures. A call site that
-     * can <em>change</em> the launch target while the button is on screen calls this after a save, so the
+     * (Re)points an existing button at whatever this machine currently has as the launch target. A call site
+     * that can <em>change</em> the launch target while the button is on screen calls this after a save, so the
      * button and the target cannot disagree.
      */
-    public static void bind(Button button, Path resourcesDir, Report report) {
-        LaunchSpec spec = specOf(resourcesDir);
+    public static void bind(Button button, StudioServices services, Report report) {
+        LaunchSpec spec = LaunchTargetValue.spec(services);
         if (spec == null) {
             button.setDisable(true);
             button.setOnAction(null);
             button.setTooltip(new Tooltip(
-                    "No launch target configured yet — set one in the Launch Target dialog first."));
+                    "No launch target on this computer yet — pick an emulator app, or run the bot with "
+                            + "-Dbotmaker.launch.target=…"));
             return;
         }
         button.setDisable(false);
         button.setTooltip(new Tooltip("Start " + spec.describe() + " now, without running the bot"));
-        button.setOnAction(e -> launch(button, spec, report, resourcesDir));
-    }
-
-    /** The parsed {@code launch.target} of the project rooted at {@code resourcesDir}, or {@code null}. */
-    public static LaunchSpec specOf(Path resourcesDir) {
-        if (resourcesDir == null) return null;
-        String spec = ProjectFile.launchTarget(resourcesDir);
-        return (spec == null || spec.isBlank()) ? null : LaunchSpec.parse(spec);
+        button.setOnAction(e -> launch(button, spec, report, services));
     }
 
     /**
@@ -120,10 +116,10 @@ public final class QuickLaunch {
                 : "";
     }
 
-    private static void launch(Button button, LaunchSpec spec, Report report, Path resourcesDir) {
+    private static void launch(Button button, LaunchSpec spec, Report report, StudioServices services) {
         button.setDisable(true);
-        if (usesBackgroundSession(spec, ProjectFile.sessionIsolated(resourcesDir))) {
-            launchInBackground(button, spec, report, resourcesDir);
+        if (usesBackgroundSession(spec, BotSettingsWindow.current(services).session().isolated())) {
+            launchInBackground(button, spec, report, services.resourcesDir());
             return;
         }
         report.accept(true, "Launching " + spec.describe() + "…");
@@ -173,7 +169,7 @@ public final class QuickLaunch {
             button.setDisable(false);
             report.accept(false, "Can't run " + spec.describe() + " in the background — "
                     + SessionBackends.installHint(SessionBackends.preferredBackend(spec))
-                    + ". Turn off \"Run in background\" (Launch Target dialog) to launch on your desktop instead.");
+                    + ". Turn off \"Run in a private display\" (⚙ Bot Settings) to launch on your desktop instead.");
             return;
         }
         // The session is created at the project's standard resolution, not a fixed 1280x720: gamescope's -w/-h

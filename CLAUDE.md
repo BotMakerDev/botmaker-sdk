@@ -163,7 +163,8 @@ snapshots and several of them are now wrong.** This section says which.
 
 **What is true now (SDK 2.0.0).** A project gets two files from its template, in
 `src/main/java/<bot package>/plugins/sdk/`: `Sdk.java`, with a `@Managed("flow")` method returning a
-`com.botmaker.sdk.api.flow.Flow` and a `@Managed("capture")` method returning a `CaptureSource`; and
+`com.botmaker.sdk.api.flow.Flow`, a `@Managed("capture")` method returning a `CaptureSource` and (since
+2026-09-27) a `@Managed("settings")` method returning a `BotSettings`; and
 `Pictures.java`, `@Managed("pictures")` on the type. They are the user's — the host rewrites the expression
 a `@Managed` method returns and nothing else, and a body that is not exactly `return <expr>;` is read-only
 with a reason. An activity's work is a **method reference**, `Flow.activity(Collect::body, …)`, so renaming
@@ -834,8 +835,12 @@ around that; the emitters belong in this module.
     editor by **type** instead of by a `(method, argIndex)` table that would silently stop firing whenever
     `Pixel` gains an overload. (It was two types, `Tolerance` and `MinPixels`, until they were merged; this
     entry named them long after they were gone.)
-  - `api.BotSettings` — the bot's runtime tuning (delays, confidence, compare margin, retry budget, real
-    input), seeded from the project's `botmaker-project.properties` on first read. Was `api.vision.ClickConfig`.
+  - `api.bot.BotSettings` — the bot's runtime tuning (delays, confidence, compare margin, retry budget, real
+    input, debug, private display) as an immutable value since 2026-09-27: `@Managed("settings")` in
+    `Sdk.java`, installed by `Bot.run` before the first click, read by the SDK as `BotSettings.current()`,
+    changed for a while with `BotSettings.use(...)`. Its Java is five calls (`plugin/types/SettingsTypes`), and
+    ⚙ Bot Settings (`plugin/settings/BotSettingsWindow`) edits it. Was a static facade seeded from
+    `botmaker-project.properties`, and before that `api.vision.ClickConfig`.
   - `api.capture.Screen` (`capture()`), `api.interaction.Mouse`/`Wait`, `api.core.Direction`,
     geometry `api.Point`/`Rect`/`Size`.
   - `api.BotMaker` — console IO. `readX()` prints a SOH-wrapped `BM-INPUT:<type>` marker to stdout
@@ -847,8 +852,10 @@ around that; the emitters belong in this module.
   - `internal/observe/IpcObserver` — it *implements* `api.observe.BotObserver` and consumes
     `MatchEvent`/`ClickEvent`/`Surface`/`Bots`; it is the adapter from SDK observer callbacks onto shared's
     already-shared telemetry wire (`shared.ipc.TelemetryClient`). Moving it would move the SDK types with it.
-  - `internal/config/ProjectDefaults` — a thin typed accessor mapping shared's `ProjectProperties` (which owns
-    the file, the key names and the parsing) onto `CaptureSource`/`Size`.
+  - `internal/config/ProjectDefaults` — what a running bot was told from outside its code: the
+    `botmaker.launch.target` system property (this machine's; the SDK plugin sets it through
+    `Runs.setProperty`, `plugin/settings/LaunchTargetValue`) and the session half of its `BotSettings`. No file
+    is read since 2026-09-27.
   - `internal/ocr/{OcrEngine,OcrNative,OcrPreprocessor}` — the Tesseract stack behind `api.vision.Text`,
     moved here from `com.botmaker.shared.ocr` in 1.2.0. It is internal because a bot only ever *receives*
     a `TextResult`; it never names the engine. `OcrNative` extracts the bundled `tessdata` and delegates the

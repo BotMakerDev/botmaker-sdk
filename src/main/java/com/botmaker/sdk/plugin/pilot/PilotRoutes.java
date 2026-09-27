@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin.pilot;
 
-import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstances;
 import com.botmaker.session.DesktopSession;

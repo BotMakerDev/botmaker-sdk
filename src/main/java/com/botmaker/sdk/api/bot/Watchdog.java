@@ -83,7 +83,7 @@ public final class Watchdog {
      */
     public static void checkpoint() {
         State s = STATE.get();
-        if (s.repeats >= BotSettings.maxRetryAttempts()) {
+        if (s.repeats >= BotSettings.current().maxRetryAttempts()) {
             int repeats = s.repeats;
             String sig = s.signature;
             progress();

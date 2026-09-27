@@ -15,8 +15,8 @@ import com.botmaker.shared.launch.Launcher;
  * (Steam, Epic, Heroic, Faugus), a plain executable or command line, or an app running inside a named Android
  * emulator.
  *
- * <p>Persisted as a single {@code launch.target} string in {@code botmaker-project.properties} (see
- * {@code ProjectDefaults}) using the {@link #spec()} form:
+ * <p>Given to a bot as a single string, the {@code botmaker.launch.target} system property this machine starts
+ * it with (see {@code ProjectDefaults}), in the {@link #spec()} form:
  * <pre>
  *   steam:&lt;appId&gt;
  *   epic:&lt;appName&gt;

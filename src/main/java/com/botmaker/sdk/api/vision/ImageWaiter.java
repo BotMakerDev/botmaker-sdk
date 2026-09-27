@@ -46,7 +46,7 @@ public class ImageWaiter {
      */
     @Records(Gesture.AWAIT)
     public static boolean waitFor(ImageTemplate template, int timeoutSeconds) {
-        return waitFor(template, Source.current(), timeoutSeconds, BotSettings.confidence());
+        return waitFor(template, Source.current(), timeoutSeconds, BotSettings.current().confidence());
     }
 
     /**
@@ -76,7 +76,7 @@ public class ImageWaiter {
      * @return true if the template was found within timeout, false if the timeout elapsed
      */
     public static boolean waitFor(ImageTemplate template, CaptureSource source, int timeoutSeconds) {
-        return waitFor(template, source, timeoutSeconds, BotSettings.confidence());
+        return waitFor(template, source, timeoutSeconds, BotSettings.current().confidence());
     }
 
     /**
@@ -132,7 +132,7 @@ public class ImageWaiter {
      * @see #waitUntilGone(ImageTemplate, CaptureSource, int, double)
      */
     public static boolean waitUntilGone(ImageTemplate template, int timeoutSeconds) {
-        return waitUntilGone(template, Source.current(), timeoutSeconds, BotSettings.confidence());
+        return waitUntilGone(template, Source.current(), timeoutSeconds, BotSettings.current().confidence());
     }
 
     /**
@@ -162,7 +162,7 @@ public class ImageWaiter {
      * @return true if the template disappeared within the timeout, false if the timeout elapsed
      */
     public static boolean waitUntilGone(ImageTemplate template, CaptureSource source, int timeoutSeconds) {
-        return waitUntilGone(template, source, timeoutSeconds, BotSettings.confidence());
+        return waitUntilGone(template, source, timeoutSeconds, BotSettings.current().confidence());
     }
 
     /**
@@ -217,7 +217,7 @@ public class ImageWaiter {
      * @see #waitAndClick(ImageTemplate, CaptureSource, int, double)
      */
     public static boolean waitAndClick(ImageTemplate template, int timeoutSeconds) {
-        return waitAndClick(template, Source.current(), timeoutSeconds, BotSettings.confidence());
+        return waitAndClick(template, Source.current(), timeoutSeconds, BotSettings.current().confidence());
     }
 
     /**
@@ -247,7 +247,7 @@ public class ImageWaiter {
      * @return true if the template was found and clicked within the timeout, false otherwise
      */
     public static boolean waitAndClick(ImageTemplate template, CaptureSource source, int timeoutSeconds) {
-        return waitAndClick(template, source, timeoutSeconds, BotSettings.confidence());
+        return waitAndClick(template, source, timeoutSeconds, BotSettings.current().confidence());
     }
 
     /**
@@ -267,9 +267,9 @@ public class ImageWaiter {
                                        int timeoutSeconds, double confidence) {
         if (waitFor(template, source, timeoutSeconds, confidence)) {
             MatchResult result = Vision.lastMatch();
-            Point clickPoint = BotSettings.randomizeClicks() ? result.randomClickPoint() : result.center();
+            Point clickPoint = BotSettings.current().randomizeClicks() ? result.randomClickPoint() : result.center();
             Mouse.click(clickPoint);
-            Wait.milliseconds(BotSettings.foundDelay());
+            Wait.milliseconds(BotSettings.current().foundDelay());
             Debug.log("[Vision] found and clicked " + template.id());
             return true;
         }

@@ -17,12 +17,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class WatchdogTest {
 
-    private int savedMax;
+    private BotSettings saved;
 
     @BeforeEach
     void setUp() {
-        savedMax = BotSettings.maxRetryAttempts();
-        BotSettings.setMaxRetryAttempts(3);
+        saved = BotSettings.current();
+        BotSettings.use(saved.maxRetryAttempts(3));
         Watchdog.enable();
         Watchdog.reset();
     }
@@ -31,7 +31,7 @@ class WatchdogTest {
     void tearDown() {
         Watchdog.disable();
         Watchdog.reset();
-        BotSettings.setMaxRetryAttempts(savedMax);
+        BotSettings.use(saved);
     }
 
     private static void fireMiss(int times) {

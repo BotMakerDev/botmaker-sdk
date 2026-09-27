@@ -5,10 +5,10 @@ import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.impl.NestedSession;
 import com.botmaker.session.launch.BackgroundLauncher;
-import com.botmaker.shared.config.ProjectFile;
 import javafx.application.Platform;
 
 import java.nio.file.Path;
+import java.util.function.Supplier;
 
 /**
  * The pilot's view onto the shared {@link BackgroundLauncher}: it brings the project's configured
@@ -39,11 +39,16 @@ public final class NestedSessionLauncher implements AutoCloseable {
         void accept(boolean ok, String message);
     }
 
-    private final Path resourcesDir;
+    private final Supplier<String> launchTarget;
     private final BackgroundLauncher launcher;
 
-    public NestedSessionLauncher(Path resourcesDir) {
-        this.resourcesDir = resourcesDir;
+    /**
+     * @param resourcesDir the project's resources, which key the one launcher per project
+     * @param launchTarget what this machine launches for the bot, asked afresh each time — the run property
+     *                     can change while the pilot is open
+     */
+    public NestedSessionLauncher(Path resourcesDir, Supplier<String> launchTarget) {
+        this.launchTarget = launchTarget;
         this.launcher = BackgroundLauncher.forProject(resourcesDir);
     }
 
@@ -82,14 +87,10 @@ public final class NestedSessionLauncher implements AutoCloseable {
 
     /**
      * The project's configured launch target, or {@code null} when none is set — for the UI's
-     * availability/label.
-     *
-     * <p>Read straight out of {@code botmaker-project.properties} through shared's {@link ProjectFile}, which
-     * is the same answer the editor's own Launch button gets: the key, its grammar and what a missing file
-     * means all belong to shared, so there is one reader and not one per host.
+     * availability/label. The same answer the Launch now button gets: this machine's run property.
      */
     public LaunchSpec configuredTarget() {
-        String spec = ProjectFile.launchTarget(resourcesDir);
+        String spec = launchTarget.get();
         return spec == null || spec.isBlank() ? null : LaunchSpec.parse(spec);
     }
 
@@ -101,7 +102,7 @@ public final class NestedSessionLauncher implements AutoCloseable {
     public void start(NestedSession.Backend backend, int width, int height, Report report) {
         LaunchSpec spec = configuredTarget();
         if (spec == null) {
-            report.accept(false, "No launch target configured — set one in the Launch Target dialog first.");
+            report.accept(false, "No launch target on this computer — pick an emulator app first.");
             return;
         }
         if (spec.runsOffDesktop()) {

@@ -107,7 +107,7 @@ public class Bot {
      * <p>The start-up step is the SDK's own: {@link Target#startIfNotRunning()} on the cold start,
      * {@link Target#restart()} on a recovery, driven by the {@link StartMode} the supervisor supplies. That is
      * the whole of what generated projects used to carry as a read-only {@code Startup.java} — the launch
-     * target itself was never in that file, it is read from {@code botmaker-project.properties} at runtime, so
+     * target itself was never in that file, it is this machine's {@code botmaker.launch.target} property, so
      * the file said nothing a bot's own project didn't already say. A project with no target configured simply
      * launches nothing.
      *
@@ -135,12 +135,12 @@ public class Bot {
             case COLD -> {
                 Target.startIfNotRunning();
                 // Always wait for the game window to appear before starting activities
-                Target.waitForLaunch(BotSettings.defaultLaunchWaitTimeout());
+                Target.waitForLaunch(BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
             }
             case RESTART -> {
                 Target.restart();
                 // Always wait for the game window to appear after restart
-                Target.waitForLaunch(BotSettings.defaultLaunchWaitTimeout());
+                Target.waitForLaunch(BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
             }
         }
     }

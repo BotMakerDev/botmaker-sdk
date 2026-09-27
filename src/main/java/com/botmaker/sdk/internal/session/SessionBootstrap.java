@@ -3,7 +3,6 @@ package com.botmaker.sdk.internal.session;
 import com.botmaker.sdk.api.bot.Session;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
-import com.botmaker.shared.config.ProjectProperties;
 import com.botmaker.shared.launch.LaunchIsolation;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.ActiveSession;
@@ -60,19 +59,19 @@ public final class SessionBootstrap {
     private SessionBootstrap() {}
 
     /**
-     * Whether this bot runs isolated on a private display. <b>Default: the project's {@code session.isolated}
-     * setting, which itself defaults to {@code true}</b> ({@link ProjectDefaults#sessionIsolated()}) — so a bot
-     * run anywhere with its project file on the classpath isolates unless it opts out. The {@link
+     * Whether this bot runs isolated on a private display. <b>Default: its settings' {@code session.isolated},
+     * which itself defaults to {@code true}</b> ({@link ProjectDefaults#sessionIsolated()}) — so a bot isolates
+     * unless it opts out. The {@link
      * #ISOLATED_PROPERTY} system property (or {@code BOTMAKER_SESSION_ISOLATED} env) is an explicit override in
      * either direction, winning over the project setting when set to a recognised boolean.
      */
     public static boolean isolationRequested() {
         Boolean override = Session.override();
         if (override == null) {
-            override = ProjectProperties.parseBoolean(System.getProperty(ISOLATED_PROPERTY));
+            override = ProjectDefaults.parseBoolean(System.getProperty(ISOLATED_PROPERTY));
         }
         if (override == null) {
-            override = ProjectProperties.parseBoolean(System.getenv(ISOLATED_ENV));
+            override = ProjectDefaults.parseBoolean(System.getenv(ISOLATED_ENV));
         }
         return override != null ? override : ProjectDefaults.sessionIsolated();
     }

@@ -53,20 +53,24 @@ public final class SettingsEditors {
      * not tuning a delay, it is writing a different bot.
      */
     static Setting bounds(String setter) {
+        // The withers a bot writes to change one setting for a while —
+        // BotSettings.use(BotSettings.current().confidence(0.9)) — by name (2026-09-27; the static setters
+        // these rows were keyed on are gone).
         return switch (setter == null ? "" : setter) {
-            case "setFoundDelay" -> number("Delay after a match",
+            case "foundDelay" -> number("Delay after a match",
                     "Milliseconds (≥ 0):", " ms", true, 0, 600_000, 50, 500);
-            case "setNotFoundDelay" -> number("Delay after no match",
+            case "notFoundDelay" -> number("Delay after no match",
                     "Milliseconds (≥ 0):", " ms", true, 0, 600_000, 50, 200);
-            case "setMaxRetryAttempts" -> number("Max stuck checks",
+            case "maxRetryAttempts" -> number("Max stuck checks",
                     "Checks before considered stuck (≥ 1):", "", true, 1, 600_000, 1, 20);
-            case "setDefaultConfidence" -> number("Match confidence",
+            case "confidence" -> number("Match confidence",
                     "Confidence (0.0 – 1.0):", "", false, 0, 1, 0.05, 0.8);
-            case "setCompareMargin" -> number("Compare margin",
+            case "compareMargin" -> number("Compare margin",
                     "How far the right template must beat a look-alike (0.0 – 1.0):", "", false,
                     0, 1, 0.01, 0.05);
-            case "enableRandomClicks" -> new Setting(null, "Randomize click points");
-            case "enableDebugMode" -> new Setting(null, "Debug logging");
+            case "randomizeClicks" -> new Setting(null, "Randomize click points");
+            case "debug" -> new Setting(null, "Debug logging");
+            case "realInput" -> new Setting(null, "Drive the real mouse and keyboard");
             default -> null;
         };
     }

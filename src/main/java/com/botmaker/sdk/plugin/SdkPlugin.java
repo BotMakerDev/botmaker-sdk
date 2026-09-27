@@ -11,6 +11,7 @@ import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
@@ -21,10 +22,12 @@ import com.botmaker.sdk.plugin.pictures.ResourceManagerDialog;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.setup.ProjectSetup;
 import com.botmaker.sdk.plugin.source.SourcePicker;
 import com.botmaker.sdk.plugin.types.CaptureTypes;
 import com.botmaker.sdk.plugin.types.FlowTypes;
+import com.botmaker.sdk.plugin.types.SettingsTypes;
 import com.botmaker.sdk.plugin.types.PictureAt;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import javafx.scene.paint.Color;
@@ -119,16 +122,16 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      */
     @Override
     public List<ComponentType<?>> componentTypes() {
-        return Stream.of(FlowTypes.ALL, CaptureTypes.ALL, SdkTypes.PRECISION_WITHERS,
+        return Stream.of(FlowTypes.ALL, CaptureTypes.ALL, SettingsTypes.ALL, SdkTypes.PRECISION_WITHERS,
                         List.of(SdkTypes.COMBO_HELD, SdkTypes.STEP))
                 .<ComponentType<?>>flatMap(List::stream).toList();
     }
 
     /**
-     * The three values this plugin's windows keep in step, each read-only on the canvas with a reason.
+     * The four values this plugin's windows keep in step, each read-only on the canvas with a reason.
      *
      * <p>The picture constants — {@code static final ImageTemplate COLLECT = new ImageTemplate(…)} — are the
-     * reason for the third. 🖼 Manage Pictures renames the file, the constant and every use of it together
+     * reason for the last. 🖼 Manage Pictures renames the file, the constant and every use of it together
      * (through the host's {@code Sources}); the canvas can only rename the one it is looking at, which leaves
      * the bot calling a name that is gone. The class says so itself, with {@code @Managed("pictures")} on the
      * file the bot holds, so it is a statement rather than an inference about shape.
@@ -143,6 +146,10 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                 new ManagedValue(CAPTURE,
                         "This is where the bot reads pixels from. Choose it in 🎯 Capture Source.",
                         SDK_HOLDER, CaptureSource.class, CaptureSource.desktop()),
+                new ManagedValue(SETTINGS,
+                        "These are the bot's settings — delays, confidence, input and its private display."
+                                + " Change them in ⚙ Bot Settings.",
+                        SDK_HOLDER, BotSettings.class, BotSettings.DEFAULTS),
                 new ManagedValue(PICTURES,
                         "Picture constants are managed in 🖼 Manage Pictures, which renames the picture and"
                                 + " every use of it together.",
@@ -160,6 +167,9 @@ public final class SdkPlugin extends AbstractStudioPlugin {
 
     /** The {@code @Managed} id on the method holding this bot's capture source. */
     public static final String CAPTURE = "capture";
+
+    /** The {@code @Managed} id on the method holding this bot's settings (2026-09-27). */
+    public static final String SETTINGS = BotSettingsWindow.ID;
 
     /** The {@code @Managed} id on the class of picture constants this plugin's window keeps in step. */
     public static final String PICTURES = "pictures";
@@ -214,6 +224,11 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                         "Choose what the bot looks at — a monitor, an application window or an emulator "
                                 + "instance",
                         ToolbarGroup.PROJECT, 50, this::openCaptureSource),
+                ToolbarItem.of("bot-settings", "⚙ Bot Settings",
+                        "How the bot clicks and looks — delays, match confidence, real input for games, and "
+                                + "whether it runs on a private display",
+                        ToolbarGroup.PROJECT, 60, context -> BotSettingsWindow.open(context.services(),
+                                context.services().dialogs().ownerWindow().orElse(null))),
                 ToolbarItem.of("project-setup", "📋 Project Setup",
                         "What this project still needs before it can run — something to launch, something "
                                 + "to capture, and the pictures it looks for",

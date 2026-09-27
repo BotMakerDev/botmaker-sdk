@@ -49,7 +49,7 @@ class CallSitesTest {
     @Test
     void a_setter_is_claimed_only_when_the_table_bounds_it() {
         assertTrue(CallSites.BOT_SETTING.test(TestContexts.slot(
-                TestContexts.method(BotSettings.class, "setDefaultConfidence"), 0, "0.8")));
+                TestContexts.method(BotSettings.class, "confidence", double.class), 0, "0.8")));
     }
 
     @Test

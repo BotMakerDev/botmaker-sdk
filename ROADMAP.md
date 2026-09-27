@@ -8,6 +8,34 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — the bot's settings are its own Java (studio cleanup, phase 7a)
+
+**Done**
+- `api.bot.BotSettings` is an immutable record: `of(Clicks, Vision, Input, Session, maxRetryAttempts, debug)`
+  with `clicks(…)`, `vision(…)`, `input(…)`, `session(…)` and the enums `InputBackend`/`DisplayBackend`;
+  `DEFAULTS`; a compact constructor that clamps rather than throws. The runtime value is `current()`, replaced by
+  `use(settings)` — which pins the Linux input backend (a `-D` on the command line still wins), escalates real
+  input once and never claims to undo it, and sets `Debug`. Withers (`confidence(0.9)`, …) return copies. The
+  static setters and readers are **deleted** (2.0.0 is the sanctioned break); ~90 call sites read
+  `BotSettings.current()`, launch waits use `DEFAULT_LAUNCH_WAIT_TIMEOUT`. No `@Palette` on it any more:
+  every member would have been hidden.
+- `SdkValues` claims `"settings"`, so `Bot.run(…, Sdk.class)` installs it before anything clicks. Its Java is
+  five `ComponentType`s (`plugin/types/SettingsTypes`), `DEFAULTS` read and written as the constant.
+- `SdkPlugin` declares `ManagedValue("settings", …, "Sdk", BotSettings.class, DEFAULTS)` and a ⚙ Bot Settings
+  toolbar item (PROJECT/60): `plugin/settings/BotSettingsWindow`, Studio's Input & Clicks window moved here, with
+  debug output added. An `Sdk.java` without the method gets the text to paste and Save off — the host writes
+  whole holders, never a method into one.
+- `internal/config/ProjectDefaults` reads no file: the launch target is the `botmaker.launch.target` system
+  property, session isolation/backend come from `BotSettings.current()`, and `parseBoolean` moved here from
+  shared. The plugin reads and writes the launch target through `Runs.property/setProperty`
+  (`plugin/settings/LaunchTargetValue`, beside the window so `emulator` and `launch` still do not name each
+  other); `QuickLaunch` and `NestedSessionLauncher` take the services/a supplier instead of a resources path.
+- `SettingsEditors`' bounded table is keyed on the withers.
+
+**Deferred / next**
+- There is still no picker for "what this computer launches" beyond an emulator app; `Target.set(…)` in the
+  bot's own code is the other way. A launch-target window would write the same run property.
+
 ## 2026-09-27 — combo hold and key sequences (picker feedback 3, phase 5)
 
 **Done**
