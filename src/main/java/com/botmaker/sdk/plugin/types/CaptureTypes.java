@@ -1,6 +1,8 @@
 package com.botmaker.sdk.plugin.types;
 
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.toolkit.AbstractPluginType;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -11,6 +13,8 @@ import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.RegionSource;
+import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
+import javafx.scene.Node;
 
 import java.lang.reflect.Executable;
 import java.util.List;
@@ -34,12 +38,15 @@ public final class CaptureTypes {
      * that changes later; a concrete source would freeze the declaration into what was true when it was
      * made.
      *
-     * <p>No editor: the host draws the value read-only, and the project's own source is picked in 🎯 Capture
-     * Targets.
+     * <p>Drawn as a pill opening the source tiles ({@link CaptureSourceEditors}), the same picker as the
+     * toolbar's Capture Source.
      */
-    public static final class CaptureSourceType extends AbstractPluginType<CaptureSource> {
+    public static final class CaptureSourceType extends AbstractPluginType<CaptureSource>
+            implements EditableType<CaptureSource> {
         public CaptureSourceType() { super(CaptureSource.class); }
         @Override public CaptureSource fresh() { return new CurrentSource(); }
+        @Override public Node editor(ValueContext ctx) { return CaptureSourceEditors.source(ctx); }
+        @Override public Node preview(ValueContext ctx) { return CaptureSourceEditors.preview(ctx); }
     }
 
     /** {@code Source.current()}. */

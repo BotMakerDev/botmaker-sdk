@@ -3,6 +3,8 @@ package com.botmaker.sdk.plugin.source;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.emulator.EmulatorSource;
+import com.botmaker.sdk.internal.capture.RegionSource;
+import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import com.botmaker.session.Preview;
@@ -87,6 +89,8 @@ public final class SourcePicker {
     private final boolean includeProjectDefault;
 
     private Selection selected;
+    /** The source the picker opened on, whose tile it pre-selects; {@code null} for none. */
+    private CaptureSource initial;
     private VBox selectedTile;
     private Stage stage;
     private ExecutorService thumbExec;
@@ -95,6 +99,22 @@ public final class SourcePicker {
         this.services = services;
         this.owner = owner;
         this.includeProjectDefault = includeProjectDefault;
+    }
+
+    /**
+     * Pre-selects the tile for {@code current} once it is drawn, and pre-fills the region fields when it is
+     * narrowed — so reopening a narrowed source and pressing Select keeps the narrowing. {@code null}, or a
+     * source no tile stands for, leaves the default selection.
+     */
+    public SourcePicker preselect(CaptureSource current) {
+        this.initial = current;
+        return this;
+    }
+
+    /** Selects {@code tile} when it stands for the source this picker opened on. */
+    private void offer(VBox tile, CaptureSource target) {
+        CaptureSource wanted = initial instanceof RegionSource region ? region.parent() : initial;
+        if (CaptureLabels.same(wanted, target)) select(tile, new Selection.Concrete(target));
     }
 
     /** Shows the picker modally and returns the chosen source, or empty when it was cancelled. */
@@ -124,6 +144,12 @@ public final class SourcePicker {
         TextField ry = regionField("y");
         TextField rw = regionField("w");
         TextField rh = regionField("h");
+        if (initial instanceof RegionSource region && region.sub() != null) {
+            rx.setText(String.valueOf(region.sub().x()));
+            ry.setText(String.valueOf(region.sub().y()));
+            rw.setText(String.valueOf(region.sub().width()));
+            rh.setText(String.valueOf(region.sub().height()));
+        }
         Label regionLabel = new Label("Region of source (optional):");
         regionLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
         HBox regionRow = new HBox(6, regionLabel, rx, ry, rw, rh);
@@ -257,6 +283,7 @@ public final class SourcePicker {
                 select(tile, new Selection.Concrete(target));
                 if (e.getClickCount() == 2) close();
             });
+            offer(tile, target);
             into.getChildren().add(tile);
             tiles.add(tile);
         }
@@ -284,6 +311,7 @@ public final class SourcePicker {
         // Preselected only when the project-default tile did not claim it — so this is the "add a source"
         // flow's default, where the whole desktop is a better guess than screen 1.
         if (selected == null) select(tile, new Selection.Concrete(target));
+        offer(tile, target);
         into.getChildren().add(tile);
         thumbs().submit(() -> show(tile, com.botmaker.shared.capture.ScreenCapture.captureDesktop()));
     }
@@ -318,6 +346,7 @@ public final class SourcePicker {
                         select(tile, new Selection.Concrete(target));
                         if (e.getClickCount() == 2) close();
                     });
+                    offer(tile, target);
                     if (image != null) setThumb(tile, image);
                     into.getChildren().add(tile);
                 });
@@ -392,6 +421,7 @@ public final class SourcePicker {
                         select(tile, new Selection.Concrete(target));
                         if (e.getClickCount() == 2) close();
                     });
+                    offer(tile, target);
                     if (image != null) setThumb(tile, image);
                     into.getChildren().add(tile);
                 });

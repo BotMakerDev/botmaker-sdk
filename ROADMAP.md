@@ -8,6 +8,23 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — pictures and capture sources draw themselves (picker phase 6d)
+
+**Done**
+- `pictures/TemplateGalleryDialog` is every picture picker: its unused `CaptureAction` hook became
+  `Options.withCapture()` (hide, Capture Templates, come back with what was saved selected, per
+  `ChooserSelection`) and `withNote` (why a `Matches` case is narrowed). `TemplateEditors.choose` uses it in
+  place of the toolkit's flat `Modals.gallery`; a row's ＋ is multi-select.
+- `CaptureTemplates.open(…, Consumer<List<String>> onSaved)`: the names saved while it was open, `[]` on every
+  early exit.
+- `ImageTemplateGroupType` and `CaptureTypes.CaptureSourceType` are `EditableType`s: the picture row, and
+  `editors/CaptureSourceEditors` (pill over `SourcePicker`, which gained `preselect` — tile by
+  `CaptureLabels.same`, region fields from a `RegionSource`).
+
+**Deferred / next**
+- 6e: `MatchResult`, `Matches`, `ColorMatch`, `TextMatch` — the last four types `plugin validate` refuses.
+- A window tile is pre-selected only when the slot's title substring equals the whole window title.
+
 ## 2026-09-27 — Duration leaves the SDK (picker phase 6c, phase A)
 
 **Done**

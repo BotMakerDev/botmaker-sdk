@@ -19,11 +19,19 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Added
+
+- **Every picture picker is the Resource Manager's gallery** (tags, search, large tiles) with *Capture new…*:
+  the pictures a capture saves come back selected, ready to confirm. A picture row's ＋ picks several at once.
+- **`ImageTemplateGroup` and `CaptureSource` draw themselves.** A group is the picture row; a source is a pill
+  opening the capture-source tiles — *Project default* writes `Source.current()`, and a narrowed source reopens
+  with its tile selected and its region filled in.
+
 ### Changed
 
-- **Nine types implement `EditableType`** (contract 0.3.0): `ImageTemplate`, `Precision`, `Point`, `Rect`,
-  `Size`, `Direction`, `Key`, `MouseButton`, `Combo`. `ImageTemplateGroup`, `CaptureSource` and the four vision
-  results are plain `PluginType` and have no picker until picker phases 6d/6e, so `plugin validate` refuses
+- **Eleven types implement `EditableType`** (contract 0.3.0): `ImageTemplate`, `ImageTemplateGroup`,
+  `CaptureSource`, `Precision`, `Point`, `Rect`, `Size`, `Direction`, `Key`, `MouseButton`, `Combo`. The four
+  vision results are plain `PluginType` and have no picker until picker phase 6e, so `plugin validate` refuses
   the SDK until then.
 
 ### Removed

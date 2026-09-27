@@ -65,6 +65,15 @@ public final class CaptureLabels {
     }
 
     /**
+     * Whether {@code a} and {@code b} name the same thing to capture — same kind, same monitor, title or
+     * instance. The sources have no {@code equals} of their own; the source picker asks this to pre-select the
+     * tile a slot already holds.
+     */
+    public static boolean same(CaptureSource a, CaptureSource b) {
+        return a != null && b != null && a.getClass() == b.getClass() && shortLabel(a).equals(shortLabel(b));
+    }
+
+    /**
      * Which screen {@code source} names, or {@code 0}.
      *
      * <p>Zero for a source that is not a monitor at all, because both end in the same place: something has
