@@ -17,6 +17,7 @@ import javafx.scene.image.Image;
 import javafx.scene.image.PixelFormat;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.MouseButton;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -57,8 +58,12 @@ final class MatchOverlay {
     private final PauseTransition debounce = new PauseTransition(DEBOUNCE);
     private final AtomicLong generation = new AtomicLong();
     private final List<Pin> pins = new ArrayList<>();
+    private final Rectangle probeSwatch = new Rectangle(18, 18);
+    private final Label probeLabel = Styles.on(new Label(), Styles.CAPTION);
 
     private EditorFrame frame;
+    /** The last pixel clicked, {@code {x, y}} in image pixels, or null. */
+    private int[] probed;
     private java.awt.Color target;
     private PrecisionEditors.Settings settings;
     private Pass last;
@@ -75,17 +80,66 @@ final class MatchOverlay {
         ZoomPan.attach(surface, layers);
         readout.setWrapText(true);
         readout.setMaxWidth(VIEW_WIDTH);
-        node = new VBox(6, surface, hintLine(), readout);
+        probeSwatch.setStroke(Color.gray(0.5));
+        probeSwatch.setFill(Color.TRANSPARENT);
+        probeLabel.setWrapText(true);
+        probeLabel.setText("Click the frame to read a pixel.");
+        HBox probe = new HBox(6, probeSwatch, probeLabel);
+        probe.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        node = new VBox(6, surface, hintLine(), probe, readout);
         debounce.setOnFinished(e -> run());
         // The canvas's own coordinates are image pixels whatever the zoom: ZoomPan transforms the group above it.
+        // Every left click answers (feedback 2, 2026-09-27): a crosshair where it landed, the pixel's colour
+        // beside the frame, and the blob it belongs to outlined — before, a click outside a pin mode did
+        // nothing at all, and a pin was a dot a few screen pixels wide on a frame drawn at a third of its size.
         marks.setOnMouseClicked(e -> {
-            if (e.getButton() != MouseButton.PRIMARY || pinning == null || frame == null) return;
+            if (e.getButton() != MouseButton.PRIMARY || frame == null) return;
             int x = (int) e.getX(), y = (int) e.getY();
             if (x < 0 || y < 0 || x >= frame.image().getWidth() || y >= frame.image().getHeight()) return;
-            pins.add(new Pin(x, y, pinning));
-            onPin.accept(new java.awt.Color(frame.image().getRGB(x, y)), pinning);
+            java.awt.Color colour = new java.awt.Color(frame.image().getRGB(x, y));
+            probed = new int[] {x, y};
+            refreshProbe();
+            if (pinning != null) {
+                pins.add(new Pin(x, y, pinning));
+                onPin.accept(colour, pinning);
+            }
             draw();
         });
+        // Marks are sized per screen pixel, so a zoom redraws them.
+        marks.localToSceneTransformProperty().addListener((o, was, is) -> draw());
+    }
+
+    /** The swatch and sentence for the last pixel clicked, against the target and tolerance as they are now. */
+    private void refreshProbe() {
+        if (probed == null || frame == null) return;
+        java.awt.Color colour = new java.awt.Color(frame.image().getRGB(probed[0], probed[1]));
+        probeSwatch.setFill(Color.rgb(colour.getRed(), colour.getGreen(), colour.getBlue()));
+        probeLabel.setText(probeText(probed[0], probed[1], colour, target,
+                settings == null ? 0 : settings.deltaE()));
+    }
+
+    /**
+     * A clicked pixel, in words: where, its colour as RGB and hex, and — once there is a target — how far it
+     * is from it and whether the search counts it.
+     */
+    static String probeText(int x, int y, java.awt.Color pixel, java.awt.Color target, double deltaE) {
+        String where = String.format("(%d, %d)  RGB %d, %d, %d  %s", x, y,
+                pixel.getRed(), pixel.getGreen(), pixel.getBlue(), hex(pixel));
+        if (target == null) return where + "  — no target colour to compare with yet";
+        double distance = com.botmaker.sdk.api.vision.Pixel.distance(pixel, target);
+        return where + String.format("  ΔE %s from the target — %s",
+                distance < 0.05 ? "0" : String.format("%.1f", distance),
+                distance <= deltaE ? "matches" : "does not match");
+    }
+
+    static String hex(java.awt.Color c) {
+        return String.format("#%02X%02X%02X", c.getRed(), c.getGreen(), c.getBlue());
+    }
+
+    /** How many image pixels one screen pixel spans at the current zoom, so a mark keeps its on-screen size. */
+    private double perScreenPixel() {
+        double scale = marks.getLocalToSceneTransform().getMxx();
+        return scale > 0 ? 1 / scale : 1;
     }
 
     private static Label hintLine() {
@@ -120,6 +174,9 @@ final class MatchOverlay {
     void show(EditorFrame frame) {
         this.frame = frame;
         pins.clear();
+        probed = null;
+        probeSwatch.setFill(Color.TRANSPARENT);
+        probeLabel.setText("Click the frame to read a pixel.");
         last = null;
         Image image = ScreenCapture.toFxImage(frame.image());
         for (Canvas c : List.of(base, marks)) {
@@ -133,6 +190,7 @@ final class MatchOverlay {
     void update(java.awt.Color target, PrecisionEditors.Settings settings) {
         this.target = target;
         this.settings = settings;
+        refreshProbe();
         schedule();
     }
 
@@ -213,12 +271,44 @@ final class MatchOverlay {
                     .forEach(m -> g.strokeRect(m.x(), m.y(), m.width(), m.height()));
             g.setLineDashes();
         }
-        for (Pin p : pins) {
-            g.setFill(p.good() ? Color.LIMEGREEN : Color.RED);
-            g.fillOval(p.x() - 5, p.y() - 5, 10, 10);
-            g.setStroke(Color.WHITE);
-            g.setLineWidth(1.5);
-            g.strokeOval(p.x() - 5, p.y() - 5, 10, 10);
+        // Marks keep their size on screen at any zoom: a frame is usually drawn at a fraction of its pixels.
+        double unit = perScreenPixel();
+        if (probed != null && last != null) {
+            // The blob the clicked pixel belongs to, whichever list it is in: the match that pixel makes.
+            List<RawColorMatch> all = new ArrayList<>(last.kept());
+            all.addAll(last.small());
+            all.stream().filter(m -> contains(m, probed[0], probed[1])).findFirst().ifPresent(m -> {
+                g.setStroke(Color.YELLOW);
+                g.setLineWidth(4 * unit);
+                double pad = 3 * unit;
+                g.strokeRect(m.x() - pad, m.y() - pad, m.width() + 2 * pad, m.height() + 2 * pad);
+            });
         }
+        for (Pin p : pins) {
+            double r = 7 * unit;
+            g.setFill(p.good() ? Color.LIMEGREEN : Color.RED);
+            g.fillOval(p.x() - r, p.y() - r, 2 * r, 2 * r);
+            g.setStroke(Color.WHITE);
+            g.setLineWidth(2 * unit);
+            g.strokeOval(p.x() - r, p.y() - r, 2 * r, 2 * r);
+        }
+        if (probed != null) {
+            double cx = probed[0] + 0.5, cy = probed[1] + 0.5;
+            double arm = 14 * unit, ring = 6 * unit;
+            for (Color c : List.of(Color.BLACK, Color.WHITE)) {
+                // A dark stroke under a light one: the crosshair reads on any frame.
+                g.setStroke(c);
+                g.setLineWidth((c == Color.BLACK ? 4 : 2) * unit);
+                g.strokeLine(cx - arm, cy, cx - ring, cy);
+                g.strokeLine(cx + ring, cy, cx + arm, cy);
+                g.strokeLine(cx, cy - arm, cx, cy - ring);
+                g.strokeLine(cx, cy + ring, cx, cy + arm);
+                g.strokeOval(cx - ring, cy - ring, 2 * ring, 2 * ring);
+            }
+        }
+    }
+
+    private static boolean contains(RawColorMatch m, int x, int y) {
+        return x >= m.x() && y >= m.y() && x < m.x() + m.width() && y < m.y() + m.height();
     }
 }

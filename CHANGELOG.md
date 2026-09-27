@@ -29,6 +29,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A point, size or rectangle's menu lists where to pick directly**: *Edit values…*, then the bot's source,
+  another window or screen, and the whole desktop — no second menu after the first. *Edit values…* has
+  steppers, a drawing to scale, a rectangle's right and bottom, and takes a pasted `x, y`.
+- **Clicking a Precision frame answers.** A crosshair marks the pixel, its colour shows beside the frame as a
+  swatch with RGB, hex and ΔE from the target (matches or not), and the blob it belongs to is outlined — in
+  any mode, where a click outside a pin mode did nothing. Pins keep their size at any zoom.
 - **A key combination takes any keys, in order.** Click or press keys and each is added — two ordinary keys,
   a modifier anywhere — shown as chips beneath the keyboard, each removable, with Clear. It held modifiers plus
   one key before, and opened empty on any other combo.

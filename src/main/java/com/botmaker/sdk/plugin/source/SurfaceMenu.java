@@ -11,6 +11,8 @@ import javafx.scene.robot.Robot;
 import javafx.stage.Window;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -35,41 +37,73 @@ public final class SurfaceMenu {
 
     private SurfaceMenu() {}
 
+    /**
+     * One entry of the menu: its words, and how it turns into a surface — at once, or through
+     * {@link SourcePicker}, which may be cancelled and then calls nothing.
+     */
+    public record Entry(String label, Consumer<Consumer<Surface>> resolve) {}
+
+    /**
+     * The entries, in menu order: the last other surface again, the bot's own source, another window or
+     * screen, the whole desktop. What {@link #choose} shows, and what a widget with a menu of its own lists
+     * there instead (feedback 2, 2026-09-27). A choice is remembered as it resolves.
+     */
+    public static List<Entry> entries(StudioServices services) {
+        Window owner = services.dialogs().ownerWindow().orElse(null);
+        Surface bots = botsOwn(services);
+        List<Entry> entries = new ArrayList<>();
+        Surface last = LAST.get(key(services));
+        if (last != null && !last.botsOwn() && !CaptureLabels.isDesktop(last.source())) {
+            entries.add(fixed(services, "Again: " + last.label(), last));
+        }
+        if (bots != null) entries.add(fixed(services, bots.label(), bots));
+        if (owner != null) {
+            entries.add(new Entry("Another window or screen…", onChosen -> new SourcePicker(services, owner, false)
+                    .showAndWait()
+                    .filter(SourcePicker.Selection.Concrete.class::isInstance)
+                    .map(SourcePicker.Selection.Concrete.class::cast)
+                    .ifPresent(c -> remember(services, new Surface(c.target(), false,
+                            CaptureLabels.shortLabel(c.target())), onChosen))));
+        }
+        entries.add(fixed(services, "Whole desktop", desktop()));
+        return List.copyOf(entries);
+    }
+
     /** Shows the menu and hands the choice over on the FX thread; a dismissed menu calls nothing. */
     public static void choose(StudioServices services, Consumer<Surface> onChosen) {
         Window owner = services.dialogs().ownerWindow().orElse(null);
-        CaptureSource botSource = EditorFrame.defaultSource(services);
-        Surface bots = botSource == null ? null
-                : new Surface(botSource, true, "Bot's source (" + CaptureLabels.shortLabel(botSource) + ")");
-        Consumer<Surface> remember = s -> {
-            LAST.put(key(services), s);
-            onChosen.accept(s);
-        };
         if (owner == null) {
-            remember.accept(bots != null ? bots : desktop());
+            // No window to put a menu on: the bot's own source when there is one, else the desktop.
+            Surface bots = botsOwn(services);
+            remember(services, bots != null ? bots : desktop(), onChosen);
             return;
         }
+        List<Entry> entries = entries(services);
         ContextMenu menu = new ContextMenu();
-        Surface last = LAST.get(key(services));
-        if (last != null && !last.botsOwn() && !CaptureLabels.isDesktop(last.source())) {
-            menu.getItems().add(item("Again: " + last.label(), last, remember));
+        for (int i = 0; i < entries.size(); i++) {
+            Entry entry = entries.get(i);
+            if (i == entries.size() - 1) menu.getItems().add(new SeparatorMenuItem());
+            MenuItem item = new MenuItem(entry.label());
+            item.setOnAction(e -> entry.resolve().accept(onChosen));
+            menu.getItems().add(item);
         }
-        if (bots != null) menu.getItems().add(item(bots.label(), bots, remember));
-        MenuItem other = new MenuItem("Another window or screen…");
-        other.setOnAction(e -> new SourcePicker(services, owner, false).showAndWait()
-                .filter(SourcePicker.Selection.Concrete.class::isInstance)
-                .map(SourcePicker.Selection.Concrete.class::cast)
-                .ifPresent(c -> remember.accept(new Surface(c.target(), false,
-                        CaptureLabels.shortLabel(c.target())))));
-        menu.getItems().addAll(other, new SeparatorMenuItem(), item("Whole desktop", desktop(), remember));
         Robot robot = new Robot();
         menu.show(owner, robot.getMouseX(), robot.getMouseY());
     }
 
-    private static MenuItem item(String text, Surface surface, Consumer<Surface> onChosen) {
-        MenuItem item = new MenuItem(text);
-        item.setOnAction(e -> onChosen.accept(surface));
-        return item;
+    private static Surface botsOwn(StudioServices services) {
+        CaptureSource source = EditorFrame.defaultSource(services);
+        return source == null ? null
+                : new Surface(source, true, "Bot's source (" + CaptureLabels.shortLabel(source) + ")");
+    }
+
+    private static Entry fixed(StudioServices services, String label, Surface surface) {
+        return new Entry(label, onChosen -> remember(services, surface, onChosen));
+    }
+
+    private static void remember(StudioServices services, Surface surface, Consumer<Surface> onChosen) {
+        LAST.put(key(services), surface);
+        onChosen.accept(surface);
     }
 
     private static Surface desktop() {

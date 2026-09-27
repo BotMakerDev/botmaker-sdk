@@ -8,6 +8,18 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — screen pickers (picker feedback 2, phase 4)
+
+**Done**
+- `SurfaceMenu.entries` is the menu as data (`Entry(label, resolve)`); `choose` draws it. `SdkScreenPicks.forSlot`
+  offers each entry as a `ScreenPicks.Choice` bound to it, so the toolkit's tuple pill lists them.
+- `MatchOverlay` probes every left click: crosshair and ring sized per screen pixel, swatch + `probeText`
+  (RGB, hex, ΔE, matches), the blob containing the pixel outlined yellow; redraws on zoom.
+
+**Deferred / next**
+- The colour editor's eyedropper still opens `SurfaceMenu.choose` as a second menu; it has no pill menu to
+  list the entries in.
+
 ## 2026-09-27 — keyboard and combos (picker feedback 2, phase 3)
 
 **Done**

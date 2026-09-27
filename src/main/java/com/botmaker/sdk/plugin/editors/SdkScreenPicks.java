@@ -74,10 +74,28 @@ public final class SdkScreenPicks implements ScreenPicks {
         StudioServices services = ctx.services();
         if (services == null) return get();
         PickSpace space = PickSpace.of(ctx.slot().flatMap(SlotContext::enclosingExecutable), ctx.slot().isPresent());
+        return on(services, space, onChosen -> SurfaceMenu.choose(services, onChosen), true);
+    }
+
+    /**
+     * A picker over the surface {@code chooser} settles on. The one {@link #forSlot} hands out asks with the
+     * menu, and lists each of the menu's entries as a {@link ScreenPicks.Choice} bound to it, so a pill shows
+     * them in its own menu (feedback 2, 2026-09-27); a bound one offers no choices of its own.
+     */
+    private static ScreenPicks on(StudioServices services, PickSpace space,
+                                  Consumer<Consumer<SurfaceMenu.Surface>> chooser, boolean offersChoices) {
         return new ScreenPicks() {
             @Override
+            public java.util.List<Choice> choices() {
+                if (!offersChoices) return java.util.List.of();
+                return SurfaceMenu.entries(services).stream()
+                        .map(entry -> new Choice(entry.label(), on(services, space, entry.resolve(), false)))
+                        .toList();
+            }
+
+            @Override
             public void region(Consumer<Region> onSelected) {
-                onFrame(services, space, (overlay, bounds, owner) -> overlay.selectRegion(owner, r -> {
+                onFrame(services, space, chooser, (overlay, bounds, owner) -> overlay.selectRegion(owner, r -> {
                     int[] v = space.region(r, bounds);
                     onSelected.accept(new Region(v[0], v[1], v[2], v[3]));
                 }));
@@ -85,7 +103,7 @@ public final class SdkScreenPicks implements ScreenPicks {
 
             @Override
             public void point(Consumer<Region> onPicked) {
-                onFrame(services, space, (overlay, bounds, owner) -> overlay.pickPoint(owner, p -> {
+                onFrame(services, space, chooser, (overlay, bounds, owner) -> overlay.pickPoint(owner, p -> {
                     int[] v = space.point(p, bounds);
                     onPicked.accept(new Region(v[0], v[1], 0, 0));
                 }));
@@ -93,7 +111,7 @@ public final class SdkScreenPicks implements ScreenPicks {
 
             @Override
             public void color(Consumer<Color> onSampled) {
-                onFrame(services, space, (overlay, bounds, owner) -> overlay.pickColor(owner, pick -> {
+                onFrame(services, space, chooser, (overlay, bounds, owner) -> overlay.pickColor(owner, pick -> {
                     java.awt.Color c = pick.color();
                     onSampled.accept(Color.rgb(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha() / 255.0));
                 }));
@@ -115,9 +133,10 @@ public final class SdkScreenPicks implements ScreenPicks {
      * desktop pick crops to one monitor and reports inside it, which no origin here could correct). An
      * emulator's frame has no desktop origin at all, and an absolute slot is told so.
      */
-    private static void onFrame(StudioServices services, PickSpace space, OnFrame then) {
+    private static void onFrame(StudioServices services, PickSpace space,
+                                Consumer<Consumer<SurfaceMenu.Surface>> chooser, OnFrame then) {
         Window owner = services.dialogs().ownerWindow().orElse(null);
-        SurfaceMenu.choose(services, surface -> {
+        chooser.accept(surface -> {
             Consumer<EditorFrame> onGrab = frame -> {
                 Rectangle origin = PickSpace.origin(frame);
                 if (origin == null && space == PickSpace.ABSOLUTE) {
