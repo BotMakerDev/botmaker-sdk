@@ -24,6 +24,7 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.editors.GeometryEditors;
 import com.botmaker.sdk.plugin.editors.InputEditors;
 import com.botmaker.sdk.plugin.editors.PrecisionEditors;
+import com.botmaker.sdk.plugin.editors.ResultEditors;
 import com.botmaker.sdk.plugin.editors.TemplateEditors;
 import javafx.scene.Node;
 
@@ -232,10 +233,10 @@ public final class SdkTypes {
      * {@code MatchResult} value would change the declaration into a fabricated miss. Calling it to obtain
      * one is worse still — it would run the vision stack inside {@code botmaker plugin validate}.
      *
-     * <p>{@link #editor(ValueContext)} answers {@code null}, so the host shows the expression as written and
-     * read-only. That is the honest control: there is nothing here anyone configures.
+     * <p>{@link #editor(ValueContext)} is a pill saying in plain words what the bot fills in, with the Java in
+     * its tooltip ({@link ResultEditors}). That is the honest control: there is nothing here anyone configures.
      */
-    private static final class SeededType<T> implements PluginType<T> {
+    private static final class SeededType<T> implements EditableType<T> {
         private final Class<T> type;
         private final Method freshCall;
 
@@ -247,6 +248,8 @@ public final class SdkTypes {
         @Override public Class<T> type() { return type; }
         @Override public T fresh() { return null; }
         @Override public Method freshCall() { return freshCall; }
+        @Override public Node editor(ValueContext ctx) { return ResultEditors.pill(ctx, type); }
+        @Override public Node preview(ValueContext ctx) { return ResultEditors.pill(ctx, type); }
     }
 
     /**

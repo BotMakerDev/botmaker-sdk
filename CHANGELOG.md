@@ -29,10 +29,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
-- **Eleven types implement `EditableType`** (contract 0.3.0): `ImageTemplate`, `ImageTemplateGroup`,
-  `CaptureSource`, `Precision`, `Point`, `Rect`, `Size`, `Direction`, `Key`, `MouseButton`, `Combo`. The four
-  vision results are plain `PluginType` and have no picker until picker phase 6e, so `plugin validate` refuses
-  the SDK until then.
+- **Every type implements `EditableType`** (contract 0.3.0): `ImageTemplate`, `ImageTemplateGroup`,
+  `CaptureSource`, `Precision`, `Point`, `Rect`, `Size`, `Direction`, `Key`, `MouseButton`, `Combo`, and the four
+  vision results. A result (`MatchResult`, `Matches`, `ColorMatch`, `TextMatch`) is a pill in plain words —
+  *Last picture match*, *Pictures found*, *Last colour match*, *Last text read* — with its Java in the
+  tooltip: the bot fills it in, so there is nothing to set.
 
 ### Removed
 

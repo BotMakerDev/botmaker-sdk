@@ -274,21 +274,17 @@ class SdkPluginSurfaceTest {
     }
 
     /**
-     * Which SDK types draw themselves (6f, 6d). The four vision results have no picker yet — 6e gives them
-     * one — so `plugin validate` fails the SDK until then, by design.
+     * Every SDK type draws itself (6f, 6d, 6e): the four vision results as a pill saying what the bot fills
+     * in, the rest as real pickers — so `plugin validate`'s pickers check has nothing to refuse here.
      */
     @Test
-    void exactly_eleven_sdk_types_draw_themselves() {
-        List<String> editable = new ArrayList<>();
+    void every_sdk_type_draws_itself() {
         List<String> plain = new ArrayList<>();
         for (PluginType<?> type : plugin.types()) {
-            (type instanceof EditableType<?> ? editable : plain).add(type.type().getSimpleName());
+            if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
-        assertEquals(List.of("ImageTemplate", "ImageTemplateGroup", "CaptureSource", "Precision", "Point", "Rect",
-                "Size", "Direction", "Key", "MouseButton", "Combo").stream().sorted().toList(),
-                editable.stream().sorted().toList());
-        assertEquals(List.of("MatchResult", "Matches", "ColorMatch",
-                "TextMatch").stream().sorted().toList(), plain.stream().sorted().toList());
+        assertEquals(List.of(), plain);
+        assertEquals(15, plugin.types().size());
     }
 
     /**

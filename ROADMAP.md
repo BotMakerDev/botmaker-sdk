@@ -8,6 +8,17 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — the vision results explain themselves (picker phase 6e1)
+
+**Done**
+- `SdkTypes.SeededType` is an `EditableType`: `editors/ResultEditors` draws a read-only pill in plain words
+  with the Java in its tooltip, as editor and preview (the maintainer's choice over exempting them from the
+  check or a fake-value editor). Every SDK type now draws itself (`SdkPluginSurfaceTest.every_sdk_type_draws_itself`),
+  so 6f phase B's `pickers` check passes on the SDK.
+
+**Deferred / next**
+- 6e2 collection pickers and 6e3 the basics review are basics' work.
+
 ## 2026-09-27 — pictures and capture sources draw themselves (picker phase 6d)
 
 **Done**
@@ -22,7 +33,6 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
   `CaptureLabels.same`, region fields from a `RegionSource`).
 
 **Deferred / next**
-- 6e: `MatchResult`, `Matches`, `ColorMatch`, `TextMatch` — the last four types `plugin validate` refuses.
 - A window tile is pre-selected only when the slot's title substring equals the whole window title.
 
 ## 2026-09-27 — Duration leaves the SDK (picker phase 6c, phase A)
