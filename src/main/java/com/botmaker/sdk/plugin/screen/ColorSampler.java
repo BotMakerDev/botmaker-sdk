@@ -88,6 +88,37 @@ public final class ColorSampler {
         new Surface(services, frame, onPicked).show();
     }
 
+    /** The pick at frame pixel ({@code px},{@code py}): its colour and its neighbourhood's spread. */
+    static Sample sampleAt(EditorFrame frame, int px, int py) {
+        BufferedImage image = frame.image();
+        return new Sample(new java.awt.Color(image.getRGB(px, py), false), frame, spreadAt(image, px, py));
+    }
+
+    /**
+     * The largest ΔE between the centre pixel and any of its {@value #NEIGHBOURHOOD}×{@value #NEIGHBOURHOOD}
+     * neighbours — measured with {@link ColorMatcher#deltaE}, the same function the bot will run, rather
+     * than a second approximation of Lab distance living in the editor. A centre off the frame has none.
+     */
+    static double spreadAt(BufferedImage image, int px, int py) {
+        if (!inside(image, px, py)) return 0;
+        java.awt.Color centre = new java.awt.Color(image.getRGB(px, py), false);
+        int r = NEIGHBOURHOOD / 2;
+        double worst = 0;
+        for (int dy = -r; dy <= r; dy++) {
+            for (int dx = -r; dx <= r; dx++) {
+                int x = px + dx, y = py + dy;
+                if (!inside(image, x, y)) continue;
+                worst = Math.max(worst,
+                        ColorMatcher.deltaE(centre, new java.awt.Color(image.getRGB(x, y), false)));
+            }
+        }
+        return worst;
+    }
+
+    private static boolean inside(BufferedImage image, int x, int y) {
+        return x >= 0 && y >= 0 && x < image.getWidth() && y < image.getHeight();
+    }
+
     /** One open sampler window. Instance state (the hovered pixel) is what keeps the readouts in step. */
     private static final class Surface {
 
@@ -203,9 +234,10 @@ public final class ColorSampler {
             });
             pane.setOnMouseClicked(e -> {
                 if (e.getButton() != MouseButton.PRIMARY || hoverX < 0) return;
-                java.awt.Color picked = new java.awt.Color(image.getRGB(hoverX, hoverY), false);
+                // Read before closing: closing fires the mouse-exit above, which forgets the hovered pixel.
+                Sample picked = sampleAt(frame, hoverX, hoverY);
                 stage.close();
-                onPicked.accept(new Sample(picked, frame, spreadAt(hoverX, hoverY)));
+                onPicked.accept(picked);
             });
         }
 
@@ -226,7 +258,7 @@ public final class ColorSampler {
             swatch.setFill(Color.rgb(c.getRed(), c.getGreen(), c.getBlue()));
             readout.setText(String.format("#%02X%02X%02X   rgb(%d, %d, %d)   at %d,%d",
                     c.getRed(), c.getGreen(), c.getBlue(), c.getRed(), c.getGreen(), c.getBlue(), px, py));
-            double spread = spreadAt(px, py);
+            double spread = spreadAt(image, px, py);
             spreadLabel.setText(String.format(
                     "this %dx%d patch varies by ΔE %.1f — a tolerance of about %.0f would hold it together",
                     NEIGHBOURHOOD, NEIGHBOURHOOD, spread, Math.ceil(spread)));
@@ -234,26 +266,6 @@ public final class ColorSampler {
             drawLoupe(px, py);
             placeLoupe(e.getX(), e.getY());
             loupe.setVisible(true);
-        }
-
-        /**
-         * The largest ΔE between the centre pixel and any of its {@value #NEIGHBOURHOOD}×{@value #NEIGHBOURHOOD}
-         * neighbours — measured with {@link ColorMatcher#deltaE}, the same function the bot will run, rather
-         * than a second approximation of Lab distance living in the editor.
-         */
-        private double spreadAt(int px, int py) {
-            java.awt.Color centre = new java.awt.Color(image.getRGB(px, py), false);
-            int r = NEIGHBOURHOOD / 2;
-            double worst = 0;
-            for (int dy = -r; dy <= r; dy++) {
-                for (int dx = -r; dx <= r; dx++) {
-                    int x = px + dx, y = py + dy;
-                    if (x < 0 || y < 0 || x >= image.getWidth() || y >= image.getHeight()) continue;
-                    worst = Math.max(worst,
-                            ColorMatcher.deltaE(centre, new java.awt.Color(image.getRGB(x, y), false)));
-                }
-            }
-            return worst;
         }
 
         /** Draws the neighbourhood of ({@code px},{@code py}) magnified, with a crosshair on the exact pixel. */

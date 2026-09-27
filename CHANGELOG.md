@@ -46,6 +46,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   *Last picture match*, *Pictures found*, *Last colour match*, *Last text read* — with its Java in the
   tooltip: the bot fills it in, so there is nothing to set.
 
+### Fixed
+
+- **Picking a colour on screen sets it.** A click on the frozen frame threw and changed nothing: closing the
+  sampler forgot the pixel under the pointer before it was read.
+
 ### Removed
 
 - **The SDK's own Duration editor.** Basics draws the JDK types; a Duration slot gets basics' picker (presets,

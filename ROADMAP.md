@@ -8,6 +8,13 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-27 — colour pick crash (picker feedback 3, phase 1)
+
+**Done**
+- `ColorSampler`'s click read `hoverX`/`hoverY` after `stage.close()`, whose mouse-exit resets them to −1, so
+  `spreadAt(-1, -1)` threw and `onPicked` never ran. The pick is `sampleAt(frame, px, py)`, read before the
+  close; `spreadAt` is static and answers 0 off the frame. `ColorSamplerTest`.
+
 ## 2026-09-27 — screen pickers (picker feedback 2, phase 4)
 
 **Done**
