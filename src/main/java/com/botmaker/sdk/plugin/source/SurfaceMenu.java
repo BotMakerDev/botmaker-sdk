@@ -60,6 +60,7 @@ public final class SurfaceMenu {
         if (bots != null) entries.add(fixed(services, bots.label(), bots));
         if (owner != null) {
             entries.add(new Entry("Another window or screen…", onChosen -> new SourcePicker(services, owner, false)
+                    .surfaceOnly()
                     .showAndWait()
                     .filter(SourcePicker.Selection.Concrete.class::isInstance)
                     .map(SourcePicker.Selection.Concrete.class::cast)

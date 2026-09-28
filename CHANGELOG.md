@@ -128,6 +128,21 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     that work.
   - The overlay opens faster: the frame is no longer encoded to PNG and decoded again first.
   - "Picking on the whole desktop instead" messages read as two sentences.
+- **🎯 Capture Source:**
+  - A source narrowed to a region is read as that region of its window, screen or emulator. It used to read
+    as the whole desktop everywhere in the editor: pixel editors, captures and the pilot all looked at the
+    desktop instead.
+  - Monitor tiles are numbered as the bot numbers monitors. "Screen 2" could write a bot that read screen 1
+    when JavaFX and the OS listed monitors in different orders.
+  - The window opens on the project's current source, region included, instead of on the whole desktop.
+  - The region fields empty when another tile is clicked, instead of narrowing it with numbers meant for the
+    last one. A double-click keeps a typed region.
+  - **Draw…** beside the region fields grabs the selected source and lets you drag the region on it;
+    **Whole** clears it. The status line names the region that was written.
+  - The desktop and the monitor thumbnails come from one grab instead of two. A window listed twice under
+    one title shows once. A tile whose preview failed says "No preview" instead of "…" for ever.
+  - "Another window or screen…" from a pill's pick menu shows no region row, since it chooses only where to
+    pick.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every

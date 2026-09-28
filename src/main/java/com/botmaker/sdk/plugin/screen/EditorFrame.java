@@ -157,8 +157,30 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
         return CaptureValue.current(services);
     }
 
-    /** The pixels of {@code source}, or {@code null} when the grab failed or came back blank. */
+    /**
+     * The pixels of {@code source}, or {@code null} when the grab failed or came back blank.
+     *
+     * <p>A region is its surface's frame cropped, as the bot reads it: the surface is grabbed whole and cut to
+     * {@link CaptureLabels#region}, and an on-screen frame's bounds move with the cut.
+     */
     private static EditorFrame grab(CaptureSource source, boolean raise) {
+        EditorFrame whole = grabWhole(CaptureLabels.whole(source), raise);
+        com.botmaker.sdk.api.geometry.Rect region = CaptureLabels.region(source);
+        if (whole == null || region == null) return whole;
+        BufferedImage image = whole.image();
+        int x = Math.min(region.x(), image.getWidth() - 1);
+        int y = Math.min(region.y(), image.getHeight() - 1);
+        int w = Math.max(1, Math.min(region.width(), image.getWidth() - x));
+        int h = Math.max(1, Math.min(region.height(), image.getHeight() - y));
+        BufferedImage cut = image.getSubimage(x, y, w, h);
+        if (!usable(cut)) return null;
+        Rectangle bounds = whole.onScreen()
+                ? new Rectangle(whole.bounds().x + x, whole.bounds().y + y, w, h)
+                : fitToPrimaryScreen(w, h);
+        return new EditorFrame(cut, CaptureLabels.shortLabel(source), bounds, whole.onScreen());
+    }
+
+    private static EditorFrame grabWhole(CaptureSource source, boolean raise) {
         try {
             String label = CaptureLabels.shortLabel(source);
             if (CaptureLabels.emulatorName(source) != null) return emulatorFrame(source, label);

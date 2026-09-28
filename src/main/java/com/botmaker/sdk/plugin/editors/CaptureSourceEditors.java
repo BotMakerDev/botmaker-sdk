@@ -7,7 +7,6 @@ import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.capture.CurrentSource;
-import com.botmaker.sdk.internal.capture.RegionSource;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.source.SourcePicker;
 import javafx.scene.Node;
@@ -60,13 +59,8 @@ public final class CaptureSourceEditors {
         return new CurrentSource();
     }
 
-    /**
-     * The pill's words: {@link CaptureLabels#shortLabel}, except for the two it cannot say — it reads the
-     * project default as the whole desktop, and a narrowed source as whatever it narrows.
-     */
+    /** The pill's words, {@link CaptureLabels#shortLabel}: the project default and a region included. */
     public static String label(CaptureSource source) {
-        if (source instanceof CurrentSource) return "Project default";
-        if (source instanceof RegionSource region) return label(region.parent()) + " (region)";
         return CaptureLabels.shortLabel(source);
     }
 }

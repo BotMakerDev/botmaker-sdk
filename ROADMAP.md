@@ -8,6 +8,19 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — Capture Source reworked (SDK plugin rework, phase 2)
+
+**Done**
+- `CaptureLabels` answers every "which surface" question for a region's surface (`whole`, `region`), and its
+  labels say a region is one; `same` compares the region too. `EditorFrame` grabs a region's surface and cuts
+  it, moving the frame's bounds with the cut.
+- `SourcePicker`: monitor tiles from AWT's screen devices, the index space `CaptureSource.monitor(i)` reads;
+  one desktop grab for all desktop and monitor thumbnails; one tile per window title; "No preview" instead of
+  a permanent "…"; region fields emptied on a click on another surface and applied on double-click; **Draw…**
+  (grab raised, rubber band on the frame) and **Whole**; `surfaceOnly()` for `SurfaceMenu`.
+- 🎯 Capture Source opens on `CaptureValue.current` and reports the written value's long label.
+- `CaptureSourceEditors.label` is `CaptureLabels.shortLabel`. `CaptureLabelsTest`, `SourcePickerTest`.
+
 ## 2026-09-28 — screen overlay and picks reworked (SDK plugin rework, phase 1)
 
 **Done**

@@ -5,15 +5,17 @@ import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.emulator.EmulatorSource;
-import com.botmaker.sdk.internal.capture.RegionSource;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
-import com.botmaker.sdk.plugin.screen.ScreenCapture;
+import com.botmaker.sdk.plugin.screen.FrameShotSource;
+import com.botmaker.sdk.plugin.screen.ScreenOverlay;
 import com.botmaker.session.Preview;
 import com.botmaker.shared.capture.GamescopeHost;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.capture.ScreenCapture;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorProbe;
@@ -21,7 +23,6 @@ import com.botmaker.shared.emulator.Platforms.PlatformStatus;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -35,10 +36,11 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
-import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -53,9 +55,12 @@ import java.util.concurrent.Executors;
  * tile that means "whatever the project is pointed at, now and later".
  *
  * <p>It is the plugin's own vocabulary end to end — a tile stands for one {@link CaptureSource}, which is
- * the SDK's own type and not the host's. The host supplies exactly the three things nobody else can: the
- * current look, the window a modal should be owned by, and the conversion of a grabbed
- * {@link BufferedImage} into something JavaFX can draw.
+ * the SDK's own type and not the host's. The host supplies exactly the two things nobody else can: the
+ * current look and the window a modal should be owned by.
+ *
+ * <p>Below the tiles, an optional region narrows the choice to a rectangle of the source's own pixels, typed
+ * or drawn on a grab of it ({@code Draw…}). A caller that only wants a surface — {@link SurfaceMenu}'s
+ * "another window" — asks {@link #surfaceOnly()} and gets no region row.
  *
  * <p>A tile stands for the source itself, handed to the host as a value and written into the bot's own Java
  * through {@code CaptureTypes}.
@@ -94,9 +99,18 @@ public final class SourcePicker {
     private Selection selected;
     /** The source the picker opened on, whose tile it pre-selects; {@code null} for none. */
     private CaptureSource initial;
+    /** Whether the region row is shown; a caller that uses only the surface turns it off. */
+    private boolean offersRegion = true;
     private VBox selectedTile;
     private Stage stage;
     private ExecutorService thumbExec;
+
+    private final TextField rx = regionField("x");
+    private final TextField ry = regionField("y");
+    private final TextField rw = regionField("w");
+    private final TextField rh = regionField("h");
+    /** Why Draw… could not draw, under the region row; empty otherwise. */
+    private final Label regionNote = new Label();
 
     public SourcePicker(StudioServices services, Window owner, boolean includeProjectDefault) {
         this.services = services;
@@ -114,11 +128,13 @@ public final class SourcePicker {
     public static void choose(ActionContext context) {
         StudioServices services = context.services();
         new SourcePicker(services, Modals.owner(services), false)
+                .preselect(CaptureValue.current(services))
                 .showAndWait()
                 .ifPresent(selection -> {
                     if (!(selection instanceof Selection.Concrete concrete)) return;
                     CaptureValue.point(services, concrete.target(), concrete.region());
-                    services.status("Capture source is now " + CaptureLabels.shortLabel(concrete.target()) + ".");
+                    services.status("Capture source is now "
+                            + CaptureLabels.longLabel(CaptureValue.current(services)) + ".");
                 });
     }
 
@@ -132,10 +148,33 @@ public final class SourcePicker {
         return this;
     }
 
-    /** Selects {@code tile} when it stands for the source this picker opened on. */
+    /** Hides the region row: the caller reads only which surface was chosen, never a narrowing of it. */
+    public SourcePicker surfaceOnly() {
+        this.offersRegion = false;
+        return this;
+    }
+
+    /** Selects {@code tile} when it stands for the surface this picker opened on, region aside. */
     private void offer(VBox tile, CaptureSource target) {
-        CaptureSource wanted = initial instanceof RegionSource region ? region.parent() : initial;
-        if (CaptureLabels.same(wanted, target)) select(tile, new Selection.Concrete(target));
+        if (CaptureLabels.same(CaptureLabels.whole(initial), target)) select(tile, new Selection.Concrete(target));
+    }
+
+    /**
+     * Makes {@code tile} clickable for {@code target}: a click selects it, a double click selects and closes. A
+     * click on another surface than the one the region fields were filled for empties them — a region is a
+     * rectangle of one surface's pixels, and the same numbers on another are a different place.
+     */
+    private void clickable(VBox tile, CaptureSource target) {
+        tile.setOnMouseClicked(e -> {
+            if (!(selected instanceof Selection.Concrete c && CaptureLabels.same(c.target(), target))) {
+                setRegion(null);
+            }
+            select(tile, new Selection.Concrete(target));
+            if (e.getClickCount() == 2) {
+                applyRegion();
+                close();
+            }
+        });
     }
 
     /** Shows the picker modally and returns the chosen source, or empty when it was cancelled. */
@@ -161,20 +200,21 @@ public final class SourcePicker {
 
         // The optional region is a rectangle WITHIN the chosen source, in its own pixels. Left blank it is
         // the whole source, which is what almost every pick means.
-        TextField rx = regionField("x");
-        TextField ry = regionField("y");
-        TextField rw = regionField("w");
-        TextField rh = regionField("h");
-        if (initial instanceof RegionSource region && region.sub() != null) {
-            rx.setText(String.valueOf(region.sub().x()));
-            ry.setText(String.valueOf(region.sub().y()));
-            rw.setText(String.valueOf(region.sub().width()));
-            rh.setText(String.valueOf(region.sub().height()));
-        }
+        Rect narrowed = CaptureLabels.region(initial);
+        setRegion(narrowed == null ? null
+                : new Rectangle(narrowed.x(), narrowed.y(), narrowed.width(), narrowed.height()));
         Label regionLabel = new Label("Region of source (optional):");
         regionLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
-        HBox regionRow = new HBox(6, regionLabel, rx, ry, rw, rh);
+        Button draw = new Button("Draw…");
+        draw.setTooltip(new javafx.scene.control.Tooltip(
+                "Grab the selected source and drag the part of it the bot should read"));
+        draw.setOnAction(e -> drawRegion());
+        Button clear = new Button("Whole");
+        clear.setTooltip(new javafx.scene.control.Tooltip("Read all of the selected source"));
+        clear.setOnAction(e -> setRegion(null));
+        HBox regionRow = new HBox(6, regionLabel, rx, ry, rw, rh, draw, clear);
         regionRow.setAlignment(Pos.CENTER_LEFT);
+        regionNote.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
 
         Button refresh = new Button("↻ Refresh");
         refresh.setOnAction(e -> {
@@ -191,17 +231,18 @@ public final class SourcePicker {
         Button ok = new Button("Select");
         ok.setDefaultButton(true);
         ok.setOnAction(e -> {
-            applyRegion(rx, ry, rw, rh);
+            applyRegion();
             close();
         });
 
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox bar = new HBox(8, refresh, spacer, regionRow, cancel, ok);
+        HBox bar = new HBox(8, refresh, spacer, cancel, ok);
         bar.setAlignment(Pos.CENTER_LEFT);
-        bar.setPadding(new Insets(10, 14, 12, 14));
+        VBox footer = offersRegion ? new VBox(6, regionRow, regionNote, bar) : new VBox(bar);
+        footer.setPadding(new Insets(10, 14, 12, 14));
 
-        VBox root = new VBox(scroll, bar);
+        VBox root = new VBox(scroll, footer);
         VBox.setVgrow(scroll, Priority.ALWAYS);
 
         stage = new Stage();
@@ -214,8 +255,7 @@ public final class SourcePicker {
         stage.setOnHidden(e -> stopThumbs());
 
         loadWindows(windows);
-        loadScreens(monitors);
-        loadDesktop(desktop);
+        loadDesktopAndScreens(desktop, monitors);
         loadEmulators(emulators);
 
         stage.showAndWait();
@@ -241,14 +281,50 @@ public final class SourcePicker {
      * Blank, partial or invalid input leaves the selection as the whole source; a region on "Project default"
      * is not a thing that can be said, since that choice is not a source yet.
      */
-    private void applyRegion(TextField rx, TextField ry, TextField rw, TextField rh) {
+    private void applyRegion() {
         if (!(selected instanceof Selection.Concrete concrete)) return;
-        Integer x = parseInt(rx.getText());
-        Integer y = parseInt(ry.getText());
-        Integer w = parseInt(rw.getText());
-        Integer h = parseInt(rh.getText());
-        if (x == null || y == null || w == null || h == null || w <= 0 || h <= 0) return;
-        selected = new Selection.Concrete(concrete.target(), new Rectangle(x, y, w, h));
+        Rectangle region = parseRegion(rx.getText(), ry.getText(), rw.getText(), rh.getText());
+        if (region != null) selected = new Selection.Concrete(concrete.target(), region);
+    }
+
+    /** The four fields as a rectangle, or {@code null} unless all four are whole numbers with a positive size. */
+    static Rectangle parseRegion(String x, String y, String w, String h) {
+        Integer px = parseInt(x), py = parseInt(y), pw = parseInt(w), ph = parseInt(h);
+        if (px == null || py == null || pw == null || ph == null || px < 0 || py < 0 || pw <= 0 || ph <= 0) {
+            return null;
+        }
+        return new Rectangle(px, py, pw, ph);
+    }
+
+    /** Fills the four fields with {@code region}, or empties them for the whole source. */
+    private void setRegion(Rectangle region) {
+        rx.setText(region == null ? "" : String.valueOf(region.x));
+        ry.setText(region == null ? "" : String.valueOf(region.y));
+        rw.setText(region == null ? "" : String.valueOf(region.width));
+        rh.setText(region == null ? "" : String.valueOf(region.height));
+        regionNote.setText("");
+    }
+
+    /**
+     * The Draw… press: grabs the selected surface as a capture would — raised, so what is drawn on is what is
+     * on screen — and runs the rubber band on that frame, whose pixels are the surface's own. The drag fills
+     * the four fields; the picker comes back to the front, since raising the source covered it.
+     */
+    private void drawRegion() {
+        if (!(selected instanceof Selection.Concrete concrete)) {
+            regionNote.setText("Choose a source tile first: \"Project default\" is not a surface to draw on.");
+            return;
+        }
+        regionNote.setText("Grabbing " + CaptureLabels.shortLabel(concrete.target()) + "…");
+        EditorFrame.grabAsync(services, concrete.target(),
+                frame -> {
+                    regionNote.setText("");
+                    new ScreenOverlay(new FrameShotSource(frame)).selectRegion(stage, r -> {
+                        setRegion(new Rectangle(r[0], r[1], r[2], r[3]));
+                        if (stage != null) stage.toFront();
+                    });
+                },
+                failure -> regionNote.setText(failure.headline() + " " + failure.detail()));
     }
 
     private static Integer parseInt(String text) {
@@ -285,56 +361,49 @@ public final class SourcePicker {
     }
 
     /**
-     * One tile per monitor, thumbnailed from a <b>single</b> whole-desktop grab cropped per screen.
+     * The "Whole desktop" tile — every monitor combined, which is what a bot with no target sees — and one tile
+     * per monitor, all thumbnailed from a <b>single</b> desktop grab.
      *
-     * <p>One grab and not one per tile: a per-monitor capture under Wayland goes through the portal, so N
-     * monitors would be N confirmation dialogs before the picker had drawn itself.
+     * <p>One grab and not one per tile: under Wayland a grab can be a screenshot program run or a portal
+     * dialog, and the desktop and each monitor used to be one each.
+     *
+     * <p><b>Monitors are numbered as {@code CaptureSource.monitor(i)} numbers them</b> — AWT's screen devices,
+     * the order the bot captures in — not JavaFX's {@code Screen} list, whose order is its own. Until
+     * 2026-09-28 the tiles followed JavaFX's, so on a machine where the two disagreed "Screen 2" wrote a bot that
+     * read screen 1. The thumbnail is cut from the grab with the same bounds the bot's monitor capture uses.
      */
-    private void loadScreens(FlowPane into) {
-        List<Screen> screens = Screen.getScreens();
-        List<VBox> tiles = new ArrayList<>();
-        for (int i = 0; i < screens.size(); i++) {
-            Screen screen = screens.get(i);
-            Rectangle2D bounds = screen.getBounds();
-            String name = String.format("Screen %d — %d×%d", i + 1,
-                    (int) bounds.getWidth(), (int) bounds.getHeight());
-            VBox tile = tile(name, screen.equals(Screen.getPrimary()) ? "Primary monitor" : "Monitor");
-            CaptureSource target = CaptureSource.monitor(i);
-            tile.setOnMouseClicked(e -> {
-                select(tile, new Selection.Concrete(target));
-                if (e.getClickCount() == 2) close();
-            });
-            offer(tile, target);
-            into.getChildren().add(tile);
-            tiles.add(tile);
-        }
-        thumbs().submit(() -> {
-            // Qualified, and both names are load-bearing: shared's ScreenCapture grabs pixels, this
-            // package's converts one to a JavaFX Image. An import of either shadows the other.
-            BufferedImage desktop = com.botmaker.shared.capture.ScreenCapture.captureDesktop();
-            if (desktop == null) return;
-            for (int i = 0; i < tiles.size() && i < screens.size(); i++) {
-                BufferedImage shot = EditorFrame.cropped(desktop, toAwt(screens.get(i).getBounds()));
-                VBox tile = tiles.get(i);
-                show(tile, shot);
-            }
-        });
-    }
-
-    /** One "Whole desktop" tile — every monitor combined, which is what a bot with no target sees. */
-    private void loadDesktop(FlowPane into) {
-        VBox tile = tile("Whole desktop", "All monitors combined");
-        CaptureSource target = CaptureSource.desktop();
-        tile.setOnMouseClicked(e -> {
-            select(tile, new Selection.Concrete(target));
-            if (e.getClickCount() == 2) close();
-        });
+    private void loadDesktopAndScreens(FlowPane desktopInto, FlowPane monitorsInto) {
+        VBox desktopTile = tile("Whole desktop", "All monitors combined");
+        CaptureSource desktop = CaptureSource.desktop();
+        clickable(desktopTile, desktop);
         // Preselected only when the project-default tile did not claim it — so this is the "add a source"
         // flow's default, where the whole desktop is a better guess than screen 1.
-        if (selected == null) select(tile, new Selection.Concrete(target));
-        offer(tile, target);
-        into.getChildren().add(tile);
-        thumbs().submit(() -> show(tile, com.botmaker.shared.capture.ScreenCapture.captureDesktop()));
+        if (selected == null) select(desktopTile, new Selection.Concrete(desktop));
+        offer(desktopTile, desktop);
+        desktopInto.getChildren().add(desktopTile);
+
+        GraphicsDevice[] devices = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
+        GraphicsDevice primary = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        List<VBox> tiles = new ArrayList<>();
+        List<Rectangle> bounds = new ArrayList<>();
+        for (int i = 0; i < devices.length; i++) {
+            Rectangle b = ScreenCapture.monitorBounds(i);
+            VBox tile = tile("Screen %d — %d×%d".formatted(i + 1, b.width, b.height),
+                    devices[i] == primary ? "Primary monitor" : "Monitor");
+            CaptureSource target = CaptureSource.monitor(i);
+            clickable(tile, target);
+            offer(tile, target);
+            monitorsInto.getChildren().add(tile);
+            tiles.add(tile);
+            bounds.add(b);
+        }
+        thumbs().submit(() -> {
+            BufferedImage grab = ScreenCapture.captureDesktop();
+            show(desktopTile, grab);
+            for (int i = 0; i < tiles.size(); i++) {
+                show(tiles.get(i), grab == null ? null : EditorFrame.cropped(grab, bounds.get(i)));
+            }
+        });
     }
 
     /**
@@ -363,12 +432,9 @@ public final class SourcePicker {
                 Platform.runLater(() -> {
                     VBox tile = tile(name, running ? "Emulator · running" : "Emulator · stopped");
                     CaptureSource target = new EmulatorSource(name);
-                    tile.setOnMouseClicked(e -> {
-                        select(tile, new Selection.Concrete(target));
-                        if (e.getClickCount() == 2) close();
-                    });
+                    clickable(tile, target);
                     offer(tile, target);
-                    if (image != null) setThumb(tile, image);
+                    setThumb(tile, image, running ? "No preview" : "Stopped");
                     into.getChildren().add(tile);
                 });
             }
@@ -422,9 +488,12 @@ public final class SourcePicker {
                 Platform.runLater(() -> into.getChildren().add(emptyWindowsHint()));
                 return;
             }
+            // One tile per title: the source a tile writes is window(title), which matches the first window of
+            // that title whichever tile was clicked, so a second tile would be the same choice drawn twice.
+            java.util.Set<String> seen = new java.util.HashSet<>();
             for (GenericWindow window : found) {
                 String title = window.getTitle();
-                if (title == null || title.isBlank()) continue;
+                if (title == null || title.isBlank() || !seen.add(title)) continue;
                 // A compositor's output window is not an application: whatever is inside it is already listed
                 // under its own name, as the emulator tile or as the session.
                 if (GamescopeHost.isHost(window)) continue;
@@ -438,12 +507,9 @@ public final class SourcePicker {
                 Platform.runLater(() -> {
                     VBox tile = tile(title, "Window");
                     CaptureSource target = CaptureSource.window(title);
-                    tile.setOnMouseClicked(e -> {
-                        select(tile, new Selection.Concrete(target));
-                        if (e.getClickCount() == 2) close();
-                    });
+                    clickable(tile, target);
                     offer(tile, target);
-                    if (image != null) setThumb(tile, image);
+                    setThumb(tile, image, "No preview");
                     into.getChildren().add(tile);
                 });
             }
@@ -496,18 +562,28 @@ public final class SourcePicker {
         return tile;
     }
 
-    /** Hops to the FX thread and draws {@code shot} on {@code tile}, if there is anything to draw. */
+    /** Hops to the FX thread and draws {@code shot} on {@code tile}, or says there is no preview. */
     private void show(VBox tile, BufferedImage shot) {
         Image image = toFx(shot);
-        if (image != null) Platform.runLater(() -> setThumb(tile, image));
+        Platform.runLater(() -> setThumb(tile, image, "No preview"));
     }
 
     private Image toFx(BufferedImage image) {
-        return image == null ? null : ScreenCapture.toFxImage(image);
+        return image == null ? null : ScreenOverlay.toFxImage(image);
     }
 
-    private void setThumb(VBox tile, Image image) {
+    /**
+     * Replaces the tile's "…" with {@code image}, or with {@code missing} when there is none — a tile left on
+     * "…" reads as still loading for ever. A tile with no preview is still a tile the user can pick.
+     */
+    private void setThumb(VBox tile, Image image, String missing) {
         if (tile.getChildren().isEmpty() || !(tile.getChildren().get(0) instanceof StackPane holder)) return;
+        if (image == null) {
+            Label none = new Label(missing);
+            none.setStyle("-fx-text-fill: #6b7280;");
+            holder.getChildren().setAll(none);
+            return;
+        }
         ImageView view = new ImageView(image);
         view.setPreserveRatio(true);
         view.setFitWidth(TILE_W);
@@ -526,11 +602,6 @@ public final class SourcePicker {
         return "-fx-background-radius: 8; -fx-border-radius: 8; -fx-border-width: 2; -fx-cursor: hand;"
                 + " -fx-border-color: " + (isSelected ? "#3498db" : "transparent") + ";"
                 + " -fx-background-color: " + (isSelected ? "rgba(52,152,219,0.10)" : "transparent") + ";";
-    }
-
-    private static Rectangle toAwt(Rectangle2D bounds) {
-        return new Rectangle((int) Math.round(bounds.getMinX()), (int) Math.round(bounds.getMinY()),
-                (int) Math.round(bounds.getWidth()), (int) Math.round(bounds.getHeight()));
     }
 
     private synchronized ExecutorService thumbs() {
