@@ -6,14 +6,8 @@ import javafx.stage.Window;
  * Where {@link ScreenOverlay} gets its pixels — the one thing the overlay needs from whoever knows what a
  * capture target is.
  *
- * <p><b>Two methods, and that is the measured size of the coupling.</b> A survey of the 1,324-line service
- * this was split out of found exactly two places where the overlay flow touched a capture target: resolving
- * which pixels to grab, and naming the window a captured template came from. Everything else — the screen
- * chooser, the rubber-band surfaces, the magnifier, the crop arithmetic, the blank-frame warning — was
- * already target-free.
- *
- * <p>{@link DesktopSource} is the only implementation. The interface is kept rather than inlined, because two
- * methods is also the measured size of what a different source would have to supply.
+ * <p>Two implementations: {@link DesktopSource} grabs this machine's screens, and {@link FrameShotSource}
+ * hands over a frame {@link EditorFrame} already grabbed. The overlay knows neither.
  */
 public interface ShotSource {
 
@@ -23,15 +17,4 @@ public interface ShotSource {
      * @param owner the window a chooser or a warning would be owned by; may be {@code null}
      */
     Grab grab(Window owner);
-
-    /**
-     * The window title a template captured through this source records, or {@code null} for a screen or
-     * desktop grab.
-     *
-     * <p>Not derivable from a {@link ScreenShot}: a shot carries pixels and bounds, and "which window was
-     * this" is a fact about the target rather than about the frame. It is asked at capture time rather than
-     * carried on the shot so that a source with no window says so by answering {@code null} once, instead of
-     * every shot carrying a field that is usually empty.
-     */
-    String title();
 }

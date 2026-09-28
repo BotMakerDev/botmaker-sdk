@@ -3,12 +3,7 @@ package com.botmaker.sdk.plugin.screen;
 import javafx.scene.image.Image;
 import javafx.stage.Window;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -30,33 +25,19 @@ public final class ScreenCapture {
     private final ScreenOverlay overlay = new ScreenOverlay(new DesktopSource());
 
     /**
-     * Runs the interactive crop on the FX thread. With multiple monitors the user first picks which screen;
-     * the frame is then shown 1:1 and the user rubber-bands a region. Calls {@code onCaptured} with the
-     * cropped image, or does nothing if the user cancels (Esc / empty selection / chooser) or capture is
-     * unavailable.
-     */
-    public void captureRegion(Window owner, Consumer<BufferedImage> onCaptured) {
-        overlay.captureRegion(owner, onCaptured);
-    }
-
-    /**
-     * As {@link #captureRegion(Window, Consumer)} but also reports the capture source's physical resolution
-     * (the full screen pixel size the region was cropped from) so the caller can record it as the picture's
-     * authored resolution.
+     * The interactive crop, reporting the cropped image and the physical resolution of the screen it was cut
+     * from, so the caller can record it as the picture's authored resolution.
      */
     public void captureRegion(Window owner, ScreenOverlay.RegionCapture onCaptured) {
         overlay.captureRegion(owner, onCaptured);
     }
 
-    /**
-     * Interactive rubber-band selection returning the chosen region as {@code [x, y, width, height]} in the
-     * <b>capture source's</b> own pixel space. Does nothing if the user cancels or capture is unavailable.
-     */
+    /** Rubber-band selection returning {@code [x, y, width, height]} in the chosen screen's pixels. */
     public void selectRegion(Window owner, Consumer<int[]> onSelected) {
         overlay.selectRegion(owner, onSelected);
     }
 
-    /** Interactive point pick with a magnified close-up, reporting {@code [x, y]} in the source's own space. */
+    /** Point pick with a magnified close-up, reporting {@code [x, y]} in the chosen screen's pixels. */
     public void pickPoint(Window owner, Consumer<int[]> onPicked) {
         overlay.pickPoint(owner, onPicked);
     }
@@ -66,32 +47,8 @@ public final class ScreenCapture {
         overlay.pickColor(owner, onPicked);
     }
 
-    /**
-     * Captures once and drives a single reusable overlay through {@code steps} in order — for a whole method
-     * call's on-screen arguments.
-     */
-    public void runSession(Window owner, List<ScreenOverlay.PickStep> steps, Runnable onDone) {
-        overlay.runSession(owner, steps, onDone);
-    }
-
-    /** Registers {@code listener}; returns a handle that unregisters it when closed. */
-    public static AutoCloseable addCaptureOverlayListener(ScreenOverlay.CaptureOverlayListener listener) {
-        return ScreenOverlay.addCaptureOverlayListener(listener);
-    }
-
     /** The single {@code BufferedImage} → FX {@code Image} conversion in this module; null-tolerant. */
     public static Image toFxImage(BufferedImage image) {
         return ScreenOverlay.toFxImage(image);
-    }
-
-    /**
-     * Writes {@code image} to {@code target} as PNG, creating parent directories.
-     *
-     * <p>About files rather than about pixels, and here because the overlay's callers are the ones that save
-     * what they picked.
-     */
-    public void savePng(BufferedImage image, Path file) throws IOException {
-        Files.createDirectories(file.getParent());
-        ImageIO.write(image, "png", file.toFile());
     }
 }

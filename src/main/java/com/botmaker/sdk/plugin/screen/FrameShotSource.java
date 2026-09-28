@@ -19,11 +19,6 @@ public record FrameShotSource(EditorFrame frame) implements ShotSource {
         return new Grab(new ScreenShot(frame.image(), logical(frame.bounds()), false, false), null);
     }
 
-    @Override
-    public String title() {
-        return null;
-    }
-
     /**
      * {@code bounds} in the logical pixels a stage is placed in. A grab is in device pixels; on a scaled
      * screen the two differ by the screen's output scale, and the overlay scales its picks back through the

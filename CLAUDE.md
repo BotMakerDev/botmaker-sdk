@@ -247,10 +247,15 @@ is a run property; what a bot was tested on is its gallery entry.
 
 - **This plugin grabs its own pixels**, through `botmaker-shared`; the contract has no capture service.
   `plugin/screen/EditorFrame` has two `grabAsync` overloads and the second is not the first with a flag: an
-  editor samples the target *as it is*, while a capture raises and snaps the window to the project's size
-  first, or every picture is authored at whatever size the window happened to be. A blank per-window grab on
-  Wayland falls through to a desktop capture cropped to the window. `EditorFrame.Failure` tells *no target*
-  from *the grab came back blank*, because they send a user to two different places.
+  editor samples the target *as it is*, while a capture raises the window first so what it saves is what is
+  on screen (at whatever size it is — the matcher rescales against each picture's sidecar). A blank per-window
+  grab on Wayland falls through to a desktop capture cropped to the window. `EditorFrame.Failure` tells *no
+  target* from *the grab came back blank*, because they send a user to two different places.
+- **The whole desktop is read through shared's `ScreenCapture`**, the grab a bot uses too (Robot, or under
+  Wayland the first installed of Spectacle, grim, gnome-screenshot). There is no second desktop grab here.
+- **One overlay, `plugin/screen/ScreenOverlay`**: a rubber band, a point lens and a colour lens over a frozen
+  frame. Each shows a hint, previews the exact numbers it will write (through the slot's `PickSpace`), and
+  cancels on Esc or a right-click; over a frame it is promoted above fullscreen windows (`OverlayStage`).
 - **`OverlayStage` is here, not in the toolkit**: the raise is shared's
   (`NativeControllerFactory.promoteOverlayAboveFullscreen`), and the toolkit names no BotMaker upstream but the
   contract. The capture surfaces are deliberately ownerless, so a user can minimise the editor and keep

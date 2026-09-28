@@ -115,6 +115,21 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **Picking a point, a region or a colour off the screen** (Point, Rect and Size pills, the eyedropper,
+  capturing a picture in 🖼 Manage Pictures):
+  - A region dragged past the edge of the frame is clamped to it, instead of reporting negative or oversized
+    numbers.
+  - A point is the pixel the lens's crosshair boxes. It used to round to the neighbouring pixel half the time.
+  - The overlay stays above a fullscreen game instead of opening behind it.
+  - While dragging, a readout shows the region `x, y   w × h` that will be written; the point readout now also
+    shows the desktop numbers when the call reads desktop pixels.
+  - Every overlay says what to do in a corner, and a right-click cancels it as Esc does.
+  - A failed grab says so, instead of doing nothing. On Wayland the message names the screenshot programs
+    that work.
+  - The overlay opens faster: the frame is no longer encoded to PNG and decoded again first.
+  - "Picking on the whole desktop instead" messages read as two sentences.
+- **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
+  the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every
   use and left the constant itself called `ORE`, so the bot stopped compiling. The constant and every use are
   renamed together now, and a rename that would not compile is refused before the file moves. Deleting a

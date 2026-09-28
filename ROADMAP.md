@@ -8,6 +8,27 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — screen overlay and picks reworked (SDK plugin rework, phase 1)
+
+**Done**
+- `ScreenOverlay`: one rubber band for crops and region picks (there were two copies) with a live
+  `x, y   w × h` readout; points floored to the pixel the crosshair boxes; regions clamped to the frame; a hint
+  in a corner that moves out of the pointer's way; right-click cancels; promoted above fullscreen windows
+  over a frame; a failed grab warns instead of doing nothing; `toFxImage` copies pixels instead of a PNG round
+  trip. It takes the slot's `PickSpace` and origin, so the readout previews the number written.
+- Deleted, no caller: `runSession`/`PickStep`/`CapturedCrop` and the session overlay, the capture-overlay
+  listener hooks (Studio's HUD listens to its own copy), `ShotSource.title`, `ScreenCapture.savePng` and the
+  `Consumer` `captureRegion` overload.
+- `DesktopGrab` deleted: `DesktopSource` reads shared's `ScreenCapture`, which gained grim and
+  gnome-screenshot, so the overlay and the bot read the desktop one way.
+- `EditorFrame.Failure` speaks of a capture source rather than of sampling a colour, and its headlines end in
+  a full stop, since every caller appends a second sentence.
+- `ScreenOverlayTest` pins the pick arithmetic.
+
+**Deferred / next**
+- Studio still carries its own `services/capture/ScreenOverlay` for the overlay HUD; that is Studio's to
+  retire, not this plugin's.
+
 ## 2026-09-28 — a picture run element is built with `SlotRun.Element.of`
 
 **Done**

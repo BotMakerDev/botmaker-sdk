@@ -25,10 +25,9 @@ import java.util.function.Consumer;
  * Which project is open is the one thing only the host knows, and {@link StudioServices#resourcesDir()}
  * answers it; everything after that — which source the project chose, and what that source's pixels are — is
  * this plugin's own vocabulary read out of the bot's own Java through {@link CaptureValue}, and
- * {@code botmaker-shared} grabbing it. The contract's {@code Capture.grabFrame} does the same thing from the
- * host side and is scheduled for deletion; it cannot serve this, because it reports a failed or blank grab by
- * simply never calling back, and an editor that cannot tell "failed" from "still working" cannot say
- * anything useful to the person waiting.
+ * {@code botmaker-shared} grabbing it. The contract's {@code Capture.grabFrame} did the same from the host side
+ * and is deleted: it reported a failed or blank grab by never calling back, and an editor that cannot tell
+ * "failed" from "still working" cannot say anything useful to the person waiting.
  *
  * <p><b>Never a silent desktop fallback.</b> What is sampled has to be a pixel of the thing the bot will look
  * at. Quietly grabbing the whole desktop instead hands back a colour from the wrong image with no sign that
@@ -65,14 +64,14 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
      * configured perfectly well.
      */
     public enum Failure {
-        NO_TARGET("This project has no capture target",
-                "Sampling a colour needs a frame of the thing the bot will look at. Choose the game window, "
-                        + "or a screen, as this project's capture target and try again."),
-        BLANK("The capture target produced a blank frame",
-                "The target is set, but grabbing it returned nothing. This usually means the window is "
-                        + "minimised or on another workspace — or, on a Wayland session, that the screenshot "
-                        + "tool could not reach it. Bring the game to the front and try again, or point the "
-                        + "project at a different target.");
+        NO_TARGET("This project has no capture source.",
+                "Picking off the screen needs a frame of the thing the bot will look at. Choose the game "
+                        + "window, or a screen, in 🎯 Capture Source and try again."),
+        BLANK("The capture source produced a blank frame.",
+                "The source is set, but grabbing it returned nothing. This usually means the window is "
+                        + "closed, minimised or on another workspace — or, on a Wayland session, that no "
+                        + "screenshot program could reach it. Bring the game to the front and try again, or "
+                        + "choose a different source.");
 
         private final String headline;
         private final String detail;

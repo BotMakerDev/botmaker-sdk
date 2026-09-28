@@ -95,28 +95,24 @@ public final class SdkScreenPicks implements ScreenPicks {
 
             @Override
             public void region(Consumer<Region> onSelected) {
-                onFrame(services, space, chooser, (overlay, bounds, owner) -> overlay.selectRegion(owner, r -> {
-                    int[] v = space.region(r, bounds);
-                    onSelected.accept(new Region(v[0], v[1], v[2], v[3]));
-                }));
+                onFrame(services, space, chooser, (overlay, owner) -> overlay.selectRegion(owner,
+                        r -> onSelected.accept(new Region(r[0], r[1], r[2], r[3]))));
             }
 
             @Override
             public void point(Consumer<Region> onPicked) {
-                onFrame(services, space, chooser, (overlay, bounds, owner) -> overlay.pickPoint(owner, p -> {
-                    int[] v = space.point(p, bounds);
-                    onPicked.accept(new Region(v[0], v[1], 0, 0));
-                }));
+                onFrame(services, space, chooser, (overlay, owner) -> overlay.pickPoint(owner,
+                        p -> onPicked.accept(new Region(p[0], p[1], 0, 0))));
             }
         };
     }
 
     /**
-     * An overlay ready to pick on, where its frame's top-left is on the desktop ({@code null} when nowhere —
-     * {@link PickSpace#origin}), and its owner.
+     * An overlay ready to pick on, already reporting in the slot's {@link PickSpace} — its readout included —
+     * and its owner.
      */
     private interface OnFrame {
-        void run(ScreenOverlay overlay, Rectangle origin, Window owner);
+        void run(ScreenOverlay overlay, Window owner);
     }
 
     /**
@@ -135,7 +131,7 @@ public final class SdkScreenPicks implements ScreenPicks {
                     services.status(frame.label() + " is not on the desktop: these are its own pixels, "
                             + "and this call reads desktop pixels.");
                 }
-                then.run(new ScreenOverlay(new FrameShotSource(frame)), origin, owner);
+                then.run(new ScreenOverlay(new FrameShotSource(frame), space, origin), owner);
             };
             Consumer<EditorFrame.Failure> gaveUp = failure -> services.status(failure.headline());
             Consumer<EditorFrame.Failure> onFail = failure -> {
