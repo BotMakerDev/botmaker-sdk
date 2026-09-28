@@ -2,7 +2,9 @@ package com.botmaker.sdk.plugin.settings;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.ManagedHandle;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import javafx.geometry.Insets;
@@ -66,6 +68,12 @@ public final class BotSettingsWindow {
     private BotSettingsWindow(StudioServices services, Window owner) {
         this.services = services;
         this.owner = owner;
+    }
+
+    /** The ⚙ Bot Settings press. */
+    public static void open(ActionContext context) {
+        StudioServices services = context.services();
+        open(services, Modals.owner(services));
     }
 
     /** Opens the window over {@code owner}. Call it on the JavaFX application thread. */

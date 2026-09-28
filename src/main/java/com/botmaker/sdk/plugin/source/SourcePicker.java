@@ -1,10 +1,13 @@
 package com.botmaker.sdk.plugin.source;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.toolbar.ActionContext;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.capture.RegionSource;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import com.botmaker.session.Preview;
@@ -99,6 +102,24 @@ public final class SourcePicker {
         this.services = services;
         this.owner = owner;
         this.includeProjectDefault = includeProjectDefault;
+    }
+
+    /**
+     * The 🎯 Capture Source press: chooses what the bot reads pixels from, and writes it into the bot's own
+     * Java — the one expression {@code Sdk.captureSource()} returns.
+     *
+     * <p><b>The item's label is constant.</b> A plugin's toolbar list is built with no {@link StudioServices},
+     * so a label supplier has no project to read the current source out of.
+     */
+    public static void choose(ActionContext context) {
+        StudioServices services = context.services();
+        new SourcePicker(services, Modals.owner(services), false)
+                .showAndWait()
+                .ifPresent(selection -> {
+                    if (!(selection instanceof Selection.Concrete concrete)) return;
+                    CaptureValue.point(services, concrete.target(), concrete.region());
+                    services.status("Capture source is now " + CaptureLabels.shortLabel(concrete.target()) + ".");
+                });
     }
 
     /**

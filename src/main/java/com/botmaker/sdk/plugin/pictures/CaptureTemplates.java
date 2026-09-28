@@ -1,6 +1,8 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.toolbar.ActionContext;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.plugin.pictures.TemplateNaming.NamedCapture;
 import com.botmaker.sdk.plugin.pictures.TemplateNaming.NamedTemplate;
@@ -113,6 +115,37 @@ public final class CaptureTemplates {
         this.target = target;
         this.suggestedTag = suggestedTag;
         this.onClosed = onClosed;
+    }
+
+    /**
+     * The ✂ Capture Templates press: the tool over the project's target.
+     *
+     * <p>The tag is not pre-filled: <em>which file the editor has open</em> is host state with no member on
+     * the contract for it, and growing one is exactly the move the platform's stop condition exists to refuse.
+     * The tag menu is on the naming dialog either way.
+     */
+    public static void open(ActionContext context) {
+        StudioServices services = context.services();
+        open(services, Modals.owner(services), null);
+    }
+
+    /**
+     * The overlay's ✂ Picture of this press: cuts a picture out of the window the overlay is over, rather than
+     * out of the project's default target.
+     *
+     * <p>What the overlay adds is a target for <em>this</em> session, which makes the tool usable over a
+     * window the project has never heard of, including a project that names no target at all. The override
+     * is not written down. Pointing the bot at that window is the button beside this one, so a user who
+     * wanted a picture does not silently get a re-pointed bot.
+     *
+     * <p>{@link ActionContext#overBounds()} is deliberately unused: the tool re-probes and raises its target
+     * at save time so a window the user has since moved is still tracked, and a rectangle captured when the
+     * HUD opened would be stale exactly then.
+     */
+    public static void pictureHere(ActionContext context) {
+        StudioServices services = context.services();
+        CaptureSource target = context.overWindowTitle().map(CaptureSource::window).orElse(null);
+        open(services, Modals.owner(services), target, null, () -> {});
     }
 
     /** Opens the tool for the project's default capture target. Must be called on the FX thread. */
@@ -259,7 +292,7 @@ public final class CaptureTemplates {
                         TemplateNaming.promptNew(services, owner, cropped, suggestedTag);
                 if (named.isEmpty()) return;
                 save(cropped, named.get().name(), frame.image().getWidth(), frame.image().getHeight());
-                TemplateLibrary.applyTags(resources(), Map.of(named.get().name(), named.get().tags()));
+                TemplateLibrary.applyTags(services, Map.of(named.get().name(), named.get().tags()));
             } catch (Exception failed) {
                 warn("Failed to save the picture: " + failed.getMessage());
             } finally {
@@ -297,7 +330,7 @@ public final class CaptureTemplates {
                             frame.image().getWidth(), frame.image().getHeight());
                     saved.add(template.name());
                 }
-                TemplateLibrary.applyTags(resources(), batch.tagsFor(saved));
+                TemplateLibrary.applyTags(services, batch.tagsFor(saved));
             } catch (Exception failed) {
                 warn("Failed to save the pictures: " + failed.getMessage());
             } finally {
@@ -330,7 +363,7 @@ public final class CaptureTemplates {
             Optional<NamedCapture> named = TemplateNaming.promptNew(services, owner, cut, suggestedTag);
             if (named.isEmpty()) return;
             save(cut, named.get().name(), objectFrameWidth, objectFrameHeight);
-            TemplateLibrary.applyTags(resources(), Map.of(named.get().name(), named.get().tags()));
+            TemplateLibrary.applyTags(services, Map.of(named.get().name(), named.get().tags()));
         } catch (Exception failed) {
             warn("Failed to save the object: " + failed.getMessage());
         } finally {

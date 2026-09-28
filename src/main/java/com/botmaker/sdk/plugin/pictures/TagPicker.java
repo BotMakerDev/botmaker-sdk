@@ -132,7 +132,7 @@ public class TagPicker extends MenuButton {
     private void createTag() {
         Window owner = getScene() == null ? null : getScene().getWindow();
         promptNewTag(services, owner).ifPresent(tag -> {
-            catalog = TemplateLibrary.declareTag(services.resourcesDir(), tag);
+            catalog = TemplateLibrary.declareTag(services, tag);
             selected.add(tag);
             rebuild();
             refreshLabel();
@@ -216,6 +216,6 @@ public class TagPicker extends MenuButton {
      */
     private static TagCatalog catalogOf(StudioServices services) {
         Path resources = services == null ? null : services.resourcesDir();
-        return resources == null ? TagCatalog.of(List.of(), List.of()) : TemplateLibrary.tagCatalog(resources);
+        return resources == null ? TagCatalog.of(List.of(), List.of()) : TemplateLibrary.tagCatalog(services);
     }
 }

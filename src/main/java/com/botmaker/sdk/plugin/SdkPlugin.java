@@ -2,28 +2,11 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.DeclaredPlugin;
 import com.botmaker.plugin.api.StudioPlugin;
-import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.toolbar.ActionContext;
-import com.botmaker.plugin.api.toolbar.ToolbarGroup;
-import com.botmaker.plugin.api.toolbar.ToolbarItem;
-import com.botmaker.plugin.toolkit.Modals;
-import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
-import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
-import com.botmaker.sdk.plugin.flow.FlowValue;
-import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
-import com.botmaker.sdk.plugin.pictures.ResourceManagerDialog;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
-import com.botmaker.sdk.plugin.screen.CaptureLabels;
-import com.botmaker.sdk.plugin.screen.CaptureValue;
-import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
-import com.botmaker.sdk.plugin.setup.ProjectSetup;
-import com.botmaker.sdk.plugin.source.SourcePicker;
 import com.botmaker.sdk.plugin.types.PictureAt;
 import com.botmaker.sdk.plugin.types.SdkTypes;
-
-import java.util.List;
 
 /**
  * The BotMaker SDK, as a Studio plugin.
@@ -35,9 +18,9 @@ import java.util.List;
  *
  * <h2>The palette</h2>
  *
- * <p>Nothing here lists it: the toolkit's {@code buildCatalog()} scans this jar for {@code @Palette}, and
- * every {@code com.botmaker.sdk.api} class carrying one is catalogued. What an older pin may be offered is
- * that catalog <b>intersected with the bot's own resolved jar</b>, which the host computes from bytecode.
+ * <p>Nothing here lists it: the host scans this jar for {@code @Palette}, and every {@code com.botmaker.sdk.api}
+ * class carrying one is catalogued. What an older pin may be offered is that catalog <b>intersected with the
+ * bot's own resolved jar</b>, which the host computes from bytecode.
  *
  * <h2>Where this class may live, and where it may not</h2>
  *
@@ -56,14 +39,13 @@ public final class SdkPlugin extends DeclaredPlugin {
     /**
      * The whole plugin, stated once: the types it owns and the parts inside its values ({@link SdkTypes}), the
      * editors a type cannot choose for itself ({@link SdkEditors}), the {@code @Managed} values its windows keep
-     * ({@link SdkValues}), and the picture under a recorded click ({@link PictureAt}).
+     * ({@link SdkValues}), its buttons ({@link SdkToolbarItems}) and the picture under a recorded click
+     * ({@link PictureAt}).
      *
-     * <p><b>Each list is behind a supplier, and that emptiness is load-bearing.</b>
-     *
-     * <p><b>Constructing a plugin must not link an optional dependency.</b> {@code javafx-controls} is
-     * {@code optional} here, so the classpath a headless host resolves this plugin onto — the CLI's
-     * {@code validate} and {@code run}, the registry's CI — does not have it, and a constructor that touched a
-     * JavaFX type fails there with:
+     * <p><b>Constructing a plugin must not link an optional dependency</b>, so each list is behind a supplier.
+     * {@code javafx-controls} is {@code optional} here, so the classpath a headless host resolves this plugin
+     * onto — the CLI's {@code validate} and {@code run}, the registry's CI — does not have it, and a constructor
+     * that touched a JavaFX type fails there with:
      *
      * <pre>
      * ServiceConfigurationError: Provider com.botmaker.sdk.plugin.SdkPlugin could not be instantiated
@@ -71,8 +53,8 @@ public final class SdkPlugin extends DeclaredPlugin {
      * </pre>
      *
      * <p>{@code PluginLoader} catches that, so the symptom is an empty palette and one line on stderr. It never
-     * shows locally, because an {@code optional} dependency <em>is</em> on this module's own classpath.
-     * Everything JavaFX-shaped belongs behind a supplier ({@code SdkPluginHeadlessTest}).
+     * shows locally, because an {@code optional} dependency <em>is</em> on this module's own classpath
+     * ({@code SdkPluginHeadlessTest}).
      */
     public SdkPlugin() {
         super(StudioPlugin.id(ID).named(NAME)
@@ -80,207 +62,17 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .parts(() -> SdkTypes.PARTS)
                 .editors(() -> SdkEditors.ALL)
                 .values(() -> SdkValues.ALL)
+                .toolbar(() -> SdkToolbarItems.ALL)
                 .recorded(() -> PictureAt.ALL));
     }
 
     /**
-     * Takes the project being bound.
-     *
-     * <p>A plugin is constructed once and then serves whatever the host binds, so which project it has can
-     * only arrive this way. Nothing is read here — a project open must not pay for a window nobody has
-     * looked at yet.
-     */
-    @Override
-    public void projectOpened(StudioServices services) {
-        // The flow is a value in the bot's own Java, so reading it needs the host rather than a path.
-        // Two readers have no value cell to ask through — see FlowValue's own note — and this is where they
-        // are given one.
-        FlowValue.bind(services);
-    }
-
-    /**
-     * The toolbar buttons. The host keeps the bar itself — the grouping, the order, the packing and the
-     * overflow — which is why an item is contributed as data rather than as a {@code Node}.
-     *
-     * <p>The pilot UI is built lazily and kept, because it owns the port and the display: a second press
-     * must re-show the pairing dialog rather than rebind and drop an already-paired phone. It is released in
-     * {@link #projectClosing()}. Capture Templates keeps nothing — it is single-instance in its own class,
-     * because what it owns is the screen rather than a resource, and the screen is gone when it closes.
-     *
-     * <p><b>Capture Templates is in {@link ToolbarGroup#TOOLS}</b>, whose own definition names a template
-     * cutter: it is opened <em>over</em> a running target rather than beside the code.
-     */
-    @Override
-    public List<ToolbarItem> toolbarItems() {
-        return List.of(
-                ToolbarItem.of("pilot", "🎮 Pilot",
-                        "Stream what the bot sees to your phone or browser — watch it, start/stop it, "
-                                + "or turn on Interact to click and drag in the game yourself",
-                        ToolbarGroup.RUN, 10, context -> pilot(context.services()).open()),
-                ToolbarItem.of("capture-templates", "✂ Capture Templates",
-                        "Draw regions over the game and save them as pictures the bot can look for — "
-                                + "one at a time, several in a pass, or an object cut out of its background",
-                        ToolbarGroup.TOOLS, 20, this::openCaptureTemplates),
-                ToolbarItem.of("manage-templates", "🖼 Manage Pictures",
-                        "Rename, retag, replace, delete, import and export the pictures the bot looks for — "
-                                + "a rename carries every block that uses it",
-                        ToolbarGroup.TOOLS, 30, this::openResourceManager),
-                ToolbarItem.of("activity-flow", "🔀 Activity Flow",
-                        "Define what this bot does, one card per activity, and wire each outcome to what "
-                                + "runs next — the graph, its loop safety, and which activities are on",
-                        ToolbarGroup.AUTHORING, 10, this::openActivityFlow),
-                ToolbarItem.of("capture-source", "🎯 Capture Source",
-                        "Choose what the bot looks at — a monitor, an application window or an emulator "
-                                + "instance",
-                        ToolbarGroup.PROJECT, 50, this::openCaptureSource),
-                ToolbarItem.of("bot-settings", "⚙ Bot Settings",
-                        "How the bot clicks and looks — delays, match confidence, real input for games, and "
-                                + "whether it runs on a private display",
-                        ToolbarGroup.PROJECT, 60, context -> BotSettingsWindow.open(context.services(),
-                                Modals.owner(context.services()))),
-                ToolbarItem.of("project-setup", "📋 Project Setup",
-                        "What this project still needs before it can run — something to launch, something "
-                                + "to capture, and the pictures it looks for",
-                        ToolbarGroup.PROJECT, 40, this::openProjectSetup),
-                ToolbarItem.of("point-here", "⌖ Point bot here",
-                        "Make the window the overlay is drawn over this project's capture source",
-                        ToolbarGroup.OVERLAY, 10, this::pointCaptureTargetHere),
-                ToolbarItem.of("picture-here", "✂ Picture of this",
-                        "Cut a picture out of the window the overlay is drawn over, whatever the project's "
-                                + "capture target is",
-                        ToolbarGroup.OVERLAY, 20, this::capturePictureHere));
-    }
-
-    /**
-     * Writes the window the overlay is drawn over into this project's capture source.
-     *
-     * <p><b>This is the direction the fact travels, and it only travels this way.</b> The host tells the
-     * plugin which window its own HUD is drawn over — something only the host can know — and the plugin
-     * writes it into the bot's own Java as the expression {@code Sdk.captureSource()} returns. Studio holds
-     * no capture source of its own; see {@code docs/refactor/28-overlay-items.md}.
-     */
-    private void pointCaptureTargetHere(ActionContext context) {
-        StudioServices services = context.services();
-        String title = context.overWindowTitle().orElse(null);
-        if (title == null) {
-            services.status("Nothing to point at — the overlay is not over a window.");
-            return;
-        }
-        CaptureValue.point(services, CaptureSource.window(title));
-        services.status("Capture source is now \"" + title + "\".");
-    }
-
-    /**
-     * Cuts a picture out of the window the overlay is over, rather than out of the project's default target.
-     *
-     * <p>What the overlay adds is a target for <em>this</em> session, which makes the tool usable over a
-     * window the project has never heard of, including a project that names no target at all. The override
-     * is not written down. Pointing the bot at that window is the button beside this one, so a user who
-     * wanted a picture does not silently get a re-pointed bot.
-     *
-     * <p>{@link ActionContext#overBounds()} is deliberately unused: the capture tool re-probes and raises its
-     * target at save time so a window the user has since moved is still tracked, and a rectangle captured
-     * when the HUD opened would be stale exactly then.
-     */
-    private void capturePictureHere(ActionContext context) {
-        StudioServices services = context.services();
-        CaptureSource target = context.overWindowTitle()
-                .map(CaptureSource::window)
-                .orElse(null);
-        CaptureTemplates.open(services, Modals.owner(services), target, null, () -> {});
-    }
-
-    /**
-     * Opens the capture tool over the project's target.
-     *
-     * <p>The tag is not pre-filled: <em>which file the editor has open</em> is host state with no member on
-     * the contract for it, and growing one is exactly the move the platform's stop condition exists to refuse.
-     * The tag menu is on the naming dialog either way.
-     */
-    private void openCaptureTemplates(ActionContext context) {
-        StudioServices services = context.services();
-        CaptureTemplates.open(services, Modals.owner(services), null);
-    }
-
-    /**
-     * Opens the flow editor.
-     *
-     * <p>It is this plugin's window rather than a host frame with sections, because a flow's nodes, edges,
-     * ports and outcomes are vocabulary of this plugin's own that the contract must never learn. Single-instance
-     * is not enforced: this window owns no port and no display, so a second one is a second view of the same
-     * value.
-     */
-    private void openActivityFlow(ActionContext context) {
-        StudioServices services = context.services();
-        new ActivityFlowDialog(services, Modals.owner(services)).show();
-    }
-
-    /**
-     * Opens the picture library: the other end of Capture Templates, managing the pictures that exist. Its
-     * rename and delete change the bot's {@code Pictures} constants through
-     * {@link com.botmaker.plugin.api.source.PluginValues}, by binding. Not single-instance: it owns no port and
-     * no display.
-     */
-    private void openResourceManager(ActionContext context) {
-        StudioServices services = context.services();
-        ResourceManagerDialog.open(services, Modals.owner(services));
-    }
-
-    /**
-     * Chooses what the bot reads pixels from, and writes it into the bot's own Java — the one expression
-     * {@code Sdk.captureSource()} returns.
-     *
-     * <p><b>The label is constant.</b> {@link #toolbarItems()} is called with no {@link StudioServices}, so a
-     * label supplier here has no project to read the current source out of. Giving the plugin a services
-     * field to close over would make the item's <em>label</em> depend on load order, which is worse than a
-     * button that says what it opens.
-     */
-    private void openCaptureSource(ActionContext context) {
-        StudioServices services = context.services();
-        new SourcePicker(services, Modals.owner(services), false)
-                .showAndWait()
-                .ifPresent(selection -> {
-                    if (!(selection instanceof SourcePicker.Selection.Concrete concrete)) return;
-                    CaptureValue.point(services, concrete.target(), concrete.region());
-                    services.status("Capture source is now "
-                            + CaptureLabels.shortLabel(concrete.target()) + ".");
-                });
-    }
-
-    /**
-     * Opens the project checklist. It sits at order 40, immediately <em>before</em> Capture Source, because
-     * it is the window that sends a user to that one.
-     */
-    private void openProjectSetup(ActionContext context) {
-        StudioServices services = context.services();
-        ProjectSetup.open(services, Modals.owner(services));
-    }
-
-    /**
-     * Releases the pilot's port and its nested display when the project it was serving is left.
-     *
-     * <p>This plugin instance is reused for the next project, so the field is dropped as well as closed: a
-     * pilot still answering on the old port would be streaming a project nobody has open, and one whose
-     * {@code resourcesDir} points at the previous project would be worse.
+     * Releases the pilot's port and its nested display when the project it was serving is left. This plugin
+     * instance is reused for the next project, and a pilot still answering on the old port would be streaming
+     * a project nobody has open.
      */
     @Override
     public void projectClosing() {
-        RemotePilotUi open = pilot;
-        pilot = null;
-        if (open != null) open.close();
-        FlowValue.unbind();
+        RemotePilotUi.release();
     }
-
-    private RemotePilotUi pilot(StudioServices services) {
-        if (pilot == null) pilot = new RemotePilotUi(services);
-        return pilot;
-    }
-
-    /**
-     * The pilot for the project currently bound, or {@code null} until its button is first pressed.
-     *
-     * <p>Touched only on the JavaFX thread — a toolbar press and {@code projectClosing()} both arrive there —
-     * so it needs no synchronization.
-     */
-    private RemotePilotUi pilot;
 }

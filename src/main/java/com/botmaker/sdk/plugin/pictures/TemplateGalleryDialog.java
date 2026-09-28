@@ -82,7 +82,7 @@ public final class TemplateGalleryDialog {
         stage.initModality(Modality.APPLICATION_MODAL);
         if (owner != null) stage.initOwner(owner);
 
-        TemplateGallery gallery = new TemplateGallery(resources, options.multiSelect());
+        TemplateGallery gallery = new TemplateGallery(services, options.multiSelect());
         if (options.filter() != null) gallery.setFilter(options.filter());
 
         Button choose = new Button(options.multiSelect() ? "Add" : "Choose");

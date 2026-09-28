@@ -1,6 +1,9 @@
 package com.botmaker.sdk.plugin.pictures;
 
+import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.vision.TemplateNames;
+import com.botmaker.sdk.plugin.flow.FlowValue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javax.imageio.ImageIO;
@@ -316,24 +319,26 @@ public final class TemplateLibrary {
     }
 
     /**
-     * The project's declared tags — one per activity, plus the custom ones from the manifest. Read from disk
+     * The project's declared tags — one per activity, plus the custom ones from the manifest. Read afresh
      * for the same reason the manifest is (see above): the activities are edited by a dialog, a canvas and a
      * repair pass, and a cache here would be another of them to invalidate.
+     *
+     * <p>It takes the services rather than a folder because half of it is the flow, which is a value in the
+     * bot's own Java and read through the host.
      */
-    public static TagCatalog tagCatalog(Path resourcesDir) {
-        return TagCatalog.of(activityNames(), manifest(resourcesDir).customTags());
+    public static TagCatalog tagCatalog(StudioServices services) {
+        return TagCatalog.of(activityNames(services), manifest(services.resourcesDir()).customTags());
     }
 
     /**
-     * The open project's activity names in the order its flow lists them, or none.
+     * The project's activity names in the order its flow lists them, or none.
      *
-     * <p>Read from the flow value the open project holds, never from a file: the flow is the bot's own Java.
-     * Degrading rather than throwing is the difference between a tag picklist that is short and one that
+     * <p>Degrading rather than throwing is the difference between a tag picklist that is short and one that
      * will not open — an unreadable flow is reported by the flow editor, not by a tag menu.
      */
-    private static List<String> activityNames() {
-        return com.botmaker.sdk.plugin.flow.FlowValue.current().activities().stream()
-                .map(com.botmaker.sdk.api.flow.Flow.Activity::name)
+    private static List<String> activityNames(StudioServices services) {
+        return FlowValue.read(services).activities().stream()
+                .map(Flow.Activity::name)
                 .filter(name -> !name.isBlank())
                 .toList();
     }
@@ -344,13 +349,14 @@ public final class TemplateLibrary {
      * something carries it), then {@link TemplateManifest#UNTAGGED}. A template carrying two tags appears
      * under both; there is only ever one file.
      */
-    public static Map<String, List<Path>> listByTag(Path resourcesDir) {
+    public static Map<String, List<Path>> listByTag(StudioServices services) {
+        Path resourcesDir = services.resourcesDir();
         List<Path> files = list(resourcesDir);
         Map<String, Path> byName = new LinkedHashMap<>();
         for (Path file : files) byName.put(baseName(file), file);
 
         Map<String, List<Path>> grouped = new LinkedHashMap<>();
-        manifest(resourcesDir).byTag(byName.keySet(), tagCatalog(resourcesDir)).forEach((tag, names) ->
+        manifest(resourcesDir).byTag(byName.keySet(), tagCatalog(services)).forEach((tag, names) ->
                 grouped.put(tag, names.stream().map(byName::get).filter(Objects::nonNull).toList()));
         return grouped;
     }
@@ -362,10 +368,11 @@ public final class TemplateLibrary {
      * <p>One call rather than one per template because the manifest is a single file: saving inside a loop
      * would rewrite it once per capture and, if the last write lost, silently drop the earlier ones.
      */
-    public static void applyTags(Path resourcesDir,
+    public static void applyTags(StudioServices services,
                                  Map<String, ? extends Collection<String>> tagsByTemplate) {
         if (tagsByTemplate.isEmpty()) return;
-        TagCatalog catalog = tagCatalog(resourcesDir);
+        Path resourcesDir = services.resourcesDir();
+        TagCatalog catalog = tagCatalog(services);
         TemplateManifest updated = manifest(resourcesDir);
         for (Map.Entry<String, ? extends Collection<String>> entry : tagsByTemplate.entrySet()) {
             updated = updated.withTags(entry.getKey(), catalog.declaredOnly(entry.getValue()));
@@ -379,8 +386,9 @@ public final class TemplateLibrary {
      * tag set. An undeclared tag is refused rather than declared as a side effect: declaring is
      * {@link #declareTag}'s job, and a typo should not become a group.
      */
-    public static void addTag(Path resourcesDir, Collection<String> baseNames, String tag) {
-        if (baseNames.isEmpty() || !tagCatalog(resourcesDir).isDeclared(tag)) return;
+    public static void addTag(StudioServices services, Collection<String> baseNames, String tag) {
+        if (baseNames.isEmpty() || !tagCatalog(services).isDeclared(tag)) return;
+        Path resourcesDir = services.resourcesDir();
         saveManifest(resourcesDir, manifest(resourcesDir).tagged(baseNames, tag));
     }
 
@@ -391,9 +399,10 @@ public final class TemplateLibrary {
     }
 
     /** Declares {@code tag} as a custom tag and saves; returns the catalog it now belongs to. */
-    public static TagCatalog declareTag(Path resourcesDir, String tag) {
+    public static TagCatalog declareTag(StudioServices services, String tag) {
+        Path resourcesDir = services.resourcesDir();
         saveManifest(resourcesDir, manifest(resourcesDir).declaring(tag));
-        return tagCatalog(resourcesDir);
+        return tagCatalog(services);
     }
 
     /**
@@ -513,20 +522,6 @@ public final class TemplateLibrary {
                 .toList();
     }
 
-    /**
-     * The declared tag named {@code candidate}, or {@code null} — what a caller with a suggestion in hand
-     * checks it against before offering it.
-     *
-     * <p>This is the half of Studio's {@code openActivityTag} that could travel. The other half — <em>which
-     * activity is open in the editor right now</em> — is host state that nothing but the host can answer, so
-     * it stayed there as {@code ImageTemplates.openActivityTag} and calls this to finish the job. The split
-     * is the same one the whole move runs on: a picture folder is the plugin's, an open file is the editor's.
-     *
-     * <p>It <em>selects</em> a declared tag, it does not create one, so a file that is no longer a declared
-     * activity offers nothing rather than conjuring a tag out of a file name.
-     */
-    public static String declaredTag(Path resourcesDir, String candidate) {
-        TagCatalog.Tag tag = candidate == null ? null : tagCatalog(resourcesDir).find(candidate);
-        return tag == null ? null : tag.name();
-    }
+    // declaredTag(Path, String) stood here until 2026-09-28, for Studio's ImageTemplates.openActivityTag. Studio
+    // stopped depending on the SDK on 2026-09-02, so it had no caller.
 }

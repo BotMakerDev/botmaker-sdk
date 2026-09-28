@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.pictures;
 
+import com.botmaker.plugin.api.StudioServices;
 import javafx.css.PseudoClass;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
@@ -56,13 +57,10 @@ public final class TemplateGallery extends HBox {
     private static final double BAND_THRESHOLD = 4;
 
     /**
-     * The project's resources directory, which is the whole of what this needs to know about the host.
-     *
-     * <p>It took a {@code ProjectConfig} while it lived in Studio, and every question it asked of one was
-     * {@code resourcesRoot()} — a picture folder is the SDK's concept, and which project is open is the only
-     * part of it the host owns. So the field is the answer rather than the thing that holds it, and the
-     * gallery can be opened by anything that can name a directory.
+     * The project's host services: the picture folder, and the flow whose activities are half the tag rail
+     * (2026-09-28; it held the folder alone while the flow was read through a static).
      */
+    private final StudioServices services;
     private final Path resourcesDir;
     private final boolean multiSelect;
 
@@ -92,9 +90,10 @@ public final class TemplateGallery extends HBox {
     private Runnable onTagChanged;
     private Consumer<Path> onActivate;
 
-    public TemplateGallery(Path resourcesDir, boolean multiSelect) {
+    public TemplateGallery(StudioServices services, boolean multiSelect) {
         super(10);
-        this.resourcesDir = resourcesDir;
+        this.services = services;
+        this.resourcesDir = services.resourcesDir();
         this.multiSelect = multiSelect;
         getStyleClass().add("template-gallery");
 
@@ -177,9 +176,9 @@ public final class TemplateGallery extends HBox {
             // an unwritable folder is a gallery with one fewer cell, not a refusal
         }
         TemplateGalleryModel.Row was = rail.getSelectionModel().getSelectedItem();
-        TagCatalog catalog = TemplateLibrary.tagCatalog(resourcesDir);
+        TagCatalog catalog = TemplateLibrary.tagCatalog(services);
         List<TemplateGalleryModel.Row> rows =
-                TemplateGalleryModel.rows(TemplateLibrary.listByTag(resourcesDir), catalog);
+                TemplateGalleryModel.rows(TemplateLibrary.listByTag(services), catalog);
         rail.getItems().setAll(rows);
 
         String wanted = was instanceof TemplateGalleryModel.TagRow row ? row.tag() : TemplateManifest.ALL;
@@ -259,14 +258,14 @@ public final class TemplateGallery extends HBox {
     }
 
     private void refreshGrid() {
-        List<Path> files = TemplateLibrary.listByTag(resourcesDir)
+        List<Path> files = TemplateLibrary.listByTag(services)
                 .getOrDefault(selectedTag(), List.of()).stream().filter(filter).toList();
         List<Path> visible = TemplateGalleryModel.matching(files, search.getText());
 
         tiles.clear();
         grid.getChildren().clear();
         TemplateManifest manifest = TemplateLibrary.manifest(resourcesDir);
-        TagCatalog catalog = TemplateLibrary.tagCatalog(resourcesDir);
+        TagCatalog catalog = TemplateLibrary.tagCatalog(services);
         for (Path file : visible) {
             Node tile = tile(file, catalog.declaredOnly(manifest.tagsOf(TemplateLibrary.baseName(file))));
             tiles.put(file, tile);

@@ -208,8 +208,15 @@ which installs every `@Managed` value it is handed and walks the flow (`internal
   `@OutcomeName`, and `@Setting(label, prompt, unit, min, max, step, fallback)` on the `BotSettings` withers,
   which is `SettingsEditors`' whole table now. `SdkEditors.ALL` is `SlotEditor.onParameter(X.class).draw(…)`.
   An annotation added to an api parameter is additive and never-delete holds.
-- **`ActivityEditors`' activity list comes from `FlowValue.current()`** (*The two pickers the lambda was
-  built for*). `Activities.define` is deleted; the outcome-name editor is still why `outcome` takes a
+- **`SdkPlugin` is only a declaration (2026-09-28).** Wherever a section below says
+  `SdkPlugin.toolbarItems()` or one of its private `open…` methods, read `SdkToolbarItems`: one constant per
+  button, each pressing its feature's own `open(ActionContext)` (`RemotePilotUi.open`, `CaptureTemplates.open`,
+  `SourcePicker.choose`, `CaptureValue.pointHere`, …). The pilot's one instance is `RemotePilotUi`'s static,
+  released by `projectClosing()`. `SdkPlugin.projectOpened` and `FlowValue.bind`/`current` are deleted: the
+  tag catalog takes the `StudioServices` (`TemplateLibrary.tagCatalog(services)`), so nothing holds a project
+  in a static.
+- **`ActivityEditors`' activity list comes from `FlowValue.read(ctx.services())`** (*The two pickers the
+  lambda was built for*). `Activities.define` is deleted; the outcome-name editor is still why `outcome` takes a
   context.
 - **A bot's enable flag is `Flow.Activity.enabled()`**, read through `Flows.enabled(name)`.
   `Settings.enabled` is deleted rather than deprecated — it read `activities.json`, so with that file gone

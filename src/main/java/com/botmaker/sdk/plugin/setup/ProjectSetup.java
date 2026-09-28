@@ -1,6 +1,8 @@
 package com.botmaker.sdk.plugin.setup;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.toolbar.ActionContext;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
@@ -75,6 +77,15 @@ public final class ProjectSetup {
     private ProjectSetup(StudioServices services, Window owner) {
         this.services = services;
         this.owner = owner;
+    }
+
+    /**
+     * The 📋 Project Setup press. The item sits at order 40, immediately <em>before</em> Capture Source,
+     * because this is the window that sends a user to that one.
+     */
+    public static void open(ActionContext context) {
+        StudioServices services = context.services();
+        open(services, Modals.owner(services));
     }
 
     /** Opens the checklist, or focuses the one already open. */

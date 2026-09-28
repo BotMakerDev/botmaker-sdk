@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.pilot.ui;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.pilot.NestedSessionLauncher;
 import com.botmaker.sdk.plugin.pilot.PilotControlService;
@@ -104,9 +105,39 @@ public final class RemotePilotUi implements AutoCloseable {
      * <p>Idempotent while the server is up: it re-shows the existing pairing dialog, keeping the paired phone
      * connected on the same URL/port/token.
      */
-    public void open() {
+    public void show() {
         bringUp(false, false);
     }
+
+    /**
+     * The 🎮 Pilot press: shows the pilot of the project {@code context} describes, bringing it up on the first
+     * press.
+     *
+     * <p>The pilot is kept rather than rebuilt, because it owns the port and the display: a second press must
+     * re-show the pairing dialog rather than rebind and drop an already-paired phone. A pilot left over from
+     * another project is released first. Touched only on the JavaFX thread — a press and
+     * {@link #release()} both arrive there — so the field needs no synchronization.
+     */
+    public static void open(ActionContext context) {
+        StudioServices services = context.services();
+        if (current != null && current.services != services) release();
+        if (current == null) current = new RemotePilotUi(services);
+        current.show();
+    }
+
+    /**
+     * Releases the pilot's port and its nested display, if one was brought up; the plugin calls it when the
+     * project it was serving is left. A pilot still answering on the old port would be streaming a project
+     * nobody has open.
+     */
+    public static void release() {
+        RemotePilotUi open = current;
+        current = null;
+        if (open != null) open.close();
+    }
+
+    /** The pilot of the project currently bound, or {@code null} until its button is first pressed. */
+    private static RemotePilotUi current;
 
     /**
      * The live private session's host window id for the overlay to draw over, or {@code 0} when there is none —

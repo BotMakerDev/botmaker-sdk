@@ -2,6 +2,8 @@ package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.toolbar.ActionContext;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -122,7 +124,7 @@ public final class ResourceManagerDialog {
 
         // Multi-select: plain click toggles a tile, so filing or deleting a group is the same gesture as
         // picking one. Every bulk action below reads gallery.selectedFiles().
-        gallery = new TemplateGallery(resources(), true);
+        gallery = new TemplateGallery(services, true);
         gallery.setOnSelectionChanged(() -> {
             showPreview(selectedFile());
             refreshSingleBox();
@@ -282,7 +284,7 @@ public final class ResourceManagerDialog {
         // still ticking boxes in it. The listener in singlePane() runs this again once the menu closes.
         if (addTagButton.isShowing()) return;
         previewTags.getChildren().clear();
-        List<String> tags = TemplateLibrary.tagCatalog(resources())
+        List<String> tags = TemplateLibrary.tagCatalog(services)
                 .declaredOnly(TemplateLibrary.manifest(resources()).tagsOf(name));
         for (String tag : tags) previewTags.getChildren().add(tagChip(name, tag));
         previewTags.getChildren().add(tagMenu(name, tags));
@@ -392,11 +394,11 @@ public final class ResourceManagerDialog {
         addTagButton.getItems().clear();
         Set<String> carried = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         carried.addAll(already);
-        for (String tag : TemplateLibrary.tagCatalog(resources()).names()) {
+        for (String tag : TemplateLibrary.tagCatalog(services).names()) {
             CheckBox box = new CheckBox(tag);
             box.setSelected(carried.contains(tag));
             box.setOnAction(e -> {
-                if (box.isSelected()) TemplateLibrary.addTag(resources(), List.of(templateName), tag);
+                if (box.isSelected()) TemplateLibrary.addTag(services, List.of(templateName), tag);
                 else TemplateLibrary.removeTag(resources(), List.of(templateName), tag);
                 published();
                 // Repaint the chips and the rail counts without closing the menu the user is still working in.
@@ -410,8 +412,8 @@ public final class ResourceManagerDialog {
         if (!addTagButton.getItems().isEmpty()) addTagButton.getItems().add(new SeparatorMenuItem());
         MenuItem create = new MenuItem("New tag…");
         create.setOnAction(e -> TagPicker.promptNewTag(services, stage).ifPresent(tag -> {
-            TemplateLibrary.declareTag(resources(), tag);
-            TemplateLibrary.addTag(resources(), List.of(templateName), tag);
+            TemplateLibrary.declareTag(services, tag);
+            TemplateLibrary.addTag(services, List.of(templateName), tag);
             published();
             reload();
         }));
@@ -447,7 +449,7 @@ public final class ResourceManagerDialog {
                 // check for themselves.
                 .withFilter(file -> !manifest.tagsOf(TemplateLibrary.baseName(file)).contains(tag));
         TemplateGalleryDialog.open(services, stage, options, files -> {
-            TemplateLibrary.addTag(resources(), files.stream().map(TemplateLibrary::baseName).toList(), tag);
+            TemplateLibrary.addTag(services, files.stream().map(TemplateLibrary::baseName).toList(), tag);
             published();
             reload();
             statusLabel.setText("Added " + files.size() + " template(s) to \"" + tag + "\".");
@@ -865,6 +867,16 @@ public final class ResourceManagerDialog {
      */
     private void published() {
         statusLabel.setText("");
+    }
+
+    /**
+     * The 🖼 Manage Pictures press: the other end of Capture Templates, managing the pictures that exist. Its
+     * rename and delete change the bot's {@code Pictures} constants through {@link PluginValues}, by binding.
+     * Not single-instance: it owns no port and no display.
+     */
+    public static void open(ActionContext context) {
+        StudioServices services = context.services();
+        open(services, Modals.owner(services));
     }
 
     /** Opens the manager for the project {@code services} describes. */

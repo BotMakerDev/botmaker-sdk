@@ -108,7 +108,7 @@ public final class TagManagerDialog {
 
     private void reload() {
         TagCatalog.Tag selected = list.getSelectionModel().getSelectedItem();
-        list.getItems().setAll(TemplateLibrary.tagCatalog(resources()).tags());
+        list.getItems().setAll(TemplateLibrary.tagCatalog(services).tags());
         if (selected != null) {
             list.getItems().stream().filter(t -> t.name().equalsIgnoreCase(selected.name())).findFirst()
                     .ifPresent(t -> list.getSelectionModel().select(t));
@@ -117,14 +117,14 @@ public final class TagManagerDialog {
 
     /** How many templates carry {@code tag} — the number that makes a delete's consequence visible. */
     private int countFor(String tag) {
-        Map<String, List<java.nio.file.Path>> byTag = TemplateLibrary.listByTag(resources());
+        Map<String, List<java.nio.file.Path>> byTag = TemplateLibrary.listByTag(services);
         List<java.nio.file.Path> files = byTag.get(tag);
         return files == null ? 0 : files.size();
     }
 
     private void createTag() {
         TagPicker.promptNewTag(services, stage).ifPresent(tag -> {
-            TemplateLibrary.declareTag(resources(), tag);
+            TemplateLibrary.declareTag(services, tag);
             changed("Created \"" + tag + "\".");
         });
     }
@@ -147,7 +147,7 @@ public final class TagManagerDialog {
     }
 
     private Optional<String> promptRename(String current) {
-        TagCatalog catalog = TemplateLibrary.tagCatalog(resources());
+        TagCatalog catalog = TemplateLibrary.tagCatalog(services);
         while (true) {
             Dialog<String> dialog = new Dialog<>();
             services.theme().apply(dialog);

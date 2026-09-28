@@ -2,6 +2,8 @@ package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.toolbar.ActionContext;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import javafx.application.Platform;
@@ -136,6 +138,19 @@ public final class ActivityFlowDialog {
     public ActivityFlowDialog(StudioServices services, Window owner) {
         this.services = services;
         this.owner = owner;
+    }
+
+    /**
+     * The 🔀 Activity Flow press.
+     *
+     * <p>It is this plugin's window rather than a host frame with sections, because a flow's nodes, edges,
+     * ports and outcomes are vocabulary of this plugin's own that the contract must never learn. Single-instance
+     * is not enforced: this window owns no port and no display, so a second one is a second view of the same
+     * value.
+     */
+    public static void open(ActionContext context) {
+        StudioServices services = context.services();
+        new ActivityFlowDialog(services, Modals.owner(services)).show();
     }
 
     public void show() {

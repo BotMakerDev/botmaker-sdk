@@ -8,6 +8,22 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — `SdkPlugin` is a declaration (guided plugin declaration, phase 3)
+
+**Done**
+- `plugin/SdkToolbarItems`: an id constant and a `ToolbarItem` constant per button, and `ALL`, each by
+  `ToolbarItem.id(…)` steps. The ids, labels, tooltips, groups and orders are unchanged.
+- Each press is its feature's own entry point: `RemotePilotUi.open`, `CaptureTemplates.open`/`pictureHere`,
+  `ResourceManagerDialog.open`, `ActivityFlowDialog.open`, `BotSettingsWindow.open`, `ProjectSetup.open`,
+  `SourcePicker.choose`, `CaptureValue.pointHere` — each takes the `ActionContext` and finds its owner window
+  through `Modals.owner`. The pilot's single instance is `RemotePilotUi`'s own static, dropped by
+  `RemotePilotUi.release()`; its instance `open()` is `show()` now.
+- `SdkPlugin` is its constructor and `projectClosing() { RemotePilotUi.release(); }` — no private method,
+  no field, no `projectOpened`.
+- `FlowValue.bind`/`unbind`/`current` and its static services are deleted. The tag catalog read the flow
+  through them; `TemplateLibrary.tagCatalog`, `listByTag`, `applyTags`, `addTag` and `declareTag` take the
+  `StudioServices` instead, and `TemplateGallery` is built from them. `declaredTag` had no caller and is gone.
+
 ## 2026-09-28 — call-site editors by parameter annotation (guided plugin declaration, phase 2)
 
 **Done**

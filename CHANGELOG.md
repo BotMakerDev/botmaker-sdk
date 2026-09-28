@@ -21,6 +21,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Every toolbar button opens through its feature's own `open(ActionContext)`**, listed in the plugin's
+  `SdkToolbarItems` with an id constant each. The buttons, their order and what they open are unchanged.
 - **Parameter annotations saying what a `String` or a number is for**: `@SteamAppId`, `@EpicAppName`,
   `@ProgramPath`, `@LaunchOption` (`api.launch`), `@EmulatorName` (`api.emulator`), `@ActivityName`,
   `@OutcomeName` and `@Setting(label, …, min, max, step)` (`api.bot`), on the launch calls, the emulator
