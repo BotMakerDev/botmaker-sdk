@@ -3,9 +3,15 @@ package com.botmaker.sdk.plugin.pilot.ui;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.FunnelIssue;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.PilotMode;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.PilotOutcome;
+import com.botmaker.plugin.api.Dialogs;
+import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.Theme;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -71,6 +77,36 @@ class RemotePilotFunnelTest {
         assertEquals(original.mode(), refreshed.mode());
         assertEquals(original.funnelError(), refreshed.funnelError());
         assertNotEquals(original.token(), refreshed.token());
+    }
+
+    /** Ticked and highlighted as the blocker at once was the old answer when Tailscale named certificates. */
+    @Test
+    void the_https_step_is_not_ticked_when_it_is_the_blocker() {
+        assertTrue(FunnelSetupWizard.httpsStepDone(new RemotePilotUi.FunnelDiag(true, true, FunnelIssue.NOT_ENABLED)));
+        assertFalse(FunnelSetupWizard.httpsStepDone(
+                new RemotePilotUi.FunnelDiag(true, true, FunnelIssue.NO_HTTPS_CERT)));
+        assertFalse(FunnelSetupWizard.httpsStepDone(new RemotePilotUi.FunnelDiag(true, false, FunnelIssue.LOGGED_OUT)));
+        assertFalse(FunnelSetupWizard.httpsStepDone(null));
+    }
+
+    /**
+     * The host hands every press a fresh services object, so the pilot is kept by project directory — comparing
+     * the objects released it (and dropped the paired phone) on every press.
+     */
+    @Test
+    void a_second_press_in_the_same_project_keeps_the_pilot() {
+        assertTrue(RemotePilotUi.sameProject(services("/p/a"), services("/p/a")));
+        assertFalse(RemotePilotUi.sameProject(services("/p/a"), services("/p/b")));
+        assertFalse(RemotePilotUi.sameProject(null, services("/p/a")));
+    }
+
+    private static StudioServices services(String resources) {
+        return new StudioServices() {
+            @Override public Path projectDir() { return Path.of(resources).getParent(); }
+            @Override public Path resourcesDir() { return Path.of(resources); }
+            @Override public Theme theme() { return null; }
+            @Override public Dialogs dialogs() { return null; }
+        };
     }
 
     @Test

@@ -236,6 +236,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     out its whole boot timeout, then open Waydroid diagnostics over whatever you had moved on to.
   - The picker's and Connect a phone's background checks no longer keep Studio running after it closes.
   - Waydroid diagnostics' "Upstream docs" link no longer freezes the dialog while the browser starts.
+- **🎮 Remote Pilot:**
+  - Pressing 🎮 again keeps the pilot running. Every press used to restart it, which dropped the paired
+    phone and killed the game running in background mode.
+  - Pressing it while the pairing dialog is open brings that dialog forward instead of opening a second one.
+  - **Reset pairing token** now disconnects the phones connected with the old token. They used to stay
+    connected, still watching and driving the bot, until they reconnected.
+  - Leaving the project closes the pairing dialog, whose address stops working then.
+  - The Funnel setup checklist no longer ticks the HTTPS-certificates step while highlighting it as the
+    blocker.
+  - Background mode's hint no longer points at a Run ▸ Launch Target… menu that does not exist.
 - **Launch:** the unused launch-target picker and its game-grid dialog are deleted; nothing called them.
   `Target.current()` and `Target.set` are no longer offered in the palette, since no editor can fill either.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads

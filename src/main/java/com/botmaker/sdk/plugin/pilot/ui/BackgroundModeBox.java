@@ -122,7 +122,8 @@ final class BackgroundModeBox {
                 return;
             }
             if (spec == null) {
-                status.setText("● Set a launch target (Run ▸ Launch Target…) to enable background mode.");
+                status.setText("● Background mode needs a launch target on this computer — 📋 Project Setup "
+                        + "shows what this one has.");
             } else if (!SessionBackends.isAvailable(backend.getValue())) {
                 status.setText("● To use this backend for background mode, "
                         + SessionBackends.installHint(backend.getValue()) + ".");

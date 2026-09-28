@@ -333,12 +333,22 @@ public final class PilotServer implements AutoCloseable {
 
     /**
      * Revokes the current pairing token: generates + persists a fresh one so previously-paired phones can no
-     * longer authorize (they must rescan). Safe to call while running — new connections use the new token,
-     * and any in-flight client keeps its socket until it reconnects. Returns the new token.
+     * longer authorize (they must rescan), and disconnects every phone connected now. A revoke that left an
+     * open socket connected would leave exactly the phone it was pressed against still watching and driving
+     * the bot. Returns the new token.
      */
     public synchronized String resetToken() {
         token = newToken();
         PilotPreferences.token(token);
+        for (WsContext ctx : clients.keySet()) {
+            clients.remove(ctx);
+            try {
+                ctx.closeSession();
+            } catch (Exception ignored) {
+                // Already gone; removing it was the part that mattered.
+            }
+        }
+        input.releaseHeld();
         return token;
     }
 

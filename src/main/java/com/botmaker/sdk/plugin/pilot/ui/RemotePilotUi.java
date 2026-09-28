@@ -117,12 +117,21 @@ public final class RemotePilotUi implements AutoCloseable {
      * re-show the pairing dialog rather than rebind and drop an already-paired phone. A pilot left over from
      * another project is released first. Touched only on the JavaFX thread — a press and
      * {@link #release()} both arrive there — so the field needs no synchronization.
+     *
+     * <p>"Another project" is decided by the project's directory, never by the services object: the host
+     * builds a fresh {@link StudioServices} for every press, so comparing the objects released the pilot on
+     * every press — the paired phone dropped and the game in the private display killed.
      */
     public static void open(ActionContext context) {
         StudioServices services = context.services();
-        if (current != null && current.services != services) release();
+        if (current != null && !sameProject(current.services, services)) release();
         if (current == null) current = new RemotePilotUi(services);
         current.show();
+    }
+
+    /** Whether two services answer for the same open project — the same resources directory. */
+    static boolean sameProject(StudioServices a, StudioServices b) {
+        return a != null && b != null && java.util.Objects.equals(a.resourcesDir(), b.resourcesDir());
     }
 
     /**
@@ -161,6 +170,7 @@ public final class RemotePilotUi implements AutoCloseable {
      */
     @Override
     public void close() {
+        RemotePilotDialog.closeShowing();
         if (nestedLauncher != null) {
             try {
                 nestedLauncher.close();

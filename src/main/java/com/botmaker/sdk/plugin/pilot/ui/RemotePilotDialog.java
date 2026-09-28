@@ -53,10 +53,36 @@ final class RemotePilotDialog {
      */
     record Actions(UnaryOperator<PilotOutcome> resetToken, Runnable enableFunnel, Supplier<Node> backgroundMode) {}
 
+    /**
+     * The pairing dialog on screen, if any. It is not modal, so a second 🎮 press used to stack a second copy,
+     * each with its own background-mode box; the press now brings the open one forward. Every path that
+     * re-renders (a reset token, the Funnel bring-up) closes the old one first. FX thread only.
+     */
+    private static Alert showing;
+
     private RemotePilotDialog() {
     }
 
+    /** Closes the pairing dialog, if one is up — its URL and token stop working when the pilot is released. */
+    static void closeShowing() {
+        Alert open = showing;
+        showing = null;
+        if (open == null) return;
+        if (javafx.application.Platform.isFxApplicationThread()) {
+            if (open.isShowing()) open.close();
+        } else {
+            javafx.application.Platform.runLater(() -> { if (open.isShowing()) open.close(); });
+        }
+    }
+
     static void show(StudioServices services, PilotOutcome outcome, Actions actions) {
+        if (showing != null && showing.isShowing()) {
+            if (showing.getDialogPane().getScene().getWindow() instanceof javafx.stage.Stage stage) {
+                stage.toFront();
+                stage.requestFocus();
+            }
+            return;
+        }
         PilotMode mode = outcome.mode();
         String url = outcome.url();
         String funnelError = outcome.funnelError();
@@ -152,6 +178,7 @@ final class RemotePilotDialog {
 
         alert.getDialogPane().setContent(content);
         alert.setResizable(true); // let the user grow it if the QR codes crowd the buttons on small screens
+        showing = alert;
         alert.show();
     }
 

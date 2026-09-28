@@ -55,7 +55,7 @@ final class FunnelSetupWizard {
 
         // 2. HTTPS certificates — can't reliably probe, but the CLI error names it (NO_HTTPS_CERT) when it's
         // the blocker, so highlight it then. This is the most common blocker once the ACL grant is in place.
-        HBox s2 = PilotWidgets.stepRow(step1ok, "HTTPS certificates enabled for your tailnet",
+        HBox s2 = PilotWidgets.stepRow(httpsStepDone(diag), "HTTPS certificates enabled for your tailnet",
                 issue == FunnelIssue.NO_HTTPS_CERT);
         s2.getChildren().add(PilotWidgets.linkBtn("Open DNS settings ▸", TAILSCALE_DNS_ADMIN_URL));
         box.getChildren().add(s2);
@@ -87,5 +87,14 @@ final class FunnelSetupWizard {
         recheck.setOnAction(e -> onRecheck.run());
         box.getChildren().add(recheck);
         return box;
+    }
+
+    /**
+     * Whether the HTTPS-certificate step reads as done. It cannot be probed, so it is ticked once the first step
+     * is — except when Tailscale's own error names certificates, which used to tick it and highlight it as the
+     * blocker at once.
+     */
+    static boolean httpsStepDone(FunnelDiag diag) {
+        return diag != null && diag.cliPresent() && diag.loggedIn() && diag.issue() != FunnelIssue.NO_HTTPS_CERT;
     }
 }

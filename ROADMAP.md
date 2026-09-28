@@ -8,6 +8,26 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — Remote Pilot reworked (SDK plugin rework, phase 13)
+
+**Done**
+- `RemotePilotUi.open` keeps the pilot when `sameProject` (by `resourcesDir()`): Studio's `HostActionContext`
+  builds a fresh `HostServices` per press, so the old identity check released the pilot on every press.
+- `PilotServer.resetToken` closes every connected session and releases held input.
+- `RemotePilotDialog` is single-instance (`showing`); `RemotePilotUi.close` closes it (`closeShowing`, FX-hop safe).
+- `FunnelSetupWizard.httpsStepDone`: not ticked when Tailscale's error names certificates.
+- `BackgroundModeBox`'s no-target hint no longer names a nonexistent menu.
+- Tests: `RemotePilotFunnelTest` (same project, HTTPS step). The token-reset disconnect has no headless test:
+  an authorized socket starts real screen capture (`PilotServerTest`'s note).
+
+**Deferred / next**
+- `TailscaleFunnelService.disable` runs `tailscale funnel reset`, which clears *every* serve/funnel the user
+  has, not only the pilot's. The narrower `off` form hung on the CLI version it was written against; needs a
+  check on a current Tailscale before changing.
+- Since phase 11 a PC game has no way to become this computer's launch target from the UI, so background mode
+  only starts for an emulator app on Waydroid. Tied to the launch-stack question (delegate to Faugus).
+- A paused bot (SIGSTOP) is stopped fine by Studio (SIGKILL); checked, not a bug.
+
 ## 2026-09-28 — Emulators reworked (SDK plugin rework, phase 12)
 
 **Done**
