@@ -182,6 +182,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - Picking a picture that has no `Pictures` constant yet declares one, so the block reads `Pictures.ORE`
     and follows a later rename. It used to write the path. A recorded click on such a picture does the same.
   - A picture whose file is missing says so in the pill's tooltip.
+- **The precision dialog:**
+  - Pressing OK without touching the slider keeps a tolerance written by hand. `Precision.of(60)` became 40
+    and `12.34` became 12.3.
+  - The two counts keep a value above the spinner's usual ceiling instead of lowering it.
+  - A pin dropped before there is a target colour is no longer drawn, since it teaches nothing.
+  - Picking a new target colour clears the pins, which were measured from the old one.
+  - *Target colour…* with no frame yet puts the frame it grabs under the matches too.
+  - Only `Pixel`'s own `matchesAt`, `coverage` and `findInRange` hide a knob. Your own method of the same
+    name is offered all three.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every

@@ -8,6 +8,20 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — Precision editor reworked (SDK plugin rework, phase 6)
+
+**Done**
+- `PrecisionEditors`: the slider remembers an `Exact(position, value)`, so a value it cannot show (past 40, or
+  finer than a tenth) is written back unchanged unless the thumb moves. The area and count spinners' ceilings
+  grow to the value opened with. `knobsFor(Executable)` hides a knob only for `Pixel`'s own methods, compared
+  by class name.
+- The frame pane has one `forget` for Clear pins, a new frame and a new target colour. *Target colour…* with no
+  frame shows the grabbed frame under the overlay. `MatchOverlay.onPin` is a `BiPredicate`: a pin with no
+  target is refused, not drawn.
+- Tests in `PrecisionEditorTest`: an untouched slider, and `knobsFor` on a bot's own `coverage`.
+
+No redesign: the dialog's layout was not the problem.
+
 ## 2026-09-28 — picture editors reworked (SDK plugin rework, phase 5)
 
 **Done**

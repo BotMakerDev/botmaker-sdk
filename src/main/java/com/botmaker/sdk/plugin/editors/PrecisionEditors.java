@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.api.vision.Pixel;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.plugin.screen.ColorSampler;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
@@ -78,6 +79,8 @@ public final class PrecisionEditors {
 
     /** Past LOOSE the match is mostly noise, but leave headroom so the slider isn't a wall at the last anchor. */
     private static final double MAX_DELTA_E = 40.0;
+    /** The spinners' ceilings, unless the value opened with is larger. */
+    private static final int MAX_AREA = 1_000_000, MAX_COUNT = 10_000_000;
     /** The blob preview canvas is square; a blob larger than this is drawn clipped rather than scaled down. */
     private static final int PREVIEW_SIDE = 180;
 
@@ -124,6 +127,16 @@ public final class PrecisionEditors {
         return new Knobs(true, true);
     }
 
+    /**
+     * {@link #knobsFor(String)} for the call the slot sits in — but only {@code Pixel}'s own methods are known
+     * to read part of the type. A bot's own {@code coverage(Color, Precision)} may read all of it, so any other
+     * class's method is offered every knob. By class name, never by {@code Class} identity.
+     */
+    static Knobs knobsFor(Executable call) {
+        boolean pixels = call != null && call.getDeclaringClass().getName().equals(Pixel.class.getName());
+        return knobsFor(pixels ? call.getName() : null);
+    }
+
     /** The editor: a pill saying the whole setting, opening the dialog that explains each part of it. */
     public static Node precision(ValueContext ctx) {
         Button button = Styles.on(new Button(pillText(ctx)), Styles.PILL);
@@ -133,21 +146,21 @@ public final class PrecisionEditors {
 
     private static void open(ValueContext ctx, Consumer<String> relabel) {
         Settings current = current(ctx);
-        String methodName = ctx.slot().flatMap(SlotContext::enclosingExecutable)
-                .map(Executable::getName).orElse(null);
-        Knobs knobs = knobsFor(methodName);
+        Executable call = ctx.slot().flatMap(SlotContext::enclosingExecutable).orElse(null);
+        Knobs knobs = knobsFor(call);
 
         Slider slider = toleranceSlider(current.deltaE());
+        // The ceilings grow to hold a value written by hand, which OK would otherwise clamp without being asked.
         Spinner<Integer> areaSpinner = new Spinner<>(new SpinnerValueFactory.IntegerSpinnerValueFactory(
-                1, 1_000_000, current.minArea(), 4));
+                1, Math.max(MAX_AREA, current.minArea()), current.minArea(), 4));
         Spinner<Integer> countSpinner = new Spinner<>(new SpinnerValueFactory.IntegerSpinnerValueFactory(
-                0, 10_000_000, current.minCount(), 50));
+                0, Math.max(MAX_COUNT, current.minCount()), current.minCount(), 50));
 
         java.awt.Color[] target = {targetOf(ctx).orElse(null)};
         List<Runnable> onTarget = new ArrayList<>();
         VBox content = new VBox(12);
 
-        String note = knobs.note(methodName);
+        String note = knobs.note(call == null ? null : call.getName());
         if (note != null) content.getChildren().add(hint(note));
 
         if (knobs.tolerance()) content.getChildren().add(tolerancePane(slider, () -> target[0], onTarget));
@@ -206,33 +219,40 @@ public final class PrecisionEditors {
         slider.setShowTickLabels(true);
         slider.setMajorTickUnit(5);
         slider.setMinorTickCount(4);
-        slider.getProperties().put(EXACT, slider.getValue());
+        slider.getProperties().put(EXACT, new Exact(slider.getValue(), deltaE));
         return slider;
     }
 
-    /** The slider's key for the value it was last set to exactly — opened with, or taught. */
+    /** The slider's key for the {@link Exact} value it was last set to — opened with, or taught. */
     private static final String EXACT = "precision.exact";
+
+    /** A value set rather than dragged, and the slider position it put the thumb at. */
+    private record Exact(double position, double value) {}
 
     /** What the slider means now: {@link #tolerance} against the value it was last set to exactly. */
     private static double tolerance(Slider slider) {
-        Object exact = slider.getProperties().get(EXACT);
-        return tolerance(slider.getValue(), exact instanceof Double d ? d : Double.NaN);
+        return slider.getProperties().get(EXACT) instanceof Exact e
+                ? tolerance(slider.getValue(), e.position(), e.value())
+                : Math.round(slider.getValue());
     }
 
     /** Moves the slider to a value a lesson taught, keeping its tenth. */
     private static void teach(Slider slider, double deltaE) {
         double placed = clamp(deltaE);
-        slider.getProperties().put(EXACT, placed);
+        slider.getProperties().put(EXACT, new Exact(placed, placed));
         slider.setValue(placed);
     }
 
     /**
-     * The tolerance a slider position means: {@code exact} — the value the dialog opened with, or the last one
-     * a lesson set — keeps its tenth; anything else was dragged or clicked and lands on a whole number, so a
-     * drag near an anchor is the anchor ({@code TIGHT} is 5, not 5.4).
+     * The tolerance a slider position means. At {@code position} — where the value the dialog opened with, or
+     * the last one a lesson set, put the thumb — it is that {@code value}, untouched: a hand-written
+     * {@code Precision.of(60)} sits at the slider's end and a {@code 12.34} between ticks, and pressing OK
+     * without moving either must write them back as they were (it wrote 40 and 12.3 until 2026-09-28).
+     * Anything else was dragged or clicked and lands on a whole number, so a drag near an anchor is the anchor
+     * ({@code TIGHT} is 5, not 5.4).
      */
-    static double tolerance(double sliderValue, double exact) {
-        return Math.abs(sliderValue - exact) < 1e-9 ? round(sliderValue) : Math.round(sliderValue);
+    static double tolerance(double sliderValue, double position, double value) {
+        return Math.abs(sliderValue - position) < 1e-9 ? value : Math.round(sliderValue);
     }
 
     private static Node tolerancePane(Slider slider, Supplier<java.awt.Color> target, List<Runnable> onTarget) {
@@ -289,29 +309,40 @@ public final class PrecisionEditors {
         lesson.setWrapText(true);
         lesson.setMaxWidth(720);
 
+        // Pins are distances from one target on one frame: a new frame or a new target takes them and their
+        // lesson away, which until 2026-09-28 a new target did not.
+        Runnable forget = () -> {
+            good.clear();
+            bad.clear();
+            overlay.clearPins();
+            lesson.setText("");
+        };
         Consumer<EditorFrame.Failure> failed =
                 f -> lesson.setText(f.headline() + " Frame… picks another window, a screen or the desktop.");
+        Consumer<EditorFrame> onFrame = f -> {
+            forget.run();
+            overlay.show(f);
+        };
         Button frameButton = new Button("Frame…");
         frameButton.setOnAction(e -> SurfaceMenu.choose(services, surface -> {
-            Consumer<EditorFrame> onFrame = f -> {
-                good.clear();
-                bad.clear();
-                lesson.setText("");
-                overlay.show(f);
-            };
             if (surface.botsOwn()) EditorFrame.grabAsync(services, onFrame, failed);
             else EditorFrame.grabAsync(services, surface.source(), onFrame, failed);
         }));
 
-        Button eyedropper = new Button("Target colour…");
+        Button eyedropper = new Button(TargetColor.BUTTON);
         eyedropper.setTooltip(new javafx.scene.control.Tooltip(
                 "Preview against a colour of your choosing; it is not written into the call."));
         Consumer<EditorFrame> sampleOn = f -> ColorSampler.openOn(services, f, s -> {
+            forget.run();
             target[0] = s.color();
             targetChanged.run();
         });
+        // With no frame yet, the one grabbed to sample from goes under the overlay too.
         eyedropper.setOnAction(e -> overlay.frame().ifPresentOrElse(sampleOn,
-                () -> EditorFrame.grabAsync(services, sampleOn, failed)));
+                () -> EditorFrame.grabAsync(services, f -> {
+                    onFrame.accept(f);
+                    sampleOn.accept(f);
+                }, failed)));
 
         ToggleGroup pinMode = new ToggleGroup();
         ToggleButton shouldMatch = new ToggleButton("+ Should match");
@@ -321,22 +352,19 @@ public final class PrecisionEditors {
         pinMode.selectedToggleProperty().addListener((o, was, now) ->
                 overlay.mode(now == shouldMatch ? Boolean.TRUE : now == shouldNot ? Boolean.FALSE : null));
         Button clear = new Button("Clear pins");
-        clear.setOnAction(e -> {
-            good.clear();
-            bad.clear();
-            overlay.clearPins();
-            lesson.setText("");
-        });
+        clear.setOnAction(e -> forget.run());
 
+        // A pin with no target to measure from teaches nothing, so it is refused rather than drawn and ignored.
         overlay.onPin((colour, isGood) -> {
             if (target[0] == null) {
                 lesson.setText(TargetColor.describe(null));
-                return;
+                return false;
             }
             (isGood ? good : bad).add(colour);
             ToleranceTeacher.Lesson taught = ToleranceTeacher.teach(target[0], good, bad, tolerance(slider));
             teach(slider, taught.deltaE());
             lesson.setText(lessonText(taught));
+            return true;
         });
 
         EditorFrame.grabAsync(services, overlay::show, failed);
@@ -426,8 +454,11 @@ public final class PrecisionEditors {
     static final class TargetColor {
         private TargetColor() {}
 
+        /** The button that picks one, named in the sentence that asks for one. */
+        static final String BUTTON = "Target colour…";
+
         static String describe(java.awt.Color target) {
-            return target == null ? "No colour to preview against: pick one with the eyedropper."
+            return target == null ? "No colour to preview against: pick one with " + BUTTON
                     : String.format("Target #%02X%02X%02X", target.getRed(), target.getGreen(), target.getBlue());
         }
     }

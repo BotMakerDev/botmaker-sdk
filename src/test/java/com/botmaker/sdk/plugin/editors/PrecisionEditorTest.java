@@ -160,7 +160,7 @@ class PrecisionEditorTest {
 
     @Test
     void the_overlay_says_what_it_previews_against() {
-        assertEquals("No colour to preview against: pick one with the eyedropper.",
+        assertEquals("No colour to preview against: pick one with Target colour…",
                 PrecisionEditors.TargetColor.describe(null));
         assertEquals("Target #FF0000", PrecisionEditors.TargetColor.describe(java.awt.Color.RED));
     }
@@ -168,9 +168,36 @@ class PrecisionEditorTest {
     /** A drag lands on whole numbers, so the anchors (TIGHT is 5) stay reachable; only a lesson sets a tenth. */
     @Test
     void a_dragged_tolerance_lands_on_whole_numbers() {
-        assertEquals(5.0, PrecisionEditors.tolerance(5.37, 12.3), "a drag near TIGHT is TIGHT");
-        assertEquals(12.3, PrecisionEditors.tolerance(12.3, 12.3), "the value it opened with, or was taught, keeps its tenth");
-        assertEquals(9.4, PrecisionEditors.tolerance(9.4, 9.4));
+        assertEquals(5.0, PrecisionEditors.tolerance(5.37, 12.3, 12.3), "a drag near TIGHT is TIGHT");
+        assertEquals(12.3, PrecisionEditors.tolerance(12.3, 12.3, 12.3), "the value it opened with, or was taught, keeps its tenth");
+        assertEquals(9.4, PrecisionEditors.tolerance(9.4, 9.4, 9.4));
+    }
+
+    @Test
+    void an_untouched_slider_writes_back_the_value_it_opened_with() {
+        // Precision.of(60) puts the thumb at the slider's end (40), and 12.34 between tenths: OK must keep both.
+        assertEquals(60.0, PrecisionEditors.tolerance(40, 40, 60));
+        assertEquals(12.34, PrecisionEditors.tolerance(12.34, 12.34, 12.34));
+        assertEquals(39.0, PrecisionEditors.tolerance(38.8, 40, 60), "a drag off the end is a drag");
+    }
+
+    @Test
+    void only_pixels_own_methods_hide_a_knob() throws NoSuchMethodException {
+        var coverage = com.botmaker.sdk.api.vision.Pixel.class.getMethod("coverage",
+                java.awt.Color.class, Precision.class);
+        assertFalse(PrecisionEditors.knobsFor(coverage).quantity());
+
+        // A bot's own method of the same name may read every field.
+        var own = Mine.class.getDeclaredMethod("coverage", java.awt.Color.class, Precision.class);
+        assertTrue(PrecisionEditors.knobsFor(own).quantity());
+        assertTrue(PrecisionEditors.knobsFor((java.lang.reflect.Executable) null).quantity());
+    }
+
+    @SuppressWarnings("unused")
+    private static final class Mine {
+        static double coverage(java.awt.Color target, Precision precision) {
+            return precision.minCount();
+        }
     }
 
     @Test

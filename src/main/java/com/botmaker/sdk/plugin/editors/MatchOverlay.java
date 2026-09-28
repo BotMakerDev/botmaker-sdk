@@ -28,7 +28,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 
 /**
  * What a {@code Precision} does to a real frame, drawn on it (2026-09-26): every pixel within ΔE of the target
@@ -68,7 +68,7 @@ final class MatchOverlay {
     private PrecisionEditors.Settings settings;
     private Pass last;
     private Boolean pinning;
-    private BiConsumer<java.awt.Color, Boolean> onPin = (c, good) -> {};
+    private BiPredicate<java.awt.Color, Boolean> onPin = (c, good) -> true;
 
     MatchOverlay() {
         Group layers = new Group(base, marks);
@@ -99,10 +99,7 @@ final class MatchOverlay {
             java.awt.Color colour = new java.awt.Color(frame.image().getRGB(x, y));
             probed = new int[] {x, y};
             refreshProbe();
-            if (pinning != null) {
-                pins.add(new Pin(x, y, pinning));
-                onPin.accept(colour, pinning);
-            }
+            if (pinning != null && onPin.test(colour, pinning)) pins.add(new Pin(x, y, pinning));
             draw();
         });
         // Marks are sized per screen pixel, so a zoom redraws them.
@@ -151,7 +148,8 @@ final class MatchOverlay {
         return node;
     }
 
-    void onPin(BiConsumer<java.awt.Color, Boolean> onPinned) {
+    /** Asked for each pin before it is drawn: {@code false} refuses it, so no pin shows that taught nothing. */
+    void onPin(BiPredicate<java.awt.Color, Boolean> onPinned) {
         this.onPin = onPinned;
     }
 
