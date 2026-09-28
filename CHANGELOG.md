@@ -228,6 +228,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     or Epic on Windows), or pick an emulator app, which sets it and lets ▶ Launch now start it.
   - A launch target this computer cannot read is no longer ticked ✓. The row names it and offers **Clear**.
   - Esc closes the window.
+- **Emulators:**
+  - A device slot holding a constant or a variable shows it as written instead of "Choose a device…".
+  - Picking an app inside an emulator says on the status line that it also changed what this computer
+    launches and where the bot captures from. Both used to change silently.
+  - Closing the emulator picker stops a Start or Stop still waiting for the emulator. The wait used to run
+    out its whole boot timeout, then open Waydroid diagnostics over whatever you had moved on to.
+  - The picker's and Connect a phone's background checks no longer keep Studio running after it closes.
+  - Waydroid diagnostics' "Upstream docs" link no longer freezes the dialog while the browser starts.
 - **Launch:** the unused launch-target picker and its game-grid dialog are deleted; nothing called them.
   `Target.current()` and `Target.set` are no longer offered in the palette, since no editor can fill either.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads

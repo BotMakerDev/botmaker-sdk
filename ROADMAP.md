@@ -8,6 +8,17 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — Emulators reworked (SDK plugin rework, phase 12)
+
+**Done**
+- `EmulatorEditors.label(ctx)`: an argument the host could not read shows its source (`Slots.sourceOr`), not
+  the empty prompt (`EmulatorEditorTest`). Picking an app reports the launch-target and capture-source change
+  through `services.status`. Javadoc: claimed by `@EmulatorName`, which `use`, `named`, `launch` and `stop` carry.
+- `emulator/Workers.start`: every probe, poll and download thread in `EmulatorPicker`, `ConnectPhone` and
+  `WaydroidReport` is a daemon. The picker interrupts its start/stop polls when hidden (`POLLS`), and an
+  interrupted poll touches no UI, so it no longer opens `WaydroidReport` after the picker closed.
+- `WaydroidReport.browse` runs off the FX thread.
+
 ## 2026-09-28 — Launch and Project Setup reworked (SDK plugin rework, phase 11)
 
 **Done**

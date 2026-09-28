@@ -118,12 +118,12 @@ public final class ConnectPhone {
      */
     private static void refreshServer(VBox section) {
         setBody(section, List.of(new Label("Checking for an adb server…")));
-        new Thread(() -> {
+        Workers.start("connect-phone-adb-server", () -> {
             boolean running = AdbTools.serverRunning();
             List<AdbTools.ServerDevice> devices = running ? AdbTools.devices() : List.of();
             boolean binary = AdbTools.binary().isPresent();
             Platform.runLater(() -> setBody(section, serverRows(section, running, devices, binary)));
-        }, "connect-phone-adb-server").start();
+        });
     }
 
     private static List<Region> serverRows(VBox section, boolean running,
@@ -139,10 +139,10 @@ public final class ConnectPhone {
                 // AdbTools.devices), so a background process is never a side effect of opening a dialog.
                 start.setOnAction(e -> {
                     start.setDisable(true);
-                    new Thread(() -> {
+                    Workers.start("connect-phone-start-server", () -> {
                         AdbTools.startServer();
                         Platform.runLater(() -> refreshServer(section));
-                    }, "connect-phone-start-server").start();
+                    });
                 });
                 rows.add(new HBox(start));
                 rows.add(pairBox(section));
@@ -240,7 +240,7 @@ public final class ConnectPhone {
                                    Supplier<AdbTools.Outcome> command, String threadName) {
         buttons.forEach(b -> b.setDisable(true));
         problem.setText("Working…");
-        new Thread(() -> {
+        Workers.start(threadName, () -> {
             AdbTools.Outcome outcome = command.get();
             Platform.runLater(() -> {
                 buttons.forEach(b -> b.setDisable(false));
@@ -251,7 +251,7 @@ public final class ConnectPhone {
                     refreshServer(section);
                 }
             });
-        }, threadName).start();
+        });
     }
 
     /**
@@ -318,7 +318,7 @@ public final class ConnectPhone {
             refreshSaved(section);
         });
 
-        new Thread(() -> {
+        Workers.start("connect-phone-probe", () -> {
             boolean reachable = device.endpoint().reachable();
             Platform.runLater(() -> {
                 dot.setFill(reachable ? ONLINE : OFFLINE);
@@ -326,7 +326,7 @@ public final class ConnectPhone {
                 // from one that has left tcpip mode, or from a Wi-Fi address that has since been reassigned.
                 state.setText(reachable ? "answering" : "not answering");
             });
-        }, "connect-phone-probe").start();
+        });
 
         HBox row = new HBox(8, dot, name, address, spacer, state, forget);
         row.setAlignment(Pos.CENTER_LEFT);
@@ -401,7 +401,7 @@ public final class ConnectPhone {
      */
     private static void refreshScrcpy(VBox slot) {
         slot.getChildren().setAll(note("Checking for scrcpy…"));
-        new Thread(() -> {
+        Workers.start("connect-phone-scrcpy", () -> {
             boolean present = ScrcpyServer.available();
             Platform.runLater(() -> {
                 if (present) {
@@ -416,7 +416,7 @@ public final class ConnectPhone {
                                 ManagedTools::installScrcpyServer,
                                 () -> refreshScrcpy(slot)));
             });
-        }, "connect-phone-scrcpy").start();
+        });
     }
 
     // --- the two downloads ---
@@ -444,7 +444,7 @@ public final class ConnectPhone {
             bar.setVisible(true);
             bar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
             problem.setText("");
-            new Thread(() -> {
+            Workers.start(threadName, () -> {
                 // total is -1 when the server sent no Content-Length; the bar then stays indeterminate rather
                 // than inventing a fraction.
                 boolean ok = install.apply((bytes, total) -> {
@@ -461,7 +461,7 @@ public final class ConnectPhone {
                                 + "Nothing was installed.");
                     }
                 });
-            }, threadName).start();
+            });
         });
 
         HBox row = new HBox(8, button, bar, problem);

@@ -62,7 +62,7 @@ public final class WaydroidReport {
         dialog.getDialogPane().setContent(scroll);
 
         // The probes shell out (systemctl, waydroid status, ip route) — never on the FX thread.
-        new Thread(() -> {
+        Workers.start("waydroid-diagnostics", () -> {
             List<Finding> findings = WaydroidDiagnostics.run();
             Platform.runLater(() -> {
                 body.getChildren().clear();
@@ -74,7 +74,7 @@ public final class WaydroidReport {
                     body.getChildren().add(card(finding));
                 }
             });
-        }, "waydroid-diagnostics").start();
+        });
 
         dialog.showAndWait();
     }
@@ -136,14 +136,20 @@ public final class WaydroidReport {
         return card;
     }
 
-    /** Opens a URL in the user's browser; silently does nothing where that isn't supported. */
+    /**
+     * Opens a URL in the user's browser; silently does nothing where that isn't supported. Off the FX thread:
+     * AWT's {@code browse} spawns the desktop's opener and can block, and a frozen dialog over a help link is
+     * worse than a link that took a second.
+     */
     private static void browse(String url) {
-        try {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(URI.create(url));
+        Workers.start("waydroid-docs", () -> {
+            try {
+                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                    Desktop.getDesktop().browse(URI.create(url));
+                }
+            } catch (Exception ignored) {
+                // A diagnostics panel that throws while opening a help page is worse than one that doesn't.
             }
-        } catch (Exception ignored) {
-            // A diagnostics panel that throws while trying to open a help page is worse than one that doesn't.
-        }
+        });
     }
 }

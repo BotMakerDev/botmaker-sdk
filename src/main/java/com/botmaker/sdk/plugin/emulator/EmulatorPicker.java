@@ -36,6 +36,7 @@ import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -98,10 +99,20 @@ public final class EmulatorPicker {
      */
     private static StudioServices host;
 
+    /**
+     * The start/stop polls of the showing on screen, interrupted when it closes. A poll can wait out an
+     * emulator's whole boot timeout, and nobody is left to read its answer once the picker is gone.
+     */
+    private static final Set<Thread> POLLS = ConcurrentHashMap.newKeySet();
+
     /** Shows the picker; resolves to the chosen instance (and optional app), or empty if cancelled. */
     public static Optional<Selection> show(StudioServices services, Window owner) {
         host = services;
         Dialog<Selection> dialog = new Dialog<>();
+        dialog.setOnHidden(e -> {
+            POLLS.forEach(Thread::interrupt);
+            POLLS.clear();
+        });
         services.theme().apply(dialog);
         dialog.setTitle("Choose an emulator");
         if (owner != null) dialog.initOwner(owner);
@@ -132,7 +143,7 @@ public final class EmulatorPicker {
      */
     private static void populate(VBox rows, Dialog<Selection> dialog) {
         rows.getChildren().setAll(new Label("Scanning for emulators…"));
-        new Thread(() -> {
+        Workers.start("emulator-picker-scan", () -> {
             EmulatorInstanceScanner.Scan scan = new EmulatorInstanceScanner().scan();
             Platform.runLater(() -> {
                 rows.getChildren().clear();
@@ -147,7 +158,7 @@ public final class EmulatorPicker {
                 }
                 rows.getChildren().add(connectPhoneRow(rows, dialog));
             });
-        }, "emulator-picker-scan").start();
+        });
     }
 
     /**
@@ -251,7 +262,7 @@ public final class EmulatorPicker {
      * {@link #transition} re-runs it once the poll settles rather than assuming what it asked for happened.
      */
     private static void probeAndLoad(EmulatorInstance instance, RowUi ui, Dialog<Selection> dialog) {
-        new Thread(() -> {
+        Workers.start("emulator-probe-" + instance.name(), () -> {
             boolean running = EmulatorProbe.isRunning(instance);
             List<EmulatorProbe.InstalledApp> live = running ? EmulatorProbe.installedAppsDetailed(instance) : null;
             BufferedImage shot = running ? EmulatorProbe.screencap(instance) : null;
@@ -265,7 +276,7 @@ public final class EmulatorPicker {
                 renderApps(ui.apps(), instance, show, emptyNote(running, live), dialog);
                 showAction(instance, ui, dialog, running);
             });
-        }, "emulator-probe-" + instance.name()).start();
+        });
     }
 
     /**
@@ -315,9 +326,14 @@ public final class EmulatorPicker {
         ui.state().setText(start ? "starting…" : "stopping…");
         ui.dot().setFill(Color.web("#fbbc04"));
         long timeout = start ? instance.platformId().bootTimeout().toMillis() : STOP_TIMEOUT_MS;
-        new Thread(() -> {
+        Thread[] self = new Thread[1];
+        self[0] = Workers.start("emulator-" + (start ? "start-" : "stop-") + instance.name(), () -> {
             boolean dispatched = start ? EmulatorLauncher.launch(instance) : EmulatorLauncher.stop(instance);
             boolean settled = dispatched && waitFor(instance, start, timeout);
+            POLLS.remove(self[0]);
+            // Interrupted means the picker closed: there is no row to update, and a Waydroid report popping
+            // up over whatever the user went back to would answer a question nobody is asking any more.
+            if (Thread.currentThread().isInterrupted()) return;
             Platform.runLater(() -> {
                 if (!dispatched) {
                     // Nothing was spawned, so there is nothing to re-probe — leave the row as it was.
@@ -331,12 +347,14 @@ public final class EmulatorPicker {
                 }
                 probeAndLoad(instance, ui, dialog);
             });
-        }, "emulator-" + (start ? "start-" : "stop-") + instance.name()).start();
+        });
+        POLLS.add(self[0]);
     }
 
     /**
      * Polls until the instance reports {@code wantRunning}, or the ceiling elapses. Off-FX (each probe blocks),
-     * and it stops early on an interrupt so a closed dialog doesn't leave a thread counting out four minutes.
+     * and it stops early on an interrupt — which closing the picker sends ({@link #POLLS}) — so a closed dialog
+     * doesn't leave a thread counting out four minutes.
      *
      * <p><b>Starting waits for readiness, stopping only for the port.</b> They are different questions:
      * a started instance is only useful once Android has booted far enough to answer {@code pm list packages}
@@ -436,7 +454,7 @@ public final class EmulatorPicker {
      * it fetched for — a start/stop or a re-probe can rebuild the list underneath a fetch in flight.
      */
     private static void loadIcons(EmulatorInstance instance, List<String> packages, VBox apps) {
-        new Thread(() -> {
+        Workers.start("emulator-icons-" + instance.name(), () -> {
             for (int i = 0; i < packages.size(); i++) {
                 String pkg = packages.get(i);
                 String key = instance.identity() + "/" + pkg;
@@ -465,7 +483,7 @@ public final class EmulatorPicker {
                     }
                 });
             }
-        }, "emulator-icons-" + instance.name()).start();
+        });
     }
 
     /** Prompts for a package name and, if given, resolves the dialog to {@code (instance, package)}. */
