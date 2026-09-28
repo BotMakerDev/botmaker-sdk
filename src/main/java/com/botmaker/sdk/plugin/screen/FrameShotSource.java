@@ -16,13 +16,13 @@ public record FrameShotSource(EditorFrame frame) implements ShotSource {
 
     @Override
     public Grab grab(Window owner) {
-        return new Grab(new ScreenShot(frame.image(), logical(frame.bounds()), false, false), null);
+        return new Grab(new ScreenShot(frame.image(), frame.placement(), false, false), null);
     }
 
     /**
-     * {@code bounds} in the logical pixels a stage is placed in. A grab is in device pixels; on a scaled
-     * screen the two differ by the screen's output scale, and the overlay scales its picks back through the
-     * image, so only the placement needs converting.
+     * Device-pixel {@code bounds} in the logical pixels a stage is placed in. On a scaled screen the two differ
+     * by the screen's output scale, and the overlay scales its picks back through the image, so only the
+     * placement needs converting. {@link EditorFrame#placement} is the caller, and knows when not to.
      */
     static Rectangle2D logical(Rectangle bounds) {
         double scale = Screen.getScreens().stream()

@@ -1,12 +1,12 @@
 package com.botmaker.sdk.plugin.screen;
 
-import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.plugin.toolkit.ZoomPan;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -88,22 +88,22 @@ public final class ObjectCaptureSurface {
     private boolean paintingForeground = true;
     private boolean gesturing = false;      // a box/paint drag is in flight (the press landed on the image)
 
-    private ObjectCaptureSurface(StudioServices services, java.awt.Rectangle bounds, BufferedImage frame,
-                                 Consumer<BufferedImage> onExtract, Runnable onCancel) {
-        this.frame = frame;
+    private ObjectCaptureSurface(EditorFrame grabbed, Consumer<BufferedImage> onExtract, Runnable onCancel) {
+        Rectangle2D bounds = grabbed.placement();
+        this.frame = grabbed.image();
         this.session = new MagicWand.Session(frame);
         this.onExtract = onExtract;
         this.onCancel = onCancel;
-        this.scaleX = frame.getWidth() / (double) bounds.width;
-        this.scaleY = frame.getHeight() / (double) bounds.height;
+        this.scaleX = frame.getWidth() / bounds.getWidth();
+        this.scaleY = frame.getHeight() / bounds.getHeight();
 
         // Show the frozen frame as the surface body so the user points at exactly what will be captured.
         background = new ImageView(ScreenCapture.toFxImage(frame));
-        background.setFitWidth(bounds.width);
-        background.setFitHeight(bounds.height);
+        background.setFitWidth(bounds.getWidth());
+        background.setFitHeight(bounds.getHeight());
         preview.setMouseTransparent(true);
 
-        strokeLayer = new Canvas(bounds.width, bounds.height);
+        strokeLayer = new Canvas(bounds.getWidth(), bounds.getHeight());
         strokeLayer.setMouseTransparent(true);
 
         band.setFill(Color.TRANSPARENT);
@@ -115,7 +115,7 @@ public final class ObjectCaptureSurface {
 
         layers = new Group(background, preview, strokeLayer, band);
 
-        pane.getChildren().addAll(layers, buildControlBar(bounds));
+        pane.getChildren().addAll(layers, buildControlBar());
         pane.setStyle("-fx-background-color: rgba(10,14,20,0.15);");
         zoomPan = ZoomPan.attach(pane, layers);
         zoomPan.zoomProperty().addListener((obs, o, n) -> applyZoom());
@@ -124,22 +124,21 @@ public final class ObjectCaptureSurface {
 
         stage = new Stage(StageStyle.TRANSPARENT);
         stage.setAlwaysOnTop(true);
-        stage.setX(bounds.x);
-        stage.setY(bounds.y);
-        stage.setWidth(bounds.width);
-        stage.setHeight(bounds.height);
+        stage.setX(bounds.getMinX());
+        stage.setY(bounds.getMinY());
+        stage.setWidth(bounds.getWidth());
+        stage.setHeight(bounds.getHeight());
         // Opted out of the host's theming — see CaptureSurface: a translucent surface over the game.
         pane.getStyleClass().add(Styles.UNTHEMED);
-        Scene scene = new Scene(pane, bounds.width, bounds.height, Color.TRANSPARENT);
+        Scene scene = new Scene(pane, bounds.getWidth(), bounds.getHeight(), Color.TRANSPARENT);
         scene.setOnKeyPressed(this::onKeyPressed);
         stage.setScene(scene);
     }
 
-    /** Opens the object-capture surface over {@code frame} (the frozen snapshot of {@code bounds}). */
-    public static ObjectCaptureSurface open(StudioServices services, java.awt.Rectangle bounds,
-                                            BufferedImage frame,
-                                            Consumer<BufferedImage> onExtract, Runnable onCancel) {
-        ObjectCaptureSurface s = new ObjectCaptureSurface(services, bounds, frame, onExtract, onCancel);
+    /** Opens the object-capture surface over {@code frame}, frozen, placed where its pixels came from. */
+    public static ObjectCaptureSurface open(EditorFrame frame, Consumer<BufferedImage> onExtract,
+                                            Runnable onCancel) {
+        ObjectCaptureSurface s = new ObjectCaptureSurface(frame, onExtract, onCancel);
         s.stage.show();
         OverlayStage.promoteAboveFullscreen(s.stage);
         return s;
@@ -152,7 +151,7 @@ public final class ObjectCaptureSurface {
         stage.close();
     }
 
-    private HBox buildControlBar(java.awt.Rectangle bounds) {
+    private HBox buildControlBar() {
         hud.setTextFill(Color.web("#e8eefb"));
 
         zoomLabel.setTextFill(Color.web("#9fb0cc"));
@@ -357,10 +356,15 @@ public final class ObjectCaptureSurface {
         }
     }
 
-    /** Republishes the preview after an undo/redo restored a mask state (an empty state clears the preview). */
+    /**
+     * Republishes the preview after an undo/redo restored a mask state. An empty state clears the preview and
+     * goes back to boxing: undoing the first box used to leave the surface refining nothing, with no way to
+     * draw a new box short of cancelling.
+     */
     private void applyHistory(MagicWand.Result r) {
         lastResult = r;
-        if (r == null || r.isEmpty()) {
+        boxed = r != null && !r.isEmpty();
+        if (!boxed) {
             preview.setImage(null);
         } else {
             showPreview(r);

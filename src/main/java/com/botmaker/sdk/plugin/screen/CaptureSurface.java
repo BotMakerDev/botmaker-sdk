@@ -1,9 +1,9 @@
 package com.botmaker.sdk.plugin.screen;
 
-import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Styles;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -24,8 +24,9 @@ import java.util.function.Consumer;
 
 /**
  * The transparent, always-on-top rubber-band surface shown <em>only while drawing</em> a template region
- * over the live window (it is created, shown, and disposed per capture session by {@link OverlayTemplateCapture}
- * — the persistent mini-toolbar never covers the window, which keeps the window clickable between captures).
+ * over the live window (it is created, shown, and disposed per capture session by
+ * {@code pictures.CaptureTemplates} — the persistent mini-toolbar never covers the window, which keeps the
+ * window clickable between captures).
  *
  * <p>Two modes:
  * <ul>
@@ -68,12 +69,17 @@ public final class CaptureSurface {
     /** The current band's bounding box {x, y, w, h} in overlay pixels, so a release is shape-agnostic. */
     private final double[] box = new double[4];
     private final List<Region> regions = new ArrayList<>();
+    /** Each recorded region's outline and badge, in step with {@link #regions}, so the last can be undone. */
+    private final List<List<javafx.scene.Node>> marks = new ArrayList<>();
     private Button doneButton;
     private boolean finished;
 
-    private CaptureSurface(StudioServices services, java.awt.Rectangle bounds, BufferedImage backdrop,
-                           Mode mode, Shape shape,
+    private CaptureSurface(EditorFrame frame, Mode mode, Shape shape,
                            Consumer<Region> onRegion, Consumer<List<Region>> onDone, Runnable onCancel) {
+        Rectangle2D bounds = frame.placement();
+        // The frame isn't on the desktop behind us (an emulator's pixels arrive over ADB), so draw it —
+        // otherwise the user rubber-bands over their own desktop and crops something else entirely.
+        BufferedImage backdrop = frame.onScreen() ? null : frame.image();
         this.mode = mode;
         this.shape = shape;
         this.onRegion = onRegion;
@@ -90,13 +96,11 @@ public final class CaptureSurface {
         // capture mode is active, while keeping the live window clearly visible underneath.
         pane.setStyle("-fx-background-color: rgba(20,110,220,0.06);");
         if (backdrop != null) {
-            // The frame isn't on the desktop behind us (an emulator's pixels arrive over ADB), so draw it —
-            // otherwise the user rubber-bands over their own desktop and crops something else entirely.
-            ImageView frame = new ImageView(ScreenCapture.toFxImage(backdrop));
-            frame.setFitWidth(bounds.width);
-            frame.setFitHeight(bounds.height);
-            frame.setMouseTransparent(true);
-            pane.getChildren().add(0, frame);
+            ImageView view = new ImageView(ScreenCapture.toFxImage(backdrop));
+            view.setFitWidth(bounds.getWidth());
+            view.setFitHeight(bounds.getHeight());
+            view.setMouseTransparent(true);
+            pane.getChildren().add(0, view);
         }
         pane.getChildren().add(buildControlBar());
         installDrawHandlers();
@@ -105,47 +109,45 @@ public final class CaptureSurface {
         // Deliberately ownerless: an owned stage minimizes with the Studio window; the capture surface must
         // stay put so the user can capture while Studio is out of the way.
         stage.setAlwaysOnTop(true);
-        stage.setX(bounds.x);
-        stage.setY(bounds.y);
-        stage.setWidth(bounds.width);
-        stage.setHeight(bounds.height);
+        stage.setX(bounds.getMinX());
+        stage.setY(bounds.getMinY());
+        stage.setWidth(bounds.getWidth());
+        stage.setHeight(bounds.getHeight());
 
         // Opted out of the host's theming: this surface is a translucent tint over the live game, and the
         // shell's chrome is the one thing it must not acquire.
         pane.getStyleClass().add(Styles.UNTHEMED);
-        Scene scene = new Scene(pane, bounds.width, bounds.height, Color.TRANSPARENT);
-        scene.setOnKeyPressed(e -> { if (e.getCode() == KeyCode.ESCAPE) cancel(); });
+        Scene scene = new Scene(pane, bounds.getWidth(), bounds.getHeight(), Color.TRANSPARENT);
+        scene.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) cancel();
+            else if (mode == Mode.MANY && e.isShortcutDown() && e.getCode() == KeyCode.Z) removeLast();
+        });
         stage.setScene(scene);
     }
 
     /**
-     * Opens a one-shot surface: the first drawn region fires {@code onRegion}; Esc/Cancel fires
-     * {@code onCancel}.
+     * Opens a one-shot surface over {@code frame}: the first drawn region fires {@code onRegion}; Esc/Cancel
+     * fires {@code onCancel}.
      *
-     * <p>{@code backdrop} is the frame to paint under the rubber band, and is {@code null} for every target
-     * whose pixels are genuinely on the desktop at {@code bounds} — the surface is transparent and the live
-     * window shows through. Pass the captured frame when it is <em>not</em> on screen (an emulator, whose
-     * pixels arrive over ADB), so what the user draws over is what the crop is taken from.
+     * <p>Over an on-screen frame the surface is transparent and the live window shows through; over one that
+     * is not on screen (an emulator, whose pixels arrive over ADB) it paints the frame, so what the user draws
+     * over is what the crop is taken from.
      */
-    public static CaptureSurface single(StudioServices services, java.awt.Rectangle bounds,
-                                        BufferedImage backdrop,
-                                        Shape shape, Consumer<Region> onRegion, Runnable onCancel) {
-        CaptureSurface s = new CaptureSurface(services, bounds, backdrop, Mode.SINGLE, shape,
-                onRegion, null, onCancel);
+    public static CaptureSurface single(EditorFrame frame, Shape shape, Consumer<Region> onRegion,
+                                        Runnable onCancel) {
+        CaptureSurface s = new CaptureSurface(frame, Mode.SINGLE, shape, onRegion, null, onCancel);
         s.stage.show();
         OverlayStage.promoteAboveFullscreen(s.stage);
         return s;
     }
 
     /**
-     * Opens a multi-region surface: draw several, then Done fires {@code onDone}; Esc/Cancel fires
-     * {@code onCancel}. {@code backdrop} as in {@link #single}.
+     * Opens a multi-region surface over {@code frame}: draw several, then Done fires {@code onDone}; Ctrl+Z
+     * removes the last one drawn; Esc/Cancel fires {@code onCancel}.
      */
-    public static CaptureSurface many(StudioServices services, java.awt.Rectangle bounds,
-                                      BufferedImage backdrop,
-                                      Shape shape, Consumer<List<Region>> onDone, Runnable onCancel) {
-        CaptureSurface s = new CaptureSurface(services, bounds, backdrop, Mode.MANY, shape,
-                null, onDone, onCancel);
+    public static CaptureSurface many(EditorFrame frame, Shape shape, Consumer<List<Region>> onDone,
+                                      Runnable onCancel) {
+        CaptureSurface s = new CaptureSurface(frame, Mode.MANY, shape, null, onDone, onCancel);
         s.stage.show();
         OverlayStage.promoteAboveFullscreen(s.stage);
         return s;
@@ -171,7 +173,7 @@ public final class CaptureSurface {
 
         Label hint = new Label(mode == Mode.SINGLE
                 ? "Draw a region over the window · Esc to cancel"
-                : "Draw regions over the window, then Done · Esc to cancel");
+                : "Draw regions over the window, then Done · Ctrl+Z removes the last · Esc to cancel");
         hint.setTextFill(Color.WHITE);
 
         Button cancel = new Button("✕ Cancel");
@@ -249,6 +251,14 @@ public final class CaptureSurface {
         return new Rectangle(region.x(), region.y(), region.w(), region.h());
     }
 
+    /** Removes the region drawn last, and its outline and badge (MANY mode, Ctrl+Z). */
+    private void removeLast() {
+        if (finished || regions.isEmpty()) return;
+        regions.removeLast();
+        pane.getChildren().removeAll(marks.removeLast());
+        doneButton.setText("✓ Done (" + regions.size() + ")");
+    }
+
     /** Records a region and marks it on the surface with a persistent outline + index badge (MANY mode). */
     private void addRegion(Region region) {
         regions.add(region);
@@ -265,6 +275,7 @@ public final class CaptureSurface {
         badge.setLayoutY(region.y() + 2);
 
         pane.getChildren().addAll(mark, badge);
+        marks.add(List.of(mark, badge));
         rubberBand.toFront();
         if (doneButton != null) doneButton.setText("✓ Done (" + regions.size() + ")");
     }

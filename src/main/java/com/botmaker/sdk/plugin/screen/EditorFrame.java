@@ -93,6 +93,20 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
     }
 
     /**
+     * Where a stage showing this frame goes, in the logical pixels JavaFX places stages in.
+     *
+     * <p>An on-screen frame's {@code bounds} are the grab's device pixels, which on a scaled screen are the
+     * logical ones times the output scale — so a surface placed at them landed off to the right and too big.
+     * An off-screen frame's bounds were computed in logical pixels to begin with ({@link #fitToPrimaryScreen}).
+     * Every surface drawn over a frame is placed here; a pick still maps back through the image, never through
+     * this.
+     */
+    public javafx.geometry.Rectangle2D placement() {
+        return onScreen ? FrameShotSource.logical(bounds)
+                : new javafx.geometry.Rectangle2D(bounds.x, bounds.y, bounds.width, bounds.height);
+    }
+
+    /**
      * Grabs the project's default capture target off the calling thread and delivers the result on the
      * JavaFX thread: a frame, or the {@link Failure} that says why there is none.
      *

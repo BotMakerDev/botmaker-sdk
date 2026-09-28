@@ -12,6 +12,7 @@ import com.botmaker.sdk.plugin.screen.CaptureSurface.Region;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
 import com.botmaker.sdk.plugin.screen.ObjectCaptureSurface;
 import com.botmaker.sdk.plugin.screen.OverlayStage;
+import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
@@ -25,6 +26,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import javafx.util.Duration;
 
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -99,6 +101,8 @@ public final class CaptureTemplates {
     private final List<String> saved = new ArrayList<>();
 
     private Stage toolbarStage;
+    /** The toolbar's "▧ W×H" readout, refreshed on every grab. */
+    private final Label size = new Label();
     private CaptureSurface surface;
     private ObjectCaptureSurface objectSurface;
 
@@ -224,9 +228,9 @@ public final class CaptureTemplates {
         Button close = new Button("✕ Close");
         close.setOnAction(e -> closeTool());
 
-        // The size readout, so the user always knows what resolution they are capturing at — and sees it
-        // when the target is not at the size the bot will replay against, which nothing else reveals.
-        Label size = new Label(readout(frame.bounds()));
+        // The size readout, so the user always knows what resolution they are capturing at. Refreshed on every
+        // grab: the tool follows a window that is resized between two captures, and so must the number.
+        showSize(frame);
         size.setTextFill(Color.web("#8fa3bf"));
         size.setStyle("-fx-font-size: 11px;");
 
@@ -235,7 +239,7 @@ public final class CaptureTemplates {
         bar.setPadding(new Insets(8, 10, 8, 10));
         bar.setStyle(OverlayStage.PANEL);
 
-        toolbarStage = OverlayStage.bar(bar, frame.bounds());
+        toolbarStage = OverlayStage.bar(bar, frame.placement());
         toolbarStage.getScene().setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ESCAPE) closeTool();
         });
@@ -265,31 +269,32 @@ public final class CaptureTemplates {
     }
 
     /**
-     * {@code "▧ 1600×900"} — the size these pixels are actually being captured at.
+     * {@code "▧ 1600×900"} — the size, in the frame's own pixels, of what is being captured: the size a saved
+     * picture records as authored.
      *
      * <p>There is no project-wide reference size to compare it with: each picture records the size it was
      * authored at in its own sidecar and the matcher rescales against that.
      */
-    private String readout(java.awt.Rectangle bounds) {
-        return "▧ " + bounds.width + "×" + bounds.height;
+    private void showSize(EditorFrame frame) {
+        size.setText("▧ " + frame.image().getWidth() + "×" + frame.image().getHeight());
     }
 
     // ── Capture one ────────────────────────────────────────────────────────────────────────────────────
 
     private void beginSingle() {
         toolbarStage.hide();
-        grab(frame -> surface = CaptureSurface.single(services, frame.bounds(), backdrop(frame), shape,
-                this::onSingleRegion, this::endSession), this::failSession);
+        grab(frame -> surface = CaptureSurface.single(frame, shape, this::onSingleRegion, this::endSession),
+                this::failSession);
     }
 
     private void onSingleRegion(Region region) {
         surface.hide();
-        grab(frame -> {
+        grabAfterHiding(frame -> {
             try {
                 BufferedImage cropped = crop(frame.image(), region);
                 if (cropped == null) return;
                 Optional<NamedCapture> named =
-                        TemplateNaming.promptNew(services, owner, cropped, suggestedTag);
+                        TemplateNaming.promptNew(services, null, cropped, suggestedTag);
                 if (named.isEmpty()) return;
                 save(cropped, named.get().name(), frame.image().getWidth(), frame.image().getHeight());
                 TemplateLibrary.applyTags(services, Map.of(named.get().name(), named.get().tags()));
@@ -305,8 +310,8 @@ public final class CaptureTemplates {
 
     private void beginMany() {
         toolbarStage.hide();
-        grab(frame -> surface = CaptureSurface.many(services, frame.bounds(), backdrop(frame), shape,
-                this::onManyDone, this::endSession), this::failSession);
+        grab(frame -> surface = CaptureSurface.many(frame, shape, this::onManyDone, this::endSession),
+                this::failSession);
     }
 
     private void onManyDone(List<Region> regions) {
@@ -315,7 +320,7 @@ public final class CaptureTemplates {
             endSession();
             return;
         }
-        grab(frame -> {
+        grabAfterHiding(frame -> {
             try {
                 List<BufferedImage> crops = new ArrayList<>();
                 for (Region region : regions) {
@@ -323,14 +328,14 @@ public final class CaptureTemplates {
                     if (cropped != null) crops.add(cropped);
                 }
                 if (crops.isEmpty()) return;
-                TemplateNaming.Batch batch = TemplateNaming.showBatch(services, owner, crops, suggestedTag);
-                List<String> saved = new ArrayList<>();
+                TemplateNaming.Batch batch = TemplateNaming.showBatch(services, null, crops, suggestedTag);
+                List<String> written = new ArrayList<>();
                 for (NamedTemplate template : batch.templates()) {
                     save(template.image(), template.name(),
                             frame.image().getWidth(), frame.image().getHeight());
-                    saved.add(template.name());
+                    written.add(template.name());
                 }
-                TemplateLibrary.applyTags(services, batch.tagsFor(saved));
+                TemplateLibrary.applyTags(services, batch.tagsFor(written));
             } catch (Exception failed) {
                 warn("Failed to save the pictures: " + failed.getMessage());
             } finally {
@@ -348,8 +353,7 @@ public final class CaptureTemplates {
             // bot rescales against — and not the cut-out's own size.
             objectFrameWidth = frame.image().getWidth();
             objectFrameHeight = frame.image().getHeight();
-            objectSurface = ObjectCaptureSurface.open(services, frame.bounds(), frame.image(),
-                    this::onObjectExtracted, this::endSession);
+            objectSurface = ObjectCaptureSurface.open(frame, this::onObjectExtracted, this::endSession);
         }, this::failSession);
     }
 
@@ -360,7 +364,7 @@ public final class CaptureTemplates {
     private void onObjectExtracted(BufferedImage cut) {
         if (objectSurface != null) objectSurface.hide();
         try {
-            Optional<NamedCapture> named = TemplateNaming.promptNew(services, owner, cut, suggestedTag);
+            Optional<NamedCapture> named = TemplateNaming.promptNew(services, null, cut, suggestedTag);
             if (named.isEmpty()) return;
             save(cut, named.get().name(), objectFrameWidth, objectFrameHeight);
             TemplateLibrary.applyTags(services, Map.of(named.get().name(), named.get().tags()));
@@ -374,23 +378,34 @@ public final class CaptureTemplates {
     // ── Shared plumbing ────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * Re-grabs the target off the FX thread — raising and snapping the window first — and delivers the frame
-     * back on it.
+     * Re-grabs the target off the FX thread — raising the window first — and delivers the frame back on it,
+     * with the toolbar's size readout brought up to date.
      *
      * <p>Every step re-grabs rather than reusing the last frame, which is what lets the tool follow a window
      * the user has moved or resized between two captures.
      */
     private void grab(Consumer<EditorFrame> onFrame, Consumer<EditorFrame.Failure> onFailure) {
-        EditorFrame.grabAsync(services, target, onFrame, onFailure);
+        EditorFrame.grabAsync(services, target, frame -> {
+            if (toolbarStage != null) showSize(frame);
+            onFrame.accept(frame);
+        }, onFailure);
     }
 
     /**
-     * The frame the rubber-band surface must paint itself, or {@code null} when the pixels really are on the
-     * desktop behind it and the surface can stay transparent.
+     * {@link #grab} once the surface just hidden has left the screen.
+     *
+     * <p>The picture is cut from this grab, and a desktop or monitor source is read off the screen itself:
+     * grabbing in the same instant as {@code hide()} could catch the compositor still showing the surface, and
+     * save its tint and its control bar into the picture. A window source waits too, briefly, inside the raise.
      */
-    private static BufferedImage backdrop(EditorFrame frame) {
-        return frame.onScreen() ? null : frame.image();
+    private void grabAfterHiding(Consumer<EditorFrame> onFrame, Consumer<EditorFrame.Failure> onFailure) {
+        PauseTransition settle = new PauseTransition(Duration.millis(SETTLE_MS));
+        settle.setOnFinished(e -> grab(onFrame, onFailure));
+        settle.play();
     }
+
+    /** How long a hidden surface is given to leave the screen before the picture is grabbed. */
+    private static final int SETTLE_MS = 150;
 
     /** Reports a failed grab and returns to the toolbar. */
     private void failSession(EditorFrame.Failure failure) {
@@ -470,20 +485,35 @@ public final class CaptureTemplates {
         w = Math.max(1, Math.min(w, full.getWidth() - x));
         h = Math.max(1, Math.min(h, full.getHeight() - y));
         BufferedImage sub = full.getSubimage(x, y, w, h);
-        if (r.shape() != CaptureSurface.Shape.ELLIPSE) return sub;
+        return r.shape() == CaptureSurface.Shape.ELLIPSE ? oval(sub) : sub;
+    }
 
+    /**
+     * {@code image} inside its inscribed oval, transparent outside it, with a smooth rim.
+     *
+     * <p>The oval is painted as an anti-aliased mask and the image drawn into it ({@code SRC_IN}). Clipping to
+     * the oval instead, as this did until 2026-09-28, ignores anti-aliasing — a clip is all or nothing per pixel
+     * — so every oval picture had a stair-stepped edge the matcher had to forgive.
+     */
+    static BufferedImage oval(BufferedImage image) {
+        int w = image.getWidth(), h = image.getHeight();
         BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = out.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setClip(new Ellipse2D.Double(0, 0, w, h));
-        g.drawImage(sub, 0, 0, null);
+        g.fill(new Ellipse2D.Double(0, 0, w, h));
+        g.setComposite(java.awt.AlphaComposite.SrcIn);
+        g.drawImage(image, 0, 0, null);
         g.dispose();
         return out;
     }
 
+    /**
+     * A warning over the game once the tool is up — ownerless and above fullscreen windows, as the naming
+     * dialogs are ({@link TemplateNaming#place}) — and owned by the editor before it, when nothing covers it.
+     */
     private void warn(String message) {
         Alert alert = services.theme().alert(Alert.AlertType.WARNING, message);
-        if (owner != null) alert.initOwner(owner);
+        TemplateNaming.place(alert, toolbarStage == null ? owner : null);
         alert.showAndWait();
     }
 }

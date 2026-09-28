@@ -8,6 +8,20 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — Capture Templates reworked (SDK plugin rework, phase 3)
+
+**Done**
+- `EditorFrame.placement()`: where a stage over a frame goes, in logical pixels (an on-screen frame's bounds
+  are device pixels; an off-screen one's were logical already). `CaptureSurface`, `ObjectCaptureSurface` and
+  `OverlayStage.bar` take it, the surfaces by taking the `EditorFrame`; `FrameShotSource` uses it too, which
+  stops it shrinking an emulator frame by the screen's scale.
+- `CaptureTemplates`: the save grab waits 150 ms after the surface hides; dialogs during a session are
+  ownerless and promoted above fullscreen (`TemplateNaming.place`); `oval` paints an anti-aliased mask with
+  `SRC_IN` instead of clipping; the size readout is the frame's pixels and refreshes on every grab.
+- `CaptureSurface` many mode: Ctrl+Z removes the last region. `ObjectCaptureSurface`: an undo to an empty mask
+  returns to boxing.
+- `CaptureTemplatesTest` pins the oval.
+
 ## 2026-09-28 — Capture Source reworked (SDK plugin rework, phase 2)
 
 **Done**

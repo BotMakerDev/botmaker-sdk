@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.sdk.plugin.screen.OverlayStage;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -19,6 +20,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.awt.image.BufferedImage;
@@ -56,8 +58,8 @@ public final class TemplateNaming {
      * A crop the user chose to keep, paired with its validated (sanitized, unique) name and its tags.
      *
      * <p>{@code index} is the crop's position in the list handed to {@link #showBatch} — carried through
-     * because only the kept rows come back, so a caller that keyed something else off that list (the "Pick
-     * all" session keys an <em>argument slot</em>) cannot recover it positionally once a row is discarded.
+     * because only the kept rows come back, so a caller that keyed something else off that list cannot recover
+     * it positionally once a row is discarded.
      */
     public record NamedTemplate(int index, String name, BufferedImage image, List<String> tags) {}
 
@@ -109,7 +111,7 @@ public final class TemplateNaming {
         while (true) {
             Dialog<String> dialog = new Dialog<>();
             services.theme().apply(dialog);
-            if (owner != null) dialog.initOwner(owner);
+            place(dialog, owner);
             dialog.setTitle("Picture name");
             dialog.setHeaderText(null);
             ButtonType ok = new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
@@ -171,7 +173,7 @@ public final class TemplateNaming {
                                   String suggestedTag) {
         Dialog<Batch> dialog = new Dialog<>();
         services.theme().apply(dialog);
-        if (owner != null) dialog.initOwner(owner);
+        place(dialog, owner);
         dialog.setTitle("Name captured pictures");
         dialog.setHeaderText("Name each picture, or tick Discard to skip it.");
 
@@ -303,7 +305,29 @@ public final class TemplateNaming {
 
     private static void warn(StudioServices services, Window owner, String message) {
         Alert alert = services.theme().alert(Alert.AlertType.WARNING, message);
-        if (owner != null) alert.initOwner(owner);
+        place(alert, owner);
         alert.showAndWait();
+    }
+
+    /**
+     * Owns {@code dialog} by {@code owner}, or — with no owner — keeps it above every window, fullscreen games
+     * included.
+     *
+     * <p>Capture Templates names a picture while the game it was cut from is in front, and may be fullscreen.
+     * A dialog owned by the editor is stacked with the editor, behind that game: a modal nobody could see,
+     * holding the tool until it was found. So the tool passes no owner, and the dialog is promoted the way its
+     * surfaces are ({@link OverlayStage#promoteAboveFullscreen}).
+     */
+    static void place(Dialog<?> dialog, Window owner) {
+        if (owner != null) {
+            dialog.initOwner(owner);
+            return;
+        }
+        dialog.setOnShown(e -> {
+            if (dialog.getDialogPane().getScene().getWindow() instanceof Stage stage) {
+                stage.setAlwaysOnTop(true);
+                OverlayStage.promoteAboveFullscreen(stage);
+            }
+        });
     }
 }

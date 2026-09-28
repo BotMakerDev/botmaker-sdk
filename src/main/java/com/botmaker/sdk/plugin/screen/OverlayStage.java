@@ -100,7 +100,7 @@ public final class OverlayStage {
      * <p>It is tucked <em>inside</em> the top of {@code over} when there is no room above it, so a target at
      * the top edge of the screen does not put its toolbar off-screen.
      */
-    public static Stage bar(Region bar, java.awt.Rectangle over) {
+    public static Stage bar(Region bar, javafx.geometry.Rectangle2D over) {
         bar.getStyleClass().add(Styles.UNTHEMED);
         Scene scene = new Scene(bar, Color.TRANSPARENT);
         Stage stage = new Stage(StageStyle.TRANSPARENT);
@@ -110,8 +110,8 @@ public final class OverlayStage {
         stage.show();
         stage.sizeToScene();
         double height = stage.getHeight();
-        stage.setX(over.x);
-        stage.setY(over.y - height - 4 >= 0 ? over.y - height - 4 : over.y + 4);
+        stage.setX(over.getMinX());
+        stage.setY(over.getMinY() - height - 4 >= 0 ? over.getMinY() - height - 4 : over.getMinY() + 4);
         promoteAboveFullscreen(stage);
         return stage;
     }

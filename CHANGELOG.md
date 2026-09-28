@@ -143,6 +143,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     one title shows once. A tile whose preview failed says "No preview" instead of "…" for ever.
   - "Another window or screen…" from a pill's pick menu shows no region row, since it chooses only where to
     pick.
+- **✂ Capture Templates:**
+  - On a scaled (HiDPI) screen the drawing surface, the object cutter and the toolbar sit over the window
+    instead of off to the right and too large. An emulator frame is no longer shrunk by the screen's scale.
+  - A picture no longer risks catching the drawing surface's tint and control bar: the save waits for the
+    surface to leave the screen before grabbing.
+  - The naming dialog and warnings open above a fullscreen game instead of behind it, owned by the editor.
+  - Oval pictures have a smooth edge instead of a stair-stepped one.
+  - Capture many: Ctrl+Z removes the region drawn last.
+  - Capture object: undoing the first box goes back to drawing a box instead of leaving nothing to refine.
+  - The toolbar's size readout follows the window when it is resized between captures, and shows the size
+    a picture records.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every
