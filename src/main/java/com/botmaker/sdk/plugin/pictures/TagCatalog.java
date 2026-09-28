@@ -112,6 +112,24 @@ public record TagCatalog(List<Tag> tags) {
     }
 
     /**
+     * Why {@code tag} (sanitized) can't be declared, phrased for the user, or null when it can — the one answer
+     * the new-tag and rename-tag dialogs share. {@code current} is the tag being renamed, or null: it may keep
+     * its own name in another case.
+     */
+    public String nameProblem(String tag, String current) {
+        if (tag == null || tag.isBlank()) return "Please enter a name for the tag.";
+        if (current != null && tag.equalsIgnoreCase(current)) return null;
+        if (TemplateManifest.isSyntheticTag(tag)) {
+            return "\"" + tag + "\" is a built-in group. Choose a different name.";
+        }
+        Tag existing = find(tag);
+        if (existing == null) return null;
+        return existing.isManaged()
+                ? "\"" + existing.name() + "\" is the tag of the activity of that name — it already exists."
+                : "There is already a tag called \"" + existing.name() + "\".";
+    }
+
+    /**
      * {@code names} narrowed to the tags this catalog declares, spelled the way the catalog spells them and
      * ordered the way it orders them — what every assignment path saves, so a stale selection or a
      * hand-edited manifest can't put an undeclared tag back into the file.

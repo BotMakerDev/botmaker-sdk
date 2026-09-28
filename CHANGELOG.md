@@ -154,6 +154,24 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - Capture object: undoing the first box goes back to drawing a box instead of leaving nothing to refine.
   - The toolbar's size readout follows the window when it is resized between captures, and shows the size
     a picture records.
+- **🖼 Manage Pictures:**
+  - *Replace image ▸ Capture a new picture…* captures from the project's capture source, the way Capture
+    Templates does, and records that surface's size. It used to crop the whole desktop and record the
+    monitor's size, so the bot rescaled the new picture wrongly. The window comes back when the capture is
+    cancelled; it used to stay minimised, and because it is modal it blocked Studio.
+  - A picture named before names were lowercase (`Ore`) can be renamed to `ore`. The rename refused it as
+    taken by itself.
+  - A rename whose file move fails puts the `Pictures` constant back, so the bot still finds the picture.
+  - The preview shows a replaced picture straight away.
+  - A delete that stops part-way says why. The count used to replace the reason.
+  - Missing files are found from the `Pictures` constants as well as from the tags. An untagged picture
+    deleted in a file manager went unnoticed until a run failed to load it. *Forget them* says which
+    constants stayed because something still uses them.
+  - Importing a `.bmtemplates` archive files the pictures under their custom tags. The tags arrived
+    undeclared, so every imported picture showed as Untagged.
+  - Renaming a tag checks the name as you type, the same way a new tag does, and a change of case is
+    allowed.
+  - Typing in the search box no longer lists the folder and reads the flow on every keystroke.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every

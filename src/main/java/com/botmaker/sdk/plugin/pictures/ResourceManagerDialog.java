@@ -4,8 +4,6 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
-import com.botmaker.sdk.plugin.screen.ScreenCapture;
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
@@ -34,6 +32,8 @@ import javafx.stage.Window;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -192,14 +192,18 @@ public final class ResourceManagerDialog {
         return gallery.selectedFiles();
     }
 
+    /**
+     * Shows {@code file}, read from disk now. Through a stream rather than a URL, so the picture a replace has
+     * just written is the one shown, and a file that went away shows nothing instead of throwing.
+     */
     private void showPreview(Path file) {
-        if (file == null) {
+        if (file == null || !Files.isRegularFile(file)) {
             preview.setImage(null);
             return;
         }
-        try {
-            preview.setImage(new Image(file.toUri().toString()));
-        } catch (Exception e) {
+        try (InputStream in = Files.newInputStream(file)) {
+            preview.setImage(new Image(in));
+        } catch (IOException e) {
             preview.setImage(null);
         }
     }
@@ -309,7 +313,7 @@ public final class ResourceManagerDialog {
         if (file == null) return;
         String current = TemplateLibrary.baseName(file);
         String wanted = TemplateLibrary.sanitizeName(nameField.getText());
-        String problem = renameProblem(current, wanted);
+        String problem = TemplateNaming.renameProblem(resources(), current, wanted);
         boolean unchanged = wanted.equals(current);
         renameButton.setDisable(problem != null || unchanged || nameField.isDisabled());
         if (TemplateLibrary.isDefaultTemplate(file)) {
@@ -324,24 +328,13 @@ public final class ResourceManagerDialog {
         }
     }
 
-    /** Why {@code wanted} can't be used, or null when it can. */
-    private String renameProblem(String current, String wanted) {
-        if (wanted.isBlank()) return "A template needs a name.";
-        if (wanted.equals(current)) return null;
-        if (TemplateLibrary.isReservedName(wanted)) return "\"" + wanted + "\" is a name the library uses.";
-        if (TemplateLibrary.exists(resources(), wanted)) {
-            return "There is already a template called " + wanted + ".";
-        }
-        return null;
-    }
-
     /** Renames the previewed template and every block that names it, in one step. */
     private void renameToFieldValue() {
         Path file = selectedFile();
         if (file == null || renameButton.isDisabled()) return;
         String current = TemplateLibrary.baseName(file);
         String wanted = TemplateLibrary.sanitizeName(nameField.getText());
-        if (renameProblem(current, wanted) != null) return;
+        if (wanted.equals(current) || TemplateNaming.renameProblem(resources(), current, wanted) != null) return;
         // The Java first: the host refuses a rename that would stop the bot compiling, and then the file has
         // not moved either. Unmarked: every block still points at the same picture, under a new name.
         TemplateUses.Scan scan = TemplateUses.find(values(), current);
@@ -352,15 +345,20 @@ public final class ResourceManagerDialog {
         }
         try {
             TemplateLibrary.renameTemplate(resources(), file, wanted);
-            published();
-            reload();
-            gallery.setSelection(List.of(TemplateLibrary.fileForName(resources(), wanted)));
-            statusLabel.setText(scan.isEmpty()
-                    ? "Renamed to " + wanted + "."
-                    : "Renamed to " + wanted + " and updated " + scan.describe() + ".");
         } catch (IOException e) {
-            statusLabel.setText("Failed to rename: " + e.getMessage());
+            // The constant already names the new file, which is not there: put the Java back, so the bot
+            // goes on finding the picture that did not move.
+            Optional<String> back = TemplateUses.rename(values(), wanted, current);
+            statusLabel.setText("Failed to rename: " + e.getMessage()
+                    + back.map(why -> " — and the bot still names " + wanted + ": " + why).orElse(""));
+            return;
         }
+        published();
+        reload();
+        gallery.setSelection(List.of(TemplateLibrary.fileForName(resources(), wanted)));
+        statusLabel.setText(scan.isEmpty()
+                ? "Renamed to " + wanted + "."
+                : "Renamed to " + wanted + " and updated " + scan.describe() + ".");
     }
 
     // -------------------------------------------------------------------------
@@ -486,15 +484,18 @@ public final class ResourceManagerDialog {
     // about pictures that already exist, including the per-picture "Capture a new picture…", which is a
     // region crop this window runs itself.
 
-    /** Recaptures a template's picture from the screen, keeping everything else about it. */
+    /**
+     * Recaptures a template's picture from the project's capture source — the surface the bot matches it on,
+     * whose size the sidecar records — keeping everything else about it. This window steps aside while the
+     * surface is up and comes back however the capture ends, a cancel included.
+     */
     private void replaceByCapture(Path file) {
         if (file == null) return;
-        stage.setIconified(true);   // a region crop owns the screen; this window is on it
-        new ScreenCapture().captureRegion(stage, (BufferedImage img, int sourceW, int sourceH) ->
-                Platform.runLater(() -> {
-                    stage.setIconified(false);
-                    applyReplacement(file, img, sourceW, sourceH);
-                }));
+        stage.hide();
+        CaptureTemplates.recapture(services, owner, (picture, frameWidth, frameHeight, windowTitle) -> {
+            stage.show();
+            applyReplacement(file, picture, frameWidth, frameHeight, windowTitle);
+        }, stage::show);
     }
 
     /** Replaces a template's picture with an image file from disk. */
@@ -513,22 +514,19 @@ public final class ResourceManagerDialog {
                 return;
             }
             // Unknown capture resolution: the file came from outside, so there is no window size to record.
-            applyReplacement(file, img, 0, 0);
+            applyReplacement(file, img, 0, 0, null);
         } catch (IOException e) {
             statusLabel.setText("Failed to read the image: " + e.getMessage());
         }
     }
 
-    private void applyReplacement(Path file, BufferedImage img, int sourceW, int sourceH) {
+    private void applyReplacement(Path file, BufferedImage img, int sourceW, int sourceH, String windowTitle) {
         if (img == null) return;
         try {
-            TemplateLibrary.replaceImage(file, img, sourceW, sourceH, null);
+            TemplateLibrary.replaceImage(file, img, sourceW, sourceH, windowTitle);
             published();
             reload();
             gallery.setSelection(List.of(file));
-            // Straight from disk, past the JavaFX image cache, which would otherwise hand back the old picture
-            // for the same URL.
-            preview.setImage(new Image(file.toUri() + "?t=" + System.currentTimeMillis()));
             statusLabel.setText("Replaced the picture of " + TemplateLibrary.baseName(file)
                     + " — every block that uses it now sees the new one.");
         } catch (IOException e) {
@@ -631,17 +629,19 @@ public final class ResourceManagerDialog {
      */
     private void deleteAll(List<Path> files, boolean skippedDefault, int rewritten) {
         int deleted = 0;
+        String stopped = null;
         for (Path file : files) {
-            Optional<String> kept = TemplateUses.forget(values(), TemplateLibrary.baseName(file));
+            String name = TemplateLibrary.baseName(file);
+            Optional<String> kept = TemplateUses.forget(values(), name);
             if (kept.isPresent()) {
-                statusLabel.setText("Stopped before " + TemplateLibrary.baseName(file) + ": " + kept.get());
+                stopped = "Stopped before " + name + ": " + kept.get();
                 break;
             }
             try {
                 TemplateLibrary.deleteTemplate(resources(), file);
                 deleted++;
             } catch (IOException e) {
-                statusLabel.setText("Failed to delete " + TemplateLibrary.baseName(file) + ": " + e.getMessage());
+                stopped = "Failed to delete " + name + ": " + e.getMessage();
                 break;
             }
         }
@@ -653,7 +653,8 @@ public final class ResourceManagerDialog {
                     + " elsewhere";
         }
         if (skippedDefault) note += ". The default template was left alone";
-        statusLabel.setText(note + ".");
+        // The reason a delete stopped is the sentence that matters, so the count cannot write over it.
+        statusLabel.setText(note + "." + (stopped == null ? "" : " " + stopped));
     }
 
     // -------------------------------------------------------------------------
@@ -773,17 +774,16 @@ public final class ResourceManagerDialog {
     // -------------------------------------------------------------------------
 
     /**
-     * Asks about templates the manifest still files but whose file is gone — deleted in a file manager, or
-     * lost to a git checkout. Nothing used to say anything: the tags stayed, the generated constant vanished
-     * on the next regeneration, and the first anyone heard of it was a block failing to find its picture at
-     * run time.
+     * Asks about templates the project still names — a tag, a {@code Pictures} constant — whose file is gone:
+     * deleted in a file manager, or lost to a git checkout ({@link TemplateUses#missing}). Otherwise the first
+     * anyone hears of it is a block failing to find its picture at run time.
      *
-     * <p>Two answers are offered, because there are two situations. Nothing in the source names it: forget it,
-     * which drops the manifest entry. Something does: point those blocks at a template that still exists,
-     * through the same transfer the delete path uses — that is the repair, and it is the same one either way.
+     * <p>Two answers are offered, because there are two situations. Nothing in the source uses it: forget it,
+     * which drops its tags and its constant. Something does: point those blocks at a template that still
+     * exists, through the same transfer the delete path uses — that is the repair either way.
      */
     private void reportMissing() {
-        List<String> missing = TemplateLibrary.missingTemplates(resources());
+        List<String> missing = TemplateUses.missing(values(), resources());
         if (missing.isEmpty()) return;
 
         Map<String, TemplateUses.Scan> used = new LinkedHashMap<>();
@@ -793,10 +793,10 @@ public final class ResourceManagerDialog {
         }
 
         StringBuilder body = new StringBuilder(missing.size() == 1
-                ? "\"" + missing.getFirst() + "\" is still filed under its tags, but its file is not in the "
-                        + "project any more."
-                : missing.size() + " templates are still filed under their tags, but their files are not in "
-                        + "the project any more:\n    " + String.join(", ", missing));
+                ? "\"" + missing.getFirst() + "\" is still named by this project, but its file is not in it any "
+                        + "more."
+                : missing.size() + " templates are still named by this project, but their files are not in it "
+                        + "any more:\n    " + String.join(", ", missing));
         if (!used.isEmpty()) {
             body.append("\n\nYour blocks still name ").append(used.size() == 1 ? "one of them" : "some of them")
                     .append(":\n");
@@ -836,20 +836,23 @@ public final class ResourceManagerDialog {
         }
     }
 
-    /** Drops the manifest entries of templates that no longer have a file, and regenerates the constants. */
+    /** Drops the manifest entries and the {@code Pictures} constants of templates that no longer have a file. */
     private void forgetMissing(List<String> missing) {
         TemplateManifest manifest = TemplateLibrary.manifest(resources());
+        List<String> stillUsed = new ArrayList<>();
         for (String name : missing) {
             manifest = manifest.without(name);
             // Its constant goes too, unless something still reads it: the host refuses that, and a constant
-            // naming a missing file is the user's to see in the Errors tab rather than ours to guess about.
-            TemplateUses.forget(values(), name);
+            // naming a missing file is the user's to fix where it is used rather than ours to guess about.
+            if (TemplateUses.forget(values(), name).isPresent()) stillUsed.add(name);
         }
         TemplateLibrary.saveManifest(resources(), manifest);
         published();
         reload();
         statusLabel.setText("Forgot " + missing.size() + (missing.size() == 1 ? " template" : " templates")
-                + " whose file was gone.");
+                + " whose file was gone."
+                + (stillUsed.isEmpty() ? "" : " Still used, so still declared in Pictures: "
+                        + String.join(", ", stillUsed) + "."));
     }
 
     // -------------------------------------------------------------------------

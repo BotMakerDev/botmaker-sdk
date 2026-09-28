@@ -196,6 +196,54 @@ public final class CaptureTemplates {
         new CaptureTemplates(services, owner, target, suggestedTag, done).start();
     }
 
+    /** What {@link #recapture} hands back: the new picture, the frame it was cut from, and that frame's window. */
+    @FunctionalInterface
+    public interface Recaptured {
+        void accept(BufferedImage picture, int frameWidth, int frameHeight, String windowTitle);
+    }
+
+    /**
+     * One rectangle over the project's capture source, unnamed and unsaved — Manage Pictures' replace. The
+     * same surface and the same settle-then-regrab as Capture one, without the toolbar: a picture being
+     * replaced already has its name and its tags. {@code onCancelled} runs when no picture comes back, Esc and
+     * a failed grab included, so a caller that stepped aside always returns.
+     */
+    public static void recapture(StudioServices services, Window owner, Recaptured onCaptured,
+                                 Runnable onCancelled) {
+        new CaptureTemplates(services, owner, null, null, names -> {}).recaptureOnce(onCaptured, onCancelled);
+    }
+
+    private void recaptureOnce(Recaptured onCaptured, Runnable onCancelled) {
+        Consumer<EditorFrame.Failure> failed = failure -> {
+            dropSurface();
+            warn(failure.headline() + "\n\n" + failure.detail());
+            onCancelled.run();
+        };
+        grab(frame -> surface = CaptureSurface.single(frame, CaptureSurface.Shape.RECT, region -> {
+            surface.hide();
+            grabAfterHiding(fresh -> {
+                dropSurface();
+                BufferedImage cropped = crop(fresh.image(), region);
+                if (cropped == null) {
+                    onCancelled.run();
+                    return;
+                }
+                onCaptured.accept(cropped, fresh.image().getWidth(), fresh.image().getHeight(), windowTitle());
+            }, failed);
+        }, () -> {
+            dropSurface();
+            onCancelled.run();
+        }), failed);
+    }
+
+    /** Disposes the drawing surface, if one is up. */
+    private void dropSurface() {
+        if (surface != null) {
+            surface.close();
+            surface = null;
+        }
+    }
+
     /**
      * Probes the target once up front, so the tool fails before showing anything and can place its toolbar
      * beside where the target actually is. Every later capture re-probes, so a window the user has since
@@ -415,10 +463,7 @@ public final class CaptureTemplates {
 
     /** Disposes the active surface (if any) and brings the mini-toolbar back. */
     private void endSession() {
-        if (surface != null) {
-            surface.close();
-            surface = null;
-        }
+        dropSurface();
         if (objectSurface != null) {
             objectSurface.close();
             objectSurface = null;
@@ -428,10 +473,7 @@ public final class CaptureTemplates {
 
     /** Closes the toolbar and any live surface, and clears the single-instance reference. */
     private void closeTool() {
-        if (surface != null) {
-            surface.close();
-            surface = null;
-        }
+        dropSurface();
         if (objectSurface != null) {
             objectSurface.close();
             objectSurface = null;

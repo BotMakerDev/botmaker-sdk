@@ -5,7 +5,10 @@ import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -90,6 +93,21 @@ class TemplateUsesTest {
     }
 
     @Test
+    void aConstantWhoseFileIsGoneIsMissingEvenWithNoTag(@TempDir Path resources) throws IOException {
+        TemplateLibrary.saveTemplate(resources, new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB), "ore", 0, 0,
+                null);
+        Host host = new Host("ORE", "GOLD", "ELSEWHERE");
+        host.paths.put("ORE", TemplateLibrary.pathForName("ore"));
+        host.paths.put("GOLD", TemplateLibrary.pathForName("gold"));
+        host.paths.put("ELSEWHERE", "assets/elsewhere.png");
+        TemplateLibrary.saveManifest(resources, TemplateManifest.empty().declaring("Loot")
+                .withTags("silver", List.of("Loot")));
+
+        assertEquals(List.of("gold", "silver"), TemplateUses.missing(host, resources),
+                "gold's constant and silver's tag outlived their files; a path the user chose is theirs");
+    }
+
+    @Test
     void theRepointNoteNamesBothPictures() {
         String note = TemplateUses.repointNote("ore", "gold");
         assertTrue(note.contains("\"ore\"") && note.contains("\"gold\""), note);
@@ -120,8 +138,13 @@ class TemplateUsesTest {
         public Optional<ValueContext> open(String id, String member) {
             if (!members.contains(member)) return Optional.empty();
             opened = TestContexts.row(ImageTemplate.class, "new ImageTemplate(\"old.png\")");
+            String path = paths.get(member);
+            if (path != null) opened = opened.withValue(new ImageTemplate(path));
             return Optional.of(opened);
         }
+
+        /** The path each constant's initialiser holds, for the constants a test reads back. */
+        final Map<String, String> paths = new LinkedHashMap<>();
 
         @Override
         public Optional<String> add(String id, String member, Object value) {

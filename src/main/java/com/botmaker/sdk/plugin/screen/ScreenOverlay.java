@@ -99,35 +99,15 @@ public final class ScreenOverlay {
         this.origin = origin;
     }
 
-    /** Receives a cropped region plus the physical resolution of the source it was cropped from. */
-    @FunctionalInterface
-    public interface RegionCapture {
-        void onRegion(BufferedImage cropped, int sourceWidth, int sourceHeight);
-    }
-
     /** What a {@link #pickColor} overlay reports: where the click landed, and the pixel that was under it. */
     public record ScreenPick(int x, int y, java.awt.Color color) {}
-
-    /**
-     * The interactive crop: the frame is shown 1:1 and the user rubber-bands a region. With several monitors
-     * and a desktop source the user first picks which screen. Calls {@code onCaptured} with the cropped image
-     * and the size of the frame it was cut from (a picture's authored resolution), or does nothing if the user
-     * cancels or capture is unavailable.
-     */
-    public void captureRegion(Window owner, RegionCapture onCaptured) {
-        grabAsync(owner, shot -> showRegion(owner, shot, "Drag over what the picture should show.", rect -> {
-            BufferedImage frame = shot.image();
-            onCaptured.onRegion(frame.getSubimage(rect[0], rect[1], rect[2], rect[3]),
-                    frame.getWidth(), frame.getHeight());
-        }, false));
-    }
 
     /**
      * Interactive rubber-band selection reporting {@code [x, y, width, height]} in the frame's pixels, then
      * this overlay's {@link PickSpace}. Does nothing if the user cancels or capture is unavailable.
      */
     public void selectRegion(Window owner, Consumer<int[]> onSelected) {
-        grabAsync(owner, shot -> showRegion(owner, shot, "Drag to select a region.", onSelected, true));
+        grabAsync(owner, shot -> showRegion(owner, shot, "Drag to select a region.", onSelected));
     }
 
     /**
@@ -269,12 +249,10 @@ public final class ScreenOverlay {
 
     /**
      * The one rubber-band overlay. While dragging, a readout beside the band says the region it will report;
-     * on release a region at least {@link #MIN_DRAG} pixels each way is handed on, clamped to the frame.
-     *
-     * @param mapped true to report the region through this overlay's {@link PickSpace}; false for a crop, which
-     *               is always in the frame's own pixels
+     * on release a region at least {@link #MIN_DRAG} pixels each way is handed on, clamped to the frame and
+     * mapped through this overlay's {@link PickSpace}.
      */
-    private void showRegion(Window owner, ScreenShot shot, String hint, Consumer<int[]> onRegion, boolean mapped) {
+    private void showRegion(Window owner, ScreenShot shot, String hint, Consumer<int[]> onRegion) {
         Pane pane = new Pane(background(shot));
 
         Rectangle selection = new Rectangle();
@@ -307,8 +285,7 @@ public final class ScreenOverlay {
             selection.setY(Math.min(start[1], y));
             selection.setWidth(Math.abs(x - start[0]));
             selection.setHeight(Math.abs(y - start[1]));
-            int[] r = sourceRect(shot, pane, selection);
-            if (mapped) r = space.region(r, origin);
+            int[] r = space.region(sourceRect(shot, pane, selection), origin);
             readout.setText("%d, %d   %d × %d".formatted(r[0], r[1], r[2], r[3]));
             double rx = selection.getX() + selection.getWidth() + 6;
             double ry = selection.getY() + selection.getHeight() + 6;
@@ -320,8 +297,7 @@ public final class ScreenOverlay {
             if (!selection.isVisible() || e.getButton() != MouseButton.PRIMARY) return;
             stage.close();
             if (selection.getWidth() < MIN_DRAG || selection.getHeight() < MIN_DRAG) return;
-            int[] r = sourceRect(shot, pane, selection);
-            onRegion.accept(mapped ? space.region(r, origin) : r);
+            onRegion.accept(space.region(sourceRect(shot, pane, selection), origin));
         });
         stage.show();
     }

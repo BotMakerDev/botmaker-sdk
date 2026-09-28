@@ -195,6 +195,16 @@ class TemplateManifestTest {
     }
 
     @Test
+    void aChangeOfCaseIsARenameToo() {
+        TemplateManifest renamed = TemplateManifest.empty()
+                .declaring("shared")
+                .withTags("a", List.of("shared"))
+                .renamedTag("shared", "Shared");
+        assertEquals(List.of("Shared"), List.copyOf(renamed.customTags()));
+        assertEquals(List.of("Shared"), List.copyOf(renamed.tagsOf("a")));
+    }
+
+    @Test
     void theListingIsOverTheDeclaredSetNotOverWhatWasAssigned() {
         TagCatalog catalog = TagCatalog.of(null, List.of("Shared", "Empty"));
         TemplateManifest manifest = TemplateManifest.empty()

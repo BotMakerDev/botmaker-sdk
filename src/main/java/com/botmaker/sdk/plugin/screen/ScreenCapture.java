@@ -24,14 +24,6 @@ public final class ScreenCapture {
 
     private final ScreenOverlay overlay = new ScreenOverlay(new DesktopSource());
 
-    /**
-     * The interactive crop, reporting the cropped image and the physical resolution of the screen it was cut
-     * from, so the caller can record it as the picture's authored resolution.
-     */
-    public void captureRegion(Window owner, ScreenOverlay.RegionCapture onCaptured) {
-        overlay.captureRegion(owner, onCaptured);
-    }
-
     /** Rubber-band selection returning {@code [x, y, width, height]} in the chosen screen's pixels. */
     public void selectRegion(Window owner, Consumer<int[]> onSelected) {
         overlay.selectRegion(owner, onSelected);

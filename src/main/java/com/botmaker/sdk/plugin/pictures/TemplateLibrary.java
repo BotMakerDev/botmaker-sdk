@@ -168,11 +168,11 @@ public final class TemplateLibrary {
      * check {@link #exists} for uniqueness. Shared by every naming path (the single-capture prompt and the
      * batch dialog).
      *
-     * <p><b>Lowercase, and no {@code -}, because the name is also a Java constant.</b> Every template is
-     * declared in the generated {@code Templates} class as {@code YTUJ = "…/ytuj.png"}, and Studio reads that
-     * constant back to know which file a block refers to. Restricting the name to a lowercase identifier makes
-     * the two exactly reversible — see {@link TemplateNames}. Names captured
-     * before this rule keep working; they simply get no constant.
+     * <p><b>Lowercase, and no {@code -}, because the name is also a Java constant.</b> Every picture is
+     * declared in the bot's {@code Pictures} class as {@code ORE = new ImageTemplate("…/ore.png")}, and a block
+     * names it through that constant. Restricting the name to a lowercase identifier makes the two exactly
+     * reversible — see {@link TemplateNames}. Names captured before this rule keep working; they simply get no
+     * constant until they are renamed.
      */
     public static String sanitizeName(String raw) {
         return raw == null ? "" : raw.trim().replaceAll("[^A-Za-z0-9_]", "_").toLowerCase(Locale.ROOT);
@@ -194,8 +194,8 @@ public final class TemplateLibrary {
         if (!Files.isDirectory(dir)) return List.of();
         try (Stream<Path> files = Files.list(dir)) {
             return files
-                    .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".png"))
-                    .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()))
+                    .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".png"))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT)))
                     .toList();
         } catch (IOException e) {
             System.err.println("Failed to list image templates: " + e.getMessage());
@@ -511,9 +511,8 @@ public final class TemplateLibrary {
 
     /**
      * Templates the manifest still files under a tag but whose PNG is no longer on disk — someone deleted the
-     * file outside Studio. {@link #list} simply stops returning them, which is why nothing noticed: the tags
-     * survive, the generated constant goes away on the next regeneration, and any block naming the template
-     * fails at run time with a missing file. The resource manager asks about these when it opens.
+     * file outside Studio. {@link #list} simply stops returning them, so nothing else notices. The manifest's
+     * half of {@link TemplateUses#missing}, which adds the {@code Pictures} constants left naming a gone file.
      */
     public static List<String> missingTemplates(Path resourcesDir) {
         return manifest(resourcesDir).tagsByTemplate().keySet().stream()

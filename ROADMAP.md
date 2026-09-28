@@ -8,6 +8,30 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — Manage Pictures reworked (SDK plugin rework, phase 4)
+
+**Done**
+- `CaptureTemplates.recapture(services, owner, Recaptured, onCancelled)`: one rectangle over the project's
+  capture source, with the same surface and settle-then-regrab as Capture one, and no toolbar or naming.
+  Manage Pictures' *Capture a new picture…* uses it and hides and shows its window around it. The desktop
+  crop it replaced (`ScreenCapture.captureRegion`, `ScreenOverlay.captureRegion`/`RegionCapture`) is deleted,
+  and `showRegion` lost its `mapped` flag.
+- `TemplateNaming.renameProblem`: the rename check, in the new-name wording, accepting a change of case.
+  `ResourceManagerDialog` rolls the constant back when the file move fails, previews through a stream, and
+  keeps a delete's stop reason in the status line.
+- `TemplateUses.missing(values, resourcesDir)`: the manifest's missing names plus every `Pictures` constant
+  written as ours (`ORE` → `…/ore.png`) whose file is gone. `forgetMissing` reports the constants the host
+  kept.
+- `TemplateArchive.importInto` declares the custom tags the imported pictures carry.
+- `TagCatalog.nameProblem(tag, current)` is shared by `TagPicker.promptNewTag` and the new
+  `promptRenameTag`. `TagManagerDialog`'s loop of warning pop-ups is gone. `TemplateManifest.renamedTag`
+  accepts a change of case.
+- `TemplateGallery` holds the library per `reload()`, so the search and the rail redraw without I/O.
+- Stale javadoc fixed: `ImageTemplateLibrary`, `ProjectArchive`, the generated `Templates` class,
+  `TagPicklist`, `EditorFrame#defaultTarget`.
+- Tests: `TemplateArchiveTest`, `TemplateNamingTest`, and additions to `TemplateUsesTest`, `TagCatalogTest`
+  and `TemplateManifestTest`.
+
 ## 2026-09-28 — Capture Templates reworked (SDK plugin rework, phase 3)
 
 **Done**

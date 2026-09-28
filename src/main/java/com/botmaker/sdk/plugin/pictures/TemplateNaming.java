@@ -298,6 +298,19 @@ public final class TemplateNaming {
         return null;
     }
 
+    /**
+     * Why the picture {@code current} cannot be renamed to {@code wanted} (both sanitized), or null when it can
+     * — Manage Pictures' rename, in the same words as a new name.
+     *
+     * <p>A name differing from {@code current} only in case is the picture's own and not a collision: a picture
+     * named before names were lowercase ({@code Ore.png}) is renamed to {@code ore} exactly that way, and the
+     * case-insensitive {@link TemplateLibrary#exists} would otherwise refuse it as taken by itself.
+     */
+    static String renameProblem(Path resources, String current, String wanted) {
+        if (wanted != null && wanted.equalsIgnoreCase(current) && !wanted.isBlank()) return null;
+        return nameProblem(resources, wanted, "A picture needs a name.");
+    }
+
     private static List<NamedTemplate> fail(StudioServices services, Window owner, String message) {
         warn(services, owner, message);
         return null;

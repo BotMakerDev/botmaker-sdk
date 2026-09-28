@@ -85,6 +85,15 @@ public final class TemplateGallery extends HBox {
     private double bandOriginY;
     private boolean banding;
 
+    /**
+     * The library as of the last {@link #reload()}: files by tag, their tags, the declared set. Held so that a
+     * keystroke in the search or a click on the rail redraws the grid without listing the folder, parsing the
+     * manifest and reading the flow again; every change made here reloads.
+     */
+    private Map<String, List<Path>> byTag = Map.of();
+    private TemplateManifest manifest = TemplateManifest.empty();
+    private TagCatalog catalog = TagCatalog.empty();
+
     private Predicate<Path> filter = file -> true;
     private Runnable onSelectionChanged;
     private Runnable onTagChanged;
@@ -176,9 +185,10 @@ public final class TemplateGallery extends HBox {
             // an unwritable folder is a gallery with one fewer cell, not a refusal
         }
         TemplateGalleryModel.Row was = rail.getSelectionModel().getSelectedItem();
-        TagCatalog catalog = TemplateLibrary.tagCatalog(services);
-        List<TemplateGalleryModel.Row> rows =
-                TemplateGalleryModel.rows(TemplateLibrary.listByTag(services), catalog);
+        catalog = TemplateLibrary.tagCatalog(services);
+        manifest = TemplateLibrary.manifest(resourcesDir);
+        byTag = TemplateLibrary.listByTag(services);
+        List<TemplateGalleryModel.Row> rows = TemplateGalleryModel.rows(byTag, catalog);
         rail.getItems().setAll(rows);
 
         String wanted = was instanceof TemplateGalleryModel.TagRow row ? row.tag() : TemplateManifest.ALL;
@@ -258,14 +268,11 @@ public final class TemplateGallery extends HBox {
     }
 
     private void refreshGrid() {
-        List<Path> files = TemplateLibrary.listByTag(services)
-                .getOrDefault(selectedTag(), List.of()).stream().filter(filter).toList();
+        List<Path> files = byTag.getOrDefault(selectedTag(), List.of()).stream().filter(filter).toList();
         List<Path> visible = TemplateGalleryModel.matching(files, search.getText());
 
         tiles.clear();
         grid.getChildren().clear();
-        TemplateManifest manifest = TemplateLibrary.manifest(resourcesDir);
-        TagCatalog catalog = TemplateLibrary.tagCatalog(services);
         for (Path file : visible) {
             Node tile = tile(file, catalog.declaredOnly(manifest.tagsOf(TemplateLibrary.baseName(file))));
             tiles.put(file, tile);

@@ -5,13 +5,10 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -21,7 +18,6 @@ import javafx.stage.Window;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * The one place the project's tags are edited — "declared, not invented" needs somewhere the declaring
@@ -139,44 +135,11 @@ public final class TagManagerDialog {
             status.setText("\"" + tag.name() + "\" follows its activity — rename the activity to rename it.");
             return;
         }
-        promptRename(tag.name()).ifPresent(renamed -> {
+        TagPicker.promptRenameTag(services, stage, tag.name()).ifPresent(renamed -> {
             TemplateLibrary.saveManifest(resources(),
                     TemplateLibrary.manifest(resources()).renamedTag(tag.name(), renamed));
             changed("Renamed to \"" + renamed + "\".");
         });
-    }
-
-    private Optional<String> promptRename(String current) {
-        TagCatalog catalog = TemplateLibrary.tagCatalog(services);
-        while (true) {
-            Dialog<String> dialog = new Dialog<>();
-            services.theme().apply(dialog);
-            dialog.initOwner(stage);
-            dialog.setTitle("Rename tag");
-            dialog.setHeaderText(null);
-            ButtonType ok = new ButtonType("Rename", ButtonBar.ButtonData.OK_DONE);
-            dialog.getDialogPane().getButtonTypes().addAll(ok, ButtonType.CANCEL);
-
-            TextField field = new TextField(current);
-            VBox box = new VBox(8, new Label("New name for \"" + current + "\":"), field);
-            box.setPadding(new Insets(10));
-            dialog.getDialogPane().setContent(box);
-            dialog.setResultConverter(bt -> bt == ok ? field.getText() : null);
-
-            Optional<String> raw = dialog.showAndWait();
-            if (raw.isEmpty()) return Optional.empty();
-            String name = TemplateManifest.sanitizeTag(raw.get());
-            if (name.equalsIgnoreCase(current)) return Optional.empty();
-            if (name.isBlank() || TemplateManifest.isSyntheticTag(name)) {
-                warn("Please choose a name that isn't blank or a built-in group.");
-                continue;
-            }
-            if (catalog.isDeclared(name)) {
-                warn("There is already a tag called \"" + name + "\".");
-                continue;
-            }
-            return Optional.of(name);
-        }
     }
 
     private void deleteSelected() {
@@ -205,11 +168,5 @@ public final class TagManagerDialog {
         status.setText(message);
         reload();
         if (onChanged != null) onChanged.run();
-    }
-
-    private void warn(String message) {
-        Alert alert = services.theme().alert(Alert.AlertType.WARNING, message);
-        alert.initOwner(stage);
-        alert.showAndWait();
     }
 }

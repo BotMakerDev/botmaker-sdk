@@ -17,8 +17,7 @@ import java.util.zip.ZipOutputStream;
  * Import/export of image templates on their own — a {@code .bmtemplates} zip — so a set of templates can move
  * between projects without carrying a whole bot with it.
  *
- * <p>Distinct from {@link ProjectArchive}, which collects a <em>project</em> to publish. This is the smaller
- * unit: the PNGs, their resolution sidecars (the SDK reads those to rescale a template at a different
+ * <p>Smaller than a published project: the PNGs, their resolution sidecars (the SDK reads those to rescale a template at a different
  * resolution — an export without them would import templates that mis-scale) and a slice of the tag manifest
  * covering exactly the exported names.
  *
@@ -30,8 +29,8 @@ import java.util.zip.ZipOutputStream;
  * </pre>
  *
  * <p>Import never overwrites: a name already taken in the destination is imported under a suffixed name and
- * reported. Templates are referenced from generated source by path, so silently replacing one would change
- * what an existing bot matches against — the safe failure is a duplicate the user can delete, not a
+ * reported. A bot names a template through its {@code Pictures} constant, so silently replacing one would
+ * change what an existing bot matches against — the safe failure is a duplicate the user can delete, not a
  * substitution they never see.
  *
  * <p><b>Unless the two are the same picture</b>, in which case the import is skipped entirely. Renaming
@@ -181,6 +180,18 @@ public final class TemplateArchive {
             merged = merged.withTags(target, incoming.tagsOf(source));
             imported.add(target);
             if (!target.equals(sanitized)) renamed.put(sanitized, target);
+        }
+
+        // A custom tag an imported picture carries arrives declared. An assignment to a tag nothing declares
+        // is inert, so without this every imported picture was filed under Untagged. A tag nothing imported
+        // carries is not declared: the pictures that wore it were already here.
+        for (String tag : incoming.customTags()) {
+            for (String name : imported) {
+                if (merged.tagsOf(name).contains(tag)) {
+                    merged = merged.declaring(tag);
+                    break;
+                }
+            }
         }
 
         TemplateLibrary.saveManifest(resourcesDir, merged);

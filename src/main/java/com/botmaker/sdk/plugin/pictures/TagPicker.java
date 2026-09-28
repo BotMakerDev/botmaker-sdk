@@ -38,8 +38,7 @@ import java.util.Set;
  * {@code ImageTemplate}'s concept and the catalog it draws is {@link TagCatalog}, read out of this plugin's
  * own manifest under {@link StudioServices#resourcesDir()}. The host is the only possible source of which
  * project is open; everything after that is vocabulary, and vocabulary on the contract is the back door the
- * platform exists to close. Studio's {@code TagPicklist} is a two-line subclass of this, so the tag manager
- * and the parameters screen — which are host work and are staying — go on offering exactly the same menu.
+ * platform exists to close.
  *
  * <p>Activity tags are listed first under their own heading, custom ones after, matching the catalog's order
  * so the same two groups appear here, in the gallery and in the tag manager. Ticking does not close the menu
@@ -157,62 +156,68 @@ public class TagPicker extends MenuButton {
      * <p>Returns the sanitized name; the caller declares it.
      */
     public static Optional<String> promptNewTag(StudioServices services, Window owner) {
+        return promptTagName(services, owner, null);
+    }
+
+    /**
+     * Asks for a new name for the custom tag {@code current}, with the same inline reasons as a new tag. Empty
+     * when cancelled or left as it was; a change of case only is a rename like any other.
+     */
+    public static Optional<String> promptRenameTag(StudioServices services, Window owner, String current) {
+        return promptTagName(services, owner, current);
+    }
+
+    /** The one tag-name dialog: a new tag when {@code current} is null, else a rename of {@code current}. */
+    private static Optional<String> promptTagName(StudioServices services, Window owner, String current) {
         TagCatalog catalog = catalogOf(services);
+        boolean rename = current != null;
         Dialog<String> dialog = new Dialog<>();
         services.theme().apply(dialog);
         if (owner != null) dialog.initOwner(owner);
-        dialog.setTitle("New tag");
+        dialog.setTitle(rename ? "Rename tag" : "New tag");
         dialog.setHeaderText(null);
-        ButtonType ok = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
+        ButtonType ok = new ButtonType(rename ? "Rename" : "Create", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(ok, ButtonType.CANCEL);
 
-        TextField field = new TextField();
+        TextField field = new TextField(rename ? current : "");
         field.setPromptText("e.g. Shared buttons");
         Label problem = new Label();
         problem.getStyleClass().add("dialog-error-text");
         problem.setWrapText(true);
-        VBox box = new VBox(8, new Label("Name this tag. It will be offered everywhere pictures "
-                + "are tagged, whether or not anything carries it yet."), field, problem);
+        VBox box = new VBox(8, new Label(rename
+                ? "New name for \"" + current + "\". Every picture filed under it follows."
+                : "Name this tag. It will be offered everywhere pictures are tagged, whether or not anything "
+                        + "carries it yet."), field, problem);
         box.setPadding(new Insets(10));
         dialog.getDialogPane().setContent(box);
 
-        Node create = dialog.getDialogPane().lookupButton(ok);
+        Node confirm = dialog.getDialogPane().lookupButton(ok);
         Runnable validate = () -> {
-            String reason = tagProblem(catalog, TemplateManifest.sanitizeTag(field.getText()));
+            String tag = TemplateManifest.sanitizeTag(field.getText());
+            String reason = catalog.nameProblem(tag, current);
             // Blank is a refusal too, but not a complaint: an empty field is where everyone starts.
-            String typed = field.getText() == null ? "" : field.getText().trim();
-            problem.setText(typed.isEmpty() ? "" : reason == null ? "" : reason);
-            create.setDisable(reason != null);
+            problem.setText(tag.isEmpty() || reason == null ? "" : reason);
+            confirm.setDisable(reason != null || tag.equals(current));
         };
         field.textProperty().addListener((o, was, is) -> validate.run());
         validate.run();
-        Platform.runLater(field::requestFocus);
+        Platform.runLater(() -> {
+            field.requestFocus();
+            field.selectAll();
+        });
         dialog.setResultConverter(bt -> bt == ok ? field.getText() : null);
 
         Optional<String> raw = dialog.showAndWait();
         if (raw.isEmpty()) return Optional.empty();
         String tag = TemplateManifest.sanitizeTag(raw.get());
-        return tagProblem(catalog, tag) == null ? Optional.of(tag) : Optional.empty();
-    }
-
-    /** Why {@code tag} can't be declared, phrased for the user, or null when it can. */
-    private static String tagProblem(TagCatalog catalog, String tag) {
-        if (tag == null || tag.isBlank()) return "Please enter a name for the tag.";
-        if (TemplateManifest.isSyntheticTag(tag)) {
-            return "\"" + tag + "\" is a built-in group. Choose a different name.";
-        }
-        TagCatalog.Tag existing = catalog.find(tag);
-        if (existing == null) return null;
-        return existing.isManaged()
-                ? "\"" + existing.name() + "\" is the tag of the activity of that name — it already exists."
-                : "There is already a tag called \"" + existing.name() + "\".";
+        return catalog.nameProblem(tag, current) == null && !tag.equals(current) ? Optional.of(tag) : Optional.empty();
     }
 
     /**
      * The project's declared tags, or an empty catalog when there is no project.
      *
-     * <p>Read on every call rather than held, for the same reason {@link EditorFrame#defaultTarget} is: a tag
-     * declared in another window has to be offered here without anything being rebuilt.
+     * <p>Read on every call rather than held: a tag declared in another window has to be offered here without
+     * anything being rebuilt.
      */
     private static TagCatalog catalogOf(StudioServices services) {
         Path resources = services == null ? null : services.resourcesDir();

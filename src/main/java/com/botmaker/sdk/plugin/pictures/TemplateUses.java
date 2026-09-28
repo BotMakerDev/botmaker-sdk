@@ -5,8 +5,11 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * A picture as the bot's Java names it — the constant {@code Pictures.ORE} in the open set
@@ -120,6 +123,28 @@ public final class TemplateUses {
     public static Optional<String> forget(PluginValues values, String baseName) {
         String constant = declared(values, baseName);
         return constant == null ? Optional.empty() : values.remove(SET, constant);
+    }
+
+    /**
+     * Every picture whose file is gone while something still names it — a tag in the manifest, or a
+     * {@code Pictures} constant — sorted. A file deleted in a file manager or lost to a checkout left both
+     * behind, and an untagged picture was invisible to a manifest-only check until a run failed to load it.
+     *
+     * <p>Only a constant written as one of ours counts ({@code ORE = new ImageTemplate(".../ore.png")}): one the
+     * user pointed at some other path is theirs, and nothing here answers for it.
+     */
+    public static List<String> missing(PluginValues values, Path resourcesDir) {
+        Set<String> gone = new TreeSet<>(TemplateLibrary.missingTemplates(resourcesDir));
+        for (String member : values.members(SET)) {
+            String baseName = TemplateNames.baseNameFor(member);
+            if (baseName == null || TemplateLibrary.exists(resourcesDir, baseName)) continue;
+            String path = values.open(SET, member)
+                    .flatMap(value -> value.value(ImageTemplate.class))
+                    .map(ImageTemplate::filePath)
+                    .orElse(null);
+            if (TemplateNames.pathFor(baseName).equals(path)) gone.add(baseName);
+        }
+        return List.copyOf(gone);
     }
 
     /**

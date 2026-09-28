@@ -74,4 +74,23 @@ class TagCatalogTest {
         assertEquals(List.of(), TagCatalog.of(List.of(), List.of()).names());
         assertEquals(List.of(), TagCatalog.empty().names());
     }
+
+    @Test
+    void aNewTagMayNotBeBlankBuiltInOrTaken() {
+        TagCatalog catalog = TagCatalog.of(activities("Mining"), List.of("Shared"));
+
+        assertTrue(catalog.nameProblem("", null).contains("enter a name"));
+        assertTrue(catalog.nameProblem("all", null).contains("built-in group"));
+        assertTrue(catalog.nameProblem("mining", null).contains("activity"));
+        assertTrue(catalog.nameProblem("SHARED", null).contains("already a tag called \"Shared\""));
+        assertNull(catalog.nameProblem("Loot", null));
+    }
+
+    @Test
+    void aRenamedTagMayKeepItsOwnNameInAnotherCase() {
+        TagCatalog catalog = TagCatalog.of(activities("Mining"), List.of("shared", "Loot"));
+
+        assertNull(catalog.nameProblem("Shared", "shared"));
+        assertTrue(catalog.nameProblem("loot", "shared").contains("already"));
+    }
 }

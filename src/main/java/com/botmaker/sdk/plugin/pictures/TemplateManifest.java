@@ -23,12 +23,12 @@ import java.util.TreeSet;
  * Which tags each image template carries — the whole of template "organisation", kept as metadata beside the
  * files rather than as directory structure.
  *
- * <p><b>Why not folders.</b> A template's identity is the path embedded in generated code
+ * <p><b>Why not folders.</b> A template's identity is the path its {@code Pictures} constant holds
  * ({@code new ImageTemplate("src/main/resources/images/accept.png")}), so moving one into a folder rewrites
- * every bot source that references it. Worse, a template shared by two activities would have to live in one
- * folder or be duplicated into both — and duplicates drift. Tags are many-to-one by construction: the file
- * never moves, {@link ImageTemplateLibrary#pathForName} never changes, and a shared template simply carries
- * both tags. The UI renders the tags as a tree, so it still <em>reads</em> like folders.
+ * the bot's source. Worse, a template shared by two activities would have to live in one folder or be
+ * duplicated into both — and duplicates drift. Tags are many-to-one by construction: the file never moves,
+ * {@link TemplateLibrary#pathForName} never changes, and a shared template simply carries both tags. The
+ * gallery's rail lists the tags, so it still <em>reads</em> like folders.
  *
  * <p>Stored as {@code templates.json} at the images root:
  * {@snippet lang=json :
@@ -38,7 +38,7 @@ import java.util.TreeSet;
  * migration. A manifest written before {@code customTags} existed is a bare {@code {"<name>": {…}}} map;
  * {@link #read} recognises both, so an older project loads with its tags intact and is rewritten into the
  * current shape on the next save. (A template <em>called</em> "templates" cannot make the two shapes
- * ambiguous: {@link ImageTemplateLibrary#isReservedName} has always refused that name, because its
+ * ambiguous: {@link TemplateLibrary#isReservedName} has always refused that name, because its
  * resolution sidecar would be this file.)
  *
  * <p><b>Assignments here, declarations elsewhere.</b> This file records which tags a template carries and
@@ -49,7 +49,7 @@ import java.util.TreeSet;
  * lossless. Rename it back and its templates are filed under it again.
  *
  * <p>Immutable — every mutator returns a new manifest, and only {@link #write} touches the disk. Names are
- * matched case-insensitively, the same way {@link ImageTemplateLibrary#exists} treats template files, so the
+ * matched case-insensitively, the same way {@link TemplateLibrary#exists} treats template files, so the
  * manifest cannot disagree with the filesystem about whether two names are the same template.
  */
 public record TemplateManifest(Map<String, SortedSet<String>> tagsByTemplate, SortedSet<String> customTags) {
@@ -117,7 +117,7 @@ public record TemplateManifest(Map<String, SortedSet<String>> tagsByTemplate, So
 
     /**
      * Normalizes a user-entered tag: trims and collapses runs of whitespace. Unlike a template name (which
-     * becomes a file name and so is restricted to {@code [A-Za-z0-9_-]}), a tag is only ever a label, so it
+     * becomes a file name and so is restricted to {@code [a-z0-9_]}), a tag is only ever a label, so it
      * may contain spaces and punctuation. Blank means "no tag" — callers drop it.
      */
     public static String sanitizeTag(String raw) {
@@ -221,7 +221,8 @@ public record TemplateManifest(Map<String, SortedSet<String>> tagsByTemplate, So
     public TemplateManifest renamedTag(String from, String to) {
         String was = sanitizeTag(from);
         String now = sanitizeTag(to);
-        if (was.isBlank() || now.isBlank() || was.equalsIgnoreCase(now)) return this;
+        // A change of case is a rename too: the sets compare case-insensitively, so each is rebuilt below.
+        if (was.isBlank() || now.isBlank() || was.equals(now)) return this;
         SortedSet<String> nextCustom = newTagSet();
         customTags.forEach(t -> nextCustom.add(t.equalsIgnoreCase(was) ? now : t));
         Map<String, SortedSet<String>> next = new LinkedHashMap<>();
