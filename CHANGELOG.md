@@ -196,6 +196,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     showed its default white, a colour the bot does not use.
   - A colour picked with the eyedropper is written once, not twice.
   - The eyedropper's frozen frame cancels on a right-click too, like every other pick.
+- **Input editors:**
+  - A direction pad or mouse drawing that selects nothing, because the value is a variable or a call, shows
+    the value as written under it.
+  - A mouse button with no part on the drawing is selected when you press it on the strip.
+  - A hold or wait field takes digits only. A typo in a combination's hold dropped the whole combination on
+    OK, and a typo in a step's wait was ignored.
+  - The keyboard window takes a key press as soon as it opens. The search box had the focus, so the key was
+    typed there.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every

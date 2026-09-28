@@ -83,4 +83,14 @@ class InputEditorTest {
         assertEquals("Choose key steps…", InputEditors.sequencePill(TestContexts.typedSlot(
                 com.botmaker.sdk.api.interaction.KeySequence.class, "")));
     }
+
+    /** A pad or a mouse selects nothing for a value it cannot read, so the value is shown as written. */
+    @Test
+    void a_shape_that_selects_nothing_shows_the_value_as_written() {
+        Class<?> direction = com.botmaker.sdk.api.geometry.Direction.class;
+        assertEquals("heading", InputEditors.unreadSource(TestContexts.typedSlot(direction, "heading"), direction));
+        assertEquals(null, InputEditors.unreadSource(TestContexts.typedSlot(direction, ""), direction));
+        assertEquals(null, InputEditors.unreadSource(TestContexts.typedSlot(direction, "Direction.NORTH")
+                .withValue(com.botmaker.sdk.api.geometry.Direction.NORTH), direction));
+    }
 }

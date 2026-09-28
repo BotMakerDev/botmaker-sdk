@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.sdk.api.interaction.Key;
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -120,6 +121,11 @@ final class KeyboardView {
             }
         }));
         board.setOnMousePressed(e -> board.requestFocus());
+        // The window gives its first field the focus, which was the search box: a key pressed on opening was
+        // typed into the search, while the hint says to press it (until 2026-09-28). The board takes it instead.
+        board.sceneProperty().addListener((o, was, is) -> {
+            if (is != null) Platform.runLater(board::requestFocus);
+        });
 
         Label hint = new Label(chordMode
                 ? "Click keys, or press them — each one is added, in order. Drag a chip to change the order; ✕ "

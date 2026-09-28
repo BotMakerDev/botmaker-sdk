@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Slots;
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.interaction.Combo;
 import com.botmaker.sdk.api.interaction.Key;
@@ -15,6 +16,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextFormatter;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
@@ -102,6 +104,7 @@ public final class InputEditors {
 
         VBox box = new VBox(4, pad);
         box.getStyleClass().add("direction-pad");
+        showUnread(ctx, Direction.class, box, group);
 
         // A direction with no square still has to be reachable, so it goes in a row underneath as a named
         // button rather than quietly disappearing from the editor.
@@ -195,17 +198,42 @@ public final class InputEditors {
 
         VBox box = new VBox(6, drawing, capture);
         box.getStyleClass().add("mouse-diagram");
+        showUnread(ctx, MouseButton.class, box, group);
 
         // A button this drawing has no part for is still reachable, for the reason the direction pad's
         // spare row exists: an editor that cannot express a value the type has is worse than an ugly one.
+        // It joins `buttons` too, so pressing it on the strip above selects it (it wrote and showed nothing).
         HBox spare = new HBox(2);
         for (MouseButton constant : MouseButton.values()) {
             if (buttons.containsKey(constant)) continue;
-            spare.getChildren().add(
-                    toggle(ctx, group, constant, constant.name(), constant.name(), current, "mouse-diagram-key"));
+            ToggleButton button =
+                    toggle(ctx, group, constant, constant.name(), constant.name(), current, "mouse-diagram-key");
+            spare.getChildren().add(button);
+            buttons.put(constant, button);
         }
         if (!spare.getChildren().isEmpty()) box.getChildren().add(spare);
         return box;
+    }
+
+    /**
+     * An enum drawn as a shape selects nothing for a value it cannot read — a variable, a call — so the value
+     * is shown as written under it until something is picked. It said nothing at all until 2026-09-28, and an
+     * empty pad reads as "not set".
+     */
+    private static void showUnread(ValueContext ctx, Class<?> type, VBox box, ToggleGroup group) {
+        String unread = unreadSource(ctx, type);
+        if (unread == null) return;
+        Label written = Styles.on(new Label(unread), Styles.CAPTION);
+        written.setTooltip(new Tooltip("Not a value this editor can read. A pick replaces it."));
+        box.getChildren().add(written);
+        group.selectedToggleProperty().addListener((o, was, is) -> {
+            if (is != null) box.getChildren().remove(written);
+        });
+    }
+
+    /** The source to show beside a shape that selects nothing, or {@code null} when it selects the value. */
+    static String unreadSource(ValueContext ctx, Class<?> type) {
+        return ctx.value(type).isEmpty() && !Slots.isEmpty(ctx) ? Slots.raw(ctx) : null;
     }
 
     // --- key and combination ---------------------------------------------------------------------------
@@ -333,12 +361,16 @@ public final class InputEditors {
         });
     }
 
-    /** A whole-millisecond field, marked while what it holds is not one. */
+    /**
+     * A whole-millisecond field that takes digits only, blank meaning none. It accepted anything and marked it
+     * red until 2026-09-28, and OK closed the window regardless: a combination with a typo in its hold was
+     * dropped whole, and a step's wait kept its old value without a word.
+     */
     private static TextField msField(Duration initial) {
         TextField field = new TextField(Long.toString(initial.toMillis()));
         field.setPrefColumnCount(5);
-        field.textProperty().addListener((o, was, is) ->
-                field.setStyle(holdOf(is) == null ? "-fx-border-color: -bm-danger;" : ""));
+        field.setTextFormatter(new TextFormatter<String>(change ->
+                change.getControlNewText().matches("\\d{0,7}") ? change : null));
         return field;
     }
 

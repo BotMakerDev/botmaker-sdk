@@ -8,6 +8,18 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — input editors and the `@Records` writers reworked (SDK plugin rework, phase 8)
+
+**Done**
+- `InputEditors`: `showUnread`/`unreadSource` put an unread value's source under the direction pad and the
+  mouse drawing, removed once the toggle group selects something. The mouse's spare toggles join `buttons`,
+  so the capture strip selects them. `msField` has a digits-only `TextFormatter` (seven digits), so
+  `holdOf` never answers `null` from it and neither OK can lose a typed value.
+- `KeyboardView`: the board requests focus once it is in a scene.
+- `@Records` writers checked, unchanged. New `plugin/SdkRecordsTest`: every `Gesture` has a public static
+  writer, `Keyboard.combo(Combo)` outranks `combo(Key...)`, and `ImageClicker.click` outranks `Mouse.click`.
+- Test: `InputEditorTest.a_shape_that_selects_nothing_shows_the_value_as_written`.
+
 ## 2026-09-28 — colour and geometry editors reworked (SDK plugin rework, phase 7)
 
 **Done**
