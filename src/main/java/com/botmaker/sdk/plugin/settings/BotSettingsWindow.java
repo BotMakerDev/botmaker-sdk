@@ -102,12 +102,20 @@ public final class BotSettingsWindow {
 
         Stage stage = new Stage();
         Button cancel = new Button("Cancel");
+        cancel.setCancelButton(true);
         cancel.setOnAction(e -> stage.close());
         Button save = new Button("Save");
         save.setDefaultButton(true);
         save.setOnAction(e -> {
-            ctx.ifPresent(c -> c.set(collect()));
-            services.status("Bot settings saved in Sdk.settings().");
+            BotSettings chosen = collect();
+            // Nothing changed, nothing written: a Save that rewrote an untouched value was one more entry in the
+            // project's history and, for BotSettings.DEFAULTS, a chance to spell it differently.
+            if (chosen.equals(current)) {
+                services.status("Bot settings unchanged.");
+            } else {
+                ctx.ifPresent(c -> c.set(chosen));
+                services.status("Bot settings saved in Sdk.settings().");
+            }
             stage.close();
         });
         Region spacer = new Region();
@@ -152,7 +160,8 @@ public final class BotSettingsWindow {
                 }""";
         Label says = note("This project's Sdk.java has no settings() method, so the bot runs on the defaults "
                 + "below and there is nothing here to save into. Paste this into the class Sdk (importing "
-                + "com.botmaker.sdk.api.bot.BotSettings), then open this window again:");
+                + "com.botmaker.sdk.api.bot.BotSettings and com.botmaker.plugin.api.managed.Managed), then open "
+                + "this window again:");
         TextArea code = new TextArea(snippet);
         code.setEditable(false);
         code.setPrefRowCount(4);
@@ -244,14 +253,35 @@ public final class BotSettingsWindow {
         debug.setSelected(s.debug());
     }
 
-    /** What the controls say, as the value {@code Sdk.settings()} will return. */
+    /**
+     * What the controls say, as the value {@code Sdk.settings()} will return.
+     *
+     * <p>A number typed into a spinner reaches its value only on Enter or on leaving the field, so one typed
+     * and followed straight by Save was dropped (until 2026-09-28). Each field's text is committed first; text
+     * that is not a number leaves the last good value.
+     */
     BotSettings collect() {
+        for (Spinner<?> s : new Spinner<?>[] {foundDelay, notFoundDelay, confidence, compareMargin,
+                maxRetryAttempts}) {
+            commitTyped(s);
+        }
         return BotSettings.of(
                 BotSettings.clicks(foundDelay.getValue(), notFoundDelay.getValue(), randomizeClicks.isSelected()),
                 BotSettings.vision(confidence.getValue(), compareMargin.getValue()),
                 BotSettings.input(realInput.isSelected(), linuxInput.getValue()),
                 BotSettings.session(isolatedSession.isSelected(), sessionBackend.getValue()),
                 maxRetryAttempts.getValue(), debug.isSelected());
+    }
+
+    private static <T> void commitTyped(Spinner<T> spinner) {
+        String text = spinner.getEditor().getText();
+        if (text == null || text.isBlank()) return;
+        try {
+            T typed = spinner.getValueFactory().getConverter().fromString(text.trim());
+            if (typed != null) spinner.getValueFactory().setValue(typed);
+        } catch (RuntimeException notANumber) {
+            // the last value the spinner held stands
+        }
     }
 
     private static <T> StringConverter<T> labels(java.util.function.Function<T, String> label) {

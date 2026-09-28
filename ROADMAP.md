@@ -8,6 +8,15 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — Bot Settings reworked (SDK plugin rework, phase 10)
+
+**Done**
+- `BotSettingsWindow.collect` commits each spinner's typed text first (`commitTyped`). Save compares with the
+  value read and writes only a change. Cancel is the cancel button. The missing-method note names the
+  `Managed` import too.
+- Checked, unchanged: `SettingsEditors` (`@Setting` read off the parameter), `SettingsTypes`, the `BotSettings`
+  withers' annotations. No new test: what changed is JavaFX spinner behaviour, which the suite does not start.
+
 ## 2026-09-28 — Activity Flow reworked (SDK plugin rework, phase 9)
 
 **Done**

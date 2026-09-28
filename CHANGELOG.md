@@ -213,6 +213,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     and in the new-activity dialog. It was accepted, and then the flow could not be saved.
   - The go-home and popup ticks and the outcomes hint name what exists: the home method given to
     `Bot.run`, `PopupGuard`, and `ctx.outcome("…")`. They named `GoHome.run()`, `Popups.run()` and `run()`.
+- **⚙ Bot Settings:**
+  - A number typed into a field and followed straight by Save is kept. It was dropped unless you pressed
+    Enter or left the field first.
+  - Save with nothing changed writes nothing.
+  - Esc cancels.
+  - The snippet for a project with no `settings()` names both imports it needs.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every
