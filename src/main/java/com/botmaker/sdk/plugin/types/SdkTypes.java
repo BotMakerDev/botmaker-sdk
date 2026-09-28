@@ -3,7 +3,9 @@ package com.botmaker.sdk.plugin.types;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.DeclaredCallType;
+import com.botmaker.plugin.api.value.DeclaredType;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -20,7 +22,9 @@ import com.botmaker.sdk.api.vision.Matches;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.TextMatch;
 import com.botmaker.sdk.api.vision.Vision;
+import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.vision.TemplateNames;
+import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 import com.botmaker.sdk.plugin.editors.GeometryEditors;
 import com.botmaker.sdk.plugin.editors.InputEditors;
 import com.botmaker.sdk.plugin.editors.PrecisionEditors;
@@ -174,6 +178,20 @@ public final class SdkTypes {
                     .writtenAsEach(ImageTemplateGroup::of, ImageTemplateGroup::templates);
 
     /**
+     * Where a bot reads pixels from. An interface, so it is written as whichever of {@link CaptureTypes}' calls
+     * builds it. A fresh one is the ambient source, which keeps following the project's source when that
+     * changes later; a concrete source would freeze the declaration into what was true when it was made.
+     *
+     * <p>Drawn as a pill opening the source tiles ({@link CaptureSourceEditors}), the same picker as the
+     * toolbar's Capture Source.
+     */
+    public static final DeclaredType<CaptureSource> CAPTURE_SOURCE = PluginType.value(CaptureSource.class)
+            .fresh(CurrentSource::new)
+            .editor(() -> CaptureSourceEditors::source)
+            .preview(() -> CaptureSourceEditors::preview)
+            .writtenAsParts();
+
+    /**
      * Types a bot author may <b>hold</b> but nobody edits, whose fresh form is a call the bot re-evaluates.
      *
      * <p>{@code filledBy} names the method the host writes a call to: {@code Vision.lastMatch()} means <em>the
@@ -213,7 +231,7 @@ public final class SdkTypes {
             IMAGE_TEMPLATE, PRECISION,
             POINT, RECT, SIZE, DIRECTION,
             KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE,
-            CaptureTypes.CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP,
+            CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP,
             MATCH_RESULT, MATCHES, COLOR_MATCH, TEXT_MATCH);
 
     /**

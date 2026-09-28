@@ -8,6 +8,12 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — `CAPTURE_SOURCE` declared in `SdkTypes`
+
+**Done**
+- `SdkTypes.CAPTURE_SOURCE` beside the other types, so `ALL` lists only its own constants. `CaptureTypes` is the
+  seven calls a capture source is written as, like `FlowTypes` and `SettingsTypes`.
+
 ## 2026-09-28 — `SdkPlugin` is a declaration (guided plugin declaration, phase 3)
 
 **Done**

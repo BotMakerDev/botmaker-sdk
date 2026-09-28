@@ -2,8 +2,6 @@ package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
-import com.botmaker.plugin.api.value.DeclaredType;
-import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -14,12 +12,12 @@ import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.RegionSource;
-import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 
 import java.util.List;
 
 /**
- * A {@link CaptureSource} as values: the type itself, and the calls one is written as.
+ * The calls a {@link CaptureSource} is written as. The type itself is {@link SdkTypes#CAPTURE_SOURCE}, declared
+ * with the others and written through these ({@code writtenAsParts()}).
  *
  * <p>{@code CaptureSource} is an interface, so the host cannot take one apart through a single
  * {@link ComponentType}. Each concrete source is its own part: {@code Source.current()},
@@ -31,20 +29,6 @@ import java.util.List;
 public final class CaptureTypes {
 
     private CaptureTypes() {}
-
-    /**
-     * The declared type. A fresh one is the ambient source, which keeps following the project's source when
-     * that changes later; a concrete source would freeze the declaration into what was true when it was
-     * made.
-     *
-     * <p>Drawn as a pill opening the source tiles ({@link CaptureSourceEditors}), the same picker as the
-     * toolbar's Capture Source.
-     */
-    public static final DeclaredType<CaptureSource> CAPTURE_SOURCE = PluginType.value(CaptureSource.class)
-            .fresh(CurrentSource::new)
-            .editor(() -> CaptureSourceEditors::source)
-            .preview(() -> CaptureSourceEditors::preview)
-            .writtenAsParts();
 
     /**
      * {@code Source.current()}. Built as the ambient source itself rather than by calling the factory, which
