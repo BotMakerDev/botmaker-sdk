@@ -234,7 +234,7 @@ public final class TemplateEditors {
         if (run != null) return run.elements();
         return ctx.value(ImageTemplateGroup.class)
                 .map(group -> group.templates().stream()
-                        .map(t -> new SlotRun.Element(t, t.filePath())).toList())
+                        .map(t -> SlotRun.Element.of(t, t.filePath())).toList())
                 .orElse(List.of());
     }
 

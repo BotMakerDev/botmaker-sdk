@@ -8,6 +8,13 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — a picture run element is built with `SlotRun.Element.of`
+
+**Done**
+- `TemplateEditors` builds each element with the contract's `Element.of(value, source)` instead of the record's
+  constructor, which a compiled plugin cannot survive the day the record grows. The SDK and basics pass
+  `plugin validate`'s new `contract-links` check.
+
 ## 2026-09-28 — `CAPTURE_SOURCE` declared in `SdkTypes`
 
 **Done**
