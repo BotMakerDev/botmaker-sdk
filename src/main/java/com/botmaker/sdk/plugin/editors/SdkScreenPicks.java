@@ -14,7 +14,6 @@ import com.botmaker.sdk.plugin.screen.PickSpace;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import com.botmaker.sdk.plugin.screen.ScreenOverlay;
 import com.botmaker.sdk.plugin.source.SurfaceMenu;
-import javafx.scene.paint.Color;
 import javafx.stage.Window;
 
 import java.awt.Rectangle;
@@ -109,14 +108,6 @@ public final class SdkScreenPicks implements ScreenPicks {
                     onPicked.accept(new Region(v[0], v[1], 0, 0));
                 }));
             }
-
-            @Override
-            public void color(Consumer<Color> onSampled) {
-                onFrame(services, space, chooser, (overlay, bounds, owner) -> overlay.pickColor(owner, pick -> {
-                    java.awt.Color c = pick.color();
-                    onSampled.accept(Color.rgb(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha() / 255.0));
-                }));
-            }
         };
     }
 
@@ -174,13 +165,5 @@ public final class SdkScreenPicks implements ScreenPicks {
         // A Region with no size: the toolkit has one coordinate type, and a point is a region whose width
         // and height are nobody's business.
         new ScreenCapture().pickPoint(null, p -> onPicked.accept(new Region(p[0], p[1], 0, 0)));
-    }
-
-    @Override
-    public void color(Consumer<Color> onSampled) {
-        new ScreenCapture().pickColor(null, pick -> {
-            java.awt.Color c = pick.color();
-            onSampled.accept(Color.rgb(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha() / 255.0));
-        });
     }
 }

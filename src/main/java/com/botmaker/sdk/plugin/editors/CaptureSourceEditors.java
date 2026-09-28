@@ -3,7 +3,7 @@ package com.botmaker.sdk.plugin.editors;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Modals;
-import com.botmaker.plugin.toolkit.Values;
+import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.capture.CurrentSource;
@@ -32,7 +32,7 @@ public final class CaptureSourceEditors {
 
     public static Node source(ValueContext ctx) {
         CaptureSource current = ctx.value(CaptureSource.class).orElse(null);
-        MenuButton pill = Pills.bare(current != null ? label(current) : Values.labelOr(ctx.source(), "Choose…"));
+        MenuButton pill = Pills.bare(current != null ? label(current) : Slots.sourceOr(ctx, "Choose…"));
         Pills.onOpen(pill, () -> List.of(Pills.item("Choose a capture source…", () ->
                 new SourcePicker(ctx.services(), Modals.owner(ctx.services()), true)
                         .preselect(ctx.value(CaptureSource.class).orElse(null))

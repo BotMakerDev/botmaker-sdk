@@ -213,13 +213,13 @@ public final class InputEditors {
     /** The key pill: the cap, else the source as written, else an invitation. */
     static String keyPill(ValueContext ctx) {
         return ctx.value(Key.class).map(Key::label)
-                .orElseGet(() -> Slots.raw(ctx).isBlank() ? "Choose a key…" : Slots.raw(ctx));
+                .orElseGet(() -> Slots.sourceOr(ctx, "Choose a key…"));
     }
 
     /** The combination pill: {@code Ctrl+Shift+S}, else the source as written, else an invitation. */
     static String comboPill(ValueContext ctx) {
         return ctx.value(Combo.class).map(Combo::toString)
-                .orElseGet(() -> Slots.raw(ctx).isBlank() ? "Choose keys…" : Slots.raw(ctx));
+                .orElseGet(() -> Slots.sourceOr(ctx, "Choose keys…"));
     }
 
     /**
@@ -256,7 +256,7 @@ public final class InputEditors {
     /** The sequence pill: {@code Ctrl+A → 100 ms → Ctrl+C}, else the source as written, else an invitation. */
     static String sequencePill(ValueContext ctx) {
         return ctx.value(KeySequence.class).map(KeySequence::toString)
-                .orElseGet(() -> Slots.raw(ctx).isBlank() ? "Choose key steps…" : Slots.raw(ctx));
+                .orElseGet(() -> Slots.sourceOr(ctx, "Choose key steps…"));
     }
 
     /** {@code items} with the one at {@code from} taken out and put back at {@code to}; unchanged for a bad index. */

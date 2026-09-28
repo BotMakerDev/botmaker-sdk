@@ -64,6 +64,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **Key, combination, key-step and capture-source pills** label an unread value through the toolkit's
+  `Slots.sourceOr`. `SdkScreenPicks` no longer implements a colour pick (the toolkit's `ScreenPicks.color`,
+  which nothing called, is deleted); the colour editor's own sampling is unchanged.
 - **`SdkPlugin` is one declaration** on the contract's `DeclaredPlugin`:
   `StudioPlugin.id(ID).named(NAME).types(…).parts(…).editors(…).values(…).recorded(…)`. Its `build…`
   overrides and the inline part list are gone; `SdkTypes.PARTS` holds the parts.
