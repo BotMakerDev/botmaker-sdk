@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.launch;
+import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.util.Debug;
@@ -20,22 +21,14 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * that hasn't picked a game yet simply doesn't launch anything. Override at runtime with
  * {@link #set(LaunchTarget)}.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): seven of the nine are offered — every verb is, and
- * the two hidden members are the two that deal in a {@link LaunchTarget} the editor cannot put anywhere.
- * {@link #current()} hands back one, and a launch target is not a declarable variable type in Studio (it is
- * chosen through the launch dialog), so a menu entry producing one is the {@code Window.capture()} case again:
- * a value the user cannot name, store or pass on.
- *
- * <p><b>Of the two {@code set} overloads only {@link #set(LaunchTarget)} is offered, and the {@code String}
- * one is hidden</b> — which is the sweep's usual verdict inverted, and worth the sentence. Everywhere else the
- * plain type wins over the SDK type because the editor can fill a {@code String} and cannot fill the other.
- * Here it is the reverse: {@code set(String)} does not take a name, it takes a <em>spec grammar</em>
- * ({@code steam:12345}, {@code exe:C:\…}) that a user has to already know, with nothing to help them write it,
- * while {@code set(LaunchTarget)} has a dedicated picker — Studio's {@code LaunchTargetArgPicker} recognises
- * the parameter type and offers the game library and a file chooser, committing
- * {@code LaunchTarget.parse("…")}. So the rule was never "prefer {@code String}"; it is <b>prefer the argument
- * the editor can produce</b>, and on this one method that is the typed form. {@code set(String)} stays public
- * for a bot computing its target from a config value.
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): every verb is offered, and the two names that deal
+ * in a {@link LaunchTarget} are hidden. {@link #current()} hands one back, and a launch target is not a type
+ * Studio can declare or draw, so a menu entry producing one is the {@code Window.capture()} case again: a value
+ * the user cannot name, store or pass on. {@code set} is hidden for the same reason from the other side:
+ * {@code set(LaunchTarget)} has a slot nothing can fill, and {@code set(String)} takes a <em>spec grammar</em>
+ * ({@code steam:12345}, {@code exe:C:\…}) a user has to already know. Both stay public for a bot computing its
+ * target from a config value. A target picker was planned and never wired; it was deleted on 2026-09-28, since
+ * a game is started by its own launcher, or by {@link Game}'s calls, whose arguments have editors.
  */
 @Palette(category = "launch", categoryLabel = "Launch", icon = "🚀", order = 41)
 public final class Target {
@@ -49,6 +42,7 @@ public final class Target {
      * The current launch target, initialised lazily from the project default. May be {@code null} when no target
      * is configured.
      */
+    @Hidden("hands back a LaunchTarget, which a bot cannot declare, store or pass on in Studio")
     public static LaunchTarget current() {
         if (!initialised) {
             synchronized (Target.class) {
@@ -65,6 +59,7 @@ public final class Target {
      * Overrides the current target. Accepts a {@code launch.target} spec string (see {@link LaunchTarget});
      * {@code null}/blank or an unparseable spec clears it back to "no target".
      */
+    @Hidden("both overloads take what an editor cannot build: a LaunchTarget, or the launch.target spec grammar")
     public static void set(String spec) {
         current = LaunchTarget.parse(spec);
         initialised = true;

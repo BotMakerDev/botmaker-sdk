@@ -126,7 +126,11 @@ public final class SourcePicker {
      * so a label supplier has no project to read the current source out of.
      */
     public static void choose(ActionContext context) {
-        StudioServices services = context.services();
+        choose(context.services());
+    }
+
+    /** As {@link #choose(ActionContext)}, for a window of this plugin's own — Project Setup's capture row. */
+    public static void choose(StudioServices services) {
         new SourcePicker(services, Modals.owner(services), false)
                 .preselect(CaptureValue.current(services))
                 .showAndWait()

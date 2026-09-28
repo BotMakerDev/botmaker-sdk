@@ -77,8 +77,8 @@ public final class QuickLaunch {
             button.setDisable(true);
             button.setOnAction(null);
             button.setTooltip(new Tooltip(
-                    "No launch target on this computer yet — pick an emulator app, or run the bot with "
-                            + "-Dbotmaker.launch.target=…"));
+                    "No launch target on this computer — start the game from its own launcher, or pick an "
+                            + "emulator app in an Emulators block"));
             return;
         }
         button.setDisable(false);

@@ -5,10 +5,13 @@ import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
+import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
+import com.botmaker.sdk.plugin.source.SourcePicker;
+import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -20,7 +23,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -28,34 +30,41 @@ import java.nio.file.Path;
 
 /**
  * The <b>Project Setup</b> checklist — one window that says, for a project as it stands right now, whether it
- * has something to launch, something to capture and any pictures, and what to do
- * about each answer that is no.
+ * has something to capture, any pictures and something to launch, and what to do about each answer that is no.
  *
  * <h2>Why this is the plugin's</h2>
  *
- * <p>Every row reads a fact that belongs to this module. The launch target is this machine's
- * {@code botmaker.launch.target} run property ({@link LaunchTargetValue}); the capture source is
- * {@code Sdk.captureSource()} in the bot's own Java; the pictures are the images folder, read through
- * {@link TemplateLibrary}. The host holds none of it. What the host supplies is the three things
- * nobody else can: which project is open, the current look, and the window this modal is owned by.
+ * <p>Every row reads a fact that belongs to this module. The capture source is {@code Sdk.captureSource()} in
+ * the bot's own Java; the pictures are the images folder, read through {@link TemplateLibrary}; the launch
+ * target is this machine's {@code botmaker.launch.target} run property ({@link LaunchTargetValue}). The host
+ * holds none of it. What the host supplies is the three things nobody else can: which project is open, the
+ * current look, and the window this one is owned by.
  *
- * <h2>Every row is a statement, not a button</h2>
+ * <h2>Each row opens the window that changes it</h2>
  *
- * <p>Studio's version opened a dialog per row. This one opens nothing, and that is deliberate rather than a
- * reduction: two of the four destinations are already this plugin's own toolbar items (🎯 Capture Targets,
- * ✂ Capture Templates) and a plugin has no handle on another item, while the other two are still host dialogs
- * this window may not name. So a row reports its state and says where to change it — the precedent the
- * Capture Templates and Capture Targets steps both set. The one control that survives is <b>▶ Launch now</b>,
- * because starting the configured target is this module's own work and needs nobody's dialog.
+ * <p>The capture row opens 🎯 Capture Source and the pictures row ✂ Capture Templates — both this plugin's
+ * own, so calling them names no other plugin and no host dialog. The window is <b>not modal</b>: an
+ * application-modal checklist blocked the very toolbar its rows used to send the user to, and the ownerless
+ * capture tool with it.
+ *
+ * <h2>The launch target is optional, and has no picker here (2026-09-28)</h2>
+ *
+ * <p>A game is started by its own launcher — Faugus on Linux, Steam or Epic on Windows — or by the bot's own
+ * {@code Game} blocks, and BotMaker does not grow a second launcher UI beside them (the maintainer's call). The
+ * row shows what this computer has, if anything: an emulator app picked in an Emulators block sets it, and
+ * <b>▶ Launch now</b> then starts it. A value it cannot read is shown with a Clear button, never a ✓.
  *
  * <h2>Refreshing</h2>
  *
- * <p>Studio's copy also subscribed to its {@code SettingsChangedEvent}. There is no such thing on the
- * contract and there should not be — so the two triggers that remain are the window regaining focus (which is
- * what happens when any of the four destinations closes) and the <b>Re-check</b> button. Between them they
- * cover every way a row's answer can change while this window is open.
+ * <p>There is no settings-changed event on the contract, and there should not be — so the triggers are the
+ * window regaining focus, a row's window closing, and the <b>Re-check</b> button.
  */
 public final class ProjectSetup {
+
+    /** What the launch row says when this computer has no launch target, which is a fine place to be. */
+    static final String NO_LAUNCH_TARGET = "None on this computer, and none is needed: start your game from its "
+            + "own launcher (Faugus on Linux, Steam or Epic on Windows), or let the bot start it with a Game "
+            + "block. Picking an emulator app in an Emulators block sets one, and ▶ Launch now then starts it.";
 
     /** The one open instance, so pressing the toolbar button twice focuses rather than stacks. */
     private static ProjectSetup active;
@@ -79,10 +88,7 @@ public final class ProjectSetup {
         this.owner = owner;
     }
 
-    /**
-     * The 📋 Project Setup press. The item sits at order 40, immediately <em>before</em> Capture Source,
-     * because this is the window that sends a user to that one.
-     */
+    /** The 📋 Project Setup press. */
     public static void open(ActionContext context) {
         StudioServices services = context.services();
         open(services, Modals.owner(services));
@@ -99,11 +105,27 @@ public final class ProjectSetup {
         active.show();
     }
 
+    /**
+     * What the launch row shows for this machine's raw spec: whether it is set, whether it is a value nothing
+     * can read (no {@code kind:}, or a kind nobody knows), and the line under the title.
+     */
+    record LaunchRow(boolean set, boolean unreadable, String detail) {}
+
+    static LaunchRow launchRow(String spec) {
+        if (spec == null || spec.isBlank()) return new LaunchRow(false, false, NO_LAUNCH_TARGET);
+        LaunchSpec parsed = LaunchSpec.parse(spec);
+        if (parsed == null || parsed.kind() == LaunchKind.UNKNOWN) {
+            return new LaunchRow(false, true, "\"" + spec.trim() + "\" is not a launch target this computer "
+                    + "can read. Clear it, then pick the emulator app again if that is what it was.");
+        }
+        return new LaunchRow(true, false, parsed.describe());
+    }
+
     private void show() {
         Label heading = new Label("Set your project up to run");
         heading.setStyle("-fx-font-weight: bold; -fx-font-size: 15px;");
-        Label intro = new Label("A new bot needs a few things wired up before it can run. Work down the list — "
-                + "each row says where to set that step, and ticks green once it's done.");
+        Label intro = new Label("Work down the list — each row opens the window that sets it, and ticks green "
+                + "once it's done.");
         intro.setWrapText(true);
         intro.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
 
@@ -111,6 +133,7 @@ public final class ProjectSetup {
         summary.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
 
         launchStatus = new Label();
+        launchStatus.setWrapText(true);
         launchStatus.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
 
         rows = new VBox(10);
@@ -119,6 +142,7 @@ public final class ProjectSetup {
         recheck.setOnAction(e -> refresh());
         Button done = new Button("Done");
         done.setDefaultButton(true);
+        done.setCancelButton(true);
         done.setOnAction(e -> stage.close());
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -130,11 +154,10 @@ public final class ProjectSetup {
 
         stage = new Stage();
         stage.setTitle("Project Setup");
-        stage.initModality(Modality.APPLICATION_MODAL);
         if (owner != null) stage.initOwner(owner);
-        stage.setScene(services.theme().scene(root, 520, 460));
+        stage.setScene(services.theme().scene(root, 540, 480));
         stage.setMinWidth(440);
-        stage.setMinHeight(360);
+        stage.setMinHeight(380);
         stage.setOnHidden(e -> active = null);
         stage.focusedProperty().addListener((obs, was, focused) -> {
             if (focused && stage.isShowing()) refresh();
@@ -149,38 +172,36 @@ public final class ProjectSetup {
         Path resources = services.resourcesDir();
         CaptureSource source = EditorFrame.defaultSource(services);
 
-        String launchSpec = LaunchTargetValue.current(services);
-        boolean launchDone = launchSpec != null && !launchSpec.isBlank();
+        LaunchRow launch = launchRow(LaunchTargetValue.current(services));
         boolean captureDone = captureConfigured(source);
         int templateCount = TemplateLibrary.list(resources).size();
 
-        int required = 2;
-        int doneCount = (launchDone ? 1 : 0) + (captureDone ? 1 : 0);
-        summary.setText(doneCount + " of " + required + " required steps done"
-                + (doneCount == required ? " — you're ready to run." : ""));
+        summary.setText(!captureDone ? "Choose a capture source to run."
+                : launch.unreadable() ? "Ready to run — clear the unreadable launch target."
+                : "You're ready to run.");
+
+        Button chooseSource = new Button("Choose…");
+        chooseSource.setOnAction(e -> {
+            SourcePicker.choose(services);
+            refresh();
+        });
+        Button capture = new Button("Capture…");
+        capture.setOnAction(e -> CaptureTemplates.open(services, stage, null, this::refresh));
 
         rows.getChildren().setAll(
-                row(launchDone, false, "Launch target",
-                        launchDone
-                                ? LaunchSpec.describe(launchSpec)
-                                : "Not set on this computer — pick an emulator app in an Emulators block, "
-                                        + "or have the bot open its game itself with a Target.set block.",
-                        quickLaunchButton()),
-                row(captureDone, false, "Capture source",
-                        describeCapture(source) + " Choose it with 🎯 Capture Source on the toolbar.",
-                        null),
+                row(captureDone, false, "Capture source", describeCapture(source), chooseSource),
                 row(templateCount > 0, true, "Pictures (optional)",
                         templateCount == 0
-                                ? "None yet — only needed for image-matching bots (skip for pixel/OCR/coords). "
-                                        + "Capture them with ✂ Capture Templates on the toolbar."
+                                ? "None yet — only needed for image-matching bots (skip for pixel/OCR/coords)."
                                 : templateCount + (templateCount == 1 ? " picture saved." : " pictures saved."),
-                        null));
+                        capture),
+                row(launch.set(), !launch.unreadable(), "Launch target (optional)", launch.detail(),
+                        launch.unreadable() ? clearLaunchButton() : quickLaunchButton()));
     }
 
     /**
      * The launch row's control: start the configured target <em>without</em> running the bot, so the user can
-     * confirm the row's ✓ means what they wanted — and so the game's window exists before they walk down to
-     * the capture row, which is the next step and needs something to point at.
+     * confirm the row's ✓ means what they wanted. Disabled, saying why, when this computer has none.
      *
      * <p>Rebuilt on every {@link #refresh()} rather than kept and re-bound; {@link QuickLaunch#button} re-reads
      * the target each time, so the button cannot go stale.
@@ -190,6 +211,17 @@ public final class ProjectSetup {
             launchStatus.setText(message);
             launchStatus.setStyle("-fx-font-size: 11px; -fx-text-fill: " + (ok ? "gray" : "#c0392b") + ";");
         });
+    }
+
+    /** Forgets a launch target nothing can read, so a run stops being handed it. */
+    private Button clearLaunchButton() {
+        Button clear = new Button("Clear");
+        clear.setOnAction(e -> {
+            LaunchTargetValue.set(services, null);
+            launchStatus.setText("Launch target cleared on this computer.");
+            refresh();
+        });
+        return clear;
     }
 
     /**

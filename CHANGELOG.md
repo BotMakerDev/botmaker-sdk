@@ -219,6 +219,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - Save with nothing changed writes nothing.
   - Esc cancels.
   - The snippet for a project with no `settings()` names both imports it needs.
+- **📋 Project Setup:**
+  - It no longer blocks the rest of Studio while open. It used to, which blocked the very toolbar buttons
+    its rows sent you to.
+  - The capture row has a **Choose…** button that opens 🎯 Capture Source, and the pictures row a
+    **Capture…** button that opens ✂ Capture Templates. The checklist refreshes when either closes.
+  - The launch target is optional and says so. Start the game from its own launcher (Faugus on Linux, Steam
+    or Epic on Windows), or pick an emulator app, which sets it and lets ▶ Launch now start it.
+  - A launch target this computer cannot read is no longer ticked ✓. The row names it and offers **Clear**.
+  - Esc closes the window.
+- **Launch:** the unused launch-target picker and its game-grid dialog are deleted; nothing called them.
+  `Target.current()` and `Target.set` are no longer offered in the palette, since no editor can fill either.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every

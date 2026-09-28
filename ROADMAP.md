@@ -8,6 +8,27 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — Launch and Project Setup reworked (SDK plugin rework, phase 11)
+
+**Done**
+- `plugin/launch/LaunchTargetArgPicker` and `GameLibraryPickerDialog` deleted: no caller, and the picker only
+  relabelled its own button. The maintainer's call: BotMaker grows no launcher UI of its own. A game is started
+  by its own launcher (Faugus on Linux, Steam or Epic on Windows) or by `Game` calls, whose `@SteamAppId`,
+  `@EpicAppName`, `@ProgramPath` and `@LaunchOption` editors are unchanged.
+- `ProjectSetup` is `Modality.NONE` (application-modal blocked the toolbar and the ownerless capture tool its
+  rows named). The capture row opens `SourcePicker.choose(StudioServices)` (new overload) and the pictures row
+  `CaptureTemplates.open(…, onClosed)`; both refresh the checklist. The launch row is optional
+  (`launchRow(spec)`, tested in `ProjectSetupTest`), and an unreadable spec — no `kind:` or an `UNKNOWN` kind —
+  shows a Clear button instead of a ✓. Done is also the cancel button.
+- `QuickLaunch`'s disabled tooltip no longer tells a user to pass `-Dbotmaker.launch.target`.
+- `api.launch.Target`: `current()` and `set` are `@Hidden` (additive), since no editor fills a `LaunchTarget`
+  or the spec grammar; the javadoc on `Target` and `LaunchTarget` no longer names the deleted picker.
+
+**Deferred / next**
+- Whether to cut the shared launch stack (Steam/Epic/Heroic scanners, protocol handlers) down to delegating to
+  Faugus and the OS launchers is a separate plan, not started. `Game.launchHeroic`/`launchFaugus` still have
+  no argument editor.
+
 ## 2026-09-28 — Bot Settings reworked (SDK plugin rework, phase 10)
 
 **Done**

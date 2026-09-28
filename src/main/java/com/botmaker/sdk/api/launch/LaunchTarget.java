@@ -42,9 +42,9 @@ import com.botmaker.shared.launch.Launcher;
  * therefore must not be encouraged to name, and the second is the string {@link #isRunning()} consults on the
  * bot's behalf. {@link #parse(String)} is hidden for exactly the reason {@code Target.set(String)} is: it takes
  * the <em>spec grammar</em> above ({@code steam:12345}, {@code exe:C:\…}), which a user has to already know to
- * write, and it returns {@code null} rather than complaining when they get it wrong. The supported path is the
- * picker — {@code LaunchTargetArgPicker} writes {@code LaunchTarget.parse("…")} into bot source with a spec it
- * built itself — and a picker is not a menu, so hiding the method costs the picker nothing.
+ * write, and it returns {@code null} rather than complaining when they get it wrong. A target reaches a bot as
+ * this computer's {@code botmaker.launch.target} run property (an emulator app picked in Studio sets it), or
+ * from {@link Game}'s calls, whose arguments have editors; there is no target picker to offer this method.
  */
 @Palette(category = "launch", categoryLabel = "Launch", order = 93)
 @Hidden("a value type: Game and Target hand one back, a bot does not build one from a menu")
