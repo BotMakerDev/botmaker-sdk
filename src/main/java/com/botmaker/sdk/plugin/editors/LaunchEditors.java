@@ -6,8 +6,10 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.plugin.toolkit.Thumbnail;
+import com.botmaker.shared.game.EpicLibraryScanner;
 import com.botmaker.shared.game.GameLibraryProvider;
 import com.botmaker.shared.game.InstalledGame;
+import com.botmaker.shared.game.SteamLibraryScanner;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.image.Image;
@@ -21,10 +23,10 @@ import java.util.function.Supplier;
  * The editors for the three arguments of a launch call that are all, as far as the compiler is concerned, the
  * same {@code String}: which game, which program, and what to pass it on the command line.
  *
- * <p><b>These are the package's exception to matching on the type</b> (see {@link SdkEditors}). Nothing about
- * {@code String} says whether it holds a Steam app id, a path to an executable or {@code --fullscreen}; only
- * the call around it does, which is what {@link CallSites} reads and why these editors are absent from the
- * Parameters window rather than misfiring in it.
+ * <p><b>These are chosen by the parameter, not the type</b> (see {@link SdkEditors}). Nothing about
+ * {@code String} says whether it holds a Steam app id, a path to an executable or {@code --fullscreen}; the
+ * annotation on the parameter it is passed to does ({@code @SteamAppId}, {@code @ProgramPath}, …), which is
+ * why these editors are absent from the Parameters window rather than misfiring in it.
  *
  * <p>The libraries are read through {@code botmaker-shared}, which is published — so a third-party plugin can
  * offer exactly this, and none of it required asking the host for anything. That is the host-only rule doing
@@ -36,6 +38,16 @@ public final class LaunchEditors {
     private static final double PILL_ART_HEIGHT = 28;
 
     private LaunchEditors() {}
+
+    /** A {@code @SteamAppId} argument: the Steam games installed here. */
+    public static Node steamGame(ValueContext ctx) {
+        return game(ctx, SteamLibraryScanner::new);
+    }
+
+    /** An {@code @EpicAppName} argument: the Epic games installed here. */
+    public static Node epicGame(ValueContext ctx) {
+        return game(ctx, EpicLibraryScanner::new);
+    }
 
     /**
      * The launch id of a store launch call — a grid of installed cover art, or the id typed by hand.
@@ -119,8 +131,7 @@ public final class LaunchEditors {
      *
      * <p>The whole of it is {@link Editors#program}, which is the toolkit's because nothing in it names a
      * game, a store or the SDK: browsing for an executable is a shape, and the only
-     * SDK knowledge left here is <em>which argument of which call</em> gets this editor, which is
-     * {@link CallSites#LAUNCH_PROGRAM}.
+     * SDK knowledge left is <em>which parameter</em> gets this editor, which is {@code @ProgramPath}.
      *
      * <p>The prompt is the one thing worth stating from here. Typed matters as much as browsed: a launch
      * target is frequently a command that is not a file on this machine at all, and a chooser alone would

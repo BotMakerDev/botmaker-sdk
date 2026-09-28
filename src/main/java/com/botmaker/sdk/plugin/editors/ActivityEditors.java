@@ -16,8 +16,9 @@ import java.util.Set;
  *
  * <p>Both values are a {@code String}, and both name something the user drew somewhere else:
  * {@code Activities.disable("Mining")} names an activity of the open project, and {@code ctx.outcome("BAG_FULL")}
- * names one of the outcomes declared on the canvas. Nothing about the type says either — which is what
- * {@link CallSites} is for — and typing them by hand is the one mistake the platform cannot catch for the
+ * names one of the outcomes declared on the canvas. Nothing about the type says either — the parameters
+ * carry {@code @ActivityName} and {@code @OutcomeName} for that — and typing them by hand is the one mistake
+ * the platform cannot catch for the
  * user: a name that matches nothing is not an error anywhere, it is an activity that never runs and an
  * outcome nothing is wired to.
  *

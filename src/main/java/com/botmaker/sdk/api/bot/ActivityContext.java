@@ -53,7 +53,7 @@ public final class ActivityContext {
      * declared and never wired, and it is deliberately the same: a bot must not fail to start or die
      * mid-flow over a name.
      */
-    public Outcome outcome(String name) {
+    public Outcome outcome(@OutcomeName String name) {
         Flow.Activity declared = Flows.installed().activity(activity);
         if (name != null && !name.isBlank() && !Outcome.NEXT.equals(name)
                 && declared != null && !declared.outcomes().contains(name)) {

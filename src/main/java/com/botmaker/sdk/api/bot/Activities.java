@@ -27,23 +27,23 @@ public final class Activities {
     private Activities() {}
 
     /** Whether the named activity runs right now: its canvas switch, plus any override made this run. */
-    public static boolean active(String name) {
+    public static boolean active(@ActivityName String name) {
         return FlowWalker.active(name);
     }
 
     /** Switches the named activity on for the rest of the run. */
-    public static void enable(String name) {
+    public static void enable(@ActivityName String name) {
         FlowWalker.setEnabled(name, true);
     }
 
     /** Switches the named activity off for the rest of the run; the flow takes its {@code DISABLED} wire. */
-    public static void disable(String name) {
+    public static void disable(@ActivityName String name) {
         FlowWalker.setEnabled(name, false);
     }
 
     /** Switches the named activity on or off for the rest of the run. */
     @Hidden("the boolean picks between enable and disable, which the menu already offers by name")
-    public static void setEnabled(String name, boolean enabled) {
+    public static void setEnabled(@ActivityName String name, boolean enabled) {
         FlowWalker.setEnabled(name, enabled);
     }
 }

@@ -95,7 +95,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code executablePath} is null/blank
      * @throws RuntimeException         if the process could not be started
      */
-    public static Process launch(String executablePath, String... args) {
+    public static Process launch(@ProgramPath String executablePath, @LaunchOption String... args) {
         if (isolate(exeSpec(executablePath, args))) {
             return null;
         }
@@ -111,7 +111,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code appId} is null/blank
      * @throws RuntimeException         if neither the Steam URL nor the CLI fallback could be invoked
      */
-    public static void launchSteam(String appId) {
+    public static void launchSteam(@SteamAppId String appId) {
         if (isolate(storeSpec(LaunchKind.STEAM, appId))) {
             return;
         }
@@ -136,7 +136,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code appName} is null/blank
      * @throws RuntimeException         if the Epic protocol URL could not be invoked (launcher not installed?)
      */
-    public static void launchEpic(String appName) {
+    public static void launchEpic(@EpicAppName String appName) {
         if (isolate(storeSpec(LaunchKind.EPIC, appName))) {
             return;
         }
@@ -208,7 +208,7 @@ public class Game {
      * @param source  the capture source used to detect an existing instance
      * @return true if the game was launched, false if it was already running
      */
-    public static boolean launchEpicIfNotRunning(String appName, CaptureSource source) {
+    public static boolean launchEpicIfNotRunning(@EpicAppName String appName, CaptureSource source) {
         if (isRunning(source)) {
             return false;
         }
@@ -265,7 +265,8 @@ public class Game {
      * @param args           optional command-line arguments
      * @return true if the game was launched, false if it was already running
      */
-    public static boolean launchIfNotRunning(String executablePath, CaptureSource source, String... args) {
+    public static boolean launchIfNotRunning(@ProgramPath String executablePath, CaptureSource source,
+                                             @LaunchOption String... args) {
         if (isRunning(source)) {
             return false;
         }
@@ -280,7 +281,7 @@ public class Game {
      * @param source the capture source used to detect an existing instance
      * @return true if the game was launched, false if it was already running
      */
-    public static boolean launchSteamIfNotRunning(String appId, CaptureSource source) {
+    public static boolean launchSteamIfNotRunning(@SteamAppId String appId, CaptureSource source) {
         if (isRunning(source)) {
             return false;
         }
@@ -298,8 +299,8 @@ public class Game {
      * @param args           optional command-line arguments
      * @return true if the game's window was present within the timeout, false if it timed out
      */
-    public static boolean launchAndWait(String executablePath, CaptureSource source, long timeoutMillis,
-                                        String... args) {
+    public static boolean launchAndWait(@ProgramPath String executablePath, CaptureSource source, long timeoutMillis,
+                                        @LaunchOption String... args) {
         launchIfNotRunning(executablePath, source, args);
         return waitForLaunch(source, timeoutMillis);
     }
@@ -312,7 +313,7 @@ public class Game {
      * @param args           optional command-line arguments
      * @return true if the game's window was present within the timeout, false if it timed out
      */
-    public static boolean launchAndWait(String executablePath, String... args) {
+    public static boolean launchAndWait(@ProgramPath String executablePath, @LaunchOption String... args) {
         return launchAndWait(executablePath, Source.current(), BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT, args);
     }
 

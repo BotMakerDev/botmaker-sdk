@@ -1,25 +1,39 @@
 package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.api.slot.SlotEditor;
+import com.botmaker.sdk.api.bot.ActivityName;
+import com.botmaker.sdk.api.bot.OutcomeName;
+import com.botmaker.sdk.api.bot.Setting;
+import com.botmaker.sdk.api.emulator.EmulatorName;
+import com.botmaker.sdk.api.launch.EpicAppName;
+import com.botmaker.sdk.api.launch.LaunchOption;
+import com.botmaker.sdk.api.launch.ProgramPath;
+import com.botmaker.sdk.api.launch.SteamAppId;
 import com.botmaker.sdk.plugin.emulator.EmulatorEditors;
-import com.botmaker.shared.game.EpicLibraryScanner;
-import com.botmaker.shared.game.SteamLibraryScanner;
 
 import java.awt.Color;
 import java.util.List;
 
 /**
- * Every editor this plugin offers, in the order it wants them consulted.
+ * The editors this plugin offers that none of its types chooses for itself, in the order it wants them
+ * consulted. An editor for one of this plugin's own types — Point, Precision, a picture — is not here: it is
+ * declared beside the type, in {@code SdkTypes}.
  *
- * <p>Order matters only within this list — the host consults its own editors first and its JDK/enum fallbacks
- * last, whatever a plugin claims. So this is not a precedence table so much as a table of contents, and the
- * one rule inside it is that a narrower match comes before a wider one.
+ * <p>Three kinds:
+ * <ul>
+ *   <li><b>By parameter.</b> A Steam app id, a program path and a launch flag are all {@code String}; the api
+ *       says which is which by annotating the parameter ({@code launchSteam(@SteamAppId String appId)}), and
+ *       the editor is chosen by the annotation. These are absent from the Parameters window, which has no
+ *       call behind a row.</li>
+ *   <li><b>By a run of pictures</b>, which neither a parameter nor a type can say: only the host knows that
+ *       several arguments are one list.</li>
+ *   <li><b>By another plugin's type</b>: plugin-basics declares {@code java.awt.Color}; this plugin offers a
+ *       colour picker that samples the capture target, and the host asks the user which to use.</li>
+ * </ul>
  *
- * <p><b>Everything here matches on the type, not on the call site.</b> That is deliberate and it is what the
- * contract's {@code ValueContext} bought: an editor chosen by type is drawn both in a bot's source and in the
- * Parameters window, while one chosen by {@code enclosingMethod()} can only ever appear in the first. Where a
- * call site genuinely is what decides — a Steam app id and a window title are both {@code String} — the editor
- * asks {@link com.botmaker.plugin.api.slot.ValueContext#asSlot()} and declines when the answer is {@code null}.
+ * <p>Order matters only within this list — the host consults its own editors first, whatever a plugin claims —
+ * and the one rule inside it is that a narrower match comes before a wider one. Every drawing is
+ * {@code () -> X::method}, so building this list links no JavaFX.
  */
 public final class SdkEditors {
 
@@ -27,33 +41,19 @@ public final class SdkEditors {
 
     /** Built once and shared: an editor holds no state, the value lives in the context it is handed. */
     public static final List<SlotEditor> ALL = List.of(
-            // Chosen by the call, and therefore first: every one of these is a String, and the type-based
-            // editors below would not claim them — but a plugin loaded before this one might, and a narrower
-            // match belongs ahead of a wider one regardless of who is currently holding the wider one.
-            SlotEditor.of(CallSites.STEAM_APP_ID,
-                    ctx -> LaunchEditors.game(ctx, SteamLibraryScanner::new)),
-            SlotEditor.of(CallSites.EPIC_APP_NAME,
-                    ctx -> LaunchEditors.game(ctx, EpicLibraryScanner::new)),
-            SlotEditor.of(CallSites.LAUNCH_PROGRAM, LaunchEditors::program),
-            SlotEditor.of(CallSites.LAUNCH_OPTION, LaunchEditors::option),
-            SlotEditor.of(CallSites.BOT_SETTING, SettingsEditors::setting),
-            // The emulator instance name, scanned through botmaker-shared.
-            SlotEditor.of(CallSites.EMULATOR_NAME, EmulatorEditors::instanceName),
-            // The two names that tie a bot's code to its Activity Flow canvas. Both are a String and both
-            // name something drawn elsewhere, so nothing but the call could choose these.
-            SlotEditor.of(CallSites.ACTIVITY_NAME, ActivityEditors::activityName),
-            SlotEditor.of(CallSites.OUTCOME_NAME, ActivityEditors::outcomeName),
+            SlotEditor.onParameter(SteamAppId.class).draw(() -> LaunchEditors::steamGame),
+            SlotEditor.onParameter(EpicAppName.class).draw(() -> LaunchEditors::epicGame),
+            SlotEditor.onParameter(ProgramPath.class).draw(() -> LaunchEditors::program),
+            SlotEditor.onParameter(LaunchOption.class).draw(() -> LaunchEditors::option),
+            SlotEditor.onParameter(Setting.class).draw(() -> SettingsEditors::setting),
+            SlotEditor.onParameter(EmulatorName.class).draw(() -> EmulatorEditors::instanceName),
+            SlotEditor.onParameter(ActivityName.class).draw(() -> ActivityEditors::activityName),
+            SlotEditor.onParameter(OutcomeName.class).draw(() -> ActivityEditors::outcomeName),
 
-            // Rect, Point, Size, Precision and a single ImageTemplate are not here: they are this plugin's
-            // own types, so their editors are PluginType.editor in SdkTypes.
+            // Several named pictures. Ahead of SdkTypes' single-picture editor because it claims a subset of
+            // what that one would, and the host consults a plugin's slot editors before its types' editors:
+            // the order is the difference between found.hasAny(coin, gem) drawn as one row and as two pickers.
+            SlotEditor.when(TemplateEditors::isRunOfPictures).draw(() -> TemplateEditors::group),
 
-            // Several named pictures, and it comes ahead of SdkTypes' single-picture editor because it claims
-            // a subset of what that one would: an ImageTemplate argument that the host says is one of a run.
-            // The host consults a plugin's slot editors before its types' editors, and here the order is the
-            // whole difference between "found.hasAny(coin, gem)" drawn as one row and drawn as two pickers.
-            // An ImageTemplateGroup slot is drawn by the same row, as that type's own editor (SdkTypes).
-            SlotEditor.of(TemplateEditors::isRunOfPictures, TemplateEditors::group),
-            // Color is plugin-basics' type, so this is an alternative editor, not a declaration: the host asks
-            // the user which to use. Duration was one too until 2026-09-27; basics draws it now. By class.
-            SlotEditor.forType(Color.class, ColorEditors::color));
+            SlotEditor.forType(Color.class).draw(() -> ColorEditors::color));
 }

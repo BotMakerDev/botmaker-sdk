@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Parameter annotations saying what a `String` or a number is for**: `@SteamAppId`, `@EpicAppName`,
+  `@ProgramPath`, `@LaunchOption` (`api.launch`), `@EmulatorName` (`api.emulator`), `@ActivityName`,
+  `@OutcomeName` and `@Setting(label, …, min, max, step)` (`api.bot`), on the launch calls, the emulator
+  calls, `Activities`, `ActivityContext.outcome` and the `BotSettings` withers. Nothing reads them while a bot
+  runs; Studio picks each argument's editor by them. `launchSteam(int)` carries none: the game grid writes a
+  `String`.
 - **BREAKING: the bot's settings are its own Java.** `BotSettings` is a value now, declared in `Sdk.java` as
   `@Managed("settings") public static BotSettings settings()` —
   `BotSettings.of(BotSettings.clicks(500, 200, true), BotSettings.vision(0.8, 0.05), BotSettings.input(false,

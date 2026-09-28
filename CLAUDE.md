@@ -202,6 +202,12 @@ which installs every `@Managed` value it is handed and walks the flow (`internal
 - **`capture.json`, `CaptureTargets` and `capture.source` are deleted** (*The capture targets are authoring
   data*, *…managed here…*). A project has one capture source, the expression `Sdk.captureSource()` returns;
   `Source.current()` resolves to what `Bot.run` installed, or the whole desktop.
+- **`CallSites` is deleted (2026-09-28).** Wherever a section below says `CallSites.X` chooses an editor by
+  method name and argument index, read *an annotation on the api parameter*: `api.launch.@SteamAppId`,
+  `@EpicAppName`, `@ProgramPath`, `@LaunchOption`; `api.emulator.@EmulatorName`; `api.bot.@ActivityName`,
+  `@OutcomeName`, and `@Setting(label, prompt, unit, min, max, step, fallback)` on the `BotSettings` withers,
+  which is `SettingsEditors`' whole table now. `SdkEditors.ALL` is `SlotEditor.onParameter(X.class).draw(…)`.
+  An annotation added to an api parameter is additive and never-delete holds.
 - **`ActivityEditors`' activity list comes from `FlowValue.current()`** (*The two pickers the lambda was
   built for*). `Activities.define` is deleted; the outcome-name editor is still why `outcome` takes a
   context.

@@ -90,7 +90,7 @@ public final class Emulators {
      * instance or the product exposes no launch command. Poll {@link EmulatorRef#running()} / retry
      * {@link #named(String)} for readiness afterwards.
      */
-    public static boolean launch(String name) {
+    public static boolean launch(@EmulatorName String name) {
         boolean dispatched = findInstance(name).map(EmulatorLauncher::launch).orElse(false);
         Debug.log("[Emulator] launch '" + name + "' -> " + (dispatched ? "dispatched" : "no such instance"));
         return dispatched;
@@ -100,7 +100,7 @@ public final class Emulators {
      * Stops the configured instance named {@code name} via its product's console tool. Returns whether a stop
      * was dispatched; {@code false} if there's no such instance or the product exposes no stop command.
      */
-    public static boolean stop(String name) {
+    public static boolean stop(@EmulatorName String name) {
         boolean dispatched = findInstance(name).map(EmulatorLauncher::stop).orElse(false);
         Debug.log("[Emulator] stop '" + name + "' -> " + (dispatched ? "dispatched" : "no such instance"));
         return dispatched;
@@ -130,7 +130,7 @@ public final class Emulators {
      * @throws IllegalArgumentException if {@code name} is null/blank
      * @throws IllegalStateException    if no running instance with that name is found
      */
-    public static Emulator named(String name) {
+    public static Emulator named(@EmulatorName String name) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name must not be empty");
         }
@@ -168,7 +168,7 @@ public final class Emulators {
      * @throws IllegalArgumentException if {@code name} is null/blank
      * @throws IllegalStateException    if no running instance with that name is found
      */
-    public static Emulator use(String name) {
+    public static Emulator use(@EmulatorName String name) {
         Emulator emu = named(name);
         emu.use();
         return emu;

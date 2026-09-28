@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — call-site editors by parameter annotation (guided plugin declaration, phase 2)
+
+**Done**
+- Eight `RUNTIME` parameter annotations in `api.launch`/`api.emulator`/`api.bot`, put on the parameters the
+  old `CallSites` named by method string and argument index. `CallSites` deleted; `SdkEditors.ALL` is
+  `SlotEditor.onParameter(X.class).draw(() -> E::m)` plus the picture run (`when`) and `Color` (`forType`).
+- `SettingsEditors.bounds`' switch over setter names is gone: label, prompt, unit and range are `@Setting`'s
+  elements on each `BotSettings` wither, and a whole number is read off the parameter's type.
+- `LaunchEditors.steamGame`/`epicGame`, so no drawing is a lambda (the headless rule).
+- Behaviour: `launchSteam(int)` no longer offers the game grid, which wrote a `String` into an `int` slot.
+- `CallSitesTest` → `SdkEditorsTest`.
+
+**Deferred / next**
+- Phase 3: `SdkToolbarItems.ALL`, `open(ActionContext)` per feature, `FlowValue`'s static bind gone.
+
 ## 2026-09-28 — declared by contract steps (guided plugin declaration, phase 1)
 
 **Done**
