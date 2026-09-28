@@ -1,7 +1,7 @@
 package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
-import com.botmaker.plugin.toolkit.Types;
+import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.sdk.api.bot.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
@@ -9,11 +9,6 @@ import com.botmaker.sdk.api.flow.FlowLayout;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.botmaker.plugin.toolkit.Types.flag;
-import static com.botmaker.plugin.toolkit.Types.method;
-import static com.botmaker.plugin.toolkit.Types.text;
-import static com.botmaker.plugin.toolkit.Types.whole;
 
 /**
  * The shapes a {@code @Managed} value of this plugin's takes: the flow's five records, as the components
@@ -35,8 +30,8 @@ import static com.botmaker.plugin.toolkit.Types.whole;
  * <p><b>A call with the wrong number of arguments is not this shape</b>, and every {@code build} below says
  * so by answering {@code null} or the record's own empty value rather than guessing: it is a call to
  * something else, or to a newer version of this factory, and either way lining its parts up with these would
- * be rewriting code on a hunch. The parts are each factory's parameters ({@link Types#call}), so the two
- * cannot drift apart.
+ * be rewriting code on a hunch. Each factory is a method reference and each part an accessor, and the value
+ * is built back by invoking the factory, so the call and its parts cannot drift apart.
  *
  * <h2>A body is a name, and it crosses as the source it is written as</h2>
  *
@@ -72,13 +67,8 @@ public final class FlowTypes {
     // ---- the five containers ---------------------------------------------------------------------------
 
     /** {@code Flow.of(List<Activity>, List<Edge>, List<Preset>, String, Limits)}. */
-    public static final ComponentType<Flow> FLOW_SHAPE = Types.call(Flow.class,
-            method(Flow.class, "of", List.class, List.class, List.class, String.class, Flow.Limits.class),
-            value -> value == null ? List.of(List.of(), List.of(), List.of(), "", Flow.Limits.DEFAULT)
-                    : List.of(value.activities(), value.edges(), value.presets(), value.start(), value.limits()),
-            parts -> parts.size() != 5 ? Flow.NONE
-                    : new Flow(list(parts.get(0)), list(parts.get(1)), list(parts.get(2)), text(parts, 3),
-                    parts.get(4) instanceof Flow.Limits l ? l : Flow.Limits.DEFAULT));
+    public static final DeclaredCall<Flow> FLOW_SHAPE = ComponentType.part(Flow.class)
+            .writtenAs(Flow::of, Flow::activities, Flow::edges, Flow::presets, Flow::start, Flow::limits);
 
     /**
      * {@code Flow.activity(ActivityBody, String, String, boolean, boolean, boolean, List<String>)}.
@@ -90,52 +80,51 @@ public final class FlowTypes {
      * which reads as "written by hand" and is refused rather than guessed at. A card with no method yet is
      * written as the constant that says so: the host writes a component nothing declares verbatim, and an
      * empty one has no Java at all.
+     *
+     * <p>So this is the one part here taken apart and built back by hand ({@code components} and
+     * {@code build}): the text is not an {@code ActivityBody}, and no accessor or factory could hand it over.
+     * It is the last place a plugin's value carries Java text, and it is known.
      */
-    public static final ComponentType<Flow.Activity> ACTIVITY_SHAPE = Types.call(Flow.Activity.class,
-            method(Flow.class, "activity", ActivityBody.class, String.class, String.class, boolean.class,
-                    boolean.class, boolean.class, List.class),
-            value -> value == null ? List.of("", "", "", true, false, false, List.of())
-                    : List.of(bodyLiteral(sourceOf(value.body())), value.name(), value.description(),
-                    value.enabled(), value.goHome(), value.popupCheck(), value.outcomes()),
-            parts -> parts.size() != 7 ? null
-                    : new Flow.Activity(new Named(bodyOf(text(parts, 0))), text(parts, 1), text(parts, 2),
-                    flag(parts, 3), flag(parts, 4), flag(parts, 5), list(parts.get(6))));
+    public static final DeclaredCall<Flow.Activity> ACTIVITY_SHAPE = ComponentType.part(Flow.Activity.class)
+            .writtenAs(Flow::activity, Flow.Activity::body, Flow.Activity::name, Flow.Activity::description,
+                    Flow.Activity::enabled, Flow.Activity::goHome, Flow.Activity::popupCheck, Flow.Activity::outcomes)
+            .components(value -> List.of(bodyLiteral(sourceOf(value.body())), value.name(), value.description(),
+                    value.enabled(), value.goHome(), value.popupCheck(), value.outcomes()))
+            .build(FlowTypes::activity);
+
+    private static Flow.Activity activity(List<Object> parts) {
+        if (parts.size() != 7 || !(parts.get(0) instanceof String body) || !(parts.get(1) instanceof String name)
+                || !(parts.get(2) instanceof String description) || !(parts.get(3) instanceof Boolean enabled)
+                || !(parts.get(4) instanceof Boolean goHome) || !(parts.get(5) instanceof Boolean popupCheck)) {
+            return null;
+        }
+        return new Flow.Activity(new Named(bodyOf(body)), name, description, enabled, goHome, popupCheck,
+                list(parts.get(6)));
+    }
 
     /** {@code Flow.preset(String, List<String>)}. */
-    public static final ComponentType<Flow.Preset> PRESET_SHAPE = Types.call(Flow.Preset.class,
-            method(Flow.class, "preset", String.class, List.class),
-            value -> value == null ? List.of("", List.of()) : List.of(value.name(), value.activities()),
-            parts -> parts.size() != 2 ? null : new Flow.Preset(text(parts, 0), list(parts.get(1))));
+    public static final DeclaredCall<Flow.Preset> PRESET_SHAPE = ComponentType.part(Flow.Preset.class)
+            .writtenAs(Flow::preset, Flow.Preset::name, Flow.Preset::activities);
 
     /** {@code Flow.edge(String, String, String)}. */
-    public static final ComponentType<Flow.Edge> EDGE_SHAPE = Types.call(Flow.Edge.class,
-            method(Flow.class, "edge", String.class, String.class, String.class),
-            value -> value == null ? List.of("", "", "") : List.of(value.from(), value.to(), value.outcome()),
-            parts -> parts.size() != 3 ? null : new Flow.Edge(text(parts, 0), text(parts, 1), text(parts, 2)));
+    public static final DeclaredCall<Flow.Edge> EDGE_SHAPE = ComponentType.part(Flow.Edge.class)
+            .writtenAs(Flow::edge, Flow.Edge::from, Flow.Edge::to, Flow.Edge::outcome);
 
     /** {@code Flow.limits(int, int)}. */
-    public static final ComponentType<Flow.Limits> LIMITS_SHAPE = Types.call(Flow.Limits.class,
-            method(Flow.class, "limits", int.class, int.class),
-            value -> {
-                Flow.Limits limits = value == null ? Flow.Limits.DEFAULT : value;
-                return List.of(limits.maxSteps(), limits.stepDelayMs());
-            },
-            parts -> parts.size() != 2 ? Flow.Limits.DEFAULT : new Flow.Limits(whole(parts, 0), whole(parts, 1)));
+    public static final DeclaredCall<Flow.Limits> LIMITS_SHAPE = ComponentType.part(Flow.Limits.class)
+            .writtenAs(Flow::limits, Flow.Limits::maxSteps, Flow.Limits::stepDelayMs);
 
     /**
      * {@code FlowLayout.of(Map<String, Spot>, boolean)}: the card positions, the {@code @Managed("flow.layout")}
      * value beside the flow (2026-09-27). The map is the host's to write ({@code Map.ofEntries}); its values
      * are {@link #SPOT_SHAPE}s. A flow nobody has laid out is written {@code FlowLayout.NONE}.
      */
-    public static final ComponentType<FlowLayout> LAYOUT_SHAPE = Types.call(FlowLayout.class,
-                    method(FlowLayout.class, "of", Map.class, boolean.class),
-                    value -> {
-                        FlowLayout layout = value == null ? FlowLayout.NONE : value;
-                        return List.of(layout.spots(), layout.goHomeByDefault());
-                    },
-                    FlowTypes::layout)
-            .constants(Types.constant(FlowLayout.class, "NONE"));
+    public static final DeclaredCall<FlowLayout> LAYOUT_SHAPE = ComponentType.part(FlowLayout.class)
+            .writtenAs(FlowLayout::of, FlowLayout::spots, FlowLayout::goHomeByDefault)
+            .build(FlowTypes::layout)
+            .constants(FlowLayout.NONE);
 
+    /** The layout back, keeping every entry that is a name and a spot: a stray entry costs one card, not all. */
     private static FlowLayout layout(List<Object> parts) {
         if (parts.size() != 2) return null;
         Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
@@ -148,13 +137,8 @@ public final class FlowTypes {
     }
 
     /** {@code FlowLayout.at(int, int)}. */
-    public static final ComponentType<FlowLayout.Spot> SPOT_SHAPE = Types.call(FlowLayout.Spot.class,
-            method(FlowLayout.class, "at", int.class, int.class),
-            value -> {
-                FlowLayout.Spot spot = value == null ? new FlowLayout.Spot(0, 0) : value;
-                return List.of(spot.x(), spot.y());
-            },
-            parts -> parts.size() != 2 ? null : FlowLayout.at(whole(parts, 0), whole(parts, 1)));
+    public static final DeclaredCall<FlowLayout.Spot> SPOT_SHAPE = ComponentType.part(FlowLayout.Spot.class)
+            .writtenAs(FlowLayout::at, FlowLayout.Spot::x, FlowLayout.Spot::y);
 
     /** The flow's five and the layout's two, which is what {@code SdkPlugin.componentTypes()} hands the host. */
     public static final List<ComponentType<?>> ALL = List.of(FLOW_SHAPE, ACTIVITY_SHAPE, PRESET_SHAPE,

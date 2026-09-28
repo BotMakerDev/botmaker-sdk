@@ -13,6 +13,7 @@ import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -23,18 +24,21 @@ import java.util.Optional;
  * best match whose rectangle holds the click wins. A picture that is merely somewhere on screen does not count:
  * the recording is of what was clicked.
  */
-public final class PictureAt implements RecordedValue<ImageTemplate> {
+public final class PictureAt {
 
     /** How sure a match must be to name the thing clicked. Stricter than a bot's default: a wrong guess is code. */
     private static final double CONFIDENCE = 0.9;
 
-    @Override
-    public Class<ImageTemplate> type() {
-        return ImageTemplate.class;
-    }
+    /** The declaration the plugin lists: an {@link ImageTemplate} parameter of a recording is {@link #find}'s. */
+    public static final RecordedValue<ImageTemplate> PICTURE = RecordedValue.of(ImageTemplate.class).at(PictureAt::find);
 
-    @Override
-    public Optional<ImageTemplate> at(StudioServices services, Spot spot) {
+    /** Every value this plugin reads off the screen for a recording. */
+    public static final List<RecordedValue<?>> ALL = List.of(PICTURE);
+
+    private PictureAt() {}
+
+    /** The project picture whose best match holds {@code spot}, or empty. */
+    public static Optional<ImageTemplate> find(StudioServices services, RecordedValue.Spot spot) {
         if (spot == null || spot.frame() == null || services == null) return Optional.empty();
         Path resources = services.resourcesDir();
         if (resources == null) return Optional.empty();

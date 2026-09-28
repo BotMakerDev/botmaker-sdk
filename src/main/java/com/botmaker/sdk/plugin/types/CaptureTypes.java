@@ -1,7 +1,10 @@
 package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
-import com.botmaker.plugin.toolkit.Types;
+import com.botmaker.plugin.api.value.DeclaredCall;
+import com.botmaker.plugin.api.value.DeclaredType;
+import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.emulator.EmulatorSource;
@@ -15,18 +18,15 @@ import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 
 import java.util.List;
 
-import static com.botmaker.plugin.toolkit.Types.method;
-
 /**
- * A {@link CaptureSource} as values: the type itself, and the six calls one is written as.
+ * A {@link CaptureSource} as values: the type itself, and the calls one is written as.
  *
  * <p>{@code CaptureSource} is an interface, so the host cannot take one apart through a single
- * {@link ComponentType}. Each concrete source is its own: {@code Source.current()},
+ * {@link ComponentType}. Each concrete source is its own part: {@code Source.current()},
  * {@code CaptureSource.desktop()}, {@code .monitor(i)}, {@code .window("t")},
  * {@code new EmulatorSource("n")} and {@code CaptureSource.region(source, rect)}. The host reads a
  * {@code CaptureSource} slot as whichever of them the Java is, and writes a value back through the one
- * matching its class. Each call's parts are its factory's parameters ({@link Types#call}), so the two cannot
- * drift apart.
+ * matching its class — which is what {@code writtenAsParts()} on the type says.
  */
 public final class CaptureTypes {
 
@@ -40,56 +40,59 @@ public final class CaptureTypes {
      * <p>Drawn as a pill opening the source tiles ({@link CaptureSourceEditors}), the same picker as the
      * toolbar's Capture Source.
      */
-    public static final Types.Declared<CaptureSource> CAPTURE_SOURCE =
-            Types.editable(CaptureSource.class, CurrentSource::new, () -> CaptureSourceEditors::source)
-                    .preview(() -> CaptureSourceEditors::preview);
+    public static final DeclaredType<CaptureSource> CAPTURE_SOURCE = PluginType.value(CaptureSource.class)
+            .fresh(CurrentSource::new)
+            .editor(() -> CaptureSourceEditors::source)
+            .preview(() -> CaptureSourceEditors::preview)
+            .writtenAsParts();
 
-    /** {@code Source.current()}. */
-    public static final ComponentType<CurrentSource> CURRENT = Types.call(CurrentSource.class,
-            method(Source.class, "current"), value -> List.of(), parts -> new CurrentSource());
+    /**
+     * {@code Source.current()}. Built as the ambient source itself rather than by calling the factory, which
+     * would resolve it to whatever the editor's own process has installed.
+     */
+    public static final DeclaredCall<CurrentSource> CURRENT = ComponentType.part(CurrentSource.class)
+            .writtenAs(Source::current)
+            .build(parts -> parts.isEmpty() ? new CurrentSource() : null);
 
     /** {@code CaptureSource.desktop()}. */
-    public static final ComponentType<Desktop> DESKTOP = Types.call(Desktop.class,
-            method(CaptureSource.class, "desktop"), value -> List.of(), parts -> new Desktop());
+    public static final DeclaredCall<Desktop> DESKTOP = ComponentType.part(Desktop.class)
+            .writtenAs(CaptureSource::desktop);
 
     /** {@code CaptureSource.monitor(index)}. */
-    public static final ComponentType<Monitor> MONITOR = Types.call(Monitor.class,
-            method(CaptureSource.class, "monitor", int.class),
-            value -> List.of(value.index()), parts -> new Monitor(Types.whole(parts, 0)));
+    public static final DeclaredCall<Monitor> MONITOR = ComponentType.part(Monitor.class)
+            .writtenAs(CaptureSource::monitor, Monitor::index);
 
     /** {@code CaptureSource.window("title")}. */
-    public static final ComponentType<NamedWindow> WINDOW = Types.call(NamedWindow.class,
-            method(CaptureSource.class, "window", String.class),
-            value -> List.of(value.titleSubstring()), parts -> new NamedWindow(Types.text(parts, 0)));
+    public static final DeclaredCall<NamedWindow> WINDOW = ComponentType.part(NamedWindow.class)
+            .writtenAs(CaptureSource::window, NamedWindow::titleSubstring);
 
     /**
      * {@code new EmulatorSource("name")}: a constructor, since {@code EmulatorSource} is not one of
      * {@code CaptureSource}'s factories. It is still correct Java, and the bot captures from the emulator.
      */
-    public static final ComponentType<EmulatorSource> EMULATOR = Types.call(EmulatorSource.class,
-            Types.constructor(EmulatorSource.class, String.class),
-            value -> List.of(value.instanceName()), parts -> new EmulatorSource(Types.text(parts, 0)));
+    public static final DeclaredCall<EmulatorSource> EMULATOR = ComponentType.part(EmulatorSource.class)
+            .writtenAs(EmulatorSource::new, EmulatorSource::instanceName);
 
     /**
      * {@code CaptureSource.region(source, new Rect(x, y, w, h))}: a region is a part of which pixels the bot
      * reads, so it is a value too. A region of a region is written as one call inside the other.
+     *
+     * <p>Named with {@link Ref#member}, not a reference: {@code CaptureSource} has a static
+     * {@code region(source, rect)} and an instance {@code source.region(rect)}, so {@code CaptureSource::region}
+     * is ambiguous in javac. It is the one factory here that a reference cannot name.
      */
-    public static final ComponentType<RegionSource> REGION = Types.call(RegionSource.class,
-            method(CaptureSource.class, "region", CaptureSource.class, Rect.class),
-            value -> List.of(value.parent(), value.sub()), CaptureTypes::region);
+    public static final DeclaredCall<RegionSource> REGION = ComponentType.part(RegionSource.class)
+            .writtenAsMember(Ref.member(CaptureSource.class, "region", CaptureSource.class, Rect.class),
+                    RegionSource::parent, RegionSource::sub);
 
     /**
      * {@code source.region(new Rect(…))}: the chain a person writes, read as the region it builds. It is an
-     * instance factory, so the host never writes it: an edited region is written as {@link #REGION}.
+     * instance factory, so the host never writes it: an edited region is written as {@link #REGION}. Named by
+     * {@link Ref#member} for the reason {@link #REGION} is.
      */
-    public static final ComponentType<RegionSource> REGION_CHAIN = Types.call(RegionSource.class,
-            method(CaptureSource.class, "region", Rect.class),
-            value -> List.of(value.parent(), value.sub()), CaptureTypes::region);
-
-    private static RegionSource region(List<Object> parts) {
-        return parts.size() == 2 && parts.get(0) instanceof CaptureSource of && parts.get(1) instanceof Rect sub
-                ? new RegionSource(of, sub) : null;
-    }
+    public static final DeclaredCall<RegionSource> REGION_CHAIN = ComponentType.part(RegionSource.class)
+            .writtenAsMember(Ref.member(CaptureSource.class, "region", Rect.class),
+                    RegionSource::parent, RegionSource::sub);
 
     /**
      * Every shape, in the order the host tries them: the six it writes, then the chained region, which it

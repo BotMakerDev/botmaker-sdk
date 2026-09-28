@@ -49,15 +49,15 @@ class GeometryLabelTest {
 
     // Each label is asked with the declaration the plugin hands its editor.
     private static String pointLabel(ValueContext ctx) {
-        return GeometryEditors.pointLabel(ctx, SdkTypes.POINT_TYPE);
+        return GeometryEditors.pointLabel(ctx, SdkTypes.POINT);
     }
 
     private static String rectLabel(ValueContext ctx) {
-        return GeometryEditors.rectLabel(ctx, SdkTypes.RECT_TYPE);
+        return GeometryEditors.rectLabel(ctx, SdkTypes.RECT);
     }
 
     private static String sizeLabel(ValueContext ctx) {
-        return GeometryEditors.sizeLabel(ctx, SdkTypes.SIZE_TYPE);
+        return GeometryEditors.sizeLabel(ctx, SdkTypes.SIZE);
     }
 
     // --- a value labels as its numbers ---

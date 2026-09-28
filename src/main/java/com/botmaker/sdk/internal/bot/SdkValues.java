@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Flows;
+import com.botmaker.sdk.internal.vision.TemplateNames;
 
 import java.util.List;
 
@@ -30,32 +31,38 @@ public final class SdkValues {
     /** The class the method-shaped values live in: {@code plugins/sdk/Sdk.java}, named by the bot's {@code main}. */
     public static final String HOLDER = "Sdk";
 
-    public static final ManagedValue<Flow> FLOW = ManagedValue.of("flow", HOLDER, Flow.class, Flow.NONE,
-            "This is the bot's activity flow. Draw it in 🔀 Activity Flow, which keeps the activities, the wires"
-                    + " and the layout in step.");
+    public static final ManagedValue<Flow> FLOW = ManagedValue.method("flow")
+            .in(HOLDER)
+            .holds(Flow.class, Flow.NONE)
+            .because("This is the bot's activity flow. Draw it in 🔀 Activity Flow, which keeps the activities,"
+                    + " the wires and the layout in step.");
 
-    public static final ManagedValue<FlowLayout> FLOW_LAYOUT = ManagedValue.of("flow.layout", HOLDER,
-            FlowLayout.class, FlowLayout.NONE,
-            "These are where the Activity Flow's cards sit. Drag them in 🔀 Activity Flow, which keeps them in"
-                    + " step with the activities' names.");
+    public static final ManagedValue<FlowLayout> FLOW_LAYOUT = ManagedValue.method("flow.layout")
+            .in(HOLDER)
+            .holds(FlowLayout.class, FlowLayout.NONE)
+            .because("These are where the Activity Flow's cards sit. Drag them in 🔀 Activity Flow, which keeps"
+                    + " them in step with the activities' names.");
 
-    public static final ManagedValue<CaptureSource> CAPTURE = ManagedValue.of("capture", HOLDER,
-            CaptureSource.class, CaptureSource.desktop(),
-            "This is where the bot reads pixels from. Choose it in 🎯 Capture Source.");
+    public static final ManagedValue<CaptureSource> CAPTURE = ManagedValue.method("capture")
+            .in(HOLDER)
+            .holds(CaptureSource.class, CaptureSource.desktop())
+            .because("This is where the bot reads pixels from. Choose it in 🎯 Capture Source.");
 
-    public static final ManagedValue<BotSettings> SETTINGS = ManagedValue.of("settings", HOLDER,
-            BotSettings.class, BotSettings.DEFAULTS,
-            "These are the bot's settings — delays, confidence, input and its private display. Change them in"
-                    + " ⚙ Bot Settings.");
+    public static final ManagedValue<BotSettings> SETTINGS = ManagedValue.method("settings")
+            .in(HOLDER)
+            .holds(BotSettings.class, BotSettings.DEFAULTS)
+            .because("These are the bot's settings — delays, confidence, input and its private display. Change"
+                    + " them in ⚙ Bot Settings.");
 
     /**
      * The picture constants — {@code static final ImageTemplate COLLECT = new ImageTemplate(…)}. 🖼 Manage
      * Pictures renames the file, the constant and every use of it together; the canvas can only rename the one
      * it is looking at, which would leave the bot calling a name that is gone.
      */
-    public static final ManagedValue<Void> PICTURES = ManagedValue.openSet("pictures", "Pictures",
-            "Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every use of it"
-                    + " together.");
+    public static final ManagedValue<Void> PICTURES = ManagedValue.openSet("pictures")
+            .in(TemplateNames.CLASS_NAME)
+            .because("Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every"
+                    + " use of it together.");
 
     /** All five, in the order the plugin declares them. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOW, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES);

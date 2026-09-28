@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — declared by contract steps (guided plugin declaration, phase 1)
+
+**Done**
+- `SdkPlugin` extends `DeclaredPlugin`; constructor is the declaration. `SdkTypes`, `CaptureTypes`,
+  `FlowTypes`, `SettingsTypes` on `PluginType.value`/`ComponentType.part` with method references;
+  `SdkTypes.PARTS`; result types via `filledBy`; `PictureAt.ALL`; `SdkValues` via `ManagedValue.method`.
+- Two hand-made builds remain, each with its reason: `CaptureTypes.CURRENT` (calling `Source.current()` in
+  the editor would resolve it) and `FlowTypes.ACTIVITY_SHAPE` (its body crosses as Java text).
+
+**Deferred / next**
+- Phase 2: call-site editors from api parameter annotations (`@SteamAppId`, `@Setting`, …), `CallSites`
+  deleted. Phase 3: `SdkToolbarItems.ALL`, a feature `open(ActionContext)` each, `FlowValue`'s static bind
+  gone, `SdkPlugin` keeps only `projectClosing`.
+- Open: the activity body as Java text (`"Collect::body"`), the last one.
+
 ## 2026-09-28 — pictures renamed by binding (plugin authoring cleanup, phase 4)
 
 **Done**

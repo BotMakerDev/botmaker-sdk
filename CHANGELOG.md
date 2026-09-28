@@ -56,6 +56,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **`SdkPlugin` is one declaration** on the contract's `DeclaredPlugin`:
+  `StudioPlugin.id(ID).named(NAME).types(…).parts(…).editors(…).values(…).recorded(…)`. Its `build…`
+  overrides and the inline part list are gone; `SdkTypes.PARTS` holds the parts.
+- **Types, parts and values are declared by the contract's steps, factories by method reference.** No method
+  is named by string except `CaptureSource.region`, which javac cannot reference. The build is derived by
+  invoking the factory, so the hand-written builds and their fallbacks are gone: a flow, a setting or a
+  capture source whose argument is of the wrong kind is shown as written rather than defaulted.
+  `POINT_TYPE`/`RECT_TYPE`/`SIZE_TYPE` are `POINT`/`RECT`/`SIZE`; the private `seeded` helper is
+  `MATCH_RESULT`, `MATCHES`, `COLOR_MATCH`, `TEXT_MATCH` (`filledBy(Vision::lastMatch)`); `PictureAt` is a
+  `RecordedValue.of(…).at(PictureAt::find)` constant; `SdkValues` uses `ManagedValue.method(…)` and names the
+  pictures class through `TemplateNames.CLASS_NAME`.
 - **The plugin's types are declared with the toolkit's `Types`.** `SdkTypes`' nested `…Type` classes are
   constants (`IMAGE_TEMPLATE`, `PRECISION`, `POINT_TYPE`, `COMBO`, …); `Point`, `Rect`, `Size` and
   `Precision` are `Types.record`, so their parts are the records' own. The copied `method`/`constructor`/

@@ -98,8 +98,8 @@ static facades (`ImageFinder`, `ImageClicker`, `ScreenCapture`, …) are statele
 
 - **The palette is discovered, never listed.** `@Palette` on an `api` class = catalogued (the recognition
   set — imports, "does `Point` mean ours or `java.awt`'s"); `@Hidden` on a type = not offered in an insert
-  menu. The toolkit's `AbstractStudioPlugin.buildCatalog()` defaults to `PaletteCatalog.scan(getClass())`,
-  which reflects every `@Palette` class under this jar's `api` root; members are discovered, in the class
+  menu. The host finds every `@Palette` class in this jar (`botmaker-plugin-host`'s `Palettes`, since
+  `SdkPlugin` declares no catalog); members are discovered, in the class
   file's own declaration order (`SourceOrder`, alphabetical on any failure). **Constructors are not
   catalogued**: a palette entry inserts a *call*.
 - **Recording is the host's; the SDK annotates.** `@Records(Gesture, rank)` on a public static `api` method
@@ -222,9 +222,13 @@ parameter is a `@Param` field and the flow is a `@Managed` value, both Java. `Sd
 `img:` prefix `Images.template` still needs) and the spelling of a duration, folded into
 `DurationEditor`. **A type is declared once, in `plugin/types/SdkTypes`**, as a `PluginType` (and a
 `ComponentType` beside it when its Java is a call), and the host writes and reads its Java. Adding a type
-means adding one constant there and nothing else — since 2026-09-28 a toolkit `Types` expression
-(`editable(…).writtenAs(Types.record(…))`, `enumType`, `call`), with the editor passed as `() -> X::editor`
-so `SdkPluginHeadlessTest` stays green. Wherever the text below says *codec*, *`SdkValueTypes`* or
+means adding one constant there and nothing else — since 2026-09-28 a contract `PluginType.value(X.class)`
+declaration whose steps ask for the fresh value, the editor (`() -> X::editor`, so `SdkPluginHeadlessTest`
+stays green) and the Java (`writtenAs(Owner::factory, X::part, …)`, `writtenAsRecord()`, `writtenAsEach`,
+`writtenAsConstant()`, or `filledBy(Vision::lastMatch)` for a result nobody edits). A part that is never
+picked on its own is `ComponentType.part(X.class).writtenAs(…)` in `SdkTypes.PARTS`. No factory is named by
+string except `CaptureSource.region`, which javac cannot reference (`Ref.member`). `SdkPlugin` is one
+`StudioPlugin.id(ID).named(NAME)…` declaration on the contract's `DeclaredPlugin`. Wherever the text below says *codec*, *`SdkValueTypes`* or
 *`WireText`*, it describes the machinery that went.
 
 The runtime half of *derived files stop being Java*, and the precondition for deleting `SourceEmitter`. A

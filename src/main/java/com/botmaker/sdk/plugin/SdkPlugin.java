@@ -1,16 +1,11 @@
 package com.botmaker.sdk.plugin;
 
+import com.botmaker.plugin.api.DeclaredPlugin;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.record.RecordedValue;
-import com.botmaker.plugin.api.slot.SlotEditor;
-import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
-import com.botmaker.plugin.api.value.ComponentType;
-import com.botmaker.plugin.api.value.PluginType;
-import com.botmaker.plugin.toolkit.AbstractStudioPlugin;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.bot.SdkValues;
@@ -25,16 +20,10 @@ import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.setup.ProjectSetup;
 import com.botmaker.sdk.plugin.source.SourcePicker;
-import com.botmaker.sdk.plugin.types.CaptureTypes;
-import com.botmaker.sdk.plugin.types.FlowTypes;
-import com.botmaker.sdk.plugin.types.SettingsTypes;
 import com.botmaker.sdk.plugin.types.PictureAt;
 import com.botmaker.sdk.plugin.types.SdkTypes;
-import javafx.scene.paint.Color;
 
 import java.util.List;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 /**
  * The BotMaker SDK, as a Studio plugin.
@@ -56,13 +45,20 @@ import java.util.stream.Stream;
  * cannot write this name down, and nothing a bot links may reach JavaFX or the toolkit
  * ({@code PluginLayersTest}).
  */
-public final class SdkPlugin extends AbstractStudioPlugin {
+public final class SdkPlugin extends DeclaredPlugin {
 
     /** The stable identifier the host files this plugin's contributions under. */
     public static final String ID = "com.botmaker.sdk";
 
+    /** What Studio shows in Manage Plugins. */
+    public static final String NAME = "BotMaker SDK";
+
     /**
-     * Does nothing but name the plugin, and that emptiness is load-bearing.
+     * The whole plugin, stated once: the types it owns and the parts inside its values ({@link SdkTypes}), the
+     * editors a type cannot choose for itself ({@link SdkEditors}), the {@code @Managed} values its windows keep
+     * ({@link SdkValues}), and the picture under a recorded click ({@link PictureAt}).
+     *
+     * <p><b>Each list is behind a supplier, and that emptiness is load-bearing.</b>
      *
      * <p><b>Constructing a plugin must not link an optional dependency.</b> {@code javafx-controls} is
      * {@code optional} here, so the classpath a headless host resolves this plugin onto — the CLI's
@@ -76,64 +72,15 @@ public final class SdkPlugin extends AbstractStudioPlugin {
      *
      * <p>{@code PluginLoader} catches that, so the symptom is an empty palette and one line on stderr. It never
      * shows locally, because an {@code optional} dependency <em>is</em> on this module's own classpath.
-     * Everything JavaFX-shaped belongs behind a {@code build…} hook ({@code SdkPluginHeadlessTest}).
+     * Everything JavaFX-shaped belongs behind a supplier ({@code SdkPluginHeadlessTest}).
      */
     public SdkPlugin() {
-        super(ID, "BotMaker SDK");
-    }
-
-    /**
-     * The editors for this plugin's own types — a region dragged on screen instead of
-     * {@code new Rect(12, 40, 300, 80)}, and the rest of {@link SdkEditors}. The host asks every plugin in
-     * turn, after its own editors and before its JDK fallbacks; nothing here is privileged.
-     */
-    @Override
-    protected List<SlotEditor> buildSlotEditors() {
-        return SdkEditors.ALL;
-    }
-
-    /**
-     * The fourteen types this plugin declares — what each one is, what a fresh one is, and how a person
-     * edits one.
-     *
-     * <p>Being in this list means <em>this type is one a bot author can hold</em>: it is what "Declare Bot
-     * Variable" and the Add Function dialog offer. Adding a type here makes it declarable; removing one takes
-     * it out of both menus.
-     *
-     * <p>Ten answer a real {@code fresh()}; the capture source's is the ambient source, which keeps following
-     * the project's source when that changes later. The four vision results answer {@code freshCall()}
-     * instead, because their honest starting value is a <em>call the bot re-evaluates</em>: a match is
-     * something the bot found a moment ago, not something anyone configures.
-     *
-     * <p>Not cached here: {@link AbstractStudioPlugin} does the caching, and {@code fresh()} is asked every
-     * time a value is seeded so it may read this plugin's live state.
-     */
-    @Override
-    protected List<PluginType<?>> buildTypes() {
-        return SdkTypes.ALL;
-    }
-
-    /**
-     * The five records a {@code Flow} is written as, the six calls a {@code CaptureSource} is written as, and
-     * the chains a person writes by hand and the host only reads: {@code source.region(r)} and the three
-     * {@code Precision} withers. None is a type anybody declares on its own; the host reads each back so an
-     * editor is handed a value rather than a string. Then a key sequence's step, and {@code combo.held(d)} —
-     * the one chain the host also writes, because the declaration that owns {@code Combo} has no hold.
-     */
-    @Override
-    protected List<ComponentType<?>> buildComponentTypes() {
-        return Stream.of(FlowTypes.ALL, CaptureTypes.ALL, SettingsTypes.ALL, SdkTypes.PRECISION_WITHERS,
-                        List.of(SdkTypes.COMBO_HELD, SdkTypes.STEP))
-                .<ComponentType<?>>flatMap(List::stream).toList();
-    }
-
-    /**
-     * The five values this plugin's windows keep in step, each read-only on the canvas with a reason. Declared
-     * once, in {@link SdkValues}, where the runtime half claims the same constants.
-     */
-    @Override
-    protected List<ManagedValue<?>> buildManagedValues() {
-        return SdkValues.ALL;
+        super(StudioPlugin.id(ID).named(NAME)
+                .types(() -> SdkTypes.ALL)
+                .parts(() -> SdkTypes.PARTS)
+                .editors(() -> SdkEditors.ALL)
+                .values(() -> SdkValues.ALL)
+                .recorded(() -> PictureAt.ALL));
     }
 
     /**
@@ -202,16 +149,6 @@ public final class SdkPlugin extends AbstractStudioPlugin {
                         "Cut a picture out of the window the overlay is drawn over, whatever the project's "
                                 + "capture target is",
                         ToolbarGroup.OVERLAY, 20, this::capturePictureHere));
-    }
-
-    /**
-     * The one parameter type of this plugin's {@code @Records} methods the host cannot fill: the picture under
-     * a recorded click. Everything else a recording writes — coordinates, keys, text, durations, the capture
-     * source — the host fills by type.
-     */
-    @Override
-    public List<RecordedValue<?>> recordedValues() {
-        return List.of(new PictureAt());
     }
 
     /**
