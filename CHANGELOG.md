@@ -204,6 +204,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     OK, and a typo in a step's wait was ignored.
   - The keyboard window takes a key press as soon as it opens. The search box had the focus, so the key was
     typed there.
+- **🔀 Activity Flow:**
+  - Renaming an outcome keeps its wire. The card dropped the wire before the rename could carry it across.
+  - Renaming an activity keeps it in the presets that switch it on.
+  - Saving a preset selects the preset just saved, not the one two before it.
+  - A saved preset can be deleted (✕ beside Apply), and may not be called Everything or Nothing.
+  - An activity name that differs from another only in case is refused where you type it, in the side panel
+    and in the new-activity dialog. It was accepted, and then the flow could not be saved.
+  - The go-home and popup ticks and the outcomes hint name what exists: the home method given to
+    `Bot.run`, `PopupGuard`, and `ctx.outcome("…")`. They named `GoHome.run()`, `Popups.run()` and `run()`.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every

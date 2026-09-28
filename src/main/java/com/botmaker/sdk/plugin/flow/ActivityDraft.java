@@ -38,7 +38,7 @@ public final class ActivityDraft {
      */
     private final ObservableList<String> outcomes = FXCollections.observableArrayList();
 
-    /** Run the project's {@code GoHome.run()} before this activity. On by default; see the card's tick. */
+    /** Run the home method handed to {@code Bot.run} before this activity. On by default; see the card's tick. */
     private final BooleanProperty goHome = new SimpleBooleanProperty(true);
 
     /** Let the popup guard dismiss popups during this activity. On by default; see the card's tick. */

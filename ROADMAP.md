@@ -8,6 +8,24 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — Activity Flow reworked (SDK plugin rework, phase 9)
+
+**Done**
+- `ActivityFlowDialog.renameOutcome` rewires first (`rewiredOutcome`), then renames: the card's outcome
+  listener prunes wires whose port is gone, and it ran before the rewire. `renameDraft` goes through
+  `FlowNames.activityNameProblem` over the other cards and carries the presets (`renamedIn`).
+- Presets: the just-saved one is selected by the combo's own last index; `FlowNames.presetNameProblem`
+  refuses the built-ins' names; `deleteSelectedPreset` behind a ✕, disabled for a built-in.
+- `FlowNames.activityNameProblem` refuses a case-only clash, as `validate` does. `OUTCOMES_HINT`,
+  `GO_HOME_TIP`, `POPUP_TIP` are the one copy of what both dialogs say.
+- Checked, unchanged: `FlowRules`, `FlowValue`, `SnapshotHistory`, the canvas's wiring and start rules,
+  `ActivityEditors`.
+- Tests in `ActivityFlowValidationTest`: case clash where typed, preset names, outcome rewire, preset rename.
+
+**Deferred / next**
+- Dragging from a wired port refuses ("remove that wire first") rather than moving the wire. Moving it is
+  what a user expects; it changes a gesture, so it waits for a decision.
+
 ## 2026-09-28 — input editors and the `@Records` writers reworked (SDK plugin rework, phase 8)
 
 **Done**

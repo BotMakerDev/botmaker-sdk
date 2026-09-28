@@ -95,13 +95,57 @@ public final class FlowNames {
         return null;
     }
 
-    /** Why {@code candidate} can't name an activity given the names already {@code taken}, or null when it can. */
+    /**
+     * Why {@code candidate} can't name an activity given the names already {@code taken}, or null when it can.
+     *
+     * <p>A name that differs from a taken one only in case is refused here too, since saving refuses it
+     * ({@code ActivityFlowDialog.validate}): until 2026-09-28 this let it through, and the flow then sat
+     * unsaved with the reason on the status line. {@code taken} holds the <em>other</em> activities, so a
+     * card renamed to its own name in another case is allowed.
+     */
     public static String activityNameProblem(String candidate, Collection<String> taken) {
         if (candidate == null || candidate.isEmpty()) return "Give the activity a name.";
         if (!isValidIdentifier(candidate)) {
             return "Enter a valid activity name (letters, digits, _; not starting with a digit).";
         }
         if (taken.contains(candidate)) return "Activity '" + candidate + "' already exists.";
+        for (String other : taken) {
+            if (other.equalsIgnoreCase(candidate)) {
+                return "'" + candidate + "' differs from " + other + " only in case — pick another name.";
+            }
+        }
         return null;
     }
+
+    /**
+     * Why {@code candidate} can't name a saved preset, or null when it can. The two built-ins are derived
+     * from the canvas and never saved, so a saved preset of either name would sit beside them in the list,
+     * spelled the same and meaning something else.
+     */
+    public static String presetNameProblem(String candidate, Collection<String> builtIns) {
+        if (candidate == null || candidate.isBlank()) return "A preset needs a name.";
+        for (String builtIn : builtIns) {
+            if (builtIn.equalsIgnoreCase(candidate.trim())) {
+                return "'" + builtIn + "' is built in — pick another name.";
+            }
+        }
+        return null;
+    }
+
+    // What both activity dialogs say about the three things a card carries beyond its name. One copy, because
+    // both named a GoHome.run() and a Popups.run() that no project has had since the flow became Java.
+
+    /** The outcomes section's explanation. */
+    public static final String OUTCOMES_HINT = "What this activity can report. Its body returns one with "
+            + "ctx.outcome(\"…\"), and each is wired on the canvas. Every activity also has a NEXT outcome "
+            + "(ctx.done()), and any outcome you leave unwired ends the run.";
+
+    /** The go-home tick's tooltip. */
+    public static final String GO_HOME_TIP = "Run the home method handed to Bot.run(…) immediately before "
+            + "this activity, so it starts from a known screen.";
+
+    /** The popup tick's tooltip. */
+    public static final String POPUP_TIP = "Let the popup handler installed with PopupGuard dismiss popups "
+            + "before each vision step of this activity. Turn it off for an activity that works through a "
+            + "popup itself — otherwise the guard closes it underneath.";
 }

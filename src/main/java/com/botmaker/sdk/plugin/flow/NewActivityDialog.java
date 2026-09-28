@@ -81,12 +81,9 @@ public final class NewActivityDialog {
         name.setPromptText("e.g. Resources");
         description.setPromptText("what it does (optional)");
         goHome.setSelected(goHomeByDefault);
-        goHome.setTooltip(new Tooltip(
-                "Call GoHome.run() immediately before this activity, so it starts from a known screen."));
+        goHome.setTooltip(new Tooltip(FlowNames.GO_HOME_TIP));
         popupCheck.setSelected(true);
-        popupCheck.setTooltip(new Tooltip(
-                "Let Popups.run() dismiss popups before each vision step of this activity. Turn it off for an "
-                        + "activity that works through a popup itself — otherwise the guard closes it underneath."));
+        popupCheck.setTooltip(new Tooltip(FlowNames.POPUP_TIP));
 
         GridPane head = new GridPane();
         head.setHgap(8);
@@ -126,9 +123,7 @@ public final class NewActivityDialog {
     }
 
     private Node buildOutcomes() {
-        Label explain = new Label("What this activity can report. Return one from its run() method and wire "
-                + "each one on the canvas. Every activity also has a NEXT outcome, and any outcome you "
-                + "leave unwired ends the run. You can add more later from the side panel.");
+        Label explain = new Label(FlowNames.OUTCOMES_HINT + " You can add more later from the side panel.");
         explain.setWrapText(true);
         explain.getStyleClass().add("dialog-hint-text");
 

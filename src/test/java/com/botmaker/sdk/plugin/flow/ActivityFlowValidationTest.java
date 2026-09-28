@@ -82,4 +82,37 @@ class ActivityFlowValidationTest {
         assertNotNull(problem);
         assertTrue(problem.contains("case"), problem);
     }
+
+    /** Naming a card refuses what saving would refuse, so a flow never sits unsaved over a name. */
+    @Test
+    void a_name_differing_only_in_case_is_refused_where_it_is_typed() {
+        assertNotNull(FlowNames.activityNameProblem("MINING", List.of("Mining")));
+        // A card renamed to its own name in another case: its own name is not among the others.
+        assertNull(FlowNames.activityNameProblem("MINING", List.of("Fishing")));
+    }
+
+    @Test
+    void a_saved_preset_may_not_take_a_built_in_name() {
+        assertNotNull(FlowNames.presetNameProblem("everything", List.of("Everything", "Nothing")));
+        assertNotNull(FlowNames.presetNameProblem("  ", List.of("Everything", "Nothing")));
+        assertNull(FlowNames.presetNameProblem("Night farm", List.of("Everything", "Nothing")));
+    }
+
+    /** A renamed outcome keeps its wire; another activity's wire of the same outcome is not touched. */
+    @Test
+    void renaming_an_outcome_carries_its_wire() {
+        List<Flow.Edge> edges = List.of(new Flow.Edge("Mining", "Bank", "FULL"),
+                new Flow.Edge("Fishing", "Bank", "FULL"));
+
+        assertEquals(List.of(new Flow.Edge("Mining", "Bank", "BAG_FULL"), new Flow.Edge("Fishing", "Bank", "FULL")),
+                ActivityFlowDialog.rewiredOutcome(edges, "Mining", "FULL", "BAG_FULL"));
+    }
+
+    @Test
+    void renaming_an_activity_keeps_it_in_its_presets() {
+        List<Flow.Preset> presets = List.of(Flow.preset("Night", List.of("Mining", "Bank")));
+
+        assertEquals(List.of(Flow.preset("Night", List.of("Digging", "Bank"))),
+                ActivityFlowDialog.renamedIn(presets, "Mining", "Digging"));
+    }
 }

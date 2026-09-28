@@ -283,6 +283,13 @@ public final class ActivityFlowDialog {
         Button savePreset = new Button("Save selection as preset…");
         savePreset.setOnAction(e -> saveCurrentSelectionAsPreset());
 
+        Button deletePreset = new Button("✕");
+        deletePreset.setTooltip(new javafx.scene.control.Tooltip("Delete the chosen preset"));
+        deletePreset.disableProperty().bind(javafx.beans.binding.Bindings.createBooleanBinding(
+                () -> presetCombo.getValue() == null || !presets.contains(presetCombo.getValue()),
+                presetCombo.valueProperty()));
+        deletePreset.setOnAction(e -> deleteSelectedPreset());
+
         Button addActivity = new Button("Add activity");
         addActivity.setTooltip(new javafx.scene.control.Tooltip(
                 "Name it and declare its outcomes up front. Double-clicking empty canvas opens the same "
@@ -302,7 +309,7 @@ public final class ActivityFlowDialog {
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox bar = new HBox(8, new Label("Presets:"), presetCombo, applyPreset, savePreset,
+        HBox bar = new HBox(8, new Label("Presets:"), presetCombo, applyPreset, deletePreset, savePreset,
                 new Separator(javafx.geometry.Orientation.VERTICAL), undoButton(), redoButton(),
                 new Separator(javafx.geometry.Orientation.VERTICAL), recenter, arrange,
                 spacer, addActivity);
@@ -374,8 +381,9 @@ public final class ActivityFlowDialog {
         Optional<String> chosen = prompt.showAndWait();
         if (chosen.isEmpty()) return;
 
+        String problem = FlowNames.presetNameProblem(chosen.get(), List.of(EVERYTHING, NOTHING));
+        if (problem != null) { error(problem); return; }
         String name = chosen.get().trim();
-        if (name.isEmpty()) { error("A preset needs a name."); return; }
 
         List<String> on = new ArrayList<>();
         for (ActivityDraft d : canvas.drafts()) {
@@ -384,7 +392,26 @@ public final class ActivityFlowDialog {
         presets.removeIf(p -> p.name().equals(name)); // re-saving a name overwrites it
         presets.add(Flow.preset(name, on));
         refreshPresetCombo();
-        presetCombo.getSelectionModel().select(presets.size() - 1);
+        // The last item of the list, which is the built-ins then these: presets.size() - 1 selected the preset
+        // two before the one just saved (until 2026-09-28).
+        presetCombo.getSelectionModel().select(presetCombo.getItems().size() - 1);
+        error("");
+        markDirty();
+    }
+
+    /**
+     * Takes the selected saved preset out of the flow. There was no way to until 2026-09-28: a preset saved by
+     * mistake stayed in {@code Sdk.flow()} until somebody edited the Java. The built-ins are never saved, so
+     * there is nothing to delete for them.
+     */
+    private void deleteSelectedPreset() {
+        Flow.Preset preset = presetCombo.getValue();
+        if (preset == null || !presets.contains(preset)) {
+            error("Pick a preset you saved; the built-in ones can't be deleted.");
+            return;
+        }
+        presets.remove(preset);
+        refreshPresetCombo();
         error("");
         markDirty();
     }
@@ -451,16 +478,12 @@ public final class ActivityFlowDialog {
         // answer for a text field and a tick you can simply set back.
         goHome.selectedProperty().addListener((o, was, is) -> markDirty());
         goHome.setTooltip(new javafx.scene.control.Tooltip(
-                "Call GoHome.run() immediately before this activity, so it starts from a known screen. Same "
-                        + "tick as the ⌂ on the card."));
+                FlowNames.GO_HOME_TIP + " Same tick as the ⌂ on the card."));
 
         CheckBox popupCheck = new CheckBox("Check for popups");
         popupCheck.selectedProperty().bindBidirectional(draft.popupCheckProperty());
         popupCheck.selectedProperty().addListener((o, was, is) -> markDirty());
-        popupCheck.setTooltip(new javafx.scene.control.Tooltip(
-                "Let Popups.run() dismiss popups before each vision step of this activity. Turn it off for an "
-                        + "activity that works through a popup itself — otherwise the guard closes it "
-                        + "underneath."));
+        popupCheck.setTooltip(new javafx.scene.control.Tooltip(FlowNames.POPUP_TIP));
 
         TextField body = new TextField(draft.body());
         body.setPromptText("Collect::body");
@@ -508,9 +531,7 @@ public final class ActivityFlowDialog {
     private Node buildOutcomeEditor(ActivityDraft draft) {
         VBox box = new VBox(6);
 
-        Label explain = new Label("What this activity can report. Return one from its run() method and wire "
-                + "each one on the canvas. Every activity also has a NEXT outcome, and any outcome "
-                + "you leave unwired ends the run.");
+        Label explain = new Label(FlowNames.OUTCOMES_HINT);
         explain.setWrapText(true);
         explain.getStyleClass().add("dialog-hint-text");
         box.getChildren().add(explain);
@@ -579,16 +600,37 @@ public final class ActivityFlowDialog {
         }
         int at = draft.outcomes().indexOf(oldName);
         if (at < 0) return;
+        // The wire first, then the outcome. The card drops every wire whose port has gone the moment the list
+        // changes, so renaming the outcome first dropped its wire before it could be carried across — a rename
+        // lost the wiring it promises to keep (until 2026-09-28).
+        canvas.edges().setAll(rewiredOutcome(canvas.edges(), draft.name(), oldName, candidate));
         draft.outcomes().set(at, candidate);
         field.setText(candidate);
-        List<Flow.Edge> rewired = new ArrayList<>(canvas.edges().size());
-        for (Flow.Edge e : canvas.edges()) {
-            boolean mine = e.from().equals(draft.name()) && e.outcomeOrNext().equals(oldName);
-            rewired.add(mine ? new Flow.Edge(e.from(), e.to(), candidate) : e);
-        }
-        canvas.edges().setAll(rewired);
         error("");
         canvas.refresh();
+    }
+
+    /** {@code edges} with {@code activity}'s wire from {@code oldName} leaving from {@code newName} instead. */
+    static List<Flow.Edge> rewiredOutcome(List<Flow.Edge> edges, String activity, String oldName, String newName) {
+        List<Flow.Edge> rewired = new ArrayList<>(edges.size());
+        for (Flow.Edge e : edges) {
+            boolean mine = e.from().equals(activity) && e.outcomeOrNext().equals(oldName);
+            rewired.add(mine ? new Flow.Edge(e.from(), e.to(), newName) : e);
+        }
+        return rewired;
+    }
+
+    /**
+     * {@code presets} with the activity {@code oldName} called {@code newName}. A preset names its activities,
+     * so a rename that left them alone quietly took the renamed card out of every preset (until 2026-09-28).
+     */
+    static List<Flow.Preset> renamedIn(List<Flow.Preset> presets, String oldName, String newName) {
+        List<Flow.Preset> out = new ArrayList<>(presets.size());
+        for (Flow.Preset p : presets) {
+            out.add(Flow.preset(p.name(), p.activities().stream()
+                    .map(a -> a.equals(oldName) ? newName : a).toList()));
+        }
+        return out;
     }
 
     /**
@@ -599,13 +641,13 @@ public final class ActivityFlowDialog {
      * that is what the flag is for, it survives everything, and it needs no second mechanism.
      *
      * <p>It asks first, because the wiring goes with it. What it does <b>not</b> touch is the user's own Java:
-     * an activity's behaviour is a {@code define("Mining", …)} call in a file this editor has never known the
-     * location of, and deleting somebody's source because a card left a canvas is not this window's to do.
+     * an activity's behaviour is the method its card names ({@code Collect::body}), and deleting somebody's
+     * source because a card left a canvas is not this window's to do. ↶ brings the card back.
      */
     private void deleteActivity(ActivityDraft draft) {
         Alert confirm = services.theme().alert(Alert.AlertType.CONFIRMATION,
-                "Its card and every wire into or out of it are removed when you save. The file you wrote its "
-                        + "steps in is left exactly as it is.\n\n"
+                "Its card and every wire into or out of it are removed; ↶ brings them back. The method it "
+                        + "runs is left exactly as it is.\n\n"
                         + "To stop it running without losing it, turn its switch off instead.",
                 ButtonType.CANCEL, ButtonType.OK);
         confirm.initOwner(stage);
@@ -743,16 +785,19 @@ public final class ActivityFlowDialog {
 
     private void renameDraft(ActivityDraft draft, String candidate, TextField field) {
         if (candidate.equals(draft.name())) return;
-        if (!FlowNames.isValidIdentifier(candidate)) {
-            error("Invalid activity name — reverted.");
+        // The new-activity dialog's rule, over the other cards: one rule for both ways of naming a card.
+        Set<String> others = new HashSet<>();
+        for (ActivityDraft d : canvas.drafts()) if (d != draft) others.add(d.name());
+        String problem = FlowNames.activityNameProblem(candidate, others);
+        if (problem != null) {
+            error(problem + " Reverted.");
             field.setText(draft.name());
             return;
         }
-        if (canvas.drafts().stream().anyMatch(d -> d != draft && d.name().equals(candidate))) {
-            error("Activity '" + candidate + "' already exists — reverted.");
-            field.setText(draft.name());
-            return;
-        }
+        String was = draft.name();
+        List<Flow.Preset> renamed = renamedIn(presets, was, candidate);
+        presets.clear();
+        presets.addAll(renamed);
         draft.nameProperty().set(candidate); // the card re-labels and its wires follow the new name
         refreshPresetCombo();
         error("");
