@@ -39,6 +39,12 @@ import java.util.Map;
  * never runs a bot's code, and has no classpath to resolve one against — so it crosses as the
  * {@code String} the file writes, and is written back exactly so. The flow editor checks what a person
  * types into the field ({@code FlowNames.isMethodReference}); this class checks nothing.
+ *
+ * <p><b>It stays text, and that was decided (2026-09-28).</b> This is not a plugin writing Java: the host
+ * writes the text through its own source-leaf path (Studio's {@code ValueWriter.ofClass}), which parses it into
+ * a tree, and a rename in the real {@code Sdk.java} already follows the binding. A contract {@code MethodName}
+ * type was considered and declined — one contract type, grammar changes and a flow-editor rewrite to save
+ * about forty lines. Do not propose it again without new facts.
  */
 public final class FlowTypes {
 

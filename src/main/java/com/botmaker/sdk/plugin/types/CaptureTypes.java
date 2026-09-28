@@ -64,6 +64,10 @@ public final class CaptureTypes {
      * <p>Named with {@link Ref#member}, not a reference: {@code CaptureSource} has a static
      * {@code region(source, rect)} and an instance {@code source.region(rect)}, so {@code CaptureSource::region}
      * is ambiguous in javac. It is the one factory here that a reference cannot name.
+     *
+     * <p><b>It stays (decided 2026-09-28).</b> {@code api.*} never deletes, so both {@code region}s exist for
+     * ever, and a new-named static factory would still leave {@link #REGION_CHAIN} reading the instance one
+     * through {@code Ref.member}. Do not propose removing it again without new facts.
      */
     public static final DeclaredCall<RegionSource> REGION = ComponentType.part(RegionSource.class)
             .writtenAsMember(Ref.member(CaptureSource.class, "region", CaptureSource.class, Rect.class),
