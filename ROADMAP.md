@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — picture editors reworked (SDK plugin rework, phase 5)
+
+**Done**
+- `TemplateEditors.template`: an unread value is labelled with `Slots.sourceOr`; *Clear* became *Use the
+  placeholder picture* (it wrote `TemplateNames.pathFor("")`, `images/.png`); the pill's tooltip says when the
+  file is missing. `commit` and the run's add and change declare the picture's `Pictures` constant first
+  (`TemplateUses.declare`), and ensure the placeholder file for the placeholder.
+- `TemplateGalleryDialog.Options.withSelected(names)`: the picker opens on the current picture.
+  `TemplateGallery.setSelection` keeps only tiles on screen. The new `reveal` moves the rail to All and
+  clears the search first when a named file is out of view; the picker's Capture new… and Manage Pictures'
+  rename, replace and import use it.
+- `PictureAt.find` declares the constant of the picture it names.
+- Tests: `PictureAtTest` (a click on a picture and beside it, over a noise frame) and a placeholder case in
+  `TemplateEditorTest`.
+
 ## 2026-09-28 — Manage Pictures reworked (SDK plugin rework, phase 4)
 
 **Done**

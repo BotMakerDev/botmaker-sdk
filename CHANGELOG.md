@@ -172,6 +172,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - Renaming a tag checks the name as you type, the same way a new tag does, and a change of case is
     allowed.
   - Typing in the search box no longer lists the folder and reads the flow on every keystroke.
+- **Picture slots and picture rows:**
+  - *Clear* is now *Use the placeholder picture*. It wrote `images/.png`, a file no project has, so the bot
+    failed to load it at run time.
+  - A slot holding something that is not a picture (a variable, a call) shows it as written instead of
+    "Choose a picture…".
+  - The gallery opens with the current picture selected. A picture out of view (another tag, a search) is
+    brought into view, after a capture too.
+  - Picking a picture that has no `Pictures` constant yet declares one, so the block reads `Pictures.ORE`
+    and follows a later rename. It used to write the path. A recorded click on such a picture does the same.
+  - A picture whose file is missing says so in the pill's tooltip.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every

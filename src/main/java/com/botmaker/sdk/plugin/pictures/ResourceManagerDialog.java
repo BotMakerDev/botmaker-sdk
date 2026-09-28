@@ -355,7 +355,7 @@ public final class ResourceManagerDialog {
         }
         published();
         reload();
-        gallery.setSelection(List.of(TemplateLibrary.fileForName(resources(), wanted)));
+        gallery.reveal(List.of(TemplateLibrary.fileForName(resources(), wanted)));
         statusLabel.setText(scan.isEmpty()
                 ? "Renamed to " + wanted + "."
                 : "Renamed to " + wanted + " and updated " + scan.describe() + ".");
@@ -526,7 +526,7 @@ public final class ResourceManagerDialog {
             TemplateLibrary.replaceImage(file, img, sourceW, sourceH, windowTitle);
             published();
             reload();
-            gallery.setSelection(List.of(file));
+            gallery.reveal(List.of(file));
             statusLabel.setText("Replaced the picture of " + TemplateLibrary.baseName(file)
                     + " — every block that uses it now sees the new one.");
         } catch (IOException e) {
@@ -703,7 +703,7 @@ public final class ResourceManagerDialog {
             TemplateArchive.ImportResult result = TemplateArchive.importInto(resources(), source.toPath());
             for (String name : result.imported()) TemplateUses.declare(values(), name).ifPresent(services::status);
             reload();
-            gallery.setSelection(result.imported().stream()
+            gallery.reveal(result.imported().stream()
                     .map(name -> TemplateLibrary.fileForName(resources(), name)).toList());
             statusLabel.setText(result.summary());
             reportImport(result);

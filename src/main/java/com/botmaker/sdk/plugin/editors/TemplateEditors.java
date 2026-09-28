@@ -4,9 +4,10 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.SlotRun;
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.plugin.toolkit.Pills;
-import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.plugin.toolkit.Pills;
+import com.botmaker.plugin.toolkit.Slots;
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
@@ -14,10 +15,13 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.pictures.ChooserSelection;
 import com.botmaker.sdk.plugin.pictures.TemplateGalleryDialog;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.Control;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
@@ -56,32 +60,35 @@ public final class TemplateEditors {
     private TemplateEditors() {}
 
     /**
-     * A pill naming the current picture, with its thumbnail, that opens the project's gallery.
+     * A pill naming the current picture, with its thumbnail, that opens the project's gallery — on the current
+     * picture, so what is picked now is in view.
      *
-     * <p>A menu rather than a plain button because <em>clear</em> has to be reachable: a slot with no picture
-     * in it is a legal state (a freshly inserted block), and an editor that can only ever set one makes the
-     * empty state unreachable once it has been left.
+     * <p>A value the host could not read (a variable, a call) is shown as written and changed only by an
+     * explicit pick. <em>Use the placeholder</em> goes back to what a fresh block holds: a picture that
+     * exists. It was <em>Clear</em> until 2026-09-28 and wrote {@code images/.png}, a file that never exists,
+     * so the bot failed to load it at run time.
      */
     public static Node template(ValueContext ctx) {
-        MenuButton pill = Pills.bare(label(nameOf(ctx)));
+        String current = nameOf(ctx);
+        MenuButton pill = Pills.bare(current.isEmpty() ? Slots.sourceOr(ctx, "Choose a picture…") : current);
         ImageView thumb = new ImageView();
         thumb.setFitWidth(CHIP);
         thumb.setFitHeight(CHIP);
         thumb.setPreserveRatio(true);
-        showPicture(thumb, ctx.services(), nameOf(ctx), CHIP);
         pill.setGraphic(thumb);
+        showPicture(pill, thumb, ctx.services(), current, CHIP);
 
         Pills.onOpen(pill, () -> List.of(
-                Pills.item("Choose a picture…", () -> choose(ctx, picked -> {
+                Pills.item("Choose a picture…", () -> choose(ctx, List.of(nameOf(ctx)), picked -> {
                     commit(ctx, picked);
                     pill.setText(label(picked));
-                    showPicture(thumb, ctx.services(), picked, CHIP);
+                    showPicture(pill, thumb, ctx.services(), picked, CHIP);
                 })),
                 Pills.separator(),
-                Pills.item("Clear", () -> {
-                    commit(ctx, "");
-                    pill.setText(label(""));
-                    showPicture(thumb, ctx.services(), "", CHIP);
+                Pills.item("Use the placeholder picture", () -> {
+                    commit(ctx, TemplateLibrary.DEFAULT_TEMPLATE_NAME);
+                    pill.setText(label(TemplateLibrary.DEFAULT_TEMPLATE_NAME));
+                    showPicture(pill, thumb, ctx.services(), TemplateLibrary.DEFAULT_TEMPLATE_NAME, CHIP);
                 })));
         return pill;
     }
@@ -163,12 +170,14 @@ public final class TemplateEditors {
         thumb.setFitWidth(24);
         thumb.setFitHeight(24);
         thumb.setPreserveRatio(true);
-        showPicture(thumb, ctx.services(), name, 24);
         pill.setGraphic(thumb);
+        showPicture(pill, thumb, ctx.services(), name, 24);
 
         Pills.onOpen(pill, () -> {
-            MenuItem change = Pills.item("Change…", () -> choose(ctx, picked ->
-                    write(row, ctx, replace(elements, index, templateFor(picked)))));
+            MenuItem change = Pills.item("Change…", () -> choose(ctx, List.of(name), picked -> {
+                declare(ctx.services(), picked);
+                write(row, ctx, replace(elements, index, templateFor(picked)));
+            }));
             // Disabled rather than absent at the floor: the row still shows that removal exists, and the
             // label says why this one cannot go. Silently omitting it reads as a missing feature.
             MenuItem remove = elements.size() <= floor
@@ -190,9 +199,12 @@ public final class TemplateEditors {
     /** The trailing add button — {@code Choose pictures…} while the row is empty, {@code ＋} after that. */
     private static Node addButton(HBox row, ValueContext ctx, List<SlotRun.Element> elements) {
         return Pills.button(elements.isEmpty() ? "Choose pictures…" : "＋",
-                () -> choose(ctx, true, picked -> {
+                () -> choose(ctx, true, List.of(), picked -> {
                     List<Object> next = new ArrayList<>(elements);
-                    for (String name : picked) next.add(templateFor(name));
+                    for (String name : picked) {
+                        declare(ctx.services(), name);
+                        next.add(templateFor(name));
+                    }
                     write(row, ctx, next);
                 }));
     }
@@ -262,26 +274,28 @@ public final class TemplateEditors {
 
     // ── the gallery ─────────────────────────────────────────────────────────────────────────────────────
 
-    /** Opens the project's pictures and hands back the base name of the one chosen. */
-    private static void choose(ValueContext ctx, Consumer<String> onPicked) {
-        choose(ctx, false, picked -> onPicked.accept(picked.get(picked.size() - 1)));
+    /** Opens the project's pictures on {@code current} and hands back the base name of the one chosen. */
+    private static void choose(ValueContext ctx, List<String> current, Consumer<String> onPicked) {
+        choose(ctx, false, current, picked -> onPicked.accept(picked.get(picked.size() - 1)));
     }
 
     /**
-     * Opens the project's pictures — the Resource Manager's gallery with Capture new… — and hands back the
-     * base names chosen: one, or several when {@code multi}.
+     * Opens the project's pictures — the Resource Manager's gallery with Capture new… — with {@code current}
+     * selected, and hands back the base names chosen: one, or several when {@code multi}.
      *
      * <p>A {@code Matches} case can only ever test pictures its enclosing find call was given, so offering
      * the whole library there lets somebody write a branch that is dead by construction. The host works the
      * set out from the code around the run and hands it over as values; the gallery offers only those.
      */
-    private static void choose(ValueContext ctx, boolean multi, Consumer<List<String>> onPicked) {
+    private static void choose(ValueContext ctx, boolean multi, List<String> current,
+                               Consumer<List<String>> onPicked) {
         StudioServices services = ctx.services();
         SlotRun run = runOf(ctx);
         List<String> only = run == null ? null : namesOf(run.allowed().orElse(null));
         TemplateGalleryDialog.Options options = TemplateGalleryDialog.Options
                 .pickOne(multi ? "Choose pictures" : "Choose a picture")
-                .withCapture();
+                .withCapture()
+                .withSelected(current);
         if (multi) options = options.multi();
         if (only != null) {
             options = options
@@ -322,9 +336,27 @@ public final class TemplateEditors {
         return element.value(ImageTemplate.class).map(t -> baseNameOf(t.filePath())).orElse("");
     }
 
-    /** Writes the picture called {@code baseName}; the host writes it as the bot's constant when there is one. */
+    /**
+     * Writes the picture called {@code baseName}; the host writes it as the bot's constant. A picture with no
+     * constant yet — one named before pictures had constants, or dropped into the folder by hand — is declared
+     * first, so the block reads {@code Pictures.ORE} and follows a later rename, rather than holding the path.
+     */
     static void commit(ValueContext ctx, String baseName) {
+        declare(ctx.services(), baseName);
         ctx.set(templateFor(baseName));
+    }
+
+    /** Declares {@code baseName}'s {@code Pictures} constant when it can have one and has none; best-effort. */
+    private static void declare(StudioServices services, String baseName) {
+        if (services == null || baseName == null || baseName.isBlank()) return;
+        if (TemplateLibrary.DEFAULT_TEMPLATE_NAME.equals(baseName) && services.resourcesDir() != null) {
+            try {
+                TemplateLibrary.ensurePlaceholder(services.resourcesDir());
+            } catch (java.io.IOException ignored) {
+                // an unwritable folder: the value is still written, and the run says the file is missing
+            }
+        }
+        TemplateUses.declare(services.pluginValues(), baseName).ifPresent(services::status);
     }
 
     /** The picture called {@code baseName}, in the project's images folder. */
@@ -348,12 +380,20 @@ public final class TemplateEditors {
         return Values.labelOr(baseName, "Choose a picture…");
     }
 
-    /** Points {@code view} at the picture for {@code baseName}, or hides it when there is none to show. */
-    private static void showPicture(ImageView view, StudioServices services, String baseName, double size) {
+    /**
+     * Points {@code view} at the picture for {@code baseName}, or hides it when there is none to show — and
+     * says so on {@code pill}, since a name with no thumbnail is otherwise the same as one still loading.
+     */
+    private static void showPicture(Control pill, ImageView view, StudioServices services, String baseName,
+                                    double size) {
         Image picture = picture(services, baseName, size);
         view.setImage(picture);
         view.setVisible(picture != null);
         view.setManaged(picture != null);
+        pill.setTooltip(picture == null && baseName != null && !baseName.isBlank()
+                ? new Tooltip("No picture file called " + baseName + " — it was deleted, or never captured. "
+                        + "The bot will fail to load it.")
+                : null);
     }
 
     /**

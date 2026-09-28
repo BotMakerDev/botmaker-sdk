@@ -200,13 +200,30 @@ public final class TemplateGallery extends HBox {
         refreshGrid();
     }
 
-    /** Selects exactly {@code files} (those still on screen), as a caller re-opening a picker would want. */
+    /**
+     * Selects exactly {@code files} that are on screen, as a caller re-opening a picker would want. One the
+     * rail, the search or the filter hides is left out: a Choose that hands back a picture nobody could see,
+     * or one the filter refused, is the surprise {@link #refreshGrid} already guards against.
+     */
     public void setSelection(Collection<Path> files) {
         selected.clear();
-        selected.addAll(files);
+        files.stream().filter(tiles::containsKey).forEach(selected::add);
         tiles.forEach((file, node) -> node.pseudoClassStateChanged(SELECTED, selected.contains(file)));
         refreshSelectionBar();
         if (onSelectionChanged != null) onSelectionChanged.run();
+    }
+
+    /**
+     * Selects {@code files}, first moving the rail to All and clearing the search when one of them is out of
+     * view — what a caller that has just saved, renamed or imported pictures, or is reopening a picker on the
+     * current one, wants: the pictures it names, in sight. One the filter refuses is still left out.
+     */
+    public void reveal(Collection<Path> files) {
+        if (!tiles.keySet().containsAll(files)) {
+            search.clear();
+            rail.getSelectionModel().selectFirst();   // All, which rows() always puts first
+        }
+        setSelection(files);
     }
 
     /** Selects every template the grid is currently showing — the tag being viewed, narrowed by the search. */

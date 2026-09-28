@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.slot.SlotRun;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
+import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -83,6 +84,14 @@ class TemplateEditorTest {
         TemplateEditors.commit(ctx, "gold");
         assertEquals("src/main/resources/images/gold.png",
                 ((ImageTemplate) ctx.value()).filePath());
+    }
+
+    @Test
+    void thePlaceholderIsAPictureThatExistsNotAnEmptyName() {
+        // "Clear" wrote images/.png until 2026-09-28: a file no project has, so the bot failed to load it.
+        TestContexts.Recording ctx = TestContexts.typedSlot(ImageTemplate.class, "Pictures.ORE");
+        TemplateEditors.commit(ctx, TemplateLibrary.DEFAULT_TEMPLATE_NAME);
+        assertEquals(TemplateLibrary.DEFAULT_TEMPLATE_PATH, ((ImageTemplate) ctx.value()).filePath());
     }
 
     @Test

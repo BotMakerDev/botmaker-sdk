@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.pictures.TemplateUses;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
@@ -59,7 +60,11 @@ public final class PictureAt {
                 // A picture that will not load or match is simply not what was clicked.
             }
         }
-        return best == null ? Optional.empty() : Optional.of(new ImageTemplate(TemplateLibrary.pathFor(best)));
+        if (best == null) return Optional.empty();
+        // The host writes a picture as its Pictures constant, and one named before pictures had constants has
+        // none: declared here, the recorded call reads Pictures.COLLECT rather than holding the path.
+        TemplateUses.declare(services.pluginValues(), TemplateLibrary.baseName(best)).ifPresent(services::status);
+        return Optional.of(new ImageTemplate(TemplateLibrary.pathFor(best)));
     }
 
     private static boolean contains(Rect rect, int x, int y) {

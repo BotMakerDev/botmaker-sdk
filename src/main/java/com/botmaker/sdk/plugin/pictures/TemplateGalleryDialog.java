@@ -44,28 +44,37 @@ public final class TemplateGalleryDialog {
      * @param filter      which pictures to offer, or {@code null} for the whole library
      * @param capture     whether to offer Capture new…
      * @param note        a sentence shown above the gallery saying why it is narrowed, or {@code null}
+     * @param selected    the base names selected when it opens — what the slot holds now
      */
     public record Options(String title, boolean multiSelect, Predicate<Path> filter, boolean capture,
-                          String note) {
+                          String note, List<String> selected) {
+
+        public Options {
+            selected = selected == null ? List.of() : List.copyOf(selected);
+        }
 
         public static Options pickOne(String title) {
-            return new Options(title, false, null, false, null);
+            return new Options(title, false, null, false, null, List.of());
         }
 
         public Options withFilter(Predicate<Path> filter) {
-            return new Options(title, multiSelect, filter, capture, note);
+            return new Options(title, multiSelect, filter, capture, note, selected);
         }
 
         public Options multi() {
-            return new Options(title, true, filter, capture, note);
+            return new Options(title, true, filter, capture, note, selected);
         }
 
         public Options withCapture() {
-            return new Options(title, multiSelect, filter, true, note);
+            return new Options(title, multiSelect, filter, true, note, selected);
         }
 
         public Options withNote(String note) {
-            return new Options(title, multiSelect, filter, capture, note);
+            return new Options(title, multiSelect, filter, capture, note, selected);
+        }
+
+        public Options withSelected(List<String> selected) {
+            return new Options(title, multiSelect, filter, capture, note, selected);
         }
     }
 
@@ -89,6 +98,10 @@ public final class TemplateGalleryDialog {
         choose.setDefaultButton(true);
         choose.setDisable(true);
         gallery.setOnSelectionChanged(() -> choose.setDisable(gallery.selectedFiles().isEmpty()));
+        // A name that is gone, or one the filter refuses, drops away.
+        gallery.reveal(options.selected().stream()
+                .filter(name -> !name.isBlank() && TemplateLibrary.exists(resources, name))
+                .map(name -> TemplateLibrary.fileForName(resources, name)).toList());
         choose.setOnAction(e -> {
             List<Path> picked = gallery.selectedFiles();
             stage.close();
@@ -113,7 +126,7 @@ public final class TemplateGalleryDialog {
                 CaptureTemplates.open(services, owner, null, gallery.selectedRealTag(), saved -> {
                     stage.show();
                     gallery.reload();
-                    gallery.setSelection(savedFiles(resources, saved, options));
+                    gallery.reveal(savedFiles(resources, saved, options));
                 });
             });
             buttons.getChildren().add(capture);
