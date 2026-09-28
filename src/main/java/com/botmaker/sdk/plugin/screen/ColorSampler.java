@@ -210,7 +210,7 @@ public final class ColorSampler {
             Button cancel = new Button("Cancel");
             cancel.setOnAction(e -> stage.close());
 
-            Label hint = new Label("click to pick · Ctrl+scroll zoom · middle-drag pan · Ctrl+0 reset · Esc cancel");
+            Label hint = new Label("click to pick · Ctrl+scroll zoom · middle-drag pan · Ctrl+0 reset · Esc or right-click cancel");
             hint.setTextFill(Color.web("#6b7688"));
             hint.setStyle("-fx-font-size: 11px;");
 
@@ -234,6 +234,11 @@ public final class ColorSampler {
                 hoverX = hoverY = -1;
             });
             pane.setOnMouseClicked(e -> {
+                // A right-click cancels, as it does on every other pick surface (ScreenOverlay).
+                if (e.getButton() == MouseButton.SECONDARY) {
+                    stage.close();
+                    return;
+                }
                 if (e.getButton() != MouseButton.PRIMARY || hoverX < 0) return;
                 // Read before closing: closing fires the mouse-exit above, which forgets the hovered pixel.
                 Sample picked = sampleAt(frame, hoverX, hoverY);

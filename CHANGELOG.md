@@ -191,6 +191,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - *Target colour…* with no frame yet puts the frame it grabs under the matches too.
   - Only `Pixel`'s own `matchesAt`, `coverage` and `findInRange` hide a knob. Your own method of the same
     name is offered all three.
+- **The colour editor:**
+  - A colour it cannot read, such as a variable, is shown as written beside the swatch. The swatch alone
+    showed its default white, a colour the bot does not use.
+  - A colour picked with the eyedropper is written once, not twice.
+  - The eyedropper's frozen frame cancels on a right-click too, like every other pick.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every

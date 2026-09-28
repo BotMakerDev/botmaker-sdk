@@ -116,6 +116,15 @@ class ColorEditorTest {
         assertNull(ColorEditors.current(TestContexts.row(java.awt.Color.class,"")));
     }
 
+    /** The swatch alone would claim its default; an unread value is shown as written beside it. */
+    @Test
+    void an_unread_value_is_shown_as_written_and_a_read_one_is_not() {
+        assertEquals("healthBarColour",
+                ColorEditors.unreadSource(TestContexts.typedSlot(java.awt.Color.class, "healthBarColour")));
+        assertNull(ColorEditors.unreadSource(TestContexts.typedSlot(java.awt.Color.class, "")));
+        assertNull(ColorEditors.unreadSource(slotHolding(new java.awt.Color(12, 34, 56))));
+    }
+
     /** What a pick writes, read straight back, is the colour that was picked — wherever the value is. */
     @Test
     void the_round_trip_holds_wherever_the_value_is() {

@@ -4,6 +4,8 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
+import com.botmaker.plugin.toolkit.Slots;
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.screen.ColorSampler;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
@@ -13,6 +15,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ColorPicker;
+import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
@@ -26,13 +29,16 @@ import javafx.scene.paint.Color;
  * swatch is there for the rare case where somebody does know, and everything else about this editor is about
  * getting the number off a real image.
  *
- * <p><b>The eyedropper has two paths and the better one needs a capture target.</b> With one configured it
- * opens {@link ColorSampler} over a frozen frame of the target — a loupe, and the ΔE spread of the
- * surrounding patch, which is the only honest suggestion a tolerance has ever had. Without one it falls back
- * to the host's live screen pick ({@code Capture.sampleColor}), which is what Studio's Parameters window did
- * before this editor existed. The fallback matters more than it looks: it means a project that has not set a
- * capture target still has a working eyedropper, so this editor never has to send anybody to a dialog before
- * they can answer the question in front of them.
+ * <p><b>The eyedropper asks where first and has two paths.</b> The user picks a surface
+ * ({@link SurfaceMenu}: the bot's source, another window or screen, the whole desktop), and a frozen frame of
+ * it opens {@link ColorSampler} — a loupe, and the ΔE spread of the surrounding patch, which is the only
+ * honest suggestion a tolerance has ever had. When no frame comes back it says why and falls back to a live
+ * pick off the screen ({@code ScreenCapture.pickColor}), so a project with no capture source still has a
+ * working eyedropper and nobody is sent to a dialog before they can answer the question in front of them.
+ *
+ * <p>A value this editor cannot read — a variable, a call — is shown as
+ * written beside the swatch, which otherwise sits at its default and would claim a colour the bot does not
+ * use.
  *
  * <p><b>It replaced two editors that had drifted.</b> Studio drew a slot's colour with a swatch and a frozen
  * sampler, and a Parameters row's colour with a swatch and the live screen pick — same value, same question,
@@ -50,18 +56,40 @@ public final class ColorEditors {
         Color initial = current(ctx);
         if (initial != null) picker.setValue(initial);
 
-        picker.setOnAction(e -> commit(ctx, picker.getValue()));
+        HBox box = new HBox(4);
+        box.setAlignment(Pos.CENTER_LEFT);
+        String unread = unreadSource(ctx);
+        Label written = unread == null ? null : Styles.on(new Label(unread), Styles.CAPTION);
+        if (written != null) {
+            written.setTooltip(new Tooltip("Not a colour this editor can read. A pick replaces it."));
+            box.getChildren().add(written);
+        }
+
+        // A ColorPicker fires its action whenever its value changes, the eyedropper's setValue included, so
+        // this is the one place a colour is written: the eyedropper wrote it a second time until 2026-09-28.
+        picker.setOnAction(e -> {
+            commit(ctx, picker.getValue());
+            box.getChildren().remove(written);
+        });
 
         Button eyedropper = Pills.button("⌖", () -> pick(ctx, picked -> {
-            picker.setValue(picked);
-            commit(ctx, picked);
+            if (picked.equals(picker.getValue())) {
+                commit(ctx, picked);
+                box.getChildren().remove(written);
+            } else {
+                picker.setValue(picked);
+            }
         }));
         eyedropper.setTooltip(new Tooltip("Pick a colour off a window, a screen or the desktop"));
         eyedropper.getStyleClass().add("color-eyedropper");
 
-        HBox box = new HBox(4, picker, eyedropper);
-        box.setAlignment(Pos.CENTER_LEFT);
+        box.getChildren().addAll(picker, eyedropper);
         return box;
+    }
+
+    /** The expression to show beside the swatch when the value is one this editor cannot read, else null. */
+    static String unreadSource(ValueContext ctx) {
+        return current(ctx) == null && !Slots.isEmpty(ctx) ? Slots.raw(ctx) : null;
     }
 
     /**
@@ -144,10 +172,6 @@ public final class ColorEditors {
 
     private static Color fx(java.awt.Color colour) {
         return Color.rgb(colour.getRed(), colour.getGreen(), colour.getBlue());
-    }
-
-    private static String hex(int r, int g, int b) {
-        return String.format("#%02X%02X%02X", r, g, b);
     }
 
     private static int channel(double zeroToOne) {

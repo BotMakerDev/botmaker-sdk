@@ -8,6 +8,17 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-28 — colour and geometry editors reworked (SDK plugin rework, phase 7)
+
+**Done**
+- `ColorEditors.color`: an unread value shows its source beside the swatch (`unreadSource`), removed on the
+  first pick. The picker's action is the one writer; the eyedropper sets the picker's value and commits
+  itself only when the value does not change, since a `ColorPicker` fires no action then. Class javadoc
+  rewritten for `SurfaceMenu` and the `ScreenCapture.pickColor` fallback; unused `hex` removed.
+- `ColorSampler`: a right-click cancels, matching `ScreenOverlay`.
+- `GeometryEditors` checked, no change: the tuple pill, its label and `PickSpace` were reworked in phase 1.
+- Test: `ColorEditorTest.an_unread_value_is_shown_as_written_and_a_read_one_is_not`.
+
 ## 2026-09-28 — Precision editor reworked (SDK plugin rework, phase 6)
 
 **Done**
