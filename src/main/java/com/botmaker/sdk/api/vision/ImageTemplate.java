@@ -34,7 +34,7 @@ import java.util.List;
  */
 // The generated Activities declares one per image-template variable, and builds it from the stored path.
 @Palette(category = "vision", categoryLabel = "Vision", order = 95)
-@Hidden("a value type: the generated templates class builds them, a bot holds and passes them on")
+@Hidden("a value type: the project's Pictures class holds them, a bot passes them on")
 public class ImageTemplate implements AutoCloseable {
 
     private final String filePath;

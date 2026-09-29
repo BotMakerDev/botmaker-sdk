@@ -78,11 +78,23 @@ public final class Text {
         return read(Source.current(), DEFAULT_OPTIONS);
     }
 
-    /** All recognized text within {@code source} using {@code opts}, as one string. */
+    /**
+     * All recognized text within {@code source} using {@code opts}, as one string. {@code null} options are
+     * {@link #DEFAULT_OPTIONS}, here and in every {@code OcrOptions} overload.
+     */
     public static String read(CaptureSource source, OcrOptions opts) {
         BufferedImage img = source.capture();
         if (img == null) return "";
-        return OcrEngine.text(img, opts);
+        return OcrEngine.text(img, orDefault(opts));
+    }
+
+    /**
+     * {@code opts}, or {@link #DEFAULT_OPTIONS} for {@code null}. Studio has no editor for an {@code OcrOptions}
+     * and seeds a dropped block's options with {@code null}; that threw from {@link #read} and, in every search,
+     * was caught as "no text" — a block that compiled and silently never matched.
+     */
+    static OcrOptions orDefault(OcrOptions opts) {
+        return opts == null ? DEFAULT_OPTIONS : opts;
     }
 
     // ---------------------------------------------------------------------
@@ -271,7 +283,7 @@ public final class Text {
         try {
             BufferedImage img = source.capture();
             if (img == null) return new ArrayList<>();
-            List<TextResult> raw = OcrEngine.recognize(img, opts);
+            List<TextResult> raw = OcrEngine.recognize(img, orDefault(opts));
             Point origin = source.origin();
             List<TextMatch> out = new ArrayList<>(raw.size());
             for (TextResult r : raw) {

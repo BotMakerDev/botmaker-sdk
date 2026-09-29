@@ -8,6 +8,27 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — vision result pills and palette sweep (SDK plugin rework, phase 14, the last)
+
+**Done**
+- `ResultEditors`' words name the type, not the fresh call: the pill draws every unreadable value of the four
+  result types, so "Last picture match" was false for `ImageFinder.find(…)`.
+- Swept every offered palette member's parameter types. The unfillable ones were `OcrOptions` (ten `Text`
+  overloads) and `ZoneId` (`Time.now`, `Time.setDefaultTimeZone`): Studio seeds `null` for a type with no
+  editor, and `@Hidden` cannot hide one overload. `Text.orDefault` reads `null` as `DEFAULT_OPTIONS`;
+  `Time` reads a `null` zone as the default (now) or the system zone (set, which threw).
+- `Flows` is `@Hidden` (the user's call): a dropped `use` cleared the flow, `installed` hands back a `Flow`
+  nothing takes, `enabled` is `Activities.active` without the picker.
+- Stale `@Hidden` reasons fixed: `Precision` (called an enum), `ImageTemplate` (named a generated class).
+- Tests: `ResultEditorsTest`, `TextOptionsTest`, `TimeWindowTest.aMissingZoneIsTheDefaultOne`.
+
+**Deferred / next**
+- `long` has no editor (plugin-basics declares `int` but not `long`), so every timeout slot — `Text.waitFor`,
+  `Pixel.waitFor`, `Mouse.drag`, `Target.waitForLaunch` — is seeded `0`, which returns at once. Either basics
+  declares `long`, or those overloads grow `Duration` twins. A cross-module decision.
+- An `OcrOptions` editor (languages, whitelist, upscale) would make the ten overloads worth offering.
+- `Game.launchHeroic`/`launchFaugus` take a plain `String` with no picker; tied to the launch-stack question.
+
 ## 2026-09-28 — Remote Pilot reworked (SDK plugin rework, phase 13)
 
 **Done**

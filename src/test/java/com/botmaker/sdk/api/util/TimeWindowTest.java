@@ -80,4 +80,19 @@ class TimeWindowTest {
         assertEquals(Time.today().getMonth(), Time.month());
         assertEquals(Time.today().getMonthValue(), Time.month().getValue());
     }
+
+    /** A dropped block's {@code ZoneId} is {@code null}: Studio has no editor for one. */
+    @Test
+    void aMissingZoneIsTheDefaultOne() {
+        java.time.ZoneId before = Time.getDefaultTimeZone();
+        try {
+            Time.setDefaultTimeZone(java.time.ZoneId.of("Asia/Tokyo"));
+            assertEquals(Time.now(java.time.ZoneId.of("Asia/Tokyo")).getHour(), Time.now((java.time.ZoneId) null).getHour());
+
+            Time.setDefaultTimeZone((java.time.ZoneId) null);
+            assertEquals(java.time.ZoneId.systemDefault(), Time.getDefaultTimeZone());
+        } finally {
+            Time.setDefaultTimeZone(before);
+        }
+    }
 }

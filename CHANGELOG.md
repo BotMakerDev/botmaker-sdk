@@ -248,6 +248,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - Background mode's hint no longer points at a Run ▸ Launch Target… menu that does not exist.
 - **Launch:** the unused launch-target picker and its game-grid dialog are deleted; nothing called them.
   `Target.current()` and `Target.set` are no longer offered in the palette, since no editor can fill either.
+- **Vision results and the palette:**
+  - A vision result's pill names its type ("Picture match", "Colour match", "Text found"). It said "Last
+    picture match" for every call, `ImageFinder.find(…)` included.
+  - A `Text` block with an options slot works when dropped from the palette. Studio fills that slot with
+    `null`, which threw from `read` and made every search report "no text"; `null` options now mean the defaults.
+  - `Time.now(ZoneId)` and `Time.setDefaultTimeZone(ZoneId)` take the `null` a dropped block is written with:
+    `now` uses the default timezone, and `setDefaultTimeZone` goes back to the system one instead of throwing.
+  - The Flow menu (`Flows`) is no longer offered. A dropped `use` was written `Flows.use(null)` and cleared the
+    bot's flow; Bot ▸ Activities (`active`, `enable`, `disable`, with the activity picker) covers the rest.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads
   the desktop through shared's capture, which now knows grim and gnome-screenshot as well as Spectacle.
 - **Renaming a picture in 🖼 Manage Pictures no longer breaks the bot.** It renamed `Pictures.ORE` at every

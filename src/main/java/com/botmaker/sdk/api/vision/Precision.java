@@ -52,14 +52,11 @@ import com.botmaker.plugin.api.palette.Palette;
  * @param minArea  the minimum cluster area in pixels; always at least 1
  * @param minCount the minimum number of matching pixels in the whole search; 0 for no requirement
  */
-// The generated Activities declares one per precision variable, and rebuilds it from the three stored numbers
-// — so the three components are part of the scaffold's surface, not only the type name.
-//
-// Curated for the palette: both `of` factories and all four fluent builders are offered. This is the type
-// Pixel's tolerance lives in (see the note on Pixel), so hiding any of it would put that tolerance out of the
-// editor's reach entirely. `toString` is an Object override and never a menu entry.
+// Curated for the palette: the type is hidden from the insert menus, because a Precision is written by its slot
+// editor (a named constant or a tuned value), never inserted as a call of its own. Its members stay catalogued
+// so the name resolves; `toString` is an Object override and never a menu entry.
 @Palette(category = "vision", categoryLabel = "Vision", order = 99)
-@Hidden("a value type: an enum constant a bot picks, never a menu entry of its own")
+@Hidden("a value type: the Precision editor writes one into a slot, it is not inserted from a menu")
 public record Precision(double deltaE, int minArea, int minCount) {
 
     /** The area floor the named constants start from: filters out stray anti-aliased pixels. */

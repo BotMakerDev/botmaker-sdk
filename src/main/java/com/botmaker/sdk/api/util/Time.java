@@ -204,11 +204,14 @@ public final class Time {
     /**
      * Returns the current date and time in the specified timezone.
      *
-     * @param zone the timezone to use
+     * <p>Studio has no editor for a {@code ZoneId} and seeds a dropped block with {@code null}, so {@code null}
+     * means {@link #getDefaultTimeZone() the default timezone} rather than a {@code NullPointerException}.
+     *
+     * @param zone the timezone to use, or {@code null} for the default one
      * @return the current date and time in the specified timezone
      */
     public static LocalDateTime now(ZoneId zone) {
-        return LocalDateTime.now(zone);
+        return LocalDateTime.now(zone == null ? defaultTimeZone : zone);
     }
 
     /**
@@ -234,13 +237,13 @@ public final class Time {
     /**
      * Sets the default timezone used by this Time API.
      *
-     * @param zone the timezone to use as default
+     * <p>{@code null} goes back to the system timezone. It threw before 2.0.0; Studio seeds a dropped block
+     * with {@code null} (it has no {@code ZoneId} editor), so the block it offered failed on its first run.
+     *
+     * @param zone the timezone to use as default, or {@code null} for the system timezone
      */
     public static void setDefaultTimeZone(ZoneId zone) {
-        if (zone == null) {
-            throw new IllegalArgumentException("Default timezone cannot be null");
-        }
-        defaultTimeZone = zone;
+        defaultTimeZone = zone == null ? ZoneId.systemDefault() : zone;
     }
 
     /**
