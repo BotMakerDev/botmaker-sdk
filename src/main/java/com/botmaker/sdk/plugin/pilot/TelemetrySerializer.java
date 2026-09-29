@@ -56,6 +56,10 @@ public final class TelemetrySerializer {
 
     record Trace(String type, Line line) {}
 
+    record Input(String type, java.util.List<String> kinds) {}
+
+    record Notice(String type, String text) {}
+
     /**
      * One trace line as a phone shows it: when (the bot's clock, ms), how serious ({@code TraceLine.Level}'s
      * id, {@code ""} for one the host did not know), what wrote it, what it said, and how many times.
@@ -132,6 +136,20 @@ public final class TelemetrySerializer {
      */
     public static String videoStoppedJson() {
         return write(new VideoStopped("video", null));
+    }
+
+    /**
+     * The {@code input} message, sent once on connect: which {@code {"cmd":"input","kind":…}} kinds this host
+     * takes. A phone shows its keyboard only when {@code key} is among them, so an older SDK that never sends
+     * this simply has no keyboard button rather than one that silently does nothing.
+     */
+    public static String inputJson(java.util.List<String> kinds) {
+        return write(new Input("input", kinds));
+    }
+
+    /** The {@code notice} message: one sentence the phone shows briefly, such as why a key was not sent. */
+    public static String noticeJson(String text) {
+        return write(new Notice("notice", text));
     }
 
     /** The log drawer's message. The source line, the writer and the region stay on the host. */

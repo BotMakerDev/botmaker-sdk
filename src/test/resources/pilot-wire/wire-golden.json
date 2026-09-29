@@ -137,5 +137,13 @@
   "video.stopped": {
     "type": "video",
     "codec": null
+  },
+  "input.kinds": {
+    "type": "input",
+    "kinds": ["tap", "down", "move", "up", "scroll", "key", "text"]
+  },
+  "notice.not-focused": {
+    "type": "notice",
+    "text": "Keys go only to the bot's window. Tap the window first so it has focus."
   }
 }

@@ -48,7 +48,7 @@ class TelemetryWireContractTest {
      * The corpus, byte for byte. Update this together with {@code GOLDEN_SHA256} in the pilot repo's
      * {@code wire.test.ts} — and with the copy of the file itself, which must stay byte-identical.
      */
-    private static final String GOLDEN_SHA256 = "72869283e65c1eafdf9e2cad4f78662bd95a377a260cdae29d603993a32d76b7";
+    private static final String GOLDEN_SHA256 = "b1c12fa89d19fca28a2d414e79d55fd40281d5207e8e7dd7748030eb98f55e29";
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final JsonNode CORPUS = corpus();
@@ -159,6 +159,18 @@ class TelemetryWireContractTest {
         // Sent on every way a stream can end — route change, dead encoder, last H.264 client gone — because
         // the client has to tear its decoder down and start reading JPEG frames again for any of them.
         assertWire("video.stopped", TelemetrySerializer.videoStoppedJson());
+    }
+
+    @Test
+    void onConnectTheHostSaysWhichInputKindsItTakes() {
+        // A phone draws its keyboard only when "key" is here, so an SDK that never sends this has none.
+        assertWire("input.kinds", TelemetrySerializer.inputJson(PilotInputService.Kind.wireNames()));
+    }
+
+    @Test
+    void aKeyThatWasNotSentComesBackAsANotice() {
+        assertWire("notice.not-focused",
+                TelemetrySerializer.noticeJson(PilotInputService.Typed.NOT_FOCUSED.notice()));
     }
 
     // --- What the corpus cannot express ---

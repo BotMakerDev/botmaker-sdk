@@ -17,6 +17,25 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Added
+
+- **The Remote Pilot takes keys and text.** `{"cmd":"input","kind":"key","key":"ENTER"}` presses an `api.interaction.Key`
+  by name and `{"kind":"text","text":…}` types (control characters dropped, 256 at most), on the route the last
+  frame came from: a nested session's controller, an emulator's `input keyevent`/`input text`, or the host
+  `:0`. **On `:0` a key is sent only while the focused window is the streamed frame** (each edge within
+  16 px), since a key cannot be clamped to the frame the way a tap is and the pilot may be reachable over
+  Funnel; otherwise the phone gets `{"type":"notice","text":…}` saying to tap the window first. On connect the
+  server announces `{"type":"input","kinds":[…]}` so a phone shows its keyboard only when the host takes keys.
+  Both new messages are in the shared wire corpus (`pilot-wire/wire-golden.json`, digest moved in both repos).
+- **The bundled BotPilot client** (`src/main/resources/pilot/`) is rebuilt with pinch-zoom and the keyboard.
+
+### Changed
+
+- **An input of a kind this SDK does not know is logged** (`Pilot: ignoring input of unknown kind "…"`) and
+  still ignored, where it was dropped without a word.
+
 ## [1.2.0] — 2026-09-29
 
 ### Added

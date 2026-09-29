@@ -44,11 +44,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *       {@code "reason"} sentence while the stream has no frames to send — see {@link #reportEmpty}) and the
  *       video stream's start/stop ({@code {"type":"video","codec":"avc1.42E01E","sx":…}}), and the run's trace
  *       lines ({@code {"type":"trace","line":{"ts":…,"level":"debug","source":"Vision","text":…,"count":1}}},
- *       the last {@link #TRACE_BACKLOG} of them replayed to a phone that connects mid-run).</li>
+ *       the last {@link #TRACE_BACKLOG} of them replayed to a phone that connects mid-run), on connect the
+ *       input kinds this host takes ({@code {"type":"input","kinds":["tap",…,"key","text"]}}), and a
+ *       {@code {"type":"notice","text":…}} when a key or text was not sent.</li>
  *   <li><b>text</b> client→server: control commands ({@code {"cmd":"start|stop|pause|resume"}}), the
  *       Interact arm/disarm ({@code {"cmd":"interact","on":true}}), once armed, manual gestures
  *       ({@code {"cmd":"input","kind":"tap|down|move|up|scroll","x":…,"y":…,"button":1,"amount":-3}} in
- *       absolute screen coordinates — see {@link PilotInputService}) and the codec negotiation
+ *       absolute screen coordinates — see {@link PilotInputService}), keys and text
+ *       ({@code {"cmd":"input","kind":"key","key":"ENTER"}}, {@code {"cmd":"input","kind":"text","text":"hi"}};
+ *       an unknown kind is ignored and logged) and the codec negotiation
  *       ({@code {"cmd":"hello","accept":["h264"]}} — see {@link #handleHello}).</li>
  * </ul>
  *
@@ -220,6 +224,7 @@ public final class PilotServer implements AutoCloseable {
                 clients.put(ctx, new Client());
                 ctx.enableAutomaticPings();
                 ctx.send(stateJson()); // let a fresh client render the current run state immediately
+                ctx.send(TelemetrySerializer.inputJson(PilotInputService.Kind.wireNames()));
                 // …and the run's recent trace, so a phone that connects mid-run opens on context, not blank.
                 for (String line : traceBacklog()) ctx.send(line);
             });
@@ -361,7 +366,7 @@ public final class PilotServer implements AutoCloseable {
             case PAUSE -> { control.pause(); refreshPausedState(); }
             case RESUME -> { control.resume(); refreshPausedState(); }
             case INTERACT -> client.interact.set(node.path("on").asBoolean(false));
-            case INPUT -> handleInput(client, node);
+            case INPUT -> handleInput(client, ctx, node);
             case HELLO -> handleHello(client, ctx, node);
         }
     }
@@ -396,12 +401,23 @@ public final class PilotServer implements AutoCloseable {
      * One manual Interact gesture. Dropped silently unless this connection armed Interact and we have a
      * frame surface to bound it by — an unarmed client's pointer events must never reach the desktop.
      */
-    private void handleInput(Client client, JsonNode node) {
+    private void handleInput(Client client, WsContext ctx, JsonNode node) {
         if (!client.interact.get()) return;
         PilotInputService.Kind kind;
+        String named = node.path("kind").asText("");
         try {
-            kind = PilotInputService.Kind.valueOf(node.path("kind").asText("").toUpperCase(java.util.Locale.ROOT));
+            kind = PilotInputService.Kind.valueOf(named.toUpperCase(java.util.Locale.ROOT));
         } catch (IllegalArgumentException unknownKind) {
+            // A newer phone's gesture: ignored, never a dropped connection, and said once in the log.
+            System.err.println("Pilot: ignoring input of unknown kind \"" + named + "\"");
+            return;
+        }
+        if (kind == PilotInputService.Kind.KEY || kind == PilotInputService.Kind.TEXT) {
+            PilotInputService.Typed typed = input.type(lastRoute, kind, node.path("key").asText(""),
+                    node.path("text").asText(""), lastBounds);
+            if (typed != PilotInputService.Typed.SENT && ctx.session.isOpen()) {
+                ctx.send(TelemetrySerializer.noticeJson(typed.notice()));
+            }
             return;
         }
         input.apply(lastRoute, kind, node.path("x").asInt(), node.path("y").asInt(),

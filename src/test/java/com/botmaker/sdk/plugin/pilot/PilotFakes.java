@@ -38,7 +38,10 @@ final class PilotFakes {
         /** What a {@code :0} window search sees, for the title-matched desktop target path. */
         final List<GenericWindow> windows = new ArrayList<>();
 
-        @Override public GenericWindow getForegroundWindow() { return null; }
+        /** What has focus on this display, for the pilot's keyboard guard. */
+        GenericWindow foreground;
+
+        @Override public GenericWindow getForegroundWindow() { return foreground; }
         @Override public List<GenericWindow> getChildWindows(GenericWindow parent) { return List.of(); }
         @Override public List<GenericWindow> getAllWindows() { return windows; }
         @Override public BufferedImage captureWindow(GenericWindow window) { calls.add("capture"); return windowFrame; }
@@ -46,9 +49,9 @@ final class PilotFakes {
         @Override public void focusWindow(GenericWindow window) { }
         @Override public void moveWindow(GenericWindow window, int x, int y) { }
         @Override public void resizeWindow(GenericWindow window, int width, int height) { }
-        @Override public void keyDown(int nativeKeyCode) { }
-        @Override public void keyUp(int nativeKeyCode) { }
-        @Override public void typeText(String text) { }
+        @Override public void keyDown(int nativeKeyCode) { calls.add("keyDown " + nativeKeyCode); }
+        @Override public void keyUp(int nativeKeyCode) { calls.add("keyUp " + nativeKeyCode); }
+        @Override public void typeText(String text) { calls.add("type " + text); }
         @Override public void mouseMove(int xAbs, int yAbs) { calls.add("move " + xAbs + "," + yAbs); }
         @Override public void mouseButton(int button, boolean press) { calls.add("button " + button + " " + press); }
         @Override public void scroll(int amount) { calls.add("scroll " + amount); }
@@ -176,6 +179,8 @@ final class PilotFakes {
         }
 
         @Override public void scroll(int x, int y, int amount) { calls.add("scroll " + x + "," + y + " " + amount); }
+        @Override public void key(int androidKeyCode) { calls.add("key " + androidKeyCode); }
+        @Override public void text(String text) { calls.add("text " + text); }
         @Override public void close() { closed = true; }
     }
 }

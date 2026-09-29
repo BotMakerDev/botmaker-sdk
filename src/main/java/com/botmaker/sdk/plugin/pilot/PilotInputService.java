@@ -1,5 +1,7 @@
 package com.botmaker.sdk.plugin.pilot;
 
+import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.session.Capability;
@@ -66,8 +68,44 @@ public final class PilotInputService implements AutoCloseable {
         }
     }
 
-    /** One gesture step from the client. {@code amount} is only read for {@link Kind#SCROLL}. */
-    public enum Kind { TAP, DOWN, MOVE, UP, SCROLL }
+    /**
+     * One step from the client. {@code amount} is only read for {@link Kind#SCROLL}; {@link Kind#KEY} and
+     * {@link Kind#TEXT} carry no coordinates and go through {@link #type} rather than {@link #apply}.
+     */
+    public enum Kind {
+        TAP, DOWN, MOVE, UP, SCROLL, KEY, TEXT;
+
+        /** The wire names of every kind, lower case — what the server announces a phone may send. */
+        public static java.util.List<String> wireNames() {
+            return java.util.Arrays.stream(values()).map(k -> k.name().toLowerCase(java.util.Locale.ROOT)).toList();
+        }
+    }
+
+    /** What became of a {@link Kind#KEY} or {@link Kind#TEXT} step. Every outcome but {@link #SENT} is told to the phone. */
+    public enum Typed {
+        SENT(""),
+        UNKNOWN_KEY("Pilot does not know that key."),
+        NOT_FOCUSED("Keys go only to the bot's window. Tap the window first so it has focus."),
+        UNSUPPORTED("This screen does not take that key."),
+        FAILED("The key could not be sent.");
+
+        private final String notice;
+
+        Typed(String notice) {
+            this.notice = notice;
+        }
+
+        /** The sentence the phone shows, empty for {@link #SENT}. */
+        public String notice() {
+            return notice;
+        }
+    }
+
+    /** The longest text one {@link Kind#TEXT} step types; a paste longer than a chat line is not a keystroke. */
+    static final int MAX_TEXT = 256;
+
+    /** How far (px) each edge of the focused window may sit from the streamed frame's and still count as it. */
+    static final int FOCUS_TOLERANCE = 16;
 
     /**
      * The host {@code :0} controller, resolved lazily (constructing it probes X11/Win32 and must not run at
@@ -107,7 +145,7 @@ public final class PilotInputService implements AutoCloseable {
      */
     public synchronized boolean apply(PilotRoute route, Kind kind, int x, int y, int button, int amount,
                                       Bounds bounds) {
-        if (bounds == null) return false;
+        if (bounds == null || kind == Kind.KEY || kind == Kind.TEXT) return false;
         // A route that changed under a drag ends that drag on the surface that owns the button, now, before
         // anything is dispatched to the new one.
         if (heldButton != 0 && !routeOrDesktop(route).equals(heldRoute)) releaseHeld();
@@ -160,6 +198,83 @@ public final class PilotInputService implements AutoCloseable {
             releaseHeld();
             return false;
         }
+    }
+
+    /**
+     * Presses one key ({@link Kind#KEY}, a {@link Key} constant's name such as {@code ENTER}) or types text
+     * ({@link Kind#TEXT}) on {@code route}.
+     *
+     * <p><b>A key has no coordinates, so it cannot be clamped to the frame the way a tap is</b>: it goes to
+     * whatever has focus. On a nested session or an emulator that is the bot's own screen, so anything goes.
+     * On the host {@code :0} it could be a terminal or Studio itself, and the pilot may be reachable over a
+     * public Funnel URL, so a key is sent there only while the focused window <em>is</em> the streamed frame
+     * ({@link #focusedIsFrame}); otherwise it is refused and the phone is told to tap the window first. (The
+     * user's call, 2026-09-29.)
+     */
+    public synchronized Typed type(PilotRoute route, Kind kind, String keyName, String text, Bounds bounds) {
+        if (bounds == null) return Typed.FAILED;
+        String typed = kind == Kind.TEXT ? printable(text) : "";
+        if (kind == Kind.TEXT && typed.isEmpty()) return Typed.SENT;
+        Key key = null;
+        if (kind == Kind.KEY) {
+            try {
+                key = Key.valueOf(keyName == null ? "" : keyName.toUpperCase(java.util.Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                return Typed.UNKNOWN_KEY;
+            }
+        } else if (kind != Kind.TEXT) {
+            return Typed.UNKNOWN_KEY;
+        }
+        try {
+            if (route instanceof PilotRoute.Emulator(EmulatorSurface surface)) {
+                if (key == null) {
+                    surface.text(typed);
+                    return Typed.SENT;
+                }
+                int code = AndroidKeys.code(key);
+                if (code < 0) return Typed.UNSUPPORTED;
+                surface.key(code);
+                return Typed.SENT;
+            }
+            NativeController nc = controller(route);
+            if (nc == null) return Typed.FAILED;
+            if (sessionOf(route) == null) {
+                GenericWindow focused = nc.getForegroundWindow();
+                if (!focusedIsFrame(focused == null ? null : focused.getRect(), bounds)) return Typed.NOT_FOCUSED;
+            }
+            if (key == null) {
+                nc.typeText(typed);
+            } else {
+                nc.keyDown(key.nativeCode());
+                nc.keyUp(key.nativeCode());
+            }
+            return Typed.SENT;
+        } catch (Exception e) {
+            System.err.println("Pilot interact " + kind + " failed: " + e.getMessage());
+            return Typed.FAILED;
+        }
+    }
+
+    /**
+     * Whether the focused window is the frame the phone is shown: every edge within {@link #FOCUS_TOLERANCE}.
+     * A window target's frame is that window's own rect, so the two match exactly when the game has focus; a
+     * whole-screen frame matches only a fullscreen window.
+     */
+    static boolean focusedIsFrame(java.awt.Rectangle focused, Bounds frame) {
+        if (focused == null || focused.width <= 0 || focused.height <= 0) return false;
+        return Math.abs(focused.x - frame.sx()) <= FOCUS_TOLERANCE
+                && Math.abs(focused.y - frame.sy()) <= FOCUS_TOLERANCE
+                && Math.abs(focused.x + focused.width - (frame.sx() + frame.sw())) <= FOCUS_TOLERANCE
+                && Math.abs(focused.y + focused.height - (frame.sy() + frame.sh())) <= FOCUS_TOLERANCE;
+    }
+
+    /** {@code text} without control characters, at most {@link #MAX_TEXT} characters. */
+    static String printable(String text) {
+        if (text == null) return "";
+        StringBuilder out = new StringBuilder();
+        text.codePoints().filter(c -> !Character.isISOControl(c))
+                .limit(MAX_TEXT).forEach(out::appendCodePoint);
+        return out.toString();
     }
 
     /** {@code route}, never null — {@link PilotRoute#DESKTOP} is what a missing route means everywhere here. */
