@@ -41,6 +41,11 @@ kept the Pilot in this plugin, so the transports are here.
   that fails, a missing binary, the address ranges), and `RemotePilotFunnelTest` updated (fallback order,
   warnings).
 
+- Phase 11 follow-up: the LAN address is the default route's source first (a UDP `connect` to `1.1.1.1`,
+  which sends nothing), then the interface scan. On the dev box a Waydroid bridge (`waydroid0`,
+  `192.168.240.1`) carries a private address too; `waydroid`, `lxc`, `vboxnet`, `vmnet`, `cni` and `flannel`
+  joined the skipped names.
+
 **Deferred / next**
 - A quick tunnel's address changes at every start, so the APK's saved connection goes stale. The phone-side
   "can't reach" guidance is phase 12.

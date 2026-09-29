@@ -69,6 +69,16 @@ class TransportsTest {
         assertTrue(a.fix().toLowerCase().contains("install"), a.fix());
     }
 
+    /** On the dev box a Waydroid bridge (192.168.240.1) sits beside the Wi-Fi; the route must pick the Wi-Fi. */
+    @Test
+    void the_lan_address_found_here_is_never_a_virtual_bridge() throws Exception {
+        String lan = DirectTransport.lanAddress();
+        if (lan == null) return; // a build machine with no private network
+        java.net.NetworkInterface nic = java.net.NetworkInterface.getByInetAddress(InetAddress.getByName(lan));
+        assertTrue(DirectTransport.isLan(nic.getName(), InetAddress.getByName(lan), InetAddress.getByName(lan).getAddress()),
+                nic.getName() + " " + lan);
+    }
+
     @Test
     void tailscale_is_the_cgnat_range_and_the_lan_is_private_and_not_virtual() throws Exception {
         assertTrue(DirectTransport.isTailscale(new byte[] {100, 64, 0, 1}));
@@ -80,6 +90,8 @@ class TransportsTest {
         assertTrue(DirectTransport.isLan("wlp2s0", home, home.getAddress()));
         assertFalse(DirectTransport.isLan("docker0", home, home.getAddress()));
         assertFalse(DirectTransport.isLan("tailscale0", home, home.getAddress()));
+        InetAddress waydroid = InetAddress.getByName("192.168.240.1");
+        assertFalse(DirectTransport.isLan("waydroid0", waydroid, waydroid.getAddress()));
         InetAddress publicAddress = InetAddress.getByName("8.8.8.8");
         assertFalse(DirectTransport.isLan("eth0", publicAddress, publicAddress.getAddress()));
     }

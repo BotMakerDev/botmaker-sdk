@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.pilot.transport;
 
+import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -21,6 +22,10 @@ import java.util.Locale;
  * it on whatever else the computer was connected to as well.
  */
 final class DirectTransport implements PilotTransport {
+
+    /** Interfaces that are not the local network: tunnels, containers, virtual machines, Android containers. */
+    private static final String[] VIRTUAL = {"tailscale", "docker", "br-", "veth", "virbr", "tun", "wg", "podman",
+            "waydroid", "lxc", "vboxnet", "vmnet", "cni", "flannel"};
 
     private final TransportKind kind;
     private String host;
@@ -67,8 +72,23 @@ final class DirectTransport implements PilotTransport {
         return firstAddress(true);
     }
 
-    /** This computer's first private-range IPv4 address that is not a tunnel or a container bridge. */
+    /**
+     * This computer's local network IPv4: the source address of its default route when that is a private one
+     * on a physical interface, else the first such address. The route comes first because a Waydroid or Docker
+     * bridge also carries a private address, and may be listed before the Wi-Fi.
+     */
     static String lanAddress() {
+        try (DatagramSocket probe = new DatagramSocket()) {
+            // A UDP connect sends nothing; it only asks the kernel which source address the route would use.
+            probe.connect(InetAddress.getByName("1.1.1.1"), 9);
+            InetAddress local = probe.getLocalAddress();
+            NetworkInterface nic = NetworkInterface.getByInetAddress(local);
+            if (local instanceof Inet4Address && nic != null && isLan(nic.getName(), local, local.getAddress())) {
+                return local.getHostAddress();
+            }
+        } catch (Exception ignored) {
+            // No default route (a network without internet): the interface scan below.
+        }
         return firstAddress(false);
     }
 
@@ -99,7 +119,7 @@ final class DirectTransport implements PilotTransport {
      */
     static boolean isLan(String nic, InetAddress addr, byte[] ipv4) {
         String name = nic == null ? "" : nic.toLowerCase(Locale.ROOT);
-        for (String virtual : new String[] {"tailscale", "docker", "br-", "veth", "virbr", "tun", "wg", "podman"}) {
+        for (String virtual : VIRTUAL) {
             if (name.startsWith(virtual)) return false;
         }
         return addr.isSiteLocalAddress() && !isTailscale(ipv4);
