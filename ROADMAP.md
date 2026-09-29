@@ -8,6 +8,30 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — `OcrOptions` editor (rework follow-ups, phase 4)
+
+**Done**
+- `SdkTypes.OCR_OPTIONS`: fresh `Text.DEFAULT_OPTIONS.withCharWhitelist("")`, written as the record's
+  constructor. The whitelist is `""` rather than `null` because Studio's `ValueWriter` cannot write a `null`
+  part (one unwritable part empties the whole value); `OcrEngine` already reads both the same.
+- `SdkTypes.OCR_CHAINS` (in `PARTS`): `OcrOptions.defaults()` and the nine withers, read and never written,
+  like `PRECISION_WITHERS` (receiver `o -> o`). Studio's writer tries only one-link chains, so a many-wither
+  form could not be written anyway; the constructor always keeps the whole value.
+- `plugin/editors/OcrEditors`: pill + dialog (languages as checkboxes over `OcrLanguage`, codes the SDK does
+  not bundle kept and listed, lines/words, whitelist with *Digits only*/*Any*, upscale spinner 1–4, clean-up
+  NONE/OTSU/ADAPTIVE, invert). Page segmentation, engine mode and grayscale are not shown and are kept.
+  **Try it** grabs the project's source (`EditorFrame.grabAsync`) and runs `OcrEngine.text` on a daemon
+  thread; a missing Tesseract native is reported as text, not thrown. Commit hands `null` whitelist back as `""`.
+- `PaletteFillabilityTest`: the nine `Text#…(OcrOptions)` exemptions removed; only the two `ZoneId` ones remain.
+- Tests: `OcrOptionsTypeTest`, `OcrEditorsTest`; `SdkPluginSurfaceTest` now counts 17 types.
+
+**Deferred / next**
+- `withLanguages(OcrLanguage...)` (varargs) is not a declared chain, so `defaults().withLanguages(ENGLISH)`
+  still shows as written. Declaring it needs the host to read a varargs argument inside a receiver chain.
+- `Text.DEFAULT_OPTIONS` in a slot shows as written (a field of `Text`, not of `OcrOptions`). An
+  `OcrOptions` constant plus `.constants(…)` would make it read and let a fresh block write a name instead of
+  the nine-argument constructor.
+
 ## 2026-09-29 — timeouts as `Duration` (rework follow-ups, phase 3)
 
 **Done**

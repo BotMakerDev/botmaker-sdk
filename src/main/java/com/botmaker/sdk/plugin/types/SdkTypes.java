@@ -19,7 +19,9 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Matches;
+import com.botmaker.sdk.api.vision.OcrOptions;
 import com.botmaker.sdk.api.vision.Precision;
+import com.botmaker.sdk.api.vision.Text;
 import com.botmaker.sdk.api.vision.TextMatch;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.capture.CurrentSource;
@@ -27,6 +29,7 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 import com.botmaker.sdk.plugin.editors.GeometryEditors;
 import com.botmaker.sdk.plugin.editors.InputEditors;
+import com.botmaker.sdk.plugin.editors.OcrEditors;
 import com.botmaker.sdk.plugin.editors.PrecisionEditors;
 import com.botmaker.sdk.plugin.editors.ResultEditors;
 import com.botmaker.sdk.plugin.editors.TemplateEditors;
@@ -37,7 +40,7 @@ import java.util.stream.Stream;
 
 /**
  * The types the SDK declares ({@link #ALL}) and the calls inside its values that are not types of their own
- * ({@link #PARTS}): a picture and a group of them, how exactly to match one, three geometry shapes, three
+ * ({@link #PARTS}): a picture and a group of them, how exactly to match one, how to read text, three geometry shapes, three
  * enums, a key combination and a key sequence, the capture source, and the vision results a bot holds but
  * nobody edits.
  *
@@ -93,6 +96,18 @@ public final class SdkTypes {
     public static final DeclaredCallType<Precision> PRECISION = PluginType.value(Precision.class)
             .fresh(() -> Precision.DEFAULT)
             .editor(() -> PrecisionEditors::precision)
+            .writtenAsRecord();
+
+    /**
+     * How {@code Text} reads the screen: languages, lines or words, a character whitelist, the upscale and the
+     * clean-up. A fresh one is what {@code Text} reads with when handed none, except that "any character" is
+     * {@code ""}: the value is written as the record's constructor, and the host writes no {@code null} part.
+     * A chain a person writes — {@code OcrOptions.defaults().withUpscale(3.0)} — is read through
+     * {@link #OCR_CHAINS}.
+     */
+    public static final DeclaredCallType<OcrOptions> OCR_OPTIONS = PluginType.value(OcrOptions.class)
+            .fresh(() -> Text.DEFAULT_OPTIONS.withCharWhitelist(""))
+            .editor(() -> OcrEditors::options)
             .writtenAsRecord();
 
     /**
@@ -228,7 +243,7 @@ public final class SdkTypes {
      * the top of the list.
      */
     public static final List<PluginType<?>> ALL = List.of(
-            IMAGE_TEMPLATE, PRECISION,
+            IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS,
             POINT, RECT, SIZE, DIRECTION,
             KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE,
             CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP,
@@ -246,12 +261,35 @@ public final class SdkTypes {
             ComponentType.part(Precision.class).writtenAs(Precision::minCount, p -> p, Precision::minCount));
 
     /**
+     * {@code OcrOptions.defaults()} and its withers, the chain a person writes
+     * ({@code OcrOptions.defaults().withLevel(TextResult.Level.LINE).withCharWhitelist("0123456789")}), read as
+     * the value it builds. Read and never written, as {@link #PRECISION_WITHERS} are: {@code defaults()} loses
+     * every part it is not handed, and the withers answer the value itself as their receiver, so an edited
+     * value is written as {@link #OCR_OPTIONS} writes it. {@code withLanguages(OcrLanguage...)} is not among
+     * them; its {@code String} twin is.
+     */
+    public static final List<DeclaredCall<OcrOptions>> OCR_CHAINS = List.of(
+            ComponentType.part(OcrOptions.class).writtenAs(OcrOptions::defaults),
+            ComponentType.part(OcrOptions.class).writtenAs(OcrOptions::withLanguages, o -> o, OcrOptions::languages),
+            ComponentType.part(OcrOptions.class).writtenAs(OcrOptions::withPageSegMode, o -> o, OcrOptions::pageSegMode),
+            ComponentType.part(OcrOptions.class)
+                    .writtenAs(OcrOptions::withOcrEngineMode, o -> o, OcrOptions::ocrEngineMode),
+            ComponentType.part(OcrOptions.class).writtenAs(OcrOptions::withGrayscale, o -> o, OcrOptions::grayscale),
+            ComponentType.part(OcrOptions.class).writtenAs(OcrOptions::withUpscale, o -> o, OcrOptions::upscale),
+            ComponentType.part(OcrOptions.class).writtenAs(OcrOptions::withBinarize, o -> o, OcrOptions::binarize),
+            ComponentType.part(OcrOptions.class).writtenAs(OcrOptions::withInvert, o -> o, OcrOptions::invert),
+            ComponentType.part(OcrOptions.class)
+                    .writtenAs(OcrOptions::withCharWhitelist, o -> o, OcrOptions::charWhitelist),
+            ComponentType.part(OcrOptions.class).writtenAs(OcrOptions::withLevel, o -> o, OcrOptions::level));
+
+    /**
      * The calls inside this plugin's values that are not types of their own: a flow's and a layout's shapes,
-     * the calls a capture source and the bot settings are written as, the precision withers, a held combo and
-     * a key sequence's step. None is picked on its own; the host reads each back so an editor is handed a
+     * the calls a capture source and the bot settings are written as, the precision and OCR withers, a held
+     * combo and a key sequence's step. None is picked on its own; the host reads each back so an editor is handed a
      * value rather than a string.
      */
     public static final List<ComponentType<?>> PARTS = Stream.of(
-                    FlowTypes.ALL, CaptureTypes.ALL, SettingsTypes.ALL, PRECISION_WITHERS, List.of(COMBO_HELD, STEP))
+                    FlowTypes.ALL, CaptureTypes.ALL, SettingsTypes.ALL, PRECISION_WITHERS, OCR_CHAINS,
+                    List.of(COMBO_HELD, STEP))
             .<ComponentType<?>>flatMap(List::stream).toList();
 }

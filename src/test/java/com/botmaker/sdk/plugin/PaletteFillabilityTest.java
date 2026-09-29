@@ -27,8 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * editor, or a shape the host fills itself.
  *
  * <p>A parameter of any other type is seeded with {@code null} by Studio and shown read-only, so the dropped
- * block either threw on its first run or did nothing: {@code Text}'s {@code OcrOptions} overloads and
- * {@code Time}'s {@code ZoneId} ones did both until 2026-09-29. Hiding one overload is impossible
+ * block either threw on its first run or did nothing: {@code Text}'s {@code OcrOptions} overloads did both
+ * until the SDK declared {@code OcrOptions} (2026-09-29), and {@code Time}'s {@code ZoneId} ones until they
+ * read a {@code null} as the default zone. Hiding one overload is impossible
  * ({@code @Hidden} hides a name), so such a member must take the {@code null}, and is listed below with why.
  */
 class PaletteFillabilityTest {
@@ -38,9 +39,6 @@ class PaletteFillabilityTest {
      * is {@code Owner#member(parameterType)}.
      */
     private static final Set<String> NULL_MEANS_DEFAULT = Set.of(
-            "Text#read(OcrOptions)", "Text#find(OcrOptions)", "Text#findExact(OcrOptions)",
-            "Text#findMatching(OcrOptions)", "Text#findFuzzy(OcrOptions)", "Text#findAll(OcrOptions)",
-            "Text#readAll(OcrOptions)", "Text#waitFor(OcrOptions)", "Text#waitForGone(OcrOptions)",
             "Time#now(ZoneId)", "Time#setDefaultTimeZone(ZoneId)");
 
     @Test

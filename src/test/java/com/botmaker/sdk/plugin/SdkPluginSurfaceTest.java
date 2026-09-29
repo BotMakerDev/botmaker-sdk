@@ -21,6 +21,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Matches;
+import com.botmaker.sdk.api.vision.OcrOptions;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.TextMatch;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -85,7 +86,7 @@ class SdkPluginSurfaceTest {
      * they answer {@code freshCall()} where the first nine answer {@code fresh()}.
      */
     private static final List<Class<?>> DECLARED_TYPES = List.of(
-            ImageTemplate.class, Precision.class, Point.class, Rect.class, Size.class,
+            ImageTemplate.class, Precision.class, OcrOptions.class, Point.class, Rect.class, Size.class,
             Direction.class, Key.class, MouseButton.class, Combo.class,
             com.botmaker.sdk.api.interaction.KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, MatchResult.class, Matches.class,
             ColorMatch.class, TextMatch.class);
@@ -292,7 +293,7 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(16, plugin.types().size());
+        assertEquals(17, plugin.types().size());
     }
 
     /**

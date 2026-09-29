@@ -5,9 +5,9 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
- * A block dropped from the palette seeds its {@code OcrOptions} with {@code null}, because Studio has no editor
- * for one. Every overload reads that as the defaults, where it used to throw from {@code read} and to be caught
- * as "no text" by every search.
+ * A block dropped from the palette seeded its {@code OcrOptions} with {@code null} until the SDK declared the
+ * type (2026-09-29), and a bot written then still passes it. Every overload reads that as the defaults, where it
+ * used to throw from {@code read} and to be caught as "no text" by every search.
  */
 class TextOptionsTest {
 

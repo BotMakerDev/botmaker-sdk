@@ -91,9 +91,9 @@ public final class Text {
     }
 
     /**
-     * {@code opts}, or {@link #DEFAULT_OPTIONS} for {@code null}. Studio has no editor for an {@code OcrOptions}
-     * and seeds a dropped block's options with {@code null}; that threw from {@link #read} and, in every search,
-     * was caught as "no text" — a block that compiled and silently never matched.
+     * {@code opts}, or {@link #DEFAULT_OPTIONS} for {@code null}. Until the SDK plugin declared
+     * {@code OcrOptions} (2026-09-29), Studio seeded a dropped block's options with {@code null}; that threw from
+     * {@link #read} and, in every search, was caught as "no text". A bot written then still passes it.
      */
     static OcrOptions orDefault(OcrOptions opts) {
         return opts == null ? DEFAULT_OPTIONS : opts;

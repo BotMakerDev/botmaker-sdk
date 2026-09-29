@@ -256,8 +256,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **Vision results and the palette:**
   - A vision result's pill names its type ("Picture match", "Colour match", "Text found"). It said "Last
     picture match" for every call, `ImageFinder.find(…)` included.
-  - A `Text` block with an options slot works when dropped from the palette. Studio fills that slot with
+  - A `Text` block with an options slot works when dropped from the palette. Studio filled that slot with
     `null`, which threw from `read` and made every search report "no text"; `null` options now mean the defaults.
+  - **Text reading options have an editor.** An `OcrOptions` slot or `@Param` is a pill ("English, lines, ×2")
+    opening a dialog: languages, whole lines or single words, only these characters (with *Digits only*), how
+    much to enlarge, the clean-up, light text on a dark background, and **Try it**, which reads the bot's
+    capture source with those settings. A dropped block starts on what `Text` reads with by default, and a
+    chain you wrote (`OcrOptions.defaults().withUpscale(3.0)`) is read as its value.
   - `Time.now(ZoneId)` and `Time.setDefaultTimeZone(ZoneId)` take the `null` a dropped block is written with:
     `now` uses the default timezone, and `setDefaultTimeZone` goes back to the system one instead of throwing.
   - Waits and timeouts dropped from the palette wait. Each timeout call has a `Duration` shape that the palette
