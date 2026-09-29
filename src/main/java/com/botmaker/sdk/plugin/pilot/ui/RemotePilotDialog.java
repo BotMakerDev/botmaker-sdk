@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.pilot.ui;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.pilot.transport.PilotTransport.Availability;
+import com.botmaker.sdk.plugin.pilot.transport.TailnetPhones;
 import com.botmaker.sdk.plugin.pilot.transport.TransportKind;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.PilotOutcome;
 import javafx.geometry.Pos;
@@ -22,6 +23,8 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -130,8 +133,9 @@ final class RemotePilotDialog {
                     + "the LEFT QR (or open the link). The RIGHT QR installs the optional BotPilot app.";
         }));
         if (kind == TransportKind.TAILNET) {
-            content.getChildren().add(
-                    PilotWidgets.linkBtn("Get Tailscale for your phone ▸", TAILSCALE_DOWNLOAD_URL));
+            content.getChildren().addAll(
+                    PilotWidgets.linkBtn("Get Tailscale for your phone ▸", TAILSCALE_DOWNLOAD_URL),
+                    phoneStatus());
         }
 
         // Lead with the input-mode choice: background (isolated :N) vs. mirroring the real desktop. This is the
@@ -183,6 +187,41 @@ final class RemotePilotDialog {
         alert.setResizable(true); // let the user grow it if the QR codes crowd the buttons on small screens
         showing = alert;
         alert.show();
+    }
+
+    /**
+     * Whether Tailscale sees the phone online, filled in off the FX thread (the CLI can take seconds). A phone
+     * offline here cannot reach a tailnet address whatever the dialog says, and the fix is on the phone.
+     */
+    private static Node phoneStatus() {
+        Label label = PilotWidgets.wrapped("Checking whether your phone is on the tailnet…");
+        label.setStyle("-fx-text-fill: #8b93a1;");
+        Thread probe = new Thread(() -> {
+            List<TailnetPhones.Phone> phones = TailnetPhones.probe();
+            String text = phoneStatusText(phones, Instant.now());
+            boolean anyOnline = phones.stream().anyMatch(TailnetPhones.Phone::online);
+            javafx.application.Platform.runLater(() -> {
+                label.setText(text);
+                label.setStyle(anyOnline ? "-fx-text-fill: #4cc38a;" : "-fx-text-fill: #e67e22;");
+            });
+        }, "pilot-tailnet-phones");
+        probe.setDaemon(true);
+        probe.start();
+        return label;
+    }
+
+    /** The phone lines, plus what to do on the phone when none of them is online. */
+    static String phoneStatusText(List<TailnetPhones.Phone> phones, Instant now) {
+        if (phones.isEmpty()) {
+            return "No phone on this tailnet yet: sign the phone's Tailscale app in to the same account.";
+        }
+        StringBuilder text = new StringBuilder();
+        for (TailnetPhones.Phone phone : phones) text.append(TailnetPhones.describe(phone, now)).append('\n');
+        if (phones.stream().noneMatch(TailnetPhones.Phone::online)) {
+            text.append("On the phone: open Tailscale and connect; turn on Settings ▸ Network ▸ VPN ▸ Tailscale ▸ "
+                    + "Always-on VPN; set Tailscale's battery use to Unrestricted.");
+        }
+        return text.toString().strip();
     }
 
     /** What the user should know about who else can reach the pilot over {@code kind}, or {@code null}. */

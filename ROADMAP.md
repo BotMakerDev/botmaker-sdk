@@ -8,6 +8,18 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — why the phone cannot connect, on both ends (rework follow-ups, phase 12)
+
+**Done**
+- `transport/TailnetPhones`: the Android and iOS peers in `tailscale status --json`, online first, with
+  `describe` (`○ Pixel 10 — offline in Tailscale, last seen 9 days ago`). The pairing dialog probes it off the
+  FX thread under the Tailscale transport and adds the phone-side steps when no phone is online
+  (`RemotePilotDialog.phoneStatusText`).
+- The served client is rebuilt from `botmaker-pilot/web`, whose reconnect overlay now lists the steps for the
+  paired route (`reach.ts`: tailnet, Funnel, quick tunnel, LAN).
+- The shell's server gained the same diagnosis as `--doctor` in phase 11; the two read the same JSON fields
+  and share no code (the remote server depends on nothing of ours).
+
 ## 2026-09-29 — the Pilot's free transports (rework follow-ups, phase 10)
 
 The phone reached the pilot two ways: a Tailscale bind by default, and Funnel behind an "Advanced" link. The

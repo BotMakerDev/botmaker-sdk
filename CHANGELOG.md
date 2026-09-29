@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The Remote Pilot says why a phone cannot connect, on both ends.** Over Tailscale, the pairing dialog shows
+  each phone on the tailnet and whether Tailscale sees it online (`○ Pixel 10 — offline in Tailscale, last seen
+  9 days ago`), with what to do on the phone. On the phone, *Can't reach this connection* now lists the steps
+  for the way it was paired: Tailscale (connect, Always-on VPN, battery Unrestricted), Funnel, a quick tunnel
+  (its address changes, scan again) or the local network (same Wi-Fi).
 - **The Remote Pilot's pairing dialog lets you pick how the phone reaches it**, from four free ways:
   Tailscale (the default), Tailscale Funnel, a **Cloudflare quick tunnel** (a public `trycloudflare.com`
   address with no account and nothing on the phone; it needs `cloudflared` installed, and the address changes

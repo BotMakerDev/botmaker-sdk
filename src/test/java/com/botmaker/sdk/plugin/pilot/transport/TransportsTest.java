@@ -79,6 +79,24 @@ class TransportsTest {
                 nic.getName() + " " + lan);
     }
 
+    /** Trimmed from {@code tailscale status --json} on the dev box, 2026-09-29: the phone nine days offline. */
+    @Test
+    void reads_the_phones_on_the_tailnet_and_when_they_were_last_seen() {
+        List<TailnetPhones.Phone> phones = TailnetPhones.parse("""
+                {"BackendState":"Running","Peer":{
+                  "k1":{"HostName":"laptop","OS":"linux","Online":true},
+                  "k2":{"HostName":"Pixel 10","OS":"android","Online":false,"LastSeen":"2026-09-19T16:11:03.1Z"},
+                  "k3":{"HostName":"iPad","OS":"iOS","Online":true,"LastSeen":"0001-01-01T00:00:00Z"}}}
+                """);
+        assertEquals(2, phones.size());
+        assertEquals("iPad", phones.get(0).name()); // online first
+        java.time.Instant now = java.time.Instant.parse("2026-09-29T12:00:00Z");
+        assertEquals("○ Pixel 10 — offline in Tailscale, last seen 9 days ago",
+                TailnetPhones.describe(phones.get(1), now));
+        assertEquals("● iPad — online in Tailscale", TailnetPhones.describe(phones.get(0), now));
+        assertEquals(List.of(), TailnetPhones.parse("not json"));
+    }
+
     @Test
     void tailscale_is_the_cgnat_range_and_the_lan_is_private_and_not_virtual() throws Exception {
         assertTrue(DirectTransport.isTailscale(new byte[] {100, 64, 0, 1}));

@@ -103,6 +103,18 @@ class RemotePilotFunnelTest {
         assertTrue(RemotePilotDialog.warning(TransportKind.QUICK_TUNNEL).contains("public internet"));
     }
 
+    @Test
+    void the_dialog_says_what_to_do_on_the_phone_only_when_no_phone_is_online() {
+        java.time.Instant now = java.time.Instant.parse("2026-09-29T12:00:00Z");
+        var offline = new com.botmaker.sdk.plugin.pilot.transport.TailnetPhones.Phone("Pixel 10", false,
+                java.util.Optional.of(now.minusSeconds(9 * 86_400)));
+        var online = new com.botmaker.sdk.plugin.pilot.transport.TailnetPhones.Phone("Pixel 10", true,
+                java.util.Optional.empty());
+        assertTrue(RemotePilotDialog.phoneStatusText(List.of(offline), now).contains("Always-on VPN"));
+        assertFalse(RemotePilotDialog.phoneStatusText(List.of(online), now).contains("Always-on VPN"));
+        assertTrue(RemotePilotDialog.phoneStatusText(List.of(), now).contains("sign the phone"));
+    }
+
     /** Ticked and highlighted as the blocker at once was the old answer when Tailscale named certificates. */
     @Test
     void the_https_step_is_not_ticked_when_it_is_the_blocker() {
