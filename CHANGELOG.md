@@ -260,6 +260,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     `null`, which threw from `read` and made every search report "no text"; `null` options now mean the defaults.
   - `Time.now(ZoneId)` and `Time.setDefaultTimeZone(ZoneId)` take the `null` a dropped block is written with:
     `now` uses the default timezone, and `setDefaultTimeZone` goes back to the system one instead of throwing.
+  - Waits and timeouts dropped from the palette wait. Each timeout call has a `Duration` shape that the palette
+    now leads with — `ImageWaiter.waitFor`/`waitUntilGone`/`waitAndClick`, `Text.waitFor`/`waitForGone`,
+    `Pixel.waitFor`/`waitForGone`, `Game.waitForLaunch`/`waitForDefaultSource`/`launchAndWait`,
+    `Target.waitForLaunch` — and a new `Duration` starts at one second. The seconds and milliseconds shapes
+    started at `0` and gave up at once; they stay, one step away in the same menu.
   - The Flow menu (`Flows`) is no longer offered. A dropped `use` was written `Flows.use(null)` and cleared the
     bot's flow; Bot ▸ Activities (`active`, `enable`, `disable`, with the activity picker) covers the rest.
 - **Desktop picks work on GNOME and Sway under Wayland** wherever a bot's own capture does: the plugin reads

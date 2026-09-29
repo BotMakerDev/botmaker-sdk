@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.util.Debug;
 
 import com.botmaker.sdk.api.geometry.Point;
@@ -11,6 +12,7 @@ import com.botmaker.shared.opencv.RawColorMatch;
 
 import java.awt.Color;
 import java.awt.image.BufferedImage;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -231,6 +233,33 @@ public class Pixel {
     /** {@link #waitFor(Color, CaptureSource, Precision, long)} against the current source. */
     public static boolean waitFor(Color target, Precision precision, long timeoutMs) {
         return waitFor(target, Source.current(), precision, timeoutMs);
+    }
+
+    /**
+     * Polls until {@code target} appears in the current source or {@code timeout} elapses. The palette's lead for
+     * {@code waitFor} since 2026-09-29: a dropped block starts at the editor's {@code Duration}, where the
+     * {@code long} shape started at 0 ms and returned at once.
+     *
+     * @return true if it appeared; the match is in {@link Vision#lastColorMatch()}
+     */
+    @PaletteDefault
+    public static boolean waitFor(Color target, Precision precision, Duration timeout) {
+        return waitFor(target, Source.current(), precision, timeout.toMillis());
+    }
+
+    /** {@link #waitFor(Color, Precision, Duration)} in {@code source}. */
+    public static boolean waitFor(Color target, CaptureSource source, Precision precision, Duration timeout) {
+        return waitFor(target, source, precision, timeout.toMillis());
+    }
+
+    /** Polls until {@code target} is gone from the current source, or {@code timeout} elapses. The lead. */
+    public static boolean waitForGone(Color target, Precision precision, Duration timeout) {
+        return waitForGone(target, Source.current(), precision, timeout.toMillis());
+    }
+
+    /** {@link #waitForGone(Color, Precision, Duration)} in {@code source}. */
+    public static boolean waitForGone(Color target, CaptureSource source, Precision precision, Duration timeout) {
+        return waitForGone(target, source, precision, timeout.toMillis());
     }
 
     /** Polls until {@code target} is <em>gone</em> from {@code source}, or {@code timeoutMs} elapses. */

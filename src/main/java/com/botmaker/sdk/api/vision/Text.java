@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.util.Debug;
 
 import com.botmaker.sdk.api.geometry.Point;
@@ -9,6 +10,7 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.internal.ocr.OcrEngine;
 
 import java.awt.image.BufferedImage;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -267,6 +269,34 @@ public final class Text {
             if (sleep()) return false;
         }
         return false;
+    }
+
+    /**
+     * Polls until {@code needle} appears in {@code source} or {@code timeout} elapses. The palette's lead for
+     * {@code waitFor} since 2026-09-29: a dropped block starts at the editor's {@code Duration}, where the
+     * {@code long} shape started at 0 ms and returned at once.
+     *
+     * @return true if it appeared; the match is in {@link Vision#lastTextMatch()}
+     */
+    @PaletteDefault
+    public static boolean waitFor(String needle, CaptureSource source, Duration timeout) {
+        return waitFor(needle, source, DEFAULT_OPTIONS, timeout.toMillis());
+    }
+
+    /** {@link #waitFor(String, CaptureSource, Duration)} using {@code opts}. */
+    public static boolean waitFor(String needle, CaptureSource source, OcrOptions opts, Duration timeout) {
+        return waitFor(needle, source, opts, timeout.toMillis());
+    }
+
+    /** Polls until {@code needle} is gone from {@code source}, or {@code timeout} elapses. The palette's lead. */
+    @PaletteDefault
+    public static boolean waitForGone(String needle, CaptureSource source, Duration timeout) {
+        return waitForGone(needle, source, DEFAULT_OPTIONS, timeout.toMillis());
+    }
+
+    /** {@link #waitForGone(String, CaptureSource, Duration)} using {@code opts}. */
+    public static boolean waitForGone(String needle, CaptureSource source, OcrOptions opts, Duration timeout) {
+        return waitForGone(needle, source, opts, timeout.toMillis());
     }
 
     // ---------------------------------------------------------------------

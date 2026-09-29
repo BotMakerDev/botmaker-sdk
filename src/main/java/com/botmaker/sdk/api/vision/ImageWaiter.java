@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.plugin.api.record.Gesture;
 import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.util.Debug;
@@ -11,6 +12,8 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.interaction.Mouse;
 import com.botmaker.sdk.api.interaction.Wait;
+
+import java.time.Duration;
 
 /**
  * Poll for a template to appear / disappear. Every method mirrors {@link ImageFinder}: a whole-desktop
@@ -93,8 +96,30 @@ public class ImageWaiter {
      */
     public static boolean waitFor(ImageTemplate template, CaptureSource source,
                                       int timeoutSeconds, double confidence) {
+        return awaitFor(template, source, timeoutSeconds * 1000L, confidence);
+    }
+
+    /**
+     * Waits up to {@code timeout} for {@code template} to appear on the current capture source.
+     *
+     * <p>The palette's lead for {@code waitFor} since 2026-09-29: a dropped block starts at the editor's
+     * {@code Duration}, where the whole-seconds {@code int} shape started at 0 and returned at once.
+     *
+     * @return true if the template was found within timeout, false if the timeout elapsed
+     */
+    @PaletteDefault
+    public static boolean waitFor(ImageTemplate template, Duration timeout) {
+        return awaitFor(template, Source.current(), timeout.toMillis(), BotSettings.current().confidence());
+    }
+
+    /** {@link #waitFor(ImageTemplate, Duration)} on {@code source}. */
+    public static boolean waitFor(ImageTemplate template, CaptureSource source, Duration timeout) {
+        return awaitFor(template, source, timeout.toMillis(), BotSettings.current().confidence());
+    }
+
+    private static boolean awaitFor(ImageTemplate template, CaptureSource source, long timeoutMs,
+                                    double confidence) {
         long startTime = System.currentTimeMillis();
-        long timeoutMs = timeoutSeconds * 1000L;
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             // Per poll, not once at entry: a popup that opens *during* the wait is exactly the case that would
@@ -179,8 +204,28 @@ public class ImageWaiter {
      */
     public static boolean waitUntilGone(ImageTemplate template, CaptureSource source,
                                         int timeoutSeconds, double confidence) {
+        return awaitGone(template, source, timeoutSeconds * 1000L, confidence);
+    }
+
+    /**
+     * Waits up to {@code timeout} for {@code template} to leave the current capture source. The palette's lead,
+     * for the reason given on {@link #waitFor(ImageTemplate, Duration)}.
+     *
+     * @return true if the template disappeared within the timeout, false if the timeout elapsed
+     */
+    @PaletteDefault
+    public static boolean waitUntilGone(ImageTemplate template, Duration timeout) {
+        return awaitGone(template, Source.current(), timeout.toMillis(), BotSettings.current().confidence());
+    }
+
+    /** {@link #waitUntilGone(ImageTemplate, Duration)} on {@code source}. */
+    public static boolean waitUntilGone(ImageTemplate template, CaptureSource source, Duration timeout) {
+        return awaitGone(template, source, timeout.toMillis(), BotSettings.current().confidence());
+    }
+
+    private static boolean awaitGone(ImageTemplate template, CaptureSource source, long timeoutMs,
+                                     double confidence) {
         long startTime = System.currentTimeMillis();
-        long timeoutMs = timeoutSeconds * 1000L;
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             PopupGuard.check();   // per poll, as in waitFor
@@ -265,7 +310,28 @@ public class ImageWaiter {
      */
     public static boolean waitAndClick(ImageTemplate template, CaptureSource source,
                                        int timeoutSeconds, double confidence) {
-        if (waitFor(template, source, timeoutSeconds, confidence)) {
+        return awaitAndClick(template, source, timeoutSeconds * 1000L, confidence);
+    }
+
+    /**
+     * Waits up to {@code timeout} for {@code template} on the current capture source, then clicks it. The
+     * palette's lead, for the reason given on {@link #waitFor(ImageTemplate, Duration)}.
+     *
+     * @return true if the template was found and clicked within the timeout, false otherwise
+     */
+    @PaletteDefault
+    public static boolean waitAndClick(ImageTemplate template, Duration timeout) {
+        return awaitAndClick(template, Source.current(), timeout.toMillis(), BotSettings.current().confidence());
+    }
+
+    /** {@link #waitAndClick(ImageTemplate, Duration)} on {@code source}. */
+    public static boolean waitAndClick(ImageTemplate template, CaptureSource source, Duration timeout) {
+        return awaitAndClick(template, source, timeout.toMillis(), BotSettings.current().confidence());
+    }
+
+    private static boolean awaitAndClick(ImageTemplate template, CaptureSource source, long timeoutMs,
+                                         double confidence) {
+        if (awaitFor(template, source, timeoutMs, confidence)) {
             MatchResult result = Vision.lastMatch();
             Point clickPoint = BotSettings.current().randomizeClicks() ? result.randomClickPoint() : result.center();
             Mouse.click(clickPoint);

@@ -8,6 +8,23 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — timeouts as `Duration` (rework follow-ups, phase 3)
+
+**Done**
+- `Duration` twins, each the palette lead (`@PaletteDefault`, or the narrowest shape):
+  `ImageWaiter.waitFor`/`waitUntilGone`/`waitAndClick` (plain and `CaptureSource`; the loops moved to private
+  millisecond cores `awaitFor`/`awaitGone`/`awaitAndClick`), `Text.waitFor`/`waitForGone` (with and without
+  `OcrOptions`), `Pixel.waitFor`/`waitForGone` (plus a current-source `waitForGone`),
+  `Game.waitForLaunch`/`waitForDefaultSource`/`launchAndWait`, `Target.waitForLaunch`. Additive; japicmp green.
+- `ImageWaiter`'s whole-seconds `int` was in scope too: `int` has an editor but starts at 0, so the dropped
+  wait returned at once. `@Records(AWAIT)` stays on the `int` shape (the recorder's writer is unchanged).
+- `Mouse.drag(…, long)` left alone: 0 ms there means an instant drag, and the lead `drag(Point, Point)` has no
+  duration.
+- plugin-basics: `long` declared (`LARGE_WHOLE`, the whole-number field) and `Duration` fresh is one second.
+- `PaletteFillabilityTest`: every parameter of every offered member is a declared type, annotated, an enum,
+  an array of those, or a functional interface; else it is in `NULL_MEANS_DEFAULT` (the `OcrOptions` and
+  `ZoneId` shapes), and a stale entry fails too.
+
 ## 2026-09-29 — Pilot Funnel off, narrowed (rework follow-ups, phase 2)
 
 **Done**

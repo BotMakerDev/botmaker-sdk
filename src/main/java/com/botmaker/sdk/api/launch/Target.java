@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.launch;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.Source;
@@ -165,5 +166,15 @@ public final class Target {
         }
 
         return Game.waitForLaunch(Source.current(), timeoutMillis);
+    }
+
+    /**
+     * Waits up to {@code timeout} for the current target's window to appear. The palette's lead since
+     * 2026-09-29: a dropped block starts at the editor's {@code Duration}, where the {@code long} shape started
+     * at 0 ms and gave up at once.
+     */
+    @PaletteDefault
+    public static boolean waitForLaunch(java.time.Duration timeout) {
+        return waitForLaunch(timeout.toMillis());
     }
 }

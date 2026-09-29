@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.launch;
 
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -10,6 +11,8 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.shared.launch.GameLauncher;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
+
+import java.time.Duration;
 
 /**
  * Launches a game so a bot can automate it.
@@ -325,6 +328,28 @@ public class Game {
      */
     public static boolean waitForDefaultSource(long timeoutMillis) {
         return waitForLaunch(Source.current(), timeoutMillis);
+    }
+
+    /**
+     * Blocks until {@code source}'s window appears, or {@code timeout} elapses. The palette's lead for
+     * {@code waitForLaunch} since 2026-09-29: a dropped block starts at the editor's {@code Duration}, where the
+     * {@code long} shape started at 0 ms and gave up at once.
+     */
+    @PaletteDefault
+    public static boolean waitForLaunch(CaptureSource source, Duration timeout) {
+        return waitForLaunch(source, timeout.toMillis());
+    }
+
+    /** {@link #launchAndWait(String, CaptureSource, long, String...)} with the wait as a {@code Duration}. */
+    public static boolean launchAndWait(@ProgramPath String executablePath, CaptureSource source, Duration timeout,
+                                        @LaunchOption String... args) {
+        return launchAndWait(executablePath, source, timeout.toMillis(), args);
+    }
+
+    /** Waits up to {@code timeout} for the default capture source. The palette's lead, as for waitForLaunch. */
+    @PaletteDefault
+    public static boolean waitForDefaultSource(Duration timeout) {
+        return waitForDefaultSource(timeout.toMillis());
     }
 
     // --- Process control (by executable name) ---
