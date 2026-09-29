@@ -6,8 +6,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -30,50 +28,57 @@ public class FlowRulesTest {
     private static final List<Flow.Edge> A_TO_B = List.of(wire("A", "B"));
 
     @Test
-    void aFreshWireBetweenUnconnectedActivitiesIsAllowed() {
-        assertNull(FlowRules.rejectionFor(List.of(), "A", "", "B"));
-        assertNull(FlowRules.rejectionFor(A_TO_B, "B", "", "C"));
+    void aFreshWireBetweenUnconnectedActivitiesIsAdded() {
+        assertEquals(List.of(wire("A", "B")), FlowRules.rewired(List.of(), "A", "", "B"));
+        assertEquals(List.of(wire("A", "B"), wire("B", "C")), FlowRules.rewired(A_TO_B, "B", "", "C"));
     }
 
     @Test
     void anActivityMayNowWireToItself() {
         // "Didn't work — try again" is a self-wire. The step budget is what stops it spinning, not the editor.
-        assertNull(FlowRules.rejectionFor(List.of(), "A", "FAILED", "A"));
+        assertEquals(List.of(wire("A", "A", "FAILED")), FlowRules.rewired(List.of(), "A", "FAILED", "A"));
     }
 
     @Test
     void aForkOnDifferentOutcomesIsTheWholePoint() {
         // Two wires out of A, one per outcome — this is branching, and it used to be rejected outright.
         List<Flow.Edge> edges = List.of(wire("A", "B", "BAG_FULL"));
-        assertNull(FlowRules.rejectionFor(edges, "A", "NO_ORE", "C"));
-        assertNull(FlowRules.rejectionFor(edges, "A", "", "D"), "the default outcome is its own wire too");
+        assertEquals(2, FlowRules.rewired(edges, "A", "NO_ORE", "C").size());
+        assertEquals(2, FlowRules.rewired(edges, "A", "", "D").size(), "the default outcome is its own wire too");
     }
 
     @Test
     void aJoinIsAllowedSoBranchesCanMeetAgain() {
         List<Flow.Edge> edges = List.of(wire("A", "C", "BAG_FULL"));
-        assertNull(FlowRules.rejectionFor(edges, "B", "", "C"));
+        assertEquals(2, FlowRules.rewired(edges, "B", "", "C").size());
     }
 
     @Test
     void aCycleIsAllowedBecauseItIsHowABotRepeats() {
         List<Flow.Edge> chain = List.of(wire("A", "B"), wire("B", "C"));
-        assertNull(FlowRules.rejectionFor(chain, "C", "DONE", "A"));
+        assertEquals(3, FlowRules.rewired(chain, "C", "DONE", "A").size());
     }
 
+    /** One result still leads to one place: a second wire from the same port moves the first, in its place. */
     @Test
-    void oneOutcomeCannotLeadToTwoPlaces() {
-        List<Flow.Edge> edges = List.of(wire("A", "B", "BAG_FULL"));
-        String rejection = FlowRules.rejectionFor(edges, "A", "BAG_FULL", "C");
-        assertNotNull(rejection);
-        assertTrue(rejection.contains("BAG_FULL"), rejection);
+    void wiringAWiredPortMovesItsWire() {
+        List<Flow.Edge> edges = List.of(wire("A", "B", "BAG_FULL"), wire("B", "C"));
+        assertEquals(List.of(wire("A", "C", "BAG_FULL"), wire("B", "C")),
+                FlowRules.rewired(edges, "A", "BAG_FULL", "C"));
     }
 
     @Test
     void aBlankOutcomeIsTheSameWireAsAnExplicitNext() {
-        // Persisted blank vs. "NEXT" must not become two competing wires out of the same port.
-        assertNotNull(FlowRules.rejectionFor(List.of(wire("A", "B", "")), "A", "NEXT", "C"));
-        assertNotNull(FlowRules.rejectionFor(List.of(wire("A", "B", "NEXT")), "A", "", "C"));
+        // Persisted blank vs. "NEXT" must not become two competing wires out of the same port, and the moved
+        // wire keeps the spelling the file already had.
+        assertEquals(List.of(wire("A", "C", "")), FlowRules.rewired(List.of(wire("A", "B", "")), "A", "NEXT", "C"));
+        assertEquals(List.of(wire("A", "C", "NEXT")), FlowRules.rewired(List.of(wire("A", "B", "NEXT")), "A", "", "C"));
+    }
+
+    @Test
+    void aPortWithoutAWireHoldsNothing() {
+        assertTrue(FlowRules.held(A_TO_B, "A", "BAG_FULL").isEmpty());
+        assertEquals(wire("A", "B"), FlowRules.held(A_TO_B, "A", "NEXT").orElseThrow());
     }
 
     @Test

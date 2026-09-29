@@ -283,13 +283,6 @@ public final class ActivityFlowDialog {
         Button savePreset = new Button("Save selection as preset…");
         savePreset.setOnAction(e -> saveCurrentSelectionAsPreset());
 
-        Button deletePreset = new Button("✕");
-        deletePreset.setTooltip(new javafx.scene.control.Tooltip("Delete the chosen preset"));
-        deletePreset.disableProperty().bind(javafx.beans.binding.Bindings.createBooleanBinding(
-                () -> presetCombo.getValue() == null || !presets.contains(presetCombo.getValue()),
-                presetCombo.valueProperty()));
-        deletePreset.setOnAction(e -> deleteSelectedPreset());
-
         Button addActivity = new Button("Add activity");
         addActivity.setTooltip(new javafx.scene.control.Tooltip(
                 "Name it and declare its outcomes up front. Double-clicking empty canvas opens the same "
@@ -309,7 +302,7 @@ public final class ActivityFlowDialog {
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox bar = new HBox(8, new Label("Presets:"), presetCombo, applyPreset, deletePreset, savePreset,
+        HBox bar = new HBox(8, new Label("Presets:"), presetCombo, applyPreset, savePreset,
                 new Separator(javafx.geometry.Orientation.VERTICAL), undoButton(), redoButton(),
                 new Separator(javafx.geometry.Orientation.VERTICAL), recenter, arrange,
                 spacer, addActivity);
@@ -395,23 +388,6 @@ public final class ActivityFlowDialog {
         // The last item of the list, which is the built-ins then these: presets.size() - 1 selected the preset
         // two before the one just saved (until 2026-09-28).
         presetCombo.getSelectionModel().select(presetCombo.getItems().size() - 1);
-        error("");
-        markDirty();
-    }
-
-    /**
-     * Takes the selected saved preset out of the flow. There was no way to until 2026-09-28: a preset saved by
-     * mistake stayed in {@code Sdk.flow()} until somebody edited the Java. The built-ins are never saved, so
-     * there is nothing to delete for them.
-     */
-    private void deleteSelectedPreset() {
-        Flow.Preset preset = presetCombo.getValue();
-        if (preset == null || !presets.contains(preset)) {
-            error("Pick a preset you saved; the built-in ones can't be deleted.");
-            return;
-        }
-        presets.remove(preset);
-        refreshPresetCombo();
         error("");
         markDirty();
     }

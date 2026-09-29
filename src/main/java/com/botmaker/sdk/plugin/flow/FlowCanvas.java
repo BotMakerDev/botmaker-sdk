@@ -45,6 +45,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -151,6 +152,12 @@ public final class FlowCanvas extends StackPane {
 
     private CubicCurve pendingWire;
     private ActivityDraft pendingFrom;
+    /** The wire a drag from a wired port is carrying, hidden from the canvas until the drop; else null. */
+    private Flow.Edge pickedUp;
+    /** Where the pending wire's drag began, to tell a click on a port from a drag. */
+    private Point2D pendingStart;
+    /** How far a port drag must travel before its release wires anything. */
+    private static final double CLICK_SLOP = 6;
     private String pendingOutcome;
 
     private Point2D bandOrigin;
@@ -877,15 +884,24 @@ public final class FlowCanvas extends StackPane {
 
     // --- wiring ---
 
+    /**
+     * Wires {@code from —outcome→ to}. A port that already has a wire has it moved, in one undo step; dropping
+     * it back on the card it already led to changes nothing.
+     */
     private void tryConnect(ActivityDraft from, String outcome, String to) {
-        String rejection = FlowRules.rejectionFor(edges, from.name(), outcome, to);
-        if (rejection != null) {
-            onMessage.accept(rejection);
+        Optional<Flow.Edge> old = FlowRules.held(edges, from.name(), outcome);
+        if (old.isPresent() && old.get().to().equals(to)) {
+            redrawWires();
             return;
         }
-        history.mutate("wire " + from.name() + " to " + to, () -> {
-            edges.add(new Flow.Edge(from.name(), to, outcome));
-            onMessage.accept("");
+        String label = old.isPresent() ? "move the wire from " + from.name() + " to " + to
+                : "wire " + from.name() + " to " + to;
+        history.mutate(label, () -> {
+            List<Flow.Edge> next = FlowRules.rewired(edges, from.name(), outcome, to);
+            edges.clear();
+            edges.addAll(next);
+            onMessage.accept(old.isPresent() ? "Wire moved: " + from.name() + " — "
+                    + old.get().outcomeOrNext() + " → " + to + ". ↶ puts it back." : "");
             refresh();
         });
     }
@@ -893,6 +909,7 @@ public final class FlowCanvas extends StackPane {
     private void redrawWires() {
         wires.getChildren().clear();
         for (Flow.Edge e : edges) {
+            if (e.equals(pickedUp)) continue; // on the pointer while a drag moves it
             NodeCard from = cards.get(e.from());
             NodeCard to = cards.get(e.to());
             if (from == null || to == null) continue; // stale wire; save() drops it
@@ -989,6 +1006,11 @@ public final class FlowCanvas extends StackPane {
     private void startPendingWire(ActivityDraft from, String outcome, Point2D at) {
         pendingFrom = from;
         pendingOutcome = outcome;
+        // A port that has a wire lends it to the pointer: hidden while dragged, moved on a drop onto a card,
+        // back where it was on a drop anywhere else. It used to refuse the drop with "remove that wire first".
+        pickedUp = FlowRules.held(edges, from.name(), outcome).orElse(null);
+        if (pickedUp != null) redrawWires();
+        pendingStart = at;
         pendingWire = styledCurve();
         pendingWire.getStrokeDashArray().addAll(6.0, 4.0);
         pendingWire.setMouseTransparent(true);
@@ -1015,7 +1037,14 @@ public final class FlowCanvas extends StackPane {
         String outcome = pendingOutcome;
         pendingFrom = null;
         pendingOutcome = null;
-        if (target != null && from != null) tryConnect(from, outcome, target);
+        boolean hadWire = pickedUp != null;
+        pickedUp = null;
+        // A press and release on the port is a click, not a drag: it lands on the port's own card, and wired a
+        // retry (or, since wires move, re-routed an existing one onto its own card) with no drag at all.
+        boolean dragged = pendingStart == null || pendingStart.distance(at) >= CLICK_SLOP;
+        pendingStart = null;
+        if (dragged && target != null && from != null) tryConnect(from, outcome, target);
+        else if (hadWire) redrawWires();
     }
 
     /** The activity name of the card containing the given content-space point, or null. */

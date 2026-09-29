@@ -208,7 +208,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - Renaming an outcome keeps its wire. The card dropped the wire before the rename could carry it across.
   - Renaming an activity keeps it in the presets that switch it on.
   - Saving a preset selects the preset just saved, not the one two before it.
-  - A saved preset can be deleted (✕ beside Apply), and may not be called Everything or Nothing.
+  - A saved preset may not be called Everything or Nothing.
+  - Dragging from an outcome that already has a wire moves that wire to the card you drop it on; a drop
+    anywhere else leaves it where it was. It used to refuse with "remove that wire first". A click on a port
+    no longer wires the card to itself.
   - An activity name that differs from another only in case is refused where you type it, in the side panel
     and in the new-activity dialog. It was accepted, and then the flow could not be saved.
   - The go-home and popup ticks and the outcomes hint name what exists: the home method given to

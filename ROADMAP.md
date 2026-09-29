@@ -8,6 +8,18 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — Activity Flow leftovers (rework follow-ups, phase 1)
+
+**Done**
+- The preset ✕ added in phase 9 is gone (the user's call); a saved preset still may not take a built-in name.
+- A drag from a wired outcome port moves its wire: `FlowRules.held` finds the port's wire, `FlowRules.rewired`
+  replaces it in place (keeping the file's `""`/`NEXT` spelling), and the canvas hides the carried wire
+  (`FlowCanvas.pickedUp`) until the drop. A drop off any card redraws it unchanged; a drop on its own target
+  is a no-op. `rejectionFor` is deleted (plugin package, no caller left).
+- A release within 6 px of the press is a click, not a drag (`CLICK_SLOP`): a click on a port wired the card to
+  itself, and with moving wires would have re-routed an existing wire onto its own card.
+- Tests: `FlowRulesTest` rewritten onto `rewired`/`held`.
+
 ## 2026-09-29 — vision result pills and palette sweep (SDK plugin rework, phase 14, the last)
 
 **Done**

@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -22,6 +23,8 @@ import java.util.Set;
  * again, a self-wire is a retry, and a cycle is how a bot repeats — the generated driver's step budget is
  * what bounds it now, not the editor. What is left is the one thing that genuinely cannot be drawn: <b>a
  * second wire on the same {@code (from, outcome)} pair</b>, because one result can't lead to two places.
+ * Since 2026-09-29 that is not refused either: dragging from a port that has a wire <em>moves</em> the wire
+ * ({@link #rewired}), where it used to be refused with "remove that wire first".
  *
  * <p>Note there is nothing here about ending the run. An outcome with no wire ends it, so "stop" is the
  * absence of a rule rather than a node with rules of its own.
@@ -34,18 +37,29 @@ public final class FlowRules {
     private FlowRules() {}
 
     /**
-     * Why {@code from —outcome→ to} may not be wired, or {@code null} when it is allowed. The message is
-     * written for the user and shown inline on the canvas.
+     * The wire {@code from}'s {@code outcome} port already has, if any. A blank outcome and {@code NEXT} are the
+     * same port.
      */
-    public static String rejectionFor(List<Flow.Edge> edges, String from, String outcome, String to) {
+    public static Optional<Flow.Edge> held(List<Flow.Edge> edges, String from, String outcome) {
         String label = outcome == null || outcome.isBlank() ? Flow.Edge.NEXT : outcome;
         for (Flow.Edge e : edges) {
-            if (e.from().equals(from) && e.outcomeOrNext().equals(label)) {
-                return from + " already goes somewhere when it reports " + label
-                        + " — remove that wire first, or use a different outcome.";
-            }
+            if (e.from().equals(from) && e.outcomeOrNext().equals(label)) return Optional.of(e);
         }
-        return null;
+        return Optional.empty();
+    }
+
+    /**
+     * {@code edges} with {@code from —outcome→ to} wired: the port's existing wire, if it has one, is moved to
+     * {@code to} in its place in the list, so one result still leads to exactly one place. Otherwise the wire is
+     * added at the end.
+     */
+    public static List<Flow.Edge> rewired(List<Flow.Edge> edges, String from, String outcome, String to) {
+        Optional<Flow.Edge> old = held(edges, from, outcome);
+        Flow.Edge wire = new Flow.Edge(from, to, old.map(Flow.Edge::outcome).orElse(outcome));
+        List<Flow.Edge> out = new ArrayList<>(edges);
+        if (old.isPresent()) out.set(out.indexOf(old.get()), wire);
+        else out.add(wire);
+        return out;
     }
 
     /**
