@@ -16,8 +16,6 @@ import java.util.Set;
  */
 public final class TraceSources {
 
-    private static final StackWalker WALKER = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
-
     /** The classes a line passes through on its way to {@code Diag}; the caller is the first class beyond them. */
     private static final Set<Class<?>> PASS_THROUGH = Set.of(Debug.class, Trace.class, TraceSources.class);
 
@@ -33,18 +31,10 @@ public final class TraceSources {
      * trace by. A lambda's body is named after the method it sits in ({@code lambda$body$0} is {@code body}).
      */
     public static Diag.Origin origin() {
-        return WALKER.walk(frames -> frames
-                        .filter(f -> !PASS_THROUGH.contains(f.getDeclaringClass()))
-                        .findFirst())
-                .map(f -> new Diag.Origin(of(f.getDeclaringClass()), f.getClassName(), method(f.getMethodName())))
+        return Diag.Callers.first(f -> PASS_THROUGH.contains(f.getDeclaringClass()))
+                .map(f -> new Diag.Origin(of(f.getDeclaringClass()), f.getClassName(),
+                        Diag.Callers.method(f.getMethodName())))
                 .orElse(Diag.Origin.named(""));
-    }
-
-    /** {@code name}, or the method a lambda named {@code lambda$<method>$<n>} was written in. */
-    static String method(String name) {
-        if (name == null || !name.startsWith("lambda$")) return name;
-        int end = name.indexOf('$', "lambda$".length());
-        return end < 0 ? name : name.substring("lambda$".length(), end);
     }
 
     /** {@code type}'s source: its top-level class's {@link TraceSource}, or that class's simple name. */

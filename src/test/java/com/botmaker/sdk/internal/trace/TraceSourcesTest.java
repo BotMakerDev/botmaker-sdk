@@ -123,7 +123,5 @@ class TraceSourcesTest {
                 lines.stream().map(TelemetryEvent.Log::writerClass).toList());
         assertEquals(List.of("aLineCarriesTheClassAndMethodThatWroteIt", "aLineCarriesTheClassAndMethodThatWroteIt"),
                 lines.stream().map(TelemetryEvent.Log::writerMethod).toList());
-        assertEquals("click", TraceSources.method("click"));
-        assertEquals("body", TraceSources.method("lambda$body$0"));
     }
 }

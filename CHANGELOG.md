@@ -92,6 +92,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **Finding the bot's line for a trace or telemetry event walks only as far as it needs.** `IpcObserver` took
+  a full `Thread.getStackTrace()` for every match, click and swipe while a host watched; it now asks shared's
+  `Diag.Callers`, which stops at the bot's first frame, as `TraceSources` does. What is found is unchanged.
 - **Without Tailscale, the Remote Pilot no longer listens on every network interface.** It bound `0.0.0.0`,
   which also put it on any VPN, container bridge or other network the computer was on. The local network
   choice binds the computer's Wi-Fi or Ethernet address only, and says who else can reach it.

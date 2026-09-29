@@ -8,6 +8,14 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — one caller walk (dashboard pass, phase 5)
+
+**Done**
+- `internal/trace/TraceSources.origin()` and `internal/observe/IpcObserver.botFrame()` use shared's
+  `Diag.Callers.first(skip)`. `botFrame` returns `Optional<StackWalker.StackFrame>` and no longer builds the
+  whole stack with `Thread.getStackTrace()`. `TraceSources.method` moved to `Diag.Callers.method`.
+- No logging library, the user's call: `docs/refactor/40-run-trace.md` § *Why no logging library*.
+
 ## 2026-09-29 — why the phone cannot connect, on both ends (rework follow-ups, phase 12)
 
 **Done**

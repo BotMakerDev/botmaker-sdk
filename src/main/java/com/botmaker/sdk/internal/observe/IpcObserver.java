@@ -7,6 +7,7 @@ import com.botmaker.shared.ipc.TelemetryClient;
 import com.botmaker.shared.ipc.TelemetryEvent;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -72,8 +73,7 @@ public final class IpcObserver implements BotObserver {
      * trace can reveal the block ({@code docs/refactor/40-run-trace.md}).
      */
     void onLog(TelemetryEvent.Log line) {
-        StackTraceElement at = botFrame();
-        client.send(at == null ? line : line.at(at.getClassName(), at.getLineNumber()));
+        client.send(botFrame().map(at -> line.at(at.getClassName(), at.getLineNumber())).orElse(line));
     }
 
     // --- SDK-native events → shared wire vocabulary ---
@@ -108,21 +108,16 @@ public final class IpcObserver implements BotObserver {
      * i.e. the user's own bot class — so the Studio can highlight the running block during a plain run.
      */
     private static int botLine() {
-        StackTraceElement at = botFrame();
-        return at == null ? -1 : at.getLineNumber();
+        return botFrame().map(StackWalker.StackFrame::getLineNumber).orElse(-1);
     }
 
     /**
-     * The first frame of the bot's own code, or null. Our libraries are skipped by their packages rather than
+     * The first frame of the bot's own code, or empty. Our libraries are skipped by their packages rather than
      * by {@code com.botmaker.}: the worked template is {@code com.botmaker.gamebot}, and skipping the whole
      * prefix found no line in it at all until 2026-09-29.
      */
-    static StackTraceElement botFrame() {
-        for (StackTraceElement f : Thread.currentThread().getStackTrace()) {
-            if (isLibrary(f.getClassName())) continue;
-            if (f.getLineNumber() > 0) return f;
-        }
-        return null;
+    static Optional<StackWalker.StackFrame> botFrame() {
+        return Diag.Callers.first(f -> isLibrary(f.getClassName()) || f.getLineNumber() <= 0);
     }
 
     private static final List<String> LIBRARY_PACKAGES = List.of(
