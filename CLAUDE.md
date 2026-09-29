@@ -55,7 +55,7 @@ mvn -pl botmaker-sdk -am install     # shared, session, contract, toolkit, basic
 ```
 
 Re-run it after each SDK edit; a bot pinned to `0.0.0-SNAPSHOT` resolves the fresh jar on its next
-classpath resolve, and Studio's **Project ▸ Reload Plugins** re-opens the plugin loader over it. A dev-run
+classpath resolve, and Studio's **Project ▸ Plugins & Libraries ▸ Reload plugins** re-opens the plugin loader over it. A dev-run
 Studio (`AppVersion.isDevBuild()`, no jar manifest) lists local `*-SNAPSHOT` SDK builds first in its version
 dropdowns, labelled `(local build)`; a packaged Studio never shows them.
 
