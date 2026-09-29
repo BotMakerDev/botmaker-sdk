@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.MatchEvent;
 import com.botmaker.sdk.internal.observe.Surface;
@@ -43,6 +44,7 @@ import java.util.stream.Collectors;
  * is a comparison <em>margin</em> with no other home.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "🔍", order = 20)
+@TraceSource("Vision")
 public class ImageFinder {
 
     // --- find (single template) ---
@@ -1003,7 +1005,7 @@ public class ImageFinder {
         // The centre rather than the top-left: it is the point a click would land on, so the number in the
         // log is the number to compare against where the pointer actually went.
         Point centre = result.center();
-        Trace.log("[Vision] find " + template.id() + " → (" + centre.x() + "," + centre.y() + ") "
+        Trace.log("find " + template.id() + " → (" + centre.x() + "," + centre.y() + ") "
                 + String.format(Locale.ROOT, "%.2f", result.confidence()), result.rect());
     }
 
@@ -1015,7 +1017,7 @@ public class ImageFinder {
 
     private static void reportMisses(String templateId, Trace.Runs.Run run) {
         if (run != null) {
-            Trace.log("[Vision] " + templateId + " not found", run);
+            Trace.log("" + templateId + " not found", run);
         }
     }
 

@@ -56,7 +56,7 @@ public class Window implements CaptureSource, WindowBacked {
     /** The window that currently has focus, or empty if none could be resolved. */
     public static Optional<Window> foreground() {
         GenericWindow gw = controller().getForegroundWindow();
-        Debug.log("[Window] foreground -> " + (gw == null ? "none" : gw.getTitle()));
+        Debug.log("foreground -> " + (gw == null ? "none" : gw.getTitle()));
         return gw == null ? Optional.empty() : Optional.of(new Window(gw));
     }
 
@@ -84,7 +84,7 @@ public class Window implements CaptureSource, WindowBacked {
         }
         GenericWindow gw = WindowMatch.best(controller().getAllWindows(), titleSubstring);
         Optional<Window> hit = gw == null ? Optional.empty() : Optional.of(new Window(gw));
-        Debug.log("[Window] find \"" + titleSubstring + "\" -> "
+        Debug.log("find \"" + titleSubstring + "\" -> "
                 + hit.map(Window::title).orElse("no match"));
         return hit;
     }
@@ -132,19 +132,19 @@ public class Window implements CaptureSource, WindowBacked {
 
     /** Click at coordinates relative to this window's top-left (converted to absolute internally). */
     public void click(int relativeX, int relativeY) {
-        Debug.log("[Window] click " + relativeX + "," + relativeY + " in " + title());
+        Debug.log("click " + relativeX + "," + relativeY + " in " + title());
         controller().postLeftClick(handle, relativeX, relativeY);
     }
 
     /** Bring this window to the foreground and give it input focus. */
     public void focus() {
-        Debug.log("[Window] focus " + title());
+        Debug.log("focus " + title());
         controller().focusWindow(handle);
     }
 
     /** Move this window's top-left corner to the given absolute screen coordinate. */
     public void move(int x, int y) {
-        Debug.log("[Window] move " + title() + " -> " + x + "," + y);
+        Debug.log("move " + title() + " -> " + x + "," + y);
         controller().moveWindow(handle, x, y);
     }
 
@@ -153,7 +153,7 @@ public class Window implements CaptureSource, WindowBacked {
      * cropped at, since template matching breaks when the window is a different size.
      */
     public void resize(int width, int height) {
-        Debug.log("[Window] resize " + title() + " -> " + width + "x" + height);
+        Debug.log("resize " + title() + " -> " + width + "x" + height);
         controller().resizeWindow(handle, width, height);
     }
 

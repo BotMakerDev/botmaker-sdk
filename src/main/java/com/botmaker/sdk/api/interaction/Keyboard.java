@@ -84,7 +84,7 @@ public class Keyboard {
     /** Press then release a key. */
     @Records(Gesture.KEY)
     public static void tap(Key key) {
-        Debug.log("[Keyboard] tap " + key);
+        Debug.log("tap " + key);
         press(key);
         release(key);
     }
@@ -95,7 +95,7 @@ public class Keyboard {
      */
     @Records(Gesture.COMBO)
     public static void combo(Key... keys) {
-        Debug.log("[Keyboard] combo " + java.util.Arrays.toString(keys));
+        Debug.log("combo " + java.util.Arrays.toString(keys));
         for (Key key : keys) {
             press(key);
         }
@@ -136,7 +136,7 @@ public class Keyboard {
     /** Press and hold {@code key}, delivered to {@code source}'s window (remember to {@link #release}). */
     public static void press(CaptureSource source, Key key) {
         GenericWindow w = WindowBacked.of(source);
-        Debug.log("[Keyboard] press " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
+        Debug.log("press " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
         if (w == null) {
             controller().keyDown(key.nativeCode());
             return;
@@ -147,7 +147,7 @@ public class Keyboard {
     /** Release a held {@code key} on {@code source}'s window. */
     public static void release(CaptureSource source, Key key) {
         GenericWindow w = WindowBacked.of(source);
-        Debug.log("[Keyboard] release " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
+        Debug.log("release " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
         if (w == null) {
             controller().keyUp(key.nativeCode());
             return;
@@ -157,14 +157,14 @@ public class Keyboard {
 
     /** Press then release {@code key} on {@code source}'s window. */
     public static void tap(CaptureSource source, Key key) {
-        Debug.log("[Keyboard] tap " + key + " on " + source);
+        Debug.log("tap " + key + " on " + source);
         press(source, key);
         release(source, key);
     }
 
     /** Press a chord on {@code source}'s window: hold each key in order, release in reverse. */
     public static void combo(CaptureSource source, Key... keys) {
-        Debug.log("[Keyboard] combo " + java.util.Arrays.toString(keys) + " on " + source);
+        Debug.log("combo " + java.util.Arrays.toString(keys) + " on " + source);
         for (Key key : keys) {
             press(source, key);
         }
@@ -178,7 +178,7 @@ public class Keyboard {
      * reverse.
      */
     public static void combo(CaptureSource source, Combo combo) {
-        Debug.log("[Keyboard] combo " + combo + " on " + source);
+        Debug.log("combo " + combo + " on " + source);
         java.util.List<Key> keys = combo.keys();
         for (Key key : keys) {
             press(source, key);
@@ -191,7 +191,7 @@ public class Keyboard {
 
     /** Press each step's combo on {@code source}'s window, waiting the step's {@code after} after each. */
     public static void sequence(CaptureSource source, KeySequence sequence) {
-        Debug.log("[Keyboard] sequence " + sequence + " on " + source);
+        Debug.log("sequence " + sequence + " on " + source);
         for (KeySequence.Step step : sequence.steps()) {
             combo(source, step.combo());
             if (!step.after().isZero()) pause.accept(step.after());
@@ -201,7 +201,7 @@ public class Keyboard {
     /** Type {@code text} into {@code source}'s window (see {@link #type(String)}). */
     public static void type(CaptureSource source, String text) {
         GenericWindow w = WindowBacked.of(source);
-        Debug.log("[Keyboard] type \"" + text + "\""
+        Debug.log("type \"" + text + "\""
                 + (w == null ? " (focused window)" : " -> " + w.getTitle()));
         if (w == null) {
             controller().typeText(text);

@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.util;
 
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.sdk.internal.trace.TraceSources;
 import com.botmaker.shared.Diag;
 
 /**
@@ -20,11 +21,11 @@ import com.botmaker.shared.Diag;
  * prints. A run started with {@code -Dbotmaker.debug=true} or {@code false} (Studio's Debug output toggle)
  * starts that way whatever the settings say; {@link #enable()} and {@link #disable()} still work after it.
  *
- * <p>Under Studio each printed line also reaches its Trace tab, with the {@code [Name]} it starts with as its
- * source.
- *
  * <p>Emit your own trace through {@link #log(String)} / {@link #error(String)}: they print only when debugging
- * is enabled, so bot code never has to wrap prints in an {@code if}.
+ * is enabled, so bot code never has to wrap prints in an {@code if}. <b>Each line is printed under the class
+ * that wrote it</b>: {@code Debug.log("hello")} in {@code Collect} prints {@code [Collect] hello}. Put
+ * {@link TraceSource} on the class to show another name, or start the message with {@code [Name]} for one line.
+ * Under Studio each line also reaches its Trace tab, filterable by that name.
  *
  * <p>The flag itself lives in {@code botmaker-shared}'s {@link Diag}, which this class only delegates to.
  * {@code shared} can't depend on the SDK, yet its window/capture/input code prints diagnostics of its own —
@@ -69,14 +70,14 @@ public final class Debug {
         Diag.set(on);
     }
 
-    /** Prints {@code message} to stdout when debugging is on; a no-op when off. */
+    /** Prints {@code message} to stdout under the calling class's name when debugging is on; a no-op when off. */
     public static void log(String message) {
-        Diag.log(message);
+        if (Diag.isEnabled()) Diag.log(TraceSources.caller(), message, 1, null);
     }
 
-    /** Prints {@code message} to stderr when debugging is on; a no-op when off. */
+    /** Prints {@code message} to stderr under the calling class's name when debugging is on; a no-op when off. */
     public static void error(String message) {
-        Diag.error(message);
+        if (Diag.isEnabled()) Diag.error(TraceSources.caller(), message);
     }
 
     /**
@@ -84,6 +85,6 @@ public final class Debug {
      * {@code t.printStackTrace()}, which would print on a quiet run.
      */
     public static void error(String message, Throwable t) {
-        Diag.error(message, t);
+        if (Diag.isEnabled()) Diag.error(TraceSources.caller(), message, t);
     }
 }

@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.internal.trace.Trace;
 
 /**
@@ -60,6 +61,7 @@ import com.botmaker.sdk.internal.trace.Trace;
  */
 @Palette(category = "bot", categoryLabel = "Bot", order = 35)
 @Hidden("the guard the generated entry point installs; a bot body does not reach for it")
+@TraceSource("Popup")
 public final class PopupGuard {
 
     private PopupGuard() {}
@@ -148,7 +150,7 @@ public final class PopupGuard {
             // Close the quiet run first, so the slow line lands after the checks that preceded it, not
             // before them.
             report(CHECKS.flush(RUN_KEY));
-            Debug.log("[Popup] check took " + Trace.elapsed(millis));
+            Debug.log("check took " + Trace.elapsed(millis));
             return;
         }
         report(CHECKS.tick(RUN_KEY));
@@ -156,7 +158,7 @@ public final class PopupGuard {
 
     private static void report(Trace.Runs.Run run) {
         if (run != null) {
-            Trace.log("[Popup] checked", run);
+            Trace.log("checked", run);
         }
     }
 }

@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.session;
 
 import com.botmaker.sdk.api.bot.Session;
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.launch.LaunchIsolation;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -36,6 +37,7 @@ import com.botmaker.session.display.SessionBackends;
  * Xephyr's software GL. The gate keeps the seam testable and reversible without touching the project file
  * format.
  */
+@TraceSource("Session")
 public final class SessionBootstrap {
 
     /** System property (or {@code BOTMAKER_SESSION_ISOLATED} env) that opts a bot into a nested {@code :N} run. */
@@ -134,13 +136,13 @@ public final class SessionBootstrap {
         if (adopted != null && adopted.attached() == null) {
             // A private display with nothing on it is not the session anyone meant: the target isn't up there, so
             // adopting would give the bot a black frame and no way to fix it (an adopted session never launches).
-            Debug.log("[Session] the offered display " + adopted.displayName() + " has no window — not adopting it");
+            Debug.log("the offered display " + adopted.displayName() + " has no window — not adopting it");
             adopted.close();
             adopted = null;
         }
         if (adopted != null) {
             ActiveSession.set(adopted);
-            Debug.log("[Session] adopted the live display " + adopted.displayName() + " — not launching "
+            Debug.log("adopted the live display " + adopted.displayName() + " — not launching "
                 + spec.spec() + " again");
             return true;
         }
@@ -152,14 +154,14 @@ public final class SessionBootstrap {
         if (!verdict.isolatable()) {
             // Asked before anything is spawned: a target that cannot be confined would otherwise cost the full
             // window budget and then land on :0 anyway, with a guess as the explanation.
-            Debug.log("[Session] isolated launch declined — running on :0. " + verdict.reason());
+            Debug.log("isolated launch declined — running on :0. " + verdict.reason());
             return false;
         }
         NestedSession.Backend chosen = backend(spec);
         if (!SessionBackends.isAvailable(chosen)) {
             // The backend this target needs isn't installed. For a game that means gamescope: falling back to
             // Xephyr is exactly the crash we're avoiding, so we run on :0 and tell the user what to install.
-            Debug.log("[Session] isolated launch needs " + chosen + " but it isn't installed — running on :0. Hint: "
+            Debug.log("isolated launch needs " + chosen + " but it isn't installed — running on :0. Hint: "
                 + SessionBackends.installHint(chosen));
             return false;
         }
@@ -172,18 +174,18 @@ public final class SessionBootstrap {
                 // Display came up but the game never mapped a window on :N — tear down and fall back to :0. What
                 // actually happened is read off the process table rather than guessed at, in the same words
                 // Studio uses (shared owns the wording).
-                Debug.log("[Session] isolated launch: no window appeared on the nested display — falling back "
+                Debug.log("isolated launch: no window appeared on the nested display — falling back "
                     + "to :0. " + LaunchIsolation.noWindowDiagnosis(spec));
                 ActiveSession.clear();
                 session.close();
                 return false;
             }
-            Debug.log("[Session] isolated: running " + spec.spec() + " on nested " + chosen + " display at "
+            Debug.log("isolated: running " + spec.spec() + " on nested " + chosen + " display at "
                 + size().describe());
             return true;
         } catch (Exception e) {
             String why = e.getMessage() == null ? e.toString() : e.getMessage();
-            Debug.log("[Session] isolated bring-up failed: " + why + " — falling back to :0");
+            Debug.log("isolated bring-up failed: " + why + " — falling back to :0");
             ActiveSession.clear();
             if (session != null) {
                 try { session.close(); } catch (Exception ignored) { /* best-effort teardown */ }

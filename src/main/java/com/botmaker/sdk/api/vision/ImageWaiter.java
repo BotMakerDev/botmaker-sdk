@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.plugin.api.record.Gesture;
 import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.util.TraceSource;
 
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.geometry.Point;
@@ -29,6 +30,7 @@ import java.time.Duration;
  * parameter in every offered shape: it is the question these methods exist to ask.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "⏳", order = 22)
+@TraceSource("Vision")
 public class ImageWaiter {
 
     // --- waitFor ---
@@ -128,14 +130,14 @@ public class ImageWaiter {
             MatchResult result = ImageFinder.findInternal(template, source, confidence);
             Vision.setLastMatch(result);
             if (result.isFound()) {
-                Debug.log("[Vision] found " + template.id() + " after "
+                Debug.log("found " + template.id() + " after "
                         + (System.currentTimeMillis() - startTime) + "ms");
                 return true;
             }
             Wait.milliseconds(100);
         }
 
-        Debug.log("[Vision] timeout waiting for " + template.id());
+        Debug.log("timeout waiting for " + template.id());
         Vision.setLastMatch(MatchResult.notFound());
         return false;
     }
@@ -232,14 +234,14 @@ public class ImageWaiter {
             MatchResult result = ImageFinder.findInternal(template, source, confidence);
             Vision.setLastMatch(result);
             if (!result.isFound()) {
-                Debug.log("[Vision] " + template.id() + " disappeared after "
+                Debug.log("" + template.id() + " disappeared after "
                         + (System.currentTimeMillis() - startTime) + "ms");
                 return true;
             }
             Wait.milliseconds(100);
         }
 
-        Debug.log("[Vision] timeout: " + template.id() + " still visible");
+        Debug.log("timeout: " + template.id() + " still visible");
         // Set last match to notFound since we timed out waiting for it to disappear
         Vision.setLastMatch(MatchResult.notFound());
         return false;
@@ -336,7 +338,7 @@ public class ImageWaiter {
             Point clickPoint = BotSettings.current().randomizeClicks() ? result.randomClickPoint() : result.center();
             Mouse.click(clickPoint);
             Wait.milliseconds(BotSettings.current().foundDelay());
-            Debug.log("[Vision] found and clicked " + template.id());
+            Debug.log("found and clicked " + template.id());
             return true;
         }
         return false;

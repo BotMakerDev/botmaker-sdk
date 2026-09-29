@@ -26,6 +26,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   console output is unchanged.
 - **`-Dbotmaker.debug=true|false` on the run wins over the `debug` in your Bot Settings.** The setting still
   decides for a run that does not say.
+- **`Debug.log` names the class that wrote the line.** `Debug.log("hello")` in `Collect` prints
+  `[Collect] hello`, so you never write the prefix yourself. Put `@TraceSource("Farming")` on a class to show
+  another name, or start a message with `[Name]` to name one line.
 
 - **Heroic and Faugus games are picked from a grid.** `launchHeroic` and `launchFaugus` carry
   `@HeroicAppName` and `@FaugusGameId`, so their argument opens the launcher's installed games with cover art,

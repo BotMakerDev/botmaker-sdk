@@ -8,6 +8,31 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — a trace line's source is deduced (rework follow-ups, phase 7b)
+
+The user asked for logging without writing the source at each call ("like a Logger class … then just call the
+simple debug command"). Values already describe themselves (`toString` on `Point`, `Rect`, `ImageTemplate`,
+`MatchResult`, `Window`, the capture sources), and `Mouse`, `ImageFinder` and friends are static classes with
+no instance to implement an interface, so the part left to deduce was the `[Name]` prefix.
+
+**Done**
+- `internal/trace/TraceSources.caller()`: a `StackWalker` finds the first class past `Debug`, `Trace` and
+  itself, and names it by its nest host's `@TraceSource`, or else its simple name. Only walked while debugging
+  is on.
+- New `api.util.@TraceSource(String)` (additive). On `ImageFinder`, `ImageClicker`, `ImageWaiter`, `Pixel`,
+  `Text` (`Vision`), `Emulators` (`Emulator`), `LaunchTarget` (`Target`), `ActivityContext` (`Activity`),
+  `PopupGuard` (`Popup`), `NamedWindow` (`Source`), `SessionBootstrap` (`Session`).
+- `Debug.log`/`error` and `Trace.log` pass the caller's source to shared's new `Diag.log(source, …)`/
+  `error(source, …)`. Every SDK call site lost its `[Name]` prefix; the console reads the same.
+- Behaviour change: a bot's own `Debug.log("hello")` prints `[Collect] hello`, and `ImageClicker`'s and
+  `ImageFinder`'s unprefixed lines now read `[Vision] …`.
+- `TraceSourcesTest`: the class-to-prefix table, nesting, a bot's own line, explicit prefix wins.
+
+**Deferred / next**
+- `BotSettings` (`[Input]`) and `FlowWalker` (`[Flow]`, `[Activity]`) still spell their prefixes: their lines
+  need two names each.
+- `Sound` prints its one notice with `System.out` and no debug gate; left alone.
+
 ## 2026-09-29 — the run trace, bot side (rework follow-ups, phase 7)
 
 Design: `../docs/refactor/40-run-trace.md`.
@@ -24,8 +49,8 @@ Design: `../docs/refactor/40-run-trace.md`.
 - The Pilot ignores `Log` frames for now (`PilotServer.onTelemetry`); `TelemetrySerializer` refuses one.
 
 **Deferred / next**
-- The user asked (2026-09-29) whether a trace line could be deduced instead of written at each api call.
-  Answered in the phase 7 recap; nothing changed yet.
+- The user asked (2026-09-29) whether a trace line could be deduced instead of written at each api call:
+  done for the source in phase 7b, above.
 - Phase 9: the Pilot's log drawer from `onTrace`, the match overlay, and the Bot Settings debug tick.
 
 ## 2026-09-29 — launch through existing launchers (rework follow-ups, phase 5)

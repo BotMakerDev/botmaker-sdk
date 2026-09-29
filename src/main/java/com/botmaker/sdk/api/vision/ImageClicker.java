@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.interaction.Wait;
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.ClickEvent;
 import com.botmaker.sdk.internal.observe.Surface;
@@ -35,6 +36,7 @@ import java.util.List;
  * families keep every shape, their {@code double} being a comparison <em>margin</em> nothing else holds.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "👆", order = 21)
+@TraceSource("Vision")
 public class ImageClicker {
 
     // --- click (single template) ---

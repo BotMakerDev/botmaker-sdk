@@ -176,14 +176,14 @@ public class Bot {
             try {
                 body.run();
             } catch (BotStoppedException e) {
-                Debug.log("[Bot] Stopped by request.");
+                Debug.log("Stopped by request.");
                 return;
             } catch (BotStuckException e) {
-                Debug.error("[Bot] Stuck: " + e.getMessage() + " — recovering.");
+                Debug.error("Stuck: " + e.getMessage() + " — recovering.");
                 Watchdog.reset();
                 recovery.run();
             } catch (RuntimeException e) {
-                Debug.error("[Bot] Crashed: " + e + " — recovering.");
+                Debug.error("Crashed: " + e + " — recovering.");
                 Watchdog.reset();
                 recovery.run();
             }
@@ -213,28 +213,28 @@ public class Bot {
             // Both halves are announced because a recovery is where a bot spends its most confusing time:
             // without these, "goHome" navigating a game that is already gone and "restart" waiting on a
             // launch are one indistinguishable silence.
-            Debug.log("[Bot] goHome");
+            Debug.log("goHome");
             goHome.run();
-            Debug.log("[Bot] restarting the game");
+            Debug.log("restarting the game");
             startGame.accept(StartMode.RESTART);
         };
         Watchdog.enable();
         // Cold start: open the game and reach a known screen once, before the loop. A failure here recovers
         // exactly as a mid-run failure would, so a bad first launch still self-heals instead of exiting.
         try {
-            Debug.log("[Bot] cold start");
+            Debug.log("cold start");
             startGame.accept(StartMode.COLD);
-            Debug.log("[Bot] goHome");
+            Debug.log("goHome");
             goHome.run();
         } catch (BotStoppedException e) {
-            Debug.log("[Bot] Stopped by request during start-up.");
+            Debug.log("Stopped by request during start-up.");
             return;
         } catch (BotStuckException e) {
-            Debug.error("[Bot] Stuck during start-up: " + e.getMessage() + " — recovering.");
+            Debug.error("Stuck during start-up: " + e.getMessage() + " — recovering.");
             Watchdog.reset();
             recovery.run();
         } catch (RuntimeException e) {
-            Debug.error("[Bot] Crashed during start-up: " + e + " — recovering.");
+            Debug.error("Crashed during start-up: " + e + " — recovering.");
             Watchdog.reset();
             recovery.run();
         }

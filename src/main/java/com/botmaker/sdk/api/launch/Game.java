@@ -175,10 +175,10 @@ public class Game {
             Wait.milliseconds(500);
         } catch (IllegalArgumentException e) {
             // Re-throw validation errors directly
-            Debug.error("[Game] Failed to launch Heroic game '" + appName + "': " + e.getMessage());
+            Debug.error("Failed to launch Heroic game '" + appName + "': " + e.getMessage());
             throw e;
         } catch (Exception e) {
-            Debug.error("[Game] Failed to launch Heroic game '" + appName + "': " + e.getMessage());
+            Debug.error("Failed to launch Heroic game '" + appName + "': " + e.getMessage());
             throw new RuntimeException("Failed to launch Heroic game '" + appName + "'", e);
         }
     }

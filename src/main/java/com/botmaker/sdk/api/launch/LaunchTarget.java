@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.launch;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.launch.LaunchKind;
@@ -48,6 +49,7 @@ import com.botmaker.shared.launch.Launcher;
  */
 @Palette(category = "launch", categoryLabel = "Launch", order = 93)
 @Hidden("a value type: Game and Target hand one back, a bot does not build one from a menu")
+@TraceSource("Target")
 public sealed interface LaunchTarget {
 
     /** The parsed spec this target wraps — the value {@code shared.launch} operates on. */
@@ -116,7 +118,7 @@ public sealed interface LaunchTarget {
         if (!source.isPresent()) {
             return false;
         }
-        Debug.log("[Target] " + spec + ": target window already open — skipping cold launch");
+        Debug.log("" + spec + ": target window already open — skipping cold launch");
         return true;
     }
 

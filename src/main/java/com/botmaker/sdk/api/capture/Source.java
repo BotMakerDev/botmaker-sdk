@@ -84,7 +84,7 @@ public final class Source {
             pinned = true;
             current = source;
         }
-        Debug.log("[Source] set -> " + (pinned ? current : "(auto)"));
+        Debug.log("set -> " + (pinned ? current : "(auto)"));
     }
 
     /**
@@ -97,7 +97,7 @@ public final class Source {
      */
     private static CaptureSource resolveDefault() {
         CaptureSource resolved = CaptureSource.desktop();
-        Debug.log("[Source] default -> " + resolved);
+        Debug.log("default -> " + resolved);
         return resolved;
     }
 }

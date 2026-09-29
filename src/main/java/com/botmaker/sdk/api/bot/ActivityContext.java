@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.Flows;
 
@@ -26,6 +27,7 @@ import com.botmaker.sdk.api.flow.Flows;
  */
 @Palette(category = "bot", categoryLabel = "Bot", order = 37)
 @Hidden("handed to an activity body; a bot never builds one")
+@TraceSource("Activity")
 public final class ActivityContext {
 
     private final String activity;
@@ -57,7 +59,7 @@ public final class ActivityContext {
         Flow.Activity declared = Flows.installed().activity(activity);
         if (name != null && !name.isBlank() && !Outcome.NEXT.equals(name)
                 && declared != null && !declared.outcomes().contains(name)) {
-            Debug.error("[Activity] " + activity + " reported '" + name + "', which it does not declare in "
+            Debug.error("" + activity + " reported '" + name + "', which it does not declare in "
                     + "the Activity Flow — nothing is wired to it, so the run ends here.");
         }
         return Outcome.of(name);

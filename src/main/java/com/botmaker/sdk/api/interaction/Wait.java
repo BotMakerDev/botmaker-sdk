@@ -59,7 +59,7 @@ public class Wait {
         if (duration == null) return;
         long ms = duration.toMillis();
         if (ms <= 0) return;
-        Debug.log("[Wait] " + ms + "ms");
+        Debug.log("" + ms + "ms");
         sleep(ms);
     }
 
@@ -83,7 +83,7 @@ public class Wait {
         // randomization lives here and not behind an accessor.
         long ms = lo == hi ? lo : ThreadLocalRandom.current().nextLong(Math.max(lo, 0), hi + 1);
         if (ms <= 0) return;
-        Debug.log("[Wait] " + ms + "ms (of " + lo + "–" + hi + "ms)");
+        Debug.log("" + ms + "ms (of " + lo + "–" + hi + "ms)");
         sleep(ms);
     }
 
@@ -94,7 +94,7 @@ public class Wait {
      */
     public static void milliseconds(int milliseconds) {
         if (milliseconds <= 0) return;
-        Debug.log("[Wait] " + milliseconds + "ms");
+        Debug.log("" + milliseconds + "ms");
         sleep(milliseconds);
     }
 

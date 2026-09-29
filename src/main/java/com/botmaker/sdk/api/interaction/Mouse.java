@@ -66,7 +66,7 @@ public class Mouse {
      */
     public static void click(Point p) {
         if (p == null) return;
-        Debug.log("[Mouse] click " + p);
+        Debug.log("click " + p);
         PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.LEFT.code());
     }
 
@@ -83,7 +83,7 @@ public class Mouse {
     public static void click(CaptureSource source, int x, int y) {
         if (source == null) return;
         Point o = source.origin();
-        Debug.log("[Mouse] click " + x + "," + y + " relative to " + o);
+        Debug.log("click " + x + "," + y + " relative to " + o);
         click(o.x() + x, o.y() + y);
     }
 
@@ -92,13 +92,13 @@ public class Mouse {
     /** Move the cursor to an absolute screen coordinate. */
     public static void move(Point p) {
         if (p == null) return;
-        Debug.log("[Mouse] move " + p);
+        Debug.log("move " + p);
         controller().mouseMove(p.x(), p.y());
     }
 
     /** Move the cursor to absolute screen coordinates {@code (x, y)}. */
     public static void move(int x, int y) {
-        Debug.log("[Mouse] move " + x + "," + y);
+        Debug.log("move " + x + "," + y);
         controller().mouseMove(x, y);
     }
 
@@ -106,7 +106,7 @@ public class Mouse {
 
     /** Hold a mouse button down at the current cursor position. */
     public static void down(MouseButton button) {
-        Debug.log("[Mouse] " + button + " down");
+        Debug.log("" + button + " down");
         controller().mouseButton(button.code(), true);
     }
 
@@ -118,19 +118,19 @@ public class Mouse {
 
     /** Release a held mouse button. */
     public static void up(MouseButton button) {
-        Debug.log("[Mouse] " + button + " up");
+        Debug.log("" + button + " up");
         controller().mouseButton(button.code(), false);
     }
 
     public static void rightClick(Point p) {
         if (p == null) return;
-        Debug.log("[Mouse] rightClick " + p);
+        Debug.log("rightClick " + p);
         PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.RIGHT.code());
     }
 
     public static void middleClick(Point p) {
         if (p == null) return;
-        Debug.log("[Mouse] middleClick " + p);
+        Debug.log("middleClick " + p);
         PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.MIDDLE.code());
     }
 
@@ -141,7 +141,7 @@ public class Mouse {
      */
     public static void doubleClick(Point p) {
         if (p == null) return;
-        Debug.log("[Mouse] doubleClick " + p);
+        Debug.log("doubleClick " + p);
         NativeController controller = controller();
         java.awt.Point origin = controller.cursorPosition();
         move(p);
@@ -222,7 +222,7 @@ public class Mouse {
      * velocity (map panning, slingshots, drawing) see a smooth gesture instead of a teleport.
      */
     public static void drag(Point start, Point end, long durationMs) {
-        Debug.log("[Mouse] drag " + start + " -> " + end + " over " + durationMs + "ms");
+        Debug.log("drag " + start + " -> " + end + " over " + durationMs + "ms");
         // Read the origin before the gesture; the cursor must stay with the drag until the button is
         // released, so this is restored once at the end rather than per-step.
         java.awt.Point origin = controller().cursorPosition();
@@ -266,21 +266,21 @@ public class Mouse {
     @Hidden("a signed notches is the ambiguity scrollUp/scrollDown remove; this method's own javadoc "
             + "already prefers them, and the menu offering all three as equals contradicted it")
     public static void scroll(int notches) {
-        Debug.log("[Mouse] scroll " + notches);
+        Debug.log("scroll " + notches);
         controller().scroll(notches);
     }
 
     /** Scroll up / away from you by {@code notches} (always a positive amount). */
     @Records(Gesture.SCROLL_UP)
     public static void scrollUp(int notches) {
-        Debug.log("[Mouse] scrollUp " + notches);
+        Debug.log("scrollUp " + notches);
         controller().scroll(Math.abs(notches));
     }
 
     /** Scroll down / toward you by {@code notches} (always a positive amount). */
     @Records(Gesture.SCROLL_DOWN)
     public static void scrollDown(int notches) {
-        Debug.log("[Mouse] scrollDown " + notches);
+        Debug.log("scrollDown " + notches);
         controller().scroll(-Math.abs(notches));
     }
 }

@@ -79,7 +79,7 @@ public final class Target {
     public static void start() {
         LaunchTarget t = current();
         if (t == null) {
-            Debug.log("[Target] start: no launch target configured — nothing to launch");
+            Debug.log("start: no launch target configured — nothing to launch");
             return;
         }
         // Isolated bots launch into a private nested :N display (and route input/vision through it); a plain
@@ -98,7 +98,7 @@ public final class Target {
     public static void startIfNotRunning() {
         LaunchTarget t = current();
         if (t == null) {
-            Debug.log("[Target] startIfNotRunning: no launch target configured — nothing to launch");
+            Debug.log("startIfNotRunning: no launch target configured — nothing to launch");
             return;
         }
         // Isolated: bring up (once) the private :N session and launch into it — its "already running" is the
@@ -135,7 +135,7 @@ public final class Target {
     public static boolean launchAndWait() {
         LaunchTarget t = current();
         if (t == null) {
-            Debug.log("[Target] launchAndWait: no launch target configured — nothing to launch");
+            Debug.log("launchAndWait: no launch target configured — nothing to launch");
             return false;
         }
 
@@ -157,7 +157,7 @@ public final class Target {
     public static boolean waitForLaunch(long timeoutMillis) {
         LaunchTarget t = current();
         if (t == null) {
-            Debug.log("[Target] waitForLaunch: no launch target configured — nothing to wait for");
+            Debug.log("waitForLaunch: no launch target configured — nothing to wait for");
             return false;
         }
 

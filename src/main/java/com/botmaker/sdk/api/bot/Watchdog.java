@@ -58,7 +58,7 @@ public final class Watchdog {
         if (!enabled) {
             Bots.addObserver(COUNTER);
             enabled = true;
-            Debug.log("[Watchdog] enabled");
+            Debug.log("enabled");
         }
     }
 
@@ -67,7 +67,7 @@ public final class Watchdog {
         if (enabled) {
             Bots.removeObserver(COUNTER);
             enabled = false;
-            Debug.log("[Watchdog] disabled");
+            Debug.log("disabled");
         }
     }
 
@@ -87,7 +87,7 @@ public final class Watchdog {
             int repeats = s.repeats;
             String sig = s.signature;
             progress();
-            Debug.error("[Watchdog] stuck after " + repeats + " checks repeating " + sig);
+            Debug.error("stuck after " + repeats + " checks repeating " + sig);
             throw new BotStuckException("Bot appears stuck: no progress for " + repeats
                     + " consecutive checks (repeating " + sig + ")");
         }

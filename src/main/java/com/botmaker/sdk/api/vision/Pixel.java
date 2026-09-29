@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.util.TraceSource;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -54,6 +55,7 @@ import java.util.List;
  * a method added here later is hidden until someone decides otherwise.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "🎨", order = 23)
+@TraceSource("Vision")
 public class Pixel {
 
     // ---------------------------------------------------------------------
@@ -296,7 +298,7 @@ public class Pixel {
                     img, target, precision.deltaE(), precision.minArea(), precision.minCount());
             return map(raw, source, img, target);
         } catch (Exception e) {
-            Debug.error("[Vision] error finding colour: " + e.getMessage(), e);
+            Debug.error("error finding colour: " + e.getMessage(), e);
             return new ArrayList<>();
         }
     }
