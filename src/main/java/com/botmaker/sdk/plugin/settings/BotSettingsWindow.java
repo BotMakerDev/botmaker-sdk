@@ -55,7 +55,13 @@ public final class BotSettingsWindow {
 
     private final CheckBox realInput = new CheckBox("Drive the real mouse and keyboard (turn on for games)");
     private final CheckBox randomizeClicks = new CheckBox("Click a random point inside the match, not its centre");
-    private final CheckBox debug = new CheckBox("Print the bot's debug trace");
+    /**
+     * The bot's {@code debug}, kept as it was: the tick left this window on 2026-09-29, when debug output became
+     * the host's (Studio's 🐞 Debug, the {@code botmaker.debug} run property), and nothing here may change a value
+     * the user can no longer see.
+     */
+    @SuppressWarnings("deprecation")
+    private boolean debug = BotSettings.DEFAULTS.debug();
     private final Spinner<Integer> foundDelay = new Spinner<>(0, 600_000, 500, 50);
     private final Spinner<Integer> notFoundDelay = new Spinner<>(0, 600_000, 200, 50);
     private final Spinner<Double> confidence = new Spinner<>(0.0, 1.0, 0.8, 0.05);
@@ -236,9 +242,10 @@ public final class BotSettingsWindow {
                 note("How far the right template must beat a look-alike to win."));
         grid.addRow(4, new Label("Stuck after N no-progress checks"), maxRetryAttempts,
                 note("When the watchdog decides the bot is stuck and restarts it."));
-        return new VBox(8, title("Clicks & matching"), grid, randomizeClicks, debug);
+        return new VBox(8, title("Clicks & matching"), grid, randomizeClicks);
     }
 
+    @SuppressWarnings("deprecation")
     private void seed(BotSettings s) {
         realInput.setSelected(s.input().real());
         linuxInput.setValue(s.input().linuxBackend());
@@ -250,7 +257,7 @@ public final class BotSettingsWindow {
         compareMargin.getValueFactory().setValue(s.compareMargin());
         maxRetryAttempts.getValueFactory().setValue(s.maxRetryAttempts());
         randomizeClicks.setSelected(s.randomizeClicks());
-        debug.setSelected(s.debug());
+        debug = s.debug();
     }
 
     /**
@@ -270,7 +277,7 @@ public final class BotSettingsWindow {
                 BotSettings.vision(confidence.getValue(), compareMargin.getValue()),
                 BotSettings.input(realInput.isSelected(), linuxInput.getValue()),
                 BotSettings.session(isolatedSession.isSelected(), sessionBackend.getValue()),
-                maxRetryAttempts.getValue(), debug.isSelected());
+                maxRetryAttempts.getValue(), debug);
     }
 
     private static <T> void commitTyped(Spinner<T> spinner) {

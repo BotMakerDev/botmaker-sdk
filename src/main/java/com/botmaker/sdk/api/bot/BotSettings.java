@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.plugin.api.meta.ReplacedBy;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -180,6 +181,22 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
         input = input == null ? new Input(false, InputBackend.AUTO) : input;
         session = session == null ? new Session(true, DisplayBackend.AUTO) : session;
         maxRetryAttempts = Math.max(1, maxRetryAttempts);
+    }
+
+    /**
+     * Whether the SDK's debug output starts on, for a run no host started.
+     *
+     * @deprecated since 2026-09-29 debug output is the host's to decide, for every plugin and not only the SDK:
+     * Studio's 🐞 Debug button sets {@code -Dbotmaker.debug} on the run, and a run it started ignores this value
+     * whenever the button says on or off. The value stays in the bot's settings (this API only grows) and still
+     * applies to a bot run from a terminal; Bot Settings no longer shows it.
+     */
+    @Deprecated
+    @ReplacedBy(note = "Debug output is chosen with Studio's Debug button (the botmaker.debug run property); "
+            + "this value only applies to a run no host started.")
+    @Override
+    public boolean debug() {
+        return debug;
     }
 
     // --- how the bot's Java writes it ---

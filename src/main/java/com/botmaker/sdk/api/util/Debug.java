@@ -72,12 +72,12 @@ public final class Debug {
 
     /** Prints {@code message} to stdout under the calling class's name when debugging is on; a no-op when off. */
     public static void log(String message) {
-        if (Diag.isEnabled()) Diag.log(TraceSources.caller(), message, 1, null);
+        if (Diag.isEnabled()) Diag.log(TraceSources.origin(), message, 1, null);
     }
 
     /** Prints {@code message} to stderr under the calling class's name when debugging is on; a no-op when off. */
     public static void error(String message) {
-        if (Diag.isEnabled()) Diag.error(TraceSources.caller(), message);
+        if (Diag.isEnabled()) Diag.error(TraceSources.origin(), message, null);
     }
 
     /**
@@ -85,6 +85,6 @@ public final class Debug {
      * {@code t.printStackTrace()}, which would print on a quiet run.
      */
     public static void error(String message, Throwable t) {
-        if (Diag.isEnabled()) Diag.error(TraceSources.caller(), message, t);
+        if (Diag.isEnabled()) Diag.error(TraceSources.origin(), message, t);
     }
 }

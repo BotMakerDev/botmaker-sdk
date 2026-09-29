@@ -24,7 +24,11 @@ public final class SettingsTypes {
 
     private SettingsTypes() {}
 
-    /** {@code BotSettings.of(Clicks, Vision, Input, Session, int, boolean)}; {@code BotSettings.DEFAULTS} as itself. */
+    /**
+     * {@code BotSettings.of(Clicks, Vision, Input, Session, int, boolean)}; {@code BotSettings.DEFAULTS} as itself.
+     * The deprecated {@code debug} is still a part: the bot's Java writes it, and a value read must be written back.
+     */
+    @SuppressWarnings("deprecation")
     public static final DeclaredCall<BotSettings> SETTINGS = ComponentType.part(BotSettings.class)
             .writtenAs(BotSettings::of, BotSettings::clicks, BotSettings::vision, BotSettings::input,
                     BotSettings::session, BotSettings::maxRetryAttempts, BotSettings::debug)

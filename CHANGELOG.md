@@ -79,6 +79,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **⚙ Bot Settings no longer shows "Print the bot's debug trace".** Studio's 🐞 Debug button decides debug
+  output now, for every plugin and not only the SDK. The value stays in your bot's settings and still applies
+  when the bot runs outside Studio. `BotSettings.debug()` is deprecated, with a note saying so.
+- **Each debug line says which class and method wrote it**, so Studio's Trace tab can hide one class or one
+  method's lines. A lambda counts as the method it is written in.
 - **Key, combination, key-step and capture-source pills** label an unread value through the toolkit's
   `Slots.sourceOr`. `SdkScreenPicks` no longer implements a colour pick (the toolkit's `ScreenPicks.color`,
   which nothing called, is deleted); the colour editor's own sampling is unchanged.

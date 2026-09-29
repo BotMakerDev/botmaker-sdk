@@ -33,13 +33,13 @@ public final class Trace {
      */
     public static void log(String message, Runs.Run run) {
         if (!Diag.isEnabled()) return;
-        Diag.log(TraceSources.caller(), message + " " + run, run.count(), null);
+        Diag.log(TraceSources.origin(), message + " " + run, run.count(), null);
     }
 
     /** Prints {@code message} and traces it at {@code where}, the desktop rectangle it is about. */
     public static void log(String message, Rect where) {
         if (!Diag.isEnabled()) return;
-        Diag.log(TraceSources.caller(), message, 1, where == null ? null
+        Diag.log(TraceSources.origin(), message, 1, where == null ? null
                 : new TelemetryEvent.Rect(where.x(), where.y(), where.width(), where.height()));
     }
 

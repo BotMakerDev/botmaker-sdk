@@ -8,6 +8,21 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — each line names its writer; Bot Settings' debug tick goes (rework follow-ups, phase 8b)
+
+When asked about the Bot Settings debug tick at phase 9, the user answered that `BotSettings` is the SDK's
+concern while debug output is every plugin's, and asked for "a very fine filter over the debug output: which
+class, which method".
+
+**Done**
+- `TraceSources.origin()` returns a `Diag.Origin`: the source, plus the class and method from the same stack
+  frame. A lambda's `lambda$body$0` becomes `body` (`TraceSources.method`). `Debug.log`/`error` and
+  `Trace.log` pass it. `caller()` stays, as `origin().source()`.
+- `BotSettings.debug()` is declared explicitly, `@Deprecated` with a `@ReplacedBy(note = …)` that has no
+  target: nothing in `api.*` replaces it, and the host's run property decides. The component and `of(…, debug)`
+  are unchanged, because the bot's Java writes them and `SettingsTypes` must write back what it read (it
+  suppresses the warning). `BotSettingsWindow` no longer shows the tick and keeps the loaded value when saving.
+
 ## 2026-09-29 — the bot's own line, found in `com.botmaker.*` bots too (rework follow-ups, phase 8)
 
 **Done**

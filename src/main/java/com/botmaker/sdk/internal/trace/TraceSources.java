@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.trace;
 
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.util.TraceSource;
+import com.botmaker.shared.Diag;
 
 import java.util.Set;
 
@@ -24,12 +25,26 @@ public final class TraceSources {
 
     /** The source of the class that called into the tracing classes, or empty when there is none. */
     public static String caller() {
+        return origin().source();
+    }
+
+    /**
+     * Where the line is being written: the caller's source, and its class and method, which a host filters the
+     * trace by. A lambda's body is named after the method it sits in ({@code lambda$body$0} is {@code body}).
+     */
+    public static Diag.Origin origin() {
         return WALKER.walk(frames -> frames
-                        .map(StackWalker.StackFrame::getDeclaringClass)
-                        .filter(c -> !PASS_THROUGH.contains(c))
+                        .filter(f -> !PASS_THROUGH.contains(f.getDeclaringClass()))
                         .findFirst())
-                .map(TraceSources::of)
-                .orElse("");
+                .map(f -> new Diag.Origin(of(f.getDeclaringClass()), f.getClassName(), method(f.getMethodName())))
+                .orElse(Diag.Origin.named(""));
+    }
+
+    /** {@code name}, or the method a lambda named {@code lambda$<method>$<n>} was written in. */
+    static String method(String name) {
+        if (name == null || !name.startsWith("lambda$")) return name;
+        int end = name.indexOf('$', "lambda$".length());
+        return end < 0 ? name : name.substring("lambda$".length(), end);
     }
 
     /** {@code type}'s source: its top-level class's {@link TraceSource}, or that class's simple name. */

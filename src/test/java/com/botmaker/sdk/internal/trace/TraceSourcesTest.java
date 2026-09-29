@@ -108,4 +108,22 @@ class TraceSourcesTest {
         assertEquals("hello", lines.getFirst().text());
         assertEquals(TelemetryEvent.Log.ERROR, lines.get(2).level());
     }
+
+    /** The host filters by the class and method that wrote a line; a lambda counts as the method it sits in. */
+    @Test
+    void aLineCarriesTheClassAndMethodThatWroteIt() {
+        Debug.enable();
+        Diag.setSink(lines::add);
+
+        Debug.log("direct");
+        Runnable inLambda = () -> Debug.log("from a lambda");
+        inLambda.run();
+
+        assertEquals(List.of(TraceSourcesTest.class.getName(), TraceSourcesTest.class.getName()),
+                lines.stream().map(TelemetryEvent.Log::writerClass).toList());
+        assertEquals(List.of("aLineCarriesTheClassAndMethodThatWroteIt", "aLineCarriesTheClassAndMethodThatWroteIt"),
+                lines.stream().map(TelemetryEvent.Log::writerMethod).toList());
+        assertEquals("click", TraceSources.method("click"));
+        assertEquals("body", TraceSources.method("lambda$body$0"));
+    }
 }
