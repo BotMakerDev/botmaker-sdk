@@ -165,7 +165,7 @@ public final class FlowTypes {
      * reads as "no body named yet" and the initialiser writer refuses, rather than inventing a name.
      */
     public static String sourceOf(ActivityBody body) {
-        return body instanceof Named named ? named.source() : "";
+        return body instanceof Named(String source) ? source : "";
     }
 
     /**
