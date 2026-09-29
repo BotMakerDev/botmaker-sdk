@@ -7,7 +7,9 @@ import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Values;
 import com.botmaker.plugin.toolkit.Thumbnail;
 import com.botmaker.shared.game.EpicLibraryScanner;
+import com.botmaker.shared.game.FaugusLibraryScanner;
 import com.botmaker.shared.game.GameLibraryProvider;
+import com.botmaker.shared.game.HeroicLibraryScanner;
 import com.botmaker.shared.game.InstalledGame;
 import com.botmaker.shared.game.SteamLibraryScanner;
 import javafx.application.Platform;
@@ -47,6 +49,16 @@ public final class LaunchEditors {
     /** An {@code @EpicAppName} argument: the Epic games installed here. */
     public static Node epicGame(ValueContext ctx) {
         return game(ctx, EpicLibraryScanner::new);
+    }
+
+    /** A {@code @HeroicAppName} argument: the games Heroic has installed here. */
+    public static Node heroicGame(ValueContext ctx) {
+        return game(ctx, HeroicLibraryScanner::new);
+    }
+
+    /** A {@code @FaugusGameId} argument: the games and launchers Faugus has here. */
+    public static Node faugusGame(ValueContext ctx) {
+        return game(ctx, FaugusLibraryScanner::new);
     }
 
     /**

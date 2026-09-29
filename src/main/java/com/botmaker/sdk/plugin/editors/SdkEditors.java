@@ -6,6 +6,8 @@ import com.botmaker.sdk.api.bot.OutcomeName;
 import com.botmaker.sdk.api.bot.Setting;
 import com.botmaker.sdk.api.emulator.EmulatorName;
 import com.botmaker.sdk.api.launch.EpicAppName;
+import com.botmaker.sdk.api.launch.FaugusGameId;
+import com.botmaker.sdk.api.launch.HeroicAppName;
 import com.botmaker.sdk.api.launch.LaunchOption;
 import com.botmaker.sdk.api.launch.ProgramPath;
 import com.botmaker.sdk.api.launch.SteamAppId;
@@ -43,6 +45,8 @@ public final class SdkEditors {
     public static final List<SlotEditor> ALL = List.of(
             SlotEditor.onParameter(SteamAppId.class).draw(() -> LaunchEditors::steamGame),
             SlotEditor.onParameter(EpicAppName.class).draw(() -> LaunchEditors::epicGame),
+            SlotEditor.onParameter(HeroicAppName.class).draw(() -> LaunchEditors::heroicGame),
+            SlotEditor.onParameter(FaugusGameId.class).draw(() -> LaunchEditors::faugusGame),
             SlotEditor.onParameter(ProgramPath.class).draw(() -> LaunchEditors::program),
             SlotEditor.onParameter(LaunchOption.class).draw(() -> LaunchEditors::option),
             SlotEditor.onParameter(Setting.class).draw(() -> SettingsEditors::setting),

@@ -12,7 +12,9 @@ import com.botmaker.sdk.api.bot.Setting;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.emulator.EmulatorName;
 import com.botmaker.sdk.api.emulator.Emulators;
+import com.botmaker.sdk.api.launch.FaugusGameId;
 import com.botmaker.sdk.api.launch.Game;
+import com.botmaker.sdk.api.launch.HeroicAppName;
 import com.botmaker.sdk.api.launch.LaunchOption;
 import com.botmaker.sdk.api.launch.ProgramPath;
 import com.botmaker.sdk.api.launch.SteamAppId;
@@ -56,6 +58,18 @@ class SdkEditorsTest {
         assertTrue(claimed(TestContexts.slot(ifNotRunning, 0, "\"440\"")));
         // The int overload: the game grid writes a String, which would not compile there.
         assertFalse(claimed(TestContexts.slot(TestContexts.method(Game.class, "launchSteam", int.class), 0, "440")));
+    }
+
+    /** Heroic's and Faugus's launches get their libraries' grids, as Steam's and Epic's do. */
+    @Test
+    void the_heroic_and_faugus_ids_are_claimed() {
+        Method heroic = TestContexts.method(Game.class, "launchHeroic", String.class);
+        Method faugus = TestContexts.method(Game.class, "launchFaugus", String.class);
+
+        assertTrue(carries(heroic, 0, HeroicAppName.class));
+        assertTrue(carries(faugus, 0, FaugusGameId.class));
+        assertTrue(claimed(TestContexts.slot(heroic, 0, "\"Firestone\"")));
+        assertTrue(claimed(TestContexts.slot(faugus, 0, "\"battlenet\"")));
     }
 
     /** The flags are the varargs tail, wherever the overload's fixed parameters end. */

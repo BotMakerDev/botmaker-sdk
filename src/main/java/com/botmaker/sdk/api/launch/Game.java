@@ -164,7 +164,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code appName} is null/blank
      * @throws RuntimeException         if neither the Heroic URL nor a CLI fallback could be invoked
      */
-    public static void launchHeroic(String appName) {
+    public static void launchHeroic(@HeroicAppName String appName) {
         if (isolate(storeSpec(LaunchKind.HEROIC, appName))) {
             return;
         }
@@ -197,7 +197,7 @@ public class Game {
      * @throws IllegalArgumentException if {@code gameId} is null/blank
      * @throws RuntimeException         if neither CLI form could be invoked
      */
-    public static void launchFaugus(String gameId) {
+    public static void launchFaugus(@FaugusGameId String gameId) {
         if (isolate(storeSpec(LaunchKind.FAUGUS, gameId))) {
             return;
         }

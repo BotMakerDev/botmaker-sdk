@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.plugin.launch.LaunchTargetChooser;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
@@ -47,12 +48,13 @@ import java.nio.file.Path;
  * application-modal checklist blocked the very toolbar its rows used to send the user to, and the ownerless
  * capture tool with it.
  *
- * <h2>The launch target is optional, and has no picker here (2026-09-28)</h2>
+ * <h2>The launch target is optional, and picked from the launchers (2026-09-29)</h2>
  *
- * <p>A game is started by its own launcher — Faugus on Linux, Steam or Epic on Windows — or by the bot's own
- * {@code Game} blocks, and BotMaker does not grow a second launcher UI beside them (the maintainer's call). The
- * row shows what this computer has, if anything: an emulator app picked in an Emulators block sets it, and
- * <b>▶ Launch now</b> then starts it. A value it cannot read is shown with a Clear button, never a ✓.
+ * <p>A game is started by its own launcher — Faugus or Heroic on Linux, Steam or Epic on Windows — or by the
+ * bot's own {@code Game} blocks, and BotMaker does not grow a second launcher UI beside them (the maintainer's
+ * call, 2026-09-28). So <b>Choose…</b> ({@link LaunchTargetChooser}) lists what those launchers already have
+ * and stores which one; nothing about how to start it. An emulator app picked in an Emulators block sets it
+ * too, and <b>▶ Launch now</b> then starts it. A value it cannot read is shown with a Clear button, never a ✓.
  *
  * <h2>Refreshing</h2>
  *
@@ -63,8 +65,8 @@ public final class ProjectSetup {
 
     /** What the launch row says when this computer has no launch target, which is a fine place to be. */
     static final String NO_LAUNCH_TARGET = "None on this computer, and none is needed: start your game from its "
-            + "own launcher (Faugus on Linux, Steam or Epic on Windows), or let the bot start it with a Game "
-            + "block. Picking an emulator app in an Emulators block sets one, and ▶ Launch now then starts it.";
+            + "own launcher, or let the bot start it with a Game block. Choose… picks a game Steam, Epic, Heroic "
+            + "or Faugus already has, so a run can start it — in its own display in background mode.";
 
     /** The one open instance, so pressing the toolbar button twice focuses rather than stacks. */
     private static ProjectSetup active;
@@ -196,7 +198,23 @@ public final class ProjectSetup {
                                 : templateCount + (templateCount == 1 ? " picture saved." : " pictures saved."),
                         capture),
                 row(launch.set(), !launch.unreadable(), "Launch target (optional)", launch.detail(),
-                        launch.unreadable() ? clearLaunchButton() : quickLaunchButton()));
+                        new HBox(8, chooseLaunchButton(),
+                                launch.unreadable() ? clearLaunchButton() : quickLaunchButton())));
+    }
+
+    /** Picks what this computer launches from the games its launchers already list. */
+    private Button chooseLaunchButton() {
+        Button choose = new Button("Choose…");
+        choose.setOnAction(e -> LaunchTargetChooser.choose(services, described -> {
+            report(true, "Launch target on this computer: " + described + ".");
+            refresh();
+        }, reason -> report(false, reason)));
+        return choose;
+    }
+
+    private void report(boolean ok, String message) {
+        launchStatus.setText(message);
+        launchStatus.setStyle("-fx-font-size: 11px; -fx-text-fill: " + (ok ? "gray" : "#c0392b") + ";");
     }
 
     /**
@@ -207,10 +225,7 @@ public final class ProjectSetup {
      * the target each time, so the button cannot go stale.
      */
     private Button quickLaunchButton() {
-        return QuickLaunch.button(services, (ok, message) -> {
-            launchStatus.setText(message);
-            launchStatus.setStyle("-fx-font-size: 11px; -fx-text-fill: " + (ok ? "gray" : "#c0392b") + ";");
-        });
+        return QuickLaunch.button(services, this::report);
     }
 
     /** Forgets a launch target nothing can read, so a run stops being handed it. */

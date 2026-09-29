@@ -8,6 +8,33 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — launch through existing launchers (rework follow-ups, phase 5)
+
+**Research (read-only).** Nothing new was needed in shared: `game/FaugusLibraryScanner` and
+`HeroicLibraryScanner` already read the libraries, both registered in `GameLibraries.all()`, and
+`GameLibraryScannerTest` covers them on fixtures.
+- Faugus: `games.json` under `~/.local/share/faugus-launcher` or the Flatpak root
+  `~/.var/app/io.github.Faugus.faugus-launcher/data/faugus-launcher`. It is an array of entries with
+  `gameid`, `title`, `cover`, `icon` and `hidden`. Launch with `faugus-launcher --game <gameid>` (or the
+  Flatpak form); there is no protocol handler, and `gameid` is matched exactly.
+- Heroic: launch with `heroic://launch/<appName>` (protocol URL, or Heroic's argv with `--no-gui`).
+- Both are `LaunchKind`s (`heroic:`, `faugus:`).
+
+**Done**
+- `api.launch.@HeroicAppName` and `@FaugusGameId` are on `launchHeroic`/`launchFaugus`; this is additive.
+  `SdkEditors` claims them with `LaunchEditors.heroicGame`/`faugusGame` (the same cover grid Steam and Epic
+  use). Before this, the javadoc promised "Studio's Heroic game picker" but no picker existed.
+- `plugin/launch/LaunchTargetChooser`: one gallery over every `GameLibraries.all()` entry, with each label
+  naming its launcher. A pick stores `LaunchSpec(kind, id).spec()` through `LaunchTargetValue.set`. A typed
+  target is kept only when `LaunchSpec.parse` gives a known kind. Project Setup's launch row has
+  **Choose…** beside ▶ Launch now/Clear, and its empty-state text says so.
+- The toolkit gained `Modals.gallery(StudioServices, …)` / `form(StudioServices, …)`, since the row has no slot.
+- Tests: `LaunchTargetChooserTest` and `SdkEditorsTest.the_heroic_and_faugus_ids_are_claimed`.
+
+**Deferred / next**
+- `Target.set(String spec)` has no editor; a `@LaunchTargetSpec` annotation could reuse the chooser's grid.
+- The GOG and Lutris libraries are not scanned.
+
 ## 2026-09-29 — `OcrOptions` editor (rework follow-ups, phase 4)
 
 **Done**

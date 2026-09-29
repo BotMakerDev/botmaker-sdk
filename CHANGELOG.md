@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Heroic and Faugus games are picked from a grid.** `launchHeroic` and `launchFaugus` carry
+  `@HeroicAppName` and `@FaugusGameId`, so their argument opens the launcher's installed games with cover art,
+  as Steam's and Epic's do.
+- **Project Setup ▸ Launch target ▸ Choose…** lists the games Steam, Epic, Heroic and Faugus already have on
+  this computer and makes the pick what a run launches (a typed `kind:id` works too). Nothing about how to
+  start the game is stored; its launcher knows. Background mode can then start a PC game in its own display.
 - **Every toolbar button opens through its feature's own `open(ActionContext)`**, listed in the plugin's
   `SdkToolbarItems` with an id constant each. The buttons, their order and what they open are unchanged.
 - **Parameter annotations saying what a `String` or a number is for**: `@SteamAppId`, `@EpicAppName`,
