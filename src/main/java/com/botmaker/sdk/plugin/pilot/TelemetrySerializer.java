@@ -136,6 +136,8 @@ public final class TelemetrySerializer {
             case TelemetryEvent.Region r -> new RegionEvent(ts, target, "Region", Rect.of(r.rect()));
             case TelemetryEvent.Swipe s -> new SwipeEvent(ts, target, "Swipe",
                     s.x1(), s.y1(), s.x2(), s.y2(), s.durationMs());
+            case TelemetryEvent.Log l -> throw new IllegalArgumentException(
+                    "a log line is not an event the pilot draws: " + l.text());
         };
     }
 

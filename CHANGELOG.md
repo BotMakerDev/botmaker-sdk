@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A run started from Studio sends its debug output to Studio as structured lines**: level, source (the
+  `[Vision]`, `[Game]`… it starts with), how many times a repeated line happened, and where on screen. The
+  console output is unchanged.
+- **`-Dbotmaker.debug=true|false` on the run wins over the `debug` in your Bot Settings.** The setting still
+  decides for a run that does not say.
+
 - **Heroic and Faugus games are picked from a grid.** `launchHeroic` and `launchFaugus` carry
   `@HeroicAppName` and `@FaugusGameId`, so their argument opens the launcher's installed games with cover art,
   as Steam's and Epic's do.

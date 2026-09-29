@@ -425,7 +425,8 @@ public final class PilotServer implements AutoCloseable {
     // --- Telemetry + state fan-out (text messages) ---
 
     private void onTelemetry(TelemetryEvent te) {
-        if (te == null) return;
+        // A log line is drawn nowhere on the screen, and its whole-screen target must not move the view.
+        if (te == null || te instanceof TelemetryEvent.Log) return;
         lastTarget = te.target();
         broadcastText(TelemetrySerializer.telemetryJson(te));
     }

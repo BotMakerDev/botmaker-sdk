@@ -156,7 +156,7 @@ public final class PopupGuard {
 
     private static void report(Trace.Runs.Run run) {
         if (run != null) {
-            Debug.log("[Popup] checked " + run);
+            Trace.log("[Popup] checked", run);
         }
     }
 }

@@ -1,5 +1,9 @@
 package com.botmaker.sdk.internal.trace;
 
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.shared.Diag;
+import com.botmaker.shared.ipc.TelemetryEvent;
+
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -22,6 +26,20 @@ import java.util.Map;
 public final class Trace {
 
     private Trace() {}
+
+    /**
+     * Prints {@code message} followed by {@code run}, and traces it as one line that happened {@link Run#count()}
+     * times, so a host shows {@code ×47} as a count rather than as text it would have to read back.
+     */
+    public static void log(String message, Runs.Run run) {
+        Diag.log(message + " " + run, run.count(), null);
+    }
+
+    /** Prints {@code message} and traces it at {@code where}, the desktop rectangle it is about. */
+    public static void log(String message, Rect where) {
+        Diag.log(message, 1, where == null ? null
+                : new TelemetryEvent.Rect(where.x(), where.y(), where.width(), where.height()));
+    }
 
     /**
      * {@code millis} as a duration a person reads at a glance — {@code 340ms} below a second, {@code 1.4s}

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.shared.Diag;
 import com.botmaker.shared.capture.NativeControllerFactory;
 
 /**
@@ -40,7 +41,8 @@ import com.botmaker.shared.capture.NativeControllerFactory;
  * @param session          whether the bot runs on a private display, and which kind
  * @param maxRetryAttempts how many no-progress checks {@link Watchdog} tolerates before the bot is stuck; at
  *                         least 1
- * @param debug            whether the SDK's debug output starts on
+ * @param debug            whether the SDK's debug output starts on, for a run that does not say: a
+ *                         {@code -Dbotmaker.debug=true|false} on the run (Studio's Debug output toggle) wins
  */
 public record BotSettings(Clicks clicks, Vision vision, Input input, Session session, int maxRetryAttempts,
                           boolean debug) {
@@ -237,7 +239,8 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
                 current = next.realInput(true);
             }
         }
-        Debug.set(next.debug);
+        // The run's -Dbotmaker.debug (a host's Debug output toggle) wins over the bot's own default.
+        Debug.set(Diag.runOverride().orElse(next.debug));
     }
 
     /** The system property {@code LinuxController} reads its backend from. */

@@ -8,6 +8,26 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — the run trace, bot side (rework follow-ups, phase 7)
+
+Design: `../docs/refactor/40-run-trace.md`.
+
+**Done**
+- `IpcObserver.installIfEnabled` sets itself as shared `Diag`'s sink, so under Studio each printed debug line
+  also crosses as a `TelemetryEvent.Log`, attributed to the bot line that printed it (`botLine()`).
+- The source is the `[Name]` prefix every SDK trace already starts with, read in `Diag`. No call site
+  changed for it.
+- `Trace.log(message, Run)` sends a collapsed run as one line with its count (the vision misses and the popup
+  checks), and `Trace.log(message, Rect)` a located one with its rectangle (a vision find).
+- `BotSettings.use` applies `Diag.runOverride()` over `debug`, so `-Dbotmaker.debug` (Studio's toggle, phase 8)
+  wins. The setting stays as the bot's default for a run that does not say.
+- The Pilot ignores `Log` frames for now (`PilotServer.onTelemetry`); `TelemetrySerializer` refuses one.
+
+**Deferred / next**
+- The user asked (2026-09-29) whether a trace line could be deduced instead of written at each api call.
+  Answered in the phase 7 recap; nothing changed yet.
+- Phase 9: the Pilot's log drawer from `onTrace`, the match overlay, and the Bot Settings debug tick.
+
 ## 2026-09-29 — launch through existing launchers (rework follow-ups, phase 5)
 
 **Research (read-only).** Nothing new was needed in shared: `game/FaugusLibraryScanner` and

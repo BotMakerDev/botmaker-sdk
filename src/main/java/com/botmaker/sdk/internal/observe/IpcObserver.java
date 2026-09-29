@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.observe;
 
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.shared.Diag;
 import com.botmaker.shared.ipc.TelemetryClient;
 import com.botmaker.shared.ipc.TelemetryEvent;
 
@@ -16,6 +17,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * only when {@link TelemetryClient#fromEnvironment()} finds {@code BM_IPC_PORT} — i.e. only under the Studio.
  * A normal published bot never sets that env var, so no observer is registered and no socket is opened:
  * the SDK stays fully usable, with zero overhead, on its own.
+ *
+ * <p>It is also {@code Diag}'s sink under Studio, so every debug line the bot prints crosses as a
+ * {@link TelemetryEvent.Log} as well.
  */
 public final class IpcObserver implements BotObserver {
 
@@ -41,7 +45,9 @@ public final class IpcObserver implements BotObserver {
             INSTALLED.set(false); // not under Studio; allow a later retry if the env appears
             return;
         }
-        Bots.addObserver(new IpcObserver(client));
+        IpcObserver observer = new IpcObserver(client);
+        Bots.addObserver(observer);
+        Diag.setSink(observer::onLog);
         Runtime.getRuntime().addShutdownHook(new Thread(client::close, "telemetry-client-close"));
     }
 
@@ -58,6 +64,14 @@ public final class IpcObserver implements BotObserver {
     @Override
     public void onSwipe(SwipeEvent event) {
         client.send(toTelemetry(event));
+    }
+
+    /**
+     * Ships one debug line ({@code Diag}'s sink), attributed to the bot's own line that printed it, so the host's
+     * trace can reveal the block ({@code docs/refactor/40-run-trace.md}).
+     */
+    void onLog(TelemetryEvent.Log line) {
+        client.send(line.atLine(botLine()));
     }
 
     // --- SDK-native events → shared wire vocabulary ---

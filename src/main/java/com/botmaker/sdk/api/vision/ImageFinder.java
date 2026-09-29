@@ -1003,8 +1003,8 @@ public class ImageFinder {
         // The centre rather than the top-left: it is the point a click would land on, so the number in the
         // log is the number to compare against where the pointer actually went.
         Point centre = result.center();
-        Debug.log("[Vision] find " + template.id() + " → (" + centre.x() + "," + centre.y() + ") "
-                + String.format(Locale.ROOT, "%.2f", result.confidence()));
+        Trace.log("[Vision] find " + template.id() + " → (" + centre.x() + "," + centre.y() + ") "
+                + String.format(Locale.ROOT, "%.2f", result.confidence()), result.rect());
     }
 
     /** Records a miss, printing only when its run has gone on long enough to be worth saying so. */
@@ -1015,7 +1015,7 @@ public class ImageFinder {
 
     private static void reportMisses(String templateId, Trace.Runs.Run run) {
         if (run != null) {
-            Debug.log("[Vision] " + templateId + " not found " + run);
+            Trace.log("[Vision] " + templateId + " not found", run);
         }
     }
 

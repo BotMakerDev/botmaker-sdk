@@ -55,6 +55,24 @@ class IpcObserverTest {
     }
 
     @Test
+    void aDebugLineCrossesTheWireAsALogFrame() throws Exception {
+        BlockingQueue<TelemetryEvent> received = new ArrayBlockingQueue<>(8);
+        try (TelemetryServer server = new TelemetryServer("t", received::offer);
+             TelemetryClient client = new TelemetryClient(server.port(), "t")) {
+
+            new IpcObserver(client).onLog(new TelemetryEvent.Log(
+                    TelemetryEvent.Log.ERROR, "Game", "could not launch", 1, 42L, null, -1));
+
+            TelemetryEvent.Log line =
+                    assertInstanceOf(TelemetryEvent.Log.class, received.poll(3, TimeUnit.SECONDS));
+            assertEquals("Game", line.source());
+            assertEquals("could not launch", line.text());
+            assertEquals(TelemetryEvent.Log.ERROR, line.level());
+            assertEquals(42L, line.atMillis());
+        }
+    }
+
+    @Test
     void aSwipeCrossesTheWireWithBothEndsAndItsDuration() throws Exception {
         BlockingQueue<TelemetryEvent> received = new ArrayBlockingQueue<>(8);
         try (TelemetryServer server = new TelemetryServer("t", received::offer);
