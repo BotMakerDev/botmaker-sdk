@@ -8,6 +8,22 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — Pilot Funnel off, narrowed (rework follow-ups, phase 2)
+
+**Done**
+- `TailscaleFunnelService.disable` runs `tailscale serve --https=443 off` (`OFF`) instead of
+  `tailscale funnel reset`, which cleared every serve/funnel on the machine. Checked on tailscale 1.102.4:
+  `funnel --https=443 off` blocks at the "Funnel is not enabled" gate (exit 124 under `timeout 10`), while
+  `serve --https=443 off` returns at once and reports `handler does not exist` when nothing is there, which
+  `turnedOff` counts as done.
+- No `reset` fallback (the plan had one): `disable` runs from `PilotServer` at project close, where no status
+  line would tell the user their other config went. A failure prints the manual command to stderr instead.
+- Test: `TailscaleFunnelServiceTest`.
+
+**Deferred / next**
+- Not checked end to end with Funnel enabled on the tailnet (it is not, here): that `serve … off` also drops the
+  Funnel flag of `:443`. Phase 10's transport rework runs the real cycle.
+
 ## 2026-09-29 — Activity Flow leftovers (rework follow-ups, phase 1)
 
 **Done**

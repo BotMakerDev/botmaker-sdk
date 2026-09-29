@@ -249,6 +249,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - The Funnel setup checklist no longer ticks the HTTPS-certificates step while highlighting it as the
     blocker.
   - Background mode's hint no longer points at a Run ▸ Launch Target… menu that does not exist.
+  - Stopping the pilot turns off only its own HTTPS Funnel (`tailscale serve --https=443 off`). It ran
+    `tailscale funnel reset`, which also removed anything else you served or funnelled through Tailscale.
 - **Launch:** the unused launch-target picker and its game-grid dialog are deleted; nothing called them.
   `Target.current()` and `Target.set` are no longer offered in the palette, since no editor can fill either.
 - **Vision results and the palette:**

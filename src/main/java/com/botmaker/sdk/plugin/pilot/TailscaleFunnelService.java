@@ -102,12 +102,33 @@ public final class TailscaleFunnelService {
     }
 
     /**
-     * Tears down the Funnel started by {@link #enable(int)} via {@code tailscale funnel reset}. Best-effort,
-     * never throws. (Note: the older {@code funnel --https=443 off} form <em>hangs</em> on current Tailscale
-     * — it parses {@code off} as a serve target — so {@code reset} is used instead.)
+     * Tears down the Funnel started by {@link #enable(int)}: the web handler on {@code :443} and the Funnel on
+     * it, and nothing else the user serves. Best-effort, never throws.
+     *
+     * <p>It ran {@code tailscale funnel reset} until 2026-09-29, which clears <em>every</em> serve and Funnel
+     * on the machine, the user's own included. {@code tailscale funnel --https=443 off} is not the narrow form:
+     * on 1.102 it stops at the "Funnel is not enabled" gate and blocks like {@code enable} does.
+     * {@code tailscale serve --https=443 off} passes no such gate and returns at once; a handler that is
+     * already gone is reported and counts as done. No {@code reset} fallback: this runs as a project closes,
+     * where nobody would see that it cleared their other config.
      */
     public void disable() {
-        run(List.of("tailscale", "funnel", "reset"), 10);
+        Exec e = run(OFF, 10);
+        if (!turnedOff(e.exit, e.err + e.out)) {
+            System.err.println("[Pilot] Could not turn the Remote Pilot's Funnel off: " + (e.err + e.out).trim()
+                    + " — run `tailscale serve --https=" + HTTPS_PORT + " off` to do it by hand.");
+        }
+    }
+
+    /** The port {@code tailscale funnel --bg <port>} serves on when no {@code --https} is given. */
+    static final int HTTPS_PORT = 443;
+
+    /** Turns off only the web handler {@link #enable} made, and the Funnel on it. */
+    static final List<String> OFF = List.of("tailscale", "serve", "--https=" + HTTPS_PORT, "off");
+
+    /** Whether {@link #OFF} left nothing of ours: it succeeded, or there was no handler to remove. */
+    static boolean turnedOff(int exit, String output) {
+        return exit == 0 || (output != null && output.contains("handler does not exist"));
     }
 
     // --- process plumbing ---
