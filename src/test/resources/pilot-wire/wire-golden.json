@@ -85,6 +85,26 @@
       "button": 1
     }
   },
+  "trace.debug": {
+    "type": "trace",
+    "line": {
+      "ts": 1700000000123,
+      "level": "debug",
+      "source": "Vision",
+      "text": "find ore → (150,80)",
+      "count": 3
+    }
+  },
+  "trace.unknown": {
+    "type": "trace",
+    "line": {
+      "ts": 0,
+      "level": "",
+      "source": "",
+      "text": "a line from a newer bot",
+      "count": 1
+    }
+  },
   "state.running.background": {
     "type": "state",
     "run": "running",

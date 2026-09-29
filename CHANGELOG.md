@@ -79,6 +79,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The Remote Pilot shows the bot's log.** On the phone, **📜 Log** opens a drawer with the run's debug lines.
+  It has a level floor and a search, and a phone that connects mid-run gets the last 200 lines. The served
+  pilot client is rebuilt with it.
 - **⚙ Bot Settings no longer shows "Print the bot's debug trace".** Studio's 🐞 Debug button decides debug
   output now, for every plugin and not only the SDK. The value stays in your bot's settings and still applies
   when the bot runs outside Studio. `BotSettings.debug()` is deprecated, with a note saying so.

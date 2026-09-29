@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.pilot;
 
+import com.botmaker.plugin.api.TraceLine;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -52,6 +53,14 @@ public final class TelemetrySerializer {
     record Video(String type, String codec, int sx, int sy, int sw, int sh) {}
 
     record VideoStopped(String type, String codec) {}
+
+    record Trace(String type, Line line) {}
+
+    /**
+     * One trace line as a phone shows it: when (the bot's clock, ms), how serious ({@code TraceLine.Level}'s
+     * id, {@code ""} for one the host did not know), what wrote it, what it said, and how many times.
+     */
+    record Line(long ts, String level, String source, String text, int count) {}
 
     // --- The event body, one record per kind ---
 
@@ -123,6 +132,12 @@ public final class TelemetrySerializer {
      */
     public static String videoStoppedJson() {
         return write(new VideoStopped("video", null));
+    }
+
+    /** The log drawer's message. The source line, the writer and the region stay on the host. */
+    public static String traceJson(TraceLine line) {
+        return write(new Trace("trace", new Line(line.at().toEpochMilli(), line.level().id(), line.source(),
+                line.text(), line.count())));
     }
 
     /** The event body, stamped with the send clock: {@code ts} is when it left, not when the bot saw it. */

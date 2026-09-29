@@ -8,6 +8,23 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — the Pilot's log drawer (rework follow-ups, phase 9)
+
+**Done**
+- `PilotServer` subscribes `Runs.onTrace` and sends `{"type":"trace","line":{ts,level,source,text,count}}`
+  (`TelemetrySerializer.traceJson`). It keeps the run's last `TRACE_BACKLOG` (200) for a phone that connects
+  mid-run, and empties that backlog when a run starts. The source line, the writer and the region stay on the
+  host: the phone shows the words.
+- The wire corpus gains `trace.debug` and `trace.unknown`, in both byte-identical copies (the digest changed on
+  both sides).
+- The served client (`src/main/resources/pilot`) is rebuilt from `botmaker-pilot/web`.
+
+**Dropped from the plan: a match overlay on the real screen.** A transparent window over the game takes the
+bot's own clicks on X11, and the Pilot already draws matches over its video. A Studio "run view" window was
+offered and declined as a copy of the Pilot. The user's direction instead is that the Pilot becomes something
+plugins extend. That is a design phase next, before the remote transports, which would otherwise be written
+into the Pilot's current home.
+
 ## 2026-09-29 — each line names its writer; Bot Settings' debug tick goes (rework follow-ups, phase 8b)
 
 When asked about the Bot Settings debug tick at phase 9, the user answered that `BotSettings` is the SDK's

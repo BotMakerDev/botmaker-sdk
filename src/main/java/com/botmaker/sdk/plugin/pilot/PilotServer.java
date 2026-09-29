@@ -5,6 +5,7 @@ import com.botmaker.session.video.VideoPacket;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import com.botmaker.plugin.api.Runs;
+import com.botmaker.plugin.api.TraceLine;
 import com.botmaker.sdk.plugin.pilot.TelemetrySerializer.RunState;
 import com.botmaker.shared.ipc.TelemetryFrame;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -19,6 +20,7 @@ import java.awt.Rectangle;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -40,7 +42,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li><b>text</b> server→client: telemetry events ({@code {"type":"telemetry",…}}), run-state
  *       ({@code {"type":"state","run":"running|stopped|paused","backgroundInput":true}}, plus a
  *       {@code "reason"} sentence while the stream has no frames to send — see {@link #reportEmpty}) and the
- *       video stream's start/stop ({@code {"type":"video","codec":"avc1.42E01E","sx":…}}).</li>
+ *       video stream's start/stop ({@code {"type":"video","codec":"avc1.42E01E","sx":…}}), and the run's trace
+ *       lines ({@code {"type":"trace","line":{"ts":…,"level":"debug","source":"Vision","text":…,"count":1}}},
+ *       the last {@link #TRACE_BACKLOG} of them replayed to a phone that connects mid-run).</li>
  *   <li><b>text</b> client→server: control commands ({@code {"cmd":"start|stop|pause|resume"}}), the
  *       Interact arm/disarm ({@code {"cmd":"interact","on":true}}), once armed, manual gestures
  *       ({@code {"cmd":"input","kind":"tap|down|move|up|scroll","x":…,"y":…,"button":1,"amount":-3}} in
@@ -136,6 +140,11 @@ public final class PilotServer implements AutoCloseable {
     /** Connected, authorized clients. */
     private final Map<WsContext, Client> clients = new ConcurrentHashMap<>();
 
+    /** How many trace lines a phone that connects mid-run is sent first. */
+    static final int TRACE_BACKLOG = 200;
+    /** The current run's last {@link #TRACE_BACKLOG} trace messages, oldest first; emptied when a run starts. */
+    private final java.util.ArrayDeque<String> traceBacklog = new java.util.ArrayDeque<>();
+
     private Javalin app;
     private ScheduledExecutorService frameExec;
     private volatile TelemetryEvent.Target lastTarget;
@@ -215,6 +224,8 @@ public final class PilotServer implements AutoCloseable {
                 clients.put(ctx, new Client());
                 ctx.enableAutomaticPings();
                 ctx.send(stateJson()); // let a fresh client render the current run state immediately
+                // …and the run's recent trace, so a phone that connects mid-run opens on context, not blank.
+                for (String line : traceBacklog()) ctx.send(line);
             });
             ws.onMessage(ctx -> {
                 Client client = clients.get(ctx);
@@ -243,8 +254,10 @@ public final class PilotServer implements AutoCloseable {
         if (!subscribed) {
             subscribed = true;
             subscriptions.add(runs.onTelemetry(this::onTelemetryFrame));
+            subscriptions.add(runs.onTrace(this::onTrace));
             subscriptions.add(runs.onStateChanged(running -> {
                 if (running) {
+                    clearTraceBacklog();
                     setRunState(RunState.RUNNING);
                 } else {
                     control.onRunStopped();
@@ -444,6 +457,34 @@ public final class PilotServer implements AutoCloseable {
             onTelemetry(TelemetryFrame.read(in));
         } catch (Exception unreadable) {
             // dropped, deliberately — see above
+        }
+    }
+
+    /**
+     * One line of the run's trace, as the host read it, sent to every phone for its log drawer and kept for the
+     * next phone to connect (docs/refactor/40-run-trace.md). The host already filtered nothing and decoded the
+     * frame, so this is the one message here that carries no SDK vocabulary.
+     */
+    private void onTrace(TraceLine line) {
+        if (line == null) return;
+        String json = TelemetrySerializer.traceJson(line);
+        synchronized (traceBacklog) {
+            traceBacklog.addLast(json);
+            if (traceBacklog.size() > TRACE_BACKLOG) traceBacklog.removeFirst();
+        }
+        broadcastText(json);
+    }
+
+    /** What a phone connecting now is sent after the run state, oldest first. */
+    List<String> traceBacklog() {
+        synchronized (traceBacklog) {
+            return List.copyOf(traceBacklog);
+        }
+    }
+
+    private void clearTraceBacklog() {
+        synchronized (traceBacklog) {
+            traceBacklog.clear();
         }
     }
 

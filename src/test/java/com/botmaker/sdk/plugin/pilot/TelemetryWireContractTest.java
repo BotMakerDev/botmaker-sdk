@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.pilot;
 
+import com.botmaker.plugin.api.TraceLine;
 import com.botmaker.sdk.plugin.pilot.TelemetrySerializer.RunState;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -13,8 +14,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -44,7 +48,7 @@ class TelemetryWireContractTest {
      * The corpus, byte for byte. Update this together with {@code GOLDEN_SHA256} in the pilot repo's
      * {@code wire.test.ts} — and with the copy of the file itself, which must stay byte-identical.
      */
-    private static final String GOLDEN_SHA256 = "c12e8c813f6de5088718103b3af6c4620963c1ae45adb46f36dd226aaf1675a7";
+    private static final String GOLDEN_SHA256 = "72869283e65c1eafdf9e2cad4f78662bd95a377a260cdae29d603993a32d76b7";
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final JsonNode CORPUS = corpus();
@@ -110,6 +114,22 @@ class TelemetryWireContractTest {
         // client types it `Target | null`. Characterising it here means the tolerance is deliberate.
         assertWire("telemetry.target.null",
                 TelemetrySerializer.telemetryJson(new TelemetryEvent.Click(null, 10, 20, 1)));
+    }
+
+    @Test
+    void aTraceLineCarriesWhenHowSeriousWhatWroteItWhatItSaidAndHowOften() {
+        // The source line, the writer and the region stay on the host: a phone's log drawer shows the words.
+        assertWire("trace.debug", TelemetrySerializer.traceJson(new TraceLine(
+                Instant.ofEpochMilli(1_700_000_000_123L), TraceLine.Level.DEBUG, "Vision", "find ore → (150,80)", 3,
+                "com.botmaker.sdk.api.vision.ImageFinder", "find", "com.example.Collect", OptionalInt.of(12),
+                Optional.of(new TraceLine.Region(150, 80, 32, 24)))));
+    }
+
+    @Test
+    void aTraceLineOfALevelTheHostDidNotKnowGoesOutWithAnEmptyLevel() {
+        assertWire("trace.unknown", TelemetrySerializer.traceJson(new TraceLine(
+                Instant.EPOCH, TraceLine.Level.UNKNOWN, "", "a line from a newer bot", 1, "", "", "",
+                OptionalInt.empty(), Optional.empty())));
     }
 
     @Test
