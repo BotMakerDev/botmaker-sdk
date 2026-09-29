@@ -130,6 +130,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **A bot whose package starts with `com.botmaker.` now reports which of its lines is running.** Studio got
+  no line from the worked template (`com.botmaker.gamebot`), because every class under `com.botmaker.` was
+  skipped as SDK code. Only the SDK's own packages are skipped now. A debug line also carries the bot class
+  that wrote it, so Studio's Trace tab can show the block.
 - **Picking a point, a region or a colour off the screen** (Point, Rect and Size pills, the eyedropper,
   capturing a picture in 🖼 Manage Pictures):
   - A region dragged past the edge of the frame is clamped to it, instead of reporting negative or oversized

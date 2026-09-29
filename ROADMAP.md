@@ -8,6 +8,16 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — the bot's own line, found in `com.botmaker.*` bots too (rework follow-ups, phase 8)
+
+**Done**
+- `IpcObserver.botFrame()` skips our libraries by package (`sdk`, `shared`, `session`, `plugin`, `basics`, the
+  JDK) instead of the whole `com.botmaker.` prefix, which had skipped every class of the worked template
+  (`com.botmaker.gamebot`), so none of its frames carried a line. `onLog` now sends the class as well
+  (`Log.at(className, line)`); Studio needs it to find the file.
+- Studio no longer relays `Log` frames through `onTelemetry` (they reach `onTrace` instead). `PilotServer`
+  still skips one, which costs nothing.
+
 ## 2026-09-29 — a trace line's source is deduced (rework follow-ups, phase 7b)
 
 The user asked for logging without writing the source at each call ("like a Logger class … then just call the

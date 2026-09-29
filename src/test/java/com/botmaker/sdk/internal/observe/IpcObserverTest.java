@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Verifies the bridge's SDK-event → shared-wire translation end to end over a real loopback socket
@@ -61,7 +62,7 @@ class IpcObserverTest {
              TelemetryClient client = new TelemetryClient(server.port(), "t")) {
 
             new IpcObserver(client).onLog(new TelemetryEvent.Log(
-                    TelemetryEvent.Log.ERROR, "Game", "could not launch", 1, 42L, null, -1));
+                    TelemetryEvent.Log.ERROR, "Game", "could not launch", 1, 42L, null, "", -1));
 
             TelemetryEvent.Log line =
                     assertInstanceOf(TelemetryEvent.Log.class, received.poll(3, TimeUnit.SECONDS));
@@ -70,6 +71,16 @@ class IpcObserverTest {
             assertEquals(TelemetryEvent.Log.ERROR, line.level());
             assertEquals(42L, line.atMillis());
         }
+    }
+
+    /** The worked template lives under com.botmaker too; only our libraries are skipped when finding its line. */
+    @Test
+    void aBotUnderComBotmakerIsTheBotsOwnCodeButOurLibrariesAreNot() {
+        assertFalse(IpcObserver.isLibrary("com.botmaker.gamebot.Collect"));
+        assertFalse(IpcObserver.isLibrary("com.example.Farm"));
+        assertTrue(IpcObserver.isLibrary("com.botmaker.sdk.api.interaction.Mouse"));
+        assertTrue(IpcObserver.isLibrary("com.botmaker.shared.Diag"));
+        assertTrue(IpcObserver.isLibrary("java.lang.Thread"));
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.botmaker.shared.Diag;
 import com.botmaker.shared.ipc.TelemetryClient;
 import com.botmaker.shared.ipc.TelemetryEvent;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -71,7 +72,8 @@ public final class IpcObserver implements BotObserver {
      * trace can reveal the block ({@code docs/refactor/40-run-trace.md}).
      */
     void onLog(TelemetryEvent.Log line) {
-        client.send(line.atLine(botLine()));
+        StackTraceElement at = botFrame();
+        client.send(at == null ? line : line.at(at.getClassName(), at.getLineNumber()));
     }
 
     // --- SDK-native events → shared wire vocabulary ---
@@ -106,16 +108,32 @@ public final class IpcObserver implements BotObserver {
      * i.e. the user's own bot class — so the Studio can highlight the running block during a plain run.
      */
     private static int botLine() {
+        StackTraceElement at = botFrame();
+        return at == null ? -1 : at.getLineNumber();
+    }
+
+    /**
+     * The first frame of the bot's own code, or null. Our libraries are skipped by their packages rather than
+     * by {@code com.botmaker.}: the worked template is {@code com.botmaker.gamebot}, and skipping the whole
+     * prefix found no line in it at all until 2026-09-29.
+     */
+    static StackTraceElement botFrame() {
         for (StackTraceElement f : Thread.currentThread().getStackTrace()) {
-            String cn = f.getClassName();
-            if (cn.startsWith("com.botmaker.") || cn.startsWith("java.") || cn.startsWith("javax.")
-                    || cn.startsWith("jdk.") || cn.startsWith("sun.") || cn.equals("java.lang.Thread")) {
-                continue;
-            }
-            int line = f.getLineNumber();
-            if (line > 0) return line;
+            if (isLibrary(f.getClassName())) continue;
+            if (f.getLineNumber() > 0) return f;
         }
-        return -1;
+        return null;
+    }
+
+    private static final List<String> LIBRARY_PACKAGES = List.of(
+            "com.botmaker.sdk.", "com.botmaker.shared.", "com.botmaker.session.", "com.botmaker.plugin.",
+            "com.botmaker.basics.", "java.", "javax.", "jdk.", "sun.");
+
+    static boolean isLibrary(String className) {
+        for (String prefix : LIBRARY_PACKAGES) {
+            if (className.startsWith(prefix)) return true;
+        }
+        return false;
     }
 
     private static TelemetryEvent.Target target(Surface surface) {
