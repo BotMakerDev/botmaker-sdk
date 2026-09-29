@@ -2,7 +2,8 @@ package com.botmaker.sdk.plugin.pilot.ui;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Modals;
-import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.PilotMode;
+import com.botmaker.sdk.plugin.pilot.transport.PilotTransport.Availability;
+import com.botmaker.sdk.plugin.pilot.transport.TransportKind;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.PilotOutcome;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -10,8 +11,10 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -19,6 +22,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -48,10 +52,11 @@ final class RemotePilotDialog {
      *
      * @param resetToken revokes the pairing token and returns the outcome to re-render, or {@code null} if there
      *                   is no server to revoke it on
-     * @param enableFunnel the opt-in "expose publicly over HTTPS" bring-up
+     * @param use remembers a transport and brings the pilot up again over it
      * @param backgroundMode builds the private-display controls (built lazily — it starts a launcher)
      */
-    record Actions(UnaryOperator<PilotOutcome> resetToken, Runnable enableFunnel, Supplier<Node> backgroundMode) {}
+    record Actions(UnaryOperator<PilotOutcome> resetToken, Consumer<TransportKind> use,
+                   Supplier<Node> backgroundMode) {}
 
     /**
      * The pairing dialog on screen, if any. It is not modal, so a second 🎮 press used to stack a second copy,
@@ -83,44 +88,48 @@ final class RemotePilotDialog {
             }
             return;
         }
-        PilotMode mode = outcome.mode();
+        TransportKind kind = outcome.kind();
         String url = outcome.url();
-        String funnelError = outcome.funnelError();
-        boolean funnelLive = mode == PilotMode.FUNNEL_HTTPS;
 
         Alert alert = services.theme().alert(Alert.AlertType.INFORMATION);
         alert.initOwner(Modals.owner(services));
         alert.setTitle("Remote Pilot");
-        alert.setHeaderText(switch (mode) {
-            case FUNNEL_HTTPS -> "Remote Pilot is live over HTTPS — your phone needs nothing installed.";
-            case TAILNET_DIRECT -> "Remote Pilot is running on your tailnet.";
-            case ALL_INTERFACES -> "Tailscale not detected — bound to ALL interfaces.";
+        alert.setHeaderText(switch (kind) {
+            case FUNNEL -> "Remote Pilot is live over HTTPS — your phone needs nothing installed.";
+            case QUICK_TUNNEL -> "Remote Pilot is live over a Cloudflare quick tunnel — your phone needs nothing installed.";
+            case LAN -> "Remote Pilot is on your local network.";
+            case TAILNET, UNKNOWN -> "Remote Pilot is running on your tailnet.";
         });
 
         VBox content = new VBox(10);
         content.setStyle("-fx-padding: 4;");
 
-        // The user explicitly tried "expose publicly" (Advanced) and Funnel couldn't be enabled → lead with
-        // the guided, re-checkable setup wizard rather than a dead-end error line. The default (VPN) open never
-        // sets funnelError, so this only appears after the Advanced action.
-        if (!funnelLive && funnelError != null) {
-            content.getChildren().addAll(
-                    FunnelSetupWizard.create(outcome.diag(), funnelError,
-                            () -> { alert.close(); actions.enableFunnel().run(); }),
-                    new Separator());
-            content.getChildren().add(PilotWidgets.wrapped(
-                    "Meanwhile you can connect right now over Tailscale with the link below — the phone just "
-                    + "needs Tailscale signed in to the same account."));
-        } else if (funnelLive) {
-            content.getChildren().add(PilotWidgets.wrapped(
-                    "Scan the LEFT QR (or tap the link) to open Remote Pilot on your phone — no app, account "
-                    + "or VPN needed there. The RIGHT QR installs the optional BotPilot Android app."));
-        } else {
-            // Default path: VPN over the tailnet. Present the phone's 3 steps as the intended flow, not a
-            // fallback apology.
-            content.getChildren().add(PilotWidgets.wrapped(
-                    "On your phone: ① install Tailscale, ② sign in to THIS same account, ③ scan the LEFT QR "
-                    + "(or open the link). The RIGHT QR installs the optional BotPilot app."));
+        // The way the user picked didn't come up and a direct one took over. Funnel leads with its guided,
+        // re-checkable setup checklist; the others say why and what to do.
+        if (outcome.fellBack()) {
+            if (outcome.asked() == TransportKind.FUNNEL) {
+                content.getChildren().add(FunnelSetupWizard.create(outcome.diag(), outcome.error(),
+                        () -> { alert.close(); actions.use().accept(TransportKind.FUNNEL); }));
+            } else {
+                Label failed = PilotWidgets.wrapped("⚠ " + outcome.asked().displayName() + " didn't start: "
+                        + outcome.error() + (outcome.fix() == null ? "" : "\n" + outcome.fix()));
+                failed.setStyle("-fx-text-fill: #e67e22;");
+                content.getChildren().add(failed);
+            }
+            content.getChildren().addAll(new Separator(), PilotWidgets.wrapped(
+                    "Meanwhile the pilot is reachable over " + kind.displayName() + " with the link below."));
+        }
+        content.getChildren().add(PilotWidgets.wrapped(switch (kind) {
+            case FUNNEL -> "Scan the LEFT QR (or tap the link) to open Remote Pilot on your phone — no app, account "
+                    + "or VPN needed there. The RIGHT QR installs the optional BotPilot Android app.";
+            case QUICK_TUNNEL -> "Scan the LEFT QR (or tap the link) on your phone — nothing to install there. The "
+                    + "address is new each time the pilot starts, so scan again after a restart.";
+            case LAN -> "Your phone must be on the same Wi-Fi as this computer. Scan the LEFT QR (or open the "
+                    + "link). The RIGHT QR installs the optional BotPilot app.";
+            case TAILNET, UNKNOWN -> "On your phone: ① install Tailscale, ② sign in to THIS same account, ③ scan "
+                    + "the LEFT QR (or open the link). The RIGHT QR installs the optional BotPilot app.";
+        }));
+        if (kind == TransportKind.TAILNET) {
             content.getChildren().add(
                     PilotWidgets.linkBtn("Get Tailscale for your phone ▸", TAILSCALE_DOWNLOAD_URL));
         }
@@ -158,28 +167,62 @@ final class RemotePilotDialog {
         content.getChildren().addAll(link, new Label("Token: " + outcome.token()),
                 new HBox(8, copy, reset), qrRow(url));
 
-        if (mode == PilotMode.ALL_INTERFACES) {
-            Label warn = PilotWidgets.wrapped("⚠ Anyone who can reach this machine's IP can view/control the "
-                    + "bot with this token. Prefer connecting over Tailscale.");
+        String warning = warning(kind);
+        if (warning != null) {
+            Label warn = PilotWidgets.wrapped(warning);
             warn.setStyle("-fx-text-fill: #e67e22;");
             content.getChildren().add(warn);
         }
 
-        // Advanced, opt-in: expose publicly over HTTPS so the phone needs no Tailscale/VPN. Only offered when
-        // we're not already Funnel-live and the setup wizard isn't already on screen.
-        if (!funnelLive && funnelError == null) {
-            Hyperlink advanced =
-                    new Hyperlink("Advanced: expose publicly over HTTPS (no VPN needed on the phone)…");
-            advanced.setTooltip(new Tooltip("Uses Tailscale Funnel. Needs a one-time setup on this computer's "
-                    + "Tailscale account; Studio will guide you."));
-            advanced.setOnAction(e -> { alert.close(); actions.enableFunnel().run(); });
-            content.getChildren().addAll(new Separator(), advanced);
-        }
+        content.getChildren().addAll(new Separator(), chooser(outcome, choice -> {
+            alert.close();
+            actions.use().accept(choice);
+        }));
 
         alert.getDialogPane().setContent(content);
         alert.setResizable(true); // let the user grow it if the QR codes crowd the buttons on small screens
         showing = alert;
         alert.show();
+    }
+
+    /** What the user should know about who else can reach the pilot over {@code kind}, or {@code null}. */
+    static String warning(TransportKind kind) {
+        if (kind == TransportKind.LAN) {
+            return "⚠ Anyone on this network who has the link can view and control the bot. Prefer Tailscale "
+                    + "on a network you don't own.";
+        }
+        if (kind.publicInternet()) {
+            return "⚠ This address is on the public internet: the token in the link is the only lock. Don't share "
+                    + "the link, and use Reset pairing token if it leaks.";
+        }
+        return null;
+    }
+
+    /**
+     * The transport chooser: one radio per offered way to reach the pilot, the current one selected. One that
+     * cannot be used right now says why, and can still be picked — picking it is how the user gets its setup
+     * steps (Funnel's checklist, cloudflared's install line).
+     */
+    private static Node chooser(PilotOutcome outcome, java.util.function.Consumer<TransportKind> pick) {
+        VBox box = new VBox(4);
+        Label title = new Label("Reach the pilot through:");
+        title.setStyle("-fx-font-weight: bold;");
+        box.getChildren().add(title);
+        ToggleGroup group = new ToggleGroup();
+        for (TransportKind kind : TransportKind.offered()) {
+            Availability availability = outcome.options().get(kind);
+            String text = kind.displayName() + (kind.publicInternet() ? " (public)" : "");
+            if (availability != null && !availability.ok()) text += " — " + availability.reason();
+            RadioButton radio = new RadioButton(text);
+            radio.setToggleGroup(group);
+            radio.setSelected(kind == outcome.kind());
+            if (availability != null && availability.fix() != null) radio.setTooltip(new Tooltip(availability.fix()));
+            radio.setOnAction(e -> {
+                if (kind != outcome.kind()) pick.accept(kind);
+            });
+            box.getChildren().add(radio);
+        }
+        return box;
     }
 
     /** Side-by-side QR codes with clear separation: left pairs the pilot URL, right downloads the APK. */

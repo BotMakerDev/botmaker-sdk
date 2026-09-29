@@ -21,6 +21,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The Remote Pilot's pairing dialog lets you pick how the phone reaches it**, from four free ways:
+  Tailscale (the default), Tailscale Funnel, a **Cloudflare quick tunnel** (a public `trycloudflare.com`
+  address with no account and nothing on the phone; it needs `cloudflared` installed, and the address changes
+  each time the pilot starts) and the local network. The choice is remembered. When the one you picked cannot
+  start, the pilot falls back to Tailscale or the local network and says why; it never falls back to a public
+  address. Behind Funnel or a tunnel the server listens on this computer only, and the token is still
+  required.
+
 - **A run started from Studio sends its debug output to Studio as structured lines**: level, source (the
   `[Vision]`, `[Game]`… it starts with), how many times a repeated line happened, and where on screen. The
   console output is unchanged.
@@ -79,6 +87,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **Without Tailscale, the Remote Pilot no longer listens on every network interface.** It bound `0.0.0.0`,
+  which also put it on any VPN, container bridge or other network the computer was on. The local network
+  choice binds the computer's Wi-Fi or Ethernet address only, and says who else can reach it.
 - **The Remote Pilot shows the bot's log.** On the phone, **📜 Log** opens a drawer with the run's debug lines.
   It has a level floor and a search, and a phone that connects mid-run gets the last 200 lines. The served
   pilot client is rebuilt with it.

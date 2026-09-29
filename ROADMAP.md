@@ -8,6 +8,43 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-09-29 — the Pilot's free transports (rework follow-ups, phase 10)
+
+The phone reached the pilot two ways: a Tailscale bind by default, and Funnel behind an "Advanced" link. The
+phone had been offline in Tailscale for nine days, so the user asked for more ways in, all of them free. ngrok
+was declined (its free plan caps bandwidth). The design step before this one (`docs/refactor/41-pilot-extensions.md`)
+kept the Pilot in this plugin, so the transports are here.
+
+**Done**
+- `plugin/pilot/transport/`: `PilotTransport` (`available()` with a reason and a fix, `bindHost()`,
+  `open(port)` → the base address, `close()`), `TransportKind` (stable ids, `fromId` → `UNKNOWN`,
+  `publicInternet()`), and four transports:
+  - `DirectTransport(TAILNET)`: the `100.64.0.0/10` address, as before.
+  - `FunnelTransport`: wraps `TailscaleFunnelService`; its `Diag`/`Issue`/`classify` moved here from
+    `RemotePilotUi` for the setup checklist.
+  - `QuickTunnelTransport`: runs `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:<port>`, reads the
+    `https://…trycloudflare.com` address from its log (never `api.trycloudflare.com`), waits for "Registered
+    tunnel connection", and stops the process on close or at JVM exit (a shutdown hook). The log buffer is
+    bounded. A missing `cloudflared` is unavailable with an install line for the OS.
+  - `DirectTransport(LAN)`: the first private-range IPv4 on an interface that is not Tailscale, Docker,
+    libvirt, `tun`/`wg` or Podman.
+- `RemotePilotUi` probes all four, then tries the remembered one (`PilotPreferences.transport`, default
+  tailnet) and falls back to tailnet, then LAN. **A public transport is never a fallback.** `PilotOutcome`
+  carries `kind`, `asked`, the error and fix, Funnel's `Diag` and every option's availability.
+- The pairing dialog: a *Reach the pilot through* radio list (an unavailable way says why and can still be
+  picked, which is how its setup steps are shown), per-kind instructions, a warning on LAN and on both public
+  ways. Funnel's checklist shows when Funnel was asked for and fell back; the "Advanced: expose publicly" link
+  is gone.
+- `PilotServer`: `attach(AutoCloseable front)` replaces `attachFunnel`, and `Endpoint` lost `publicBaseUrl`;
+  `detectTailscaleHost` moved to `DirectTransport`. **`0.0.0.0` is never bound any more.**
+- Tests: `TransportsTest` (ids, the log parse, a stand-in `cloudflared` script that prints an address and one
+  that fails, a missing binary, the address ranges), and `RemotePilotFunnelTest` updated (fallback order,
+  warnings).
+
+**Deferred / next**
+- A quick tunnel's address changes at every start, so the APK's saved connection goes stale. The phone-side
+  "can't reach" guidance is phase 12.
+
 ## 2026-09-29 — the Pilot's log drawer (rework follow-ups, phase 9)
 
 **Done**

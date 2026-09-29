@@ -178,20 +178,16 @@ public final class PilotServer implements AutoCloseable {
     }
 
     /**
-     * Endpoint details to surface in the UI. When {@code publicBaseUrl} is non-null the server is fronted by
-     * Tailscale Funnel (public HTTPS), so {@link #url()} yields the {@code https://…ts.net} address; otherwise
-     * it falls back to the direct {@code http://host:port} bind.
+     * Where the server is bound. The address a phone opens is the transport's (see {@code transport/}): the same
+     * {@code http://host:port} for a direct bind, a tunnel's public address otherwise.
      */
-    public record Endpoint(String host, int port, String token, String publicBaseUrl) {
-        public String url() {
-            return publicBaseUrl != null
-                    ? publicBaseUrl + "/?token=" + token
-                    : "http://" + host + ":" + port + "/?token=" + token;
-        }
-    }
+    public record Endpoint(String host, int port, String token) {}
 
-    /** Records the Funnel front (if any) so it's torn down together with the server in {@link #close()}. */
-    private volatile TailscaleFunnelService funnel;
+    /**
+     * What makes this server reachable when that is more than its own bind — a Funnel, a tunnel process — so it
+     * is torn down with the server in {@link #close()}.
+     */
+    private volatile AutoCloseable front;
 
     /** Guards the one-time run subscriptions so a stop()+start() doesn't double-register handlers. */
     private boolean subscribed;
@@ -201,7 +197,7 @@ public final class PilotServer implements AutoCloseable {
      * Idempotent — returns the existing endpoint if already running.
      */
     public synchronized Endpoint start(String host) {
-        if (app != null) return new Endpoint(host, app.port(), token, null);
+        if (app != null) return new Endpoint(host, app.port(), token);
 
         // Reuse a persisted token so the pairing URL is stable across restarts — a phone that paired
         // once reconnects without rescanning. Only mint (and persist) a fresh one the very first time.
@@ -267,17 +263,15 @@ public final class PilotServer implements AutoCloseable {
         }
 
         startFrameLoop();
-        return new Endpoint(host, app.port(), token, null);
+        return new Endpoint(host, app.port(), token);
     }
 
     /**
-     * Records that this (already-{@link #start(String) started}, loopback-bound) server is now fronted by
-     * Tailscale Funnel at {@code publicBaseUrl} and returns the public HTTPS endpoint. The {@code funnel} is
-     * kept so {@link #close()} tears the public exposure down with the server.
+     * Records what fronts this already-started server — a transport that opened a tunnel or a Funnel onto it —
+     * so {@link #close()} closes it with the server.
      */
-    public synchronized Endpoint attachFunnel(TailscaleFunnelService funnel, String publicBaseUrl) {
-        this.funnel = funnel;
-        return new Endpoint("127.0.0.1", app != null ? app.port() : 0, token, publicBaseUrl);
+    public synchronized void attach(AutoCloseable front) {
+        this.front = front;
     }
 
     @Override
@@ -297,33 +291,18 @@ public final class PilotServer implements AutoCloseable {
         subscriptions.clear();
         subscribed = false;
         if (app != null) { app.stop(); app = null; }
-        if (funnel != null) { funnel.disable(); funnel = null; }
+        if (front != null) {
+            try {
+                front.close();
+            } catch (Exception e) {
+                Diag.error("[Pilot] Couldn't close what made the Remote Pilot reachable: " + e.getMessage());
+            }
+            front = null;
+        }
     }
 
     public synchronized boolean isRunning() {
         return app != null;
-    }
-
-    /**
-     * The machine's Tailscale IPv4 (CGNAT {@code 100.64.0.0/10}) if the tunnel is up, so the pilot binds to
-     * the private tailnet rather than every interface. {@code null} if no Tailscale address is found — the
-     * caller then decides whether to bind {@code 0.0.0.0} with a warning.
-     */
-    public static String detectTailscaleHost() {
-        try {
-            var nics = java.net.NetworkInterface.getNetworkInterfaces();
-            while (nics.hasMoreElements()) {
-                for (var addr : java.util.Collections.list(nics.nextElement().getInetAddresses())) {
-                    if (addr instanceof java.net.Inet4Address) {
-                        byte[] b = addr.getAddress();
-                        // 100.64.0.0/10 → first octet 100, second octet 64–127.
-                        if ((b[0] & 0xFF) == 100 && (b[1] & 0xC0) == 64) return addr.getHostAddress();
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return null;
     }
 
     // --- Auth ---
@@ -331,7 +310,7 @@ public final class PilotServer implements AutoCloseable {
     private boolean authorized(WsContext ctx) {
         String provided = ctx.queryParam("token");
         if (token == null || provided == null) return false;
-        // Constant-time compare: this handshake is reachable over the public internet via Funnel, so avoid
+        // Constant-time compare: behind Funnel or a quick tunnel this handshake is on the public internet, so avoid
         // leaking the token length/prefix through String.equals's early-out timing.
         return java.security.MessageDigest.isEqual(
                 token.getBytes(java.nio.charset.StandardCharsets.UTF_8),
@@ -339,7 +318,7 @@ public final class PilotServer implements AutoCloseable {
     }
 
     private static String newToken() {
-        byte[] b = new byte[24]; // 192 bits — the sole guard once Funnel exposes this publicly.
+        byte[] b = new byte[24]; // 192 bits — the sole guard once a tunnel exposes this publicly.
         new SecureRandom().nextBytes(b);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
     }

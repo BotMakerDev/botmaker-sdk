@@ -1,9 +1,12 @@
 package com.botmaker.sdk.plugin.pilot;
 
+import com.botmaker.sdk.plugin.pilot.transport.TransportKind;
+
 import java.util.prefs.Preferences;
 
 /**
- * The two things the pilot remembers between runs: its pairing token and the port it last bound.
+ * The three things the pilot remembers between runs: its pairing token, the port it last bound, and the way
+ * the user picked to reach it.
  *
  * <p>Both are per <em>user</em> and not per project — a phone paired once should stay paired, and a stable
  * port is what makes the tailnet-direct URL survive a restart. They lived in the editor's own preferences
@@ -15,13 +18,34 @@ import java.util.prefs.Preferences;
  * one. Every failure is swallowed — a locked or unavailable backing store means the pilot re-mints a token
  * and takes an ephemeral port, which is a worse experience and not a broken one.
  */
-final class PilotPreferences {
+public final class PilotPreferences {
 
     private static final String NODE = "com/botmaker/sdk/pilot";
     private static final String KEY_TOKEN = "token";
     private static final String KEY_PORT = "port";
+    private static final String KEY_TRANSPORT = "transport";
 
     private PilotPreferences() {
+    }
+
+    /**
+     * The way to reach the pilot the user last picked, {@link TransportKind#TAILNET} until they pick one. Per
+     * user like the token: it is about this computer's network, not about a project.
+     */
+    public static TransportKind transport() {
+        TransportKind kind = TransportKind.fromId(read().get(KEY_TRANSPORT, TransportKind.TAILNET.id()));
+        return kind == TransportKind.UNKNOWN ? TransportKind.TAILNET : kind;
+    }
+
+    /** Remembers the way to reach the pilot the user picked. */
+    public static void transport(TransportKind kind) {
+        Preferences prefs = read();
+        try {
+            prefs.put(KEY_TRANSPORT, kind.id());
+            prefs.flush();
+        } catch (Exception ignored) {
+            // An unwritable store costs the default next time, never a failed start.
+        }
     }
 
     /** The persisted pairing token, or {@code null} when there is none. */

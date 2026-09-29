@@ -1,91 +1,114 @@
 package com.botmaker.sdk.plugin.pilot.ui;
 
-import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.FunnelIssue;
-import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.PilotMode;
-import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.PilotOutcome;
 import com.botmaker.plugin.api.Dialogs;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.Theme;
+import com.botmaker.sdk.plugin.pilot.transport.FunnelTransport;
+import com.botmaker.sdk.plugin.pilot.transport.FunnelTransport.Diag;
+import com.botmaker.sdk.plugin.pilot.transport.FunnelTransport.Issue;
+import com.botmaker.sdk.plugin.pilot.transport.TransportKind;
+import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi.PilotOutcome;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The two pure pieces of the Remote Pilot bring-up: turning a {@code tailscale funnel} error into the step of
- * the setup wizard to highlight, and deriving the pairing URL from its parts.
+ * The pure pieces of the Remote Pilot bring-up: turning a {@code tailscale funnel} error into the step of the
+ * setup checklist to highlight, deriving the pairing URL from its parts, and which transports are tried.
  *
- * <p>Both were untested private statics on {@code UIManager}. The URL half in particular was a regex rewrite
- * ({@code replaceFirst("token=[^&]*$", …)}) that only worked while the token happened to be the last query
- * parameter — these assertions pin the parts-based construction that replaced it.
+ * <p>The classification and the URL were untested private statics on {@code UIManager}. The URL half in
+ * particular was a regex rewrite ({@code replaceFirst("token=[^&]*$", …)}) that only worked while the token
+ * happened to be the last query parameter — these assertions pin the parts-based construction that replaced it.
  */
 class RemotePilotFunnelTest {
 
     @Test
     void classifiesTheOperatorGrantAheadOfEverythingElse() {
-        assertEquals(FunnelIssue.NEEDS_OPERATOR,
-                RemotePilotUi.classifyFunnel("Funnel: must be run as operator, or with sudo"));
+        assertEquals(Issue.NEEDS_OPERATOR, FunnelTransport.classify("Funnel: must be run as operator, or with sudo"));
         // Tailscale often names two blockers in one line. The operator grant is the one the user has to do
         // first — nothing else can be attempted without it — so it wins the classification.
-        assertEquals(FunnelIssue.NEEDS_OPERATOR,
-                RemotePilotUi.classifyFunnel("HTTPS cert unavailable; run tailscale set --operator first"));
+        assertEquals(Issue.NEEDS_OPERATOR,
+                FunnelTransport.classify("HTTPS cert unavailable; run tailscale set --operator first"));
     }
 
     @Test
     void classifiesTheHttpsCertificateBlocker() {
-        assertEquals(FunnelIssue.NO_HTTPS_CERT,
-                RemotePilotUi.classifyFunnel("HTTPS is not enabled in the admin panel"));
-        assertEquals(FunnelIssue.NO_HTTPS_CERT,
-                RemotePilotUi.classifyFunnel("could not get cert for host.tailnet.ts.net"));
+        assertEquals(Issue.NO_HTTPS_CERT, FunnelTransport.classify("HTTPS is not enabled in the admin panel"));
+        assertEquals(Issue.NO_HTTPS_CERT, FunnelTransport.classify("could not get cert for host.tailnet.ts.net"));
     }
 
     @Test
     void classifiesTheAclGrantAndTheSignedOutCase() {
-        assertEquals(FunnelIssue.NOT_ENABLED,
-                RemotePilotUi.classifyFunnel("Funnel is not enabled for this tailnet"));
-        assertEquals(FunnelIssue.LOGGED_OUT, RemotePilotUi.classifyFunnel("you are not logged in"));
+        assertEquals(Issue.NOT_ENABLED, FunnelTransport.classify("Funnel is not enabled for this tailnet"));
+        assertEquals(Issue.LOGGED_OUT, FunnelTransport.classify("you are not logged in"));
     }
 
     @Test
     void unrecognisedAndAbsentErrorsFallBackToOther() {
-        assertEquals(FunnelIssue.OTHER, RemotePilotUi.classifyFunnel("something we have never seen"));
-        assertEquals(FunnelIssue.OTHER, RemotePilotUi.classifyFunnel(null));
+        assertEquals(Issue.OTHER, FunnelTransport.classify("something we have never seen"));
+        assertEquals(Issue.OTHER, FunnelTransport.classify(null));
     }
 
     @Test
     void buildsThePairingUrlFromTheBaseAndTheToken() {
-        PilotOutcome direct = new PilotOutcome("http://100.64.0.7:8123", "abc", PilotMode.TAILNET_DIRECT, null, null);
-        assertEquals("http://100.64.0.7:8123/?token=abc", direct.url());
-
-        PilotOutcome funnel = new PilotOutcome("https://box.tail1234.ts.net", "xyz", PilotMode.FUNNEL_HTTPS, null,
-                new RemotePilotUi.FunnelDiag(true, true, FunnelIssue.NONE));
-        assertEquals("https://box.tail1234.ts.net/?token=xyz", funnel.url());
+        assertEquals("http://100.64.0.7:8123/?token=abc",
+                outcome("http://100.64.0.7:8123", "abc", TransportKind.TAILNET).url());
+        assertEquals("https://box.tail1234.ts.net/?token=xyz",
+                outcome("https://box.tail1234.ts.net", "xyz", TransportKind.FUNNEL).url());
+        assertEquals("https://calm-river-fox.trycloudflare.com/?token=t",
+                outcome("https://calm-river-fox.trycloudflare.com", "t", TransportKind.QUICK_TUNNEL).url());
     }
 
     @Test
     void resettingTheTokenRebuildsTheUrlAndKeepsEverythingElse() {
-        PilotOutcome original =
-                new PilotOutcome("http://100.64.0.7:8123", "old-token", PilotMode.TAILNET_DIRECT, "boom", null);
+        PilotOutcome original = new PilotOutcome("http://100.64.0.7:8123", "old-token", TransportKind.TAILNET,
+                TransportKind.FUNNEL, "boom", null, null, Map.of());
         PilotOutcome refreshed = original.withToken("new-token");
 
         assertEquals("http://100.64.0.7:8123/?token=new-token", refreshed.url());
         assertEquals(original.baseUrl(), refreshed.baseUrl());
-        assertEquals(original.mode(), refreshed.mode());
-        assertEquals(original.funnelError(), refreshed.funnelError());
+        assertEquals(original.kind(), refreshed.kind());
+        assertEquals(original.asked(), refreshed.asked());
+        assertEquals(original.error(), refreshed.error());
         assertNotEquals(original.token(), refreshed.token());
+        assertTrue(refreshed.fellBack());
+    }
+
+    /** A public transport is only ever the user's pick: when one fails, the pilot falls back to a direct one. */
+    @Test
+    void a_failed_transport_falls_back_to_the_direct_ones_and_never_to_a_public_one() {
+        assertEquals(List.of(TransportKind.QUICK_TUNNEL, TransportKind.TAILNET, TransportKind.LAN),
+                RemotePilotUi.attempts(TransportKind.QUICK_TUNNEL));
+        assertEquals(List.of(TransportKind.FUNNEL, TransportKind.TAILNET, TransportKind.LAN),
+                RemotePilotUi.attempts(TransportKind.FUNNEL));
+        assertEquals(List.of(TransportKind.TAILNET, TransportKind.LAN), RemotePilotUi.attempts(TransportKind.TAILNET));
+        assertEquals(List.of(TransportKind.LAN, TransportKind.TAILNET), RemotePilotUi.attempts(TransportKind.LAN));
+        assertEquals(List.of(TransportKind.TAILNET, TransportKind.LAN), RemotePilotUi.attempts(TransportKind.UNKNOWN));
+    }
+
+    @Test
+    void the_dialog_warns_on_every_transport_but_the_tailnet() {
+        assertNull(RemotePilotDialog.warning(TransportKind.TAILNET));
+        assertNotNull(RemotePilotDialog.warning(TransportKind.LAN));
+        assertTrue(RemotePilotDialog.warning(TransportKind.FUNNEL).contains("public internet"));
+        assertTrue(RemotePilotDialog.warning(TransportKind.QUICK_TUNNEL).contains("public internet"));
     }
 
     /** Ticked and highlighted as the blocker at once was the old answer when Tailscale named certificates. */
     @Test
     void the_https_step_is_not_ticked_when_it_is_the_blocker() {
-        assertTrue(FunnelSetupWizard.httpsStepDone(new RemotePilotUi.FunnelDiag(true, true, FunnelIssue.NOT_ENABLED)));
-        assertFalse(FunnelSetupWizard.httpsStepDone(
-                new RemotePilotUi.FunnelDiag(true, true, FunnelIssue.NO_HTTPS_CERT)));
-        assertFalse(FunnelSetupWizard.httpsStepDone(new RemotePilotUi.FunnelDiag(true, false, FunnelIssue.LOGGED_OUT)));
+        assertTrue(FunnelSetupWizard.httpsStepDone(new Diag(true, true, Issue.NOT_ENABLED)));
+        assertFalse(FunnelSetupWizard.httpsStepDone(new Diag(true, true, Issue.NO_HTTPS_CERT)));
+        assertFalse(FunnelSetupWizard.httpsStepDone(new Diag(true, false, Issue.LOGGED_OUT)));
         assertFalse(FunnelSetupWizard.httpsStepDone(null));
     }
 
@@ -113,10 +136,13 @@ class RemotePilotFunnelTest {
     void aResetNeverLeavesTheOldTokenAnywhereInTheUrl() {
         // What the old regex could not promise: anchored at the end of the string, it rewrote only a token
         // that was the last query parameter and silently left any other occurrence behind.
-        PilotOutcome refreshed =
-                new PilotOutcome("http://100.64.0.7:8123", "old-token", PilotMode.ALL_INTERFACES, null, null)
-                        .withToken("new-token");
+        PilotOutcome refreshed = outcome("http://192.168.1.20:8123", "old-token", TransportKind.LAN)
+                .withToken("new-token");
         assertTrue(refreshed.url().endsWith("token=new-token"), refreshed.url());
         assertTrue(!refreshed.url().contains("old-token"), refreshed.url());
+    }
+
+    private static PilotOutcome outcome(String base, String token, TransportKind kind) {
+        return new PilotOutcome(base, token, kind, kind, null, null, null, Map.of());
     }
 }

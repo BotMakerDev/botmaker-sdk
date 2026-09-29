@@ -7,7 +7,6 @@ import com.botmaker.sdk.plugin.pilot.NestedSessionLauncher;
 import com.botmaker.sdk.plugin.pilot.PilotControlService;
 import com.botmaker.sdk.plugin.pilot.PilotProject;
 import com.botmaker.sdk.plugin.pilot.PilotServer;
-import com.botmaker.sdk.plugin.pilot.TailscaleFunnelService;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.geometry.Pos;
@@ -18,7 +17,17 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.layout.HBox;
 
-import java.net.InetAddress;
+import com.botmaker.sdk.plugin.pilot.PilotPreferences;
+import com.botmaker.sdk.plugin.pilot.transport.FunnelTransport;
+import com.botmaker.sdk.plugin.pilot.transport.PilotTransport;
+import com.botmaker.sdk.plugin.pilot.transport.PilotTransport.Availability;
+import com.botmaker.sdk.plugin.pilot.transport.PilotTransport.Opened;
+import com.botmaker.sdk.plugin.pilot.transport.TransportKind;
+
+import java.util.EnumMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -47,32 +56,46 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class RemotePilotUi implements AutoCloseable {
 
-    /** How the pilot ended up exposed — drives the dialog header, QR URL, and warning. */
-    enum PilotMode { FUNNEL_HTTPS, TAILNET_DIRECT, ALL_INTERFACES }
-
-    /** The specific reason Funnel isn't live, so the wizard can point at the exact one-time fix. */
-    enum FunnelIssue { NONE, NOT_INSTALLED, LOGGED_OUT, NOT_ENABLED, NO_HTTPS_CERT, NEEDS_OPERATOR, OTHER }
-
-    /** Snapshot of the Tailscale/Funnel state, computed off the FX thread, that drives the setup wizard. */
-    record FunnelDiag(boolean cliPresent, boolean loggedIn, FunnelIssue issue) {}
-
     /**
-     * Result of a pilot bring-up ({@link #startDirect()} / {@link #startFunnel()}) — enough to render the
-     * pairing dialog on the FX thread.
+     * Result of a pilot bring-up ({@link #bringUpWith}) — enough to render the pairing dialog on the FX thread.
      *
-     * <p>{@code baseUrl} is the address without the query string ({@code http://host:port} or the Funnel
-     * {@code https://…ts.net}); the pairing URL is derived from it and the token. Keeping the two apart is
-     * what lets "Reset pairing token" rebuild the URL instead of rewriting it with a regex that only worked
-     * while the token happened to be the last query parameter.
+     * <p>{@code baseUrl} is the address without the query string ({@code http://host:port}, the Funnel
+     * {@code https://…ts.net} or a tunnel's {@code https://…trycloudflare.com}); the pairing URL is derived from
+     * it and the token. Keeping the two apart is what lets "Reset pairing token" rebuild the URL instead of
+     * rewriting it with a regex that only worked while the token happened to be the last query parameter.
+     *
+     * @param kind    the transport that carries the pilot
+     * @param asked   the transport the user picked; differs from {@code kind} when it failed and a direct one
+     *                took over, and then {@code error} and {@code fix} say why
+     * @param diag    Tailscale's state when {@code asked} is Funnel, for its setup checklist; else {@code null}
+     * @param options each offered transport's availability, for the chooser
      */
-    record PilotOutcome(String baseUrl, String token, PilotMode mode, String funnelError, FunnelDiag diag) {
+    record PilotOutcome(String baseUrl, String token, TransportKind kind, TransportKind asked, String error,
+                        String fix, FunnelTransport.Diag diag, Map<TransportKind, Availability> options) {
         String url() {
             return baseUrl + "/?token=" + token;
         }
 
         PilotOutcome withToken(String fresh) {
-            return new PilotOutcome(baseUrl, fresh, mode, funnelError, diag);
+            return new PilotOutcome(baseUrl, fresh, kind, asked, error, fix, diag, options);
         }
+
+        /** Whether the transport the user picked is not the one carrying the pilot. */
+        boolean fellBack() {
+            return asked != kind;
+        }
+    }
+
+    /**
+     * The transports tried for {@code asked}, in order: the one asked for, then the direct ones. A public
+     * transport is never a fallback: putting the pilot on the internet is something only the user picks.
+     */
+    static List<TransportKind> attempts(TransportKind asked) {
+        LinkedHashSet<TransportKind> order = new LinkedHashSet<>();
+        order.add(asked == TransportKind.UNKNOWN ? TransportKind.TAILNET : asked);
+        order.add(TransportKind.TAILNET);
+        order.add(TransportKind.LAN);
+        return List.copyOf(order);
     }
 
     private final StudioServices services;
@@ -95,18 +118,16 @@ public final class RemotePilotUi implements AutoCloseable {
     }
 
     /**
-     * Starts (once) the remote BotPilot server and shows a pairing dialog. The <b>default</b> path is a direct
-     * bind on the Tailscale tailnet interface: the phone reaches it by running Tailscale signed into the same
-     * account (zero computer-side setup, no public URL, more private). Exposing the pilot publicly over
-     * <b>Tailscale Funnel</b> ({@code https://<machine>.ts.net}, so the phone needs nothing) is an opt-in
-     * "Advanced" action ({@link #enableFunnelExposure()}) because it requires one-time HTTPS-cert/ACL/operator
-     * setup on this machine's account.
+     * Starts (once) the remote BotPilot server over the transport the user last picked, and shows a pairing
+     * dialog. Until they pick one it is a direct bind on the Tailscale address: the phone runs Tailscale signed
+     * into the same account, and nothing is public. The dialog's chooser switches to Funnel, a Cloudflare quick
+     * tunnel or the local network ({@link #use}).
      *
      * <p>Idempotent while the server is up: it re-shows the existing pairing dialog, keeping the paired phone
      * connected on the same URL/port/token.
      */
     public void show() {
-        bringUp(false, false);
+        bringUp(false, PilotPreferences.transport());
     }
 
     /**
@@ -191,12 +212,13 @@ public final class RemotePilotUi implements AutoCloseable {
     }
 
     /**
-     * Opt-in "Advanced" action: (re)bring up the pilot attempting <b>Tailscale Funnel</b> so the phone needs
-     * nothing installed. Always rebinds (Funnel fronts a loopback bind, unlike the default tailnet bind), then
-     * shows the pairing dialog — with the guided setup wizard if Funnel couldn't be enabled.
+     * The chooser's action: remembers {@code kind} and brings the pilot up again over it. Always rebinds, since a
+     * tunnel fronts a loopback bind and a direct transport binds its own address. A paired phone reconnects on
+     * the new address, which the dialog shows.
      */
-    void enableFunnelExposure() {
-        bringUp(true, true);
+    void use(TransportKind kind) {
+        PilotPreferences.transport(kind);
+        bringUp(true, kind);
     }
 
     /**
@@ -218,7 +240,7 @@ public final class RemotePilotUi implements AutoCloseable {
      * <p>The Tailscale CLI can block for seconds, so this must not run inline — doing so freezes (and, if the
      * CLI hangs, appears to crash) the UI.
      */
-    private void bringUp(boolean forceRestart, boolean funnel) {
+    private void bringUp(boolean forceRestart, TransportKind asked) {
         // A bring-up is already running. Its progress dialog is not modal, so without this a second toolbar
         // click would start a second thread and race two start() calls onto the same server.
         if (bringingUp) return;
@@ -247,7 +269,7 @@ public final class RemotePilotUi implements AutoCloseable {
             PilotOutcome o = null;
             String error = null;
             try {
-                o = funnel ? startFunnel() : startDirect();
+                o = bringUpWith(asked);
             } catch (Exception e) {
                 error = e.getMessage();
             }
@@ -262,9 +284,7 @@ public final class RemotePilotUi implements AutoCloseable {
                     return;
                 }
                 lastOutcome = outcome;
-                services.status(
-                        (outcome.mode() == PilotMode.FUNNEL_HTTPS ? "Remote Pilot (HTTPS) at " : "Remote Pilot at ")
-                                + outcome.url());
+                services.status("Remote Pilot (" + outcome.kind().displayName() + ") at " + outcome.url());
                 // Cancel can't unbind a server that has already come up, but it can honour what the user
                 // actually asked for: no dialog. The status line above says where it is, and the toolbar
                 // button re-shows the pairing dialog on demand.
@@ -282,7 +302,7 @@ public final class RemotePilotUi implements AutoCloseable {
         a.setTitle("Remote Pilot");
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setPrefSize(30, 30);
-        Label msg = new Label("Starting Remote Pilot…\nContacting Tailscale (this can take a few seconds).");
+        Label msg = new Label("Starting Remote Pilot…\nChecking the ways to reach it (this can take a few seconds).");
         msg.setWrapText(true);
         HBox box = new HBox(12, spinner, msg);
         box.setAlignment(Pos.CENTER_LEFT);
@@ -298,7 +318,7 @@ public final class RemotePilotUi implements AutoCloseable {
     private void showDialog(PilotOutcome outcome) {
         RemotePilotDialog.show(services, outcome, new RemotePilotDialog.Actions(
                 this::resetToken,
-                this::enableFunnelExposure,
+                this::use,
                 () -> BackgroundModeBox.create(launcher(), project)));
     }
 
@@ -314,78 +334,51 @@ public final class RemotePilotUi implements AutoCloseable {
     }
 
     /**
-     * Default bring-up: a direct bind on the Tailscale tailnet interface (phone runs Tailscale, same account),
-     * or all interfaces (LAN, with a warning) when Tailscale isn't up. No {@code tailscale} CLI call, so it's
-     * instant and never surfaces the Funnel wizard. Must run off the FX thread (server bind).
+     * Brings the server up over {@code asked}, or over the first direct transport that works when it cannot,
+     * carrying why into the outcome so the dialog says so. Every offered transport is probed first, so the
+     * chooser can show which ones work before the user picks.
+     *
+     * <p>Blocking (CLI probes, a tunnel's start, the server bind); runs off the FX thread.
+     *
+     * @throws IllegalStateException when no transport works at all
      */
-    private PilotOutcome startDirect() {
-        return directBind(null, null);
-    }
-
-    /**
-     * Opt-in bring-up: attempt Tailscale Funnel (public HTTPS, phone needs nothing). On success →
-     * {@link PilotMode#FUNNEL_HTTPS}; on any failure fall back to a direct bind but carry the reason
-     * ({@code funnelError}/{@link FunnelDiag}) so the pairing dialog shows the setup wizard.
-     * Blocking (Tailscale CLI + server bind); must run off the FX thread.
-     */
-    private PilotOutcome startFunnel() {
-        TailscaleFunnelService funnel = new TailscaleFunnelService();
-        boolean cli = funnel.isAvailable();
-        boolean loggedIn = cli && funnel.isLoggedIn();
-        String funnelError;
-        FunnelIssue issue;
-        if (cli && loggedIn && funnel.dnsName().isPresent()) {
-            PilotServer.Endpoint ep = pilotServer.start("127.0.0.1"); // loopback — only Funnel fronts it
-            var result = funnel.enable(ep.port());
-            if (result.ok()) {
-                PilotServer.Endpoint pub = pilotServer.attachFunnel(funnel, result.publicBase());
-                return new PilotOutcome(result.publicBase(), pub.token(), PilotMode.FUNNEL_HTTPS, null,
-                        new FunnelDiag(true, true, FunnelIssue.NONE));
+    private PilotOutcome bringUpWith(TransportKind asked) {
+        Map<TransportKind, PilotTransport> transports = new EnumMap<>(TransportKind.class);
+        Map<TransportKind, Availability> options = new EnumMap<>(TransportKind.class);
+        for (TransportKind kind : TransportKind.offered()) {
+            PilotTransport transport = PilotTransport.of(kind);
+            transports.put(kind, transport);
+            options.put(kind, transport.available());
+        }
+        String error = null;
+        String fix = null;
+        for (TransportKind kind : attempts(asked)) {
+            Availability availability = options.get(kind);
+            PilotTransport transport = transports.get(kind);
+            if (!availability.ok()) {
+                if (kind == asked) {
+                    error = availability.reason();
+                    fix = availability.fix();
+                }
+                continue;
             }
-            // Funnel present but couldn't be enabled (e.g. HTTPS certs / ACL / operator): tear the loopback
-            // server down and fall through to a directly-bound one, surfacing the reason.
-            funnelError = result.error();
-            issue = classifyFunnel(result.error());
+            PilotServer.Endpoint endpoint = pilotServer.start(transport.bindHost());
+            Opened opened = transport.open(endpoint.port());
+            if (opened.ok()) {
+                pilotServer.attach(transport);
+                FunnelTransport.Diag diag =
+                        transports.get(TransportKind.FUNNEL) instanceof FunnelTransport f && asked == TransportKind.FUNNEL
+                                ? f.diag() : null;
+                return new PilotOutcome(opened.baseUrl(), endpoint.token(), kind, asked, error, fix, diag,
+                        Map.copyOf(options));
+            }
+            if (kind == asked) {
+                error = opened.error();
+                fix = null;
+            }
+            transport.close();
             pilotServer.close();
-        } else {
-            issue = !cli ? FunnelIssue.NOT_INSTALLED : (!loggedIn ? FunnelIssue.LOGGED_OUT : FunnelIssue.OTHER);
-            funnelError = switch (issue) {
-                case NOT_INSTALLED -> "Tailscale isn't installed on this computer.";
-                case LOGGED_OUT -> "Tailscale isn't signed in on this computer.";
-                default -> "Tailscale Funnel is unavailable.";
-            };
         }
-        return directBind(funnelError, new FunnelDiag(cli, loggedIn, issue));
-    }
-
-    /** The tailnet-or-all-interfaces bind both paths end on, carrying any Funnel failure through to the dialog. */
-    private PilotOutcome directBind(String funnelError, FunnelDiag diag) {
-        String tailscale = PilotServer.detectTailscaleHost();
-        boolean allInterfaces = tailscale == null;
-        PilotServer.Endpoint endpoint = pilotServer.start(allInterfaces ? "0.0.0.0" : tailscale);
-
-        String displayHost = allInterfaces ? hostForUrl() : tailscale;
-        return new PilotOutcome("http://" + displayHost + ":" + endpoint.port(), endpoint.token(),
-                allInterfaces ? PilotMode.ALL_INTERFACES : PilotMode.TAILNET_DIRECT, funnelError, diag);
-    }
-
-    /** Maps a {@code tailscale funnel} stderr line to the specific one-time fix the wizard should surface. */
-    static FunnelIssue classifyFunnel(String err) {
-        if (err == null) return FunnelIssue.OTHER;
-        String e = err.toLowerCase();
-        if (e.contains("operator")) return FunnelIssue.NEEDS_OPERATOR;
-        if (e.contains("https") || e.contains("cert")) return FunnelIssue.NO_HTTPS_CERT;
-        if (e.contains("not enabled")) return FunnelIssue.NOT_ENABLED;
-        if (e.contains("not logged in") || e.contains("logged out")) return FunnelIssue.LOGGED_OUT;
-        return FunnelIssue.OTHER;
-    }
-
-    /** Best-effort local IPv4 for the displayed URL when binding all interfaces (no Tailscale). */
-    private static String hostForUrl() {
-        try {
-            return InetAddress.getLocalHost().getHostAddress();
-        } catch (Exception e) {
-            return "127.0.0.1";
-        }
+        throw new IllegalStateException(error != null ? error : "this computer has no network the phone can reach");
     }
 }
