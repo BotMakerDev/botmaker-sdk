@@ -46,7 +46,7 @@ import java.util.function.Consumer;
  * {@code combo} leads with its {@link Combo} shape (2026-09-26); the varargs one is in its submenu, and is what
  * a recording falls back to on a host that cannot fill a {@code Combo}.
  */
-@Palette(category = "interaction", categoryLabel = "Interaction", icon = "⌨", order = 11)
+@Palette(category = "interaction", categoryLabel = "Interaction", icon = "⌨")
 public class Keyboard {
 
     /**

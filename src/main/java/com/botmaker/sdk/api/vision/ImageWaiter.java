@@ -29,7 +29,7 @@ import java.time.Duration;
  * {@code double confidence} — {@link ImageTemplate#threshold()} is where that belongs. The timeout stays a
  * parameter in every offered shape: it is the question these methods exist to ask.
  */
-@Palette(category = "vision", categoryLabel = "Vision", icon = "⏳", order = 22)
+@Palette(category = "vision", categoryLabel = "Vision", icon = "⏳")
 @TraceSource("Vision")
 public class ImageWaiter {
 

@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 
@@ -19,8 +18,6 @@ import java.util.Optional;
  * visible yet" and retries, and a later capture connects once the instance has booted. A dropped connection
  * re-resolves on the next call.
  */
-@Palette(category = "emulator", categoryLabel = "Emulator", order = 90)
-@Hidden("a value type: an emulator's capture source, handed back rather than built from a menu")
 public final class EmulatorSource implements CaptureSource {
 
     private final String instanceName;

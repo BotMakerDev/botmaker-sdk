@@ -56,7 +56,7 @@ import java.util.regex.Pattern;
  * entry whose other shapes sit behind it — there was no longer a way to hide nine overloads without hiding
  * the nine operations they belong to. The second change is what made the first urgent.
  */
-@Palette(category = "vision", categoryLabel = "Vision", icon = "🔤", order = 24)
+@Palette(category = "vision", categoryLabel = "Vision", icon = "🔤")
 @TraceSource("Vision")
 public final class Text {
 

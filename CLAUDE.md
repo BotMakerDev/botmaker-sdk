@@ -85,9 +85,12 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
   reached `internal.observe.IpcObserver`, so all of them are `internal`. **The palette mirrors this**: a
   class that leaves `api` leaves the palette.
 
-- **The palette is discovered, never listed.** `@Palette` on an `api` class = catalogued (the recognition
-  set — imports, "does `Point` mean ours or `java.awt`'s"); `@Hidden` on a type = not offered in an insert
-  menu. The host finds every `@Palette` class in this jar (`botmaker-plugin-host`'s `Palettes`, since
+- **The palette is discovered, never listed.** `@Palette` on an `api` class = **offered** (its own menu
+  entry). A value type carries **no** annotation: what an offered call takes or returns from this jar is
+  catalogued by reach (the recognition set — imports, "does `Point` mean ours or `java.awt`'s"), and plumbing
+  no offered call reaches (`Debug`, `Watchdog`, `Session`) is not catalogued at all (2026-09-30; type-level
+  `@Hidden` and `order` are gone, facades are alphabetical). `@Hidden` is for a member. The host finds every
+  `@Palette` class in this jar (`botmaker-plugin-host`'s `Palettes`, since
   `SdkPlugin` declares no catalog); members are discovered in the class file's own declaration order
   (`SourceOrder`, alphabetical on any failure). **Constructors are not catalogued**: a palette entry inserts
   a *call*.

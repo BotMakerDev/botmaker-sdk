@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 import java.time.Duration;
 import java.util.List;
@@ -15,8 +13,6 @@ import java.util.Objects;
  * Each {@link Step} is a combo, pressed as {@link Keyboard#combo(Combo)} presses it (its hold included), then
  * the step's {@code after} wait. A zero wait goes straight to the next step. An empty sequence is refused.
  */
-@Palette(category = "interaction", categoryLabel = "Interaction", order = 108)
-@Hidden("a value type: a sequence a bot passes to Keyboard.sequence, never a menu entry of its own")
 public record KeySequence(List<Step> steps) {
 
     /** One combo, then the time to wait before the next step. */

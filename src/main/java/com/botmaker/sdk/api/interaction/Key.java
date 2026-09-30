@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.sun.jna.Platform;
 
 /**
@@ -25,8 +24,6 @@ import com.sun.jna.Platform;
  * {@code Direction} and {@code StartMode}, which needed no annotation: those two have no methods to hide.
  */
 // Scaffolding for the same reason as Direction: the generated Activities holds one per key variable.
-@Palette(category = "interaction", categoryLabel = "Interaction", order = 91)
-@Hidden("a value type: an enum constant a bot picks, never a menu entry of its own")
 public enum Key {
     // Letters (Linux lowercase keysym == ASCII 'a'..'z'; Windows VK 'A'..'Z')
     A(0x61, 0x41), B(0x62, 0x42), C(0x63, 0x43), D(0x64, 0x44), E(0x65, 0x45),

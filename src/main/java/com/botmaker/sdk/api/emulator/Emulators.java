@@ -50,7 +50,7 @@ import java.util.Optional;
  * member menu it can never open. If Studio ever makes {@code Emulator} declarable, {@code first} and
  * {@code named} earn their annotation that day — an addition, which stays free for the SDK's whole life.
  */
-@Palette(category = "emulator", categoryLabel = "Emulator", icon = "📱", order = 50)
+@Palette(category = "emulator", categoryLabel = "Emulator", icon = "📱")
 @TraceSource("Emulator")
 public final class Emulators {
 

@@ -43,7 +43,7 @@ import java.util.stream.Collectors;
  * and the image picker sets that one. The {@code *Compare} families keep all four, since their {@code double}
  * is a comparison <em>margin</em> with no other home.
  */
-@Palette(category = "vision", categoryLabel = "Vision", icon = "🔍", order = 20)
+@Palette(category = "vision", categoryLabel = "Vision", icon = "🔍")
 @TraceSource("Vision")
 public class ImageFinder {
 

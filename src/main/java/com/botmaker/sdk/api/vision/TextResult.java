@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.geometry.Rect;
 
 /**
@@ -21,8 +19,6 @@ import com.botmaker.sdk.api.geometry.Rect;
  * @param confidence Tesseract's confidence, 0..100 (higher is better)
  * @param level      whether this result is a {@link Level#WORD} or a {@link Level#LINE}
  */
-@Palette(category = "vision", categoryLabel = "Vision", order = 103)
-@Hidden("a value type: what an OCR pass hands back, never inserted from a menu")
 public record TextResult(String text, Rect bounds, float confidence, Level level) {
 
     /** Granularity of a {@link TextResult}: an individual word or a whole line of text. */

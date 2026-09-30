@@ -1,8 +1,6 @@
 package com.botmaker.sdk.api.util;
 
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 import java.util.Scanner;
 
@@ -18,8 +16,6 @@ import java.util.Scanner;
  * arguments, so no one of them can stand in for another and there is no spelling to prefer. This is the
  * {@code Keyboard} shape: a closed set of operations with nothing duplicated.
  */
-@Palette(category = "util", categoryLabel = "Utilities", order = 80)
-@Hidden("an import target: catalogued so the name resolves, not offered from a menu")
 public class BotMaker {
 
     /** Lazily created so simply referencing print() does not open stdin. */

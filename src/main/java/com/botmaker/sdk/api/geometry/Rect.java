@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.geometry;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 
 /**
@@ -30,8 +28,6 @@ import com.botmaker.plugin.api.palette.Palette;
  * @param height pixels down
  */
 // The generated Activities declares one per area variable, rebuilt from the four stored numbers.
-@Palette(category = "geometry", categoryLabel = "Geometry", order = 82)
-@Hidden("a value type: written by the geometry slot editor, not inserted from a menu")
 public record Rect(int x, int y, int width, int height) {
 
     /** An empty region at the origin — what a value-typed variable defaults to before it is set. */

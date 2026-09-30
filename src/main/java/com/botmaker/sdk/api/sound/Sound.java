@@ -17,7 +17,7 @@ import java.nio.ByteOrder;
  * runs after the sound rather than over it. A machine with no audio device — a server, a container — plays
  * nothing and says so once on the console: a bot never stops over a sound.
  */
-@Palette(category = "sound", categoryLabel = "Sound", icon = "🔊", order = 75)
+@Palette(category = "sound", categoryLabel = "Sound", icon = "🔊")
 public final class Sound {
 
     private static final int RATE = 44_100;

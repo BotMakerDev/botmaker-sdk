@@ -35,7 +35,7 @@ import java.time.format.DateTimeFormatter;
  * a resolution no screen automation reads; {@link #currentTimeMillis()} stays, being the half of a pair
  * {@link #elapsedMillis(long)} teaches. Everything hidden is still public and still supported.
  */
-@Palette(category = "util", categoryLabel = "Utilities", order = 70)
+@Palette(category = "util", categoryLabel = "Utilities")
 public final class Time {
 
     /** Default timezone used when no explicit timezone is specified. */

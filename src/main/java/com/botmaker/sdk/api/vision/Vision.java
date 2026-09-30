@@ -40,7 +40,7 @@ import java.util.List;
  * trim here — the seventeen methods are three parallel families of four (image, colour, text) plus
  * {@link #inFrame()}, and each one asks a different question rather than the same question a different way.
  */
-@Palette(category = "vision", categoryLabel = "Vision", icon = "👁", order = 25)
+@Palette(category = "vision", categoryLabel = "Vision", icon = "👁")
 public final class Vision {
 
     private static final ThreadLocal<MatchResult> lastMatch = new ThreadLocal<>();

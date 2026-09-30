@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 /**
  * What an activity reports when it finishes — {@code BAG_FULL}, {@code NO_ORE} — and what the flow drawn in
@@ -21,8 +19,6 @@ import com.botmaker.plugin.api.palette.Palette;
  * <p>Two outcomes are equal when their names are. The name is compared exactly, including case, because it
  * is matched against the wire drawn on the canvas and the canvas stores what was typed.
  */
-@Palette(category = "flow", categoryLabel = "Flow", order = 105)
-@Hidden("a value type: an activity body builds one through its ActivityContext, never by naming this class")
 public final class Outcome {
 
     /**

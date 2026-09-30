@@ -34,7 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>What is still worth checking is everything reflection cannot decide on its own: that every id names a
  * public member of its own facade, that nothing is offered twice, that no simple name is claimed twice (the
  * editor keys imports on it), that nothing outside {@code com.botmaker.sdk.api} — nothing a bot can write down
- * — reached the palette, and that nothing {@code @Hidden} was offered anyway.
+ * — reached the palette, that nothing {@code @Hidden} was offered anyway, and that offered means
+ * {@code @Palette} while plumbing stays out of the catalogue.
  *
  * <p>And one that is new and load-bearing: {@link PaletteCatalog#problems()} must be <b>empty</b>. Load-time
  * validation degrades rather than throwing — the precedent is {@code ValueCatalog.merge}, because a malformed
@@ -98,8 +99,30 @@ class ApiCatalogTest {
             assertTrue(facade.qualifiedName().startsWith(API_PACKAGE),
                     facade.qualifiedName() + " is not under " + API_PACKAGE
                             + "; a bot cannot write that name down, so it cannot be offered");
-            assertTrue(facade.type().isAnnotationPresent(Palette.class),
-                    facade.qualifiedName() + " is catalogued without carrying @Palette");
+        }
+    }
+
+    /**
+     * Since 2026-09-30 {@code @Palette} is what offers a class and the rest of the catalogue is what offered
+     * calls reach: a value type is catalogued because a call takes it, and plumbing no call hands over is not
+     * catalogued at all.
+     */
+    @Test
+    @DisplayName("offered is @Palette; value types are reached, plumbing is not")
+    void offeredIsPaletteAndTheRestIsReached() {
+        for (FacadeEntry facade : catalog().facades()) {
+            assertEquals(facade.type().isAnnotationPresent(Palette.class), facade.offered(),
+                    facade.qualifiedName() + ": offered disagrees with @Palette");
+        }
+        for (Class<?> value : new Class<?>[]{com.botmaker.sdk.api.geometry.Point.class,
+                com.botmaker.sdk.api.vision.MatchResult.class, com.botmaker.sdk.api.vision.ImageTemplate.class,
+                com.botmaker.sdk.api.interaction.Key.class, com.botmaker.sdk.api.capture.CaptureSource.class}) {
+            assertTrue(catalog().offers(value), value.getSimpleName() + " is reached by an offered call");
+        }
+        for (Class<?> plumbing : new Class<?>[]{com.botmaker.sdk.api.util.Debug.class,
+                com.botmaker.sdk.api.bot.Watchdog.class, com.botmaker.sdk.api.bot.Session.class,
+                com.botmaker.sdk.api.bot.PopupGuard.class, com.botmaker.sdk.api.flow.Flows.class}) {
+            assertFalse(catalog().offers(plumbing), plumbing.getSimpleName() + " is plumbing no call hands over");
         }
     }
 
@@ -107,8 +130,6 @@ class ApiCatalogTest {
     @DisplayName("nothing @Hidden reached the palette")
     void nothingHiddenIsOffered() {
         for (FacadeEntry facade : catalog().facades()) {
-            assertEquals(!facade.type().isAnnotationPresent(Hidden.class), facade.offered(),
-                    facade.qualifiedName() + ": offered disagrees with @Hidden on the type");
             for (MemberEntry member : facade.members()) {
                 Executable resolved = resolve(member.id());
                 assertTrue(resolved == null || !resolved.isAnnotationPresent(Hidden.class),

@@ -26,7 +26,7 @@ import com.botmaker.session.DesktopSession;
  * to trim, and the pair is the read and the write of one property — which is the shape the rest of this sweep
  * hides <em>arguments</em> in favour of, not one it hides.
  */
-@Palette(category = "capture", categoryLabel = "Capture", icon = "🎯", order = 60)
+@Palette(category = "capture", categoryLabel = "Capture", icon = "🎯")
 public final class Source {
 
     private static volatile CaptureSource current;

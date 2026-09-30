@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 /**
  * Why the supervisor is invoking the game start-up step, so it can do the right thing for each case rather
@@ -16,8 +14,6 @@ import com.botmaker.plugin.api.palette.Palette;
  *
  * @see Bot#start(Runnable, Runnable, java.util.function.Consumer)
  */
-@Palette(category = "bot", categoryLabel = "Bot", order = 85)
-@Hidden("a value type: an enum constant a bot picks, never a menu entry of its own")
 public enum StartMode {
     /** First launch, before the loop: bring the game up only if it isn't already running. */
     COLD,

@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 /**
  * The work one activity does, as a <b>method reference</b> — {@code Collect::body}.
@@ -33,8 +31,6 @@ import com.botmaker.plugin.api.palette.Palette;
  * canvas is a separate string precisely so that renaming one does not force the other.
  */
 @FunctionalInterface
-@Palette(category = "flow", categoryLabel = "Flow", order = 106)
-@Hidden("a value type: a flow names one as a method reference, it is not built from a menu")
 public interface ActivityBody {
 
     /**

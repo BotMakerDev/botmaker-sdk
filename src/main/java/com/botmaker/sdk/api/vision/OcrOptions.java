@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 /**
  * Immutable OCR tuning knobs. Start from {@link #defaults()} and derive variants with the {@code with*}
@@ -32,8 +30,6 @@ import com.botmaker.plugin.api.palette.Palette;
  * @param level        granularity of the recognized {@link TextResult}s: {@link TextResult.Level#WORD}
  *                     or {@link TextResult.Level#LINE}.
  */
-@Palette(category = "vision", categoryLabel = "Vision", order = 101)
-@Hidden("a value type: derived from defaults() and passed on, not inserted from a menu")
 public record OcrOptions(
         String languages,
         int pageSegMode,

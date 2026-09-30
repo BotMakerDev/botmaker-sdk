@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 
 /**
@@ -55,8 +53,6 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * ({@code "gamescope"}, {@code "xephyr"}, {@code "auto"}), and an unrecognised name degrades to {@code auto}
  * instead of throwing, so a menu entry cannot produce a bot that breaks.
  */
-@Palette(category = "bot", categoryLabel = "Bot", order = 32)
-@Hidden("the generated entry point attaches the session; a bot's own code never names it")
 public final class Session {
 
     private Session() {}

@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.internal.vision.TemplateMetadata;
 import com.botmaker.sdk.internal.vision.TemplateSource;
 import com.botmaker.shared.opencv.OpenCvNative;
@@ -33,8 +32,6 @@ import java.util.List;
  * {@code AutoCloseable} is implemented for the matchers' own try-with-resources, not for a bot to call.
  */
 // The generated Activities declares one per image-template variable, and builds it from the stored path.
-@Palette(category = "vision", categoryLabel = "Vision", order = 95)
-@Hidden("a value type: the project's Pictures class holds them, a bot passes them on")
 public class ImageTemplate implements AutoCloseable {
 
     private final String filePath;

@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.capture;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.capture.Desktop;
@@ -42,8 +41,6 @@ import java.awt.image.BufferedImage;
  * and the supported bot path is {@code Emulators.use()} followed by plain {@code Mouse}. An override point is
  * not a menu entry; that is the same verdict {@code Emulators} reached from the other direction.
  */
-@Palette(category = "capture", categoryLabel = "Capture", order = 86)
-@Hidden("a value type: a bot receives one from Source or a picker, it does not build one from a menu")
 public interface CaptureSource {
 
     /** Pixels of this source. May return {@code null} if the capture failed. */

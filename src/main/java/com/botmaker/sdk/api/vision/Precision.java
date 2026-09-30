@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 
 /**
@@ -55,8 +53,6 @@ import com.botmaker.plugin.api.palette.Palette;
 // Curated for the palette: the type is hidden from the insert menus, because a Precision is written by its slot
 // editor (a named constant or a tuned value), never inserted as a call of its own. Its members stay catalogued
 // so the name resolves; `toString` is an Object override and never a menu entry.
-@Palette(category = "vision", categoryLabel = "Vision", order = 99)
-@Hidden("a value type: the Precision editor writes one into a slot, it is not inserted from a menu")
 public record Precision(double deltaE, int minArea, int minCount) {
 
     /** The area floor the named constants start from: filters out stray anti-aliased pixels. */

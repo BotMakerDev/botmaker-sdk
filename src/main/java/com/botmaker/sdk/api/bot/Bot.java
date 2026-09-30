@@ -45,7 +45,7 @@ import java.util.function.Consumer;
  * not merely the first one, it is the only one that can exist. Both stay public: the entry point Studio
  * generates calls one of them, and a hand-written bot needs to.
  */
-@Palette(category = "bot", categoryLabel = "Bot", icon = "🤖", order = 33)
+@Palette(category = "bot", categoryLabel = "Bot", icon = "🤖")
 public class Bot {
 
     /**

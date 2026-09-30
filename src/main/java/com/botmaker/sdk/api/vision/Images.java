@@ -22,7 +22,7 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
  * the file was renamed, and {@code Images.named("ore")} does not. What is bought is that a project's pictures
  * stop being a compiled artefact of the project at all, so adding one is no longer a source edit.
  */
-@Palette(category = "vision", categoryLabel = "Vision", icon = "🖼", order = 96)
+@Palette(category = "vision", categoryLabel = "Vision", icon = "🖼")
 public final class Images {
 
     private Images() {

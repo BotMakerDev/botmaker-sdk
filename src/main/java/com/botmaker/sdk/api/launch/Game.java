@@ -48,7 +48,7 @@ import java.time.Duration;
  * {@link CaptureSource} tests a window, by process name tests the OS; the {@code *IfNotRunning} and
  * {@code launchAndWait} shapes each combine two operations a bot would otherwise write out.
  */
-@Palette(category = "launch", categoryLabel = "Launch", icon = "🎮", order = 40)
+@Palette(category = "launch", categoryLabel = "Launch", icon = "🎮")
 public class Game {
 
     private Game() {}

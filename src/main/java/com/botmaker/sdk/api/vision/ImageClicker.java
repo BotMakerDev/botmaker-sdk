@@ -35,7 +35,7 @@ import java.util.List;
  * twice over: its {@code delayMs} has a home in {@link BotSettings#foundDelay()}. The {@code *Compare}
  * families keep every shape, their {@code double} being a comparison <em>margin</em> nothing else holds.
  */
-@Palette(category = "vision", categoryLabel = "Vision", icon = "👆", order = 21)
+@Palette(category = "vision", categoryLabel = "Vision", icon = "👆")
 @TraceSource("Vision")
 public class ImageClicker {
 

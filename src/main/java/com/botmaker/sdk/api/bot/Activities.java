@@ -21,7 +21,7 @@ import com.botmaker.sdk.internal.flow.FlowWalker;
  * <p>A name the flow does not have is one line on the console and nothing else, so a typo never stops a
  * running bot.
  */
-@Palette(category = "bot", categoryLabel = "Bot", icon = "◎", order = 35)
+@Palette(category = "bot", categoryLabel = "Bot", icon = "◎")
 public final class Activities {
 
     private Activities() {}

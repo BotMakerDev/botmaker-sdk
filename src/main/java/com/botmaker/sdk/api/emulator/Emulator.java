@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
@@ -34,8 +33,6 @@ import java.util.List;
  * {@link #back}, {@link #home}, {@link #text}, {@link #key}, {@link #startApp}). Obtain instances from
  * {@link Emulators}. Not thread-safe for concurrent capture on one connection.
  */
-@Palette(category = "emulator", categoryLabel = "Emulator", order = 88)
-@Hidden("a value type: Emulators.use() hands one back, a bot does not build one from a menu")
 public final class Emulator implements CaptureSource {
 
     // Common Android key codes for the two verbs bots reach for most.

@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.launch;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -47,8 +46,6 @@ import com.botmaker.shared.launch.Launcher;
  * this computer's {@code botmaker.launch.target} run property (an emulator app picked in Studio sets it), or
  * from {@link Game}'s calls, whose arguments have editors; there is no target picker to offer this method.
  */
-@Palette(category = "launch", categoryLabel = "Launch", order = 93)
-@Hidden("a value type: Game and Target hand one back, a bot does not build one from a menu")
 @TraceSource("Target")
 public sealed interface LaunchTarget {
 

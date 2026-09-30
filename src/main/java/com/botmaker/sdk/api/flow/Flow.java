@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.flow;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.ActivityBody;
 
 import java.util.List;
@@ -68,8 +66,6 @@ import java.util.List;
  * @param start      the activity a run begins at; {@code ""} for a flow that runs nothing
  * @param limits     what stops a run that never finishes
  */
-@Palette(category = "flow", categoryLabel = "Flow", order = 100)
-@Hidden("a value type: the flow editor writes one into your project, it is not built from a menu")
 public record Flow(List<Activity> activities, List<Edge> edges, List<Preset> presets, String start,
                    Limits limits) {
 

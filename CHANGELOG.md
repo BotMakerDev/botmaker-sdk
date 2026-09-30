@@ -17,6 +17,16 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Changed
+
+- **The palette offers the calls a bot makes and nothing else.** Thirty-seven value and plumbing types lost
+  `@Palette` + `@Hidden` (contract 0.4.0: `@Palette` means offered). The value types — `Point`,
+  `MatchResult`, `ImageTemplate`, `Key` and the rest — are still recognised because an offered call takes or
+  returns them; `Debug`, `Watchdog`, `Session`, `PopupGuard`, `Flows` and `BotMaker` no longer appear in
+  Studio at all. Offered classes are listed alphabetically.
+
 ## [1.2.1] — 2026-09-29
 
 ### Added

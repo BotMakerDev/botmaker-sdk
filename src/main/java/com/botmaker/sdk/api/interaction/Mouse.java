@@ -32,7 +32,7 @@ import com.botmaker.session.PointerPolicy;
  * {@code durationMs} has no property home, unlike {@code ImageClicker}'s {@code delayMs}, so both drag shapes
  * stay.
  */
-@Palette(category = "interaction", categoryLabel = "Interaction", icon = "🖱", order = 10)
+@Palette(category = "interaction", categoryLabel = "Interaction", icon = "🖱")
 public class Mouse {
 
     /**

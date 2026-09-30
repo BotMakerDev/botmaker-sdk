@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.interaction;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 import java.time.Duration;
 import java.util.List;
@@ -22,8 +20,6 @@ import java.util.stream.Collectors;
  * <p>A combo of modifiers alone is a combo ({@code Combo.of(Key.CTRL)}); an empty one is refused, and so is a
  * negative hold.
  */
-@Palette(category = "interaction", categoryLabel = "Interaction", order = 107)
-@Hidden("a value type: a combination a bot passes to Keyboard.combo, never a menu entry of its own")
 public record Combo(List<Key> keys, Duration hold) {
 
     public Combo {

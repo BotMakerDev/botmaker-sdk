@@ -54,7 +54,7 @@ import java.util.List;
  * varies per colour rather than per bot. Annotating the class is still worth doing: it fixes the verdict, and
  * a method added here later is hidden until someone decides otherwise.
  */
-@Palette(category = "vision", categoryLabel = "Vision", icon = "🎨", order = 23)
+@Palette(category = "vision", categoryLabel = "Vision", icon = "🎨")
 @TraceSource("Vision")
 public class Pixel {
 

@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.flow;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 /**
  * The flow a bot runs.
@@ -13,8 +11,6 @@ import com.botmaker.plugin.api.palette.Palette;
  * cleared the flow, {@code installed} hands back a {@code Flow} nothing in Studio takes, and {@code enabled} is
  * {@code Activities.active} without the activity picker. Its members stay catalogued so the name resolves.
  */
-@Palette(category = "flow", categoryLabel = "Flow", icon = "⑃", order = 99)
-@Hidden("plumbing Bot.run uses; a dropped use() cleared the flow, and Activities answers the rest with a picker")
 public final class Flows {
 
     private static volatile Flow current = Flow.NONE;

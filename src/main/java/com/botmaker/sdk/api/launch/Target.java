@@ -31,7 +31,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * target from a config value. A target picker was planned and never wired; it was deleted on 2026-09-28, since
  * a game is started by its own launcher, or by {@link Game}'s calls, whose arguments have editors.
  */
-@Palette(category = "launch", categoryLabel = "Launch", icon = "🚀", order = 41)
+@Palette(category = "launch", categoryLabel = "Launch", icon = "🚀")
 public final class Target {
 
     private static volatile LaunchTarget current;

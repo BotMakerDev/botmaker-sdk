@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.geometry;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 /**
  * Represents a direction for sorting and selecting matches.
@@ -10,8 +8,6 @@ import com.botmaker.plugin.api.palette.Palette;
 // The generated Activities declares a field of this type per direction variable, and parses one back from
 // the stored name with Enum.valueOf — so the type is scaffolding, and so is whichever constant is declared
 // first, which is the fallback that helper falls back to.
-@Palette(category = "geometry", categoryLabel = "Geometry", order = 87)
-@Hidden("a value type: an enum constant a bot picks, never a menu entry of its own")
 public enum Direction {
     /**
      * Top to bottom (smallest Y to largest Y).

@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.util;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.internal.trace.TraceSources;
 import com.botmaker.shared.Diag;
 
@@ -44,8 +42,6 @@ import com.botmaker.shared.Diag;
  * {@code Throwable} is produced by the {@code catch} clause the call sits in, so the variable picker fills it
  * from scope — and this overload's own javadoc is the reason to prefer it over {@code t.printStackTrace()}.
  */
-@Palette(category = "util", categoryLabel = "Utilities", icon = "🐞", order = 31)
-@Hidden("kept out of the insert menus; its members stay catalogued so the name resolves")
 public final class Debug {
 
     private Debug() {}

@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 import java.util.function.Predicate;
 
@@ -47,8 +46,6 @@ import java.util.function.Predicate;
  * <p>{@link #otherwise} is optional. A chain that ends without one simply does nothing when no branch
  * matched, and the returned value may be discarded.
  */
-@Palette(category = "vision", categoryLabel = "Vision", order = 96)
-@Hidden("a value type: a chain is started by calling when(...) on a Matches, never built from a menu")
 public final class MatchBranch {
 
     private final Matches frame;

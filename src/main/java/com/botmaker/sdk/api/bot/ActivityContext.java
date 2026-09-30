@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.api.flow.Flow;
@@ -25,8 +23,6 @@ import com.botmaker.sdk.api.flow.Flows;
  * }
  * }</pre>
  */
-@Palette(category = "bot", categoryLabel = "Bot", order = 37)
-@Hidden("handed to an activity body; a bot never builds one")
 @TraceSource("Activity")
 public final class ActivityContext {
 

@@ -1,8 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
 
-import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 import java.util.List;
 
@@ -31,8 +29,6 @@ import java.util.List;
 // Curated for the palette: both `of` factories and `isEmpty` are offered; `toArray` is not. It exists so the
 // varargs matchers can be reached from a group, which is plumbing between two SDK classes — the palette has no
 // reason to teach a bot author to hold an ImageTemplate[]. It stays public for the one who wants it.
-@Palette(category = "vision", categoryLabel = "Vision", order = 96)
-@Hidden("a value type: a bot holds a group and passes it on, it does not build one from a menu")
 public record ImageTemplateGroup(List<ImageTemplate> templates) {
 
     public ImageTemplateGroup {

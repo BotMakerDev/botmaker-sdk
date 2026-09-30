@@ -46,7 +46,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * records that this is precisely why the Wait block inserts the {@code Duration} form. A JDK type with a
  * picker is fillable; an SDK type without one would not be.
  */
-@Palette(category = "interaction", categoryLabel = "Interaction", icon = "⏱", order = 12)
+@Palette(category = "interaction", categoryLabel = "Interaction", icon = "⏱")
 public class Wait {
 
     /**

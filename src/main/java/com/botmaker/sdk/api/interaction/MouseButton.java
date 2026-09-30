@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.interaction;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 
 
 /**
@@ -22,8 +21,6 @@ import com.botmaker.plugin.api.palette.Palette;
  * untouched and are the entire surface a bot wants.
  */
 // Scaffolding for the same reason as Direction: the generated Activities holds one per mouse-button variable.
-@Palette(category = "interaction", categoryLabel = "Interaction", order = 92)
-@Hidden("a value type: an enum constant a bot picks, never a menu entry of its own")
 public enum MouseButton {
     LEFT(1), MIDDLE(2), RIGHT(3),
     /** The thumb button that goes back — the browser's Back, and what most games bind to a side button. */
