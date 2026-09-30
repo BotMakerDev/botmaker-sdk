@@ -2,363 +2,90 @@ package com.botmaker.sdk.api.util;
 
 import com.botmaker.plugin.api.palette.Palette;
 
-import java.time.*;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.Month;
 import java.time.format.DateTimeFormatter;
 
 /**
- * Time and date utilities for BotMaker SDK.
+ * The clock, as a bot block asks it: what time and day it is, and whether now falls in a window.
  *
- * <p>Provides comprehensive time/date functionality including current time, date components,
- * UTC variants, timezone handling, and formatting. All methods are static and return values
- * based on the current moment unless otherwise specified.
+ * <pre>{@code
+ * if (Time.isBetween(LocalTime.of(5, 30), LocalTime.of(6, 0))) collectDailyReward();
+ * if (Time.isDay(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)) runWeekendEvent();
+ * }</pre>
  *
- * <p>Examples:
- * <ul>
- *   <li>{@code Time.now()} - Get current date and time</li>
- *   <li>{@code Time.hour()} - Get current hour (0-23)</li>
- *   <li>{@code Time.nowUtc()} - Get current UTC date and time</li>
- *   <li>{@code Time.format("yyyy-MM-dd HH:mm:ss")} - Format current time</li>
- * </ul>
- *
- * <p><b>Curated for the palette</b> (see {@code @Palette}). The duplication here is not an overload family but a
- * parallel <em>vocabulary</em>: {@code hourUtc}, {@code minuteUtc}, {@code secondUtc}, {@code millisecondUtc}
- * and {@code formatUtc} each ask exactly what their local twin asks, in the zone
- * {@link #setDefaultTimeZone(String)} already sets. Those five are hidden. {@link #nowUtc()} and
- * {@link #isBetweenUtc} are <em>not</em>, because they are the two a bot cannot express by moving that
- * property: a bot that watches a local play window <em>and</em> a UTC server reset needs both zones in the same
- * run, and a global default can only hold one. So UTC stays reachable — through two entries instead of seven.
- *
- * <p>Of each {@code ZoneId}/{@code String} pair only the {@code String} form is offered: {@code ZoneId} is a JDK
- * type, so Studio has no picker and no declarable variable for it, and {@code now("Europe/London")} is the
- * spelling the editor can actually fill. {@link #getDefaultTimeZone()} is hidden for that reason alone — it
- * hands back a value the palette has nowhere to put. {@link #nanoTime()} is a bare {@code System} passthrough at
- * a resolution no screen automation reads; {@link #currentTimeMillis()} stays, being the half of a pair
- * {@link #elapsedMillis(long)} teaches. Everything hidden is still public and still supported.
+ * <p>Everything reads the machine's own time zone. <b>Ten members since 2026-09-30</b>, down from thirty-one:
+ * the UTC twins, the zone setters, the date parts ({@code second}, {@code year}, …), the elapsed-time helpers and
+ * the {@code System} passthroughs were deleted, not deprecated — nothing used them, and each was either a second
+ * spelling of a member kept here or a question a {@code java.time} value already answers
+ * ({@code Time.today().getYear()}).
  */
 @Palette(category = "util", categoryLabel = "Utilities")
 public final class Time {
 
-    /** Default timezone used when no explicit timezone is specified. */
-    private static volatile ZoneId defaultTimeZone = ZoneId.systemDefault();
+    private Time() {}
 
-    private Time() {} // Utility class - prevent instantiation
+    // --- Now ---
 
-    // --- Current time ---
-
-    /**
-     * Returns the current local date and time.
-     *
-     * @return the current date and time in the system default timezone
-     */
+    /** The current date and time. */
     public static LocalDateTime now() {
-        return LocalDateTime.now(defaultTimeZone);
+        return LocalDateTime.now();
     }
 
-    /**
-     * Returns today's date.
-     *
-     * @return the current date in the system default timezone
-     */
+    /** Today's date. */
     public static LocalDate today() {
-        return LocalDate.now(defaultTimeZone);
+        return LocalDate.now();
     }
 
-    /**
-     * Returns the current time of day.
-     *
-     * @return the current time in the system default timezone
-     */
+    /** The current time of day. */
     public static LocalTime currentTime() {
-        return LocalTime.now(defaultTimeZone);
+        return LocalTime.now();
     }
 
-    // --- Time components ---
-
-    /**
-     * Returns the current hour (0-23).
-     *
-     * @return the current hour in the system default timezone
-     */
+    /** The current hour, 0–23. */
     public static int hour() {
         return currentTime().getHour();
     }
 
-    /**
-     * Returns the current minute (0-59).
-     *
-     * @return the current minute in the system default timezone
-     */
+    /** The current minute, 0–59. */
     public static int minute() {
         return currentTime().getMinute();
     }
 
-    /**
-     * Returns the current second (0-59).
-     *
-     * @return the current second in the system default timezone
-     */
-    public static int second() {
-        return currentTime().getSecond();
-    }
-
-    /**
-     * Returns the current millisecond (0-999).
-     *
-     * @return the current millisecond in the system default timezone
-     */
-    public static int millisecond() {
-        return currentTime().getNano() / 1_000_000;
-    }
-
-    // --- Date components ---
-
-    /**
-     * Returns the current day of the month (1-31).
-     *
-     * @return the current day of the month in the system default timezone
-     */
-    public static int dayOfMonth() {
-        return today().getDayOfMonth();
-    }
-
-    /**
-     * Returns the current month.
-     *
-     * <p>Typed rather than a 1–12 {@code int} for the same reason {@link #dayOfWeek()} is: the number is
-     * ambiguous by one either way (is 1 January or is it zero-based, as it is in half the languages a bot
-     * author has met?) and nothing in an {@code int} says which. {@code Month.JANUARY} says it.
-     *
-     * @return the current month in the system default timezone
-     */
-    public static Month month() {
-        return today().getMonth();
-    }
-
-    /**
-     * Returns the current year.
-     *
-     * @return the current year in the system default timezone
-     */
-    public static int year() {
-        return today().getYear();
-    }
-
-    /**
-     * Returns the current day of the week.
-     *
-     * @return the current day of the week in the system default timezone
-     */
+    /** Today's day of the week. */
     public static DayOfWeek dayOfWeek() {
         return today().getDayOfWeek();
     }
 
-    // --- UTC variants ---
+    // --- Windows ---
 
     /**
-     * Returns the current UTC date and time.
-     *
-     * @return the current date and time in UTC
-     */
-    public static LocalDateTime nowUtc() {
-        return LocalDateTime.now(ZoneId.of("UTC"));
-    }
-
-    /**
-     * Returns the current UTC hour (0-23).
-     *
-     * @return the current hour in UTC
-     */
-    public static int hourUtc() {
-        return LocalTime.now(ZoneId.of("UTC")).getHour();
-    }
-
-    /**
-     * Returns the current UTC minute (0-59).
-     *
-     * @return the current minute in UTC
-     */
-    public static int minuteUtc() {
-        return LocalTime.now(ZoneId.of("UTC")).getMinute();
-    }
-
-    /**
-     * Returns the current UTC second (0-59).
-     *
-     * @return the current second in UTC
-     */
-    public static int secondUtc() {
-        return LocalTime.now(ZoneId.of("UTC")).getSecond();
-    }
-
-    /**
-     * Returns the current UTC millisecond (0-999).
-     *
-     * @return the current millisecond in UTC
-     */
-    public static int millisecondUtc() {
-        return LocalTime.now(ZoneId.of("UTC")).getNano() / 1_000_000;
-    }
-
-    // --- Timezone handling ---
-
-    /**
-     * Returns the current date and time in the specified timezone.
-     *
-     * <p>Studio has no editor for a {@code ZoneId} and seeds a dropped block with {@code null}, so {@code null}
-     * means {@link #getDefaultTimeZone() the default timezone} rather than a {@code NullPointerException}.
-     *
-     * @param zone the timezone to use, or {@code null} for the default one
-     * @return the current date and time in the specified timezone
-     */
-    public static LocalDateTime now(ZoneId zone) {
-        return LocalDateTime.now(zone == null ? defaultTimeZone : zone);
-    }
-
-    /**
-     * Returns the current date and time in the timezone with the specified ID.
-     *
-     * @param zoneId the timezone ID (e.g., "America/New_York", "Europe/London")
-     * @return the current date and time in the specified timezone
-     * @throws IllegalArgumentException if the zone ID is not recognized
-     */
-    public static LocalDateTime now(String zoneId) {
-        return LocalDateTime.now(ZoneId.of(zoneId));
-    }
-
-    /**
-     * Returns the default timezone used by this Time API.
-     *
-     * @return the default timezone
-     */
-    public static ZoneId getDefaultTimeZone() {
-        return defaultTimeZone;
-    }
-
-    /**
-     * Sets the default timezone used by this Time API.
-     *
-     * <p>{@code null} goes back to the system timezone. It threw before 2.0.0; Studio seeds a dropped block
-     * with {@code null} (it has no {@code ZoneId} editor), so the block it offered failed on its first run.
-     *
-     * @param zone the timezone to use as default, or {@code null} for the system timezone
-     */
-    public static void setDefaultTimeZone(ZoneId zone) {
-        defaultTimeZone = zone == null ? ZoneId.systemDefault() : zone;
-    }
-
-    /**
-     * Sets the default timezone used by this Time API by zone ID.
-     *
-     * @param zoneId the timezone ID (e.g., "America/New_York")
-     */
-    public static void setDefaultTimeZone(String zoneId) {
-        setDefaultTimeZone(ZoneId.of(zoneId));
-    }
-
-    // --- Formatting ---
-
-    /**
-     * Formats the current date and time using the specified pattern.
-     *
-     * @param pattern the formatting pattern (see java.time.format.DateTimeFormatter)
-     * @return the formatted current date and time string
-     * @throws IllegalArgumentException if the pattern is invalid
-     */
-    public static String format(String pattern) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
-        return now().format(formatter);
-    }
-
-    /**
-     * Formats the current UTC date and time using the specified pattern.
-     *
-     * @param pattern the formatting pattern (see java.time.format.DateTimeFormatter)
-     * @return the formatted current UTC date and time string
-     * @throws IllegalArgumentException if the pattern is invalid
-     */
-    public static String formatUtc(String pattern) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
-        return LocalDateTime.now(ZoneId.of("UTC")).format(formatter);
-    }
-
-    // --- Time arithmetic ---
-
-    /**
-     * Returns the number of milliseconds elapsed since the specified start time.
-     *
-     * @param startTime the start time in milliseconds (typically from System.currentTimeMillis())
-     * @return the number of milliseconds elapsed
-     */
-    public static long elapsedMillis(long startTime) {
-        return System.currentTimeMillis() - startTime;
-    }
-
-    /**
-     * Returns the number of seconds elapsed since the specified start time.
-     *
-     * @param startTime the start time in milliseconds (typically from System.currentTimeMillis())
-     * @return the number of seconds elapsed
-     */
-    public static long elapsedSeconds(long startTime) {
-        return (System.currentTimeMillis() - startTime) / 1000;
-    }
-
-    // --- Time ranges ---
-
-    /**
-     * Checks whether the current time of day falls between {@code start} and {@code end} (both inclusive to
-     * the minute) — for a window that doesn't start on the hour:
-     * {@code Time.isBetween(LocalTime.of(5, 30), LocalTime.of(6, 0))}.
+     * Whether the current time of day falls between {@code start} and {@code end} (both inclusive to the
+     * minute) — {@code Time.isBetween(LocalTime.of(5, 30), LocalTime.of(6, 0))}.
      *
      * <p>Wraps around midnight: a window whose end is before its start is read as spanning midnight, which is
      * what "the reset window is 23:50 to 00:10" means.
      *
-     * <p>This replaced an {@code isBetween(int startHour, int endHour)} that took bare hours. Whole-hour
-     * windows are still one call — {@code isBetween(LocalTime.of(5, 0), LocalTime.of(7, 0))} — and the pair of
-     * bare numbers could say nothing about being hours, which cost both a runtime range check the type makes
-     * impossible to fail and, in the Studio, a {@code (method, argIndex)} lookup that had to know where in
-     * each overload the hours sat.
-     *
-     * @param start the start of the window
-     * @param end   the end of the window
-     * @return true when now is inside the window
      * @throws IllegalArgumentException if either bound is null
      */
     public static boolean isBetween(LocalTime start, LocalTime end) {
-        return isWithin(currentTime(), start, end);
-    }
-
-    /**
-     * The UTC counterpart of {@link #isBetween(LocalTime, LocalTime)} — for a window pinned to a server's
-     * reset rather than to the machine's local clock.
-     *
-     * @param start the start of the window, in UTC
-     * @param end   the end of the window, in UTC
-     * @return true when now is inside the window
-     * @throws IllegalArgumentException if either bound is null
-     */
-    public static boolean isBetweenUtc(LocalTime start, LocalTime end) {
-        return isWithin(LocalTime.now(ZoneId.of("UTC")), start, end);
-    }
-
-    /** Both windows, one rule: inclusive to the minute, and a window that reads backwards spans midnight. */
-    private static boolean isWithin(LocalTime now, LocalTime start, LocalTime end) {
         if (start == null || end == null) {
             throw new IllegalArgumentException("Both ends of the window are required");
         }
-        LocalTime nowTime = now.withSecond(0).withNano(0);
+        LocalTime now = currentTime().withSecond(0).withNano(0);
         if (!start.isAfter(end)) {
-            return !nowTime.isBefore(start) && !nowTime.isAfter(end);
+            return !now.isBefore(start) && !now.isAfter(end);
         }
-        return !nowTime.isBefore(start) || !nowTime.isAfter(end);   // wraps midnight
+        return !now.isBefore(start) || !now.isAfter(end);   // wraps midnight
     }
 
     /**
-     * Checks whether today is one of {@code days} — for a task that only runs on certain weekdays
-     * ({@code Time.isDay(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)}).
+     * Whether today is one of {@code days} — {@code Time.isDay(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)}.
      *
      * @param days the days to test against; none given ⇒ false
-     * @return true when today is one of them
      */
     public static boolean isDay(DayOfWeek... days) {
         if (days == null) return false;
@@ -370,40 +97,28 @@ public final class Time {
     }
 
     /**
-     * Checks whether this month is one of {@code months} — for seasonal content
-     * ({@code Time.isMonth(Month.DECEMBER)}).
+     * Whether this month is one of {@code months} — for seasonal content ({@code Time.isMonth(Month.DECEMBER)}).
      *
      * @param months the months to test against; none given ⇒ false
-     * @return true when this month is one of them
      */
     public static boolean isMonth(Month... months) {
         if (months == null) return false;
-        Month thisMonth = month();
+        Month thisMonth = today().getMonth();
         for (Month candidate : months) {
             if (thisMonth == candidate) return true;
         }
         return false;
     }
 
-    // --- Current timestamp ---
+    // --- Text ---
 
     /**
-     * Returns the current system time in milliseconds since epoch.
-     * Useful for timing measurements.
+     * The current date and time in {@code pattern} ({@link DateTimeFormatter} letters) —
+     * {@code Time.format("yyyy-MM-dd HH:mm")}.
      *
-     * @return current time in milliseconds since epoch
+     * @throws IllegalArgumentException if the pattern is invalid
      */
-    public static long currentTimeMillis() {
-        return System.currentTimeMillis();
-    }
-
-    /**
-     * Returns the current system time in nanoseconds.
-     * Useful for precise timing measurements.
-     *
-     * @return current time in nanoseconds since some arbitrary origin
-     */
-    public static long nanoTime() {
-        return System.nanoTime();
+    public static String format(String pattern) {
+        return now().format(DateTimeFormatter.ofPattern(pattern));
     }
 }

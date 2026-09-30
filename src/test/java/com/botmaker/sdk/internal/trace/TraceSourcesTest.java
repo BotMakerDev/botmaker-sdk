@@ -1,6 +1,5 @@
 package com.botmaker.sdk.internal.trace;
 
-import com.botmaker.sdk.api.bot.ActivityContext;
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.bot.Watchdog;
@@ -62,7 +61,6 @@ class TraceSourcesTest {
     @Test
     void eachSdkClassIsTracedUnderThePrefixItUsedToWrite() {
         Map<Class<?>, String> before = new LinkedHashMap<>();
-        before.put(ActivityContext.class, "Activity");
         before.put(Bot.class, "Bot");
         before.put(PopupGuard.class, "Popup");
         before.put(Watchdog.class, "Watchdog");

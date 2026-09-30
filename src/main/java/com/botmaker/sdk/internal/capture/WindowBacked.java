@@ -36,6 +36,7 @@ public interface WindowBacked {
      * consumer wants, so nobody re-writes the {@code instanceof} and gets the null handling subtly different.
      */
     static GenericWindow of(CaptureSource source) {
+        if (source instanceof com.botmaker.sdk.api.capture.Window window) return WindowHandles.of(window);
         return source instanceof WindowBacked backed ? backed.targetWindow() : null;
     }
 }

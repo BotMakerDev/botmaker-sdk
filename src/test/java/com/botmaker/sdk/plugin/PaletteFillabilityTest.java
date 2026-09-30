@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>A parameter of any other type is seeded with {@code null} by Studio and shown read-only, so the dropped
  * block either threw on its first run or did nothing: {@code Text}'s {@code OcrOptions} overloads did both
  * until the SDK declared {@code OcrOptions} (2026-09-29), and {@code Time}'s {@code ZoneId} ones until they
- * read a {@code null} as the default zone. Hiding one overload is impossible
+ * read a {@code null} as the default zone (and were deleted, 2026-09-30). Hiding one overload is impossible
  * ({@code @Hidden} hides a name), so such a member must take the {@code null}, and is listed below with why.
  */
 class PaletteFillabilityTest {
@@ -38,8 +38,7 @@ class PaletteFillabilityTest {
      * Offered members whose unfillable parameter is read as a default when it arrives as {@code null}. Each entry
      * is {@code Owner#member(parameterType)}.
      */
-    private static final Set<String> NULL_MEANS_DEFAULT = Set.of(
-            "Time#now(ZoneId)", "Time#setDefaultTimeZone(ZoneId)");
+    private static final Set<String> NULL_MEANS_DEFAULT = Set.of();
 
     @Test
     void every_offered_parameter_can_be_filled() {

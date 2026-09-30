@@ -3,7 +3,8 @@ package com.botmaker.sdk.api.capture;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.internal.capture.WindowBacked;
+import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.sdk.internal.capture.WindowHandles;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -24,17 +25,17 @@ import java.util.Optional;
  *
  * <p>The underlying native handle is kept opaque; obtain a {@code Window} via the static factories.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): twelve of the fourteen are offered — the three
- * factories and every accessor and interaction a bot writes against a window it is holding. The two hidden
- * are {@link #capture()} and {@link #targetWindow()}, and they are hidden by the same mechanical rule that
- * hid {@code Time.getDefaultTimeZone()}: <b>a return value the palette has nowhere to put</b>. Their types —
- * {@code BufferedImage} and {@code GenericWindow} — are neither declarable variable types in Studio nor
- * pickable ones, so a menu entry producing either offers the user a value they cannot then name, store or
- * pass on. Both are the {@link CaptureSource}/{@code WindowBacked} contract and are called constantly, just
- * by the vision layer rather than by a bot: the sentence above about passing a {@code Window} straight into
- * {@code ImageFinder.find} <em>is</em> how a bot uses them.
+ * <p><b>No raw pixels, no native handle.</b> {@link #capture()} is {@code @Hidden}: it is the
+ * {@link CaptureSource} contract the vision layer calls, and a {@code BufferedImage} is nothing a bot block can
+ * name, store or pass on — passing a {@code Window} straight into {@code ImageFinder.find} <em>is</em> how a bot
+ * uses it. The native handle has no public method at all since 2026-09-30 ({@code targetWindow()}, which named
+ * botmaker-shared's {@code GenericWindow}); keyboard routing reads it through {@code internal.capture}.
  */
-public class Window implements CaptureSource, WindowBacked {
+public class Window implements CaptureSource {
+
+    static {
+        WindowHandles.grant(window -> window.handle);
+    }
 
     private final GenericWindow handle;
 
@@ -87,6 +88,8 @@ public class Window implements CaptureSource, WindowBacked {
     // --- CaptureSource ---
 
     @Override
+    @Hidden("the CaptureSource half of this type; hidden there and hidden here, since an override "
+            + "carries none of the interface's annotations")
     public BufferedImage capture() {
         return controller().captureWindow(handle);
     }
@@ -95,11 +98,6 @@ public class Window implements CaptureSource, WindowBacked {
     public Point origin() {
         Rectangle r = handle.getRect();
         return new Point(r.x, r.y);
-    }
-
-    @Override
-    public GenericWindow targetWindow() {
-        return handle;
     }
 
     // --- Accessors ---

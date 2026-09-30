@@ -137,8 +137,8 @@ public final class FlowNames {
 
     /** The outcomes section's explanation. */
     public static final String OUTCOMES_HINT = "What this activity can report. Its body returns one with "
-            + "ctx.outcome(\"…\"), and each is wired on the canvas. Every activity also has a NEXT outcome "
-            + "(ctx.done()), and any outcome you leave unwired ends the run.";
+            + "Activities.outcome(\"…\"), and each is wired on the canvas. Every activity also has a NEXT "
+            + "outcome (Activities.next()), and any outcome you leave unwired ends the run.";
 
     /** The go-home tick's tooltip. */
     public static final String GO_HOME_TIP = "Run the home method handed to Bot.run(…) immediately before "

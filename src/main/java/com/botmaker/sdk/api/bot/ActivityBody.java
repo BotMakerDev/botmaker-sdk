@@ -11,10 +11,10 @@ package com.botmaker.sdk.api.bot;
  *
  * <pre>{@code
  * public final class Collect {
- *     public static Outcome body(ActivityContext ctx) {
- *         if (nothingLeft()) return ctx.outcome("NOTHING_LEFT");
+ *     public static Outcome body() {
+ *         if (nothingLeft()) return Activities.outcome("NOTHING_LEFT");
  *         clickCollect();
- *         return ctx.done();
+ *         return Activities.next();
  *     }
  * }
  *
@@ -45,14 +45,17 @@ public interface ActivityBody {
      * constant, not a value read back out of a file, so {@code body == ActivityBody.NONE} is exactly the
      * question the flow asks. Calling it is harmless and reports nothing in particular.
      */
-    ActivityBody NONE = ctx -> null;
+    ActivityBody NONE = () -> null;
 
     /**
-     * Does the work and says what happened.
+     * Does the work and says what happened — {@link Activities#outcome(String)} or {@link Activities#next()}.
      *
-     * @param ctx this activity, from the inside — {@code ctx.outcome("…")} or {@code ctx.done()}
-     * @return what the flow routes on; {@code null} is read as {@code ctx.done()}, for the same reason a
-     *         lambda whose last statement fell through has nothing special to report
+     * <p>No argument since SDK 2.0.0. An {@code ActivityContext} was handed in so {@code ctx.outcome("…")}
+     * had a receiver the editor could key a picker on; the picker is keyed on the parameter's
+     * {@code @OutcomeName} now, and the flow knows which activity is running without being told.
+     *
+     * @return what the flow routes on; {@code null} is read as {@link Activities#next()}, for the same reason
+     *         a lambda whose last statement fell through has nothing special to report
      */
-    Outcome run(ActivityContext ctx);
+    Outcome run();
 }

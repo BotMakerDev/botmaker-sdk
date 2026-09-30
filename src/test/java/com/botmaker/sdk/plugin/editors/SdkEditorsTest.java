@@ -4,7 +4,6 @@ import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.bot.Activities;
-import com.botmaker.sdk.api.bot.ActivityContext;
 import com.botmaker.sdk.api.bot.ActivityName;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.OutcomeName;
@@ -102,9 +101,9 @@ class SdkEditorsTest {
     @Test
     void names_of_activities_outcomes_and_emulators_are_claimed() {
         assertTrue(carries(TestContexts.method(Activities.class, "disable"), 0, ActivityName.class));
-        assertTrue(carries(TestContexts.method(ActivityContext.class, "outcome"), 0, OutcomeName.class));
+        assertTrue(carries(TestContexts.method(Activities.class, "outcome"), 0, OutcomeName.class));
         assertTrue(carries(TestContexts.method(Emulators.class, "use", String.class), 0, EmulatorName.class));
-        assertTrue(claimed(TestContexts.slot(TestContexts.method(ActivityContext.class, "outcome"), 0, "\"done\"")));
+        assertTrue(claimed(TestContexts.slot(TestContexts.method(Activities.class, "outcome"), 0, "\"done\"")));
     }
 
     /** No call, or one the host could not resolve: nothing is claimed, rather than guessed at. */

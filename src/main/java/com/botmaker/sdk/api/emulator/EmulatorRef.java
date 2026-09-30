@@ -3,7 +3,6 @@ package com.botmaker.sdk.api.emulator;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
-import com.botmaker.shared.emulator.PlatformId;
 
 
 /**
@@ -24,11 +23,6 @@ public final class EmulatorRef {
     /** The instance name (as shown in the emulator's multi-instance manager). */
     public String name() {
         return instance.name();
-    }
-
-    /** Which emulator product this instance belongs to. */
-    public PlatformId platform() {
-        return instance.platformId();
     }
 
     /** Where this instance's ADB is — {@code host:port}, or a device serial (whether or not it's up). */

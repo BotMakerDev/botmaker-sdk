@@ -11,7 +11,6 @@ import com.botmaker.sdk.internal.observe.SwipeEvent;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
-import com.botmaker.shared.emulator.PlatformId;
 
 import java.util.List;
 
@@ -186,11 +185,6 @@ public final class Emulator implements CaptureSource {
     /** The instance name (as shown in the emulator's multi-instance manager). */
     public String name() {
         return instance.name();
-    }
-
-    /** Which emulator product this instance belongs to. */
-    public PlatformId platform() {
-        return instance.platformId();
     }
 
     /** Closes the underlying ADB connection. After this the emulator can no longer be captured or tapped. */

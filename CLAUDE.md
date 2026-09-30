@@ -148,7 +148,9 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
   `of(…)`, withers): a type because ΔE has no obvious scale and the pixel count is an *area* routinely misread
   as a width, and because an editor is claimed by **type**, never by a method and an argument index.
 - `api.bot` — `Bot.run(Home::goHome, Sdk.class)` (installs every `@Managed` value it is handed and walks the
-  flow, `internal/flow/FlowWalker`), `ActivityContext`, `Outcome`, and **`BotSettings`**, the runtime tuning
+  flow, `internal/flow/FlowWalker`), `Activities` (`outcome(@OutcomeName String)`/`next()` — a body is
+  `public static Outcome body()`, and `FlowWalker.current()` says which activity runs; `ActivityContext` was
+  deleted 2026-09-30), `Outcome`, and **`BotSettings`**, the runtime tuning
   as an immutable value: `@Managed("settings")` in `Sdk.java`, read as `BotSettings.current()`, changed for a
   while with `BotSettings.use(…)`, edited in ⚙ Bot Settings (`plugin/settings/BotSettingsWindow`).
 - `api.flow` — `Flow`, `Flow.activity(Collect::body, …)` (an activity's work is a **method reference**, so a

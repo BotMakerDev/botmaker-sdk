@@ -26,6 +26,28 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `MatchResult`, `ImageTemplate`, `Key` and the rest — are still recognised because an offered call takes or
   returns them; `Debug`, `Watchdog`, `Session`, `PopupGuard`, `Flows` and `BotMaker` no longer appear in
   Studio at all. Offered classes are listed alphabetically.
+- **An activity body takes no argument**: `public static Outcome body()`, returning
+  `Activities.outcome("BAG_FULL")` or `Activities.next()`. The flow knows which activity is running, so an
+  undeclared outcome is still reported on the console, and Studio's outcome picker now lists only the
+  outcomes of the activity whose body the call sits in (every outcome elsewhere). `ActivityBody.run()` has no
+  parameter.
+- **`Emulators`, `Game` and `Target` are no longer in the palette**: the run connects and launches the
+  project's target itself. They stay public for a hand-written bot.
+- **`Time` is ten members**: `now`, `today`, `currentTime`, `hour`, `minute`, `dayOfWeek`, `isBetween`,
+  `isDay`, `isMonth`, `format`. It reads the machine's own zone.
+
+### Removed
+
+Deleted outright rather than deprecated — nothing used them.
+
+- `ActivityContext` (use `Activities.outcome`/`next`/`enable`/`disable`).
+- `Images` (a picture named by a string; the `@Managed` `Pictures` constants replace it).
+- `Emulator.platform()`, `EmulatorRef.platform()` and `Window.targetWindow()`, which named botmaker-shared
+  types a bot cannot write down. `Window.capture()` stays for the vision layer and is `@Hidden`.
+- `Time`: `second`, `millisecond`, `dayOfMonth`, `month`, `year`, `nowUtc`, `hourUtc`, `minuteUtc`,
+  `secondUtc`, `millisecondUtc`, `now(ZoneId)`, `now(String)`, `getDefaultTimeZone`, both
+  `setDefaultTimeZone`, `formatUtc`, `elapsedMillis`, `elapsedSeconds`, `isBetweenUtc`, `currentTimeMillis`,
+  `nanoTime`.
 
 ## [1.2.1] — 2026-09-29
 

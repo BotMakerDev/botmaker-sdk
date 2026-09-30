@@ -13,8 +13,8 @@ package com.botmaker.sdk.api.bot;
  * those where the name is typed. A misspelled outcome behaves like an outcome nothing was wired to, which
  * is an ordinary state — it ends the run.
  *
- * <p>You rarely name this type. An activity body is handed an {@link ActivityContext} and answers
- * {@code ctx.outcome("BAG_FULL")} or {@code ctx.done()}, both of which build one.
+ * <p>You rarely build this type. An activity body answers {@code Activities.outcome("BAG_FULL")} or
+ * {@code Activities.next()}, both of which build one.
  *
  * <p>Two outcomes are equal when their names are. The name is compared exactly, including case, because it
  * is matched against the wire drawn on the canvas and the canvas stores what was typed.

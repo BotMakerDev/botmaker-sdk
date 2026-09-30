@@ -59,7 +59,7 @@ class ActivitiesTest {
     void aBodyCanSwitchItsOwnActivityOff() {
         install(activity("Mining", true));
 
-        new ActivityContext("Mining").disable();
+        Activities.disable("Mining");
 
         assertFalse(Activities.active("Mining"), "the override outranks the switch on the canvas");
     }
@@ -80,30 +80,24 @@ class ActivitiesTest {
         assertTrue(Activities.active("Nothing"));
     }
 
-    // ---- the context ------------------------------------------------------------------------------------
-
-    @Test
-    void theContextKnowsWhichActivityItIs() {
-        assertEquals("Mining", new ActivityContext("Mining").name());
-    }
+    // ---- outcomes ---------------------------------------------------------------------------------------
 
     /**
      * An outcome the canvas does not declare is not refused. It becomes an outcome nothing is wired to, which
-     * ends the run — the same answer as an outcome the user declared and never wired.
+     * ends the run — the same answer as an outcome the user declared and never wired. Outside a running
+     * activity (this test) there is nothing to check it against.
      */
     @Test
     void anUndeclaredOutcomeIsStillReported() {
         install(activity("Mining", true, "BAG_FULL"));
 
-        assertEquals("BAG_FUL", new ActivityContext("Mining").outcome("BAG_FUL").name());
+        assertEquals("BAG_FUL", Activities.outcome("BAG_FUL").name());
     }
 
     @Test
-    void doneIsTheImplicitOutcomeAndSoIsABlankName() {
-        ActivityContext ctx = new ActivityContext("Mining");
-
-        assertEquals("NEXT", ctx.done().name());
-        assertEquals("NEXT", ctx.outcome("  ").name());
+    void nextIsTheImplicitOutcomeAndSoIsABlankName() {
+        assertEquals("NEXT", Activities.next().name());
+        assertEquals("NEXT", Activities.outcome("  ").name());
     }
 
     // ---- the outcome value type -------------------------------------------------------------------------

@@ -28,7 +28,7 @@ import java.util.function.Consumer;
  * rather than whatever happens to have focus. Each also has a {@link CaptureSource}-first overload that
  * <em>targets</em> an explicit window — the keyboard counterpart of {@link Mouse#click(CaptureSource, int, int)}.
  * When the source has no single desktop window ({@code desktop()}/{@code monitor()}/an unopened window/an
- * emulator, i.e. {@link CaptureSource#targetWindow()} is {@code null}) the call transparently falls back to the
+ * emulator — no window behind it) the call transparently falls back to the
  * focused-window path.
  *
  * <p><b>What "targets a window" costs, on Linux.</b> Under the cursor-safe default backend the key is

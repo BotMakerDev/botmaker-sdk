@@ -1,7 +1,6 @@
 package com.botmaker.sdk.internal.flow;
 
 import com.botmaker.sdk.api.bot.ActivityBody;
-import com.botmaker.sdk.api.bot.ActivityContext;
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.bot.PopupGuard;
@@ -35,7 +34,15 @@ public final class FlowWalker {
 
     private static final Map<String, Boolean> OVERRIDES = new ConcurrentHashMap<>();
 
+    /** The activity whose body this thread is running, for {@code Activities.outcome}'s check. */
+    private static final ThreadLocal<String> CURRENT = new ThreadLocal<>();
+
     private FlowWalker() {}
+
+    /** The activity whose body is running on this thread, or {@code null} outside one. */
+    public static String current() {
+        return CURRENT.get();
+    }
 
     /**
      * Walks {@code flow} to its end. Does not return: it ends by calling {@link Bot#stop()}, which unwinds to
@@ -116,7 +123,14 @@ public final class FlowWalker {
     /** Runs one body, logs the one line that makes a debug console read as a story, and answers its outcome. */
     private static Outcome execute(String name, ActivityBody body) {
         long startedAt = System.currentTimeMillis();
-        Outcome outcome = body.run(new ActivityContext(name));
+        String outer = CURRENT.get();
+        CURRENT.set(name);
+        Outcome outcome;
+        try {
+            outcome = body.run();
+        } finally {
+            CURRENT.set(outer);
+        }
         if (outcome == null) outcome = Outcome.of(null);
         Debug.log("[Activity] " + name + " → " + outcome
                 + " (" + Trace.elapsed(System.currentTimeMillis() - startedAt) + ")");

@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.emulator;
 
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.shared.emulator.AdbDevice;
@@ -25,32 +24,11 @@ import java.util.Optional;
  * emu.use();                          // point the whole bot at it (Source.set)
  * }</pre>
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): four of the nine are offered, and this facade is
- * where the sweep's return-value rule finally bites hard enough to be worth stating as a rule.
- *
- * <p><b>A call whose only product is a handle the editor cannot hold is not a menu entry.</b> Neither
- * {@link Emulator} nor {@link EmulatorRef} is a declarable variable type in Studio — the editor's own type
- * list says in as many words that they "come from {@code Emulators.named(…)}" — so
- * {@link #first()}, {@link #named(String)} and {@link #connect(String, int)} are hidden: inserted from a menu
- * they stand as a statement that connects to an emulator and then discards it. {@link #list()} and
- * {@link #listAll()} are hidden for the stronger form of the same fact, a {@code List<…>} being something the
- * editor cannot declare at all; {@code listAll} is in any case documented as the feed for a picker rather than
- * as bot vocabulary.
- *
- * <p>What is offered is what survives that test, and the pleasing part is that the SDK had <em>already</em>
- * shipped a palette-shaped spelling of each: {@link #use()} and {@link #use(String)} are exactly
- * {@code first().use()} and {@code named(name).use()} written as one statement, so they change global state
- * ({@code Source.set}) and the discarded return value costs nothing; {@link #launch(String)} and
- * {@link #stop(String)} act on the world and answer with a {@code boolean}. The hidden five stay public and
- * fully supported for a hand-written bot that holds the handle — this is the {@code Mouse.scroll(int)} shape
- * again, the menu pointing at the spelling the author had already marked as preferred.
- *
- * <p><b>This is the verdict that decides {@code Emulator} and {@code EmulatorRef}.</b> With every
- * handle-producing method hidden, neither type is reachable from a menu, so neither is worth curating for a
- * member menu it can never open. If Studio ever makes {@code Emulator} declarable, {@code first} and
- * {@code named} earn their annotation that day — an addition, which stays free for the SDK's whole life.
+ * <p><b>Not in the palette</b> (2026-09-30). Which emulator a bot drives is the project's capture source and
+ * launch target, which the SDK sets up from the run's properties before the flow starts; a block that
+ * connects to one by hand is a second way to say what the project already says. The class stays public and
+ * supported for a hand-written bot.
  */
-@Palette(category = "emulator", categoryLabel = "Emulator", icon = "📱")
 @TraceSource("Emulator")
 public final class Emulators {
 

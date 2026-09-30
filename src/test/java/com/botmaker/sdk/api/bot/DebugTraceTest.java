@@ -69,7 +69,7 @@ class DebugTraceTest {
 
     /** One activity reporting BAG_FULL, which nothing is wired to, so the run ends after it. */
     private static final Flow MINING = Flow.of(
-            List.of(Flow.activity(ctx -> ctx.outcome("BAG_FULL"), "Mining", "", true, false, false,
+            List.of(Flow.activity(() -> Activities.outcome("BAG_FULL"), "Mining", "", true, false, false,
                     List.of("BAG_FULL"))),
             List.of(), List.of(), "Mining", Flow.limits(10, 0));
 

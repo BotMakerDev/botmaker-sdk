@@ -105,7 +105,7 @@ class FlowTypesTest {
     /** A body the file writes is kept exactly as written, whatever it is; only the "none yet" constant reads blank. */
     @Test
     void aBodyIsKeptAsWritten() {
-        for (String written : List.of("Collect::body", "ctx -> ctx.done()")) {
+        for (String written : List.of("Collect::body", "() -> Activities.next()")) {
             Flow.Activity read = FlowTypes.ACTIVITY_SHAPE.build(
                     List.of(written, "Collect", "", true, false, false, List.of()));
             assertEquals(written, FlowTypes.sourceOf(read.body()));
@@ -127,7 +127,7 @@ class FlowTypesTest {
         assertEquals("Collect::body", named.source());
         assertEquals("Collect::body", FlowTypes.sourceOf(named));
         org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class,
-                () -> named.run(null));
+                named::run);
     }
 
     /**

@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.launch;
 
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.util.Debug;
@@ -39,16 +38,10 @@ import java.time.Duration;
  * missing) does it fall back to the host {@code :0} launch in {@code GameLauncher}. So a hand-written
  * {@code Game.launchHeroic("Firestone")} lands in the private display without the bot author doing anything.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): fifteen of the sixteen are offered. The only one
- * hidden is {@link #launchSteam(int)}, which its own javadoc calls a <em>convenience overload</em> — it does
- * nothing but {@code Integer.toString} its argument. Studio's game picker fills the appId in as a string, so
- * the {@code int} form is a second spelling of a value the editor already produces in the first, and offering
- * both makes the user choose between them for no reason. It stays public for the bot that holds a number.
- * Every other pair here asks a different question rather than the same one differently: {@code isRunning} by
- * {@link CaptureSource} tests a window, by process name tests the OS; the {@code *IfNotRunning} and
- * {@code launchAndWait} shapes each combine two operations a bot would otherwise write out.
+ * <p><b>Not in the palette</b> (2026-09-30): the run launches the project's target itself ({@code Bot.start},
+ * {@link Target}), so a block launching a game is a second way to say what the run already does. The class
+ * stays public and supported for a hand-written bot; its game-id parameters keep their pickers.
  */
-@Palette(category = "launch", categoryLabel = "Launch", icon = "🎮")
 public class Game {
 
     private Game() {}

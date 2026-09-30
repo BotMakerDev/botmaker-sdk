@@ -179,7 +179,7 @@ public final class FlowTypes {
     record Named(String source) implements ActivityBody {
 
         @Override
-        public com.botmaker.sdk.api.bot.Outcome run(com.botmaker.sdk.api.bot.ActivityContext ctx) {
+        public com.botmaker.sdk.api.bot.Outcome run() {
             throw new UnsupportedOperationException(
                     "\"" + source + "\" was read out of a file by the editor and is a name, not a body");
         }

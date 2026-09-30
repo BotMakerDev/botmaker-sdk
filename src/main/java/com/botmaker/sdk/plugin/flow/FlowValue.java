@@ -37,6 +37,14 @@ public final class FlowValue {
         return FLOW.read(services).orElse(Flow.NONE);
     }
 
+    /**
+     * How {@code activity}'s body is written in the file — {@code Collect::body} — or {@code ""}: the text the
+     * host also reports as a slot's enclosing method, so an editor can tell which activity a body belongs to.
+     */
+    public static String bodySource(Flow.Activity activity) {
+        return com.botmaker.sdk.plugin.types.FlowTypes.sourceOf(activity.body());
+    }
+
     /** The flow {@code ctx} holds, or {@link Flow#NONE} when its expression is not one this plugin wrote. */
     public static Flow read(ValueContext ctx) {
         return FLOW.read(ctx).orElse(Flow.NONE);

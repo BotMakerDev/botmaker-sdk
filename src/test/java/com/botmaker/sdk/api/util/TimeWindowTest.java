@@ -5,9 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.time.Month;
-import java.time.ZoneId;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -42,17 +40,6 @@ class TimeWindowTest {
     void bothEndsAreRequired() {
         assertThrows(IllegalArgumentException.class, () -> Time.isBetween(LocalTime.NOON, null));
         assertThrows(IllegalArgumentException.class, () -> Time.isBetween(null, LocalTime.NOON));
-        assertThrows(IllegalArgumentException.class, () -> Time.isBetweenUtc(LocalTime.NOON, null));
-    }
-
-    @Test
-    void theUtcWindowIsTheSameRuleOnTheOtherClock() {
-        // The whole point of the UTC variant is that it does not follow the machine's zone — a window around
-        // local now must not match when the two clocks are hours apart.
-        LocalTime utcNow = LocalTime.now(ZoneId.of("UTC"));
-        assertTrue(Time.isBetweenUtc(utcNow.minusMinutes(1), utcNow.plusMinutes(1)));
-        assertFalse(Time.isBetweenUtc(utcNow.plusMinutes(10), utcNow.plusMinutes(20)));
-        assertTrue(Time.isBetweenUtc(utcNow.minusMinutes(1), utcNow.minusMinutes(2)), "wraps midnight too");
     }
 
     @Test
@@ -66,33 +53,10 @@ class TimeWindowTest {
 
     @Test
     void isMonthMatchesThisMonthOnly() {
-        Month thisMonth = Time.month();
+        Month thisMonth = Time.today().getMonth();
         assertTrue(Time.isMonth(thisMonth));
         assertTrue(Time.isMonth(thisMonth.plus(1), thisMonth), "any of the listed months counts");
         assertFalse(Time.isMonth(thisMonth.plus(1), thisMonth.plus(2)));
         assertFalse(Time.isMonth(), "no months listed is no match, not every month");
-    }
-
-    @Test
-    void theMonthIsTheOneTheDateNames() {
-        // The off-by-one this type exists to prevent: JANUARY is 1, not 0, and a bot that read the old int as
-        // zero-based was a month out all year without ever failing to compile.
-        assertEquals(Time.today().getMonth(), Time.month());
-        assertEquals(Time.today().getMonthValue(), Time.month().getValue());
-    }
-
-    /** A dropped block's {@code ZoneId} is {@code null}: Studio has no editor for one. */
-    @Test
-    void aMissingZoneIsTheDefaultOne() {
-        java.time.ZoneId before = Time.getDefaultTimeZone();
-        try {
-            Time.setDefaultTimeZone(java.time.ZoneId.of("Asia/Tokyo"));
-            assertEquals(Time.now(java.time.ZoneId.of("Asia/Tokyo")).getHour(), Time.now((java.time.ZoneId) null).getHour());
-
-            Time.setDefaultTimeZone((java.time.ZoneId) null);
-            assertEquals(java.time.ZoneId.systemDefault(), Time.getDefaultTimeZone());
-        } finally {
-            Time.setDefaultTimeZone(before);
-        }
     }
 }

@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.launch;
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.util.Debug;
@@ -22,16 +21,10 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * that hasn't picked a game yet simply doesn't launch anything. Override at runtime with
  * {@link #set(LaunchTarget)}.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): every verb is offered, and the two names that deal
- * in a {@link LaunchTarget} are hidden. {@link #current()} hands one back, and a launch target is not a type
- * Studio can declare or draw, so a menu entry producing one is the {@code Window.capture()} case again: a value
- * the user cannot name, store or pass on. {@code set} is hidden for the same reason from the other side:
- * {@code set(LaunchTarget)} has a slot nothing can fill, and {@code set(String)} takes a <em>spec grammar</em>
- * ({@code steam:12345}, {@code exe:C:\…}) a user has to already know. Both stay public for a bot computing its
- * target from a config value. A target picker was planned and never wired; it was deleted on 2026-09-28, since
- * a game is started by its own launcher, or by {@link Game}'s calls, whose arguments have editors.
+ * <p><b>Not in the palette</b> (2026-09-30): {@code Bot.start} launches the target itself, so a block doing it
+ * again is a second way to say what the run already does. The class stays public for a hand-written bot, and
+ * its {@code @Hidden} members say what reaches nothing if a later palette class ever returns a {@code Target}.
  */
-@Palette(category = "launch", categoryLabel = "Launch", icon = "🚀")
 public final class Target {
 
     private static volatile LaunchTarget current;

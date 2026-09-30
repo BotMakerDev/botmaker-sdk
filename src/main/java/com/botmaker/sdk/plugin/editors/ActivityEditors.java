@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.editors;
 
+import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Editors;
 import com.botmaker.sdk.api.flow.Flow;
@@ -15,7 +16,7 @@ import java.util.Set;
  * The two editors over the names that tie a bot's code to its Activity Flow canvas.
  *
  * <p>Both values are a {@code String}, and both name something the user drew somewhere else:
- * {@code Activities.disable("Mining")} names an activity of the open project, and {@code ctx.outcome("BAG_FULL")}
+ * {@code Activities.disable("Mining")} names an activity of the open project, and {@code Activities.outcome("BAG_FULL")}
  * names one of the outcomes declared on the canvas. Nothing about the type says either — the parameters
  * carry {@code @ActivityName} and {@code @OutcomeName} for that — and typing them by hand is the one mistake
  * the platform cannot catch for the
@@ -41,17 +42,17 @@ public final class ActivityEditors {
     }
 
     /**
-     * The outcome named by {@code ctx.outcome("…")} — every outcome the project declares.
+     * The outcome named by {@code Activities.outcome("…")} — the outcomes of the activity whose body the call
+     * sits in.
      *
-     * <p><b>Every one, not this activity's own</b>, and the difference is worth stating because the narrower
-     * answer is the one a reader expects. An editor is told the call it sits in ({@code outcome}, on
-     * {@code ActivityContext}) and no more: which activity's body it sits in is a fact of the flow, not of the
-     * call. So the honest set is the union, offered with
-     * duplicates collapsed. The cost is an outcome from a different activity appearing in the list; what it
-     * buys is that the common case — the outcome the user just added on the canvas — is one click rather
-     * than typed from memory, and a name typed anyway is still accepted.
+     * <p>The flow links a body by the same text the host reports as the slot's enclosing method
+     * ({@code Collect::body}), so the activities whose body is that method are the ones asked. When none is —
+     * a helper method a body calls, a body not wired yet, a slot outside a method — the list is every outcome
+     * the project declares, duplicates collapsed: a name typed anyway is still accepted, and the outcome the
+     * user just added on the canvas stays one click away. The union was the only answer until 2026-09-30,
+     * when the call had an {@code ActivityContext} receiver and no way to say which method held it.
      *
-     * <p>{@code done()} is not in the list: it is the outcome every activity has without declaring one, and
+     * <p>{@code next()} is not in the list: it is the outcome every activity has without declaring one, and
      * it is spelled by calling that method rather than by naming it here.
      */
     public static Node outcomeName(ValueContext ctx) {
@@ -66,9 +67,18 @@ public final class ActivityEditors {
         return names;
     }
 
-    private static List<String> outcomeNames(ValueContext ctx) {
+    static List<String> outcomeNames(ValueContext ctx) {
+        String method = ctx.slot().flatMap(SlotContext::enclosingMethodSource).orElse(null);
+        return outcomeNames(flow(ctx), method);
+    }
+
+    /** The outcomes of the activities whose body is {@code method}, or every activity's when none is. */
+    static List<String> outcomeNames(Flow flow, String method) {
+        List<Flow.Activity> own = method == null ? List.of() : flow.activities().stream()
+                .filter(a -> method.equals(FlowValue.bodySource(a)))
+                .toList();
         Set<String> names = new LinkedHashSet<>();
-        for (Flow.Activity activity : flow(ctx).activities()) {
+        for (Flow.Activity activity : own.isEmpty() ? flow.activities() : own) {
             for (String outcome : activity.outcomes()) {
                 if (outcome != null && !outcome.isBlank()) names.add(outcome);
             }

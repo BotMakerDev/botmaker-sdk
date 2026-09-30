@@ -169,7 +169,7 @@ public record Flow(List<Activity> activities, List<Edge> edges, List<Preset> pre
      * One wire between two activities.
      *
      * <p>{@code outcome} is {@code ""} for the wire an activity takes when it reports nothing in particular
-     * — {@code ctx.done()} — which is the common case and reads better blank than as a word the canvas
+     * — {@code Activities.next()} — which is the common case and reads better blank than as a word the canvas
      * would then have to hide.
      */
     public record Edge(String from, String to, String outcome) {

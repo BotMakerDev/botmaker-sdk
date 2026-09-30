@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.flow;
 
+import com.botmaker.sdk.api.bot.Activities;
 import com.botmaker.sdk.api.bot.ActivityBody;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.flow.Flow;
@@ -48,9 +49,10 @@ class FlowWalkerTest {
     /** A body that logs its name and the popup guard's state, and reports a scripted outcome each time. */
     private ActivityBody body(String name, String... outcomes) {
         Deque<String> script = new ArrayDeque<>(List.of(outcomes));
-        return ctx -> {
+        return () -> {
             log.add(name + (PopupGuard.isEnabled() ? "+popup" : "-popup"));
-            return script.isEmpty() ? ctx.done() : ctx.outcome(script.removeFirst());
+            assertEquals(name, FlowWalker.current(), "the walk says which activity is running");
+            return script.isEmpty() ? Activities.next() : Activities.outcome(script.removeFirst());
         };
     }
 
@@ -94,7 +96,7 @@ class FlowWalkerTest {
         assertEquals(List.of("A+popup", "R+popup"), log, "RIGHT takes the RIGHT wire; L never runs");
     }
 
-    /** A blank stored outcome is NEXT, which is what {@code ctx.done()} reports. */
+    /** A blank stored outcome is NEXT, which is what {@code Activities.next()} reports. */
     @Test
     void doneFollowsTheBlankEdge() {
         walk(flow("A", List.of(on("A"), on("B")), Flow.edge("A", "B", "")));
@@ -175,10 +177,10 @@ class FlowWalkerTest {
 
     @Test
     void anOverrideMadeMidRunIsReadOnTheNextPass() {
-        ActivityBody once = ctx -> {
+        ActivityBody once = () -> {
             log.add("once");
-            ctx.disable();
-            return ctx.done();
+            Activities.disable("Once");
+            return Activities.next();
         };
         walk(flow("Once", List.of(Flow.activity(once, "Once", "", true, false, false, List.of()), on("B")),
                 Flow.edge("Once", "Once", ""), Flow.edge("Once", "B", Flow.Edge.DISABLED)));

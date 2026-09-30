@@ -79,7 +79,7 @@ public final class NamedWindow implements CaptureSource, WindowBacked {
     /** The resolved window's native handle when open, else {@code null} (→ global focused-window keys). */
     @Override
     public com.botmaker.shared.capture.GenericWindow targetWindow() {
-        return resolve().map(Window::targetWindow).orElse(null);
+        return resolve().map(WindowHandles::of).orElse(null);
     }
 
     @Override
