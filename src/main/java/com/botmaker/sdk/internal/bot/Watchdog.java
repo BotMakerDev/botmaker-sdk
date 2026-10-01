@@ -18,16 +18,11 @@ import com.botmaker.sdk.internal.observe.MatchEvent;
  * observer only <em>counts</em> — it never throws, because the vision layer
  * ({@link com.botmaker.sdk.api.vision.ImageFinder}) swallows {@code Exception} and would eat it.
  *
- * <p>The throw happens deterministically at {@link #checkpoint()}, which the generated macro loop calls
- * once per iteration (and which you may call inside any custom loop). {@link #progress()} lets logic the
- * vision layer can't see reset the counter. All state is per-thread.
+ * <p>The throw happens deterministically at {@link #checkpoint()}, which the flow walker calls between
+ * activities. {@link #progress()} lets logic the vision layer can't see reset the counter, and the supervisor
+ * calls {@link #reset()} after a restart. All state is per-thread.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): five of the six are offered. The one hidden is
- * {@link #reset()}, whose entire body is {@code progress();} — the same operation under a second name, kept
- * because the supervisor reads better calling it {@code reset} after a restart than calling it
- * {@code progress}. That is a good reason for the method to exist and no reason at all to put it in a menu
- * beside the name it delegates to: a user choosing between two entries that do the identical thing is
- * choosing nothing. It stays public, and the supervisor goes on calling it.
+ * <p>Internal since 2026-10-01: a bot never names it, and {@code Bot.run} turns it on.
  */
 public final class Watchdog {
 

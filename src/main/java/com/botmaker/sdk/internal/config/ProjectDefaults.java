@@ -20,8 +20,8 @@ public final class ProjectDefaults {
     private ProjectDefaults() {}
 
     /**
-     * The raw launch-target spec, or {@code null} when none was given — {@code api.launch.Target} parses it via
-     * {@code api.launch.LaunchTarget}. Kept as a raw string so this reader stays free of the launch facade.
+     * The raw launch-target spec, or {@code null} when none was given — {@code internal.launch.Target} parses it via
+     * {@code internal.launch.LaunchTarget}. Kept as a raw string so this reader stays free of the launch facade.
      */
     public static String launchTarget() {
         String spec = System.getProperty(LAUNCH_TARGET);
