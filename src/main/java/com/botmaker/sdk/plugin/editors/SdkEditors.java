@@ -3,7 +3,6 @@ package com.botmaker.sdk.plugin.editors;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.sdk.api.bot.ActivityName;
 import com.botmaker.sdk.api.bot.OutcomeName;
-import com.botmaker.sdk.api.bot.Setting;
 import com.botmaker.sdk.internal.emulator.EmulatorName;
 import com.botmaker.sdk.plugin.emulator.EmulatorEditors;
 
@@ -38,7 +37,7 @@ public final class SdkEditors {
 
     /** Built once and shared: an editor holds no state, the value lives in the context it is handed. */
     public static final List<SlotEditor> ALL = List.of(
-            SlotEditor.onParameter(Setting.class).draw(() -> SettingsEditors::setting),
+            SlotEditor.when(SettingHints::claims).draw(() -> SettingsEditors::setting),
             SlotEditor.onParameter(EmulatorName.class).draw(() -> EmulatorEditors::instanceName),
             SlotEditor.onParameter(ActivityName.class).draw(() -> ActivityEditors::activityName),
             SlotEditor.onParameter(OutcomeName.class).draw(() -> ActivityEditors::outcomeName),

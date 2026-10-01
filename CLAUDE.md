@@ -158,11 +158,11 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
 - `api.console.BotMaker` — console IO. `readX()` prints a SOH-wrapped `BM-INPUT:<type>` marker to stdout before
   blocking on stdin; Studio detects/strips it to show a modal input prompt. Changing that marker on one side
   without the other breaks input prompts.
-- **Api parameters that want an editor carry an annotation**: `api.bot.@ActivityName`, `@OutcomeName`, and
-  `@Setting(label, prompt, unit, min, max, step, fallback)` on the `BotSettings` withers;
+- **Api parameters that want an editor carry an annotation**: `api.bot.@ActivityName`, `@OutcomeName`;
   `internal.emulator.@EmulatorName` on `Emulators`, whose device picker no offered call reaches any more
   (kept, flagged 2026-10-01). The launch annotations and their game grids went on 2026-10-01. `SdkEditors.ALL`
-  is `SlotEditor.onParameter(X.class).draw(…)`, and `SettingsEditors` reads `@Setting`.
+  is `SlotEditor.onParameter(X.class).draw(…)`. The `BotSettings` withers carry nothing since 2026-10-01:
+  `plugin/editors/SettingHints` keys each one's label and range by method reference (`@Setting` is deleted).
 
 ### What `internal` holds
 

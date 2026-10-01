@@ -37,6 +37,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     `Text` — a timeout is a `Duration`;
   - `Pixel.colorAt(x, y…)` and `matchesAt(x, y, …)` — take a `Point`; `Pixel.find(color)`,
     `find(color, source)` and `findInRange(low, high)`, which defaulted the `Precision` — pass one.
+- **`@Setting`**, the annotation on `BotSettings`' setters that told Studio how to draw them. No bot wrote it;
+  the ⚙ Bot Settings sliders read the same labels and ranges from the SDK plugin now.
 - **`ImageTemplate`'s threshold** (`threshold()`, `setThreshold`, the two-argument constructor): no matcher
   read it and nothing set it; how sure a match must be is `BotSettings`' confidence.
 

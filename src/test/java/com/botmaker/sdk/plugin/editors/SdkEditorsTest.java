@@ -7,7 +7,6 @@ import com.botmaker.sdk.api.bot.Activities;
 import com.botmaker.sdk.api.bot.ActivityName;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.OutcomeName;
-import com.botmaker.sdk.api.bot.Setting;
 import com.botmaker.sdk.internal.emulator.EmulatorName;
 import com.botmaker.sdk.internal.emulator.Emulators;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -19,6 +18,7 @@ import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -41,15 +41,22 @@ class SdkEditorsTest {
     }
 
     @Test
-    void every_bounded_setting_says_its_label_and_range_on_the_parameter() {
+    void every_bounded_setting_has_its_label_and_range_in_the_hints() {
         Method confidence = TestContexts.method(BotSettings.class, "confidence", double.class);
-        Setting setting = confidence.getParameters()[0].getAnnotation(Setting.class);
+        SettingHints.Hint setting = SettingHints.of(confidence.getParameters()[0]);
 
         assertEquals("Match confidence", setting.label());
         assertEquals(1, setting.max());
         assertTrue(claimed(TestContexts.slot(confidence, 0, "0.8")));
         assertTrue(claimed(TestContexts.slot(TestContexts.method(BotSettings.class, "debug", boolean.class), 0,
                 "true")));
+        // Every wither that takes one value is in the table: a new one without a hint is a free-typed number.
+        for (Method wither : BotSettings.class.getDeclaredMethods()) {
+            if (java.lang.reflect.Modifier.isStatic(wither.getModifiers()) || wither.getParameterCount() != 1
+                    || wither.getReturnType() != BotSettings.class || !java.lang.reflect.Modifier.isPublic(
+                    wither.getModifiers())) continue;
+            assertNotNull(SettingHints.of(wither.getParameters()[0]), wither.getName() + " has no hint");
+        }
     }
 
     @Test

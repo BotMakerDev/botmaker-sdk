@@ -3,13 +3,12 @@ package com.botmaker.sdk.plugin.editors;
 import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Editors;
-import com.botmaker.sdk.api.bot.Setting;
 import javafx.scene.Node;
 
 import java.lang.reflect.Parameter;
 
 /**
- * The editor for an argument passed to a {@link Setting} parameter — a number that has a range, shown as that
+ * The editor for an argument passed to a {@code BotSettings} setter — a number that has a range, shown as that
  * range instead of as a place to type any number at all, or a tick for a flag.
  *
  * <p>Every one of these settings is a number whose <em>scale</em> is the thing nobody knows. A confidence of
@@ -19,18 +18,17 @@ import java.lang.reflect.Parameter;
  * find out about.
  *
  * <p>The pill, the dialog, the spinner-or-slider division and the clamping are the toolkit's
- * {@link Editors#boundedPill} and {@link Editors#flag}. What each setting is called and what its range is sits
- * on the parameter itself, in {@code BotSettings}, so a new setting is one annotation and no table here. Until
- * 2026-09-28 this class kept that table, keyed on the setters' names.
+ * {@link Editors#boundedPill} and {@link Editors#flag}. What each setting is called and what its range is
+ * comes from {@link SettingHints}, keyed by the setter as a method reference.
  */
 public final class SettingsEditors {
 
     private SettingsEditors() {}
 
-    /** The editor for the setting this slot is passed to; {@code null} when the parameter carries none. */
+    /** The editor for the setting this slot is passed to; {@code null} when it is not a setter's argument. */
     public static Node setting(ValueContext ctx) {
         Parameter parameter = ctx.slot().flatMap(SlotContext::parameter).orElse(null);
-        Setting setting = parameter == null ? null : parameter.getAnnotation(Setting.class);
+        SettingHints.Hint setting = parameter == null ? null : SettingHints.of(parameter);
         if (setting == null) return null;
         Class<?> type = parameter.getType();
         if (type == boolean.class || type == Boolean.class) return Editors.flag(ctx, setting.label());

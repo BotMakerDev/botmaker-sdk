@@ -302,47 +302,38 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
 
     // --- one setting changed: a copy ---
 
-    // The ceiling on the two delays is ten minutes rather than Integer.MAX_VALUE: a spinner whose range is the
-    // whole int has no scale, and a bot waiting longer than that between checks is writing a different bot.
-
-    public BotSettings foundDelay(@Setting(label = "Delay after a match", prompt = "Milliseconds (≥ 0):",
-            unit = " ms", max = 600_000, step = 50, fallback = 500) int milliseconds) {
+    public BotSettings foundDelay(int milliseconds) {
         return withClicks(new Clicks(milliseconds, clicks.notFoundDelay, clicks.randomize));
     }
 
-    public BotSettings notFoundDelay(@Setting(label = "Delay after no match", prompt = "Milliseconds (≥ 0):",
-            unit = " ms", max = 600_000, step = 50, fallback = 200) int milliseconds) {
+    public BotSettings notFoundDelay(int milliseconds) {
         return withClicks(new Clicks(clicks.foundDelay, milliseconds, clicks.randomize));
     }
 
-    public BotSettings randomizeClicks(@Setting(label = "Randomize click points") boolean randomize) {
+    public BotSettings randomizeClicks(boolean randomize) {
         return withClicks(new Clicks(clicks.foundDelay, clicks.notFoundDelay, randomize));
     }
 
-    public BotSettings confidence(@Setting(label = "Match confidence", prompt = "Confidence (0.0 – 1.0):",
-            max = 1, step = 0.05, fallback = 0.8) double confidence) {
+    public BotSettings confidence(double confidence) {
         return new BotSettings(clicks, new Vision(confidence, vision.compareMargin), input, session,
                 maxRetryAttempts, debug);
     }
 
-    public BotSettings compareMargin(@Setting(label = "Compare margin",
-            prompt = "How far the right template must beat a look-alike (0.0 – 1.0):",
-            max = 1, step = 0.01, fallback = 0.05) double margin) {
+    public BotSettings compareMargin(double margin) {
         return new BotSettings(clicks, new Vision(vision.confidence, margin), input, session, maxRetryAttempts,
                 debug);
     }
 
-    public BotSettings maxRetryAttempts(@Setting(label = "Max stuck checks",
-            prompt = "Checks before considered stuck (≥ 1):", min = 1, max = 600_000, fallback = 20) int attempts) {
+    public BotSettings maxRetryAttempts(int attempts) {
         return new BotSettings(clicks, vision, input, session, attempts, debug);
     }
 
-    public BotSettings realInput(@Setting(label = "Drive the real mouse and keyboard") boolean real) {
+    public BotSettings realInput(boolean real) {
         return new BotSettings(clicks, vision, new Input(real, input.linuxBackend), session, maxRetryAttempts,
                 debug);
     }
 
-    public BotSettings debug(@Setting(label = "Debug logging") boolean on) {
+    public BotSettings debug(boolean on) {
         return new BotSettings(clicks, vision, input, session, maxRetryAttempts, on);
     }
 
