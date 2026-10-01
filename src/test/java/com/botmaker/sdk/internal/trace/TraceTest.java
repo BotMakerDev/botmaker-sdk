@@ -63,7 +63,7 @@ class TraceTest {
 
         assertEquals(2, lines.size());
         assertEquals("Vision", lines.getFirst().source());
-        assertEquals("ore not found ×47 in 3.4s", lines.getFirst().text());
+        assertEquals("ore not found over 3.4s", lines.getFirst().text(), "the count is Diag's to show, once");
         assertEquals(47, lines.getFirst().count());
         assertEquals(new TelemetryEvent.Rect(1, 2, 8, 8), lines.get(1).rect());
     }

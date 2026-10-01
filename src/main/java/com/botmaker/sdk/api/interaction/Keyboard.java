@@ -84,7 +84,6 @@ public class Keyboard {
     /** Press then release a key. */
     @Records(Gesture.KEY)
     public static void tap(Key key) {
-        Debug.log("tap " + key);
         press(key);
         release(key);
     }
@@ -95,7 +94,6 @@ public class Keyboard {
      */
     @Records(Gesture.COMBO)
     public static void combo(Key... keys) {
-        Debug.log("combo " + java.util.Arrays.toString(keys));
         for (Key key : keys) {
             press(key);
         }
@@ -157,14 +155,12 @@ public class Keyboard {
 
     /** Press then release {@code key} on {@code source}'s window. */
     public static void tap(CaptureSource source, Key key) {
-        Debug.log("tap " + key + " on " + source);
         press(source, key);
         release(source, key);
     }
 
     /** Press a chord on {@code source}'s window: hold each key in order, release in reverse. */
     public static void combo(CaptureSource source, Key... keys) {
-        Debug.log("combo " + java.util.Arrays.toString(keys) + " on " + source);
         for (Key key : keys) {
             press(source, key);
         }
@@ -178,7 +174,6 @@ public class Keyboard {
      * reverse.
      */
     public static void combo(CaptureSource source, Combo combo) {
-        Debug.log("combo " + combo + " on " + source);
         java.util.List<Key> keys = combo.keys();
         for (Key key : keys) {
             press(source, key);
@@ -191,7 +186,6 @@ public class Keyboard {
 
     /** Press each step's combo on {@code source}'s window, waiting the step's {@code after} after each. */
     public static void sequence(CaptureSource source, KeySequence sequence) {
-        Debug.log("sequence " + sequence + " on " + source);
         for (KeySequence.Step step : sequence.steps()) {
             combo(source, step.combo());
             if (!step.after().isZero()) pause.accept(step.after());

@@ -7,7 +7,6 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.MatchEvent;
 import com.botmaker.sdk.internal.observe.Surface;
@@ -44,7 +43,6 @@ import java.util.stream.Collectors;
  * is a comparison <em>margin</em> with no other home.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "🔍")
-@TraceSource("Vision")
 public class ImageFinder {
 
     // --- find (single template) ---

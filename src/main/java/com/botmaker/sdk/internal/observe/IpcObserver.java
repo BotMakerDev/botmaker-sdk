@@ -114,7 +114,8 @@ public final class IpcObserver implements BotObserver {
     /**
      * The first frame of the bot's own code, or empty. Our libraries are skipped by their packages rather than
      * by {@code com.botmaker.}: the worked template is {@code com.botmaker.gamebot}, and skipping the whole
-     * prefix found no line in it at all until 2026-09-29.
+     * prefix found no line in it at all until 2026-09-29. {@code com.botmaker.studio.} is the trace agent Studio
+     * runs a bot with (2026-09-30), whose frames sit between a traced call and the bot line that made it.
      */
     static Optional<StackWalker.StackFrame> botFrame() {
         return Diag.Callers.first(f -> isLibrary(f.getClassName()) || f.getLineNumber() <= 0);
@@ -122,7 +123,7 @@ public final class IpcObserver implements BotObserver {
 
     private static final List<String> LIBRARY_PACKAGES = List.of(
             "com.botmaker.sdk.", "com.botmaker.shared.", "com.botmaker.session.", "com.botmaker.plugin.",
-            "com.botmaker.basics.", "java.", "javax.", "jdk.", "sun.");
+            "com.botmaker.basics.", "com.botmaker.studio.", "java.", "javax.", "jdk.", "sun.");
 
     static boolean isLibrary(String className) {
         for (String prefix : LIBRARY_PACKAGES) {

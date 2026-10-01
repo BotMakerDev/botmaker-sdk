@@ -117,7 +117,7 @@ class DebugTraceTest {
         });
         String slow = printed(PopupGuard::check);
 
-        List<String> lines = linesMatching(slow, "[Popup] check took");
+        List<String> lines = linesMatching(slow, "[PopupGuard] check took");
         assertEquals(1, lines.size(), "a slow check gets its own line: " + slow);
     }
 
@@ -190,7 +190,7 @@ class DebugTraceTest {
         assertEquals(1, misses.size(), "twelve misses are one line, not twelve: " + output);
         assertTrue(misses.get(0).contains("×12"), "and the count is the information: " + misses.get(0));
 
-        List<String> hits = linesMatching(output, "[Vision] find trace_probe →");
+        List<String> hits = linesMatching(output, "[ImageFinder] find trace_probe →");
         assertEquals(1, hits.size(), "the hit is the interesting event and always prints: " + output);
     }
 

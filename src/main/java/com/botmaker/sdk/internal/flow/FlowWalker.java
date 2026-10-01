@@ -120,7 +120,11 @@ public final class FlowWalker {
         return target(flow, name, execute(name, body).name());
     }
 
-    /** Runs one body, logs the one line that makes a debug console read as a story, and answers its outcome. */
+    /**
+     * Runs one body, logs the one line that makes a debug console read as a story, and answers its outcome. A
+     * body that throws is logged as an error with its stack, debugging on or off, and the throw goes on to
+     * {@code Bot}'s recovery: the trace says which activity failed, where the console alone said only "Crashed".
+     */
     private static Outcome execute(String name, ActivityBody body) {
         long startedAt = System.currentTimeMillis();
         String outer = CURRENT.get();
@@ -128,6 +132,12 @@ public final class FlowWalker {
         Outcome outcome;
         try {
             outcome = body.run();
+        } catch (RuntimeException | Error e) {
+            if (!isStop(e)) {
+                Debug.error("[Activity] " + name + " threw " + e + " after "
+                        + Trace.elapsed(System.currentTimeMillis() - startedAt), e);
+            }
+            throw e;
         } finally {
             CURRENT.set(outer);
         }
@@ -136,6 +146,13 @@ public final class FlowWalker {
                 + " (" + Trace.elapsed(System.currentTimeMillis() - startedAt) + ")");
         return outcome;
     }
+
+    /** {@code Bot.stop()}'s throw, which ends a run on purpose and is no failure. Its class is private to {@code Bot}. */
+    private static boolean isStop(Throwable e) {
+        return e.getClass().getName().equals(STOP);
+    }
+
+    private static final String STOP = "com.botmaker.sdk.api.bot.Bot$BotStoppedException";
 
     /** Where the first edge leaving {@code from} on {@code outcome} leads, or {@code null}. */
     private static String target(Flow flow, String from, String outcome) {

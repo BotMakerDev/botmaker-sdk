@@ -59,7 +59,6 @@ public class Wait {
         if (duration == null) return;
         long ms = duration.toMillis();
         if (ms <= 0) return;
-        Debug.log("" + ms + "ms");
         sleep(ms);
     }
 
@@ -94,7 +93,6 @@ public class Wait {
      */
     public static void milliseconds(int milliseconds) {
         if (milliseconds <= 0) return;
-        Debug.log("" + milliseconds + "ms");
         sleep(milliseconds);
     }
 

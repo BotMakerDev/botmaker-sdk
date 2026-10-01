@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.sound;
 
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.sound.Meow;
 
 import javax.sound.sampled.AudioFormat;
@@ -15,7 +16,7 @@ import java.nio.ByteOrder;
  *
  * <p>Each one plays <em>until done</em>, as Scratch's "play sound until done" block does, so the next statement
  * runs after the sound rather than over it. A machine with no audio device — a server, a container — plays
- * nothing and says so once on the console: a bot never stops over a sound.
+ * nothing and says so once in the trace: a bot never stops over a sound.
  */
 @Palette(category = "sound", categoryLabel = "Sound", icon = "🔊")
 public final class Sound {
@@ -43,7 +44,7 @@ public final class Sound {
         } catch (LineUnavailableException | IllegalArgumentException | SecurityException e) {
             if (!warned) {
                 warned = true;
-                System.out.println("[Sound] No audio output here, so sounds are skipped: " + e.getMessage());
+                Debug.log("No audio output here, so sounds are skipped: " + e.getMessage());
             }
         }
     }

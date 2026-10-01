@@ -2,7 +2,6 @@ package com.botmaker.sdk.internal.session;
 
 import com.botmaker.sdk.api.bot.Session;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.launch.LaunchIsolation;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -37,7 +36,6 @@ import com.botmaker.session.display.SessionBackends;
  * Xephyr's software GL. The gate keeps the seam testable and reversible without touching the project file
  * format.
  */
-@TraceSource("Session")
 public final class SessionBootstrap {
 
     /** System property (or {@code BOTMAKER_SESSION_ISOLATED} env) that opts a bot into a nested {@code :N} run. */

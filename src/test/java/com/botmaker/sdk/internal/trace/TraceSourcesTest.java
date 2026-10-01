@@ -1,49 +1,26 @@
 package com.botmaker.sdk.internal.trace;
 
-import com.botmaker.sdk.api.bot.Bot;
-import com.botmaker.sdk.api.bot.PopupGuard;
-import com.botmaker.sdk.api.bot.Watchdog;
-import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.api.capture.Window;
-import com.botmaker.sdk.api.emulator.Emulator;
-import com.botmaker.sdk.api.emulator.Emulators;
-import com.botmaker.sdk.api.interaction.Keyboard;
-import com.botmaker.sdk.api.interaction.Mouse;
-import com.botmaker.sdk.api.interaction.Wait;
-import com.botmaker.sdk.api.launch.Game;
 import com.botmaker.sdk.api.launch.LaunchTarget;
-import com.botmaker.sdk.api.launch.Target;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.util.TraceSource;
-import com.botmaker.sdk.api.vision.ImageClicker;
 import com.botmaker.sdk.api.vision.ImageFinder;
-import com.botmaker.sdk.api.vision.ImageWaiter;
-import com.botmaker.sdk.api.vision.Pixel;
-import com.botmaker.sdk.api.vision.Text;
-import com.botmaker.sdk.internal.capture.NamedWindow;
-import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * A debug line's source is the class that wrote it, so no SDK line spells its own {@code [Name]}. The table is
- * the console's promise: each class resolves to the prefix its lines were written with by hand before
- * 2026-09-29, so a run reads exactly as it did.
+ * A debug line's source is the simple name of the top-level class that wrote it, and nothing else: no SDK line
+ * spells its own {@code [Name]}, and since 2026-09-30 no annotation renames a class.
  */
 class TraceSourcesTest {
 
-    @TraceSource("Farming")
-    private static final class Named {
+    private static final class Nested {
         static String fromLambda() {
             Supplier<String> inside = TraceSources::caller;
             return inside.get();
@@ -59,37 +36,16 @@ class TraceSourcesTest {
     }
 
     @Test
-    void eachSdkClassIsTracedUnderThePrefixItUsedToWrite() {
-        Map<Class<?>, String> before = new LinkedHashMap<>();
-        before.put(Bot.class, "Bot");
-        before.put(PopupGuard.class, "Popup");
-        before.put(Watchdog.class, "Watchdog");
-        before.put(Source.class, "Source");
-        before.put(Window.class, "Window");
-        before.put(Emulator.class, "Emulator");
-        before.put(Emulators.class, "Emulator");
-        before.put(Keyboard.class, "Keyboard");
-        before.put(Mouse.class, "Mouse");
-        before.put(Wait.class, "Wait");
-        before.put(Game.class, "Game");
-        before.put(LaunchTarget.class, "Target");
-        before.put(Target.class, "Target");
-        before.put(ImageFinder.class, "Vision");
-        before.put(ImageClicker.class, "Vision");
-        before.put(ImageWaiter.class, "Vision");
-        before.put(Pixel.class, "Vision");
-        before.put(Text.class, "Vision");
-        before.put(NamedWindow.class, "Source");
-        before.put(SessionBootstrap.class, "Session");
-
-        before.forEach((type, prefix) -> assertEquals(prefix, TraceSources.of(type), type.getName()));
+    void aClassIsTracedUnderItsOwnSimpleName() {
+        assertEquals("ImageFinder", TraceSources.of(ImageFinder.class));
+        assertEquals("LaunchTarget", TraceSources.of(LaunchTarget.class));
     }
 
     @Test
     void aNestedClassOrALambdaIsTracedUnderItsTopLevelClass() {
-        assertEquals("TraceSourcesTest", TraceSources.of(Named.class.getNestHost()));
-        assertEquals("TraceSourcesTest", Named.fromLambda(), "the annotation is read off the top-level class");
-        assertEquals("Target", TraceSources.of(LaunchTarget.Steam.class));
+        assertEquals("TraceSourcesTest", TraceSources.of(Nested.class));
+        assertEquals("TraceSourcesTest", Nested.fromLambda());
+        assertEquals("LaunchTarget", TraceSources.of(LaunchTarget.Steam.class));
     }
 
     @Test
@@ -105,6 +61,18 @@ class TraceSourcesTest {
                 lines.stream().map(TelemetryEvent.Log::source).toList());
         assertEquals("hello", lines.getFirst().text());
         assertEquals(TelemetryEvent.Log.ERROR, lines.get(2).level());
+    }
+
+    /** An error reaches the trace with debugging off; a debug line does not. */
+    @Test
+    void anErrorIsTracedOnAQuietRun() {
+        Debug.disable();
+        Diag.setSink(lines::add);
+
+        Debug.log("chatter");
+        Debug.error("crashed");
+
+        assertEquals(List.of("crashed"), lines.stream().map(TelemetryEvent.Log::text).toList());
     }
 
     /** The host filters by the class and method that wrote a line; a lambda counts as the method it sits in. */

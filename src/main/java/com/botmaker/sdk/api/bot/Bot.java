@@ -2,11 +2,13 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.palette.Untraced;
 import com.botmaker.sdk.api.flow.Flows;
 import com.botmaker.sdk.api.launch.Target;
 import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.flow.FlowWalker;
+import com.botmaker.sdk.internal.observe.IpcObserver;
 
 import java.util.function.Consumer;
 
@@ -77,7 +79,9 @@ public class Bot {
      */
     @Hidden("the entry point a bot's own main calls; a second run() inside an activity body would nest one "
             + "supervised run inside another")
+    @Untraced("holds the whole run")
     public static void run(Runnable goHome, Class<?>... values) {
+        observe();
         SdkValues.claim();
         ManagedValues.install(values);
         start(() -> FlowWalker.run(Flows.installed(), goHome), goHome);
@@ -118,6 +122,7 @@ public class Bot {
      */
     @Hidden("the entry point the generated Main already calls; a second start() inside an activity "
             + "body would nest one supervised run inside another")
+    @Untraced("holds the whole run")
     public static void start(Runnable body, Runnable goHome) {
         supervise(body, goHome, Bot::launchConfiguredTarget);
     }
@@ -155,8 +160,23 @@ public class Bot {
      * @param startGame (re)launch the game; receives {@link StartMode#COLD} on the one-time cold start and
      *                  {@link StartMode#RESTART} on every recovery restart
      */
+    @Untraced("holds the whole run")
     public static void start(Runnable body, Runnable goHome, Consumer<StartMode> startGame) {
         supervise(body, goHome, startGame);
+    }
+
+    /**
+     * Connects the run to the host's trace before anything runs, and logs a thread that dies of an exception
+     * nobody caught (2026-09-30). The trace's sink used to be installed by whichever vision call came first, so
+     * a bot that failed before matching anything showed nothing; and a helper thread's death reached stderr
+     * only, never the trace. A handler the bot set itself is kept.
+     */
+    private static void observe() {
+        IpcObserver.installIfEnabled();
+        if (Thread.getDefaultUncaughtExceptionHandler() == null) {
+            Thread.setDefaultUncaughtExceptionHandler((thread, e) ->
+                    Debug.error("thread " + thread.getName() + " died: " + e, e));
+        }
     }
 
     /**
@@ -209,6 +229,7 @@ public class Bot {
      *                  on recovery
      */
     static void supervise(Runnable body, Runnable goHome, Consumer<StartMode> startGame) {
+        observe();
         Runnable recovery = () -> {
             // Both halves are announced because a recovery is where a bot spends its most confusing time:
             // without these, "goHome" navigating a game that is already gone and "restart" waiting on a

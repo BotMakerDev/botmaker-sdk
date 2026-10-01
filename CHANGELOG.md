@@ -35,12 +35,23 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   project's target itself. They stay public for a hand-written bot.
 - **`Time` is ten members**: `now`, `today`, `currentTime`, `hour`, `minute`, `dayOfWeek`, `isBetween`,
   `isDay`, `isMonth`, `format`. It reads the machine's own zone.
+- **Studio traces every call your bot makes into the SDK**, so `Mouse`, `Wait` and `Keyboard` no longer print
+  a line of their own for each call. Run from Studio, the trace reads `[Mouse] click(…)  3 ms`.
+- **A debug line is named after the class that wrote it, and only that**: `[ImageFinder]`, not `[Vision]`;
+  `[PopupGuard]`, not `[Popup]`.
+- **Errors show with debugging off.** `Debug.error` prints and traces whatever the debug switch says, an
+  activity that throws logs its name and stack before the bot recovers, and a thread that dies of an
+  uncaught exception says so. The run connects to Studio's trace as it starts, not at its first vision call.
+- **A collapsed run's count is shown once**: `ore not found over 3.4s (×47)`, not `×47` in the text and again
+  as the count.
+- `Bot.run` and both `Bot.start` are `@Untraced`: they hold the whole run.
 
 ### Removed
 
 Deleted outright rather than deprecated — nothing used them.
 
 - `ActivityContext` (use `Activities.outcome`/`next`/`enable`/`disable`).
+- `@TraceSource`: a line is traced under its class's own name, which the Trace tab filters by.
 - `Images` (a picture named by a string; the `@Managed` `Pictures` constants replace it).
 - `Emulator.platform()`, `EmulatorRef.platform()` and `Window.targetWindow()`, which named botmaker-shared
   types a bot cannot write down. `Window.capture()` stays for the vision layer and is `@Hidden`.

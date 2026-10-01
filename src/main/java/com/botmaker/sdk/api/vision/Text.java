@@ -2,7 +2,6 @@ package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.util.TraceSource;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -57,7 +56,6 @@ import java.util.regex.Pattern;
  * the nine operations they belong to. The second change is what made the first urgent.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "🔤")
-@TraceSource("Vision")
 public final class Text {
 
     /**

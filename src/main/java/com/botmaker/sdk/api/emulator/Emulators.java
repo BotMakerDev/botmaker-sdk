@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.emulator;
 
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorInstance;
@@ -29,7 +28,6 @@ import java.util.Optional;
  * connects to one by hand is a second way to say what the project already says. The class stays public and
  * supported for a hand-written bot.
  */
-@TraceSource("Emulator")
 public final class Emulators {
 
     private Emulators() {}

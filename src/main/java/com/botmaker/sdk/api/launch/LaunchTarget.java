@@ -2,7 +2,6 @@ package com.botmaker.sdk.api.launch;
 
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.util.TraceSource;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.launch.LaunchKind;
@@ -46,7 +45,6 @@ import com.botmaker.shared.launch.Launcher;
  * this computer's {@code botmaker.launch.target} run property (an emulator app picked in Studio sets it), or
  * from {@link Game}'s calls, whose arguments have editors; there is no target picker to offer this method.
  */
-@TraceSource("Target")
 public sealed interface LaunchTarget {
 
     /** The parsed spec this target wraps — the value {@code shared.launch} operates on. */

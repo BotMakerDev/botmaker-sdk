@@ -19,11 +19,13 @@ import com.botmaker.shared.Diag;
  * prints. A run started with {@code -Dbotmaker.debug=true} or {@code false} (Studio's Debug output toggle)
  * starts that way whatever the settings say; {@link #enable()} and {@link #disable()} still work after it.
  *
- * <p>Emit your own trace through {@link #log(String)} / {@link #error(String)}: they print only when debugging
- * is enabled, so bot code never has to wrap prints in an {@code if}. <b>Each line is printed under the class
- * that wrote it</b>: {@code Debug.log("hello")} in {@code Collect} prints {@code [Collect] hello}. Put
- * {@link TraceSource} on the class to show another name, or start the message with {@code [Name]} for one line.
- * Under Studio each line also reaches its Trace tab, filterable by that name.
+ * <p>Emit your own trace through {@link #log(String)}: it prints only when debugging is enabled, so bot code
+ * never has to wrap prints in an {@code if}. {@link #error(String)} prints whether debugging is on or off
+ * (2026-09-30): a quiet run still shows what went wrong. <b>Each line is printed under the class that wrote
+ * it</b>: {@code Debug.log("hello")} in {@code Collect} prints {@code [Collect] hello}; start the message with
+ * {@code [Name]} for another name on one line. Under Studio each line also reaches its Trace tab, filterable by
+ * class and method — beside a line for every call the bot makes into a plugin, which Studio writes without any
+ * {@code Debug.log}.
  *
  * <p>The flag itself lives in {@code botmaker-shared}'s {@link Diag}, which this class only delegates to.
  * {@code shared} can't depend on the SDK, yet its window/capture/input code prints diagnostics of its own —
@@ -71,16 +73,16 @@ public final class Debug {
         if (Diag.isEnabled()) Diag.log(TraceSources.origin(), message, 1, null);
     }
 
-    /** Prints {@code message} to stderr under the calling class's name when debugging is on; a no-op when off. */
+    /** Prints {@code message} to stderr under the calling class's name, whether debugging is on or off. */
     public static void error(String message) {
-        if (Diag.isEnabled()) Diag.error(TraceSources.origin(), message, null);
+        Diag.error(TraceSources.origin(), message, null);
     }
 
     /**
-     * Prints {@code message} then {@code t}'s stack trace to stderr, when debugging is on. Use this instead of
-     * {@code t.printStackTrace()}, which would print on a quiet run.
+     * Prints {@code message} then {@code t}'s stack trace to stderr, whether debugging is on or off. Use this
+     * instead of {@code t.printStackTrace()}, which never reaches the trace.
      */
     public static void error(String message, Throwable t) {
-        if (Diag.isEnabled()) Diag.error(TraceSources.origin(), message, t);
+        Diag.error(TraceSources.origin(), message, t);
     }
 }

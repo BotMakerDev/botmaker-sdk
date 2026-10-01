@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * its {@link LaunchTarget#spec()}. The decision now reads the ambient {@link Source capture source}'s window,
  * so it is driven here by a fake {@link NativeController} (nothing real is enumerated or launched).
  *
- * <p>The skip is asserted through the {@code [Target] … skipping cold launch} trace on stdout: it is the only
+ * <p>The skip is asserted through the {@code [LaunchTarget] … skipping cold launch} trace on stdout: it is the only
  * observable of a decision whose "no" branch launches a process, so the launching branch is exercised with a
  * command that does not exist (a failed {@code ProcessBuilder} is logged, not thrown).
  */

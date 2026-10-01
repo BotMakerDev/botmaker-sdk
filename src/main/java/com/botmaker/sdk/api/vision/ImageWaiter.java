@@ -4,7 +4,6 @@ import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.plugin.api.record.Gesture;
 import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.util.TraceSource;
 
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.geometry.Point;
@@ -30,7 +29,6 @@ import java.time.Duration;
  * parameter in every offered shape: it is the question these methods exist to ask.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "⏳")
-@TraceSource("Vision")
 public class ImageWaiter {
 
     // --- waitFor ---

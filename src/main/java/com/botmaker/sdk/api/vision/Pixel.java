@@ -2,7 +2,6 @@ package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.util.TraceSource;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -55,7 +54,6 @@ import java.util.List;
  * a method added here later is hidden until someone decides otherwise.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "🎨")
-@TraceSource("Vision")
 public class Pixel {
 
     // ---------------------------------------------------------------------

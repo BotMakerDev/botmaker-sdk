@@ -4,7 +4,6 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Window;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.util.Debug;
-import com.botmaker.sdk.api.util.TraceSource;
 
 import java.awt.image.BufferedImage;
 import java.util.Optional;
@@ -18,7 +17,6 @@ import java.util.Optional;
  *
  * <p>Obtain one via {@link CaptureSource#window(String)}.
  */
-@TraceSource("Source")
 public final class NamedWindow implements CaptureSource, WindowBacked {
 
     private final String titleSubstring;

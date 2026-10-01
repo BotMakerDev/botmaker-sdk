@@ -187,9 +187,13 @@ launch, the emulator transport, OpenCV matching) lives in **shared**, where Stud
   `CurrentSource`, `WindowBacked`), `internal/session`, `internal/vision` (`TemplateNames`, the `img:`
   prefix), `internal/trace`, `internal/sound`.
 - `internal/trace` — `Trace` (collapsed runs, located lines) and `TraceSources`: **a debug line never writes its
-  own `[Name]`**. `Debug.log("click " + p)` is printed and traced under the calling class's name, or its
-  `api.util.@TraceSource` when that differs (`TraceSourcesTest` holds every SDK class to the prefix it had).
-  Only a class whose lines need two names (`BotSettings`, `FlowWalker`) spells one. `../docs/refactor/40-run-trace.md`.
+  own `[Name]`**. `Debug.log("…")` is printed and traced under the calling top-level class's simple name, and
+  only that (`@TraceSource` deleted 2026-09-30). Only a class whose lines need two names (`BotSettings`,
+  `FlowWalker`) spells one. **A line that only echoes a public call is not written**: Studio's trace agent
+  writes one per call a bot makes into an offered class, so `Mouse`, `Wait` and `Keyboard` write none of their
+  own; a line adds what the call's arguments and result cannot say (the match score, the window keys went to,
+  a collapsed run). `Debug.error`/`Diag.error` print and trace whatever the debug switch says.
+  `../docs/refactor/40-run-trace.md`.
 
 ## The plugin half
 
