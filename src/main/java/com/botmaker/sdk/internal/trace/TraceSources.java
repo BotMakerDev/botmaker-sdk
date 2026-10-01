@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.trace;
 
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.shared.Diag;
 
 import java.util.Set;

@@ -1,0 +1,88 @@
+package com.botmaker.sdk.api.console;
+
+import com.botmaker.sdk.internal.trace.TraceSources;
+import com.botmaker.shared.Diag;
+
+/**
+ * The single, global debug-output switch for a running bot. One flag governs <em>all</em> of the SDK's
+ * diagnostic printing:
+ * <ul>
+ *   <li>the lifecycle/launch traces — {@code [Bot]}, {@code [Game]}, {@code [Target]}, {@code [Activity]}
+ *       — that used to print unconditionally, and</li>
+ *   <li>the vision traces (find/click/wait/pixel/text) that used to be gated by the separate
+ *       {@code ClickConfig.DEBUG_MODE}.</li>
+ * </ul>
+ *
+ * <p><b>Default: on.</b> A bot prints its trace out of the box so a first run is legible; turn it off for a
+ * quiet production run with {@link #disable()}, or for good in the bot's settings (⚙ Bot Settings, the
+ * {@code debug} of its {@code @Managed("settings")} value), which {@code Bot.run} applies before anything
+ * prints. A run started with {@code -Dbotmaker.debug=true} or {@code false} (Studio's Debug output toggle)
+ * starts that way whatever the settings say; {@link #enable()} and {@link #disable()} still work after it.
+ *
+ * <p>Emit your own trace through {@link #log(String)}: it prints only when debugging is enabled, so bot code
+ * never has to wrap prints in an {@code if}. {@link #error(String)} prints whether debugging is on or off
+ * (2026-09-30): a quiet run still shows what went wrong. <b>Each line is printed under the class that wrote
+ * it</b>: {@code Debug.log("hello")} in {@code Collect} prints {@code [Collect] hello}; start the message with
+ * {@code [Name]} for another name on one line. Under Studio each line also reaches its Trace tab, filterable by
+ * class and method — beside a line for every call the bot makes into a plugin, which Studio writes without any
+ * {@code Debug.log}.
+ *
+ * <p>The flag itself lives in {@code botmaker-shared}'s {@link Diag}, which this class only delegates to.
+ * {@code shared} can't depend on the SDK, yet its window/capture/input code prints diagnostics of its own —
+ * keeping the state in the lower module is what makes this <em>one</em> switch rather than two that drift.
+ *
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): six of the seven are offered. The one hidden is
+ * {@link #set(boolean)}, and it is the third instance of a shape this sweep keeps finding — a method whose
+ * {@code boolean} argument selects between two behaviours that <em>already have their own names</em>. It is
+ * {@code Mouse.scroll(int)} again with a flag instead of a sign: {@link #enable()} and {@link #disable()} say
+ * at the call site what {@code set(false)} makes the reader work out. Offering all three as equals asks the
+ * user to choose a spelling for no gain. It stays public for the bot that computes the flag.
+ *
+ * <p>{@link #error(String, Throwable)} <em>is</em> offered, which is worth stating because {@code Throwable}
+ * is a JDK type and this sweep has hidden JDK-typed parameters elsewhere ({@code ZoneId}, {@code OcrOptions}).
+ * That rule was never about the package: it is about an argument the editor has <b>no way to produce</b>. A
+ * {@code Throwable} is produced by the {@code catch} clause the call sits in, so the variable picker fills it
+ * from scope — and this overload's own javadoc is the reason to prefer it over {@code t.printStackTrace()}.
+ */
+public final class Debug {
+
+    private Debug() {}
+
+    /** Whether debug output is currently on. All SDK diagnostic prints consult this. */
+    public static boolean isEnabled() {
+        return Diag.isEnabled();
+    }
+
+    /** Turns debug output on for the rest of the run. */
+    public static void enable() {
+        Diag.set(true);
+    }
+
+    /** Turns debug output off for the rest of the run (a quiet production run). */
+    public static void disable() {
+        Diag.set(false);
+    }
+
+    /** Sets debug output on or off. */
+    public static void set(boolean on) {
+        Diag.set(on);
+    }
+
+    /** Prints {@code message} to stdout under the calling class's name when debugging is on; a no-op when off. */
+    public static void log(String message) {
+        if (Diag.isEnabled()) Diag.log(TraceSources.origin(), message, 1, null);
+    }
+
+    /** Prints {@code message} to stderr under the calling class's name, whether debugging is on or off. */
+    public static void error(String message) {
+        Diag.error(TraceSources.origin(), message, null);
+    }
+
+    /**
+     * Prints {@code message} then {@code t}'s stack trace to stderr, whether debugging is on or off. Use this
+     * instead of {@code t.printStackTrace()}, which never reaches the trace.
+     */
+    public static void error(String message, Throwable t) {
+        Diag.error(TraceSources.origin(), message, t);
+    }
+}

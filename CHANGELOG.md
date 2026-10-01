@@ -19,8 +19,26 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Removed
+
+- **Plumbing a bot never writes left `api` for `internal`**: `Game`, `Target`, `LaunchTarget`, `Emulator`,
+  `Emulators`, `EmulatorRef`, `EmulatorSource`, `Session`, `Watchdog`, `BotStuckException`, `Flows`, `Window`.
+- **`Direction`**, which no call took, with its arrow-pad editor.
+- **`Bot.start(…)`** (both forms) and **`StartMode`**: `Bot.run` is the entry point.
+- **The launch annotations** (`@SteamAppId`, `@EpicAppName`, `@HeroicAppName`, `@FaugusGameId`,
+  `@ProgramPath`, `@LaunchOption`) and their game-grid editors: nothing offered carried them.
+
 ### Changed
 
+- **The packages are named by what a bot does** (imports move; Studio's upgrade repairs a bot):
+  `api.interaction` is `api.input` (`Mouse`, `MouseButton`, `Keyboard`, `Key`, `Combo`, `KeySequence`);
+  `Wait` and `Time` are `api.time`; `Debug` and `BotMaker` are `api.console` (was `api.util`); OCR —
+  `Text`, `TextMatch`, `TextResult`, `OcrOptions`, `OcrLanguage` — is `api.text`; `ActivityBody` is
+  `api.flow`.
+- **The last text match is `Text.lastMatch()`** (and `lastMatchList`, `lastMatchFound`, `clearLastMatch`,
+  `ifLastMatch`), no longer `Vision.lastTextMatch()` and its family.
+- **An emulator source is `CaptureSource.emulator("name")`.**
+- **`api.*` breaks freely**: the never-delete rule and its japicmp gate are retired.
 - **The palette offers the calls a bot makes and nothing else.** Thirty-seven value and plumbing types lost
   `@Palette` + `@Hidden` (contract 0.4.0: `@Palette` means offered). The value types — `Point`,
   `MatchResult`, `ImageTemplate`, `Key` and the rest — are still recognised because an offered call takes or

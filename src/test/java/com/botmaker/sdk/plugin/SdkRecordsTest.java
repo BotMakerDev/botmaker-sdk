@@ -2,10 +2,10 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.record.Gesture;
 import com.botmaker.plugin.api.record.Records;
-import com.botmaker.sdk.api.interaction.Combo;
-import com.botmaker.sdk.api.interaction.Keyboard;
-import com.botmaker.sdk.api.interaction.Mouse;
-import com.botmaker.sdk.api.interaction.Wait;
+import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.input.Keyboard;
+import com.botmaker.sdk.api.input.Mouse;
+import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.api.vision.ImageClicker;
 import com.botmaker.sdk.api.vision.ImageWaiter;
 import org.junit.jupiter.api.Test;

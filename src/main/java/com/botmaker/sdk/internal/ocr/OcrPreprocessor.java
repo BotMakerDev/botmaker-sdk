@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.ocr;
 
-import com.botmaker.sdk.api.vision.OcrOptions;
+import com.botmaker.sdk.api.text.OcrOptions;
 import com.botmaker.shared.opencv.OpencvManager;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;

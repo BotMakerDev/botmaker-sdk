@@ -1,10 +1,9 @@
 package com.botmaker.sdk.internal.flow;
 
 import com.botmaker.sdk.api.bot.Activities;
-import com.botmaker.sdk.api.bot.ActivityBody;
 import com.botmaker.sdk.api.bot.PopupGuard;
+import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.flow.Flows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

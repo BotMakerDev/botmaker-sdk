@@ -5,7 +5,7 @@ import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.interaction.Mouse;
+import com.botmaker.sdk.api.input.Mouse;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;

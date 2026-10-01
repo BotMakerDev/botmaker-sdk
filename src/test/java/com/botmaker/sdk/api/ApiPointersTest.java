@@ -32,17 +32,13 @@ import static org.junit.jupiter.api.Assertions.fail;
  * {@code target/classes} plus the contract's, offline. A pointer is written on an element that is still
  * compilable, naming an element that is also still compilable, so both ends are in the build being checked.
  *
- * <h2>There is no back edge any more, and japicmp is why</h2>
+ * <h2>There is no back edge</h2>
  *
  * <p>{@code @Replaces} — the claim written on the survivor — was deleted on 2026-08-27 with the annotation
- * processor, and rules 3, 4, 5 and 6 went with it. It existed for one case: a bot on 1.0 jumping straight to
- * 3.0 cannot see a pointer that was added in 2.0 on an element 3.0 deleted, so the answer had to survive on
- * the survivor. Under the <b>never-delete</b> rule now enforced by japicmp over
- * {@code com.botmaker.sdk.api.**}, the target jar still carries the deprecated element <em>and</em> its own
- * {@code @ReplacedBy}, so the forward pointer alone answers every upgrade including a skipped one, and
- * pointers compose into a chain ({@code a}→{@code b} in 2.0, {@code b}→{@code c} in 3.0 lands a bot still
- * spelling it {@code a} on {@code c}). The accepted cost is stated plainly in the pom: {@code api} only ever
- * grows.
+ * processor, and rules 3, 4, 5 and 6 went with it. A pointer is an optional courtesy since 2026-10-01, when
+ * the never-delete rule and its japicmp gate were retired: {@code api.*} breaks freely, and Studio's upgrade
+ * drops a statement whose method is gone. A pointer that <em>is</em> written must still resolve, which is all
+ * this checks.
  *
  * <p>{@code @Since} went the same day, and rule 7 with it. What it recorded — the release an element first
  * shipped in — is answerable from the jar the bot actually resolves, which is the gate-deletion test this

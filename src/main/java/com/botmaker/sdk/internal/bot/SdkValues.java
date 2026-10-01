@@ -7,7 +7,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
-import com.botmaker.sdk.api.flow.Flows;
+import com.botmaker.sdk.internal.flow.Flows;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
 import java.util.List;

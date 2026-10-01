@@ -28,7 +28,6 @@ sessions rely on to understand what changed and what's intentionally left for la
 ```bash
 mvn compile        # Build
 mvn test           # Run tests (JUnit Jupiter)
-mvn verify         # + japicmp against botmaker.japicmp.baseline: an api.* removal is fatal
 mvn install        # Install to ~/.m2 at the coordinate a bot resolves (see Local dev)
 ```
 
@@ -101,19 +100,20 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
   fill is `plugin/types/PictureAt`, a `RecordedValue` (the project picture under the click). This module
   writes no Java for a recording.
 
-- **No `api` signature may name a type the SDK does not version.** `botmaker-shared` and OpenCV are *freely
-  breakable* by design while `api.*` is under contract, so a public `api` method returning one of their
-  types promises a spelling nobody keeps. `ImageTemplate.getMat()` (`org.opencv.core.Mat`) is
-  package-private for this reason, a window handle is reached through **`internal.capture.WindowBacked`**
-  (`WindowBacked.of(source)`), and OCR lives here rather than in shared (`api.vision` `OcrOptions`,
-  `OcrLanguage`, `TextResult`; `internal.ocr` the engine). **`../docs/refactor/22-api-audit.md` is the
-  record** of that audit.
+- **No `api` signature may name a type a bot cannot write**: not `internal` (`PluginLayersTest`, by
+  reflection), and not `botmaker-shared` or OpenCV, which are freely breakable. `ImageTemplate.getMat()`
+  (`org.opencv.core.Mat`) is package-private for this reason, a window handle is reached through
+  **`internal.capture.WindowBacked`** (`WindowBacked.of(source)`), an emulator source is
+  `CaptureSource.emulator(name)`, and OCR lives here rather than in shared (`api.text`; `internal.ocr` the
+  engine). **`../docs/refactor/22-api-audit.md` is the record** of the shared audit.
 
-- **`com.botmaker.sdk.api.*`** is the API bots compile against, and every class in it sits in a sub-package
-  that says what it is: `api.bot`, `api.capture`, `api.emulator`, `api.flow`, `api.geometry` (`Point`,
-  `Rect`, `Size`, `Direction`), `api.interaction`, `api.launch`, `api.sound`, `api.util` (`Time`,
-  `BotMaker`, `Debug`), `api.vision`. **The `api` root holds no classes**; a name landing there means
-  somebody skipped the question above. The full picture is **`../docs/refactor/21-api-compat.md`**.
+- **`com.botmaker.sdk.api.*` is what a bot writes, in packages named by what a bot does** (2026-10-01):
+  `api.bot`, `api.flow`, `api.capture`, `api.input` (`Mouse`, `MouseButton`, `Keyboard`, `Key`, `Combo`,
+  `KeySequence`), `api.time` (`Wait`, `Time`), `api.vision`, `api.text` (OCR), `api.geometry` (`Point`,
+  `Rect`, `Size`), `api.sound`, `api.console` (`Debug`, `BotMaker`) — `PluginLayersTest` holds the list.
+  **The `api` root holds no classes**. Plumbing the plugin half needs and a bot never names is public in
+  `internal`: `internal.launch` (`Game`, `Target`, `LaunchTarget`), `internal.emulator`, `internal.bot`
+  (`Session`, `Watchdog`, `BotStuckException`), `internal.flow.Flows`, `internal.capture.Window`.
 
 - **The package tree is `api` / `internal` / `plugin`, and nothing else** (`../docs/refactor/34-plugin-package-tree.md`,
   enforced by `plugin/PluginLayersTest`). `api` and `internal` are what a bot links: no JavaFX, no toolkit, no
@@ -123,19 +123,14 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
   (+ `pilot/ui`), `emulator`, `launch`, `setup`. **No class under `plugin/` reads or writes Java text**: an
   editor reads the value the host hands it and hands one back.
 
-- **`api.*` never deletes, starting at 2.0.0.** SDK 2.0.0 is the one sanctioned break (`Activity`,
-  `Activities.define`, `FlowGraph`, `PopupCheck`/`Recovery`, `api.meta`, `BotSettings.defaultCaptureSource`,
-  `CaptureSource.fromProjectDefault` — the CHANGELOG's BREAKING list names each replacement). From then on a
-  public `api.*` element is deprecated and kept, never removed: japicmp in `mvn verify` against
-  `botmaker.japicmp.baseline` (`v2.0.0`, pinned ahead of the tag) makes a removal fatal, with no ignore list.
-  `internal.**` and `plugin.**` are free. The accepted cost: **`api` only grows.** An annotation added to an
-  api parameter (below) is additive, so never-delete holds.
+- **`api.*` breaks freely (2026-10-01, the maintainer's ruling).** Studio's refactor-safe upgrade drops a
+  statement whose method is gone, so the never-delete rule, its japicmp gate and the "2.0.0 is the one
+  sanctioned break" wording are retired. Delete outright; no `@Deprecated` is owed.
 
-- **A rename carries `@ReplacedBy`** (contract's `com.botmaker.plugin.api.meta`) on the deprecated element:
-  targets `fqn`, `fqn#member` or `fqn#<init>`; an empty value is an explicit "nothing takes my place";
-  several values are a split, with a parallel `whens()` sentence per candidate; `note` is shown verbatim;
-  `behaviourChanged = true` forces a review mark and needs a `note`. Pointers compose into a chain, because
-  never-delete keeps every old element and its pointer in the newest jar. **`ApiPointersTest`** is the gate
+- **A rename may carry `@ReplacedBy`** (contract's `com.botmaker.plugin.api.meta`), a courtesy Studio's
+  upgrade follows: targets `fqn`, `fqn#member` or `fqn#<init>`; an empty value is an explicit "nothing takes
+  my place"; several values are a split, with a parallel `whens()` sentence per candidate; `note` is shown
+  verbatim; `behaviourChanged = true` forces a review mark and needs a `note`. **`ApiPointersTest`** is the gate
   (four rules: every deprecated element has a pointer, every target resolves, a behaviour change has its
   note, a split says when). It is not a coverage rule. `first(…)` filters with `directOnly()`, because these
   annotations annotate each other.
@@ -144,7 +139,8 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
 
 - `api.vision` — `ImageFinder` (find + `exists` + the lambda control flow `whileExists`/`ifExists`/
   `untilExists`), `ImageClicker`, `ImageWaiter`, `MatchResult`, `ImageTemplate`, `ImageTemplateGroup`,
-  `Text` (OCR). `Precision` is `Pixel`'s knobs as one value (`EXACT`/`TIGHT`/`DEFAULT`/`LOOSE`, a validating
+  `Pixel`, `Vision` (the last image and colour match). `api.text` is OCR: `Text` (with `Text.lastMatch()`),
+  `TextMatch`, `TextResult`, `OcrOptions`, `OcrLanguage`. `Precision` is `Pixel`'s knobs as one value (`EXACT`/`TIGHT`/`DEFAULT`/`LOOSE`, a validating
   `of(…)`, withers): a type because ΔE has no obvious scale and the pixel count is an *area* routinely misread
   as a width, and because an editor is claimed by **type**, never by a method and an argument index.
 - `api.bot` — `Bot.run(Home::goHome, Sdk.class)` (installs every `@Managed` value it is handed and walks the
@@ -155,16 +151,17 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
   while with `BotSettings.use(…)`, edited in ⚙ Bot Settings (`plugin/settings/BotSettingsWindow`).
 - `api.flow` — `Flow`, `Flow.activity(Collect::body, …)` (an activity's work is a **method reference**, so a
   rename is a compile error naming `Sdk.java`), `FlowLayout` (the editor's card positions, which a run
-  ignores); `Flows.enabled(name)` reads an activity's switch.
-- `api.capture` — `CaptureSource` (`desktop()`, `monitor(i)`, `window(title)`, `region(…)`; `capture()` and
-  `origin()` go together), `Source.current()` (what `Bot.run` installed, or the whole desktop), `Window`.
-- `api.interaction` (`Mouse`, `Keyboard`, `Wait`), `api.launch`, `api.emulator`, `api.sound`, `api.geometry`.
-- `api.util.BotMaker` — console IO. `readX()` prints a SOH-wrapped `BM-INPUT:<type>` marker to stdout before
+  ignores), `ActivityBody`; `internal.flow.Flows.enabled(name)` reads an activity's switch.
+- `api.capture` — `CaptureSource` (`desktop()`, `monitor(i)`, `window(title)`, `emulator(name)`, `region(…)`;
+  `capture()` and `origin()` go together), `Source.current()` (what `Bot.run` installed, or the whole desktop).
+- `api.input` (`Mouse`, `Keyboard`, …), `api.time` (`Wait`, `Time`), `api.sound`, `api.geometry`.
+- `api.console.BotMaker` — console IO. `readX()` prints a SOH-wrapped `BM-INPUT:<type>` marker to stdout before
   blocking on stdin; Studio detects/strips it to show a modal input prompt. Changing that marker on one side
   without the other breaks input prompts.
-- **Api parameters that want an editor carry an annotation**: `api.launch.@SteamAppId`, `@EpicAppName`,
-  `@ProgramPath`, `@LaunchOption`; `api.emulator.@EmulatorName`; `api.bot.@ActivityName`, `@OutcomeName`, and
-  `@Setting(label, prompt, unit, min, max, step, fallback)` on the `BotSettings` withers. `SdkEditors.ALL`
+- **Api parameters that want an editor carry an annotation**: `api.bot.@ActivityName`, `@OutcomeName`, and
+  `@Setting(label, prompt, unit, min, max, step, fallback)` on the `BotSettings` withers;
+  `internal.emulator.@EmulatorName` on `Emulators`, whose device picker no offered call reaches any more
+  (kept, flagged 2026-10-01). The launch annotations and their game grids went on 2026-10-01. `SdkEditors.ALL`
   is `SlotEditor.onParameter(X.class).draw(…)`, and `SettingsEditors` reads `@Setting`.
 
 ### What `internal` holds
@@ -229,7 +226,7 @@ is a run property; what a bot was tested on is its gallery entry.
 - **Factories are method references, with two string exceptions that stay**:
   - `CaptureTypes`' `REGION` and `REGION_CHAIN` name `CaptureSource.region` through `Ref.member`, because the static
     `region(src, r)` and the instance `src.region(r)` share a name and an arity and javac cannot reference
-    either, and never-delete keeps both for ever — a new-named factory would still leave this one.
+    either, and both are what a bot writes — a new-named factory would still leave this one.
   - `FlowTypes`' activity body is the text `Collect::body`, written through the host's own source-leaf path
     (Studio's `ValueWriter.ofClass`), which parses it into a tree; renames already follow bindings in the real
     `Sdk.java`. A contract `MethodName` type was considered and declined (2026-09-28): one contract type,
@@ -316,7 +313,7 @@ before touching `api/capture` or `internal/session`.
 
 ### Mouse clicks & the Wayland input limitation
 
-`api.interaction.Mouse.click` routes through `NativeControllerFactory.get()` (Windows → `Clicker`/
+`api.input.Mouse.click` routes through `NativeControllerFactory.get()` (Windows → `Clicker`/
 `User32 PostMessage`; Linux → `LinuxController` XTest, with an AWT `Robot` fallback).
 
 On Linux the click warps the real cursor, then restores it. **Restore is X11-only:** under native
@@ -327,14 +324,14 @@ skips the restore when `WAYLAND_DISPLAY` is set, leaving the cursor on the targe
 "click without disturbing the cursor" path is the xdg-desktop-portal **RemoteDesktop** (libei/
 PipeWire) interface — deferred; see `ROADMAP.md`.
 
-## Android emulator (`api.emulator`)
+## Android emulator (`internal.emulator`, since 2026-10-01; a bot writes `CaptureSource.emulator(name)`)
 
 The emulator **capability** — the dadb transport (`AdbDevice`) and product discovery (`Platforms`,
 `BlueStacks`/`LdPlayer`, `WindowsRegistry`, `EmulatorInstance`) — lives in **shared**
 (`com.botmaker.shared.emulator`), because both the SDK (connect at runtime) and the plugin's picker need it.
 dadb therefore comes in transitively via shared — it is **not** a direct SDK dependency.
 
-The SDK owns only the bot-facing facade `api.emulator`: **`Emulator implements CaptureSource`** (wraps a shared
+The SDK owns only the facade `internal.emulator`: **`Emulator implements CaptureSource`** (wraps a shared
 `AdbDevice`; `origin()` is `(0,0)` so a match's coords are already emulator pixels and the whole vision/click
 stack works unchanged; `click(Point)` → `adb input tap`) and **`Emulators`** (static discovery over shared's
 `Platforms`: `list`/`first`/`named`/`connect`, plus `use()`/`use(String)` connect-and-set-`Source` shorthands).

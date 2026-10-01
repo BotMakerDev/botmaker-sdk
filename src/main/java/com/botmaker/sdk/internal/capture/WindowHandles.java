@@ -1,6 +1,5 @@
 package com.botmaker.sdk.internal.capture;
 
-import com.botmaker.sdk.api.capture.Window;
 import com.botmaker.shared.capture.GenericWindow;
 
 import java.util.function.Function;

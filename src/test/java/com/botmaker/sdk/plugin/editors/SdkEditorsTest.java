@@ -8,15 +8,8 @@ import com.botmaker.sdk.api.bot.ActivityName;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.OutcomeName;
 import com.botmaker.sdk.api.bot.Setting;
-import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.emulator.EmulatorName;
-import com.botmaker.sdk.api.emulator.Emulators;
-import com.botmaker.sdk.api.launch.FaugusGameId;
-import com.botmaker.sdk.api.launch.Game;
-import com.botmaker.sdk.api.launch.HeroicAppName;
-import com.botmaker.sdk.api.launch.LaunchOption;
-import com.botmaker.sdk.api.launch.ProgramPath;
-import com.botmaker.sdk.api.launch.SteamAppId;
+import com.botmaker.sdk.internal.emulator.EmulatorName;
+import com.botmaker.sdk.internal.emulator.Emulators;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
@@ -45,45 +38,6 @@ class SdkEditorsTest {
     private static boolean carries(Method call, int argIndex, Class<? extends Annotation> annotation) {
         return TestContexts.slot(call, argIndex, "x").slot().flatMap(SlotContext::parameter)
                 .map(parameter -> parameter.isAnnotationPresent(annotation)).orElse(false);
-    }
-
-    @Test
-    void the_steam_id_is_claimed_on_the_string_launches_only() {
-        Method launchSteam = TestContexts.method(Game.class, "launchSteam", String.class);
-        Method ifNotRunning = TestContexts.method(Game.class, "launchSteamIfNotRunning");
-
-        assertTrue(carries(launchSteam, 0, SteamAppId.class));
-        assertTrue(claimed(TestContexts.slot(launchSteam, 0, "\"440\"")));
-        assertTrue(claimed(TestContexts.slot(ifNotRunning, 0, "\"440\"")));
-        // The int overload: the game grid writes a String, which would not compile there.
-        assertFalse(claimed(TestContexts.slot(TestContexts.method(Game.class, "launchSteam", int.class), 0, "440")));
-    }
-
-    /** Heroic's and Faugus's launches get their libraries' grids, as Steam's and Epic's do. */
-    @Test
-    void the_heroic_and_faugus_ids_are_claimed() {
-        Method heroic = TestContexts.method(Game.class, "launchHeroic", String.class);
-        Method faugus = TestContexts.method(Game.class, "launchFaugus", String.class);
-
-        assertTrue(carries(heroic, 0, HeroicAppName.class));
-        assertTrue(carries(faugus, 0, FaugusGameId.class));
-        assertTrue(claimed(TestContexts.slot(heroic, 0, "\"Firestone\"")));
-        assertTrue(claimed(TestContexts.slot(faugus, 0, "\"battlenet\"")));
-    }
-
-    /** The flags are the varargs tail, wherever the overload's fixed parameters end. */
-    @Test
-    void a_launch_flag_is_every_argument_of_the_varargs_tail() {
-        Method launch = TestContexts.method(Game.class, "launch", String.class, String[].class);
-        Method ifNotRunning = TestContexts.method(Game.class, "launchIfNotRunning",
-                String.class, CaptureSource.class, String[].class);
-
-        assertTrue(carries(launch, 0, ProgramPath.class));
-        assertTrue(carries(launch, 1, LaunchOption.class));
-        assertTrue(carries(launch, 3, LaunchOption.class));
-        assertFalse(carries(ifNotRunning, 1, LaunchOption.class));
-        assertFalse(claimed(TestContexts.slot(ifNotRunning, 1, "source")));
-        assertTrue(carries(ifNotRunning, 2, LaunchOption.class));
     }
 
     @Test

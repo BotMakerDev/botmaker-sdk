@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteDefault;
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;

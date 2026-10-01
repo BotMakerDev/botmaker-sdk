@@ -1,9 +1,9 @@
 package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.DeclaredCallType;
-import com.botmaker.sdk.api.interaction.Combo;
-import com.botmaker.sdk.api.interaction.Key;
-import com.botmaker.sdk.api.interaction.KeySequence;
+import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.KeySequence;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;

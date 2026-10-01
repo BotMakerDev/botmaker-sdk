@@ -1,10 +1,10 @@
 package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.toolkit.testing.TestContexts;
-import com.botmaker.sdk.api.vision.OcrLanguage;
-import com.botmaker.sdk.api.vision.OcrOptions;
-import com.botmaker.sdk.api.vision.Text;
-import com.botmaker.sdk.api.vision.TextResult;
+import com.botmaker.sdk.api.text.OcrLanguage;
+import com.botmaker.sdk.api.text.OcrOptions;
+import com.botmaker.sdk.api.text.Text;
+import com.botmaker.sdk.api.text.TextResult;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;

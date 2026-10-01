@@ -102,15 +102,10 @@ jobs:
           mvn_retry mvn -B -f .deps/botmaker-shared/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-session/pom.xml install -DskipTests
 
-      # `verify`, not `package`, and the difference is a whole gate: japicmp binds to the verify phase, so
-      # for as long as this step stopped at `package` the never-delete rule on com.botmaker.sdk.api.** ran
-      # nowhere automatic — not here, and not on JitPack, whose build is `install -DskipTests` on a tag that
-      # already exists. It was enforced only by whoever happened to run `mvn verify` locally.
-      #
-      # -DskipTests still holds: the suite is run locally and CI is a compile gate. Skipping tests does not
-      # skip phases, so verify is reached with the tests compiled and not run — which is exactly the
-      # arrangement this file's header already describes.
-      - name: Build (and the never-delete API gate, which binds to verify)
+      # -DskipTests: the suite is run locally and CI is a compile gate. The never-delete japicmp gate that
+      # bound to verify went on 2026-10-01 — api.* breaks freely, since Studio's upgrade drops a statement
+      # whose method is gone.
+      - name: Build
         run: mvn -B -DskipTests verify
 
       # The pointer gate. NOT the API compatibility gate that used to be here: that one compared this build
@@ -126,8 +121,8 @@ jobs:
       # the same build — which is also why it is worth running in CI rather than at release time only: it
       # can be satisfied while both ends exist, and never again afterwards.
       #
-      # No japicmp, no extra source root, no version awareness (release.sh adds the one version-sensitive
-      # check via -Dbotmaker.api.maxVersion). See ../docs/refactor/21-api-compat.md (umbrella).
+      # No extra source root, no version awareness (release.sh adds the one version-sensitive check via
+      # -Dbotmaker.api.maxVersion). A @ReplacedBy is an optional courtesy since 2026-10-01.
       - name: API pointer gate (@ReplacedBy / @Replaces)
         run: mvn -B test -Dtest=ApiPointersTest -DfailIfNoTests=false
 

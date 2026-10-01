@@ -7,12 +7,13 @@ import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.RegionSource;
-import com.botmaker.sdk.api.interaction.Mouse;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.api.input.Mouse;
 
 import java.awt.image.BufferedImage;
 
 /**
- * <em>Where</em> the vision layer looks — exactly one of three things: a {@link Window}, a single
+ * <em>Where</em> the vision layer looks — exactly one of three things: a {@link #window(String) window}, a single
  * {@link #monitor(int) monitor}, or the whole {@link #desktop() desktop}. Every matcher
  * ({@code ImageFinder}/{@code ImageClicker}/{@code ImageWaiter}) takes a {@code CaptureSource} instead of a
  * loose screen rectangle, so a template is matched — and clicked — in the source's own coordinate space
@@ -58,7 +59,7 @@ public interface CaptureSource {
      * Whether this source currently exists / can be captured. The whole {@link #desktop()} and a
      * {@link #monitor(int) monitor} are always present, so this defaults to {@code true}; a window
      * source ({@link #window(String)}) overrides it to report whether a matching window is open right
-     * now. Used by {@link com.botmaker.sdk.api.launch.Game} to tell if a game is already running.
+     * now. Used by the launch stack to tell if a game is already running.
      */
     default boolean isPresent() {
         return true;
@@ -68,10 +69,10 @@ public interface CaptureSource {
      * Whether {@link #isPresent()} actually means something for this source. The whole {@link #desktop()}
      * and a {@link #monitor(int) monitor} always answer {@code true} to {@code isPresent()} because they
      * always exist — so a caller asking "is the target already up?" would get a permanent, meaningless
-     * "yes". Only a source tied to a specific application window ({@link #window(String)} and a concrete
-     * {@link Window}) reports a real presence, and only those override this to {@code true}.
+     * "yes". Only a source tied to a specific application window ({@link #window(String)}) reports a real
+     * presence, and only those override this to {@code true}.
      *
-     * <p>Used by {@link com.botmaker.sdk.api.launch.LaunchTarget#startIfNotRunning()} to decide whether the
+     * <p>Used by the launch stack's {@code LaunchTarget.startIfNotRunning()} to decide whether the
      * ambient source can answer "already running", or whether it must fall back to a process-name probe.
      */
     @Hidden("how the launch stack decides whether a source can be focused; not a question a bot asks")
@@ -81,7 +82,7 @@ public interface CaptureSource {
 
     /**
      * Sends a primary click at absolute point {@code p} — the location a matcher produced on <em>this</em>
-     * source. The default is a real desktop click ({@link com.botmaker.sdk.api.interaction.Mouse#click(Point)}),
+     * source. The default is a real desktop click ({@link Mouse#click(Point)}),
      * which is correct for the on-screen sources (desktop / monitor / window). A source whose pixels are
      * <em>not</em> on the desktop — an emulator captured over ADB — overrides this to inject the click through
      * its own channel (e.g. {@code adb input tap}); because such a source reports {@link #origin()} as
@@ -116,6 +117,14 @@ public interface CaptureSource {
      */
     static CaptureSource window(String titleSubstring) {
         return new NamedWindow(titleSubstring);
+    }
+
+    /**
+     * An Android emulator instance (or a paired phone) by its name, captured and clicked over ADB rather than on
+     * the desktop. Since 2026-10-01 the bot writes this factory; the source class behind it is the SDK's own.
+     */
+    static CaptureSource emulator(String instanceName) {
+        return new EmulatorSource(instanceName);
     }
 
     // --- Region: a Rect that belongs to THIS source ---

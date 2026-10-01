@@ -78,7 +78,7 @@ class IpcObserverTest {
     void aBotUnderComBotmakerIsTheBotsOwnCodeButOurLibrariesAreNot() {
         assertFalse(IpcObserver.isLibrary("com.botmaker.gamebot.Collect"));
         assertFalse(IpcObserver.isLibrary("com.example.Farm"));
-        assertTrue(IpcObserver.isLibrary("com.botmaker.sdk.api.interaction.Mouse"));
+        assertTrue(IpcObserver.isLibrary("com.botmaker.sdk.api.input.Mouse"));
         assertTrue(IpcObserver.isLibrary("com.botmaker.shared.Diag"));
         assertTrue(IpcObserver.isLibrary("java.lang.Thread"));
     }

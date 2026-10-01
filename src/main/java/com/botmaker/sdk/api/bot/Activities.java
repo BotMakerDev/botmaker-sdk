@@ -2,10 +2,10 @@ package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.flow.Flows;
-import com.botmaker.sdk.api.util.Debug;
 import com.botmaker.sdk.internal.flow.FlowWalker;
+import com.botmaker.sdk.internal.flow.Flows;
 
 /**
  * The flow's activities while a bot runs: what an activity body reports, and turning activities on and off.

@@ -1,8 +1,9 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.flow.Flows;
 import com.botmaker.sdk.internal.flow.FlowWalker;
+import com.botmaker.sdk.internal.flow.Flows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 

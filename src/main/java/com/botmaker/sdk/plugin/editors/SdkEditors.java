@@ -4,13 +4,7 @@ import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.sdk.api.bot.ActivityName;
 import com.botmaker.sdk.api.bot.OutcomeName;
 import com.botmaker.sdk.api.bot.Setting;
-import com.botmaker.sdk.api.emulator.EmulatorName;
-import com.botmaker.sdk.api.launch.EpicAppName;
-import com.botmaker.sdk.api.launch.FaugusGameId;
-import com.botmaker.sdk.api.launch.HeroicAppName;
-import com.botmaker.sdk.api.launch.LaunchOption;
-import com.botmaker.sdk.api.launch.ProgramPath;
-import com.botmaker.sdk.api.launch.SteamAppId;
+import com.botmaker.sdk.internal.emulator.EmulatorName;
 import com.botmaker.sdk.plugin.emulator.EmulatorEditors;
 
 import java.awt.Color;
@@ -23,10 +17,11 @@ import java.util.List;
  *
  * <p>Three kinds:
  * <ul>
- *   <li><b>By parameter.</b> A Steam app id, a program path and a launch flag are all {@code String}; the api
- *       says which is which by annotating the parameter ({@code launchSteam(@SteamAppId String appId)}), and
- *       the editor is chosen by the annotation. These are absent from the Parameters window, which has no
- *       call behind a row.</li>
+ *   <li><b>By parameter.</b> An activity name, an outcome name and a setting are all plain values; the api
+ *       says which is which by annotating the parameter ({@code outcome(@OutcomeName String name)}), and the
+ *       editor is chosen by the annotation. These are absent from the Parameters window, which has no call
+ *       behind a row. The launch annotations and their game grids went on 2026-10-01: the launch stack moved
+ *       to {@code internal}, so no offered call carried them.</li>
  *   <li><b>By a run of pictures</b>, which neither a parameter nor a type can say: only the host knows that
  *       several arguments are one list.</li>
  *   <li><b>By another plugin's type</b>: plugin-basics declares {@code java.awt.Color}; this plugin offers a
@@ -43,12 +38,6 @@ public final class SdkEditors {
 
     /** Built once and shared: an editor holds no state, the value lives in the context it is handed. */
     public static final List<SlotEditor> ALL = List.of(
-            SlotEditor.onParameter(SteamAppId.class).draw(() -> LaunchEditors::steamGame),
-            SlotEditor.onParameter(EpicAppName.class).draw(() -> LaunchEditors::epicGame),
-            SlotEditor.onParameter(HeroicAppName.class).draw(() -> LaunchEditors::heroicGame),
-            SlotEditor.onParameter(FaugusGameId.class).draw(() -> LaunchEditors::faugusGame),
-            SlotEditor.onParameter(ProgramPath.class).draw(() -> LaunchEditors::program),
-            SlotEditor.onParameter(LaunchOption.class).draw(() -> LaunchEditors::option),
             SlotEditor.onParameter(Setting.class).draw(() -> SettingsEditors::setting),
             SlotEditor.onParameter(EmulatorName.class).draw(() -> EmulatorEditors::instanceName),
             SlotEditor.onParameter(ActivityName.class).draw(() -> ActivityEditors::activityName),

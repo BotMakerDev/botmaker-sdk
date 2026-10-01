@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.sound;
 
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.sound.Meow;
 
 import javax.sound.sampled.AudioFormat;

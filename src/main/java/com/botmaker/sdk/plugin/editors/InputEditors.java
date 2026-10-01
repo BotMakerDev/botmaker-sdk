@@ -5,11 +5,10 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.plugin.toolkit.Styles;
-import com.botmaker.sdk.api.geometry.Direction;
-import com.botmaker.sdk.api.interaction.Combo;
-import com.botmaker.sdk.api.interaction.Key;
-import com.botmaker.sdk.api.interaction.KeySequence;
-import com.botmaker.sdk.api.interaction.MouseButton;
+import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.KeySequence;
+import com.botmaker.sdk.api.input.MouseButton;
 import javafx.event.Event;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -24,7 +23,6 @@ import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
-import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
@@ -34,16 +32,14 @@ import javafx.stage.Stage;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * The three input enums a bot's own API names — a {@link Direction}, a {@link Key}, a {@link MouseButton} —
- * drawn as the shapes they are rather than as three dropdowns. A {@link Combo} (2026-09-26) shares the key's
- * drawn keyboard, in chord mode.
+ * The input enums a bot's own API names — a {@link Key}, a {@link MouseButton} — drawn as the shapes they are
+ * rather than as dropdowns. A {@link Combo} (2026-09-26) shares the key's drawn keyboard, in chord mode. The
+ * direction pad went with {@code Direction} on 2026-10-01: no api method took one.
  *
  * <h2>They were Studio's, and that was the back door this platform exists to close</h2>
  *
@@ -67,85 +63,6 @@ import java.util.function.Consumer;
 public final class InputEditors {
 
     private InputEditors() {}
-
-    // --- direction -------------------------------------------------------------------------------------
-
-    /** Where each constant sits on the pad, by column and row. Both spellings share their squares. */
-    private record Cell(String name, String arrow, int column, int row) {}
-
-    private static final List<Cell> CELLS = List.of(
-            new Cell("UP_LEFT", "↖", 0, 0), new Cell("UP", "↑", 1, 0), new Cell("UP_RIGHT", "↗", 2, 0),
-            new Cell("LEFT", "←", 0, 1), new Cell("RIGHT", "→", 2, 1),
-            new Cell("DOWN_LEFT", "↙", 0, 2), new Cell("DOWN", "↓", 1, 2), new Cell("DOWN_RIGHT", "↘", 2, 2),
-            new Cell("NORTH", "↑", 1, 0), new Cell("SOUTH", "↓", 1, 2),
-            new Cell("WEST", "←", 0, 1), new Cell("EAST", "→", 2, 1),
-            new Cell("NORTH_WEST", "↖", 0, 0), new Cell("NORTH_EAST", "↗", 2, 0),
-            new Cell("SOUTH_WEST", "↙", 0, 2), new Cell("SOUTH_EAST", "↘", 2, 2),
-            new Cell("CENTER", "⊙", 1, 1));
-
-    /**
-     * A direction as a pad of arrows.
-     *
-     * <p>A dropdown of eight names is a list to read; a pad of eight arrows is a shape to point at, and the
-     * shape is what the value means. It is the one enum editor where the layout carries the semantics — up
-     * and to the left <em>is</em> up-left — so nothing has to be read at all.
-     */
-    public static Node direction(ValueContext ctx) {
-        Direction current = ctx.value(Direction.class).orElse(null);
-        ToggleGroup group = new ToggleGroup();
-
-        GridPane pad = new GridPane();
-        pad.setHgap(2);
-        pad.setVgap(2);
-        Map<Direction, int[]> cells = padCells();
-        cells.forEach((constant, square) -> pad.add(
-                toggle(ctx, group, constant, arrowOf(constant), constant.name(), current, "direction-pad-key"),
-                square[0], square[1]));
-
-        VBox box = new VBox(4, pad);
-        box.getStyleClass().add("direction-pad");
-        showUnread(ctx, Direction.class, box, group);
-
-        // A direction with no square still has to be reachable, so it goes in a row underneath as a named
-        // button rather than quietly disappearing from the editor.
-        HBox spare = new HBox(2);
-        for (Direction constant : Direction.values()) {
-            if (cells.containsKey(constant)) continue;
-            spare.getChildren().add(
-                    toggle(ctx, group, constant, constant.name(), constant.name(), current, "direction-pad-key"));
-        }
-        if (!spare.getChildren().isEmpty()) box.getChildren().add(spare);
-        return box;
-    }
-
-    /**
-     * Where each constant lands, as {@code {column, row}}: one button per square. The two spellings share
-     * squares, and a Direction holding both would otherwise stack two buttons on one cell, the second painting
-     * over the first — so the first cell per square wins.
-     */
-    static Map<Direction, int[]> padCells() {
-        Map<Direction, int[]> out = new EnumMap<>(Direction.class);
-        Set<String> taken = new HashSet<>();
-        for (Cell cell : CELLS) {
-            Direction constant = constantNamed(cell.name());
-            if (constant == null || out.containsKey(constant)) continue;
-            if (!taken.add(cell.column() + "," + cell.row())) continue;
-            out.put(constant, new int[]{cell.column(), cell.row()});
-        }
-        return out;
-    }
-
-    private static String arrowOf(Direction constant) {
-        return CELLS.stream().filter(c -> c.name().equals(constant.name())).map(Cell::arrow)
-                .findFirst().orElse(constant.name());
-    }
-
-    private static Direction constantNamed(String name) {
-        for (Direction constant : Direction.values()) {
-            if (constant.name().equals(name)) return constant;
-        }
-        return null;
-    }
 
     // --- mouse button ----------------------------------------------------------------------------------
 
@@ -489,7 +406,6 @@ public final class InputEditors {
         button.setSelected(constant == current);
         button.setTooltip(new Tooltip(tooltip));
         button.getStyleClass().add(styleClass);
-        if ("direction-pad-key".equals(styleClass)) button.setPrefSize(30, 30);
         // On the button rather than on the group: a group listener also fires for the de-selection half of
         // a switch, which would write the outgoing value a moment before the incoming one.
         button.setOnAction(e -> {

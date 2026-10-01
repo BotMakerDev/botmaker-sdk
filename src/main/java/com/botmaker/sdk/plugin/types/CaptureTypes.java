@@ -5,8 +5,8 @@ import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.api.emulator.EmulatorSource;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
@@ -22,7 +22,7 @@ import java.util.List;
  * <p>{@code CaptureSource} is an interface, so the host cannot take one apart through a single
  * {@link ComponentType}. Each concrete source is its own part: {@code Source.current()},
  * {@code CaptureSource.desktop()}, {@code .monitor(i)}, {@code .window("t")},
- * {@code new EmulatorSource("n")} and {@code CaptureSource.region(source, rect)}. The host reads a
+ * {@code .emulator("n")} and {@code CaptureSource.region(source, rect)}. The host reads a
  * {@code CaptureSource} slot as whichever of them the Java is, and writes a value back through the one
  * matching its class — which is what {@code writtenAsParts()} on the type says.
  */
@@ -51,11 +51,11 @@ public final class CaptureTypes {
             .writtenAs(CaptureSource::window, NamedWindow::titleSubstring);
 
     /**
-     * {@code new EmulatorSource("name")}: a constructor, since {@code EmulatorSource} is not one of
-     * {@code CaptureSource}'s factories. It is still correct Java, and the bot captures from the emulator.
+     * {@code CaptureSource.emulator("name")}. It was {@code new EmulatorSource("name")} until 2026-10-01, when
+     * the class moved to {@code internal}: a bot writes the factory, never the class behind it.
      */
     public static final DeclaredCall<EmulatorSource> EMULATOR = ComponentType.part(EmulatorSource.class)
-            .writtenAs(EmulatorSource::new, EmulatorSource::instanceName);
+            .writtenAs(CaptureSource::emulator, EmulatorSource::instanceName);
 
     /**
      * {@code CaptureSource.region(source, new Rect(x, y, w, h))}: a region is a part of which pixels the bot
@@ -65,9 +65,9 @@ public final class CaptureTypes {
      * {@code region(source, rect)} and an instance {@code source.region(rect)}, so {@code CaptureSource::region}
      * is ambiguous in javac. It is the one factory here that a reference cannot name.
      *
-     * <p><b>It stays (decided 2026-09-28).</b> {@code api.*} never deletes, so both {@code region}s exist for
-     * ever, and a new-named static factory would still leave {@link #REGION_CHAIN} reading the instance one
-     * through {@code Ref.member}. Do not propose removing it again without new facts.
+     * <p><b>It stays (decided 2026-09-28).</b> Both {@code region}s are what a bot writes, and a new-named
+     * static factory would still leave {@link #REGION_CHAIN} reading the instance one through
+     * {@code Ref.member}.
      */
     public static final DeclaredCall<RegionSource> REGION = ComponentType.part(RegionSource.class)
             .writtenAsMember(Ref.member(CaptureSource.class, "region", CaptureSource.class, Rect.class),

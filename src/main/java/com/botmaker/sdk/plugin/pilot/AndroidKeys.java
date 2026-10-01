@@ -1,6 +1,6 @@
 package com.botmaker.sdk.plugin.pilot;
 
-import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.input.Key;
 
 import java.util.EnumMap;
 import java.util.Map;

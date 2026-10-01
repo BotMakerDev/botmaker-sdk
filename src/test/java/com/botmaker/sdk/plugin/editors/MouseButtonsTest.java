@@ -1,6 +1,6 @@
 package com.botmaker.sdk.plugin.editors;
 
-import com.botmaker.sdk.api.interaction.MouseButton;
+import com.botmaker.sdk.api.input.MouseButton;
 import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;

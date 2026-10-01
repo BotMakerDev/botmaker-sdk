@@ -3,7 +3,7 @@ package com.botmaker.sdk.plugin.screen;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.interaction.Mouse;
+import com.botmaker.sdk.api.input.Mouse;
 import org.junit.jupiter.api.Test;
 
 import java.awt.Rectangle;

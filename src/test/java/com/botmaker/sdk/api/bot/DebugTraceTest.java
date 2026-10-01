@@ -1,13 +1,13 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.flow.Flows;
 import com.botmaker.sdk.internal.flow.FlowWalker;
+import com.botmaker.sdk.internal.flow.Flows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

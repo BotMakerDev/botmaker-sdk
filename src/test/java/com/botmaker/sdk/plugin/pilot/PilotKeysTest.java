@@ -1,6 +1,6 @@
 package com.botmaker.sdk.plugin.pilot;
 
-import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.input.Key;
 import com.botmaker.session.Capability;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;

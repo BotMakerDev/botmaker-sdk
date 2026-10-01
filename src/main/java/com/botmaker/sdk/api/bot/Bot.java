@@ -3,11 +3,13 @@ import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.Untraced;
-import com.botmaker.sdk.api.flow.Flows;
-import com.botmaker.sdk.api.launch.Target;
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
+import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.flow.FlowWalker;
+import com.botmaker.sdk.internal.flow.Flows;
+import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.observe.IpcObserver;
 
 import java.util.function.Consumer;
@@ -21,31 +23,20 @@ import java.util.function.Consumer;
  * back to a known-good state before restarting. This is the "restart the bot on failure" machinery a game
  * bot needs; the body, the recovery hooks and the per-activity logic stay in editable user code.
  *
- * <p>Both {@link #start} forms also run a start-up sequence <em>once</em> before the first loop pass —
- * {@code startGame(COLD)} then {@code goHome()} — so a fresh launch actually opens the game and reaches a known
- * screen instead of assuming it is already running. The start-up step is handed a {@link StartMode} so it can
- * tell a first {@code COLD} launch (don't relaunch an already-open game) from a {@code RESTART} recovery (shut
- * a frozen game down first). {@link #start(Runnable, Runnable)} supplies that step itself, from the project's
- * configured {@link com.botmaker.sdk.api.launch.Target}; pass your own to
- * {@link #start(Runnable, Runnable, Consumer)} when the game needs more than launching.
+ * <p>{@link #run} also runs a start-up sequence <em>once</em> before the first loop pass — launch the
+ * project's configured target, then {@code goHome()} — so a fresh launch actually opens the game and reaches a
+ * known screen instead of assuming it is already running. A first launch leaves an already-open game alone; a
+ * recovery shuts a frozen one down first.
  *
  * <p>The bot ends when {@link #stop()} is called — from an activity that is done, or automatically by the
  * generated loop once every activity is disabled. {@code stop()} unwinds the supervise loop cleanly and
  * {@code supervise} returns, rather than treating it as a crash to recover from.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): one of the three is offered, and it is the
- * smallest offered fraction in the sweep. {@link #stop()} is offered — it is exactly the statement an
- * activity that has finished its work writes, from anywhere in the call stack. <b>Neither {@link #start}
- * overload is</b>, because {@code start} is not a statement in a bot: it <em>is</em> the bot. It is written
- * once, by the generated entry point, and it does not return. Inserting a second one from a menu — inside an
- * activity, inside the very {@code body} an outer {@code start} is already running — nests one supervise loop
- * inside another, and the editor would have proposed it as if it were an ordinary call. The 3-arg form is
- * doubly unreachable: its {@code Consumer<StartMode>} is a lambda the palette has no way to seed.
- *
- * <p>This is {@code PopupGuard.install} and {@code Activity.execute()} a third time — <b>a member the
- * generated code owns is not a menu entry</b> — and here it is at its clearest, because the scaffold's call is
- * not merely the first one, it is the only one that can exist. Both stay public: the entry point Studio
- * generates calls one of them, and a hand-written bot needs to.
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): {@link #stop()} is offered — it is exactly the
+ * statement an activity that has finished its work writes, from anywhere in the call stack. {@link #run} is not:
+ * it <em>is</em> the bot, written once in its {@code main}, and it does not return. The two {@code start}
+ * overloads and their {@code StartMode} went on 2026-10-01: {@code run} replaced them, and a bot never called
+ * either.
  */
 @Palette(category = "bot", categoryLabel = "Bot", icon = "🤖")
 public class Bot {
@@ -84,7 +75,15 @@ public class Bot {
         observe();
         SdkValues.claim();
         ManagedValues.install(values);
-        start(() -> FlowWalker.run(Flows.installed(), goHome), goHome);
+        lifecycle(() -> FlowWalker.run(Flows.installed(), goHome), goHome);
+    }
+
+    /** Why the supervisor invokes the start-up step: the first launch, or a recovery after a crash. */
+    enum StartMode {
+        /** First launch, before the loop: bring the game up only if it isn't already running. */
+        COLD,
+        /** Recovery restart: shut the (possibly frozen) game down first, then bring it back up. */
+        RESTART
     }
 
     /**
@@ -103,37 +102,22 @@ public class Bot {
     }
 
     /**
-     * Starts the bot: the single public entry point, and the one a generated game bot uses. Runs {@code body}
-     * forever, with the standard "get home, then (re)start the configured launch target" lifecycle around it —
-     * a one-time cold start before the first pass, and a {@code goHome} → restart recovery on every crash or
-     * stuck state.
-     *
-     * <p>The start-up step is the SDK's own: {@link Target#startIfNotRunning()} on the cold start,
-     * {@link Target#restart()} on a recovery, driven by the {@link StartMode} the supervisor supplies. That is
-     * the whole of what generated projects used to carry as a read-only {@code Startup.java} — the launch
-     * target itself was never in that file, it is this machine's {@code botmaker.launch.target} property, so
-     * the file said nothing a bot's own project didn't already say. A project with no target configured simply
-     * launches nothing.
-     *
-     * <p>Use {@link #start(Runnable, Runnable, Consumer)} to supply a start-up step of your own instead.
+     * Runs {@code body} forever with the standard "get home, then (re)start the configured launch target"
+     * lifecycle around it — a one-time cold start before the first pass, and a {@code goHome} → restart recovery
+     * on every crash or stuck state. The launch target is this machine's {@code botmaker.launch.target}
+     * property; a project with none configured launches nothing.
      *
      * @param body   the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param goHome navigate from wherever the bot is back to a safe/home screen
      */
-    @Hidden("the entry point the generated Main already calls; a second start() inside an activity "
-            + "body would nest one supervised run inside another")
-    @Untraced("holds the whole run")
-    public static void start(Runnable body, Runnable goHome) {
+    static void lifecycle(Runnable body, Runnable goHome) {
         supervise(body, goHome, Bot::launchConfiguredTarget);
     }
 
     /**
-     * The default start-up step: bring the project's configured launch target up, choosing skip-if-already-
-     * running on a first {@code COLD} launch over force-stop-then-relaunch on a {@code RESTART} recovery.
-     * Always waits for the game window to appear after launching (as requested by user).
-     *
-     * <p>Private because a bot that wants something else passes its own {@code Consumer<StartMode>} to the
-     * 3-arg {@link #start}; the two {@link Target} calls it would delegate to are public.
+     * The start-up step: bring the project's configured launch target up, choosing skip-if-already-running on a
+     * first {@code COLD} launch over force-stop-then-relaunch on a {@code RESTART} recovery. Always waits for the
+     * game window to appear after launching.
      */
     private static void launchConfiguredTarget(StartMode mode) {
         switch (mode) {
@@ -148,21 +132,6 @@ public class Bot {
                 Target.waitForLaunch(BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
             }
         }
-    }
-
-    /**
-     * Starts the bot with the "get home, then (re)start the game" recovery and a one-time cold start
-     * before the loop — the shape a generated game bot uses. The single public entry point; delegates to
-     * the internal supervise loop.
-     *
-     * @param body      the bot's main work
-     * @param goHome    navigate from wherever the bot is back to a safe/home screen
-     * @param startGame (re)launch the game; receives {@link StartMode#COLD} on the one-time cold start and
-     *                  {@link StartMode#RESTART} on every recovery restart
-     */
-    @Untraced("holds the whole run")
-    public static void start(Runnable body, Runnable goHome, Consumer<StartMode> startGame) {
-        supervise(body, goHome, startGame);
     }
 
     /**
@@ -184,8 +153,7 @@ public class Bot {
      * {@link Watchdog} so stuck states surface as {@link BotStuckException}. Does not return under normal
      * operation.
      *
-     * <p>Package-private: bots call {@link #start} — {@code supervise} is the internal loop, not part of
-     * the public palette (Studio only surfaces {@code public} facade methods as blocks).
+     * <p>Package-private: bots call {@link #run} — {@code supervise} is the internal loop.
      *
      * @param body     the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param recovery run after a crash/stuck to restore a known-good state before the next attempt

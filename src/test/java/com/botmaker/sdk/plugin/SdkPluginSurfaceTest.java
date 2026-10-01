@@ -8,22 +8,22 @@ import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.interaction.Combo;
-import com.botmaker.sdk.api.interaction.Key;
-import com.botmaker.sdk.api.launch.Game;
-import com.botmaker.sdk.api.interaction.MouseButton;
+import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.KeySequence;
+import com.botmaker.sdk.api.input.MouseButton;
+import com.botmaker.sdk.api.text.OcrOptions;
+import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.ColorMatch;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Matches;
-import com.botmaker.sdk.api.vision.OcrOptions;
 import com.botmaker.sdk.api.vision.Precision;
-import com.botmaker.sdk.api.vision.TextMatch;
+import com.botmaker.sdk.internal.launch.Game;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
@@ -74,21 +74,21 @@ import static org.junit.jupiter.api.Assertions.fail;
 class SdkPluginSurfaceTest {
 
     /**
-     * The fifteen types <b>this plugin</b> declares, in declaration order, which is the order a "what type
-     * is this variable" dropdown offers them in after plugin-basics' nine. Written out rather than derived
+     * The sixteen types <b>this plugin</b> declares, in declaration order, which is the order a "what type
+     * is this variable" dropdown offers them in after plugin-basics' thirteen. Written out rather than derived
      * from {@code SdkTypes.ALL}, because a test that reads its expectation from its subject asserts nothing.
      *
      * <p>They were persisted ids — {@code IMAGE_TEMPLATE}, {@code POINT} — until 2026-09-22. A type's
      * identity is its Java class now, which is what a {@code @Param} field is declared as, so there is no
      * second name to keep in step with the first.
      *
-     * <p>The last six are declarable but not editable: their fresh form is a call the bot re-evaluates, so
-     * they answer {@code freshCall()} where the first nine answer {@code fresh()}.
+     * <p>The last four are declarable but not editable: their fresh form is a call the bot re-evaluates, so
+     * they answer {@code freshCall()} where the first twelve answer {@code fresh()}.
      */
     private static final List<Class<?>> DECLARED_TYPES = List.of(
             ImageTemplate.class, Precision.class, OcrOptions.class, Point.class, Rect.class, Size.class,
-            Direction.class, Key.class, MouseButton.class, Combo.class,
-            com.botmaker.sdk.api.interaction.KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, MatchResult.class, Matches.class,
+            Key.class, MouseButton.class, Combo.class,
+            KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, MatchResult.class, Matches.class,
             ColorMatch.class, TextMatch.class);
 
     private final SdkPlugin plugin = new SdkPlugin();
@@ -293,7 +293,7 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(17, plugin.types().size());
+        assertEquals(16, plugin.types().size(), "Direction went on 2026-10-01");
     }
 
     /**

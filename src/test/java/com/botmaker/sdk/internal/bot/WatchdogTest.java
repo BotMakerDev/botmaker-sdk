@@ -1,0 +1,70 @@
+package com.botmaker.sdk.internal.bot;
+
+import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.internal.observe.Bots;
+import com.botmaker.sdk.internal.observe.MatchEvent;
+import com.botmaker.sdk.internal.observe.Surface;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+/**
+ * Standalone (no Studio, no OpenCV, no real screen) tests for {@link Watchdog}. Drives it with {@code "miss"}
+ * match events (a null result) so no {@code MatchResult} needs constructing, and pins
+ * {@link BotSettings#maxRetryAttempts()} low for the duration.
+ */
+class WatchdogTest {
+
+    private BotSettings saved;
+
+    @BeforeEach
+    void setUp() {
+        saved = BotSettings.current();
+        BotSettings.use(saved.maxRetryAttempts(3));
+        Watchdog.enable();
+        Watchdog.reset();
+    }
+
+    @AfterEach
+    void tearDown() {
+        Watchdog.disable();
+        Watchdog.reset();
+        BotSettings.use(saved);
+    }
+
+    private static void fireMiss(int times) {
+        for (int i = 0; i < times; i++) {
+            Bots.fireMatch(new MatchEvent(Surface.ofScreen(), null, null));
+        }
+    }
+
+    @Test
+    void checkpointThrowsAfterMaxConsecutiveNoProgress() {
+        fireMiss(5); // repeats reaches 4 >= MAX(3)
+        assertThrows(BotStuckException.class, Watchdog::checkpoint);
+    }
+
+    @Test
+    void checkpointDoesNotThrowBelowThreshold() {
+        fireMiss(2); // repeats == 1 < MAX(3)
+        assertDoesNotThrow(Watchdog::checkpoint);
+    }
+
+    @Test
+    void progressResetsCounter() {
+        fireMiss(5);
+        Watchdog.progress();
+        assertDoesNotThrow(Watchdog::checkpoint);
+    }
+
+    @Test
+    void checkpointResetsAfterThrowingSoRecoveryStartsClean() {
+        fireMiss(5);
+        assertThrows(BotStuckException.class, Watchdog::checkpoint);
+        // Counter was reset when it threw; a fresh checkpoint must not throw again.
+        assertDoesNotThrow(Watchdog::checkpoint);
+    }
+}

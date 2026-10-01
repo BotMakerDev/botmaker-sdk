@@ -6,23 +6,22 @@ import com.botmaker.plugin.api.value.DeclaredCallType;
 import com.botmaker.plugin.api.value.DeclaredType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.geometry.Direction;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.interaction.Combo;
-import com.botmaker.sdk.api.interaction.Key;
-import com.botmaker.sdk.api.interaction.KeySequence;
-import com.botmaker.sdk.api.interaction.MouseButton;
+import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.KeySequence;
+import com.botmaker.sdk.api.input.MouseButton;
+import com.botmaker.sdk.api.text.OcrOptions;
+import com.botmaker.sdk.api.text.Text;
+import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.ColorMatch;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Matches;
-import com.botmaker.sdk.api.vision.OcrOptions;
 import com.botmaker.sdk.api.vision.Precision;
-import com.botmaker.sdk.api.vision.Text;
-import com.botmaker.sdk.api.vision.TextMatch;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.vision.TemplateNames;
@@ -132,13 +131,7 @@ public final class SdkTypes {
             .editor(() -> ctx -> GeometryEditors.size(ctx, SdkTypes.SIZE))
             .writtenAsRecord();
 
-    /** Which way something moves or faces. An enum's Java is its constant, so it needs no call. */
-    public static final PluginType<Direction> DIRECTION = PluginType.value(Direction.class)
-            .firstConstant()
-            .editor(() -> InputEditors::direction)
-            .writtenAsConstant();
-
-    /** A key on the keyboard. */
+    /** A key on the keyboard. An enum's Java is its constant, so it needs no call. */
     public static final PluginType<Key> KEY = PluginType.value(Key.class)
             .firstConstant()
             .editor(() -> InputEditors::key)
@@ -233,7 +226,7 @@ public final class SdkTypes {
 
     /** The last text match. See {@link #MATCH_RESULT}. */
     public static final PluginType<TextMatch> TEXT_MATCH = PluginType.value(TextMatch.class)
-            .filledBy(Vision::lastTextMatch)
+            .filledBy(Text::lastMatch)
             .shownAs(() -> ctx -> ResultEditors.pill(ctx, TextMatch.class));
 
     /**
@@ -244,7 +237,7 @@ public final class SdkTypes {
      */
     public static final List<PluginType<?>> ALL = List.of(
             IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS,
-            POINT, RECT, SIZE, DIRECTION,
+            POINT, RECT, SIZE,
             KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE,
             CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP,
             MATCH_RESULT, MATCHES, COLOR_MATCH, TEXT_MATCH);

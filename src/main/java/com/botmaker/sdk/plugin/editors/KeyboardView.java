@@ -1,6 +1,6 @@
 package com.botmaker.sdk.plugin.editors;
 
-import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.input.Key;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;

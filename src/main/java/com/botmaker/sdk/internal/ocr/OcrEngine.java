@@ -1,8 +1,8 @@
 package com.botmaker.sdk.internal.ocr;
 
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.vision.OcrOptions;
-import com.botmaker.sdk.api.vision.TextResult;
+import com.botmaker.sdk.api.text.OcrOptions;
+import com.botmaker.sdk.api.text.TextResult;
 import net.sourceforge.tess4j.ITessAPI.TessPageIteratorLevel;
 import net.sourceforge.tess4j.ITesseract;
 import net.sourceforge.tess4j.Tesseract;

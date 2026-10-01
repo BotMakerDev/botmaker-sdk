@@ -1,8 +1,8 @@
 package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.emulator.EmulatorSource;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;

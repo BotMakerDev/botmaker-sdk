@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.flow;
 
-import com.botmaker.sdk.api.bot.ActivityBody;
-
 import java.util.List;
 
 /**

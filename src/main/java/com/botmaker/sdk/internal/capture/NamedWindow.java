@@ -1,9 +1,8 @@
 package com.botmaker.sdk.internal.capture;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Window;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.util.Debug;
 
 import java.awt.image.BufferedImage;
 import java.util.Optional;
@@ -13,7 +12,7 @@ import java.util.Optional;
  * use via {@link Window#find(String)}. Unlike a concrete {@link Window} (which binds a native handle at
  * construction), this survives the window not existing yet and re-binds if the window reopens or moves —
  * which is what lets a bot point at a game before it has launched and lets
- * {@link com.botmaker.sdk.api.launch.Game} tell whether that game is currently running.
+ * {@link com.botmaker.sdk.internal.launch.Game} tell whether that game is currently running.
  *
  * <p>Obtain one via {@link CaptureSource#window(String)}.
  */

@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.session;
 
-import com.botmaker.sdk.api.bot.Session;
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
+import com.botmaker.sdk.internal.bot.Session;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.launch.LaunchIsolation;
 import com.botmaker.shared.launch.LaunchSpec;

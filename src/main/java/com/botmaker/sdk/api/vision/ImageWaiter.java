@@ -3,15 +3,15 @@ import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.plugin.api.record.Gesture;
 import com.botmaker.plugin.api.record.Records;
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
 
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.api.interaction.Mouse;
-import com.botmaker.sdk.api.interaction.Wait;
+import com.botmaker.sdk.api.input.Mouse;
+import com.botmaker.sdk.api.time.Wait;
 
 import java.time.Duration;
 

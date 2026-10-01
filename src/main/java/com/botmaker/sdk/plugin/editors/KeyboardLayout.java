@@ -1,6 +1,6 @@
 package com.botmaker.sdk.plugin.editors;
 
-import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.input.Key;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -10,7 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-import static com.botmaker.sdk.api.interaction.Key.*;
+import static com.botmaker.sdk.api.input.Key.*;
 
 /**
  * A full-size keyboard as rows of caps, widths in key units: the function row, the main block, the navigation

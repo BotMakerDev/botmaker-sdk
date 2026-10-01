@@ -1,8 +1,8 @@
 package com.botmaker.sdk.internal.trace;
 
-import com.botmaker.sdk.api.launch.LaunchTarget;
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.vision.ImageFinder;
+import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import org.junit.jupiter.api.AfterEach;

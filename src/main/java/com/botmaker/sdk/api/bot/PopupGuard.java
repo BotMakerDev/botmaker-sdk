@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.trace.Trace;
 
 /**

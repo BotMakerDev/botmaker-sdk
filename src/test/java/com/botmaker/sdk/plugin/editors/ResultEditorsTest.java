@@ -1,9 +1,9 @@
 package com.botmaker.sdk.plugin.editors;
 
+import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.ColorMatch;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Matches;
-import com.botmaker.sdk.api.vision.TextMatch;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

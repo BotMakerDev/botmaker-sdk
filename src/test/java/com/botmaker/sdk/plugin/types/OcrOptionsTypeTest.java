@@ -1,9 +1,9 @@
 package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
-import com.botmaker.sdk.api.vision.OcrOptions;
-import com.botmaker.sdk.api.vision.Text;
-import com.botmaker.sdk.api.vision.TextResult;
+import com.botmaker.sdk.api.text.OcrOptions;
+import com.botmaker.sdk.api.text.Text;
+import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.plugin.SdkPlugin;
 import org.junit.jupiter.api.Test;
 

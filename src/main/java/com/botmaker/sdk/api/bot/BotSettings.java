@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.meta.ReplacedBy;
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.capture.NativeControllerFactory;
 

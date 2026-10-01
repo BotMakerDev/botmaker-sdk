@@ -2,10 +2,10 @@ package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
+import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.ColorMatch;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Matches;
-import com.botmaker.sdk.api.vision.TextMatch;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;

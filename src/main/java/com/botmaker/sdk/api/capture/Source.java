@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.capture;
 
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.SessionSource;
 import com.botmaker.session.ActiveSession;

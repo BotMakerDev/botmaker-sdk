@@ -116,12 +116,11 @@ class ApiCatalogTest {
         }
         for (Class<?> value : new Class<?>[]{com.botmaker.sdk.api.geometry.Point.class,
                 com.botmaker.sdk.api.vision.MatchResult.class, com.botmaker.sdk.api.vision.ImageTemplate.class,
-                com.botmaker.sdk.api.interaction.Key.class, com.botmaker.sdk.api.capture.CaptureSource.class}) {
+                com.botmaker.sdk.api.input.Key.class, com.botmaker.sdk.api.capture.CaptureSource.class}) {
             assertTrue(catalog().offers(value), value.getSimpleName() + " is reached by an offered call");
         }
-        for (Class<?> plumbing : new Class<?>[]{com.botmaker.sdk.api.util.Debug.class,
-                com.botmaker.sdk.api.bot.Watchdog.class, com.botmaker.sdk.api.bot.Session.class,
-                com.botmaker.sdk.api.bot.PopupGuard.class, com.botmaker.sdk.api.flow.Flows.class}) {
+        for (Class<?> plumbing : new Class<?>[]{com.botmaker.sdk.api.console.Debug.class,
+                com.botmaker.sdk.api.bot.PopupGuard.class}) {
             assertFalse(catalog().offers(plumbing), plumbing.getSimpleName() + " is plumbing no call hands over");
         }
     }

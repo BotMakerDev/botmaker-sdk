@@ -1,7 +1,7 @@
 package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
-import com.botmaker.sdk.api.bot.ActivityBody;
+import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import org.junit.jupiter.api.Test;

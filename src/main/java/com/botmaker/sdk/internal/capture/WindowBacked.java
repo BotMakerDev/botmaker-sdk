@@ -17,7 +17,7 @@ import com.botmaker.shared.capture.GenericWindow;
  * called it, and no bot could do anything with the handle, so the honest fix was to move the capability out
  * of {@code api} rather than to promise shared's spelling forever.
  *
- * <p>Implemented by the sources that resolve to a desktop window — {@link com.botmaker.sdk.api.capture.Window},
+ * <p>Implemented by the sources that resolve to a desktop window — {@link Window},
  * {@link NamedWindow}, {@link SessionSource} and a {@link CaptureSource#region region} of one. Everything else
  * (the desktop, a monitor, an emulator, a window that isn't open yet) simply does not implement it, which is
  * how {@link #of} answers {@code null} and keyboard input falls back to the global focused-window path.
@@ -36,7 +36,7 @@ public interface WindowBacked {
      * consumer wants, so nobody re-writes the {@code instanceof} and gets the null handling subtly different.
      */
     static GenericWindow of(CaptureSource source) {
-        if (source instanceof com.botmaker.sdk.api.capture.Window window) return WindowHandles.of(window);
+        if (source instanceof Window window) return WindowHandles.of(window);
         return source instanceof WindowBacked backed ? backed.targetWindow() : null;
     }
 }

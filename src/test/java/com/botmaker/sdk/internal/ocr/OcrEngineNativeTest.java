@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.ocr;
 
-import com.botmaker.sdk.api.vision.OcrOptions;
-import com.botmaker.sdk.api.vision.TextResult;
+import com.botmaker.sdk.api.text.OcrOptions;
+import com.botmaker.sdk.api.text.TextResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;

@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.ocr;
 
-import com.botmaker.sdk.api.vision.OcrLanguage;
+import com.botmaker.sdk.api.text.OcrLanguage;
 
 import java.io.IOException;
 import java.io.InputStream;

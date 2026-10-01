@@ -2,7 +2,7 @@ package com.botmaker.sdk.internal.observe;
 
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Window;
+import com.botmaker.sdk.internal.capture.Window;
 
 /**
  * Identifies the surface a {@link BotObserver} event acted on — a specific {@link Window} (by title +

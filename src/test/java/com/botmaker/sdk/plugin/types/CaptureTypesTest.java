@@ -3,8 +3,8 @@ package com.botmaker.sdk.plugin.types;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.api.emulator.EmulatorSource;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
@@ -55,8 +55,8 @@ class CaptureTypesTest {
         assertEquals(Source.class.getMethod("current"), CaptureTypes.CURRENT.factory());
         assertEquals(CaptureSource.class.getMethod("region", CaptureSource.class, Rect.class),
                 CaptureTypes.REGION.factory());
-        assertEquals(EmulatorSource.class.getConstructor(String.class), CaptureTypes.EMULATOR.factory(),
-                "an emulator is a constructor");
+        assertEquals(CaptureSource.class.getMethod("emulator", String.class), CaptureTypes.EMULATOR.factory(),
+                "an emulator is CaptureSource's factory, never the internal class's constructor");
         assertEquals(List.of(CaptureSource.class, Rect.class), CaptureTypes.REGION.componentTypes(),
                 "the parts are the factory's parameters");
         assertEquals(Monitor.class, CaptureTypes.MONITOR.type());

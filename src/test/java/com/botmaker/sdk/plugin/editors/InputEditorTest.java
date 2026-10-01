@@ -1,8 +1,10 @@
 package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.toolkit.testing.TestContexts;
-import com.botmaker.sdk.api.interaction.Combo;
-import com.botmaker.sdk.api.interaction.Key;
+import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.KeySequence;
+import com.botmaker.sdk.api.input.MouseButton;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -71,26 +73,22 @@ class InputEditorTest {
 
     @Test
     void a_sequence_pill_shows_its_steps_or_the_source_as_written() {
-        com.botmaker.sdk.api.interaction.KeySequence sequence = com.botmaker.sdk.api.interaction.KeySequence.of(
-                com.botmaker.sdk.api.interaction.KeySequence.step(Combo.of(Key.CTRL, Key.A),
-                        java.time.Duration.ofMillis(100)),
-                com.botmaker.sdk.api.interaction.KeySequence.step(Combo.of(Key.CTRL, Key.C),
-                        java.time.Duration.ZERO));
+        KeySequence sequence = KeySequence.of(
+                KeySequence.step(Combo.of(Key.CTRL, Key.A), java.time.Duration.ofMillis(100)),
+                KeySequence.step(Combo.of(Key.CTRL, Key.C), java.time.Duration.ZERO));
         assertEquals("Ctrl+A → 100 ms → Ctrl+C", InputEditors.sequencePill(TestContexts.typedSlot(
-                com.botmaker.sdk.api.interaction.KeySequence.class, "x").withValue(sequence)));
-        assertEquals("steps", InputEditors.sequencePill(TestContexts.typedSlot(
-                com.botmaker.sdk.api.interaction.KeySequence.class, "steps")));
-        assertEquals("Choose key steps…", InputEditors.sequencePill(TestContexts.typedSlot(
-                com.botmaker.sdk.api.interaction.KeySequence.class, "")));
+                KeySequence.class, "x").withValue(sequence)));
+        assertEquals("steps", InputEditors.sequencePill(TestContexts.typedSlot(KeySequence.class, "steps")));
+        assertEquals("Choose key steps…", InputEditors.sequencePill(TestContexts.typedSlot(KeySequence.class, "")));
     }
 
-    /** A pad or a mouse selects nothing for a value it cannot read, so the value is shown as written. */
+    /** A mouse selects nothing for a value it cannot read, so the value is shown as written. */
     @Test
     void a_shape_that_selects_nothing_shows_the_value_as_written() {
-        Class<?> direction = com.botmaker.sdk.api.geometry.Direction.class;
-        assertEquals("heading", InputEditors.unreadSource(TestContexts.typedSlot(direction, "heading"), direction));
-        assertEquals(null, InputEditors.unreadSource(TestContexts.typedSlot(direction, ""), direction));
-        assertEquals(null, InputEditors.unreadSource(TestContexts.typedSlot(direction, "Direction.NORTH")
-                .withValue(com.botmaker.sdk.api.geometry.Direction.NORTH), direction));
+        Class<?> button = MouseButton.class;
+        assertEquals("pressed", InputEditors.unreadSource(TestContexts.typedSlot(button, "pressed"), button));
+        assertEquals(null, InputEditors.unreadSource(TestContexts.typedSlot(button, ""), button));
+        assertEquals(null, InputEditors.unreadSource(TestContexts.typedSlot(button, "MouseButton.LEFT")
+                .withValue(MouseButton.LEFT), button));
     }
 }

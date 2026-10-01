@@ -6,7 +6,7 @@ import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
-import com.botmaker.sdk.api.util.Debug;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import org.junit.jupiter.api.AfterEach;
