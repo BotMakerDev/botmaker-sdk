@@ -171,6 +171,10 @@ public final class TelemetrySerializer {
                     s.x1(), s.y1(), s.x2(), s.y2(), s.durationMs());
             case TelemetryEvent.Log l -> throw new IllegalArgumentException(
                     "a log line is not an event the pilot draws: " + l.text());
+            case TelemetryEvent.Ask a -> throw new IllegalArgumentException(
+                    "a question is not an event the pilot draws: " + a.prompt());
+            case TelemetryEvent.Answer a -> throw new IllegalArgumentException(
+                    "an answer is not an event the pilot draws: " + a.id());
         };
     }
 

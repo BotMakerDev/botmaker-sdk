@@ -25,9 +25,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   both ends included), `chance(probability)` (a coin flip weighted by `probability`), `pick(options…)` (one of
   some text) and `duration(min, max)` (a random length of time). There was no random in the SDK at all. A
   random pause stays `Wait.between(min, max)`.
+- **`Ask`, a question for the person running the bot** (`com.botmaker.sdk.api.console`): `text`, `number`,
+  `whole`, `yesNo` and `choice(prompt, options…)`. Under Studio it is a dialog sent over the run's telemetry
+  channel; anywhere else the prompt is printed and the answer read from the console. An answer that does not
+  read is asked again; a cancel throws `CancellationException`. Needs a Studio and `botmaker-shared` from the
+  same release.
 
 ### Removed
 
+- **`BotMaker`** (`print`, `readLine`, `readInt`, `readDouble`, `readBoolean`) and the `BM-INPUT` marker its
+  reads printed on stdout: a question is `Ask`, and printing is `System.out.println`.
 - **Plumbing a bot never writes left `api` for `internal`**: `Game`, `Target`, `LaunchTarget`, `Emulator`,
   `Emulators`, `EmulatorRef`, `EmulatorSource`, `Session`, `Watchdog`, `BotStuckException`, `Flows`, `Window`.
 - **`Direction`**, which no call took, with its arrow-pad editor.

@@ -31,6 +31,9 @@ public final class IpcObserver implements BotObserver {
         installIfEnabled();
     }
 
+    /** The channel this run opened, for {@link #client()}; null when not under Studio. */
+    private static volatile TelemetryClient installed;
+
     private final TelemetryClient client;
 
     // Package-private (not private) so the translation + send path can be unit-tested with a client
@@ -48,9 +51,24 @@ public final class IpcObserver implements BotObserver {
             return;
         }
         IpcObserver observer = new IpcObserver(client);
+        installed = client;
         Bots.addObserver(observer);
         Diag.setSink(observer::onLog);
         Runtime.getRuntime().addShutdownHook(new Thread(client::close, "telemetry-client-close"));
+    }
+
+    /**
+     * The channel to the Studio that launched this bot, or empty when none did: what {@code Ask} sends its
+     * question on, so a run has one socket and the answer comes back on it.
+     */
+    public static Optional<TelemetryClient> client() {
+        installIfEnabled();
+        return Optional.ofNullable(installed);
+    }
+
+    /** The bot's own source line running now, or {@code -1}: where a question was asked from. */
+    public static int callerLine() {
+        return botLine();
     }
 
     @Override

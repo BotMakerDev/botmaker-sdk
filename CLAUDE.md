@@ -110,7 +110,7 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
 - **`com.botmaker.sdk.api.*` is what a bot writes, in packages named by what a bot does** (2026-10-01):
   `api.bot`, `api.flow`, `api.capture`, `api.input` (`Mouse`, `MouseButton`, `Keyboard`, `Key`, `Combo`,
   `KeySequence`), `api.time` (`Wait`, `Time`), `api.vision`, `api.text` (OCR), `api.geometry` (`Point`,
-  `Rect`, `Size`), `api.sound`, `api.random` (`Chance`), `api.console` (`Debug`, `BotMaker`) —
+  `Rect`, `Size`), `api.sound`, `api.random` (`Chance`), `api.console` (`Debug`, `Ask`) —
   `PluginLayersTest` holds the list.
   **The `api` root holds no classes**. Plumbing the plugin half needs and a bot never names is public in
   `internal`: `internal.launch` (`Game`, `Target`, `LaunchTarget`), `internal.emulator`, `internal.bot`
@@ -156,9 +156,10 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
 - `api.capture` — `CaptureSource` (`desktop()`, `monitor(i)`, `window(title)`, `emulator(name)`, `region(…)`;
   `capture()` and `origin()` go together), `Source.current()` (what `Bot.run` installed, or the whole desktop).
 - `api.input` (`Mouse`, `Keyboard`, …), `api.time` (`Wait`, `Time`), `api.sound`, `api.geometry`.
-- `api.console.BotMaker` — console IO. `readX()` prints a SOH-wrapped `BM-INPUT:<type>` marker to stdout before
-  blocking on stdin; Studio detects/strips it to show a modal input prompt. Changing that marker on one side
-  without the other breaks input prompts.
+- `api.console.Ask` — asks the user (`text`, `number`, `whole`, `yesNo`, `choice`). Under Studio it sends a
+  `TelemetryEvent.Ask` on the run's telemetry socket (`IpcObserver.client()`) and blocks on the `Answer` Studio
+  writes back; with no Studio it prints the prompt and reads stdin. Bad input re-asks; cancel throws
+  `CancellationException`. `BotMaker` and its `BM-INPUT` stdout marker were deleted on 2026-10-01.
 - **Api parameters that want an editor carry an annotation**: `api.bot.@ActivityName`, `@OutcomeName`;
   `internal.emulator.@EmulatorName` on `Emulators`, whose device picker no offered call reaches any more
   (kept, flagged 2026-10-01). The launch annotations and their game grids went on 2026-10-01. `SdkEditors.ALL`
