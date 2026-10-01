@@ -113,8 +113,8 @@ class PluginLayersTest {
         try (Stream<Path> list = Files.list(ROOT.resolve("api"))) {
             list.filter(Files::isDirectory).forEach(p -> packages.add(p.getFileName().toString()));
         }
-        assertEquals(new TreeSet<>(Set.of("bot", "capture", "console", "flow", "geometry", "input", "sound",
-                "text", "time", "vision")), packages);
+        assertEquals(new TreeSet<>(Set.of("bot", "capture", "console", "flow", "geometry", "input", "random",
+                "sound", "text", "time", "vision")), packages);
     }
 
     /** Rule 4: no public {@code api} member takes, returns or exposes an {@code internal} type. */

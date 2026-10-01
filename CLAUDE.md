@@ -110,7 +110,8 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
 - **`com.botmaker.sdk.api.*` is what a bot writes, in packages named by what a bot does** (2026-10-01):
   `api.bot`, `api.flow`, `api.capture`, `api.input` (`Mouse`, `MouseButton`, `Keyboard`, `Key`, `Combo`,
   `KeySequence`), `api.time` (`Wait`, `Time`), `api.vision`, `api.text` (OCR), `api.geometry` (`Point`,
-  `Rect`, `Size`), `api.sound`, `api.console` (`Debug`, `BotMaker`) — `PluginLayersTest` holds the list.
+  `Rect`, `Size`), `api.sound`, `api.random` (`Chance`), `api.console` (`Debug`, `BotMaker`) —
+  `PluginLayersTest` holds the list.
   **The `api` root holds no classes**. Plumbing the plugin half needs and a bot never names is public in
   `internal`: `internal.launch` (`Game`, `Target`, `LaunchTarget`), `internal.emulator`, `internal.bot`
   (`Session`, `Watchdog`, `BotStuckException`), `internal.flow.Flows`, `internal.capture.Window`.

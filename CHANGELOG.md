@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Added
+
+- **`Chance`, random numbers for a bot** (`com.botmaker.sdk.api.random`): `between(min, max)` (a whole number,
+  both ends included), `chance(probability)` (a coin flip weighted by `probability`), `pick(options…)` (one of
+  some text) and `duration(min, max)` (a random length of time). There was no random in the SDK at all. A
+  random pause stays `Wait.between(min, max)`.
+
 ### Removed
 
 - **Plumbing a bot never writes left `api` for `internal`**: `Game`, `Target`, `LaunchTarget`, `Emulator`,
