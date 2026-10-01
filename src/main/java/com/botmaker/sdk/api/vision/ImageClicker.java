@@ -26,13 +26,10 @@ import java.util.List;
  * Every method in this class also updates {@link Vision} for the current thread,
  * enabling access to the most recent match via {@link Vision#lastMatch()}.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}), by the same rule as {@link ImageFinder}: every
- * operation is offered, and of each matcher's four shapes only the plain form and the {@code CaptureSource}
- * form are. The overloads taking a bare {@code double confidence} are hidden — still public, still supported —
- * because {@link ImageTemplate#threshold()} already answers that question and the image picker sets it. The
- * four-argument core {@link #click(ImageTemplate, CaptureSource, double, int)} is hidden for the same reason
- * twice over: its {@code delayMs} has a home in {@link BotSettings#foundDelay()}. The {@code *Compare}
- * families keep every shape, their {@code double} being a comparison <em>margin</em> nothing else holds.
+ * <p><b>Two shapes per operation</b>, as in {@link ImageFinder}: the plain form and the {@code CaptureSource}
+ * form. The confidence and compare margin are {@link BotSettings}', and so is the pause after a click
+ * ({@link BotSettings#foundDelay()}); the per-call {@code double} and {@code delayMs} overloads and the
+ * {@code ImageTemplate...} spellings of the group operations were deleted on 2026-10-01.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "👆")
 public class ImageClicker {
@@ -40,83 +37,31 @@ public class ImageClicker {
     // --- click (single template) ---
 
     /**
-     * Clicks the specified template on the current capture source using the default confidence.
+     * Clicks the specified template on the current capture source.
      * <p>
      * The match result is stored in {@link Vision} and can be retrieved with
      * {@link Vision#lastMatch()}.
      *
      * @param template the image template to search for and click
      * @return true if the template was found and clicked, false otherwise
-     * @see #click(ImageTemplate, double)
-     * @see #click(ImageTemplate, CaptureSource)
-     * @see #click(ImageTemplate, CaptureSource, double)
      */
     @Records(value = Gesture.CLICK, rank = 10)
     public static boolean click(ImageTemplate template) {
-        return click(template, Source.current(), BotSettings.current().confidence(), BotSettings.current().foundDelay());
+        return click(template, Source.current());
     }
 
     /**
-     * Clicks the specified template on the current capture source with a custom confidence threshold.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param template   the image template to search for and click
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if the template was found and clicked, false otherwise
-     */
-    public static boolean click(ImageTemplate template, double confidence) {
-        return click(template, Source.current(), confidence, BotSettings.current().foundDelay());
-    }
-
-    /**
-     * Clicks the specified template on a specific capture source using the default confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
+     * Clicks the specified template on a specific capture source.
      *
      * @param template the image template to search for and click
      * @param source   the capture source (window, monitor, or desktop region) to search within
      * @return true if the template was found and clicked, false otherwise
      */
     public static boolean click(ImageTemplate template, CaptureSource source) {
-        return click(template, source, BotSettings.current().confidence(), BotSettings.current().foundDelay());
-    }
-
-    /**
-     * Clicks the specified template on a specific capture source with a custom confidence threshold.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param template   the image template to search for and click
-     * @param source     the capture source (window, monitor, or desktop region) to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if the template was found and clicked, false otherwise
-     */
-    public static boolean click(ImageTemplate template, CaptureSource source, double confidence) {
-        return click(template, source, confidence, BotSettings.current().foundDelay());
-    }
-
-    /**
-     * Clicks the specified template on a specific capture source with a custom confidence threshold and delay.
-     * This is the core implementation that locates the template, clicks it, and waits for the specified delay.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param template   the image template to search for and click
-     * @param source     the capture source (window, monitor, or desktop region) to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @param delayMs    the delay in milliseconds after a successful click
-     * @return true if the template was found and clicked, false otherwise
-     */
-    public static boolean click(ImageTemplate template, CaptureSource source, double confidence, int delayMs) {
         PopupGuard.check();
-        MatchResult result = ImageFinder.findInternal(template, source, confidence);
+        MatchResult result = ImageFinder.findInternal(template, source, ImageFinder.confidence());
         Vision.setLastMatch(result);
-        return clickResult(source, result, delayMs > 0 ? delayMs : BotSettings.current().foundDelay());
+        return clickResult(source, result);
     }
 
     // --- click an already-located match (no second capture) ---
@@ -310,127 +255,35 @@ public class ImageClicker {
         return clickEach(frame, occurrences);
     }
 
-    // --- clickAny (first template, in order, that clears the threshold) ---
+    // --- clickAny: the first template in the group, in order, that clears the threshold ---
 
     /**
-     * Clicks the first template (in order) that appears on the current capture source using the default confidence.
-     * Templates are checked in the order provided, and the first one found above the threshold is clicked.
+     * Clicks the first template in the group (in order) that appears on the current capture source.
      * <p>
      * The match result is stored in {@link Vision} and can be retrieved with
      * {@link Vision#lastMatch()}.
      *
-     * @param templates the image templates to search for, in priority order
-     * @return true if any template was found and clicked, false otherwise
-     */
-    public static boolean clickAny(ImageTemplate... templates) {
-        return clickAny(Source.current(), BotSettings.current().confidence(), templates);
-    }
-
-    /**
-     * Clicks the first template (in order) that appears on the current capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @param templates the image templates to search for, in priority order
-     * @return true if any template was found and clicked, false otherwise
-     */
-    public static boolean clickAny(double confidence, ImageTemplate... templates) {
-        return clickAny(Source.current(), confidence, templates);
-    }
-
-    /**
-     * Clicks the first template (in order) that appears on a specific capture source using the default confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param source    the capture source to search within
-     * @param templates the image templates to search for, in priority order
-     * @return true if any template was found and clicked, false otherwise
-     */
-    public static boolean clickAny(CaptureSource source, ImageTemplate... templates) {
-        return clickAny(source, BotSettings.current().confidence(), templates);
-    }
-
-    /**
-     * Clicks the first template (in order) that appears on a specific capture source with a custom confidence.
-     * This is the core implementation that iterates through templates and clicks the first match found.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @param templates  the image templates to search for, in priority order
-     * @return true if any template was found and clicked, false otherwise
-     */
-    public static boolean clickAny(CaptureSource source, double confidence, ImageTemplate... templates) {
-        for (ImageTemplate template : templates) {
-            if (click(template, source, confidence, BotSettings.current().foundDelay())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // --- clickAny over an ImageTemplateGroup ---
-
-    /**
-     * Clicks the first template in the group that appears on the current capture source using the default confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param group the template group to search for
+     * @param group the template group to search for, in priority order
      * @return true if any template in the group was found and clicked, false otherwise
      */
     public static boolean clickAny(ImageTemplateGroup group) {
-        return clickAny(Source.current(), BotSettings.current().confidence(), group.toArray());
+        return clickAny(group, Source.current());
     }
 
     /**
-     * Clicks the first template in the group that appears on the current capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
+     * Clicks the first template in the group (in order) that appears on a specific capture source.
      *
-     * @param group      the template group to search for
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if any template in the group was found and clicked, false otherwise
-     */
-    public static boolean clickAny(ImageTemplateGroup group, double confidence) {
-        return clickAny(Source.current(), confidence, group.toArray());
-    }
-
-    /**
-     * Clicks the first template in the group that appears on a specific capture source using the default confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param group  the template group to search for
+     * @param group  the template group to search for, in priority order
      * @param source the capture source to search within
      * @return true if any template in the group was found and clicked, false otherwise
      */
     public static boolean clickAny(ImageTemplateGroup group, CaptureSource source) {
-        return clickAny(source, BotSettings.current().confidence(), group.toArray());
-    }
-
-    /**
-     * Clicks the first template in the group that appears on a specific capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param group      the template group to search for
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if any template in the group was found and clicked, false otherwise
-     */
-    public static boolean clickAny(ImageTemplateGroup group, CaptureSource source, double confidence) {
-        return clickAny(source, confidence, group.toArray());
+        for (ImageTemplate template : group.templates()) {
+            if (click(template, source)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // --- clickBest over an ImageTemplateGroup ---
@@ -452,36 +305,11 @@ public class ImageClicker {
      * @return true if any template in the group was found and clicked, false otherwise
      */
     public static boolean clickBest(ImageTemplateGroup group) {
-        PopupGuard.check();
-        CaptureSource source = Source.current();
-        MatchResult result = findBestInternal(group, source, BotSettings.current().confidence());
-        Vision.setLastMatch(result);
-        return clickResult(source, result);
-    }
-
-    /**
-     * Clicks the highest-scoring match for any template in the group on the current capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param group      the template group to search for
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if any template in the group was found and clicked, false otherwise
-     */
-    public static boolean clickBest(ImageTemplateGroup group, double confidence) {
-        PopupGuard.check();
-        CaptureSource source = Source.current();
-        MatchResult result = findBestInternal(group, source, confidence);
-        Vision.setLastMatch(result);
-        return clickResult(source, result);
+        return clickBest(group, Source.current());
     }
 
     /**
      * Clicks the highest-scoring match for any template in the group on a specific capture source.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
@@ -489,25 +317,7 @@ public class ImageClicker {
      */
     public static boolean clickBest(ImageTemplateGroup group, CaptureSource source) {
         PopupGuard.check();
-        MatchResult result = findBestInternal(group, source, BotSettings.current().confidence());
-        Vision.setLastMatch(result);
-        return clickResult(source, result);
-    }
-
-    /**
-     * Clicks the highest-scoring match for any template in the group on a specific capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param group      the template group to search for
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if any template in the group was found and clicked, false otherwise
-     */
-    public static boolean clickBest(ImageTemplateGroup group, CaptureSource source, double confidence) {
-        PopupGuard.check();
-        MatchResult result = findBestInternal(group, source, confidence);
+        MatchResult result = findBestInternal(group, source, ImageFinder.confidence());
         Vision.setLastMatch(result);
         return clickResult(source, result);
     }
@@ -516,7 +326,7 @@ public class ImageClicker {
 
     /**
      * Among the {@code good} templates, clicks the best-scoring match that still beats every
-     * {@code bad} template at its location by the default margin.
+     * {@code bad} template at its location by {@link BotSettings}' compare margin.
      * <p>
      * The match result is stored in {@link Vision} and can be retrieved with
      * {@link Vision#lastMatch()}.
@@ -526,41 +336,11 @@ public class ImageClicker {
      * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
      */
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
-        PopupGuard.check();
-        CaptureSource source = Source.current();
-        MatchResult result = compareInternal(good.templates(), bad.templates(), source,
-                BotSettings.current().confidence(), BotSettings.current().compareMargin());
-        Vision.setLastMatch(result);
-        return clickResult(source, result);
+        return clickCompare(good, bad, Source.current());
     }
 
     /**
-     * Among the {@code good} templates, clicks the best-scoring match that still beats every
-     * {@code bad} template at its location by the specified margin.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param good  the group of good templates to search for
-     * @param bad   the group of bad templates that must NOT out-score the good templates
-     * @param margin the minimum score difference required for a match
-     * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
-     */
-    public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
-        PopupGuard.check();
-        CaptureSource source = Source.current();
-        MatchResult result = compareInternal(good.templates(), bad.templates(), source,
-                BotSettings.current().confidence(), margin);
-        Vision.setLastMatch(result);
-        return clickResult(source, result);
-    }
-
-    /**
-     * Among the {@code good} templates, clicks the best-scoring match that still beats every
-     * {@code bad} template at its location by the default margin.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
+     * {@link #clickCompare(ImageTemplateGroup, ImageTemplateGroup)} searched within {@code source}.
      *
      * @param good   the group of good templates to search for
      * @param bad    the group of bad templates that must NOT out-score the good templates
@@ -570,29 +350,7 @@ public class ImageClicker {
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         PopupGuard.check();
         MatchResult result = compareInternal(good.templates(), bad.templates(), source,
-                BotSettings.current().confidence(), BotSettings.current().compareMargin());
-        Vision.setLastMatch(result);
-        return clickResult(source, result);
-    }
-
-    /**
-     * Among the {@code good} templates, clicks the best-scoring match that still beats every
-     * {@code bad} template at its location by the specified margin.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param good   the group of good templates to search for
-     * @param bad    the group of bad templates that must NOT out-score the good templates
-     * @param source the capture source to search within
-     * @param margin the minimum score difference required for a match
-     * @return true if a good template was found, beats all bad templates, and was clicked, false otherwise
-     */
-    public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
-                                          double margin) {
-        PopupGuard.check();
-        MatchResult result = compareInternal(good.templates(), bad.templates(), source,
-                BotSettings.current().confidence(), margin);
+                ImageFinder.confidence(), ImageFinder.margin());
         Vision.setLastMatch(result);
         return clickResult(source, result);
     }
@@ -614,7 +372,7 @@ public class ImageClicker {
      * @return true if a good template was found, beat all bad templates, and was clicked, false otherwise
      */
     public static boolean clickAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
-        return clickAnyCompare(good, bad, Source.current(), BotSettings.current().compareMargin());
+        return clickAnyCompare(good, bad, Source.current());
     }
 
     /**
@@ -626,24 +384,9 @@ public class ImageClicker {
      * @return true if a good template was found, beat all bad templates, and was clicked, false otherwise
      */
     public static boolean clickAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
-        return clickAnyCompare(good, bad, source, BotSettings.current().compareMargin());
-    }
-
-    /**
-     * As {@link #clickAnyCompare(ImageTemplateGroup, ImageTemplateGroup)} but on a specific capture source and
-     * with a custom compare margin.
-     *
-     * @param good   the ordered group of good templates to search for
-     * @param bad    the group of bad templates that must NOT out-score the good templates
-     * @param source the capture source to search within
-     * @param margin the minimum score difference the good must beat the bad by
-     * @return true if a good template was found, beat all bad templates, and was clicked, false otherwise
-     */
-    public static boolean clickAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
-                                          double margin) {
         PopupGuard.check();
         MatchResult result = compareAnyInternal(good.templates(), bad.templates(), source,
-                BotSettings.current().confidence(), margin);
+                ImageFinder.confidence(), ImageFinder.margin());
         Vision.setLastMatch(result);
         return clickResult(source, result);
     }
@@ -662,7 +405,7 @@ public class ImageClicker {
      * @return the number of winning locations clicked
      */
     public static int clickAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
-        return clickAllCompare(good, bad, Source.current(), BotSettings.current().compareMargin());
+        return clickAllCompare(good, bad, Source.current());
     }
 
     /**
@@ -674,24 +417,9 @@ public class ImageClicker {
      * @return the number of winning locations clicked
      */
     public static int clickAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
-        return clickAllCompare(good, bad, source, BotSettings.current().compareMargin());
-    }
-
-    /**
-     * As {@link #clickAllCompare(ImageTemplateGroup, ImageTemplateGroup)} but on a specific capture source and
-     * with a custom compare margin.
-     *
-     * @param good   the group of good templates to search for
-     * @param bad    the group of bad templates that must NOT out-score the good templates
-     * @param source the capture source to search within
-     * @param margin the minimum score difference the good must beat the bad by
-     * @return the number of winning locations clicked
-     */
-    public static int clickAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
-                                      double margin) {
         PopupGuard.check();
         List<MatchResult> winners = compareAllInternal(good.templates(), bad.templates(), source,
-                BotSettings.current().confidence(), margin);
+                ImageFinder.confidence(), ImageFinder.margin());
         Vision.setLastMatchList(winners);
         for (MatchResult match : winners) {
             Point clickPoint = BotSettings.current().randomizeClicks() ? match.randomClickPoint() : match.center();
@@ -708,7 +436,7 @@ public class ImageClicker {
     // --- clickAll (every location above the threshold) ---
 
     /**
-     * Clicks all occurrences of the template on the current capture source using the default confidence.
+     * Clicks all occurrences of the template on the current capture source.
      * <p>
      * The list of match results is stored in {@link Vision} and can be retrieved with
      * {@link Vision#lastMatchList()}.
@@ -717,51 +445,19 @@ public class ImageClicker {
      * @return the number of instances clicked
      */
     public static int clickAll(ImageTemplate template) {
-        return clickAll(template, Source.current(), BotSettings.current().confidence());
+        return clickAll(template, Source.current());
     }
 
     /**
-     * Clicks all occurrences of the template on the current capture source with a custom confidence threshold.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
-     *
-     * @param template   the image template to search for and click
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return the number of instances clicked
-     */
-    public static int clickAll(ImageTemplate template, double confidence) {
-        return clickAll(template, Source.current(), confidence);
-    }
-
-    /**
-     * Clicks all occurrences of the template on a specific capture source using the default confidence.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
+     * Clicks all occurrences of the template on a specific capture source.
      *
      * @param template the image template to search for and click
      * @param source   the capture source to search within
      * @return the number of instances clicked
      */
     public static int clickAll(ImageTemplate template, CaptureSource source) {
-        return clickAll(template, source, BotSettings.current().confidence());
-    }
-
-    /**
-     * Clicks all occurrences of the template on a specific capture source with a custom confidence threshold.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
-     *
-     * @param template   the image template to search for and click
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return the number of instances clicked
-     */
-    public static int clickAll(ImageTemplate template, CaptureSource source, double confidence) {
         PopupGuard.check();
-        List<MatchResult> matches = ImageFinder.findAllInternal(template, source, confidence);
+        List<MatchResult> matches = ImageFinder.findAllInternal(template, source, ImageFinder.confidence());
         Vision.setLastMatchList(matches);
         for (MatchResult match : matches) {
             Point clickPoint = BotSettings.current().randomizeClicks() ? match.randomClickPoint() : match.center();
@@ -787,50 +483,19 @@ public class ImageClicker {
      * @return the total number of instances clicked across all templates in the group
      */
     public static int clickAll(ImageTemplateGroup group) {
-        return clickAll(group, Source.current(), BotSettings.current().confidence());
-    }
-
-    /**
-     * Clicks all occurrences of every template in the group on the current capture source with a custom confidence.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
-     *
-     * @param group      the template group to search for and click
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return the total number of instances clicked across all templates in the group
-     */
-    public static int clickAll(ImageTemplateGroup group, double confidence) {
-        return clickAll(group, Source.current(), confidence);
+        return clickAll(group, Source.current());
     }
 
     /**
      * Clicks all occurrences of every template in the group on a specific capture source.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
      *
      * @param group  the template group to search for and click
      * @param source the capture source to search within
      * @return the total number of instances clicked across all templates in the group
      */
     public static int clickAll(ImageTemplateGroup group, CaptureSource source) {
-        return clickAll(group, source, BotSettings.current().confidence());
-    }
-
-    /**
-     * Clicks all occurrences of every template in the group on a specific capture source with a custom confidence.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
-     *
-     * @param group      the template group to search for and click
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return the total number of instances clicked across all templates in the group
-     */
-    public static int clickAll(ImageTemplateGroup group, CaptureSource source, double confidence) {
         PopupGuard.check();
+        double confidence = ImageFinder.confidence();
         List<MatchResult> all = new java.util.ArrayList<>();
         for (ImageTemplate template : group.templates()) {
             all.addAll(ImageFinder.findAllInternal(template, source, confidence));

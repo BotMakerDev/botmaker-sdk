@@ -16,27 +16,23 @@ import java.util.List;
 /**
  * Public handle for a template image used by the vision API.
  *
- * <p>It holds the configuration (file path, derived id, match threshold) and lazily owns the
- * underlying OpenCV {@link Mat}. The {@code Mat} is loaded from disk on first use and released by
- * {@link #unload()} / {@link #close()}. (This class previously delegated to an internal
- * {@code Template} wrapper; that indirection has been collapsed now that OpenCV loads reliably via
- * {@link OpenCvNative}.)
+ * <p>It holds the file path and the id derived from it, and lazily owns the underlying OpenCV {@link Mat}. The
+ * {@code Mat} is loaded from disk on first use and released by {@link #unload()} / {@link #close()}. How sure a
+ * match must be is {@code BotSettings}' confidence, not the template's: the per-template threshold was never
+ * read by a matcher nor set by the picture picker, and was deleted on 2026-10-01.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): six of the eight public methods are offered — the
- * four that describe the template ({@link #id()}, {@link #filePath()}, {@link #threshold()}, {@link #width()},
- * {@link #height()}) and the one that tunes it ({@link #setThreshold(double)}). {@link #unload()} and
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): the members that describe the template are offered
+ * ({@link #id()}, {@link #filePath()}, {@link #width()}, {@link #height()}). {@link #unload()} and
  * {@link #close()} are hidden as the pair they are: they are memory management for a {@code Mat} the bot
  * cannot see, on a handle whose loading is lazy precisely so nobody has to think about it. A bot that offers
  * them a menu entry is being invited to release image data it did not know it had allocated, and the failure
  * mode is a silent reload rather than an error — which is to say, nothing the user could learn from.
  * {@code AutoCloseable} is implemented for the matchers' own try-with-resources, not for a bot to call.
  */
-// The generated Activities declares one per image-template variable, and builds it from the stored path.
 public class ImageTemplate implements AutoCloseable {
 
     private final String filePath;
     private final String id;
-    private double threshold = 0.8; // Default confidence
 
     // Lazily-loaded OpenCV image data. Null until getMat() is first called.
     private Mat mat;
@@ -58,28 +54,12 @@ public class ImageTemplate implements AutoCloseable {
         this.id = (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
     }
 
-    /**
-     * Constructor with custom threshold.
-     */
-    public ImageTemplate(String filePath, double threshold) {
-        this(filePath);
-        this.threshold = threshold;
-    }
-
     public String id() {
         return id;
     }
 
     public String filePath() {
         return filePath;
-    }
-
-    public double threshold() {
-        return threshold;
-    }
-
-    public void setThreshold(double threshold) {
-        this.threshold = threshold;
     }
 
     /**

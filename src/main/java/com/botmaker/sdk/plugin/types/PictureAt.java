@@ -49,9 +49,10 @@ public final class PictureAt {
         for (Path file : TemplateLibrary.list(resources)) {
             if (TemplateLibrary.isUnmodifiedDefaultTemplate(file)) continue;
             try (ImageTemplate template = new ImageTemplate(file.toAbsolutePath().toString())) {
-                if (!ImageFinder.find(template, frame, CONFIDENCE)) continue;
+                if (!ImageFinder.find(template, frame)) continue;
                 MatchResult match = Vision.lastMatch();
-                if (match == null || !contains(match.rect(), spot.x(), spot.y())) continue;
+                if (match == null || match.confidence() < CONFIDENCE) continue;
+                if (!contains(match.rect(), spot.x(), spot.y())) continue;
                 if (match.confidence() > bestScore) {
                     bestScore = match.confidence();
                     best = file;

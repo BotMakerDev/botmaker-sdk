@@ -27,6 +27,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **`Bot.start(…)`** (both forms) and **`StartMode`**: `Bot.run` is the entry point.
 - **The launch annotations** (`@SteamAppId`, `@EpicAppName`, `@HeroicAppName`, `@FaugusGameId`,
   `@ProgramPath`, `@LaunchOption`) and their game-grid editors: nothing offered carried them.
+- **Second spellings of the vision calls.** Each operation keeps two shapes, plain and `CaptureSource`
+  (Studio's upgrade repairs a bot):
+  - every per-call `double confidence` and compare `margin` overload of `ImageFinder`, `ImageClicker` and
+    `ImageWaiter` — both are `BotSettings`' (`BotSettings.use(…)` to change them for a while);
+  - `ImageClicker.click(template, source, confidence, delayMs)` — the pause is `BotSettings`' `foundDelay`;
+  - `findAny`/`clickAny` over `ImageTemplate...` — pass an `ImageTemplateGroup`;
+  - the whole-seconds `int` timeouts of `ImageWaiter` and the `long` milliseconds ones of `Pixel` and
+    `Text` — a timeout is a `Duration`;
+  - `Pixel.colorAt(x, y…)` and `matchesAt(x, y, …)` — take a `Point`; `Pixel.find(color)`,
+    `find(color, source)` and `findInRange(low, high)`, which defaulted the `Precision` — pass one.
+- **`ImageTemplate`'s threshold** (`threshold()`, `setThreshold`, the two-argument constructor): no matcher
+  read it and nothing set it; how sure a match must be is `BotSettings`' confidence.
 
 ### Changed
 

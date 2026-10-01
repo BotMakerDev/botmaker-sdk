@@ -107,7 +107,7 @@ class MissingTemplateTest {
     void findAnyOnAMissingTemplateDoesNotReportItAsNotOnScreen(@TempDir Path dir) {
         ImageTemplate missing = new ImageTemplate(dir.resolve("gone.png").toString());
 
-        assertThrows(RuntimeException.class, () -> ImageFinder.findAny(blankSource(), missing),
+        assertThrows(RuntimeException.class, () -> ImageFinder.findAny(ImageTemplateGroup.of(missing), blankSource()),
                 "findAny() has the same swallow at a different call site; fixing findInternal alone is not "
                         + "enough, which is why B9 lists five locations");
     }

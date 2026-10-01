@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.console.Debug;
 
 import com.botmaker.sdk.api.geometry.Point;
@@ -15,6 +14,7 @@ import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 /**
  * Pixel-colour detection: what colour is this pixel, and where does this colour appear?
@@ -30,7 +30,7 @@ import java.util.List;
  * <p>Every search reads its strictness from a single {@link Precision}: a colour tolerance (CIELAB ΔE), a
  * minimum blob area, and a minimum total pixel count. Start from an anchor — {@link Precision#EXACT},
  * {@link Precision#TIGHT}, {@link Precision#DEFAULT}, {@link Precision#LOOSE} — and adjust what you care
- * about. The short overloads use {@code DEFAULT}.
+ * about. Every search takes one: a colour has no other place to carry its tolerance.
  *
  * <p>It is one type rather than three arguments because the numbers are unreadable apart and only meaningful
  * together; {@link Precision} carries the full argument. What matters at this level is that
@@ -46,12 +46,9 @@ import java.util.List;
  * }
  * }</pre>
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): everything here is offered. The rule that trims
- * {@link ImageFinder} — hide the parameter whose question a property already answers — has no purchase here,
- * because a {@link Color} is a JDK type and cannot carry a tolerance the way {@link ImageTemplate#threshold()}
- * does. {@link Precision} is where that tolerance lives, it is a palette type with its own picker, and it
- * varies per colour rather than per bot. Annotating the class is still worth doing: it fixes the verdict, and
- * a method added here later is hidden until someone decides otherwise.
+ * <p><b>Two shapes per operation</b>, as in {@link ImageFinder}: the plain form and the {@code CaptureSource}
+ * form. A point is a {@link Point} and a timeout a {@link Duration}; the {@code x, y} and {@code long} spellings,
+ * and the shapes that defaulted the {@link Precision}, were deleted on 2026-10-01.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "🎨")
 public class Pixel {
@@ -60,26 +57,21 @@ public class Pixel {
     // colourAt — read a colour
     // ---------------------------------------------------------------------
 
-    /** The colour at absolute screen point ({@code x},{@code y}), or {@code null} if unreadable. */
-    public static Color colorAt(int x, int y) {
-        return colorAt(x, y, Source.current());
-    }
-
-    /** The colour at {@code p} (absolute screen coordinates), or {@code null} if unreadable. */
-    public static Color colorAt(Point p) {
-        return colorAt(p.x(), p.y(), Source.current());
+    /** The colour at {@code point} (absolute screen coordinates), or {@code null} if unreadable. */
+    public static Color colorAt(Point point) {
+        return colorAt(point, Source.current());
     }
 
     /**
-     * The colour at absolute screen point ({@code x},{@code y}) as seen through {@code source}, or
-     * {@code null} if the point lies outside the source or the capture failed.
+     * The colour at absolute screen point {@code point} as seen through {@code source}, or {@code null} if the
+     * point lies outside the source or the capture failed.
      */
-    public static Color colorAt(int x, int y, CaptureSource source) {
+    public static Color colorAt(Point point, CaptureSource source) {
         BufferedImage img = source.capture();
         if (img == null) return null;
         Point origin = source.origin();
-        int lx = x - origin.x();
-        int ly = y - origin.y();
+        int lx = point.x() - origin.x();
+        int ly = point.y() - origin.y();
         if (lx < 0 || ly < 0 || lx >= img.getWidth() || ly >= img.getHeight()) return null;
         return new Color(img.getRGB(lx, ly), false);
     }
@@ -89,20 +81,20 @@ public class Pixel {
     // ---------------------------------------------------------------------
 
     /**
-     * Whether the pixel at ({@code x},{@code y}) is within {@code precision}'s tolerance (ΔE) of
-     * {@code target}. Reads only {@link Precision#deltaE()} — one pixel has no blob to measure.
+     * Whether the pixel at {@code point} is within {@code precision}'s tolerance (ΔE) of {@code target}. Reads
+     * only {@link Precision#deltaE()} — one pixel has no blob to measure.
      */
-    public static boolean matchesAt(int x, int y, Color target, Precision precision) {
-        return matchesAt(x, y, target, Source.current(), precision);
+    public static boolean matchesAt(Point point, Color target, Precision precision) {
+        return matchesAt(point, target, Source.current(), precision);
     }
 
     /**
-     * Whether the pixel at ({@code x},{@code y}) of {@code source} is within {@code precision}'s tolerance of
+     * Whether the pixel at {@code point} of {@code source} is within {@code precision}'s tolerance of
      * {@code target}. Reads only {@link Precision#deltaE()}; {@code minArea} and {@code minCount} describe a
      * cluster search and there is no cluster here, so setting them changes nothing.
      */
-    public static boolean matchesAt(int x, int y, Color target, CaptureSource source, Precision precision) {
-        Color actual = colorAt(x, y, source);
+    public static boolean matchesAt(Point point, Color target, CaptureSource source, Precision precision) {
+        Color actual = colorAt(point, source);
         return actual != null && ColorMatcher.deltaE(actual, target) <= precision.deltaE();
     }
 
@@ -115,24 +107,15 @@ public class Pixel {
     // find — colour + location precision
     // ---------------------------------------------------------------------
 
-    /** Finds {@code target} anywhere on the current source, at {@link Precision#DEFAULT}. */
-    public static boolean find(Color target) {
-        return find(target, Source.current(), Precision.DEFAULT);
-    }
-
     /** Finds {@code target} anywhere on the current source, at {@code precision}. */
     public static boolean find(Color target, Precision precision) {
         return find(target, Source.current(), precision);
     }
 
-    /** Finds {@code target} within {@code source} (use {@code source.region(...)} to narrow the area). */
-    public static boolean find(Color target, CaptureSource source) {
-        return find(target, source, Precision.DEFAULT);
-    }
-
     /**
-     * Finds {@code target} within {@code source} at {@code precision} — all three of its knobs apply. The
-     * best (largest) cluster is stored in {@link Vision#lastColorMatch()}.
+     * Finds {@code target} within {@code source} (use {@code source.region(...)} to narrow the area) at
+     * {@code precision} — all three of its knobs apply. The best (largest) cluster is stored in
+     * {@link Vision#lastColorMatch()}.
      */
     public static boolean find(Color target, CaptureSource source, Precision precision) {
         ColorMatch result = findInternal(target, source, precision);
@@ -179,8 +162,8 @@ public class Pixel {
     }
 
     /** {@link #findInRange(Color, Color, CaptureSource, Precision)} against the current source. */
-    public static boolean findInRange(Color low, Color high) {
-        return findInRange(low, high, Source.current(), Precision.DEFAULT);
+    public static boolean findInRange(Color low, Color high, Precision precision) {
+        return findInRange(low, high, Source.current(), precision);
     }
 
     // ---------------------------------------------------------------------
@@ -212,61 +195,34 @@ public class Pixel {
     // ---------------------------------------------------------------------
 
     /**
-     * Polls until {@code target} appears in {@code source} or {@code timeoutMs} elapses.
+     * Polls until {@code target} appears in the current source or {@code timeout} elapses.
      *
      * @return true if it appeared; the match is in {@link Vision#lastColorMatch()}
      */
-    public static boolean waitFor(Color target, CaptureSource source, Precision precision, long timeoutMs) {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
-            if (find(target, source, precision)) return true;
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        }
-        return false;
-    }
-
-    /** {@link #waitFor(Color, CaptureSource, Precision, long)} against the current source. */
-    public static boolean waitFor(Color target, Precision precision, long timeoutMs) {
-        return waitFor(target, Source.current(), precision, timeoutMs);
-    }
-
-    /**
-     * Polls until {@code target} appears in the current source or {@code timeout} elapses. The palette's lead for
-     * {@code waitFor} since 2026-09-29: a dropped block starts at the editor's {@code Duration}, where the
-     * {@code long} shape started at 0 ms and returned at once.
-     *
-     * @return true if it appeared; the match is in {@link Vision#lastColorMatch()}
-     */
-    @PaletteDefault
     public static boolean waitFor(Color target, Precision precision, Duration timeout) {
-        return waitFor(target, Source.current(), precision, timeout.toMillis());
+        return waitFor(target, Source.current(), precision, timeout);
     }
 
     /** {@link #waitFor(Color, Precision, Duration)} in {@code source}. */
     public static boolean waitFor(Color target, CaptureSource source, Precision precision, Duration timeout) {
-        return waitFor(target, source, precision, timeout.toMillis());
+        return poll(timeout, () -> find(target, source, precision));
     }
 
-    /** Polls until {@code target} is gone from the current source, or {@code timeout} elapses. The lead. */
+    /** Polls until {@code target} is gone from the current source, or {@code timeout} elapses. */
     public static boolean waitForGone(Color target, Precision precision, Duration timeout) {
-        return waitForGone(target, Source.current(), precision, timeout.toMillis());
+        return waitForGone(target, Source.current(), precision, timeout);
     }
 
     /** {@link #waitForGone(Color, Precision, Duration)} in {@code source}. */
     public static boolean waitForGone(Color target, CaptureSource source, Precision precision, Duration timeout) {
-        return waitForGone(target, source, precision, timeout.toMillis());
+        return poll(timeout, () -> !find(target, source, precision));
     }
 
-    /** Polls until {@code target} is <em>gone</em> from {@code source}, or {@code timeoutMs} elapses. */
-    public static boolean waitForGone(Color target, CaptureSource source, Precision precision, long timeoutMs) {
-        long deadline = System.currentTimeMillis() + timeoutMs;
+    /** Asks {@code done} every 100ms until it says yes or {@code timeout} elapses. */
+    private static boolean poll(Duration timeout, BooleanSupplier done) {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
         while (System.currentTimeMillis() < deadline) {
-            if (!find(target, source, precision)) return true;
+            if (done.getAsBoolean()) return true;
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {

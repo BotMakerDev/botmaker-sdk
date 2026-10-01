@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.text;
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.console.Debug;
 
 import com.botmaker.sdk.api.geometry.Point;
@@ -32,7 +31,7 @@ import java.util.regex.Pattern;
  * <pre>{@code
  * // Wait for a "Play" button's label, then click it.
  * CaptureSource game = CaptureSource.window("MyGame");
- * if (Text.waitFor("Play", game, 5000)) {
+ * if (Text.waitFor("Play", game, Duration.ofSeconds(5))) {
  *     Mouse.click(Text.lastMatch().center());
  * }
  *
@@ -305,17 +304,18 @@ public final class Text {
     // ---------------------------------------------------------------------
 
     /**
-     * Polls until {@code needle} appears in {@code source} or {@code timeoutMs} elapses.
+     * Polls until {@code needle} appears in {@code source} or {@code timeout} elapses. A timeout is a
+     * {@link Duration}; the {@code long} milliseconds spellings were deleted on 2026-10-01.
      *
      * @return true if it appeared; the match is in {@link #lastMatch()}
      */
-    public static boolean waitFor(String needle, CaptureSource source, long timeoutMs) {
-        return waitFor(needle, source, DEFAULT_OPTIONS, timeoutMs);
+    public static boolean waitFor(String needle, CaptureSource source, Duration timeout) {
+        return waitFor(needle, source, DEFAULT_OPTIONS, timeout);
     }
 
-    /** {@link #waitFor(String, CaptureSource, long)} using {@code opts}. */
-    public static boolean waitFor(String needle, CaptureSource source, OcrOptions opts, long timeoutMs) {
-        long deadline = System.currentTimeMillis() + timeoutMs;
+    /** {@link #waitFor(String, CaptureSource, Duration)} using {@code opts}. */
+    public static boolean waitFor(String needle, CaptureSource source, OcrOptions opts, Duration timeout) {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
         while (System.currentTimeMillis() < deadline) {
             if (find(needle, source, opts)) return true;
             if (sleep()) return false;
@@ -323,47 +323,19 @@ public final class Text {
         return false;
     }
 
-    /** Polls until {@code needle} is <em>gone</em> from {@code source}, or {@code timeoutMs} elapses. */
-    public static boolean waitForGone(String needle, CaptureSource source, long timeoutMs) {
-        return waitForGone(needle, source, DEFAULT_OPTIONS, timeoutMs);
+    /** Polls until {@code needle} is <em>gone</em> from {@code source}, or {@code timeout} elapses. */
+    public static boolean waitForGone(String needle, CaptureSource source, Duration timeout) {
+        return waitForGone(needle, source, DEFAULT_OPTIONS, timeout);
     }
 
-    /** {@link #waitForGone(String, CaptureSource, long)} using {@code opts}. */
-    public static boolean waitForGone(String needle, CaptureSource source, OcrOptions opts, long timeoutMs) {
-        long deadline = System.currentTimeMillis() + timeoutMs;
+    /** {@link #waitForGone(String, CaptureSource, Duration)} using {@code opts}. */
+    public static boolean waitForGone(String needle, CaptureSource source, OcrOptions opts, Duration timeout) {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
         while (System.currentTimeMillis() < deadline) {
             if (!find(needle, source, opts)) return true;
             if (sleep()) return false;
         }
         return false;
-    }
-
-    /**
-     * Polls until {@code needle} appears in {@code source} or {@code timeout} elapses. The palette's lead for
-     * {@code waitFor} since 2026-09-29: a dropped block starts at the editor's {@code Duration}, where the
-     * {@code long} shape started at 0 ms and returned at once.
-     *
-     * @return true if it appeared; the match is in {@link #lastMatch()}
-     */
-    @PaletteDefault
-    public static boolean waitFor(String needle, CaptureSource source, Duration timeout) {
-        return waitFor(needle, source, DEFAULT_OPTIONS, timeout.toMillis());
-    }
-
-    /** {@link #waitFor(String, CaptureSource, Duration)} using {@code opts}. */
-    public static boolean waitFor(String needle, CaptureSource source, OcrOptions opts, Duration timeout) {
-        return waitFor(needle, source, opts, timeout.toMillis());
-    }
-
-    /** Polls until {@code needle} is gone from {@code source}, or {@code timeout} elapses. The palette's lead. */
-    @PaletteDefault
-    public static boolean waitForGone(String needle, CaptureSource source, Duration timeout) {
-        return waitForGone(needle, source, DEFAULT_OPTIONS, timeout.toMillis());
-    }
-
-    /** {@link #waitForGone(String, CaptureSource, Duration)} using {@code opts}. */
-    public static boolean waitForGone(String needle, CaptureSource source, OcrOptions opts, Duration timeout) {
-        return waitForGone(needle, source, opts, timeout.toMillis());
     }
 
     // ---------------------------------------------------------------------

@@ -86,18 +86,18 @@ class PixelTest {
         CaptureSource source = new FakeSource(sceneWithRedPatch(), 500, 300);
 
         // Absolute (515,325) -> image-local (15,25), inside the red patch.
-        assertEquals(Color.RED, Pixel.colorAt(515, 325, source));
-        assertEquals(Color.WHITE, Pixel.colorAt(500, 300, source));
+        assertEquals(Color.RED, Pixel.colorAt(new Point(515, 325), source));
+        assertEquals(Color.WHITE, Pixel.colorAt(new Point(500, 300), source));
         // Outside the source entirely.
-        assertNull(Pixel.colorAt(0, 0, source));
+        assertNull(Pixel.colorAt(new Point(0, 0), source));
     }
 
     @Test
     void matchesAtUsesColourToleranceOnly() {
         CaptureSource source = new FakeSource(sceneWithRedPatch(), 0, 0);
-        assertTrue(Pixel.matchesAt(15, 25, Color.RED, source, Precision.EXACT));
-        assertFalse(Pixel.matchesAt(15, 25, Color.GREEN, source, Precision.LOOSE));
-        assertFalse(Pixel.matchesAt(0, 0, Color.RED, source, Precision.TIGHT), "white is not red");
+        assertTrue(Pixel.matchesAt(new Point(15, 25), Color.RED, source, Precision.EXACT));
+        assertFalse(Pixel.matchesAt(new Point(15, 25), Color.GREEN, source, Precision.LOOSE));
+        assertFalse(Pixel.matchesAt(new Point(0, 0), Color.RED, source, Precision.TIGHT), "white is not red");
     }
 
     @Test
@@ -143,7 +143,7 @@ class PixelTest {
         CaptureSource source = new FakeSource(sceneWithRedPatch(), 0, 0);
 
         // matchesAt tests one pixel: there is no blob to measure and no total to reach.
-        assertTrue(Pixel.matchesAt(15, 25, Color.RED, source,
+        assertTrue(Pixel.matchesAt(new Point(15, 25), Color.RED, source,
                 Precision.EXACT.minArea(100_000).minCount(100_000)));
         // coverage counts every matching pixel and never clusters.
         assertEquals(Pixel.coverage(Color.RED, source, Precision.TIGHT),

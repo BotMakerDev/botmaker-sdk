@@ -92,7 +92,7 @@ class PopupGuardTest {
     void withNothingInstalledEveryVisionStepIsUnchanged(@TempDir Path tmp) throws Exception {
         CountingSource source = new CountingSource(noise());
         assertFalse(PopupGuard.isEnabled(), "no check installed means no guard");
-        assertFalse(ImageFinder.find(templateNotIn(tmp), source, 0.9));
+        assertFalse(ImageFinder.find(templateNotIn(tmp), source));
         assertEquals(1, source.captures, "an unguarded find is one capture");
     }
 
@@ -103,10 +103,10 @@ class PopupGuardTest {
         ImageTemplate absent = templateNotIn(tmp);
         CountingSource source = new CountingSource(noise());
 
-        ImageFinder.find(absent, source, 0.9);
+        ImageFinder.find(absent, source);
         assertEquals(1, runs.get(), "the find must be guarded");
 
-        ImageFinder.findAny(source, 0.9, absent, absent);
+        ImageFinder.findAny(ImageTemplateGroup.of(absent, absent), source);
         assertEquals(2, runs.get(),
                 "findAny is one statement: the overload that delegates must not guard as well");
 
@@ -127,7 +127,7 @@ class PopupGuardTest {
             ImageFinder.whileFindAny(ImageTemplateGroup.of(absent), source, found -> {});
         });
 
-        ImageFinder.find(absent, source, 0.9);
+        ImageFinder.find(absent, source);
 
         assertEquals(1, runs.get(), "the check's own finds must not re-enter the guard");
     }
@@ -141,11 +141,11 @@ class PopupGuardTest {
 
         PopupGuard.enabled(false);
         assertFalse(PopupGuard.isEnabled());
-        ImageFinder.find(absent, source, 0.9);
+        ImageFinder.find(absent, source);
         assertEquals(0, runs.get(), "an activity that opted out must not be interrupted");
 
         PopupGuard.enabled(true);
-        ImageFinder.find(absent, source, 0.9);
+        ImageFinder.find(absent, source);
         assertEquals(1, runs.get());
     }
 
@@ -180,7 +180,8 @@ class PopupGuardTest {
         PopupGuard.install(runs::incrementAndGet);
         CountingSource source = new CountingSource(noise());
 
-        assertFalse(com.botmaker.sdk.api.vision.ImageWaiter.waitFor(templateNotIn(tmp), source, 1));
+        assertFalse(com.botmaker.sdk.api.vision.ImageWaiter.waitFor(templateNotIn(tmp), source,
+                java.time.Duration.ofSeconds(1)));
 
         assertTrue(runs.get() > 1,
                 "a popup that opens during the wait must be seen before the timeout burns, got " + runs.get());

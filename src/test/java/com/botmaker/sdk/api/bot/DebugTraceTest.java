@@ -180,10 +180,10 @@ class DebugTraceTest {
 
         String output = printed(() -> {
             for (int i = 0; i < 12; i++) {
-                ImageFinder.find(probe, source, 0.9);   // twelve polls of a wait loop, all misses
+                ImageFinder.find(probe, source);   // twelve polls of a wait loop, all misses
             }
             source.frame = withPatch;                   // …and then the thing appears
-            assertTrue(ImageFinder.find(probe, source, 0.9), "fixture: the patch must be findable");
+            assertTrue(ImageFinder.find(probe, source), "fixture: the patch must be findable");
         });
 
         List<String> misses = linesMatching(output, "trace_probe not found");
@@ -201,7 +201,7 @@ class DebugTraceTest {
         Debug.disable();
 
         assertEquals("", printed(() -> {
-            for (int i = 0; i < 5; i++) ImageFinder.find(probe, source, 0.9);
+            for (int i = 0; i < 5; i++) ImageFinder.find(probe, source);
         }));
     }
 }

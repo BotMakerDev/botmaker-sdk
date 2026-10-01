@@ -35,12 +35,11 @@ import java.util.stream.Collectors;
  * ({@link #whileFind}, {@link #untilFind}, {@link #ifFind}) — each is one capture that hands the matched
  * {@link MatchResult} to your action.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}). Every operation here is offered, but of each
- * matcher's four shapes only two are: the plain form and the {@code CaptureSource} form. The overloads taking
- * a bare {@code double confidence} are hidden — still public, still supported, still callable by hand — because
- * a per-call threshold is the second answer to a question {@link ImageTemplate#threshold()} already answers,
- * and the image picker sets that one. The {@code *Compare} families keep all four, since their {@code double}
- * is a comparison <em>margin</em> with no other home.
+ * <p><b>Two shapes per operation</b>: the plain form, which searches {@link Source#current()}, and the
+ * {@code CaptureSource} form. How sure a match must be is {@link BotSettings}' {@code confidence}, and how far a
+ * good template must out-score a bad one is its {@code compareMargin}; a bot that wants other values for a while
+ * calls {@code BotSettings.use(…)}. The per-call {@code double} overloads that answered those questions a second
+ * time, and the {@code ImageTemplate...} spellings of the group operations, were deleted on 2026-10-01.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "🔍")
 public class ImageFinder {
@@ -48,69 +47,36 @@ public class ImageFinder {
     // --- find (single template) ---
 
     /**
-     * Finds the specified template on the current capture source using the default confidence.
+     * Finds the specified template on the current capture source.
      * <p>
      * The match result is stored in {@link Vision} and can be retrieved with
      * {@link Vision#lastMatch()}.
      *
      * @param template the image template to search for
      * @return true if the template was found, false otherwise
-     * @see #find(ImageTemplate, double)
-     * @see #find(ImageTemplate, CaptureSource)
-     * @see #find(ImageTemplate, CaptureSource, double)
      */
     public static boolean find(ImageTemplate template) {
-        return find(template, Source.current(), BotSettings.current().confidence());
+        return find(template, Source.current());
     }
 
     /**
-     * Finds the specified template on the current capture source with a custom confidence threshold.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param template   the image template to search for
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if the template was found, false otherwise
-     */
-    public static boolean find(ImageTemplate template, double confidence) {
-        return find(template, Source.current(), confidence);
-    }
-
-    /**
-     * Finds the specified template on a specific capture source using the default confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
+     * Finds the specified template on a specific capture source. The returned match result contains absolute
+     * screen coordinates, so a click can land directly on {@link Vision#lastMatch()}.
      *
      * @param template the image template to search for
      * @param source   the capture source (window, monitor, or desktop region) to search within
      * @return true if the template was found, false otherwise
      */
     public static boolean find(ImageTemplate template, CaptureSource source) {
-        return find(template, source, BotSettings.current().confidence());
-    }
-
-    /**
-     * Finds the specified template on a specific capture source with a custom confidence threshold.
-     * This is the core matching method that performs the actual image capture and template matching.
-     * <p>
-     * The search is performed within the bounds of the capture source. The match result is stored
-     * in {@link Vision} and can be retrieved with {@link Vision#lastMatch()}.
-     * <p>
-     * The returned match result contains absolute screen coordinates, so clicks can be performed
-     * directly at the matched location using {@link Vision#lastMatch()}.
-     *
-     * @param template   the image template to search for
-     * @param source     the capture source (window, monitor, or desktop region) to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if the template was found at or above the confidence threshold, false otherwise
-     */
-    public static boolean find(ImageTemplate template, CaptureSource source, double confidence) {
         PopupGuard.check();
-        MatchResult result = findInternal(template, source, confidence);
+        MatchResult result = findInternal(template, source, confidence());
         Vision.setLastMatch(result);
         return result.isFound();
+    }
+
+    /** The confidence every match uses: {@link BotSettings}'. */
+    static double confidence() {
+        return BotSettings.current().confidence();
     }
 
     /**
@@ -228,137 +194,33 @@ public class ImageFinder {
         }
     }
 
-    // --- findAny (first template, in order, that clears the threshold) ---
+    // --- findAny: the first template in the group, in order, that clears the threshold ---
 
     /**
-     * Finds the first template (in order) that appears on the current capture source using the default confidence.
-     * Templates are checked in the order provided, and the first one found above the threshold is returned.
+     * Finds the first template in the group (in order) that appears on the current capture source.
      * <p>
      * The match result is stored in {@link Vision} and can be retrieved with
      * {@link Vision#lastMatch()}.
      *
-     * @param templates the image templates to search for, in priority order
-     * @return true if any template was found, false otherwise
-     * @see #findAny(double, ImageTemplate...)
-     * @see #findAny(CaptureSource, ImageTemplate...)
-     * @see #findAny(CaptureSource, double, ImageTemplate...)
-     */
-    public static boolean findAny(ImageTemplate... templates) {
-        return findAny(Source.current(), BotSettings.current().confidence(), templates);
-    }
-
-    /**
-     * Finds the first template (in order) that appears on the current capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @param templates the image templates to search for, in priority order
-     * @return true if any template was found, false otherwise
-     */
-    public static boolean findAny(double confidence, ImageTemplate... templates) {
-        return findAny(Source.current(), confidence, templates);
-    }
-
-    /**
-     * Finds the first template (in order) that appears on a specific capture source using the default confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param source    the capture source to search within
-     * @param templates the image templates to search for, in priority order
-     * @return true if any template was found, false otherwise
-     */
-    public static boolean findAny(CaptureSource source, ImageTemplate... templates) {
-        return findAny(source, BotSettings.current().confidence(), templates);
-    }
-
-    /**
-     * Finds the first template (in order) that appears on a specific capture source with a custom confidence.
-     * This is the core implementation that iterates through templates and returns the first match found.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @param templates  the image templates to search for, in priority order
-     * @return true if any template was found, false otherwise
-     */
-    public static boolean findAny(CaptureSource source, double confidence, ImageTemplate... templates) {
-        PopupGuard.check();
-        for (ImageTemplate template : templates) {
-            MatchResult result = findInternal(template, source, confidence);
-            if (result.isFound()) {
-                Vision.setLastMatch(result);
-                return true;
-            }
-        }
-        Vision.setLastMatch(MatchResult.notFound());
-        return false;
-    }
-
-    // --- findAny over an ImageTemplateGroup: first template in the group that clears the threshold ---
-
-    /**
-     * Finds the first template in the group that appears on the current capture source using the default confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param group the template group to search for
+     * @param group the template group to search for, in priority order
      * @return true if any template in the group was found, false otherwise
-     * @see #findAny(ImageTemplateGroup, double)
-     * @see #findAny(ImageTemplateGroup, CaptureSource)
-     * @see #findAny(ImageTemplateGroup, CaptureSource, double)
      */
     public static boolean findAny(ImageTemplateGroup group) {
-        return findAny(Source.current(), BotSettings.current().confidence(), group.toArray());
+        return findAny(group, Source.current());
     }
 
     /**
-     * Finds the first template in the group that appears on the current capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
+     * Finds the first template in the group (in order) that appears on a specific capture source.
      *
-     * @param group      the template group to search for
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if any template in the group was found, false otherwise
-     */
-    public static boolean findAny(ImageTemplateGroup group, double confidence) {
-        return findAny(Source.current(), confidence, group.toArray());
-    }
-
-    /**
-     * Finds the first template in the group that appears on a specific capture source using the default confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param group  the template group to search for
+     * @param group  the template group to search for, in priority order
      * @param source the capture source to search within
      * @return true if any template in the group was found, false otherwise
      */
     public static boolean findAny(ImageTemplateGroup group, CaptureSource source) {
-        return findAny(source, BotSettings.current().confidence(), group.toArray());
-    }
-
-    /**
-     * Finds the first template in the group that appears on a specific capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param group      the template group to search for
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if any template in the group was found, false otherwise
-     */
-    public static boolean findAny(ImageTemplateGroup group, CaptureSource source, double confidence) {
-        return findAny(source, confidence, group.toArray());
+        PopupGuard.check();
+        MatchResult result = findAnyInternal(source, confidence(), group.toArray());
+        Vision.setLastMatch(result);
+        return result.isFound();
     }
 
     // --- Best match: evaluate fully and return the single highest-scoring match ---
@@ -373,56 +235,21 @@ public class ImageFinder {
      *
      * @param group the template group to search for
      * @return true if any template in the group was found, false otherwise
-     * @see #findBest(ImageTemplateGroup, double)
-     * @see #findBest(ImageTemplateGroup, CaptureSource)
-     * @see #findBest(ImageTemplateGroup, CaptureSource, double)
      */
     public static boolean findBest(ImageTemplateGroup group) {
-        return findBest(group, Source.current(), BotSettings.current().confidence());
-    }
-
-    /**
-     * Finds the highest-scoring match for any template in the group on the current capture source with a custom confidence.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param group      the template group to search for
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if any template in the group was found, false otherwise
-     */
-    public static boolean findBest(ImageTemplateGroup group, double confidence) {
-        return findBest(group, Source.current(), confidence);
+        return findBest(group, Source.current());
     }
 
     /**
      * Finds the highest-scoring match for any template in the group on a specific capture source.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
      * @return true if any template in the group was found, false otherwise
      */
     public static boolean findBest(ImageTemplateGroup group, CaptureSource source) {
-        return findBest(group, source, BotSettings.current().confidence());
-    }
-
-    /**
-     * Finds the highest-scoring match for any template in the group on a specific capture source with a custom confidence.
-     * This is the core implementation that evaluates every template in the group and returns the single best match.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param group      the template group to search for
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return true if any template in the group was found, false otherwise
-     */
-    public static boolean findBest(ImageTemplateGroup group, CaptureSource source, double confidence) {
         PopupGuard.check();
+        double confidence = confidence();
         MatchResult best = MatchResult.notFound();
         for (ImageTemplate template : group.templates()) {
             MatchResult result = findInternal(template, source, confidence);
@@ -440,8 +267,8 @@ public class ImageFinder {
     private static final int COMPARE_PAD = 4;
 
     /**
-     * Among the {@code good} templates, return the best-scoring match that still beats every
-     * {@code bad} template at its location by the default margin.
+     * Among the {@code good} templates, return the best-scoring match that still beats every {@code bad}
+     * template at its location by {@link BotSettings}' compare margin.
      * <p>
      * The match result is stored in {@link Vision} and can be retrieved with
      * {@link Vision#lastMatch()}.
@@ -451,37 +278,11 @@ public class ImageFinder {
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
-        MatchResult result = compare(good.templates(), bad.templates(), Source.current(),
-                BotSettings.current().confidence(), BotSettings.current().compareMargin());
-        Vision.setLastMatch(result);
-        return result.isFound();
+        return findCompare(good, bad, Source.current());
     }
 
     /**
-     * Among the {@code good} templates, return the best-scoring match that still beats every
-     * {@code bad} template at its location by the specified margin.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param good  the group of good templates to search for
-     * @param bad   the group of bad templates that must NOT out-score the good templates
-     * @param margin the minimum score difference required for a match
-     * @return true if a good template was found and beats all bad templates, false otherwise
-     */
-    public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
-        MatchResult result = compare(good.templates(), bad.templates(), Source.current(),
-                BotSettings.current().confidence(), margin);
-        Vision.setLastMatch(result);
-        return result.isFound();
-    }
-
-    /**
-     * Among the {@code good} templates, return the best-scoring match that still beats every
-     * {@code bad} template at its location by the default margin.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
+     * {@link #findCompare(ImageTemplateGroup, ImageTemplateGroup)} searched within {@code source}.
      *
      * @param good   the group of good templates to search for
      * @param bad    the group of bad templates that must NOT out-score the good templates
@@ -489,38 +290,22 @@ public class ImageFinder {
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
     public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
-        MatchResult result = compare(good.templates(), bad.templates(), source,
-                BotSettings.current().confidence(), BotSettings.current().compareMargin());
+        PopupGuard.check();
+        MatchResult result = compare(good.templates(), bad.templates(), source, confidence(), margin());
         Vision.setLastMatch(result);
         return result.isFound();
     }
 
-    /**
-     * Among the {@code good} templates, return the best-scoring match that still beats every
-     * {@code bad} template at its location by the specified margin.
-     * <p>
-     * The match result is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatch()}.
-     *
-     * @param good   the group of good templates to search for
-     * @param bad    the group of bad templates that must NOT out-score the good templates
-     * @param source the capture source to search within
-     * @param margin the minimum score difference required for a match
-     * @return true if a good template was found and beats all bad templates, false otherwise
-     */
-    public static boolean findCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
-                                          double margin) {
-        PopupGuard.check();
-        MatchResult result = compare(good.templates(), bad.templates(), source, BotSettings.current().confidence(), margin);
-        Vision.setLastMatch(result);
-        return result.isFound();
+    /** The margin every compare uses: {@link BotSettings}'. */
+    static double margin() {
+        return BotSettings.current().compareMargin();
     }
 
     // --- findAnyCompare: the FIRST good template (in order) that beats every bad template ---
 
     /**
      * Return the first {@code good} template (in priority order) whose best match beats every
-     * {@code bad} template at its location by the default margin. Unlike {@link #findCompare} (which
+     * {@code bad} template at its location by the compare margin. Unlike {@link #findCompare} (which
      * returns the single highest-scoring good), this stops at the first good that wins — the compare
      * analogue of {@link #findAny}.
      * <p>
@@ -531,29 +316,11 @@ public class ImageFinder {
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
     public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
-        return findAnyCompare(good, bad, Source.current(), BotSettings.current().compareMargin());
+        return findAnyCompare(good, bad, Source.current());
     }
 
     /**
-     * Return the first {@code good} template (in priority order) whose best match beats every
-     * {@code bad} template at its location by the specified margin.
-     * <p>
-     * The match result is stored in {@link Vision}.
-     *
-     * @param good   the group of good templates to search for, in priority order
-     * @param bad    the group of bad templates that must NOT out-score the good template
-     * @param margin the minimum score difference required for a match
-     * @return true if a good template was found and beats all bad templates, false otherwise
-     */
-    public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
-        return findAnyCompare(good, bad, Source.current(), margin);
-    }
-
-    /**
-     * Return the first {@code good} template (in priority order) whose best match beats every
-     * {@code bad} template at its location by the default margin, searched within {@code source}.
-     * <p>
-     * The match result is stored in {@link Vision}.
+     * {@link #findAnyCompare(ImageTemplateGroup, ImageTemplateGroup)} searched within {@code source}.
      *
      * @param good   the group of good templates to search for, in priority order
      * @param bad    the group of bad templates that must NOT out-score the good template
@@ -561,26 +328,8 @@ public class ImageFinder {
      * @return true if a good template was found and beats all bad templates, false otherwise
      */
     public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
-        return findAnyCompare(good, bad, source, BotSettings.current().compareMargin());
-    }
-
-    /**
-     * Return the first {@code good} template (in priority order) whose best match beats every
-     * {@code bad} template at its location by the specified margin, searched within {@code source}.
-     * <p>
-     * The match result is stored in {@link Vision}.
-     *
-     * @param good   the group of good templates to search for, in priority order
-     * @param bad    the group of bad templates that must NOT out-score the good template
-     * @param source the capture source to search within
-     * @param margin the minimum score difference required for a match
-     * @return true if a good template was found and beats all bad templates, false otherwise
-     */
-    public static boolean findAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
-                                         double margin) {
         PopupGuard.check();
-        MatchResult result = compareAny(good.templates(), bad.templates(), source,
-                BotSettings.current().confidence(), margin);
+        MatchResult result = compareAny(good.templates(), bad.templates(), source, confidence(), margin());
         Vision.setLastMatch(result);
         return result.isFound();
     }
@@ -589,7 +338,7 @@ public class ImageFinder {
 
     /**
      * Find every location of every {@code good} template that beats all {@code bad} templates there by
-     * the default margin — the compare analogue of {@link #findAll}.
+     * the compare margin — the compare analogue of {@link #findAll}.
      * <p>
      * The list of matches is stored in {@link Vision} ({@link Vision#lastMatchList()}).
      *
@@ -598,29 +347,11 @@ public class ImageFinder {
      * @return the number of winning good matches found
      */
     public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad) {
-        return findAllCompare(good, bad, Source.current(), BotSettings.current().compareMargin());
+        return findAllCompare(good, bad, Source.current());
     }
 
     /**
-     * Find every location of every {@code good} template that beats all {@code bad} templates there by
-     * the specified margin.
-     * <p>
-     * The list of matches is stored in {@link Vision} ({@link Vision#lastMatchList()}).
-     *
-     * @param good   the group of good templates to search for
-     * @param bad    the group of bad templates that must NOT out-score a good match
-     * @param margin the minimum score difference required for a match
-     * @return the number of winning good matches found
-     */
-    public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, double margin) {
-        return findAllCompare(good, bad, Source.current(), margin);
-    }
-
-    /**
-     * Find every location of every {@code good} template that beats all {@code bad} templates there by
-     * the default margin, searched within {@code source}.
-     * <p>
-     * The list of matches is stored in {@link Vision} ({@link Vision#lastMatchList()}).
+     * {@link #findAllCompare(ImageTemplateGroup, ImageTemplateGroup)} searched within {@code source}.
      *
      * @param good   the group of good templates to search for
      * @param bad    the group of bad templates that must NOT out-score a good match
@@ -628,26 +359,8 @@ public class ImageFinder {
      * @return the number of winning good matches found
      */
     public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
-        return findAllCompare(good, bad, source, BotSettings.current().compareMargin());
-    }
-
-    /**
-     * Find every location of every {@code good} template that beats all {@code bad} templates there by
-     * the specified margin, searched within {@code source}.
-     * <p>
-     * The list of matches is stored in {@link Vision} ({@link Vision#lastMatchList()}).
-     *
-     * @param good   the group of good templates to search for
-     * @param bad    the group of bad templates that must NOT out-score a good match
-     * @param source the capture source to search within
-     * @param margin the minimum score difference required for a match
-     * @return the number of winning good matches found
-     */
-    public static int findAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
-                                     double margin) {
         PopupGuard.check();
-        List<MatchResult> results = compareAll(good.templates(), bad.templates(), source,
-                BotSettings.current().confidence(), margin);
+        List<MatchResult> results = compareAll(good.templates(), bad.templates(), source, confidence(), margin());
         Vision.setLastMatchList(results);
         return results.size();
     }
@@ -805,7 +518,7 @@ public class ImageFinder {
     // --- findAll (every location above the threshold) ---
 
     /**
-     * Finds all occurrences of the template on the current capture source using the default confidence.
+     * Finds all occurrences of the template on the current capture source.
      * <p>
      * The list of match results is stored in {@link Vision} and can be retrieved with
      * {@link Vision#lastMatchList()}.
@@ -814,52 +527,19 @@ public class ImageFinder {
      * @return the number of matches found
      */
     public static int findAll(ImageTemplate template) {
-        return findAll(template, Source.current(), BotSettings.current().confidence());
+        return findAll(template, Source.current());
     }
 
     /**
-     * Finds all occurrences of the template on the current capture source with a custom confidence threshold.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
-     *
-     * @param template   the image template to search for
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return the number of matches found
-     */
-    public static int findAll(ImageTemplate template, double confidence) {
-        return findAll(template, Source.current(), confidence);
-    }
-
-    /**
-     * Finds all occurrences of the template on a specific capture source using the default confidence.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
+     * Finds all occurrences of the template on a specific capture source.
      *
      * @param template the image template to search for
      * @param source   the capture source to search within
      * @return the number of matches found
      */
     public static int findAll(ImageTemplate template, CaptureSource source) {
-        return findAll(template, source, BotSettings.current().confidence());
-    }
-
-    /**
-     * Finds all occurrences of the template on a specific capture source with a custom confidence threshold.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}. The first match is also stored in
-     * {@link Vision#lastMatch()}.
-     *
-     * @param template   the image template to search for
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return the number of matches found
-     */
-    public static int findAll(ImageTemplate template, CaptureSource source, double confidence) {
         PopupGuard.check();
-        List<MatchResult> results = findAllInternal(template, source, confidence);
+        List<MatchResult> results = findAllInternal(template, source, confidence());
         Vision.setLastMatchList(results);
         return results.size();
     }
@@ -933,50 +613,19 @@ public class ImageFinder {
      * @return the total number of matches found across all templates in the group
      */
     public static int findAll(ImageTemplateGroup group) {
-        return findAll(group, Source.current(), BotSettings.current().confidence());
-    }
-
-    /**
-     * Finds all occurrences of every template in the group on the current capture source with a custom confidence.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
-     *
-     * @param group      the template group to search for
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return the total number of matches found across all templates in the group
-     */
-    public static int findAll(ImageTemplateGroup group, double confidence) {
-        return findAll(group, Source.current(), confidence);
+        return findAll(group, Source.current());
     }
 
     /**
      * Finds all occurrences of every template in the group on a specific capture source.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
      *
      * @param group  the template group to search for
      * @param source the capture source to search within
      * @return the total number of matches found across all templates in the group
      */
     public static int findAll(ImageTemplateGroup group, CaptureSource source) {
-        return findAll(group, source, BotSettings.current().confidence());
-    }
-
-    /**
-     * Finds all occurrences of every template in the group on a specific capture source with a custom confidence.
-     * <p>
-     * The list of match results is stored in {@link Vision} and can be retrieved with
-     * {@link Vision#lastMatchList()}.
-     *
-     * @param group      the template group to search for
-     * @param source     the capture source to search within
-     * @param confidence the minimum confidence score (0.0 to 1.0) required for a match
-     * @return the total number of matches found across all templates in the group
-     */
-    public static int findAll(ImageTemplateGroup group, CaptureSource source, double confidence) {
         PopupGuard.check();
+        double confidence = confidence();
         List<MatchResult> all = new ArrayList<>();
         for (ImageTemplate template : group.templates()) {
             all.addAll(findAllInternal(template, source, confidence));

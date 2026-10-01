@@ -86,7 +86,7 @@ class ImageClickerRoutingTest {
         int offsetX = 150, offsetY = 90;
         RecordingSource source = new RecordingSource(noiseWith(patch, offsetX, offsetY));
 
-        boolean clicked = ImageClicker.click(new ImageTemplate(templateFile.toString()), source, 0.7);
+        boolean clicked = ImageClicker.click(new ImageTemplate(templateFile.toString()), source);
 
         assertTrue(clicked, "template should be located and clicked");
         assertNotNull(source.clicked, "click must go through CaptureSource.click, not Mouse");

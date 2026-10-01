@@ -29,16 +29,6 @@ class ImageTemplateTest {
     }
 
     @Test
-    void defaultAndCustomThreshold() {
-        assertEquals(0.8, new ImageTemplate(IMAGE).threshold(), 1e-9);
-        assertEquals(0.95, new ImageTemplate(IMAGE, 0.95).threshold(), 1e-9);
-
-        ImageTemplate t = new ImageTemplate(IMAGE);
-        t.setThreshold(0.5);
-        assertEquals(0.5, t.threshold(), 1e-9);
-    }
-
-    @Test
     void blankPathRejected() {
         assertThrows(IllegalArgumentException.class, () -> new ImageTemplate("  "));
         assertThrows(IllegalArgumentException.class, () -> new ImageTemplate(null));
