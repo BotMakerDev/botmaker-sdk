@@ -17,6 +17,14 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Fixed
+
+- **1.2.2 never reached JitPack: this release is the one to install.** The build command lost a space
+  (`-B-Dbotmaker.shared.version=…`), Maven refused it, and `com.github.LiQiyeDev:botmaker-sdk:v1.2.2` has no
+  artifacts. Nothing in the library changed.
+
 ## [1.2.2] — 2026-10-01
 
 ### Added

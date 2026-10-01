@@ -34,4 +34,4 @@ install:
   # four above, and the reason its own release FORCES an SDK release.
   - . ./.deps.env
   - '[ -n "${SHARED_TAG:-}" ] && [ -n "${SESSION_TAG:-}" ] && [ -n "${STUDIO_API_TAG:-}" ] && [ -n "${PLUGIN_TOOLKIT_TAG:-}" ] && [ -n "${PLUGIN_BASICS_TAG:-}" ] || { echo "ERROR: .deps.env must pin SHARED_TAG, SESSION_TAG, STUDIO_API_TAG, PLUGIN_TOOLKIT_TAG and PLUGIN_BASICS_TAG. Cut releases with the umbrella release.sh, which writes it into the release commit." >&2; exit 1; }'
-  - mvn install -DskipTests -Dmaven.javadoc.skip=true -B-Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG -Dbotmaker.studioapi.version=$STUDIO_API_TAG -Dbotmaker.plugintoolkit.version=$PLUGIN_TOOLKIT_TAG -Dbotmaker.pluginbasics.version=$PLUGIN_BASICS_TAG
+  - mvn install -DskipTests -Dmaven.javadoc.skip=true -B -Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG -Dbotmaker.studioapi.version=$STUDIO_API_TAG -Dbotmaker.plugintoolkit.version=$PLUGIN_TOOLKIT_TAG -Dbotmaker.pluginbasics.version=$PLUGIN_BASICS_TAG
