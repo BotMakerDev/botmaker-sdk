@@ -47,6 +47,8 @@ public final class NewActivityDialog {
     private final Theme theme;
     /** The activity names already on the canvas — a new one may not collide with them. */
     private final Collection<String> taken;
+    /** The outcomes the other cards declare: reusing one is fine, a second spelling of one is not. */
+    private final Collection<String> knownOutcomes;
     private final boolean goHomeByDefault;
 
     private final ObservableList<String> outcomes = FXCollections.observableArrayList();
@@ -60,10 +62,12 @@ public final class NewActivityDialog {
     private Stage stage;
     private ActivityDraft created;
 
-    public NewActivityDialog(Window owner, Theme theme, Collection<String> taken, boolean goHomeByDefault) {
+    public NewActivityDialog(Window owner, Theme theme, Collection<String> taken, Collection<String> knownOutcomes,
+                             boolean goHomeByDefault) {
         this.owner = owner;
         this.theme = theme;
         this.taken = taken;
+        this.knownOutcomes = knownOutcomes;
         this.goHomeByDefault = goHomeByDefault;
     }
 
@@ -131,8 +135,8 @@ public final class NewActivityDialog {
         HBox.setHgrow(newOutcome, Priority.ALWAYS);
         Button add = new Button("Add");
         Runnable addOutcome = () -> {
-            String candidate = FlowNames.normalizeOutcome(newOutcome.getText());
-            String problem = FlowNames.outcomeProblem(outcomes, activityLabel(), candidate, null);
+            String candidate = FlowNames.label(newOutcome.getText());
+            String problem = FlowNames.outcomeProblem(outcomes, knownOutcomes, activityLabel(), candidate, null);
             if (problem != null) { error.setText(problem); return; }
             outcomes.add(candidate);
             newOutcome.clear();
@@ -187,7 +191,7 @@ public final class NewActivityDialog {
     }
 
     private void commit(double x, double y) {
-        String candidate = name.getText() == null ? "" : name.getText().trim();
+        String candidate = FlowNames.label(name.getText());
         String problem = FlowNames.activityNameProblem(candidate, taken);
         if (problem != null) {
             error.setText(problem);

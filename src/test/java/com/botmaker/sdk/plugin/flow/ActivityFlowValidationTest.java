@@ -37,11 +37,22 @@ class ActivityFlowValidationTest {
     }
 
     @Test
-    void anOutcomeMustBeAValidJavaIdentifier() {
-        // It becomes a constant of the generated Outcome enum.
-        String problem = ActivityFlowDialog.validate(of(activity("Mining", "bag full")));
+    void anOutcomeLabelIsFreeTextButMustMakeAConstant() {
+        // "Bag full" is Outcomes.BAG_FULL; a label with no letter first makes no constant at all.
+        assertNull(ActivityFlowDialog.validate(of(activity("Mining", "Bag full"))));
+        String problem = ActivityFlowDialog.validate(of(activity("Mining", "2nd try")));
         assertNotNull(problem);
-        assertTrue(problem.contains("bag full"), problem);
+        assertTrue(problem.contains("2nd try"), problem);
+    }
+
+    @Test
+    void twoSpellingsOfOneOutcomeAcrossActivitiesAreRejected() {
+        // An outcome is one constant wherever it is declared: the same label twice is shared, two are a clash.
+        assertNull(ActivityFlowDialog.validate(of(activity("Mining", "Bag full"), activity("Fishing", "Bag full"))));
+        String problem = ActivityFlowDialog.validate(of(activity("Mining", "Bag full"),
+                activity("Fishing", "bag-full")));
+        assertNotNull(problem);
+        assertTrue(problem.contains("BAG_FULL"), problem);
     }
 
     @Test
@@ -63,35 +74,65 @@ class ActivityFlowValidationTest {
         String problem = ActivityFlowDialog.validate(of(activity("Mining", "DISABLED")));
         assertNotNull(problem);
         assertTrue(problem.contains("DISABLED"), problem);
-        assertNull(FlowNames.outcomeProblem(List.of(), "Mining", "BAG_FULL", null));
-        assertNotNull(FlowNames.outcomeProblem(List.of(), "Mining", "DISABLED", null),
+        assertNull(FlowNames.outcomeProblem(List.of(), List.of(), "Mining", "Bag full", null));
+        assertNotNull(FlowNames.outcomeProblem(List.of(), List.of(), "Mining", "DISABLED", null),
                 "the dialog must refuse the name while it is being typed, not only on save");
+        assertNotNull(FlowNames.outcomeProblem(List.of(), List.of(), "Mining", "next", null),
+                "a label whose constant would be NEXT is the implicit outcome in another spelling");
+    }
+
+    /** The one step from a label to its constant. */
+    @Test
+    void a_label_becomes_its_constant() {
+        assertEquals("BAG_FULL", FlowNames.constantFor("Bag full"));
+        assertEquals("BAG_FULL", FlowNames.constantFor("  bag-full "));
+        assertEquals("NO_ORE", FlowNames.constantFor("no.ore"));
+        assertEquals("NOTHING_LEFT", FlowNames.constantFor("NOTHING_LEFT"));
+        assertEquals("HANDLE_FULL_INVENTORY", FlowNames.constantFor("HandleFullInventory"));
+        assertEquals("COLLECT", FlowNames.constantFor("Collect"));
+        assertNull(FlowNames.constantFor("2nd try"));
+        assertNull(FlowNames.constantFor("—"));
+        assertEquals("Bag full", FlowNames.label("  Bag   full "));
+    }
+
+    /** Adding an outcome another card declares is sharing it; a second spelling of it is a clash. */
+    @Test
+    void an_outcome_may_be_shared_but_not_respelled_or_merged_by_a_rename() {
+        assertNull(FlowNames.outcomeProblem(List.of(), List.of("Won"), "Fishing", "Won", null));
+        assertNotNull(FlowNames.outcomeProblem(List.of(), List.of("Won"), "Fishing", "WON", null));
+        assertNotNull(FlowNames.outcomeProblem(List.of("Lost"), List.of("Won"), "Fishing", "Won", "Lost"),
+                "renaming onto another outcome would merge two constants");
+        assertNull(FlowNames.outcomeProblem(List.of("Lost"), List.of("Lost"), "Fishing", "Defeat", "Lost"),
+                "another card declaring the outcome being renamed is renamed with it");
     }
 
     @Test
-    void anOutcomeTypedWithSpacesIsNormalisedRatherThanRejected() {
-        // "bag full" is a perfectly clear thing to type; turning it into the enum constant is our job.
-        assertEquals("BAG_FULL", FlowNames.normalizeOutcome("bag full"));
-        assertEquals("BAG_FULL", FlowNames.normalizeOutcome("  bag-full "));
-        assertEquals("NO_ORE", FlowNames.normalizeOutcome("no.ore"));
-        assertNull(ActivityFlowDialog.validate(of(activity("Mining",
-                FlowNames.normalizeOutcome("bag full")))));
-    }
-
-    @Test
-    void twoActivitiesDifferingOnlyInCaseAreRejected() {
-        // Two cards that read the same, and two stub files that collide on a case-insensitive filesystem.
+    void twoActivitiesMakingOneConstantAreRejected() {
+        // Two cards that read nearly the same, and one Activities.MINING for both.
         String problem = ActivityFlowDialog.validate(of(activity("Mining"), activity("MINING")));
         assertNotNull(problem);
-        assertTrue(problem.contains("case"), problem);
+        assertTrue(problem.contains("Activities.MINING"), problem);
     }
 
     /** Naming a card refuses what saving would refuse, so a flow never sits unsaved over a name. */
     @Test
-    void a_name_differing_only_in_case_is_refused_where_it_is_typed() {
+    void a_name_making_a_taken_constant_is_refused_where_it_is_typed() {
         assertNotNull(FlowNames.activityNameProblem("MINING", List.of("Mining")));
-        // A card renamed to its own name in another case: its own name is not among the others.
+        assertNotNull(FlowNames.activityNameProblem("Bag full", List.of("bag-full")));
+        // A card renamed to its own name in another spelling: its own name is not among the others.
         assertNull(FlowNames.activityNameProblem("MINING", List.of("Fishing")));
+        assertNull(FlowNames.activityNameProblem("Handle full inventory", List.of("Fishing")));
+    }
+
+    /** Two renames before a save are one; renaming back is none. */
+    @Test
+    void pending_renames_compose() {
+        java.util.Map<String, String> renames = new java.util.LinkedHashMap<>();
+        ActivityFlowDialog.renamed(renames, "Battle", "Fight");
+        ActivityFlowDialog.renamed(renames, "Fight", "Duel");
+        assertEquals(java.util.Map.of("Battle", "Duel"), renames);
+        ActivityFlowDialog.renamed(renames, "Duel", "Battle");
+        assertTrue(renames.isEmpty());
     }
 
     @Test

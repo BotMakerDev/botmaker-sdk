@@ -8,6 +8,29 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-10-02 — the flow dialog keeps the constants in step (typed flow names, phase 2)
+
+**Done**
+- `plugin/flow/FlowConstants`: a save renames each relabelled `Activities`/`Outcomes` constant (host
+  `rename` by binding, then its initialiser's label), adds one for every label none holds, writes the flow,
+  then removes the constant of each label the flow dropped. A refused rename stops the save; a refused add or
+  remove is said and the flow is written anyway. `plan(…)` is pure and tested (`FlowConstantsTest`).
+- `ActivityFlowDialog` records canvas renames by label at last save (`renamed`, composed, cleared on landing)
+  and the labels last saved; an outcome rename renames it on every card, since it is one constant.
+- Labels are free text (`FlowNames.label`), and the rules are about the constant they make
+  (`FlowNames.constantFor`: `"Bag full"` → `BAG_FULL`, camel case split): none, a clash, or `NEXT`/`DISABLED`
+  is refused where typed and on save (`validate`). `normalizeOutcome`/`isValidIdentifier` are deleted.
+- The outcome slot editor ends with *+ New outcome…*: it asks a label, declares the constant, adds it to the
+  outcomes of the card whose body holds the slot, and writes it.
+- An outcome row's commit acted on the name it was drawn with, so a second rename was refused as a duplicate;
+  it holds the current name now.
+
+**Deferred / next**
+- Phase 3: the gamebot's outcome labels as free text, `31-umbrella-history.md`, and a check that the host
+  writes a missing `Activities.java`/`Outcomes.java` on bind.
+- A flow written from *+ New outcome…* while the Activity Flow window is open is overwritten by that window's
+  next save (it holds its own drafts).
+
 ## 2026-10-02 — activities and outcomes are constants (typed flow names, phase 1)
 
 **Done**

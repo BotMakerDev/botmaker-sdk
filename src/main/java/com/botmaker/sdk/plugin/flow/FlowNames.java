@@ -4,26 +4,67 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * The naming rules the Activity Flow enforces, in one place: what makes a valid activity or outcome name, why
- * a candidate is rejected, and how an outcome is written for a user.
+ * The naming rules the Activity Flow enforces, in one place: what an activity or outcome may be called, why
+ * a candidate is refused, and which constant a label becomes.
  *
- * <p>They live here rather than on the dialog because there are two ways to name an activity — the side
- * panel's rename field and {@link NewActivityDialog} — and two ways to name an outcome. Two copies of "is
- * this a legal name" do not stay identical, and the failure is silent: the lenient copy admits a name that
- * only breaks later, when the generator writes it into Java.
+ * <p>They live here rather than on the dialog because there are three ways to name an activity or an outcome
+ * — the side panel, {@link NewActivityDialog} and the return slot's <i>+ New outcome…</i> — and three copies
+ * of "is this a legal name" do not stay identical.
+ *
+ * <h2>A label is free text; its constant is derived (2026-10-02)</h2>
+ *
+ * <p>An activity and an outcome are constants of the bot's own {@code Activities} and {@code Outcomes}
+ * classes, each holding the label the canvas shows: {@code BAG_FULL = Outcome.named("Bag full")}. The user
+ * types the label; {@link #constantFor} is the one mechanical step from it to the constant's name. So the
+ * rules are about the <em>constant</em>: a label that yields none is refused, and two labels that yield the
+ * same one are one name twice — "Bag full" and "bag-full" would both be {@code Outcomes.BAG_FULL}.
  */
 public final class FlowNames {
 
     private FlowNames() {
     }
 
-    /** Whether {@code s} can appear as-is in generated Java (a class name, a field, an enum constant). */
-    public static boolean isValidIdentifier(String s) {
-        if (s == null || s.isEmpty() || !Character.isJavaIdentifierStart(s.charAt(0))) return false;
-        for (int i = 1; i < s.length(); i++) {
-            if (!Character.isJavaIdentifierPart(s.charAt(i))) return false;
+    /** The class the activity constants live in, for sentences. */
+    static final String ACTIVITIES = "Activities";
+
+    /** The class the outcome constants live in, for sentences. */
+    static final String OUTCOMES = "Outcomes";
+
+    /**
+     * A typed label as it is kept: trimmed, with runs of whitespace collapsed to one space. Nothing else is
+     * changed — the label is what the user reads on the card, in their own spelling.
+     */
+    public static String label(String typed) {
+        return typed == null ? "" : typed.strip().replaceAll("\\s+", " ");
+    }
+
+    /**
+     * The constant a label is written as — {@code "Bag full"} to {@code BAG_FULL}, {@code "HandleFullInventory"}
+     * to {@code HANDLE_FULL_INVENTORY} — or null when it can be none (no letter, or a digit first).
+     *
+     * <p>Letters and digits are kept, upper-cased; every run of anything else is one {@code _}, and so is a
+     * step from a lower-case letter or digit to an upper-case one. So an identifier label that is already a
+     * constant ({@code NOTHING_LEFT}) is its own constant.
+     */
+    public static String constantFor(String label) {
+        if (label == null) return null;
+        StringBuilder out = new StringBuilder();
+        boolean gap = false;
+        char previous = 0;
+        for (char c : label.strip().toCharArray()) {
+            if (!Character.isLetterOrDigit(c)) {
+                gap = out.length() > 0;
+                continue;
+            }
+            boolean camelStep = Character.isUpperCase(c)
+                    && (Character.isLowerCase(previous) || Character.isDigit(previous));
+            if (out.length() > 0 && (gap || camelStep)) out.append('_');
+            out.append(Character.toUpperCase(c));
+            gap = false;
+            previous = c;
         }
-        return true;
+        if (out.isEmpty() || !Character.isJavaIdentifierStart(out.charAt(0))) return null;
+        return out.toString();
     }
 
     /**
@@ -49,21 +90,8 @@ public final class FlowNames {
     }
 
     /**
-     * An outcome name in the shape Java wants: trimmed, upper-cased, with runs of spaces, dots and dashes
-     * collapsed to {@code _}. "bag full" becomes {@code BAG_FULL} rather than being rejected — the user is
-     * naming a result, not writing an enum constant, and the one mechanical step between the two is ours to
-     * take. {@link #isValidIdentifier} still guards what this can't fix (a leading digit, punctuation).
-     */
-    public static String normalizeOutcome(String typed) {
-        if (typed == null) return "";
-        String cleaned = typed.trim().replaceAll("[\\s.\\-]+", "_");
-        return cleaned.toUpperCase();
-    }
-
-    /**
-     * How an outcome is written for the user — a port chip, a tooltip, a dialog row. It is the constant
-     * itself, always: {@link Arrow#NEXT} for the implicit one, its own name for a declared one. One
-     * spelling, so the word on a wire and the word in the bot's Java are visibly the same thing.
+     * How an outcome is written for the user — a port chip, a tooltip, a dialog row: its label, and
+     * {@link Arrow#NEXT} for the implicit one.
      */
     public static String outcomeLabel(String outcome) {
         return outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome;
@@ -71,46 +99,53 @@ public final class FlowNames {
 
     /**
      * Why {@code candidate} can't be an outcome of the activity called {@code owner}, or null when it can.
-     * {@code replacing} is the outcome being renamed, so a rename to its own name isn't a duplicate.
+     *
+     * <p>{@code own} is that activity's outcomes and {@code elsewhere} every other activity's. An outcome is
+     * one {@code Outcomes} constant however many activities report it, so adding one another activity already
+     * declares is fine — it is the same outcome — but a second spelling of it is not, and neither is
+     * <em>renaming</em> onto it ({@code replacing} non-null), which would merge two constants.
      */
-    public static String outcomeProblem(List<String> outcomes, String owner, String candidate, String replacing) {
-        if (candidate.isEmpty()) return "Give the outcome a name.";
-        if (!isValidIdentifier(candidate)) {
-            return "'" + candidate + "' isn't a valid name — it becomes an enum constant in Java.";
-        }
-        if (Arrow.NEXT.equals(candidate)) {
+    public static String outcomeProblem(List<String> own, Collection<String> elsewhere, String owner,
+                                        String candidate, String replacing) {
+        if (candidate == null || candidate.isEmpty()) return "Give the outcome a name.";
+        String constant = constantFor(candidate);
+        if (constant == null) return noConstant(candidate, OUTCOMES);
+        if (Arrow.NEXT.equals(constant)) {
             return "Every activity already has a NEXT outcome — it is always there.";
         }
-        if (Arrow.DISABLED.equals(candidate)) {
+        if (Arrow.DISABLED.equals(constant)) {
             return "DISABLED is the port for this activity being switched off — it is always there, "
                     + "and an activity can't report it because it didn't run.";
         }
-        for (String existing : outcomes) {
-            if (existing.equals(candidate) && !existing.equals(replacing)) {
-                return "'" + candidate + "' is already an outcome of " + owner + ".";
+        for (String existing : own) {
+            if (existing.equals(replacing) || !constant.equals(constantFor(existing))) continue;
+            return existing.equals(candidate) ? "'" + candidate + "' is already an outcome of " + owner + "."
+                    : sameConstant(candidate, existing, OUTCOMES, constant);
+        }
+        for (String existing : elsewhere) {
+            if (existing.equals(replacing) || !constant.equals(constantFor(existing))) continue;
+            if (replacing != null) {
+                return "'" + existing + "' is already an outcome (" + OUTCOMES + "." + constant + "), and "
+                        + "renaming onto it would merge the two. Remove this one and add '" + existing
+                        + "' instead.";
             }
+            if (!existing.equals(candidate)) return sameConstant(candidate, existing, OUTCOMES, constant);
         }
         return null;
     }
 
     /**
      * Why {@code candidate} can't name an activity given the names already {@code taken}, or null when it can.
-     *
-     * <p>A name that differs from a taken one only in case is refused here too, since saving refuses it
-     * ({@code ActivityFlowDialog.validate}): until 2026-09-28 this let it through, and the flow then sat
-     * unsaved with the reason on the status line. {@code taken} holds the <em>other</em> activities, so a
-     * card renamed to its own name in another case is allowed.
+     * {@code taken} holds the <em>other</em> activities, so a card renamed to its own name in another
+     * spelling is allowed.
      */
     public static String activityNameProblem(String candidate, Collection<String> taken) {
         if (candidate == null || candidate.isEmpty()) return "Give the activity a name.";
-        if (!isValidIdentifier(candidate)) {
-            return "Enter a valid activity name (letters, digits, _; not starting with a digit).";
-        }
+        String constant = constantFor(candidate);
+        if (constant == null) return noConstant(candidate, ACTIVITIES);
         if (taken.contains(candidate)) return "Activity '" + candidate + "' already exists.";
         for (String other : taken) {
-            if (other.equalsIgnoreCase(candidate)) {
-                return "'" + candidate + "' differs from " + other + " only in case — pick another name.";
-            }
+            if (constant.equals(constantFor(other))) return sameConstant(candidate, other, ACTIVITIES, constant);
         }
         return null;
     }
@@ -130,13 +165,23 @@ public final class FlowNames {
         return null;
     }
 
+    private static String noConstant(String candidate, String holder) {
+        return "'" + candidate + "' can't become a constant in " + holder + ".java — start it with a letter.";
+    }
+
+    private static String sameConstant(String candidate, String existing, String holder, String constant) {
+        return "'" + candidate + "' and '" + existing + "' would both be " + holder + "." + constant
+                + " — use one spelling.";
+    }
+
     // What both activity dialogs say about the three things a card carries beyond its name. One copy, because
     // both named a GoHome.run() and a Popups.run() that no project has had since the flow became Java.
 
     /** The outcomes section's explanation. */
     public static final String OUTCOMES_HINT = "What this activity can report. Its body returns one of the "
-            + "Outcomes constants, and each gets an arrow on the canvas. Every activity also has a NEXT "
-            + "outcome (Outcome.NEXT), and any outcome you leave without an arrow ends the run.";
+            + "Outcomes constants, and each gets an arrow on the canvas. An outcome is one constant however "
+            + "many activities report it, so renaming one renames it everywhere. Every activity also has a "
+            + "NEXT outcome (Outcome.NEXT), and any outcome you leave without an arrow ends the run.";
 
     /** The go-home tick's tooltip. */
     public static final String GO_HOME_TIP = "Run the home method handed to Bot.run(…) immediately before "

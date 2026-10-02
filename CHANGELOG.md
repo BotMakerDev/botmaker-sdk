@@ -34,6 +34,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - In `Sdk.flow()`, `Flow.activity(...)` takes the activity first (`Flow.activity(Activities.COLLECT,
   Collect::body, …)`), and `Flow.edge`, `Flow.preset` and the start take constants.
 
+### Added
+
+- Activity and outcome names are free text in the Activity Flow ("Bag full"); each becomes a constant
+  (`Outcomes.BAG_FULL`) that the window adds, renames and removes for you. A constant your code still uses is
+  kept, and the window says where it is used.
+- An outcome is one constant: renaming it on one activity renames it on every activity that reports it.
+- The outcome picker in a `return` ends with **+ New outcome…**, which makes the constant and adds it to that
+  activity's outcomes.
+
 ## [1.2.3] — 2026-10-01
 
 ### Fixed

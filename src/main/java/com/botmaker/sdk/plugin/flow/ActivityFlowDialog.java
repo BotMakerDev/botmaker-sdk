@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.bot.Outcome;
@@ -33,6 +34,7 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,6 +66,10 @@ import java.util.Set;
  * {@link FlowLayout} {@code Sdk.flowLayout()} returns, written after the flow and only when they moved, so a
  * renamed card keeps its place.
  *
+ * <p>Before the flow, the names in it: each activity and outcome is a constant of the bot's {@code Activities}
+ * and {@code Outcomes} classes, renamed, added and removed by binding as the canvas changes
+ * ({@link FlowConstants}), so a card renamed here renames the constant and every line of code naming it.
+ *
  * <p>A flow whose expression the plugin cannot read — hand-written, or a call to something else — is
  * <b>shown empty and refused</b> rather than overwritten, which is the same rule every other value editor
  * follows.
@@ -93,6 +99,23 @@ public final class ActivityFlowDialog {
 
     /** The layout last read or written, so a save that moved no card leaves {@code flowLayout()} alone. */
     private FlowLayout written = FlowLayout.NONE;
+
+    /**
+     * The activity and outcome labels the flow held when it was last read or written — what the bot's
+     * {@code Activities} and {@code Outcomes} constants were kept in step with. A label that leaves the flow
+     * has its constant removed on the next save ({@link FlowConstants#forget}).
+     */
+    private Set<String> savedActivities = Set.of();
+    private Set<String> savedOutcomes = Set.of();
+
+    /**
+     * Canvas renames not yet saved, label at last save → label now. A save renames the constant holding the
+     * first, and every use of it, before writing the flow under the second; without this a rename would read
+     * as a removal plus an addition, and the code naming the old constant would stop matching the canvas.
+     * Renames clear the canvas's undo history, so nothing here has to be taken back.
+     */
+    private final Map<String, String> activityRenames = new LinkedHashMap<>();
+    private final Map<String, String> outcomeRenames = new LinkedHashMap<>();
 
     private final Label statusLabel = new Label();
 
@@ -223,6 +246,8 @@ public final class ActivityFlowDialog {
         goHomeByDefault = layout.goHomeByDefault();
         canvas.select(null);
         presets.addAll(flow.presets().stream().map(Selection::of).toList());
+        savedActivities = FlowConstants.activityLabels(flow);
+        savedOutcomes = FlowConstants.outcomeLabels(flow);
         canvas.refresh();
     }
 
@@ -353,7 +378,7 @@ public final class ActivityFlowDialog {
      */
     private void createActivityAt(Point2D at) {
         Optional<ActivityDraft> made = new NewActivityDialog(stage, services.theme(), placedNames(),
-                goHomeByDefault).showAt(at.getX(), at.getY());
+                outcomesElsewhere(null), goHomeByDefault).showAt(at.getX(), at.getY());
         if (made.isEmpty()) return;
         canvas.add(made.get());
         refreshPresetCombo();   // the built-in "Everything" preset is derived from what's on the canvas
@@ -364,6 +389,13 @@ public final class ActivityFlowDialog {
         Set<String> names = new HashSet<>();
         for (ActivityDraft d : canvas.drafts()) names.add(d.name());
         return names;
+    }
+
+    /** The outcomes every card but {@code except} declares — one {@code Outcomes} constant each. */
+    private Set<String> outcomesElsewhere(ActivityDraft except) {
+        Set<String> labels = new java.util.LinkedHashSet<>();
+        for (ActivityDraft d : canvas.drafts()) if (d != except) labels.addAll(d.outcomes());
+        return labels;
     }
 
     private void saveCurrentSelectionAsPreset() {
@@ -440,8 +472,7 @@ public final class ActivityFlowDialog {
         TextField name = new TextField(draft.name());
         name.focusedProperty().addListener((o, was, is) -> {
             if (is) return;
-            String candidate = name.getText() == null ? "" : name.getText().trim();
-            renameDraft(draft, candidate, name);
+            renameDraft(draft, FlowNames.label(name.getText()), name);
         });
         TextField description = new TextField(draft.description());
         description.textProperty().addListener((o, was, is) -> {
@@ -516,21 +547,25 @@ public final class ActivityFlowDialog {
 
         for (String outcome : List.copyOf(draft.outcomes())) {
             TextField field = new TextField(outcome);
+            // What the row names now: a rename changes it without rebuilding the row, and the next commit or
+            // ✕ has to act on the outcome as it is, not as it was drawn (a second rename was refused as a
+            // duplicate of the first until 2026-10-02).
+            String[] current = {outcome};
             field.focusedProperty().addListener((o, was, is) -> {
                 if (is) return;
-                renameOutcome(draft, outcome, field.getText(), field);
+                current[0] = renameOutcome(draft, current[0], field.getText(), field);
             });
             // Enter has to commit here too: it is the obvious way to finish a rename, and without a consuming
             // handler it would reach the default button and close the dialog with the old name still set.
             field.setOnAction(e -> {
-                renameOutcome(draft, outcome, field.getText(), field);
+                current[0] = renameOutcome(draft, current[0], field.getText(), field);
                 e.consume();
             });
             Button remove = new Button("✕");
             remove.setTooltip(new javafx.scene.control.Tooltip(
-                    "Remove this outcome. Any wire leaving it is removed too."));
+                    "Remove this outcome from this activity. Any arrow leaving it is removed too."));
             remove.setOnAction(e -> {
-                draft.outcomes().remove(outcome);
+                draft.outcomes().remove(current[0]);
                 showInSidePanel(draft);
             });
             HBox row = new HBox(6, field, remove);
@@ -543,8 +578,9 @@ public final class ActivityFlowDialog {
         newOutcome.setPromptText("new outcome (e.g. bag full)");
         Button add = new Button("Add");
         Runnable addOutcome = () -> {
-            String candidate = FlowNames.normalizeOutcome(newOutcome.getText());
-            String problem = FlowNames.outcomeProblem(draft.outcomes(), draft.name(), candidate, null);
+            String candidate = FlowNames.label(newOutcome.getText());
+            String problem = FlowNames.outcomeProblem(draft.outcomes(), outcomesElsewhere(draft), draft.name(),
+                    candidate, null);
             if (problem != null) { error(problem); return; }
             draft.outcomes().add(candidate);
             newOutcome.clear();
@@ -563,29 +599,59 @@ public final class ActivityFlowDialog {
         return box;
     }
 
-    /** Renames an outcome, carrying its wire across — as renaming an activity carries its wires. */
-    private void renameOutcome(ActivityDraft draft, String oldName, String typed, TextField field) {
-        String candidate = FlowNames.normalizeOutcome(typed);
+    /**
+     * Renames an outcome on every card that declares it, carrying each arrow across, and answers the name the
+     * row now holds.
+     *
+     * <p>Every card, because an outcome is one {@code Outcomes} constant: the save renames that constant and
+     * every {@code return} of it, so a card left on the old label would be declaring a constant that is gone.
+     */
+    private String renameOutcome(ActivityDraft draft, String oldName, String typed, TextField field) {
+        String candidate = FlowNames.label(typed);
         if (candidate.equals(oldName)) {
-            field.setText(oldName);   // normalisation may have changed the text without changing the outcome
-            return;
+            field.setText(oldName);   // trimming may have changed the text without changing the outcome
+            return oldName;
         }
-        String problem = FlowNames.outcomeProblem(draft.outcomes(), draft.name(), candidate, oldName);
+        String problem = FlowNames.outcomeProblem(draft.outcomes(), outcomesElsewhere(draft), draft.name(),
+                candidate, oldName);
         if (problem != null) {
             error(problem);
             field.setText(oldName);
-            return;
+            return oldName;
         }
-        int at = draft.outcomes().indexOf(oldName);
-        if (at < 0) return;
-        // The wire first, then the outcome. The card drops every wire whose port has gone the moment the list
-        // changes, so renaming the outcome first dropped its wire before it could be carried across — a rename
-        // lost the wiring it promises to keep (until 2026-09-28).
-        canvas.edges().setAll(rewiredOutcome(canvas.edges(), draft.name(), oldName, candidate));
-        draft.outcomes().set(at, candidate);
+        List<String> also = new ArrayList<>();
+        for (ActivityDraft d : canvas.drafts()) {
+            int at = d.outcomes().indexOf(oldName);
+            if (at < 0) continue;
+            // The arrow first, then the outcome. The card drops every arrow whose port has gone the moment the
+            // list changes, so renaming the outcome first dropped its arrow before it could be carried across
+            // (until 2026-09-28).
+            canvas.edges().setAll(rewiredOutcome(canvas.edges(), d.name(), oldName, candidate));
+            d.outcomes().set(at, candidate);
+            if (d != draft) also.add(d.name());
+        }
+        renamed(outcomeRenames, oldName, candidate);
         field.setText(candidate);
-        error("");
+        error(also.isEmpty() ? "" : "Renamed on " + String.join(", ", also)
+                + " too — an outcome is one Outcomes constant.");
         canvas.refresh();
+        return candidate;
+    }
+
+    /**
+     * Records that the label {@code was} is now {@code now} in {@code renames}, keyed by the label at the last
+     * save: two renames before a save are one, and a rename back to the saved label is none.
+     */
+    static void renamed(Map<String, String> renames, String was, String now) {
+        String original = was;
+        for (Map.Entry<String, String> pending : renames.entrySet()) {
+            if (pending.getValue().equals(was)) {
+                original = pending.getKey();
+                break;
+            }
+        }
+        if (original.equals(now)) renames.remove(original);
+        else renames.put(original, now);
     }
 
     /** {@code edges} with {@code activity}'s wire from {@code oldName} leaving from {@code newName} instead. */
@@ -762,6 +828,7 @@ public final class ActivityFlowDialog {
     }
 
     private void renameDraft(ActivityDraft draft, String candidate, TextField field) {
+        field.setText(candidate);
         if (candidate.equals(draft.name())) return;
         // The new-activity dialog's rule, over the other cards: one rule for both ways of naming a card.
         Set<String> others = new HashSet<>();
@@ -776,7 +843,8 @@ public final class ActivityFlowDialog {
         List<Selection> renamed = renamedIn(presets, was, candidate);
         presets.clear();
         presets.addAll(renamed);
-        draft.nameProperty().set(candidate); // the card re-labels and its wires follow the new name
+        renamed(activityRenames, was, candidate);
+        draft.nameProperty().set(candidate); // the card re-labels and its arrows follow the new name
         refreshPresetCombo();
         error("");
     }
@@ -941,7 +1009,23 @@ public final class ActivityFlowDialog {
         progress.setVisible(true);
         savedLabel.setText("Saving…");
 
-        String refused = FlowValue.write(value.orElse(null), flow);
+        // The constants first, so the flow written next names them (FlowConstants has the order and why).
+        List<String> notes = new ArrayList<>();
+        PluginValues values = services.pluginValues();
+        Set<String> activities = FlowConstants.activityLabels(flow);
+        Set<String> outcomes = FlowConstants.outcomeLabels(flow);
+        String refused = FlowConstants.prepare(values, FlowConstants.Kind.ACTIVITIES, activities,
+                activityRenames, notes);
+        if (refused == null) {
+            refused = FlowConstants.prepare(values, FlowConstants.Kind.OUTCOMES, outcomes, outcomeRenames, notes);
+        }
+        if (refused == null) refused = FlowValue.write(value.orElse(null), flow);
+        if (refused == null) {
+            FlowConstants.forget(values, FlowConstants.Kind.ACTIVITIES, without(savedActivities, activities), notes);
+            FlowConstants.forget(values, FlowConstants.Kind.OUTCOMES, without(savedOutcomes, outcomes), notes);
+            savedActivities = activities;
+            savedOutcomes = outcomes;
+        }
         Throwable failure = null;
         FlowLayout layout = currentLayout();
         if (refused == null && layoutValue.isPresent() && !layout.equals(written)) {
@@ -954,11 +1038,21 @@ public final class ActivityFlowDialog {
                 failure = e;
             }
         }
-        saved(refused, failure);
+        saved(refused, failure, notes);
     }
 
-    /** What happens once a write has landed — or has not. */
-    private void saved(String refused, Throwable err) {
+    /** The labels of {@code before} that {@code now} no longer has. */
+    private static Set<String> without(Set<String> before, Set<String> now) {
+        Set<String> gone = new java.util.LinkedHashSet<>(before);
+        gone.removeAll(now);
+        return gone;
+    }
+
+    /**
+     * What happens once a write has landed — or has not. {@code notes} are what the save left undone without
+     * failing: a constant still used, so not removed.
+     */
+    private void saved(String refused, Throwable err, List<String> notes) {
         saving = false;
         progress.setVisible(false);
         if (refused != null) {
@@ -974,6 +1068,7 @@ public final class ActivityFlowDialog {
             error("The flow was saved. The card positions weren't: " + rootMessage(err));
             savedLabel.setText("Saved");
         } else {
+            if (!notes.isEmpty()) error(String.join(" ", notes));
             savedLabel.setText("Saved");
         }
         if (dirty) flush();
@@ -1028,38 +1123,48 @@ public final class ActivityFlowDialog {
      * variable is a {@code @Param} field of the user's own class, so neither of them generates a field and
      * javac is what has an opinion about the names. What is left checks the names this editor is still the
      * author of.
+     *
+     * <p>Since 2026-10-02 a label is free text and the rule is about the constant it becomes
+     * ({@link FlowNames#constantFor}): every label must make one, and two labels making the same one are one
+     * name spelled twice — across the whole flow for outcomes, since an outcome is one constant wherever it is
+     * declared.
      */
     public static String validate(Flow flow) {
-        Set<String> actNames = new HashSet<>();
-        Set<String> registryFields = new HashSet<>();
+        Map<String, String> activityConstants = new HashMap<>();
+        Map<String, String> outcomeConstants = new HashMap<>();
         for (Flow.Step step : flow.steps()) {
             String name = step.label();
-            if (!FlowNames.isValidIdentifier(name)) return "Invalid activity name: '" + name + "'.";
-            if (!actNames.add(name)) return "Duplicate activity name: '" + name + "'.";
-            // Two activities differing only in case would be two cards that read the same, and one constant name.
-            if (!registryFields.add(name.toUpperCase())) {
-                return "'" + name + "' clashes with another activity whose name differs only in case.";
+            String constant = FlowNames.constantFor(name);
+            if (constant == null) {
+                return "'" + name + "' can't become a constant in Activities.java — start it with a letter.";
+            }
+            String clash = activityConstants.putIfAbsent(constant, name);
+            if (clash != null) {
+                return clash.equals(name) ? "Duplicate activity name: '" + name + "'."
+                        : "'" + name + "' and '" + clash + "' would both be Activities." + constant + ".";
             }
             // Checked against the declared list, not allOutcomes(): that one de-duplicates defensively, so
             // validating it would report a clash as clean and leave the user with an outcome that silently
             // has no port.
-            Set<String> outcomeNames = new HashSet<>();
-            outcomeNames.add(Arrow.NEXT);
-            outcomeNames.add(Arrow.DISABLED);
+            Set<String> own = new HashSet<>();
             for (Outcome declared : step.outcomes()) {
                 String outcome = declared.label();
-                if (!FlowNames.isValidIdentifier(outcome)) {
-                    return "Invalid outcome in " + name + ": '" + outcome + "'.";
+                String outcomeConstant = FlowNames.constantFor(outcome);
+                if (outcomeConstant == null) {
+                    return "Invalid outcome in " + name + ": '" + outcome + "' can't become a constant in "
+                            + "Outcomes.java.";
                 }
-                if (!outcomeNames.add(outcome)) {
-                    if (Arrow.NEXT.equals(outcome)) {
-                        return name + " already has a NEXT outcome — every activity does.";
-                    }
-                    if (Arrow.DISABLED.equals(outcome)) {
-                        return name + " can't declare a DISABLED outcome — that port is always there, "
-                                + "and an activity can't report it because it didn't run.";
-                    }
-                    return "Duplicate outcome '" + outcome + "' in " + name + ".";
+                if (Arrow.NEXT.equals(outcomeConstant)) {
+                    return name + " already has a NEXT outcome — every activity does.";
+                }
+                if (Arrow.DISABLED.equals(outcomeConstant)) {
+                    return name + " can't declare a DISABLED outcome — that port is always there, "
+                            + "and an activity can't report it because it didn't run.";
+                }
+                if (!own.add(outcomeConstant)) return "Duplicate outcome '" + outcome + "' in " + name + ".";
+                String other = outcomeConstants.putIfAbsent(outcomeConstant, outcome);
+                if (other != null && !other.equals(outcome)) {
+                    return "'" + outcome + "' and '" + other + "' would both be Outcomes." + outcomeConstant + ".";
                 }
             }
         }

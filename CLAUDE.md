@@ -160,7 +160,10 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
   `Outcome.named("Won")` are values equal by label; a bot holds them as `@Managed("activities")
   Activities` and `@Managed("outcomes") Outcomes` open sets in `plugins/sdk/` (`SdkValues.ACTIVITIES`/
   `OUTCOMES`), and the host writes a value equal to a constant as the constant. The flow canvas works on
-  labels (`plugin/flow/Arrow`, `Selection`) and converts at load and save.
+  labels (`plugin/flow/Arrow`, `Selection`) and converts at load and save. A label is free text and its
+  constant is `FlowNames.constantFor` (`"Bag full"` → `BAG_FULL`); a save keeps the two classes in step by
+  binding (`plugin/flow/FlowConstants`: rename, add, write the flow, remove), and an outcome is one constant
+  however many cards declare it.
 - `api.capture` — `CaptureSource` (`desktop()`, `monitor(i)`, `window(title)`, `emulator(name)`, `region(…)`;
   `capture()` and `origin()` go together), `Source.current()` (what `Bot.run` installed, or the whole desktop).
 - `api.input` (`Mouse`, `Keyboard`, …), `api.time` (`Wait`, `Time`), `api.sound`, `api.geometry`.
