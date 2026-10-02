@@ -88,8 +88,9 @@ class SdkPluginSurfaceTest {
     private static final List<Class<?>> DECLARED_TYPES = List.of(
             ImageTemplate.class, Precision.class, OcrOptions.class, Point.class, Rect.class, Size.class,
             Key.class, MouseButton.class, Combo.class,
-            KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, MatchResult.class, Matches.class,
-            ColorMatch.class, TextMatch.class);
+            KeySequence.class, CaptureSource.class, ImageTemplateGroup.class,
+            com.botmaker.sdk.api.flow.Activity.class, com.botmaker.sdk.api.bot.Outcome.class,
+            MatchResult.class, Matches.class, ColorMatch.class, TextMatch.class);
 
     private final SdkPlugin plugin = new SdkPlugin();
 
@@ -126,7 +127,9 @@ class SdkPluginSurfaceTest {
         var pictures = byId.get("pictures");
         assertEquals("Pictures", pictures.holder());
         assertNull(pictures.type());
-        assertEquals(5, byId.size());
+        assertEquals("Activities", byId.get("activities").holder());
+        assertEquals("Outcomes", byId.get("outcomes").holder());
+        assertEquals(7, byId.size());
     }
 
     /** The palette is the host's to discover from {@code @Palette}; {@link ApiCatalogTest} checks what it finds. */
@@ -293,7 +296,7 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(16, plugin.types().size(), "Direction went on 2026-10-01");
+        assertEquals(18, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02");
     }
 
     /**

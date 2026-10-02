@@ -4,6 +4,8 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import javafx.application.Platform;
@@ -72,7 +74,7 @@ public final class ActivityFlowDialog {
     private final StudioServices services;
 
     private final FlowCanvas canvas = new FlowCanvas();
-    private final List<Flow.Preset> presets = new ArrayList<>();
+    private final List<Selection> presets = new ArrayList<>();
 
     /**
      * The {@code @Managed("flow")} value this window edits, or empty when the project has none — no
@@ -113,7 +115,7 @@ public final class ActivityFlowDialog {
     private final Label orderLabel = new Label();
     private final ProgressIndicator progress = new ProgressIndicator();
     private final VBox sidePanel = new VBox(10);
-    private final ComboBox<Flow.Preset> presetCombo = new ComboBox<>();
+    private final ComboBox<Selection> presetCombo = new ComboBox<>();
 
     /**
      * Autosave, coalesced. Every edit on the canvas asks to be written, which is far too much work to do per
@@ -169,7 +171,7 @@ public final class ActivityFlowDialog {
         canvas.setOnMessage(this::error);
         canvas.setOnChainChanged(this::refreshOrderLabel);
         canvas.setOnCanvasDoubleClick(this::createActivityAt);
-        // Wired *after* loadCurrent, so seeding the canvas doesn't read as a dozen edits by the user; and the
+        // Arrowd *after* loadCurrent, so seeding the canvas doesn't read as a dozen edits by the user; and the
         // history is cleared for the same reason — the flow as it was loaded is the state undo bottoms out at.
         canvas.setOnFlowMutated(this::markDirty);
         canvas.history().clear();
@@ -206,21 +208,21 @@ public final class ActivityFlowDialog {
         Flow flow = readFlow();
         FlowLayout layout = loadLayout();
         boolean anyPlaced = false;
-        for (Flow.Activity a : flow.activities()) {
-            FlowLayout.Spot placed = layout.spot(a.name());
+        for (Flow.Step step : flow.steps()) {
+            FlowLayout.Spot placed = layout.spot(step.label());
             anyPlaced |= placed != null;
             Point2D at = placed == null ? canvas.nextFreeSpot() : new Point2D(placed.x(), placed.y());
-            canvas.add(ActivityDraft.of(a, at.getX(), at.getY()));
+            canvas.add(ActivityDraft.of(step, at.getX(), at.getY()));
         }
         // Only when nothing at all was placed: one saved position is enough to mean someone laid this out.
-        arrangeOnOpen = !anyPlaced && !flow.activities().isEmpty();
-        canvas.edges().setAll(flow.edges());
-        canvas.setStart(flow.start());
+        arrangeOnOpen = !anyPlaced && !flow.steps().isEmpty();
+        canvas.edges().setAll(flow.edges().stream().map(Arrow::of).toList());
+        canvas.setStart(flow.start().label());
         maxSteps = flow.limits().maxSteps();
         stepDelayMs = flow.limits().stepDelayMs();
         goHomeByDefault = layout.goHomeByDefault();
         canvas.select(null);
-        presets.addAll(flow.presets());
+        presets.addAll(flow.presets().stream().map(Selection::of).toList());
         canvas.refresh();
     }
 
@@ -263,14 +265,14 @@ public final class ActivityFlowDialog {
         presetCombo.setPromptText("Preset…");
         presetCombo.setPrefWidth(180);
         presetCombo.setConverter(new javafx.util.StringConverter<>() {
-            @Override public String toString(Flow.Preset preset) { return preset == null ? "" : preset.name(); }
-            @Override public Flow.Preset fromString(String s) { return null; } // display-only
+            @Override public String toString(Selection preset) { return preset == null ? "" : preset.name(); }
+            @Override public Selection fromString(String s) { return null; } // display-only
         });
         refreshPresetCombo();
 
         Button applyPreset = new Button("Apply");
         applyPreset.setOnAction(e -> {
-            Flow.Preset preset = presetCombo.getValue();
+            Selection preset = presetCombo.getValue();
             if (preset == null) { error("Pick a preset first."); return; }
             // One step, not one per activity: a preset flips every switch at once, and taking that back should
             // be a single ↶ rather than a dozen.
@@ -383,7 +385,7 @@ public final class ActivityFlowDialog {
             if (d.enabled()) on.add(d.name());
         }
         presets.removeIf(p -> p.name().equals(name)); // re-saving a name overwrites it
-        presets.add(Flow.preset(name, on));
+        presets.add(new Selection(name, on));
         refreshPresetCombo();
         // The last item of the list, which is the built-ins then these: presets.size() - 1 selected the preset
         // two before the one just saved (until 2026-09-28).
@@ -402,9 +404,9 @@ public final class ActivityFlowDialog {
     private void refreshPresetCombo() {
         List<String> all = new ArrayList<>();
         for (ActivityDraft d : canvas.drafts()) all.add(d.name());
-        List<Flow.Preset> items = new ArrayList<>();
-        items.add(Flow.preset(EVERYTHING, all));
-        items.add(Flow.preset(NOTHING, List.of()));
+        List<Selection> items = new ArrayList<>();
+        items.add(new Selection(EVERYTHING, all));
+        items.add(new Selection(NOTHING, List.of()));
         items.addAll(presets);
         presetCombo.getItems().setAll(items);
     }
@@ -587,11 +589,11 @@ public final class ActivityFlowDialog {
     }
 
     /** {@code edges} with {@code activity}'s wire from {@code oldName} leaving from {@code newName} instead. */
-    static List<Flow.Edge> rewiredOutcome(List<Flow.Edge> edges, String activity, String oldName, String newName) {
-        List<Flow.Edge> rewired = new ArrayList<>(edges.size());
-        for (Flow.Edge e : edges) {
+    static List<Arrow> rewiredOutcome(List<Arrow> edges, String activity, String oldName, String newName) {
+        List<Arrow> rewired = new ArrayList<>(edges.size());
+        for (Arrow e : edges) {
             boolean mine = e.from().equals(activity) && e.outcomeOrNext().equals(oldName);
-            rewired.add(mine ? new Flow.Edge(e.from(), e.to(), newName) : e);
+            rewired.add(mine ? new Arrow(e.from(), e.to(), newName) : e);
         }
         return rewired;
     }
@@ -600,10 +602,10 @@ public final class ActivityFlowDialog {
      * {@code presets} with the activity {@code oldName} called {@code newName}. A preset names its activities,
      * so a rename that left them alone quietly took the renamed card out of every preset (until 2026-09-28).
      */
-    static List<Flow.Preset> renamedIn(List<Flow.Preset> presets, String oldName, String newName) {
-        List<Flow.Preset> out = new ArrayList<>(presets.size());
-        for (Flow.Preset p : presets) {
-            out.add(Flow.preset(p.name(), p.activities().stream()
+    static List<Selection> renamedIn(List<Selection> presets, String oldName, String newName) {
+        List<Selection> out = new ArrayList<>(presets.size());
+        for (Selection p : presets) {
+            out.add(new Selection(p.name(), p.activities().stream()
                     .map(a -> a.equals(oldName) ? newName : a).toList()));
         }
         return out;
@@ -771,7 +773,7 @@ public final class ActivityFlowDialog {
             return;
         }
         String was = draft.name();
-        List<Flow.Preset> renamed = renamedIn(presets, was, candidate);
+        List<Selection> renamed = renamedIn(presets, was, candidate);
         presets.clear();
         presets.addAll(renamed);
         draft.nameProperty().set(candidate); // the card re-labels and its wires follow the new name
@@ -871,9 +873,10 @@ public final class ActivityFlowDialog {
 
     /** The flow as it currently stands, ready to be written into the bot's Java. */
     private Flow currentFlow() {
-        List<Flow.Activity> activities = new ArrayList<>();
-        for (ActivityDraft d : canvas.drafts()) activities.add(d.toActivity());
-        return Flow.of(activities, List.copyOf(canvas.edges()), List.copyOf(presets), canvas.start(),
+        List<Flow.Step> steps = new ArrayList<>();
+        for (ActivityDraft d : canvas.drafts()) steps.add(d.toStep());
+        return Flow.of(steps, canvas.edges().stream().map(Arrow::toEdge).toList(),
+                presets.stream().map(Selection::toPreset).toList(), Activity.named(canvas.start()),
                 Flow.limits(maxSteps, stepDelayMs));
     }
 
@@ -1021,7 +1024,7 @@ public final class ActivityFlowDialog {
      *
      * <p><b>The generated-field check is gone</b>, and it was the largest of these. An activity's enable
      * flag and a project's variables used to become fields of one generated class, so their names had to be
-     * unique valid identifiers within one namespace; the flag is now {@link Flow.Activity#enabled()} and a
+     * unique valid identifiers within one namespace; the flag is now {@link Flow.Step#enabled()} and a
      * variable is a {@code @Param} field of the user's own class, so neither of them generates a field and
      * javac is what has an opinion about the names. What is left checks the names this editor is still the
      * author of.
@@ -1029,34 +1032,34 @@ public final class ActivityFlowDialog {
     public static String validate(Flow flow) {
         Set<String> actNames = new HashSet<>();
         Set<String> registryFields = new HashSet<>();
-        for (Flow.Activity a : flow.activities()) {
-            if (!FlowNames.isValidIdentifier(a.name())) return "Invalid activity name: '" + a.name() + "'.";
-            if (!actNames.add(a.name())) return "Duplicate activity name: '" + a.name() + "'.";
-            // Two activities differing only in case is a project whose stub files collide on a
-            // case-insensitive filesystem, and a canvas on which two cards read the same. Neither is worth
-            // letting through for the sake of a distinction only Linux can see.
-            if (!registryFields.add(a.name().toUpperCase())) {
-                return "'" + a.name() + "' clashes with another activity whose name differs only in case.";
+        for (Flow.Step step : flow.steps()) {
+            String name = step.label();
+            if (!FlowNames.isValidIdentifier(name)) return "Invalid activity name: '" + name + "'.";
+            if (!actNames.add(name)) return "Duplicate activity name: '" + name + "'.";
+            // Two activities differing only in case would be two cards that read the same, and one constant name.
+            if (!registryFields.add(name.toUpperCase())) {
+                return "'" + name + "' clashes with another activity whose name differs only in case.";
             }
             // Checked against the declared list, not allOutcomes(): that one de-duplicates defensively, so
             // validating it would report a clash as clean and leave the user with an outcome that silently
             // has no port.
             Set<String> outcomeNames = new HashSet<>();
-            outcomeNames.add(Flow.Edge.NEXT);
-            outcomeNames.add(Flow.Edge.DISABLED);
-            for (String outcome : a.outcomes()) {
+            outcomeNames.add(Arrow.NEXT);
+            outcomeNames.add(Arrow.DISABLED);
+            for (Outcome declared : step.outcomes()) {
+                String outcome = declared.label();
                 if (!FlowNames.isValidIdentifier(outcome)) {
-                    return "Invalid outcome in " + a.name() + ": '" + outcome + "'.";
+                    return "Invalid outcome in " + name + ": '" + outcome + "'.";
                 }
                 if (!outcomeNames.add(outcome)) {
-                    if (Flow.Edge.NEXT.equals(outcome)) {
-                        return a.name() + " already has a NEXT outcome — every activity does.";
+                    if (Arrow.NEXT.equals(outcome)) {
+                        return name + " already has a NEXT outcome — every activity does.";
                     }
-                    if (Flow.Edge.DISABLED.equals(outcome)) {
-                        return a.name() + " can't declare a DISABLED outcome — that port is always there, "
+                    if (Arrow.DISABLED.equals(outcome)) {
+                        return name + " can't declare a DISABLED outcome — that port is always there, "
                                 + "and an activity can't report it because it didn't run.";
                     }
-                    return "Duplicate outcome '" + outcome + "' in " + a.name() + ".";
+                    return "Duplicate outcome '" + outcome + "' in " + name + ".";
                 }
             }
         }

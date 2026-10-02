@@ -1,7 +1,9 @@
 package com.botmaker.sdk.internal.flow;
 
-import com.botmaker.sdk.api.bot.Activities;
+import com.botmaker.sdk.api.bot.ActivitySwitch;
+import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.bot.PopupGuard;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import org.junit.jupiter.api.AfterEach;
@@ -23,8 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>A run always ends in {@code Bot.stop()}, which throws — so {@link #walk} asserts the throw, and a test
  * that never reached the end would fail rather than pass by accident.
+ *
+ * <p>Activities and outcomes are written by label here ({@link #edge}, {@link #on}): a label is the value a
+ * bot's constant holds, so {@code Activity.named("A")} is what {@code Activities.A} would be.
  */
 class FlowWalkerTest {
+
+    private static final String DISABLED = Outcome.DISABLED.label();
 
     private final List<String> log = new ArrayList<>();
 
@@ -50,31 +57,39 @@ class FlowWalkerTest {
         Deque<String> script = new ArrayDeque<>(List.of(outcomes));
         return () -> {
             log.add(name + (PopupGuard.isEnabled() ? "+popup" : "-popup"));
-            assertEquals(name, FlowWalker.current(), "the walk says which activity is running");
-            return script.isEmpty() ? Activities.next() : Activities.outcome(script.removeFirst());
+            assertEquals(Activity.named(name), FlowWalker.current(), "the walk says which activity is running");
+            return script.isEmpty() ? Outcome.NEXT : Outcome.named(script.removeFirst());
         };
     }
 
-    private Flow.Activity on(String name, String... outcomes) {
-        return Flow.activity(body(name, outcomes), name, "", true, false, true, List.of());
+    private static Flow.Step step(ActivityBody body, String name, boolean enabled, boolean goHome,
+                                  boolean popupCheck) {
+        return Flow.activity(Activity.named(name), body, "", enabled, goHome, popupCheck, List.of());
     }
 
-    private Flow.Activity off(String name) {
-        return Flow.activity(body(name), name, "", false, false, true, List.of());
+    private Flow.Step on(String name, String... outcomes) {
+        return step(body(name, outcomes), name, true, false, true);
     }
 
-    private static Flow flow(String start, List<Flow.Activity> activities, Flow.Edge... edges) {
-        return flow(start, Flow.Limits.DEFAULT, activities, edges);
+    private Flow.Step off(String name) {
+        return step(body(name), name, false, false, true);
     }
 
-    private static Flow flow(String start, Flow.Limits limits, List<Flow.Activity> activities,
-                             Flow.Edge... edges) {
-        return Flow.of(activities, List.of(edges), List.of(), start, limits);
+    private static Flow.Edge edge(String from, String to, String outcome) {
+        return Flow.edge(Activity.named(from), Activity.named(to), Outcome.named(outcome));
+    }
+
+    private static Flow flow(String start, List<Flow.Step> steps, Flow.Edge... edges) {
+        return flow(start, Flow.Limits.DEFAULT, steps, edges);
+    }
+
+    private static Flow flow(String start, Flow.Limits limits, List<Flow.Step> steps, Flow.Edge... edges) {
+        return Flow.of(steps, List.of(edges), List.of(), Activity.named(start), limits);
     }
 
     /** Installs and walks {@code flow} to its end, with no pause between activities. */
     private static void walk(Flow flow, Runnable goHome) {
-        Flow unpaused = Flow.of(flow.activities(), flow.edges(), flow.presets(), flow.start(),
+        Flow unpaused = Flow.of(flow.steps(), flow.edges(), flow.presets(), flow.start(),
                 Flow.limits(flow.limits().maxSteps(), 0));
         Flows.use(unpaused);
         assertThrows(RuntimeException.class, () -> FlowWalker.run(unpaused, goHome),
@@ -89,16 +104,17 @@ class FlowWalkerTest {
 
     @Test
     void anOutcomeGoesWhereItsEdgeSays() {
-        walk(flow("A", List.of(on("A", "RIGHT"), on("L"), on("R")),
-                Flow.edge("A", "L", "LEFT"), Flow.edge("A", "R", "RIGHT")));
+        walk(flow("A", List.of(on("A", "Right"), on("L"), on("R")),
+                edge("A", "L", "Left"), edge("A", "R", "Right")));
 
-        assertEquals(List.of("A+popup", "R+popup"), log, "RIGHT takes the RIGHT wire; L never runs");
+        assertEquals(List.of("A+popup", "R+popup"), log, "Right takes the Right arrow; L never runs");
     }
 
-    /** A blank stored outcome is NEXT, which is what {@code Activities.next()} reports. */
+    /** {@code Outcome.NEXT} follows the plain arrow, which a blank label also names. */
     @Test
-    void doneFollowsTheBlankEdge() {
-        walk(flow("A", List.of(on("A"), on("B")), Flow.edge("A", "B", "")));
+    void nextFollowsThePlainEdge() {
+        walk(flow("A", List.of(on("A"), on("B")), Flow.edge(Activity.named("A"), Activity.named("B"),
+                Outcome.NEXT)));
 
         assertEquals(List.of("A+popup", "B+popup"), log);
     }
@@ -106,21 +122,21 @@ class FlowWalkerTest {
     @Test
     void aFlowMayLoopBackOnItself() {
         // Three passes, then an outcome with nothing wired to it.
-        walk(flow("A", List.of(on("A", "", "", "LEFT")), Flow.edge("A", "A", "")));
+        walk(flow("A", List.of(on("A", "", "", "Left")), edge("A", "A", "")));
 
-        assertEquals(3, log.size(), "it loops until an outcome runs out of wire");
+        assertEquals(3, log.size(), "it loops until an outcome has no arrow");
     }
 
     @Test
     void anUnwiredOutcomeEndsTheRun() {
-        walk(flow("A", List.of(on("A", "RIGHT"), on("B")), Flow.edge("A", "B", "LEFT")));
+        walk(flow("A", List.of(on("A", "Right"), on("B")), edge("A", "B", "Left")));
 
         assertEquals(List.of("A+popup"), log);
     }
 
     @Test
     void anEdgeToAnActivityTheFlowDoesNotHaveEndsTheRun() {
-        walk(flow("A", List.of(on("A")), Flow.edge("A", "Deleted", "")));
+        walk(flow("A", List.of(on("A")), edge("A", "Deleted", "")));
 
         assertEquals(List.of("A+popup"), log);
     }
@@ -136,40 +152,37 @@ class FlowWalkerTest {
 
     @Test
     void keepsTheStartWhenItNamesAnActivity() {
-        assertEquals("B", FlowWalker.start(flow("B", List.of(on("A"), on("B")))));
+        assertEquals(Activity.named("B"), FlowWalker.start(flow("B", List.of(on("A"), on("B")))));
     }
 
     /** A deleted or renamed start activity must not be the reason a bot does nothing. */
     @Test
     void fallsBackToTheFirstActivityWhenTheStartIsStale() {
-        assertEquals("A", FlowWalker.start(flow("Deleted", List.of(on("A"), on("B")))));
+        assertEquals(Activity.named("A"), FlowWalker.start(flow("Deleted", List.of(on("A"), on("B")))));
         assertNull(FlowWalker.start(Flow.NONE));
     }
 
     // ---- per-activity settings --------------------------------------------------------------------------
 
     @Test
-    void aDisabledActivityFollowsItsDisabledWireWithoutRunning() {
-        walk(flow("A", List.of(off("A"), on("B")),
-                Flow.edge("A", "A", ""), Flow.edge("A", "B", Flow.Edge.DISABLED)));
+    void aDisabledActivityFollowsItsDisabledArrowWithoutRunning() {
+        walk(flow("A", List.of(off("A"), on("B")), edge("A", "A", ""), edge("A", "B", DISABLED)));
 
         assertEquals(List.of("B+popup"), log, "the flow passes through a disabled activity, doing nothing");
     }
 
     @Test
-    void aDisabledActivityWithNoDisabledWireEndsTheRun() {
-        walk(flow("A", List.of(off("A"), on("B")), Flow.edge("A", "B", "")));
+    void aDisabledActivityWithNoDisabledArrowEndsTheRun() {
+        walk(flow("A", List.of(off("A"), on("B")), edge("A", "B", "")));
 
-        assertTrue(log.isEmpty(), "the wire is drawn, never inferred from NEXT");
+        assertTrue(log.isEmpty(), "the arrow is drawn, never inferred from NEXT");
     }
 
-    /** Drawing a flow before writing its code: a card with no body takes its DISABLED wire. */
+    /** Drawing a flow before writing its code: a card with no body takes its DISABLED arrow. */
     @Test
-    void anActivityWithNoBodyFallsThroughItsDisabledWire() {
-        Flow.Activity unwritten = Flow.activity(ActivityBody.NONE, "Unwritten", "", true, false, false,
-                List.of());
-        walk(flow("Unwritten", List.of(unwritten, on("B")),
-                Flow.edge("Unwritten", "B", Flow.Edge.DISABLED)));
+    void anActivityWithNoBodyFallsThroughItsDisabledArrow() {
+        walk(flow("Unwritten", List.of(step(ActivityBody.NONE, "Unwritten", true, false, false), on("B")),
+                edge("Unwritten", "B", DISABLED)));
 
         assertEquals(List.of("B+popup"), log);
     }
@@ -178,11 +191,11 @@ class FlowWalkerTest {
     void anOverrideMadeMidRunIsReadOnTheNextPass() {
         ActivityBody once = () -> {
             log.add("once");
-            Activities.disable("Once");
-            return Activities.next();
+            ActivitySwitch.disable(Activity.named("Once"));
+            return Outcome.NEXT;
         };
-        walk(flow("Once", List.of(Flow.activity(once, "Once", "", true, false, false, List.of()), on("B")),
-                Flow.edge("Once", "Once", ""), Flow.edge("Once", "B", Flow.Edge.DISABLED)));
+        walk(flow("Once", List.of(step(once, "Once", true, false, false), on("B")),
+                edge("Once", "Once", ""), edge("Once", "B", DISABLED)));
 
         assertEquals(List.of("once", "B+popup"), log);
     }
@@ -190,8 +203,8 @@ class FlowWalkerTest {
     @Test
     void popupCheckIsSetPerActivityRatherThanInherited() {
         PopupGuard.enabled(false);
-        Flow.Activity quiet = Flow.activity(body("B"), "B", "", true, false, false, List.of());
-        walk(flow("A", List.of(on("A"), quiet, on("C")), Flow.edge("A", "B", ""), Flow.edge("B", "C", "")));
+        walk(flow("A", List.of(on("A"), step(body("B"), "B", true, false, false), on("C")),
+                edge("A", "B", ""), edge("B", "C", "")));
 
         assertEquals(List.of("A+popup", "B-popup", "C+popup"), log,
                 "PopupGuard is process-global, so every activity states what it wants");
@@ -199,10 +212,9 @@ class FlowWalkerTest {
 
     @Test
     void goHomeRunsOnlyForActivitiesThatAskForItAndOnlyWhenActive() {
-        Flow.Activity offHoming = Flow.activity(body("A"), "A", "", false, true, true, List.of());
-        Flow.Activity homing = Flow.activity(body("C"), "C", "", true, true, true, List.of());
-        walk(flow("A", List.of(offHoming, on("B"), homing),
-                        Flow.edge("A", "B", Flow.Edge.DISABLED), Flow.edge("B", "C", "")),
+        walk(flow("A", List.of(step(body("A"), "A", false, true, true), on("B"),
+                                step(body("C"), "C", true, true, true)),
+                        edge("A", "B", DISABLED), edge("B", "C", "")),
                 () -> log.add("goHome"));
 
         assertEquals(List.of("B+popup", "goHome", "C+popup"), log,
@@ -213,7 +225,7 @@ class FlowWalkerTest {
 
     @Test
     void aFlowThatNeverEndsGivesUpAfterTheStepBudget() {
-        walk(flow("A", Flow.limits(4, 0), List.of(on("A")), Flow.edge("A", "A", "")));
+        walk(flow("A", Flow.limits(4, 0), List.of(on("A")), edge("A", "A", "")));
 
         assertEquals(4, log.size(), "four hand-offs, then it gives up rather than looping forever");
     }
@@ -221,8 +233,7 @@ class FlowWalkerTest {
     /** {@link Flow.Limits#maxSteps()} documents 0 as "no limit"; it used to stop before the first step. */
     @Test
     void aZeroStepBudgetIsNoLimit() {
-        walk(flow("A", Flow.limits(0, 0), List.of(on("A", "", "", "", "", "", "END")),
-                Flow.edge("A", "A", "")));
+        walk(flow("A", Flow.limits(0, 0), List.of(on("A", "", "", "", "", "", "End")), edge("A", "A", "")));
 
         assertEquals(6, log.size());
     }

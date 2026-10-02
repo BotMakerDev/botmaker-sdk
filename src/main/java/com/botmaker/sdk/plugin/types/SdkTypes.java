@@ -5,7 +5,9 @@ import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.DeclaredCallType;
 import com.botmaker.plugin.api.value.DeclaredType;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
@@ -25,6 +27,7 @@ import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.vision.TemplateNames;
+import com.botmaker.sdk.plugin.editors.ActivityEditors;
 import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 import com.botmaker.sdk.plugin.editors.GeometryEditors;
 import com.botmaker.sdk.plugin.editors.InputEditors;
@@ -200,6 +203,28 @@ public final class SdkTypes {
             .writtenAsParts();
 
     /**
+     * One activity of the flow, {@code Activity.named("Collect")} — which the host writes as the bot's
+     * {@code Activities.COLLECT} whenever a constant holds the same label (2026-10-02). A fresh one is no
+     * activity; the picker offers the flow's.
+     */
+    public static final DeclaredCallType<Activity> ACTIVITY = PluginType.value(Activity.class)
+            .fresh(() -> Activity.NONE)
+            .editor(() -> ActivityEditors::activity)
+            .writtenAs(Activity::named, Activity::label)
+            .constants(Activity.NONE);
+
+    /**
+     * What an activity reports, {@code Outcome.named("Won")} — written as the bot's {@code Outcomes.WON}
+     * whenever a constant holds the same label, and as {@code Outcome.NEXT}/{@code Outcome.DISABLED} for the two
+     * every activity has (2026-10-02). A fresh one is {@code NEXT}, "nothing special to report".
+     */
+    public static final DeclaredCallType<Outcome> OUTCOME = PluginType.value(Outcome.class)
+            .fresh(() -> Outcome.NEXT)
+            .editor(() -> ActivityEditors::outcome)
+            .writtenAs(Outcome::named, Outcome::label)
+            .constants(Outcome.NEXT, Outcome.DISABLED);
+
+    /**
      * Types a bot author may <b>hold</b> but nobody edits, whose fresh form is a call the bot re-evaluates.
      *
      * <p>{@code filledBy} names the method the host writes a call to: {@code Vision.lastMatch()} means <em>the
@@ -240,6 +265,7 @@ public final class SdkTypes {
             POINT, RECT, SIZE,
             KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE,
             CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP,
+            ACTIVITY, OUTCOME,
             MATCH_RESULT, MATCHES, COLOR_MATCH, TEXT_MATCH);
 
     /**

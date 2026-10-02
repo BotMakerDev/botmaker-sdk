@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.console.Debug;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.time.Wait;
@@ -25,21 +26,21 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <h2>Switching an activity off mid-run</h2>
  *
- * <p>The flow's {@link Flow.Activity#enabled()} is the default; {@link #setEnabled} overrides it for the rest
- * of the process, which is how a body says "do this once, then stop". The overrides live here because the
- * walk is the only thing that reads them.
+ * <p>The flow's {@link Flow.Step#enabled()} is the default; {@link #setEnabled} overrides it for the rest of the
+ * process, which is how a body says "do this once, then stop". The overrides live here because the walk is the
+ * only thing that reads them.
  */
 public final class FlowWalker {
 
-    private static final Map<String, Boolean> OVERRIDES = new ConcurrentHashMap<>();
+    private static final Map<Activity, Boolean> OVERRIDES = new ConcurrentHashMap<>();
 
-    /** The activity whose body this thread is running, for {@code Activities.outcome}'s check. */
-    private static final ThreadLocal<String> CURRENT = new ThreadLocal<>();
+    /** The activity whose body this thread is running. */
+    private static final ThreadLocal<Activity> CURRENT = new ThreadLocal<>();
 
     private FlowWalker() {}
 
     /** The activity whose body is running on this thread, or {@code null} outside one. */
-    public static String current() {
+    public static Activity current() {
         return CURRENT.get();
     }
 
@@ -52,7 +53,7 @@ public final class FlowWalker {
     public static void run(Flow flow, Runnable goHome) {
         int maxSteps = flow.limits().maxSteps();
         int stepDelayMs = flow.limits().stepDelayMs();
-        String current = start(flow);
+        Activity current = start(flow);
         for (int steps = 0; current != null; steps++) {
             if (maxSteps > 0 && steps >= maxSteps) {
                 Debug.error("[Flow] Gave up after " + maxSteps + " steps at '" + current
@@ -69,19 +70,19 @@ public final class FlowWalker {
         Bot.stop();
     }
 
-    /** Whether the named activity runs this pass: a runtime override if one was made, else the flow's flag. */
-    public static boolean active(String activity) {
-        Boolean override = OVERRIDES.get(activity);
+    /** Whether the activity runs this pass: a runtime override if one was made, else the flow's flag. */
+    public static boolean active(Activity activity) {
+        Boolean override = activity == null ? null : OVERRIDES.get(activity);
         return override != null ? override : Flows.enabled(activity);
     }
 
     /**
-     * Overrides the named activity's flag for the rest of the process. A name the installed flow does not
-     * have is a warning and a no-op, so a typo never stops a running bot.
+     * Overrides the activity's flag for the rest of the process. One the installed flow does not have is a
+     * warning and a no-op, so a stale constant never stops a running bot.
      */
-    public static void setEnabled(String activity, boolean enabled) {
-        if (activity == null || Flows.installed().activity(activity) == null) {
-            Debug.error("[Activity] setEnabled: the flow has no activity named '" + activity + "'. Ignoring.");
+    public static void setEnabled(Activity activity, boolean enabled) {
+        if (activity == null || Flows.installed().step(activity) == null) {
+            Debug.error("[Activity] setEnabled: the flow has no activity '" + activity + "'. Ignoring.");
             return;
         }
         OVERRIDES.put(activity, enabled);
@@ -93,30 +94,39 @@ public final class FlowWalker {
     }
 
     /** {@link Flow#start()} when the flow has it, else its first activity, else {@code null}. */
-    static String start(Flow flow) {
-        if (flow.activity(flow.start()) != null) return flow.start();
-        return flow.activities().isEmpty() ? null : flow.activities().getFirst().name();
+    static Activity start(Flow flow) {
+        if (flow.step(flow.start()) != null) return flow.start();
+        return flow.steps().isEmpty() ? null : flow.steps().getFirst().activity();
     }
 
     /**
-     * The activity after {@code name}, or {@code null} to end the run.
+     * The activity after {@code activity}, or {@code null} to end the run.
      *
      * <p>A disabled activity is not skipped <em>out of</em> the flow — the run still passes through it and
      * follows its {@code DISABLED} edge. An activity with no body yet ({@link ActivityBody#NONE}) takes the
      * same edge, for the same reason: it is on the canvas and it does nothing.
+     *
+     * <p>An unwired outcome the step does not declare is not refused: it ends the run, as any unwired outcome
+     * does, and one line says the activity reported something its card never offered.
      */
-    static String step(Flow flow, String name, Runnable goHome) {
-        Flow.Activity activity = flow.activity(name);
-        if (activity == null) return null;
-        ActivityBody body = activity.body();
-        if (body == null || body == ActivityBody.NONE || !active(name)) {
-            return target(flow, name, Flow.Edge.DISABLED);
+    static Activity step(Flow flow, Activity activity, Runnable goHome) {
+        Flow.Step step = flow.step(activity);
+        if (step == null) return null;
+        ActivityBody body = step.body();
+        if (body == null || body == ActivityBody.NONE || !active(activity)) {
+            return target(flow, activity, Outcome.DISABLED);
         }
         // Set for every activity, not only the ones that opt out: PopupGuard.enabled is process-global.
-        PopupGuard.enabled(activity.popupCheck());
+        PopupGuard.enabled(step.popupCheck());
         // After the active() check: there is nothing to go home for if the activity won't run.
-        if (activity.goHome() && goHome != null) goHome.run();
-        return target(flow, name, execute(name, body).name());
+        if (step.goHome() && goHome != null) goHome.run();
+        Outcome outcome = execute(step, body);
+        Activity next = target(flow, activity, outcome);
+        if (next == null && !outcome.equals(Outcome.NEXT) && !step.outcomes().contains(outcome)) {
+            Debug.error("[Activity] " + step.label() + " reported '" + outcome + "', which it does not declare in "
+                    + "the Activity Flow — nothing is wired to it, so the run ends here.");
+        }
+        return next;
     }
 
     /**
@@ -124,24 +134,24 @@ public final class FlowWalker {
      * body that throws is logged as an error with its stack, debugging on or off, and the throw goes on to
      * {@code Bot}'s recovery: the trace says which activity failed, where the console alone said only "Crashed".
      */
-    private static Outcome execute(String name, ActivityBody body) {
+    private static Outcome execute(Flow.Step step, ActivityBody body) {
         long startedAt = System.currentTimeMillis();
-        String outer = CURRENT.get();
-        CURRENT.set(name);
+        Activity outer = CURRENT.get();
+        CURRENT.set(step.activity());
         Outcome outcome;
         try {
             outcome = body.run();
         } catch (RuntimeException | Error e) {
             if (!isStop(e)) {
-                Debug.error("[Activity] " + name + " threw " + e + " after "
+                Debug.error("[Activity] " + step.label() + " threw " + e + " after "
                         + Trace.elapsed(System.currentTimeMillis() - startedAt), e);
             }
             throw e;
         } finally {
             CURRENT.set(outer);
         }
-        if (outcome == null) outcome = Outcome.of(null);
-        Debug.log("[Activity] " + name + " → " + outcome
+        if (outcome == null) outcome = Outcome.NEXT;
+        Debug.log("[Activity] " + step.label() + " → " + outcome
                 + " (" + Trace.elapsed(System.currentTimeMillis() - startedAt) + ")");
         return outcome;
     }
@@ -154,9 +164,9 @@ public final class FlowWalker {
     private static final String STOP = "com.botmaker.sdk.api.bot.Bot$BotStoppedException";
 
     /** Where the first edge leaving {@code from} on {@code outcome} leads, or {@code null}. */
-    private static String target(Flow flow, String from, String outcome) {
+    private static Activity target(Flow flow, Activity from, Outcome outcome) {
         for (Flow.Edge edge : flow.edges()) {
-            if (edge.from().equals(from) && edge.outcomeOrNext().equals(outcome)) return edge.to();
+            if (edge.from().equals(from) && edge.outcome().equals(outcome)) return edge.to();
         }
         return null;
     }

@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
@@ -19,11 +20,12 @@ import java.util.Map;
  * <p>A {@link ComponentType} is what lets the editor take an expression apart into typed parts, change one
  * of them and put the rest back exactly as written. One opaque {@code FLOW} leaf with a codec would give the
  * editor a string — which is where this whole design started, and what it exists to leave behind. Five
- * declarations give it {@code Flow.of(List.of(Flow.activity(…), …), List.of(…), "Collect", Flow.limits(…))}
- * as a tree it can walk, typed at every tip.
+ * declarations give it {@code Flow.of(List.of(Flow.activity(…), …), List.of(…), Activities.COLLECT,
+ * Flow.limits(…))} as a tree it can walk, typed at every tip. The tips that name an activity or an outcome are
+ * the {@code ACTIVITY} and {@code OUTCOME} types of {@code SdkTypes}, read and written as the bot's constants.
  *
  * <p><b>None of them implements {@code PluginType}</b>, and that is why the two interfaces are independent:
- * an {@code Activity}, an {@code Edge}, a {@code Preset} and a {@code Limits} are parts of a flow and are
+ * a {@code Step}, an {@code Edge}, a {@code Preset} and a {@code Limits} are parts of a flow and are
  * never picked on their own, so extending it would owe each a {@code fresh()} and an {@code editor()}
  * nothing would ever call.
  *
@@ -72,12 +74,12 @@ public final class FlowTypes {
 
     // ---- the five containers ---------------------------------------------------------------------------
 
-    /** {@code Flow.of(List<Activity>, List<Edge>, List<Preset>, String, Limits)}. */
+    /** {@code Flow.of(List<Step>, List<Edge>, List<Preset>, Activity, Limits)}. */
     public static final DeclaredCall<Flow> FLOW_SHAPE = ComponentType.part(Flow.class)
-            .writtenAs(Flow::of, Flow::activities, Flow::edges, Flow::presets, Flow::start, Flow::limits);
+            .writtenAs(Flow::of, Flow::steps, Flow::edges, Flow::presets, Flow::start, Flow::limits);
 
     /**
-     * {@code Flow.activity(ActivityBody, String, String, boolean, boolean, boolean, List<String>)}.
+     * {@code Flow.activity(Activity, ActivityBody, String, boolean, boolean, boolean, List<Outcome>)}.
      *
      * <p>A body crosses as the source it is written as, never as the functional object. An
      * {@link ActivityBody} the editor read out of a file is a {@code String} — it was never instantiated,
@@ -91,28 +93,29 @@ public final class FlowTypes {
      * {@code build}): the text is not an {@code ActivityBody}, and no accessor or factory could hand it over.
      * It is the last place a plugin's value carries Java text, and it is known.
      */
-    public static final DeclaredCall<Flow.Activity> ACTIVITY_SHAPE = ComponentType.part(Flow.Activity.class)
-            .writtenAs(Flow::activity, Flow.Activity::body, Flow.Activity::name, Flow.Activity::description,
-                    Flow.Activity::enabled, Flow.Activity::goHome, Flow.Activity::popupCheck, Flow.Activity::outcomes)
-            .components(value -> List.of(bodyLiteral(sourceOf(value.body())), value.name(), value.description(),
+    public static final DeclaredCall<Flow.Step> STEP_SHAPE = ComponentType.part(Flow.Step.class)
+            .writtenAs(Flow::activity, Flow.Step::activity, Flow.Step::body, Flow.Step::description,
+                    Flow.Step::enabled, Flow.Step::goHome, Flow.Step::popupCheck, Flow.Step::outcomes)
+            .components(value -> List.of(value.activity(), bodyLiteral(sourceOf(value.body())), value.description(),
                     value.enabled(), value.goHome(), value.popupCheck(), value.outcomes()))
-            .build(FlowTypes::activity);
+            .build(FlowTypes::step);
 
-    private static Flow.Activity activity(List<Object> parts) {
-        if (parts.size() != 7 || !(parts.get(0) instanceof String body) || !(parts.get(1) instanceof String name)
-                || !(parts.get(2) instanceof String description) || !(parts.get(3) instanceof Boolean enabled)
-                || !(parts.get(4) instanceof Boolean goHome) || !(parts.get(5) instanceof Boolean popupCheck)) {
+    private static Flow.Step step(List<Object> parts) {
+        if (parts.size() != 7 || !(parts.get(0) instanceof Activity activity)
+                || !(parts.get(1) instanceof String body) || !(parts.get(2) instanceof String description)
+                || !(parts.get(3) instanceof Boolean enabled) || !(parts.get(4) instanceof Boolean goHome)
+                || !(parts.get(5) instanceof Boolean popupCheck)) {
             return null;
         }
-        return new Flow.Activity(new Named(bodyOf(body)), name, description, enabled, goHome, popupCheck,
+        return new Flow.Step(activity, new Named(bodyOf(body)), description, enabled, goHome, popupCheck,
                 list(parts.get(6)));
     }
 
-    /** {@code Flow.preset(String, List<String>)}. */
+    /** {@code Flow.preset(String, List<Activity>)}. */
     public static final DeclaredCall<Flow.Preset> PRESET_SHAPE = ComponentType.part(Flow.Preset.class)
             .writtenAs(Flow::preset, Flow.Preset::name, Flow.Preset::activities);
 
-    /** {@code Flow.edge(String, String, String)}. */
+    /** {@code Flow.edge(Activity, Activity, Outcome)}. */
     public static final DeclaredCall<Flow.Edge> EDGE_SHAPE = ComponentType.part(Flow.Edge.class)
             .writtenAs(Flow::edge, Flow.Edge::from, Flow.Edge::to, Flow.Edge::outcome);
 
@@ -147,7 +150,7 @@ public final class FlowTypes {
             .writtenAs(FlowLayout::at, FlowLayout.Spot::x, FlowLayout.Spot::y);
 
     /** The flow's five and the layout's two, which is what {@code SdkPlugin.componentTypes()} hands the host. */
-    public static final List<ComponentType<?>> ALL = List.of(FLOW_SHAPE, ACTIVITY_SHAPE, PRESET_SHAPE,
+    public static final List<ComponentType<?>> ALL = List.of(FLOW_SHAPE, STEP_SHAPE, PRESET_SHAPE,
             EDGE_SHAPE, LIMITS_SHAPE, LAYOUT_SHAPE, SPOT_SHAPE);
 
     /**

@@ -1,6 +1,8 @@
 package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
@@ -37,17 +39,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class FlowTypesTest {
 
+    private static final Activity COLLECT = Activity.named("Collect");
+    private static final Activity REST = Activity.named("Rest");
+    private static final Outcome NOTHING_LEFT = Outcome.named("Nothing left");
+
     private static Flow gamebot() {
         return Flow.of(
-                List.of(Flow.activity(new FlowTypes.Named("Collect::body"), "Collect",
-                                "Click collect, then battle.", true, false, true, List.of("NOTHING_LEFT")),
-                        Flow.activity(new FlowTypes.Named("Rest::body"), "Rest",
+                List.of(Flow.activity(COLLECT, new FlowTypes.Named("Collect::body"),
+                                "Click collect, then battle.", true, false, true, List.of(NOTHING_LEFT)),
+                        Flow.activity(REST, new FlowTypes.Named("Rest::body"),
                                 "Wait, then go round again.", false, true, false, List.of())),
-                List.of(Flow.edge("Collect", "Collect", ""),
-                        Flow.edge("Collect", "Rest", "NOTHING_LEFT"),
-                        Flow.edge("Rest", "Collect", "")),
-                List.of(Flow.preset("Gathering only", List.of("Collect"))),
-                "Collect",
+                List.of(Flow.edge(COLLECT, COLLECT, Outcome.NEXT),
+                        Flow.edge(COLLECT, REST, NOTHING_LEFT),
+                        Flow.edge(REST, COLLECT, Outcome.NEXT)),
+                List.of(Flow.preset("Gathering only", List.of(COLLECT))),
+                COLLECT,
                 Flow.limits(1000, 1000));
     }
 
@@ -70,11 +76,9 @@ class FlowTypesTest {
     @Test
     void eachShapeInsideAFlowRoundTripsOnItsOwn() {
         Flow flow = gamebot();
-        assertEquals(flow.activities().getFirst(),
-                roundTrip(FlowTypes.ACTIVITY_SHAPE, flow.activities().getFirst()));
+        assertEquals(flow.steps().getFirst(), roundTrip(FlowTypes.STEP_SHAPE, flow.steps().getFirst()));
         // The activity with no outcomes: an empty list is a value, not an absent one.
-        assertEquals(flow.activities().get(1),
-                roundTrip(FlowTypes.ACTIVITY_SHAPE, flow.activities().get(1)));
+        assertEquals(flow.steps().get(1), roundTrip(FlowTypes.STEP_SHAPE, flow.steps().get(1)));
         assertEquals(flow.edges().getFirst(), roundTrip(FlowTypes.EDGE_SHAPE, flow.edges().getFirst()));
         assertEquals(flow.presets().getFirst(),
                 roundTrip(FlowTypes.PRESET_SHAPE, flow.presets().getFirst()));
@@ -90,7 +94,7 @@ class FlowTypesTest {
      */
     @Test
     void aFlowIsFiveComponents() {
-        assertEquals(List.of(List.class, List.class, List.class, String.class, Flow.Limits.class),
+        assertEquals(List.of(List.class, List.class, List.class, Activity.class, Flow.Limits.class),
                 FlowTypes.FLOW_SHAPE.componentTypes());
         assertEquals(5, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
     }
@@ -98,20 +102,33 @@ class FlowTypesTest {
     /** A flow is one call on {@code Flow} itself, which is what the host identifies it by. */
     @Test
     void aFlowIsWrittenAsACallOnFlow() throws NoSuchMethodException {
-        assertEquals(Flow.class.getMethod("of", List.class, List.class, List.class, String.class,
+        assertEquals(Flow.class.getMethod("of", List.class, List.class, List.class, Activity.class,
                 Flow.Limits.class), FlowTypes.FLOW_SHAPE.factory());
+    }
+
+    /**
+     * An activity and an outcome are their label, written {@code X.named("…")} — which the host replaces with the
+     * bot's constant holding the same label — and the two outcomes every activity has are written as theirs.
+     */
+    @Test
+    void namesAreWrittenAsTheirLabelOrTheSdksConstant() throws ReflectiveOperationException {
+        assertEquals(COLLECT, SdkTypes.ACTIVITY.build(SdkTypes.ACTIVITY.components(COLLECT)));
+        assertEquals(NOTHING_LEFT, SdkTypes.OUTCOME.build(SdkTypes.OUTCOME.components(NOTHING_LEFT)));
+        assertEquals(List.of(Outcome.class.getField("NEXT"), Outcome.class.getField("DISABLED")),
+                SdkTypes.OUTCOME.constants());
+        assertEquals(List.of(Activity.class.getField("NONE")), SdkTypes.ACTIVITY.constants());
     }
 
     /** A body the file writes is kept exactly as written, whatever it is; only the "none yet" constant reads blank. */
     @Test
     void aBodyIsKeptAsWritten() {
-        for (String written : List.of("Collect::body", "() -> Activities.next()")) {
-            Flow.Activity read = FlowTypes.ACTIVITY_SHAPE.build(
-                    List.of(written, "Collect", "", true, false, false, List.of()));
+        for (String written : List.of("Collect::body", "() -> Outcome.NEXT")) {
+            Flow.Step read = FlowTypes.STEP_SHAPE.build(
+                    List.of(COLLECT, written, "", true, false, false, List.of()));
             assertEquals(written, FlowTypes.sourceOf(read.body()));
         }
-        Flow.Activity none = FlowTypes.ACTIVITY_SHAPE.build(
-                List.of("ActivityBody.NONE", "Collect", "", true, false, false, List.of()));
+        Flow.Step none = FlowTypes.STEP_SHAPE.build(
+                List.of(COLLECT, "ActivityBody.NONE", "", true, false, false, List.of()));
         assertEquals("", FlowTypes.sourceOf(none.body()));
     }
 
@@ -149,11 +166,11 @@ class FlowTypesTest {
     /** The enable flag is part of the flow, because a run reads it. */
     @Test
     void anActivitySwitchedOffIsStillPartOfTheFlow() {
-        Flow off = Flow.of(List.of(Flow.activity(new FlowTypes.Named("Rest::body"), "Rest", "",
+        Flow off = Flow.of(List.of(Flow.activity(REST, new FlowTypes.Named("Rest::body"), "",
                         false, false, false, List.of())),
-                List.of(), List.of(), "Rest", Flow.Limits.DEFAULT);
+                List.of(), List.of(), REST, Flow.Limits.DEFAULT);
         Flow read = roundTrip(FlowTypes.FLOW_SHAPE, off);
-        assertFalse(read.activities().getFirst().enabled());
+        assertFalse(read.steps().getFirst().enabled());
         assertEquals(off, read);
     }
 
@@ -163,8 +180,8 @@ class FlowTypesTest {
         Flow read = roundTrip(FlowTypes.FLOW_SHAPE, gamebot());
         assertEquals(1, read.presets().size());
         assertEquals("Gathering only", read.presets().getFirst().name());
-        assertTrue(read.presets().getFirst().enables("Collect"));
-        assertFalse(read.presets().getFirst().enables("Rest"));
+        assertTrue(read.presets().getFirst().enables(COLLECT));
+        assertFalse(read.presets().getFirst().enables(REST));
     }
 
     /**

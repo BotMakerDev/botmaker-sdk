@@ -1,8 +1,6 @@
 package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.api.slot.SlotEditor;
-import com.botmaker.sdk.api.bot.ActivityName;
-import com.botmaker.sdk.api.bot.OutcomeName;
 import com.botmaker.sdk.internal.emulator.EmulatorName;
 import com.botmaker.sdk.plugin.emulator.EmulatorEditors;
 
@@ -16,11 +14,10 @@ import java.util.List;
  *
  * <p>Three kinds:
  * <ul>
- *   <li><b>By parameter.</b> An activity name, an outcome name and a setting are all plain values; the api
- *       says which is which by annotating the parameter ({@code outcome(@OutcomeName String name)}), and the
- *       editor is chosen by the annotation. These are absent from the Parameters window, which has no call
- *       behind a row. The launch annotations and their game grids went on 2026-10-01: the launch stack moved
- *       to {@code internal}, so no offered call carried them.</li>
+ *   <li><b>By parameter or call.</b> An emulator name and a setting are plain values; the api says which is
+ *       which by annotating the parameter or by a table keyed on the method, and the editor is chosen by that.
+ *       These are absent from the Parameters window, which has no call behind a row. The activity and outcome
+ *       name annotations went on 2026-10-02, when both became types of their own ({@code SdkTypes}).</li>
  *   <li><b>By a run of pictures</b>, which neither a parameter nor a type can say: only the host knows that
  *       several arguments are one list.</li>
  *   <li><b>By another plugin's type</b>: plugin-basics declares {@code java.awt.Color}; this plugin offers a
@@ -39,8 +36,6 @@ public final class SdkEditors {
     public static final List<SlotEditor> ALL = List.of(
             SlotEditor.when(SettingHints::claims).draw(() -> SettingsEditors::setting),
             SlotEditor.onParameter(EmulatorName.class).draw(() -> EmulatorEditors::instanceName),
-            SlotEditor.onParameter(ActivityName.class).draw(() -> ActivityEditors::activityName),
-            SlotEditor.onParameter(OutcomeName.class).draw(() -> ActivityEditors::outcomeName),
 
             // Several named pictures. Ahead of SdkTypes' single-picture editor because it claims a subset of
             // what that one would, and the host consults a plugin's slot editors before its types' editors:

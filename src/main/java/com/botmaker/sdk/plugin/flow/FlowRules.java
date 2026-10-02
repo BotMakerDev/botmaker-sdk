@@ -1,7 +1,5 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.sdk.api.flow.Flow;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -40,9 +38,9 @@ public final class FlowRules {
      * The wire {@code from}'s {@code outcome} port already has, if any. A blank outcome and {@code NEXT} are the
      * same port.
      */
-    public static Optional<Flow.Edge> held(List<Flow.Edge> edges, String from, String outcome) {
-        String label = outcome == null || outcome.isBlank() ? Flow.Edge.NEXT : outcome;
-        for (Flow.Edge e : edges) {
+    public static Optional<Arrow> held(List<Arrow> edges, String from, String outcome) {
+        String label = outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome;
+        for (Arrow e : edges) {
             if (e.from().equals(from) && e.outcomeOrNext().equals(label)) return Optional.of(e);
         }
         return Optional.empty();
@@ -53,10 +51,10 @@ public final class FlowRules {
      * {@code to} in its place in the list, so one result still leads to exactly one place. Otherwise the wire is
      * added at the end.
      */
-    public static List<Flow.Edge> rewired(List<Flow.Edge> edges, String from, String outcome, String to) {
-        Optional<Flow.Edge> old = held(edges, from, outcome);
-        Flow.Edge wire = new Flow.Edge(from, to, old.map(Flow.Edge::outcome).orElse(outcome));
-        List<Flow.Edge> out = new ArrayList<>(edges);
+    public static List<Arrow> rewired(List<Arrow> edges, String from, String outcome, String to) {
+        Optional<Arrow> old = held(edges, from, outcome);
+        Arrow wire = new Arrow(from, to, old.map(Arrow::outcome).orElse(outcome));
+        List<Arrow> out = new ArrayList<>(edges);
         if (old.isPresent()) out.set(out.indexOf(old.get()), wire);
         else out.add(wire);
         return out;
@@ -67,7 +65,7 @@ public final class FlowRules {
      * all nothing is wired yet, so nothing is an orphan — a flow with no wires runs its activities in the
      * order they are listed.
      */
-    public static List<String> orphans(List<String> placed, List<Flow.Edge> edges, String start) {
+    public static List<String> orphans(List<String> placed, List<Arrow> edges, String start) {
         if (edges.isEmpty()) return List.of();
         Set<String> live = new HashSet<>(reachable(placed, edges, start));
         List<String> out = new ArrayList<>();
@@ -82,13 +80,13 @@ public final class FlowRules {
      * card when {@code start} names nothing placed — which is the rule {@code FlowWalker} resolves a start
      * with, so what the canvas marks as reachable is what a run actually reaches.
      */
-    public static List<String> reachable(List<String> placed, List<Flow.Edge> edges, String start) {
+    public static List<String> reachable(List<String> placed, List<Arrow> edges, String start) {
         String from = placed.contains(start) ? start : (placed.isEmpty() ? "" : placed.getFirst());
         Set<String> known = new HashSet<>(placed);
         if (!known.contains(from)) return List.of();
 
         Map<String, List<String>> successors = new LinkedHashMap<>();
-        for (Flow.Edge edge : edges) {
+        for (Arrow edge : edges) {
             // A wire naming something that is not placed is stale — a card that has been deleted — and is
             // dropped rather than making a node of a name nothing draws.
             if (!known.contains(edge.from()) || !known.contains(edge.to())) continue;

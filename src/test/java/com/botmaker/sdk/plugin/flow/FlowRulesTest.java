@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.sdk.api.flow.Flow;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -17,15 +16,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class FlowRulesTest {
 
-    private static Flow.Edge wire(String from, String to) {
-        return new Flow.Edge(from, to, "");
+    private static Arrow wire(String from, String to) {
+        return new Arrow(from, to, "");
     }
 
-    private static Flow.Edge wire(String from, String to, String outcome) {
-        return new Flow.Edge(from, to, outcome);
+    private static Arrow wire(String from, String to, String outcome) {
+        return new Arrow(from, to, outcome);
     }
 
-    private static final List<Flow.Edge> A_TO_B = List.of(wire("A", "B"));
+    private static final List<Arrow> A_TO_B = List.of(wire("A", "B"));
 
     @Test
     void aFreshWireBetweenUnconnectedActivitiesIsAdded() {
@@ -42,27 +41,27 @@ public class FlowRulesTest {
     @Test
     void aForkOnDifferentOutcomesIsTheWholePoint() {
         // Two wires out of A, one per outcome — this is branching, and it used to be rejected outright.
-        List<Flow.Edge> edges = List.of(wire("A", "B", "BAG_FULL"));
+        List<Arrow> edges = List.of(wire("A", "B", "BAG_FULL"));
         assertEquals(2, FlowRules.rewired(edges, "A", "NO_ORE", "C").size());
         assertEquals(2, FlowRules.rewired(edges, "A", "", "D").size(), "the default outcome is its own wire too");
     }
 
     @Test
     void aJoinIsAllowedSoBranchesCanMeetAgain() {
-        List<Flow.Edge> edges = List.of(wire("A", "C", "BAG_FULL"));
+        List<Arrow> edges = List.of(wire("A", "C", "BAG_FULL"));
         assertEquals(2, FlowRules.rewired(edges, "B", "", "C").size());
     }
 
     @Test
     void aCycleIsAllowedBecauseItIsHowABotRepeats() {
-        List<Flow.Edge> chain = List.of(wire("A", "B"), wire("B", "C"));
+        List<Arrow> chain = List.of(wire("A", "B"), wire("B", "C"));
         assertEquals(3, FlowRules.rewired(chain, "C", "DONE", "A").size());
     }
 
     /** One result still leads to one place: a second wire from the same port moves the first, in its place. */
     @Test
     void wiringAWiredPortMovesItsWire() {
-        List<Flow.Edge> edges = List.of(wire("A", "B", "BAG_FULL"), wire("B", "C"));
+        List<Arrow> edges = List.of(wire("A", "B", "BAG_FULL"), wire("B", "C"));
         assertEquals(List.of(wire("A", "C", "BAG_FULL"), wire("B", "C")),
                 FlowRules.rewired(edges, "A", "BAG_FULL", "C"));
     }
@@ -85,7 +84,7 @@ public class FlowRulesTest {
     void reachabilityStartsAtTheNamedStartNotAtWhateverWasPlacedFirst() {
         // Placement order is canvas insertion order and says nothing about the flow; the start node decides.
         List<String> placed = List.of("B", "C", "A");
-        List<Flow.Edge> edges = List.of(wire("A", "B"), wire("B", "C"));
+        List<Arrow> edges = List.of(wire("A", "B"), wire("B", "C"));
         assertEquals(List.of("A", "B", "C"), FlowRules.reachable(placed, edges, "A"));
     }
 
@@ -106,7 +105,7 @@ public class FlowRulesTest {
         // The old regression, now structurally impossible: the root used to be *inferred* as "a node nothing
         // wires into", so a lone un-wired card could outrank the real chain and orphan every wired activity.
         // With an explicit start there is nothing to infer, so placement order cannot matter.
-        List<Flow.Edge> edges = List.of(wire("A", "B"), wire("B", "C"));
+        List<Arrow> edges = List.of(wire("A", "B"), wire("B", "C"));
         for (List<String> placed : List.of(
                 List.of("D", "A", "B", "C"),   // the un-wired card first — the case that used to fail
                 List.of("A", "B", "C", "D"),
@@ -121,7 +120,7 @@ public class FlowRulesTest {
         // Only what the start can reach runs, so the canvas warns about the rest rather than silently
         // picking one — even though both halves are perfectly well-formed.
         List<String> placed = List.of("A", "B", "X", "Y");
-        List<Flow.Edge> edges = List.of(wire("A", "B"), wire("X", "Y"));
+        List<Arrow> edges = List.of(wire("A", "B"), wire("X", "Y"));
         assertEquals(List.of("A", "B"), FlowRules.reachable(placed, edges, "A"));
         assertEquals(List.of("X", "Y"), FlowRules.orphans(placed, edges, "A"));
     }
@@ -129,7 +128,7 @@ public class FlowRulesTest {
     @Test
     void aCyclicFlowStillTerminatesTheWalk() {
         List<String> placed = List.of("A", "B", "C");
-        List<Flow.Edge> edges = List.of(
+        List<Arrow> edges = List.of(
                 wire("A", "B"), wire("B", "C"), wire("C", "A", "AGAIN"));
         assertEquals(List.of("A", "B", "C"), FlowRules.reachable(placed, edges, "A"));
         assertEquals(List.of(), FlowRules.orphans(placed, edges, "A"));

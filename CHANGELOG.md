@@ -17,6 +17,23 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Changed — breaking
+
+- **Activities and outcomes are constants of your bot, not strings.** Your project gets two classes beside
+  `Sdk.java`: `Activities` (`public static final Activity COLLECT = Activity.named("Collect");`) and
+  `Outcomes` (`public static final Outcome WON = Outcome.named("Won");`). A body returns `Outcomes.WON` or
+  `Outcome.NEXT`, and the flow's steps, arrows, presets and start name the same constants. A misspelled
+  outcome is now a compile error instead of a run that silently ends, and renaming an activity or outcome in
+  the Activity Flow renames every use of it.
+- `Activities.outcome("…")` and `Activities.next()` are gone: return the `Outcomes` constant, or
+  `Outcome.NEXT`. `Outcome.of` is now `Outcome.named`.
+- `Activities.enable/disable/active` are now `ActivitySwitch.enable/disable/active`, and take an `Activity`
+  constant rather than a name.
+- In `Sdk.flow()`, `Flow.activity(...)` takes the activity first (`Flow.activity(Activities.COLLECT,
+  Collect::body, …)`), and `Flow.edge`, `Flow.preset` and the start take constants.
+
 ## [1.2.3] — 2026-10-01
 
 ### Fixed

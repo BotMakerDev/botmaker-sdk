@@ -8,6 +8,28 @@ to **Deferred / next** (intentionally left for later, with enough context to pic
 
 ---
 
+## 2026-10-02 — activities and outcomes are constants (typed flow names, phase 1)
+
+**Done**
+- `api.flow.Activity` and `api.bot.Outcome` are values equal by label (`named(…)`); `Outcome.NEXT`/`DISABLED`
+  are public constants. `Flow` is `steps`/`edges`/`presets`/`start`/`limits` over them; the card record is
+  `Flow.Step`, still built by `Flow.activity(activity, body, …)`.
+- `Activities` → `ActivitySwitch` (takes an `Activity`); `outcome(String)`/`next()`, `@ActivityName` and
+  `@OutcomeName` deleted. The bot's own `Activities`/`Outcomes` classes are `ManagedValue.openSet`s
+  (`SdkValues.ACTIVITIES`/`OUTCOMES`), like `Pictures`.
+- `SdkTypes.ACTIVITY`/`OUTCOME` (`writtenAs(X::named, X::label)`, editors in `plugin/editors/ActivityEditors`):
+  the host writes a value equal to a bot constant as the constant. `FlowTypes.STEP_SHAPE` replaces
+  `ACTIVITY_SHAPE`.
+- `FlowWalker` walks by `Activity`; the "reported an outcome it does not declare" line moved from
+  `Activities.outcome` into the walk, and only fires when that outcome has no edge.
+- The canvas keeps labels (`plugin/flow/Arrow`, `Selection`) and converts at load and save.
+
+**Deferred / next**
+- Phase 2: the flow dialog adds, renames and removes the `Activities`/`Outcomes` constants through
+  `PluginValues` by binding, labels become free text (`"Bag full"` → `BAG_FULL`), and the outcome picker gets
+  *+ New outcome…*. Until then the dialog writes `Activity.named("…")` inline where no constant exists.
+- Phase 3: the gamebot template, docs and pointers. The template stays on 1.2.3 until an SDK release cuts it.
+
 ## 2026-09-29 — one caller walk (dashboard pass, phase 5)
 
 **Done**

@@ -337,8 +337,8 @@ public final class TemplateLibrary {
      * will not open — an unreadable flow is reported by the flow editor, not by a tag menu.
      */
     private static List<String> activityNames(StudioServices services) {
-        return FlowValue.read(services).activities().stream()
-                .map(Flow.Activity::name)
+        return FlowValue.read(services).steps().stream()
+                .map(Flow.Step::label)
                 .filter(name -> !name.isBlank())
                 .toList();
     }

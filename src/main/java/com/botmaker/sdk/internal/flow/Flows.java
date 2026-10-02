@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.flow;
 
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.flow.FlowLayout;
 
 /**
  * The flow a bot runs.
@@ -11,7 +11,7 @@ import com.botmaker.sdk.api.flow.FlowLayout;
  *
  * <p>Kept out of the insert menus (2026-09-29): a dropped {@code use} was written {@code Flows.use(null)} and
  * cleared the flow, {@code installed} hands back a {@code Flow} nothing in Studio takes, and {@code enabled} is
- * {@code Activities.active} without the activity picker. Its members stay catalogued so the name resolves.
+ * {@code ActivitySwitch.active} without the overrides. Its members stay catalogued so the name resolves.
  */
 public final class Flows {
 
@@ -35,16 +35,14 @@ public final class Flows {
     }
 
     /**
-     * Whether the flow has the named activity switched on — its configured default, before any
+     * Whether the flow has the activity switched on — its configured default, before any
      * {@code enable}/{@code disable} a running bot has made.
      *
-     * <p><b>An activity the flow does not mention is on.</b> That is the answer
-     * {@code Settings.enabled} gave for a name with no entry, and it has to stay: a bot may define an
-     * activity that is not on the canvas at all, and reading an absent name as <em>off</em> would make such
-     * an activity silently do nothing.
+     * <p><b>An activity the flow does not mention is on.</b> A bot may name an activity that is not on the
+     * canvas at all, and reading an absent one as <em>off</em> would make it silently do nothing.
      */
-    public static boolean enabled(String activity) {
-        Flow.Activity found = current.activity(activity);
+    public static boolean enabled(Activity activity) {
+        Flow.Step found = current.step(activity);
         return found == null || found.enabled();
     }
 }

@@ -1,7 +1,5 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.sdk.api.flow.Flow;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,7 +18,7 @@ import java.util.List;
  * {@code SnapshotHistory.clear()} is what covers that case, rather than a wider snapshot that would still get
  * it wrong.
  */
-public record FlowSnapshot(List<CardState> cards, List<Flow.Edge> edges, String start) {
+public record FlowSnapshot(List<CardState> cards, List<Arrow> edges, String start) {
 
     /** One card, as far as undo is concerned. */
     public record CardState(ActivityDraft draft, double x, double y, boolean enabled) {}

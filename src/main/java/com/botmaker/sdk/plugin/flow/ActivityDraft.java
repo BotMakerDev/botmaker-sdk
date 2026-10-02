@@ -1,5 +1,7 @@
 package com.botmaker.sdk.plugin.flow;
 
+import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 import javafx.beans.property.BooleanProperty;
@@ -16,7 +18,7 @@ import java.util.List;
  * One activity while it is being edited on the Activity Flow canvas: its name, description and outcomes,
  * whether it is enabled, and where its card sits. Mutable and observable — the node card, the side panel and
  * the preset bar all bind to the same draft, so a change in one is visible in the others immediately. On
- * save it splits in two: a {@link Flow.Activity} for {@code Sdk.flow()}, and a position for
+ * save it splits in two: a {@link Flow.Step} for {@code Sdk.flow()}, and a position for
  * {@code Sdk.flowLayout()}.
  *
  * <p><b>It carries no parameters.</b> The Studio class this was ported from held an observable list of the
@@ -32,7 +34,7 @@ public final class ActivityDraft {
 
     /**
      * The named outcomes this activity can report, excluding the implicit
-     * {@link Flow.Edge#NEXT}. Observable because the card grows one output port per outcome —
+     * {@link Arrow#NEXT}. Observable because the card grows one output port per outcome —
      * adding one in the side panel has to put a port on the card immediately, or there is nothing to drag a
      * wire from.
      */
@@ -81,10 +83,10 @@ public final class ActivityDraft {
     }
 
     /** A draft of an activity of the stored flow, placed at {@code (x, y)} — carrying its body reference. */
-    public static ActivityDraft of(Flow.Activity activity, double x, double y) {
-        return new ActivityDraft(activity.name(), activity.description(), activity.enabled(),
-                activity.outcomes(), activity.goHome(), activity.popupCheck(), x, y,
-                FlowTypes.sourceOf(activity.body()));
+    public static ActivityDraft of(Flow.Step step, double x, double y) {
+        return new ActivityDraft(step.label(), step.description(), step.enabled(),
+                step.outcomes().stream().map(Outcome::label).toList(), step.goHome(), step.popupCheck(), x, y,
+                FlowTypes.sourceOf(step.body()));
     }
 
     /**
@@ -94,9 +96,9 @@ public final class ActivityDraft {
      * from the draft's visible fields alone would hand back one whose work was blank, which is how a rename
      * on the canvas would come to unwire a card from the code behind it.
      */
-    public Flow.Activity toActivity() {
-        return new Flow.Activity(FlowTypes.body(body), name.get(), description.get(), enabled.get(),
-                goHome.get(), popupCheck.get(), List.copyOf(outcomes));
+    public Flow.Step toStep() {
+        return Flow.activity(Activity.named(name.get()), FlowTypes.body(body), description.get(), enabled.get(),
+                goHome.get(), popupCheck.get(), outcomes.stream().map(Outcome::named).toList());
     }
 
     /**
@@ -104,9 +106,9 @@ public final class ActivityDraft {
      */
     public List<String> allOutcomes() {
         List<String> all = new ArrayList<>(outcomes.size() + 1);
-        all.add(Flow.Edge.NEXT);
+        all.add(Arrow.NEXT);
         for (String o : outcomes) {
-            if (Flow.Edge.DISABLED.equals(o)) continue; // a port, never an Outcome constant
+            if (Arrow.DISABLED.equals(o)) continue; // a port, never an Outcome constant
             if (!all.contains(o)) all.add(o);
         }
         return all;
@@ -114,14 +116,14 @@ public final class ActivityDraft {
 
     /**
      * Every outcome this activity's card has a port for: {@link #allOutcomes()}, then
-     * {@link Flow.Edge#DISABLED} last.
+     * {@link Arrow#DISABLED} last.
      *
      * <p>This is the list the canvas draws ports from <em>and</em> the list it prunes wires against, which is
      * what stops a {@code DISABLED} wire from being deleted the moment it is drawn.
      */
     public List<String> flowPorts() {
         List<String> ports = new ArrayList<>(allOutcomes());
-        ports.add(Flow.Edge.DISABLED);
+        ports.add(Arrow.DISABLED);
         return ports;
     }
 

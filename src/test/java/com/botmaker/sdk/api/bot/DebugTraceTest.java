@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.Flows;
@@ -67,20 +68,47 @@ class DebugTraceTest {
 
     // --- Activity ---
 
-    /** One activity reporting BAG_FULL, which nothing is wired to, so the run ends after it. */
-    private static final Flow MINING = Flow.of(
-            List.of(Flow.activity(() -> Activities.outcome("BAG_FULL"), "Mining", "", true, false, false,
-                    List.of("BAG_FULL"))),
-            List.of(), List.of(), "Mining", Flow.limits(10, 0));
+    private static final Outcome BAG_FULL = Outcome.named("BAG_FULL");
 
-    /** Walks {@link #MINING} to its end, which is {@code Bot.stop()} throwing. */
-    private static void runMining() {
-        Flows.use(MINING);
+    /** One activity reporting {@code reported}, declaring BAG_FULL, with nothing wired, so the run ends after it. */
+    private static Flow mining(Outcome reported) {
+        Activity mining = Activity.named("Mining");
+        return Flow.of(List.of(Flow.activity(mining, () -> reported, "", true, false, false, List.of(BAG_FULL))),
+                List.of(), List.of(), mining, Flow.limits(10, 0));
+    }
+
+    /** Walks {@code flow} to its end, which is {@code Bot.stop()} throwing. */
+    private static void run(Flow flow) {
+        Flows.use(flow);
         try {
-            FlowWalker.run(MINING, null);
+            FlowWalker.run(flow, null);
         } catch (RuntimeException ended) {
             // the run is over; only what it printed matters here
         }
+    }
+
+    private static void runMining() {
+        run(mining(BAG_FULL));
+    }
+
+    /**
+     * An outcome the card does not offer is not refused — a bot must not die over its flow's bookkeeping — but
+     * the run says why it ended there, debugging on or off.
+     */
+    @Test
+    void anUndeclaredOutcomeSaysSoWhenTheRunEndsOnIt() {
+        Debug.disable();
+
+        String output = printed(() -> run(mining(Outcome.named("BAG_FUL"))));
+
+        assertTrue(output.contains("Mining reported 'BAG_FUL', which it does not declare"), output);
+    }
+
+    @Test
+    void aDeclaredUnwiredOutcomeEndsTheRunQuietly() {
+        Debug.disable();
+
+        assertEquals("", printed(DebugTraceTest::runMining));
     }
 
     @Test

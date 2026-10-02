@@ -1,5 +1,7 @@
 package com.botmaker.sdk.plugin.flow;
 
+import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import org.junit.jupiter.api.Test;
@@ -20,12 +22,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ActivityFlowValidationTest {
 
-    private static Flow of(Flow.Activity... activities) {
-        return Flow.of(List.of(activities), List.of(), List.of(), "", Flow.Limits.DEFAULT);
+    private static Flow of(Flow.Step... steps) {
+        return Flow.of(List.of(steps), List.of(), List.of(), Activity.NONE, Flow.Limits.DEFAULT);
     }
 
-    private static Flow.Activity activity(String name, String... outcomes) {
-        return Flow.activity(ActivityBody.NONE, name, "", true, false, true, List.of(outcomes));
+    private static Flow.Step activity(String name, String... outcomes) {
+        return Flow.activity(Activity.named(name), ActivityBody.NONE, "", true, false, true,
+                List.of(outcomes).stream().map(Outcome::named).toList());
     }
 
     @Test
@@ -98,21 +101,35 @@ class ActivityFlowValidationTest {
         assertNull(FlowNames.presetNameProblem("Night farm", List.of("Everything", "Nothing")));
     }
 
-    /** A renamed outcome keeps its wire; another activity's wire of the same outcome is not touched. */
+    /** A renamed outcome keeps its arrow; another activity's arrow of the same outcome is not touched. */
     @Test
-    void renaming_an_outcome_carries_its_wire() {
-        List<Flow.Edge> edges = List.of(new Flow.Edge("Mining", "Bank", "FULL"),
-                new Flow.Edge("Fishing", "Bank", "FULL"));
+    void renaming_an_outcome_carries_its_arrow() {
+        List<Arrow> arrows = List.of(new Arrow("Mining", "Bank", "FULL"), new Arrow("Fishing", "Bank", "FULL"));
 
-        assertEquals(List.of(new Flow.Edge("Mining", "Bank", "BAG_FULL"), new Flow.Edge("Fishing", "Bank", "FULL")),
-                ActivityFlowDialog.rewiredOutcome(edges, "Mining", "FULL", "BAG_FULL"));
+        assertEquals(List.of(new Arrow("Mining", "Bank", "BAG_FULL"), new Arrow("Fishing", "Bank", "FULL")),
+                ActivityFlowDialog.rewiredOutcome(arrows, "Mining", "FULL", "BAG_FULL"));
     }
 
     @Test
     void renaming_an_activity_keeps_it_in_its_presets() {
-        List<Flow.Preset> presets = List.of(Flow.preset("Night", List.of("Mining", "Bank")));
+        List<Selection> presets = List.of(new Selection("Night", List.of("Mining", "Bank")));
 
-        assertEquals(List.of(Flow.preset("Night", List.of("Digging", "Bank"))),
+        assertEquals(List.of(new Selection("Night", List.of("Digging", "Bank"))),
                 ActivityFlowDialog.renamedIn(presets, "Mining", "Digging"));
+    }
+
+    /** What the canvas draws by label is saved as the values the bot's constants hold, and read back the same. */
+    @Test
+    void an_arrow_and_a_selection_save_as_typed_values_and_back() {
+        Arrow plain = new Arrow("Mining", "Bank", "");
+        assertEquals(Flow.edge(Activity.named("Mining"), Activity.named("Bank"), Outcome.NEXT), plain.toEdge());
+        assertEquals(plain, Arrow.of(plain.toEdge()));
+        Arrow off = new Arrow("Mining", "Bank", Arrow.DISABLED);
+        assertTrue(off.toEdge().isDisabled());
+        assertEquals(off, Arrow.of(off.toEdge()));
+
+        Selection night = new Selection("Night", List.of("Mining"));
+        assertTrue(night.toPreset().enables(Activity.named("Mining")));
+        assertEquals(night, Selection.of(night.toPreset()));
     }
 }

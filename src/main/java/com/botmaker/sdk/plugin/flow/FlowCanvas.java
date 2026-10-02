@@ -110,7 +110,7 @@ public final class FlowCanvas extends StackPane {
     private final Rectangle rubberBand = new Rectangle();
 
     private final ObservableList<ActivityDraft> drafts = FXCollections.observableArrayList();
-    private final ObservableList<Flow.Edge> edges = FXCollections.observableArrayList();
+    private final ObservableList<Arrow> edges = FXCollections.observableArrayList();
 
     /** Every card by activity name. */
     private final Map<String, NodeCard> cards = new LinkedHashMap<>();
@@ -150,10 +150,10 @@ public final class FlowCanvas extends StackPane {
     /** Fired after any recorded mutation, undo or redo — the dialog saves on it. */
     private Runnable onFlowMutated = () -> {};
 
-    private CubicCurve pendingWire;
+    private CubicCurve pendingArrow;
     private ActivityDraft pendingFrom;
     /** The wire a drag from a wired port is carrying, hidden from the canvas until the drop; else null. */
-    private Flow.Edge pickedUp;
+    private Arrow pickedUp;
     /** Where the pending wire's drag began, to tell a click on a port from a drag. */
     private Point2D pendingStart;
     /** How far a port drag must travel before its release wires anything. */
@@ -257,7 +257,7 @@ public final class FlowCanvas extends StackPane {
 
     public ObservableList<ActivityDraft> drafts() { return drafts; }
 
-    public ObservableList<Flow.Edge> edges() { return edges; }
+    public ObservableList<Arrow> edges() { return edges; }
 
     /** The single selected activity — null when nothing, or more than one, is selected. */
     public ObjectProperty<ActivityDraft> selectedProperty() { return selected; }
@@ -442,13 +442,13 @@ public final class FlowCanvas extends StackPane {
         List<String> stopping = new ArrayList<>();
         for (String name : chain()) {
             boolean continues = false;
-            boolean disabledWired = false;
-            for (Flow.Edge e : edges) {
+            boolean disabledArrowd = false;
+            for (Arrow e : edges) {
                 if (!e.from().equals(name)) continue;
-                if (e.isDisabled()) disabledWired = true;
+                if (e.isDisabled()) disabledArrowd = true;
                 else continues = true;
             }
-            if (continues && !disabledWired) stopping.add(name);
+            if (continues && !disabledArrowd) stopping.add(name);
         }
         return stopping;
     }
@@ -659,7 +659,7 @@ public final class FlowCanvas extends StackPane {
     private double barycenter(String name, Map<String, Integer> rowOf) {
         double total = 0;
         int count = 0;
-        for (Flow.Edge e : edges) {
+        for (Arrow e : edges) {
             Integer row = e.to().equals(name) ? rowOf.get(e.from()) : null;
             if (row != null) {
                 total += row;
@@ -698,7 +698,7 @@ public final class FlowCanvas extends StackPane {
     /** The wiring with cycles broken: every edge except the ones a depth-first walk finds leading backwards. */
     private Map<String, List<String>> forwardEdges(Set<String> known) {
         Map<String, List<String>> all = new LinkedHashMap<>();
-        for (Flow.Edge e : edges) {
+        for (Arrow e : edges) {
             if (known.contains(e.from()) && known.contains(e.to()) && !e.from().equals(e.to())) {
                 all.computeIfAbsent(e.from(), k -> new ArrayList<>()).add(e.to());
             }
@@ -745,7 +745,7 @@ public final class FlowCanvas extends StackPane {
 
     /** Redraws the wires and re-marks orphan and start cards. Call after any topology or naming change. */
     public void refresh() {
-        redrawWires();
+        redrawArrows();
         List<String> orphans = orphans();
         String startNow = resolvedStart();
         for (Map.Entry<String, NodeCard> entry : cards.entrySet()) {
@@ -885,39 +885,39 @@ public final class FlowCanvas extends StackPane {
     // --- wiring ---
 
     /**
-     * Wires {@code from —outcome→ to}. A port that already has a wire has it moved, in one undo step; dropping
+     * Arrows {@code from —outcome→ to}. A port that already has a wire has it moved, in one undo step; dropping
      * it back on the card it already led to changes nothing.
      */
     private void tryConnect(ActivityDraft from, String outcome, String to) {
-        Optional<Flow.Edge> old = FlowRules.held(edges, from.name(), outcome);
+        Optional<Arrow> old = FlowRules.held(edges, from.name(), outcome);
         if (old.isPresent() && old.get().to().equals(to)) {
-            redrawWires();
+            redrawArrows();
             return;
         }
         String label = old.isPresent() ? "move the wire from " + from.name() + " to " + to
                 : "wire " + from.name() + " to " + to;
         history.mutate(label, () -> {
-            List<Flow.Edge> next = FlowRules.rewired(edges, from.name(), outcome, to);
+            List<Arrow> next = FlowRules.rewired(edges, from.name(), outcome, to);
             edges.clear();
             edges.addAll(next);
-            onMessage.accept(old.isPresent() ? "Wire moved: " + from.name() + " — "
+            onMessage.accept(old.isPresent() ? "Arrow moved: " + from.name() + " — "
                     + old.get().outcomeOrNext() + " → " + to + ". ↶ puts it back." : "");
             refresh();
         });
     }
 
-    private void redrawWires() {
+    private void redrawArrows() {
         wires.getChildren().clear();
-        for (Flow.Edge e : edges) {
+        for (Arrow e : edges) {
             if (e.equals(pickedUp)) continue; // on the pointer while a drag moves it
             NodeCard from = cards.get(e.from());
             NodeCard to = cards.get(e.to());
             if (from == null || to == null) continue; // stale wire; save() drops it
-            wires.getChildren().add(buildWire(e, from, to));
+            wires.getChildren().add(buildArrow(e, from, to));
         }
     }
 
-    private Node buildWire(Flow.Edge edge, NodeCard from, NodeCard to) {
+    private Node buildArrow(Arrow edge, NodeCard from, NodeCard to) {
         Point2D start = from.outPortCenter(edge.outcomeOrNext());
         Point2D end = to.inPortCenter();
         CubicCurve curve = styledCurve();
@@ -976,10 +976,10 @@ public final class FlowCanvas extends StackPane {
         return wire;
     }
 
-    private void removeEdge(Flow.Edge edge) {
+    private void removeEdge(Arrow edge) {
         history.mutate("remove the wire from " + edge.from(), () -> {
             edges.remove(edge);
-            onMessage.accept("Wire removed: " + edge.from() + " — " + edge.outcomeOrNext() + " → " + edge.to()
+            onMessage.accept("Arrow removed: " + edge.from() + " — " + edge.outcomeOrNext() + " → " + edge.to()
                     + ". ↶ puts it back.");
             refresh();
         });
@@ -1003,48 +1003,48 @@ public final class FlowCanvas extends StackPane {
         return curve;
     }
 
-    private void startPendingWire(ActivityDraft from, String outcome, Point2D at) {
+    private void startPendingArrow(ActivityDraft from, String outcome, Point2D at) {
         pendingFrom = from;
         pendingOutcome = outcome;
         // A port that has a wire lends it to the pointer: hidden while dragged, moved on a drop onto a card,
         // back where it was on a drop anywhere else. It used to refuse the drop with "remove that wire first".
         pickedUp = FlowRules.held(edges, from.name(), outcome).orElse(null);
-        if (pickedUp != null) redrawWires();
+        if (pickedUp != null) redrawArrows();
         pendingStart = at;
-        pendingWire = styledCurve();
-        pendingWire.getStrokeDashArray().addAll(6.0, 4.0);
-        pendingWire.setMouseTransparent(true);
-        movePendingWire(at, at);
-        wires.getChildren().add(pendingWire);
+        pendingArrow = styledCurve();
+        pendingArrow.getStrokeDashArray().addAll(6.0, 4.0);
+        pendingArrow.setMouseTransparent(true);
+        movePendingArrow(at, at);
+        wires.getChildren().add(pendingArrow);
     }
 
-    private void movePendingWire(Point2D start, Point2D end) {
-        pendingWire.setStartX(start.getX());
-        pendingWire.setStartY(start.getY());
-        pendingWire.setEndX(end.getX());
-        pendingWire.setEndY(end.getY());
-        pendingWire.setControlX1(start.getX() + 40);
-        pendingWire.setControlY1(start.getY());
-        pendingWire.setControlX2(end.getX() - 40);
-        pendingWire.setControlY2(end.getY());
+    private void movePendingArrow(Point2D start, Point2D end) {
+        pendingArrow.setStartX(start.getX());
+        pendingArrow.setStartY(start.getY());
+        pendingArrow.setEndX(end.getX());
+        pendingArrow.setEndY(end.getY());
+        pendingArrow.setControlX1(start.getX() + 40);
+        pendingArrow.setControlY1(start.getY());
+        pendingArrow.setControlX2(end.getX() - 40);
+        pendingArrow.setControlY2(end.getY());
     }
 
-    private void finishPendingWire(Point2D at) {
-        wires.getChildren().remove(pendingWire);
-        pendingWire = null;
+    private void finishPendingArrow(Point2D at) {
+        wires.getChildren().remove(pendingArrow);
+        pendingArrow = null;
         String target = cardIdAt(at);
         ActivityDraft from = pendingFrom;
         String outcome = pendingOutcome;
         pendingFrom = null;
         pendingOutcome = null;
-        boolean hadWire = pickedUp != null;
+        boolean hadArrow = pickedUp != null;
         pickedUp = null;
         // A press and release on the port is a click, not a drag: it lands on the port's own card, and wired a
         // retry (or, since wires move, re-routed an existing one onto its own card) with no drag at all.
         boolean dragged = pendingStart == null || pendingStart.distance(at) >= CLICK_SLOP;
         pendingStart = null;
         if (dragged && target != null && from != null) tryConnect(from, outcome, target);
-        else if (hadWire) redrawWires();
+        else if (hadArrow) redrawArrows();
     }
 
     /** The activity name of the card containing the given content-space point, or null. */
@@ -1087,7 +1087,7 @@ public final class FlowCanvas extends StackPane {
             setLayoutY(draft.y());
             // A card's size isn't known until it has been laid out, and the ports hang off its edges — so
             // re-draw the wires once the real bounds arrive (and again whenever the card resizes).
-            layoutBoundsProperty().addListener((o, was, is) -> redrawWires());
+            layoutBoundsProperty().addListener((o, was, is) -> redrawArrows());
 
             // The card is a fixed 180px wide and the title is the only part of the header with no natural
             // size, so it is the part that gets squeezed — and it was squeezed to nothing the moment a badge
@@ -1153,7 +1153,7 @@ public final class FlowCanvas extends StackPane {
             // there is nothing to drag the new wire from until the dialog is reopened.
             draft.outcomes().addListener((javafx.collections.ListChangeListener<String>) c -> {
                 rebuildPorts();
-                dropWiresForRemovedOutcomes();
+                dropArrowsForRemovedOutcomes();
                 refresh();
                 if (!restoring) invalidateHistory();
             });
@@ -1204,7 +1204,7 @@ public final class FlowCanvas extends StackPane {
                 Circle circle = port("flow-port-out");
                 // A modifier, not a replacement: the base class carries the stroke that punches the dot out
                 // of the card's edge, and DISABLED only recolours the fill.
-                if (Flow.Edge.DISABLED.equals(outcome)) {
+                if (Arrow.DISABLED.equals(outcome)) {
                     circle.getStyleClass().add("flow-port-out-disabled");
                 }
                 installPortHandlers(circle, outcome);
@@ -1218,7 +1218,7 @@ public final class FlowCanvas extends StackPane {
         }
 
         /** Drops any wire whose outcome the activity no longer declares — its port has just disappeared. */
-        private void dropWiresForRemovedOutcomes() {
+        private void dropArrowsForRemovedOutcomes() {
             // flowPorts(), not allOutcomes(): DISABLED is a port with no declared outcome behind it, so
             // pruning against the enum list would delete every DISABLED wire the moment it was drawn.
             Set<String> live = new LinkedHashSet<>(draft.flowPorts());
@@ -1244,9 +1244,9 @@ public final class FlowCanvas extends StackPane {
             cards.remove(oldName);
             cards.put(newName, this);
             if (oldName.equals(start)) start = newName;
-            List<Flow.Edge> rewired = new ArrayList<>(edges.size());
-            for (Flow.Edge e : edges) {
-                rewired.add(new Flow.Edge(e.from().equals(oldName) ? newName : e.from(),
+            List<Arrow> rewired = new ArrayList<>(edges.size());
+            for (Arrow e : edges) {
+                rewired.add(new Arrow(e.from().equals(oldName) ? newName : e.from(),
                         e.to().equals(oldName) ? newName : e.to(), e.outcome()));
             }
             edges.setAll(rewired);
@@ -1278,7 +1278,7 @@ public final class FlowCanvas extends StackPane {
                 if (card == null) continue;
                 placeAt(card, entry.getValue().getX() + dx, entry.getValue().getY() + dy);
             }
-            redrawWires();
+            redrawArrows();
             drawMinimap();
             e.consume();
         }
@@ -1297,10 +1297,10 @@ public final class FlowCanvas extends StackPane {
 
         /** What one output port promises, in the user's terms rather than the enum's. */
         private String portTooltip(String outcome) {
-            if (Flow.Edge.NEXT.equals(outcome)) {
+            if (Arrow.NEXT.equals(outcome)) {
                 return "Drag to the activity that runs next when there's nothing special to report";
             }
-            if (Flow.Edge.DISABLED.equals(outcome)) {
+            if (Arrow.DISABLED.equals(outcome)) {
                 return "Drag to the activity that runs next when " + draft.name() + " is switched off. "
                         + "Leave it unwired and the run stops there.";
             }
@@ -1310,15 +1310,15 @@ public final class FlowCanvas extends StackPane {
         private void installPortHandlers(Circle circle, String outcome) {
             Tooltip.install(circle, new Tooltip(portTooltip(outcome)));
             circle.setOnMousePressed(e -> {
-                startPendingWire(draft, outcome, outPortCenter(outcome));
+                startPendingArrow(draft, outcome, outPortCenter(outcome));
                 e.consume();
             });
             circle.setOnMouseDragged(e -> {
-                if (pendingWire != null) movePendingWire(outPortCenter(outcome), toContent(e));
+                if (pendingArrow != null) movePendingArrow(outPortCenter(outcome), toContent(e));
                 e.consume();
             });
             circle.setOnMouseReleased(e -> {
-                if (pendingWire != null) finishPendingWire(toContent(e));
+                if (pendingArrow != null) finishPendingArrow(toContent(e));
                 e.consume();
             });
         }

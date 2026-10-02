@@ -1,7 +1,5 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.sdk.api.flow.Flow;
-
 import java.util.Collection;
 import java.util.List;
 
@@ -64,11 +62,11 @@ public final class FlowNames {
 
     /**
      * How an outcome is written for the user — a port chip, a tooltip, a dialog row. It is the constant
-     * itself, always: {@link Flow.Edge#NEXT} for the implicit one, its own name for a declared one. One
+     * itself, always: {@link Arrow#NEXT} for the implicit one, its own name for a declared one. One
      * spelling, so the word on a wire and the word in the bot's Java are visibly the same thing.
      */
     public static String outcomeLabel(String outcome) {
-        return outcome == null || outcome.isBlank() ? Flow.Edge.NEXT : outcome;
+        return outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome;
     }
 
     /**
@@ -80,10 +78,10 @@ public final class FlowNames {
         if (!isValidIdentifier(candidate)) {
             return "'" + candidate + "' isn't a valid name — it becomes an enum constant in Java.";
         }
-        if (Flow.Edge.NEXT.equals(candidate)) {
+        if (Arrow.NEXT.equals(candidate)) {
             return "Every activity already has a NEXT outcome — it is always there.";
         }
-        if (Flow.Edge.DISABLED.equals(candidate)) {
+        if (Arrow.DISABLED.equals(candidate)) {
             return "DISABLED is the port for this activity being switched off — it is always there, "
                     + "and an activity can't report it because it didn't run.";
         }
@@ -136,9 +134,9 @@ public final class FlowNames {
     // both named a GoHome.run() and a Popups.run() that no project has had since the flow became Java.
 
     /** The outcomes section's explanation. */
-    public static final String OUTCOMES_HINT = "What this activity can report. Its body returns one with "
-            + "Activities.outcome(\"…\"), and each is wired on the canvas. Every activity also has a NEXT "
-            + "outcome (Activities.next()), and any outcome you leave unwired ends the run.";
+    public static final String OUTCOMES_HINT = "What this activity can report. Its body returns one of the "
+            + "Outcomes constants, and each gets an arrow on the canvas. Every activity also has a NEXT "
+            + "outcome (Outcome.NEXT), and any outcome you leave without an arrow ends the run.";
 
     /** The go-home tick's tooltip. */
     public static final String GO_HOME_TIP = "Run the home method handed to Bot.run(…) immediately before "

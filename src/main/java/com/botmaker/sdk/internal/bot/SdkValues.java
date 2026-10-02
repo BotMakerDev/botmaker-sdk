@@ -15,12 +15,12 @@ import java.util.List;
 /**
  * The SDK's {@code @Managed} values, each declared once, and what a run does with each one.
  *
- * <p>Five declarations, and every id is spelled here and nowhere else (2026-09-28): the plugin lists
+ * <p>Seven declarations, and every id is spelled here and nowhere else (2026-09-28): the plugin lists
  * {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code "flow"} is the activity
  * flow, {@code "flow.layout"} where the flow editor draws each card (a run ignores it), {@code "capture"} where
- * pixels are read from, {@code "settings"} how it clicks and looks, and {@code "pictures"} the class of picture
- * constants the bot grows.
+ * pixels are read from, {@code "settings"} how it clicks and looks, and {@code "pictures"}, {@code "activities"}
+ * and {@code "outcomes"} the classes of picture, activity and outcome constants the bot grows.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract
  * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#run} calls
@@ -64,8 +64,28 @@ public final class SdkValues {
             .because("Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every"
                     + " use of it together.");
 
-    /** All five, in the order the plugin declares them. */
-    public static final List<ManagedValue<?>> ALL = List.of(FLOW, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES);
+    /**
+     * The activity constants — {@code static final Activity COLLECT = Activity.named("Collect")} (2026-10-02).
+     * 🔀 Activity Flow adds, renames and removes them with the cards, together with every step, wire, preset and
+     * {@code ActivitySwitch} call naming them.
+     */
+    public static final ManagedValue<Void> ACTIVITIES = ManagedValue.openSet("activities")
+            .in("Activities")
+            .because("Activities are managed in 🔀 Activity Flow, which renames the card and every use of it"
+                    + " together.");
+
+    /**
+     * The outcome constants — {@code static final Outcome WON = Outcome.named("Won")} (2026-10-02). 🔀 Activity
+     * Flow adds, renames and removes them with the cards' outcomes, together with every body returning one.
+     */
+    public static final ManagedValue<Void> OUTCOMES = ManagedValue.openSet("outcomes")
+            .in("Outcomes")
+            .because("Outcomes are managed in 🔀 Activity Flow, which renames the outcome and every use of it"
+                    + " together.");
+
+    /** All seven, in the order the plugin declares them. */
+    public static final List<ManagedValue<?>> ALL = List.of(FLOW, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
+            ACTIVITIES, OUTCOMES);
 
     private static boolean claimed;
 
