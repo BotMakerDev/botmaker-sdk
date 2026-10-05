@@ -54,7 +54,7 @@ goes in `src/test` with the JUnit the rest of the module uses.
 ## Publishing
 
 The SDK is consumed by **bot projects** (not by Studio), via JitPack as
-`com.github.LiQiyeDev:botmaker-sdk:<tag>`. JitPack builds each git tag on demand and serves it under that
+`com.github.BotMakerDev:botmaker-sdk:<tag>`. JitPack builds each git tag on demand and serves it under that
 coordinate regardless of this pom's `groupId`/`version` (so the pom `version` is cosmetic). **The maintainer
 owns the SDK → JitPack publish — don't push or publish the SDK yourself;** releases are cut from the
 umbrella with `../release.sh`. The whole `CHANGELOG.md` is copied into the jar as
@@ -62,7 +62,7 @@ umbrella with `../release.sh`. The whole `CHANGELOG.md` is copied into the jar a
 
 ### Local dev (test SDK changes without pushing a tag)
 
-A bot pins `com.github.LiQiyeDev:botmaker-sdk:<version>`, and `~/.m2` is checked before JitPack. Install
+A bot pins `com.github.BotMakerDev:botmaker-sdk:<version>`, and `~/.m2` is checked before JitPack. Install
 the SDK and what it builds on at `0.0.0-SNAPSHOT` from the umbrella root:
 
 ```bash

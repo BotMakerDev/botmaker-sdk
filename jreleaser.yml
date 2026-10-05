@@ -40,7 +40,7 @@ project:
     homepage: https://github.com/BotMakerDev/botmaker-sdk
   languages:
     java:
-      groupId: com.github.LiQiyeDev
+      groupId: com.github.BotMakerDev
       artifactId: botmaker-sdk
       version: '21'
 

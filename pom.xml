@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.github.LiQiyeDev</groupId>
+    <groupId>com.github.BotMakerDev</groupId>
     <artifactId>botmaker-sdk</artifactId>
     <version>0.0.0-SNAPSHOT</version>
 
@@ -76,7 +76,7 @@
     </properties>
 
     <repositories>
-        <!-- JitPack: resolves com.github.LiQiyeDev:botmaker-shared:<tag> when this SDK is built
+        <!-- JitPack: resolves com.github.BotMakerDev:botmaker-shared:<tag> when this SDK is built
              standalone against a released shared (the umbrella reactor resolves the SNAPSHOT locally
              instead, and JitPack's own build env injects this repo too). -->
         <repository>
@@ -87,10 +87,10 @@
 
     <dependencies>
         <!-- Shared cross-platform native window plumbing (enumerate / capture / focus / input).
-             com.github.LiQiyeDev coordinate + version property so this resolves from the umbrella
+             com.github.BotMakerDev coordinate + version property so this resolves from the umbrella
              reactor locally and from JitPack when published (see the property comment above). -->
         <dependency>
-            <groupId>com.github.LiQiyeDev</groupId>
+            <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-shared</artifactId>
             <version>${botmaker.shared.version}</version>
         </dependency>
@@ -99,7 +99,7 @@
              reached from Target.start() via internal.session.SessionBootstrap. Same coordinate/property
              contract as shared above. It depends on shared itself, so this is additive, not a replacement. -->
         <dependency>
-            <groupId>com.github.LiQiyeDev</groupId>
+            <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-session</artifactId>
             <version>${botmaker.session.version}</version>
         </dependency>
@@ -110,7 +110,7 @@
              SDK in a bot's pom (nearest-wins would pin a version this jar was not built against). -->
 
         <dependency>
-            <groupId>com.github.LiQiyeDev</groupId>
+            <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-studio-api</artifactId>
             <version>${botmaker.studioapi.version}</version>
         </dependency>
@@ -119,7 +119,7 @@
              so a plugin brings its own, and `optional` (not transitive) would leave SdkPlugin unloadable in a
              project that adds the SDK. It has no dependencies, so a bot pays only its own jar. -->
         <dependency>
-            <groupId>com.github.LiQiyeDev</groupId>
+            <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-plugin-toolkit</artifactId>
             <version>${botmaker.plugintoolkit.version}</version>
         </dependency>
@@ -129,7 +129,7 @@
              2026-09-28 (the @Managed runtime is the contract's); in a bot it is one inert jar. Nothing may
              declare it directly beside this SDK in a bot's pom (nearest-wins). -->
         <dependency>
-            <groupId>com.github.LiQiyeDev</groupId>
+            <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-plugin-basics</artifactId>
             <version>${botmaker.pluginbasics.version}</version>
         </dependency>

@@ -30,6 +30,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- Published as `com.github.BotMakerDev:botmaker-sdk` (was `com.github.LiQiyeDev`), and resolves shared,
+  session, the contract, the toolkit and basics under the new groupId. A bot's pom names it as
+  `com.github.BotMakerDev:botmaker-sdk`; tags already built under the old groupId still resolve under it.
+
 - **The Remote Pilot's pause is Studio's pause** when Studio can pause a run, so pausing from the phone and
   from the run overlay is one pause. Under an older Studio the pilot pauses the bot itself, as before.
 
