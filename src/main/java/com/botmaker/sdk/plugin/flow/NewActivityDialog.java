@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.plugin.api.Theme;
+import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Modals;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -17,7 +18,6 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -44,7 +44,7 @@ import java.util.Optional;
 public final class NewActivityDialog {
 
     private final Window owner;
-    private final Theme theme;
+    private final StudioServices services;
     /** The activity names already on the canvas — a new one may not collide with them. */
     private final Collection<String> taken;
     /** The outcomes the other cards declare: reusing one is fine, a second spelling of one is not. */
@@ -62,10 +62,10 @@ public final class NewActivityDialog {
     private Stage stage;
     private ActivityDraft created;
 
-    public NewActivityDialog(Window owner, Theme theme, Collection<String> taken, Collection<String> knownOutcomes,
-                             boolean goHomeByDefault) {
+    public NewActivityDialog(Window owner, StudioServices services, Collection<String> taken,
+                             Collection<String> knownOutcomes, boolean goHomeByDefault) {
         this.owner = owner;
-        this.theme = theme;
+        this.services = services;
         this.taken = taken;
         this.knownOutcomes = knownOutcomes;
         this.goHomeByDefault = goHomeByDefault;
@@ -76,11 +76,6 @@ public final class NewActivityDialog {
      * empty if the user cancelled.
      */
     public Optional<ActivityDraft> showAt(double x, double y) {
-        stage = new Stage();
-        stage.initOwner(owner);
-        stage.initModality(Modality.APPLICATION_MODAL);
-        stage.setTitle("New activity");
-
         name.setPromptText("e.g. Resources");
         description.setPromptText("what it does (optional)");
         goHome.setSelected(goHomeByDefault);
@@ -118,7 +113,8 @@ public final class NewActivityDialog {
         root.setPadding(new Insets(16));
 
         rebuildOutcomeRows();
-        stage.setScene(FlowStyles.apply(theme.scene(root, 460, 460)));
+        stage = Modals.window(services, owner, Modals.Frame.modal("New activity", 460, 460, 0, 0), root);
+        FlowStyles.apply(stage.getScene());
         // After the stage is up: a requestFocus before the window exists has nothing to focus.
         Platform.runLater(name::requestFocus);
         stage.showAndWait();

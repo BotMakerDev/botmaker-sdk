@@ -25,7 +25,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.StringConverter;
@@ -107,7 +106,8 @@ public final class BotSettingsWindow {
         Label intro = note("Written into Sdk.settings(), in your bot's own Java, and applied before its first "
                 + "click — wherever the bot runs.");
 
-        Stage stage = new Stage();
+        VBox root = new VBox();
+        Stage stage = Modals.window(services, owner, Modals.Frame.modal("Bot Settings", 620, 720, 520, 420), root);
         Button cancel = new Button("Cancel");
         cancel.setCancelButton(true);
         cancel.setOnAction(e -> stage.close());
@@ -145,16 +145,9 @@ public final class BotSettingsWindow {
         body.setPadding(new Insets(18));
         ScrollPane scroll = new ScrollPane(body);
         scroll.setFitToWidth(true);
-        VBox root = new VBox(scroll, bar);
+        root.getChildren().addAll(scroll, bar);
         VBox.setVgrow(scroll, Priority.ALWAYS);
         bar.setPadding(new Insets(10, 18, 14, 18));
-
-        stage.setTitle("Bot Settings");
-        stage.initModality(Modality.APPLICATION_MODAL);
-        if (owner != null) stage.initOwner(owner);
-        stage.setScene(services.theme().scene(root, 620, 720));
-        stage.setMinWidth(520);
-        stage.setMinHeight(420);
         stage.show();
     }
 

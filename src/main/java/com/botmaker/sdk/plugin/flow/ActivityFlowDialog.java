@@ -179,10 +179,6 @@ public final class ActivityFlowDialog {
     }
 
     public void show() {
-        stage = new Stage();
-        stage.initOwner(owner);
-        stage.setTitle("Activity Flow");
-
         loadCurrent();
 
         BorderPane root = new BorderPane();
@@ -205,16 +201,14 @@ public final class ActivityFlowDialog {
 
         // The window's own ✕ is the same door as the Close button, and it must not be the one that loses the
         // last edit: both go through closeRequested, which flushes anything outstanding first.
+        stage = Modals.window(services, owner, Modals.Frame.modeless("Activity Flow", 1040, 680, 760, 480), root);
         stage.setOnCloseRequest(e -> {
             if (dirty || saving || closeWhenSaved) {
                 e.consume();
                 closeRequested();
             }
         });
-
-        stage.setScene(FlowStyles.apply(services.theme().scene(root, 1040, 680)));
-        stage.setMinWidth(760);
-        stage.setMinHeight(480);
+        FlowStyles.apply(stage.getScene());
         stage.show();
         // Cards have real bounds only after the first layout pass; re-draw so the wires land on the ports —
         // and auto-arrange there too, since it stacks cards by their real heights and would otherwise lay the
@@ -377,7 +371,7 @@ public final class ActivityFlowDialog {
      * (under the cursor). The dialog itself owns the name and outcome validation.
      */
     private void createActivityAt(Point2D at) {
-        Optional<ActivityDraft> made = new NewActivityDialog(stage, services.theme(), placedNames(),
+        Optional<ActivityDraft> made = new NewActivityDialog(stage, services, placedNames(),
                 outcomesElsewhere(null), goHomeByDefault).showAt(at.getX(), at.getY());
         if (made.isEmpty()) return;
         canvas.add(made.get());

@@ -153,12 +153,7 @@ public final class ProjectSetup {
         VBox root = new VBox(14, heading, intro, new Separator(), rows, new Separator(), launchStatus, bar);
         root.setPadding(new Insets(18));
 
-        stage = new Stage();
-        stage.setTitle("Project Setup");
-        if (owner != null) stage.initOwner(owner);
-        stage.setScene(services.theme().scene(root, 540, 480));
-        stage.setMinWidth(440);
-        stage.setMinHeight(380);
+        stage = Modals.window(services, owner, Modals.Frame.modeless("Project Setup", 540, 480, 440, 380), root);
         stage.setOnHidden(e -> active = null);
         stage.focusedProperty().addListener((obs, was, focused) -> {
             if (focused && stage.isShowing()) refresh();

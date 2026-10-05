@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Modals;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -8,7 +9,6 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -86,10 +86,8 @@ public final class TemplateGalleryDialog {
             services.status("Open a project to choose a picture.");
             return;
         }
-        Stage stage = new Stage();
-        stage.setTitle(options.title());
-        stage.initModality(Modality.APPLICATION_MODAL);
-        if (owner != null) stage.initOwner(owner);
+        VBox root = new VBox(12);
+        Stage stage = Modals.window(services, owner, Modals.Frame.modal(options.title(), 820, 580, 560, 420), root);
 
         TemplateGallery gallery = new TemplateGallery(services, options.multiSelect());
         if (options.filter() != null) gallery.setFilter(options.filter());
@@ -136,18 +134,14 @@ public final class TemplateGalleryDialog {
         cancel.setOnAction(e -> stage.close());
         buttons.getChildren().addAll(spacer, choose, cancel);
 
-        VBox root = new VBox(12, gallery, buttons);
         if (options.note() != null) {
             Label note = new Label(options.note());
             note.setWrapText(true);
-            root.getChildren().add(0, note);
+            root.getChildren().add(note);
         }
+        root.getChildren().addAll(gallery, buttons);
         VBox.setVgrow(gallery, Priority.ALWAYS);
         root.setPadding(new Insets(16));
-
-        stage.setScene(services.theme().scene(root, 820, 580));
-        stage.setMinWidth(560);
-        stage.setMinHeight(420);
         stage.show();
     }
 

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Modals;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
@@ -12,7 +13,6 @@ import javafx.scene.control.ListView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -55,11 +55,6 @@ public final class TagManagerDialog {
     }
 
     public void show() {
-        stage = new Stage();
-        stage.initOwner(owner);
-        stage.initModality(Modality.APPLICATION_MODAL);
-        stage.setTitle("Tags");
-
         list.setCellFactory(v -> new ListCell<>() {
             @Override protected void updateItem(TagCatalog.Tag item, boolean empty) {
                 super.updateItem(item, empty);
@@ -98,7 +93,7 @@ public final class TagManagerDialog {
         root.setPadding(new Insets(16));
 
         reload();
-        stage.setScene(services.theme().scene(root, 460, 420));
+        stage = Modals.window(services, owner, Modals.Frame.modal("Tags", 460, 420, 0, 0), root);
         stage.show();
     }
 

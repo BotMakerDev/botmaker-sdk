@@ -37,7 +37,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -251,13 +250,8 @@ public final class SourcePicker {
         VBox root = new VBox(scroll, footer);
         VBox.setVgrow(scroll, Priority.ALWAYS);
 
-        stage = new Stage();
-        stage.setTitle("Choose capture source");
-        stage.initModality(Modality.APPLICATION_MODAL);
-        if (owner != null) stage.initOwner(owner);
-        stage.setScene(services.theme().scene(root, 760, 560));
-        stage.setMinWidth(560);
-        stage.setMinHeight(420);
+        stage = Modals.window(services, owner, Modals.Frame.modal("Choose capture source", 760, 560, 560, 420),
+                root);
         stage.setOnHidden(e -> stopThumbs());
 
         loadWindows(windows);
