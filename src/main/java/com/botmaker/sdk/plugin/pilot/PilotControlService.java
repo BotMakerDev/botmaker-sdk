@@ -29,15 +29,28 @@ public final class PilotControlService {
     }
 
     public boolean isPaused() {
-        return paused;
+        return runs.isPaused() || paused;
     }
 
-    /** @return a human-readable result (success or the reason it couldn't). */
+    /**
+     * @return a human-readable result (success or the reason it couldn't).
+     *
+     * <p>Through the host when it pauses runs ({@link Runs#canPause()}), so the pilot and the host's run
+     * overlay share one pause; signalled here otherwise, for a host whose contract has no pause.
+     */
     public synchronized String pause() {
+        if (runs.canPause()) {
+            runs.pause();
+            return runs.isPaused() ? "Paused" : "Could not pause the bot.";
+        }
         return signal("STOP", true, "Paused");
     }
 
     public synchronized String resume() {
+        if (runs.isPaused()) {
+            runs.resume();
+            return runs.isPaused() ? "Could not resume the bot." : "Resumed";
+        }
         return signal("CONT", false, "Resumed");
     }
 

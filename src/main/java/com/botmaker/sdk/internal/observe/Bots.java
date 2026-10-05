@@ -63,6 +63,16 @@ public final class Bots {
         }
     }
 
+    /** Tells every observer the flow entered the activity labelled {@code label}. */
+    public static void fireActivity(String label) {
+        for (BotObserver observer : OBSERVERS) {
+            try {
+                observer.onActivity(label);
+            } catch (RuntimeException ignored) {
+            }
+        }
+    }
+
     /** Dispatches a swipe event to every observer; a misbehaving observer cannot break the bot. */
     public static void fireSwipe(SwipeEvent event) {
         for (BotObserver observer : OBSERVERS) {

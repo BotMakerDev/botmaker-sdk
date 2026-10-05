@@ -86,6 +86,12 @@ public final class IpcObserver implements BotObserver {
         client.send(toTelemetry(event));
     }
 
+    /** Where the bot is in its flow, for the host's run overlay: the activity, with no action yet. */
+    @Override
+    public void onActivity(String label) {
+        client.send(new TelemetryEvent.Step(label, "", -1));
+    }
+
     /**
      * Ships one debug line ({@code Diag}'s sink), attributed to the bot's own line that printed it, so the host's
      * trace can reveal the block ({@code docs/refactor/40-run-trace.md}).

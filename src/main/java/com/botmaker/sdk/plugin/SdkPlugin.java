@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
+import com.botmaker.sdk.plugin.run.SdkRunOverlay;
 import com.botmaker.sdk.plugin.types.PictureAt;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 
@@ -39,8 +40,8 @@ public final class SdkPlugin extends DeclaredPlugin {
     /**
      * The whole plugin, stated once: the types it owns and the parts inside its values ({@link SdkTypes}), the
      * editors a type cannot choose for itself ({@link SdkEditors}), the {@code @Managed} values its windows keep
-     * ({@link SdkValues}), its buttons ({@link SdkToolbarItems}) and the picture under a recorded click
-     * ({@link PictureAt}).
+     * ({@link SdkValues}), its buttons ({@link SdkToolbarItems}), its part of the run overlay
+     * ({@link SdkRunOverlay}) and the picture under a recorded click ({@link PictureAt}).
      *
      * <p><b>Constructing a plugin must not link an optional dependency</b>, so each list is behind a supplier.
      * {@code javafx-controls} is {@code optional} here, so the classpath a headless host resolves this plugin
@@ -63,6 +64,7 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .editors(() -> SdkEditors.ALL)
                 .values(() -> SdkValues.ALL)
                 .toolbar(() -> SdkToolbarItems.ALL)
+                .runOverlay(() -> SdkRunOverlay.ALL)
                 .recorded(() -> PictureAt.ALL));
     }
 

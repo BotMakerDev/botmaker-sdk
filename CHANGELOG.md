@@ -17,6 +17,25 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Added
+
+- **Watch your bot over the desktop while it runs.** In a Studio with the run overlay, the bar names the
+  activity your bot is in and what it just did there ("Collect · clicked · line 42"). The desktop gets a green
+  box where it found a picture, with its confidence, and a dot where it clicked; each fades after a second
+  and a half, and neither takes your clicks or the bot's. Boxes and dots are drawn for a bot that drives your
+  own desktop only; one that drives an emulator or a private display still gets its line in the bar. Nothing
+  changes in your bot's code.
+
+### Changed
+
+- **The Remote Pilot's pause is Studio's pause** when Studio can pause a run, so pausing from the phone and
+  from the run overlay is one pause. Under an older Studio the pilot pauses the bot itself, as before.
+
+**Needs a Studio whose contract has the run overlay.** An older Studio refuses this SDK's plugin by name, in
+Manage Plugins; your bot still builds and runs.
+
 ## [1.3.0] — 2026-10-05
 
 ### Changed — breaking

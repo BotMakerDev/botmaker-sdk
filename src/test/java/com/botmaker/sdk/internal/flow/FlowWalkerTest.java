@@ -100,6 +100,27 @@ class FlowWalkerTest {
         walk(flow, null);
     }
 
+    // ---- what an observer hears -------------------------------------------------------------------------
+
+    @Test
+    void anObserverHearsEachActivityThatRunsAsItIsEntered() {
+        List<String> entered = new ArrayList<>();
+        com.botmaker.sdk.internal.observe.BotObserver observer = new com.botmaker.sdk.internal.observe.BotObserver() {
+            @Override
+            public void onActivity(String label) {
+                entered.add(label + "@" + log.size());
+            }
+        };
+        com.botmaker.sdk.internal.observe.Bots.addObserver(observer);
+        try {
+            walk(flow("A", List.of(on("A"), off("B"), on("C")),
+                    edge("A", "B", Outcome.NEXT.label()), edge("B", "C", DISABLED)));
+        } finally {
+            com.botmaker.sdk.internal.observe.Bots.removeObserver(observer);
+        }
+        assertEquals(List.of("A@0", "C@1"), entered, "before each body runs; a skipped activity is not entered");
+    }
+
     // ---- routing ----------------------------------------------------------------------------------------
 
     @Test

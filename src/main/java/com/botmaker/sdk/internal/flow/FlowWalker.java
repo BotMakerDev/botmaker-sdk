@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.internal.bot.Watchdog;
+import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.trace.Trace;
 
 import java.util.Map;
@@ -138,6 +139,7 @@ public final class FlowWalker {
         long startedAt = System.currentTimeMillis();
         Activity outer = CURRENT.get();
         CURRENT.set(step.activity());
+        Bots.fireActivity(step.label());
         Outcome outcome;
         try {
             outcome = body.run();
