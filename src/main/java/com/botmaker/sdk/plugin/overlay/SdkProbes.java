@@ -107,7 +107,10 @@ public final class SdkProbes {
         return score(result.confidence());
     }
 
-    /** The probed frame as a source whose origin is where it sits on the desktop, so matches are in desktop pixels. */
+    /**
+     * The probed frame as a source whose origin is where it sits in the bot's pixels — the desktop's, or a private
+     * session's own — so matches are in the pixels the bot clicks.
+     */
     record Frame(BufferedImage image, Point origin) implements CaptureSource {
 
         @Override
