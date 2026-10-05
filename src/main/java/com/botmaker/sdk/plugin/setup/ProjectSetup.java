@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.setup;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.plugin.launch.LaunchTargetChooser;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
@@ -125,18 +126,16 @@ public final class ProjectSetup {
 
     private void show() {
         Label heading = new Label("Set your project up to run");
-        heading.setStyle("-fx-font-weight: bold; -fx-font-size: 15px;");
+        Styles.on(heading, Styles.DIALOG_HEADING);
         Label intro = new Label("Work down the list — each row opens the window that sets it, and ticks green "
                 + "once it's done.");
         intro.setWrapText(true);
-        intro.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
+        Styles.on(intro, Styles.DIALOG_HINT);
 
-        summary = new Label();
-        summary.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
+        summary = Styles.on(new Label(), Styles.DIALOG_SUBHEADING);
 
-        launchStatus = new Label();
+        launchStatus = Styles.on(new Label(), Styles.SMALL_TEXT, Styles.MUTED_TEXT);
         launchStatus.setWrapText(true);
-        launchStatus.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
 
         rows = new VBox(10);
 
@@ -214,7 +213,7 @@ public final class ProjectSetup {
 
     private void report(boolean ok, String message) {
         launchStatus.setText(message);
-        launchStatus.setStyle("-fx-font-size: 11px; -fx-text-fill: " + (ok ? "gray" : "#c0392b") + ";");
+        Styles.pick(launchStatus, ok ? Styles.MUTED_TEXT : Styles.ERROR_TEXT, Styles.MUTED_TEXT, Styles.ERROR_TEXT);
     }
 
     /**
@@ -263,14 +262,14 @@ public final class ProjectSetup {
     private HBox row(boolean done, boolean optional, String title, String detail, Node control) {
         Label glyph = new Label(done ? "✓" : (optional ? "○" : "✗"));
         glyph.setMinWidth(18);
-        glyph.setStyle("-fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: "
-                + (done ? "#27ae60" : (optional ? "#95a5a6" : "#e67e22")) + ";");
+        glyph.setStyle("-fx-font-size: 15px;");
+        Styles.on(glyph, Styles.STRONG_TEXT,
+                done ? Styles.OK_TEXT : (optional ? Styles.MUTED_TEXT : Styles.WARNING_TEXT));
 
-        Label name = new Label(title);
-        name.setStyle("-fx-font-weight: bold;");
+        Label name = Styles.on(new Label(title), Styles.STRONG_TEXT);
         Label sub = new Label(detail);
         sub.setWrapText(true);
-        sub.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
+        Styles.on(sub, Styles.DIALOG_HINT);
         VBox text = new VBox(2, name, sub);
         HBox.setHgrow(text, Priority.ALWAYS);
 

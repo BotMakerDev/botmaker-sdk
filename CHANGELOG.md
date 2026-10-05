@@ -45,6 +45,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The plugin's windows follow your theme.** Remote Pilot, Project Setup, Bot Settings, the capture-source
+  picker and the emulator dialogs drop their hard-coded greys, oranges and greens for the theme's text roles,
+  so they read in the dark themes too. Overlays drawn over a live game keep their own dark look.
 - **Nothing changes for a bot.** The plugin half declares `Pictures`, `Activities` and `Outcomes` as open sets
   of `ImageTemplate`, `Activity` and `Outcome` (the plugin contract's typed open sets), and changes them through
   the toolkit's `ManagedSet`, so a constant of the wrong kind cannot be added to one.

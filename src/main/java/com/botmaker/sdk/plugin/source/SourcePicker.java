@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.source;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
@@ -21,6 +22,7 @@ import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorProbe;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
 import javafx.application.Platform;
+import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -208,7 +210,7 @@ public final class SourcePicker {
         setRegion(narrowed == null ? null
                 : new Rectangle(narrowed.x(), narrowed.y(), narrowed.width(), narrowed.height()));
         Label regionLabel = new Label("Region of source (optional):");
-        regionLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
+        Styles.on(regionLabel, Styles.DIALOG_HINT);
         Button draw = new Button("Draw…");
         draw.setTooltip(new javafx.scene.control.Tooltip(
                 "Grab the selected source and drag the part of it the bot should read"));
@@ -218,7 +220,7 @@ public final class SourcePicker {
         clear.setOnAction(e -> setRegion(null));
         HBox regionRow = new HBox(6, regionLabel, rx, ry, rw, rh, draw, clear);
         regionRow.setAlignment(Pos.CENTER_LEFT);
-        regionNote.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
+        Styles.on(regionNote, Styles.DIALOG_HINT);
 
         Button refresh = new Button("↻ Refresh");
         refresh.setOnAction(e -> {
@@ -276,7 +278,7 @@ public final class SourcePicker {
         TextField field = new TextField();
         field.setPromptText(prompt);
         field.setPrefColumnCount(3);
-        field.setStyle("-fx-font-size: 11px;");
+        Styles.on(field, Styles.SMALL_TEXT);
         return field;
     }
 
@@ -341,8 +343,8 @@ public final class SourcePicker {
     }
 
     private static Label sectionLabel(String text) {
-        Label label = new Label(text);
-        label.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-padding: 6 0 0 2;");
+        Label label = Styles.on(new Label(text), Styles.DIALOG_SUBHEADING);
+        label.setStyle("-fx-padding: 6 0 0 2;");
         return label;
     }
 
@@ -531,14 +533,13 @@ public final class SourcePicker {
                 ? "No windows detected. On Wayland only X11/XWayland apps (e.g. many games via Proton) are\n"
                         + "listed; native Wayland windows can't be enumerated. Use a Screen or the project default."
                 : "No windows detected. Open the app you want to capture, then press ↻ Refresh.");
-        label.setStyle(label.getStyle() + " -fx-padding: 6 2 2 2;");
+        label.setStyle("-fx-padding: 6 2 2 2;");
         return label;
     }
 
     private static Label hint(String text) {
-        Label label = new Label(text);
+        Label label = Styles.on(new Label(text), Styles.DIALOG_HINT);
         label.setWrapText(true);
-        label.setStyle("-fx-text-fill: gray; -fx-font-size: 11px;");
         return label;
     }
 
@@ -547,22 +548,15 @@ public final class SourcePicker {
         holder.setMinSize(TILE_W, THUMB_H);
         holder.setPrefSize(TILE_W, THUMB_H);
         holder.setMaxSize(TILE_W, THUMB_H);
-        holder.setStyle("-fx-background-color: #101216; -fx-background-radius: 6;");
-        Label loading = new Label("…");
-        loading.setStyle("-fx-text-fill: #6b7280;");
-        holder.getChildren().add(loading);
+        holder.getChildren().add(Styles.on(new Label("…"), Styles.MUTED_TEXT));
 
-        Label nameLabel = new Label(name);
+        Label nameLabel = Styles.on(new Label(name), Styles.TILE_NAME, Styles.STRONG_TEXT);
         nameLabel.setMaxWidth(TILE_W);
-        nameLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
-        Label subtitleLabel = new Label(subtitle);
-        subtitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: gray;");
+        Label subtitleLabel = Styles.on(new Label(subtitle), Styles.TILE_NAME, Styles.MUTED_TEXT);
 
-        VBox tile = new VBox(4, holder, nameLabel, subtitleLabel);
-        tile.setPadding(new Insets(6));
+        VBox tile = Styles.on(new VBox(4, holder, nameLabel, subtitleLabel), Styles.TILE);
         tile.setMaxWidth(TILE_W + 12);
-        tile.getStyleClass().add("capture-tile");
-        tile.setStyle(tileStyle(false));
+        tile.setStyle("-fx-cursor: hand;");
         return tile;
     }
 
@@ -583,9 +577,7 @@ public final class SourcePicker {
     private void setThumb(VBox tile, Image image, String missing) {
         if (tile.getChildren().isEmpty() || !(tile.getChildren().get(0) instanceof StackPane holder)) return;
         if (image == null) {
-            Label none = new Label(missing);
-            none.setStyle("-fx-text-fill: #6b7280;");
-            holder.getChildren().setAll(none);
+            holder.getChildren().setAll(Styles.on(new Label(missing), Styles.MUTED_TEXT));
             return;
         }
         ImageView view = new ImageView(image);
@@ -596,17 +588,14 @@ public final class SourcePicker {
     }
 
     private void select(VBox tile, Selection selection) {
-        if (selectedTile != null) selectedTile.setStyle(tileStyle(false));
+        if (selectedTile != null) selectedTile.pseudoClassStateChanged(SELECTED, false);
         selectedTile = tile;
         selected = selection;
-        tile.setStyle(tileStyle(true));
+        tile.pseudoClassStateChanged(SELECTED, true);
     }
 
-    private static String tileStyle(boolean isSelected) {
-        return "-fx-background-radius: 8; -fx-border-radius: 8; -fx-border-width: 2; -fx-cursor: hand;"
-                + " -fx-border-color: " + (isSelected ? "#3498db" : "transparent") + ";"
-                + " -fx-background-color: " + (isSelected ? "rgba(52,152,219,0.10)" : "transparent") + ";";
-    }
+    /** What {@code Styles.TILE} draws a picked tile with, in the host's theme. */
+    private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
 
     private synchronized ExecutorService thumbs() {
         if (thumbExec == null || thumbExec.isShutdown()) {

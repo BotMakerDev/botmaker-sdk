@@ -247,7 +247,7 @@ public final class TemplateNaming {
         HBox box = new HBox(10, badge, thumb, row.name(), row.tags(), row.discard());
         box.setAlignment(Pos.CENTER_LEFT);
         box.setPadding(new Insets(4));
-        box.setStyle("-fx-border-color: #d0d0d0; -fx-border-radius: 4; -fx-background-radius: 4;");
+        box.setStyle("-fx-border-color: -bm-divider; -fx-border-radius: 4; -fx-background-radius: 4;");
         box.setMinHeight(Region.USE_PREF_SIZE);
         return box;
     }

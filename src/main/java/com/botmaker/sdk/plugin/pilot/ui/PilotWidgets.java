@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.pilot.ui;
 
+import com.botmaker.plugin.toolkit.Styles;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -89,13 +90,18 @@ final class PilotWidgets {
         Clipboard.getSystemClipboard().setContent(cc);
     }
 
+    /** Sets a status line's tone — {@code Styles.OK_TEXT}, {@code WARNING_TEXT} or {@code MUTED_TEXT} — as it changes. */
+    static Label tone(Label status, String tone) {
+        return Styles.pick(status, tone, Styles.OK_TEXT, Styles.WARNING_TEXT, Styles.MUTED_TEXT);
+    }
+
     /** One wizard checklist row: a ✓/✗ status glyph + label; highlighted orange when it's the active blocker. */
     static HBox stepRow(boolean done, String text, boolean isBlocker) {
-        Label glyph = new Label(done ? "✓" : "✗");
-        glyph.setStyle("-fx-font-weight: bold; -fx-text-fill: " + (done ? "#27ae60" : "#e67e22") + ";");
+        Label glyph = Styles.on(new Label(done ? "✓" : "✗"), Styles.STRONG_TEXT,
+                done ? Styles.OK_TEXT : Styles.WARNING_TEXT);
         Label label = new Label(text);
         label.setWrapText(true);
-        if (isBlocker) label.setStyle("-fx-text-fill: #e67e22; -fx-font-weight: bold;");
+        if (isBlocker) Styles.on(label, Styles.WARNING_TEXT, Styles.STRONG_TEXT);
         HBox row = new HBox(8, glyph, label);
         row.setAlignment(Pos.CENTER_LEFT);
         return row;

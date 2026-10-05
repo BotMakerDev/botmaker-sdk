@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.pilot.ui;
 
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.pilot.transport.FunnelTransport.Diag;
 import com.botmaker.sdk.plugin.pilot.transport.FunnelTransport.Issue;
 import javafx.scene.Node;
@@ -36,7 +37,7 @@ final class FunnelSetupWizard {
         Label title = PilotWidgets.wrapped("Set up Tailscale Funnel once on THIS computer's account — then any "
                 + "phone connects by just opening the link (no Tailscale, no VPN, nothing to install on the "
                 + "phone):");
-        title.setStyle("-fx-font-weight: bold;");
+        Styles.on(title, Styles.STRONG_TEXT);
         box.getChildren().add(title);
 
         boolean step1ok = diag != null && diag.cliPresent() && diag.loggedIn();
@@ -78,7 +79,7 @@ final class FunnelSetupWizard {
         // vs ACL vs operator apart when the checklist guesses wrong.
         if (funnelError != null && !funnelError.isBlank()) {
             Label raw = PilotWidgets.wrapped("Tailscale said: " + funnelError.trim());
-            raw.setStyle("-fx-text-fill: #e67e22;");
+            Styles.on(raw, Styles.WARNING_TEXT);
             box.getChildren().add(raw);
         }
 

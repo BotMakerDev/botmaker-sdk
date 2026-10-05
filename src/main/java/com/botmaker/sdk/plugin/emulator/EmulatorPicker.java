@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.emulator;
 
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
 import com.botmaker.shared.emulator.EmulatorReadiness;
@@ -513,7 +514,7 @@ public final class EmulatorPicker {
         VBox box = new VBox(4);
         box.setPadding(new Insets(8));
         Label title = new Label("No emulator instances found.");
-        title.setStyle("-fx-font-weight: bold;");
+        Styles.on(title, Styles.STRONG_TEXT);
         box.getChildren().add(title);
         for (PlatformStatus s : statuses) {
             box.getChildren().add(new Label("• " + s.statusLine()));

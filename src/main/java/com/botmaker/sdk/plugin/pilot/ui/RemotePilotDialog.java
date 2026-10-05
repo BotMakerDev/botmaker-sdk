@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.pilot.ui;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.pilot.transport.PilotTransport.Availability;
 import com.botmaker.sdk.plugin.pilot.transport.TailnetPhones;
 import com.botmaker.sdk.plugin.pilot.transport.TransportKind;
@@ -116,7 +117,7 @@ final class RemotePilotDialog {
             } else {
                 Label failed = PilotWidgets.wrapped("⚠ " + outcome.asked().displayName() + " didn't start: "
                         + outcome.error() + (outcome.fix() == null ? "" : "\n" + outcome.fix()));
-                failed.setStyle("-fx-text-fill: #e67e22;");
+                Styles.on(failed, Styles.WARNING_TEXT);
                 content.getChildren().add(failed);
             }
             content.getChildren().addAll(new Separator(), PilotWidgets.wrapped(
@@ -174,7 +175,7 @@ final class RemotePilotDialog {
         String warning = warning(kind);
         if (warning != null) {
             Label warn = PilotWidgets.wrapped(warning);
-            warn.setStyle("-fx-text-fill: #e67e22;");
+            Styles.on(warn, Styles.WARNING_TEXT);
             content.getChildren().add(warn);
         }
 
@@ -195,14 +196,14 @@ final class RemotePilotDialog {
      */
     private static Node phoneStatus() {
         Label label = PilotWidgets.wrapped("Checking whether your phone is on the tailnet…");
-        label.setStyle("-fx-text-fill: #8b93a1;");
+        PilotWidgets.tone(label, Styles.MUTED_TEXT);
         Thread probe = new Thread(() -> {
             List<TailnetPhones.Phone> phones = TailnetPhones.probe();
             String text = phoneStatusText(phones, Instant.now());
             boolean anyOnline = phones.stream().anyMatch(TailnetPhones.Phone::online);
             javafx.application.Platform.runLater(() -> {
                 label.setText(text);
-                label.setStyle(anyOnline ? "-fx-text-fill: #4cc38a;" : "-fx-text-fill: #e67e22;");
+                PilotWidgets.tone(label, anyOnline ? Styles.OK_TEXT : Styles.WARNING_TEXT);
             });
         }, "pilot-tailnet-phones");
         probe.setDaemon(true);
@@ -245,7 +246,7 @@ final class RemotePilotDialog {
     private static Node chooser(PilotOutcome outcome, java.util.function.Consumer<TransportKind> pick) {
         VBox box = new VBox(4);
         Label title = new Label("Reach the pilot through:");
-        title.setStyle("-fx-font-weight: bold;");
+        Styles.on(title, Styles.STRONG_TEXT);
         box.getChildren().add(title);
         ToggleGroup group = new ToggleGroup();
         for (TransportKind kind : TransportKind.offered()) {
@@ -283,7 +284,7 @@ final class RemotePilotDialog {
      */
     private static Node qrCell(String text, String title, String caption) {
         Label heading = new Label(title);
-        heading.setStyle("-fx-font-weight: bold;");
+        Styles.on(heading, Styles.STRONG_TEXT);
         Image code = QrCodes.qr(text, QR_PX);
 
         Node body;
@@ -301,17 +302,17 @@ final class RemotePilotDialog {
             failed.setWrapText(true);
             failed.setAlignment(Pos.CENTER);
             failed.setMaxWidth(QR_PX);
-            failed.setStyle("-fx-text-fill: #e67e22;");
+            Styles.on(failed, Styles.WARNING_TEXT);
             body = failed;
         }
 
         Label cap = new Label(caption);
         cap.setWrapText(true);
-        cap.setStyle("-fx-text-fill: #8b93a1;");
+        Styles.on(cap, Styles.MUTED_TEXT);
         VBox cell = new VBox(6, heading, body, cap);
         cell.setAlignment(Pos.CENTER);
         cell.setMaxWidth(QR_PX + 40);
-        cell.setStyle("-fx-padding: 10; -fx-border-color: #3a3f4b; -fx-border-radius: 8; -fx-border-width: 1;");
+        cell.setStyle("-fx-padding: 10; -fx-border-color: -bm-divider; -fx-border-radius: 8; -fx-border-width: 1;");
         return cell;
     }
 }

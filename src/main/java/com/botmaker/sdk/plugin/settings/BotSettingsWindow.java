@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import javafx.geometry.Insets;
@@ -102,7 +103,7 @@ public final class BotSettingsWindow {
         seed(current);
 
         Label heading = new Label("How this bot clicks and looks");
-        heading.setStyle("-fx-font-weight: bold; -fx-font-size: 15px;");
+        Styles.on(heading, Styles.DIALOG_HEADING);
         Label intro = note("Written into Sdk.settings(), in your bot's own Java, and applied before its first "
                 + "click — wherever the bot runs.");
 
@@ -171,7 +172,7 @@ public final class BotSettingsWindow {
         TextArea code = new TextArea(snippet);
         code.setEditable(false);
         code.setPrefRowCount(4);
-        code.setStyle("-fx-font-family: monospace;");
+        Styles.on(code, Styles.MONO_TEXT);
         Button copy = new Button("Copy");
         copy.setOnAction(e -> {
             ClipboardContent content = new ClipboardContent();
@@ -299,15 +300,12 @@ public final class BotSettingsWindow {
     }
 
     private static Label title(String text) {
-        Label l = new Label(text);
-        l.setStyle("-fx-font-weight: bold;");
-        return l;
+        return Styles.on(new Label(text), Styles.STRONG_TEXT);
     }
 
     private static Label note(String text) {
-        Label l = new Label(text);
+        Label l = Styles.on(new Label(text), Styles.DIALOG_HINT);
         l.setWrapText(true);
-        l.setStyle("-fx-font-size: 11px; -fx-opacity: 0.75;");
         return l;
     }
 

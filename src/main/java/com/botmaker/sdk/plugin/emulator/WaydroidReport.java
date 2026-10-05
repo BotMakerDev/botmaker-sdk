@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.emulator;
 
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.shared.emulator.WaydroidDiagnostics;
 import com.botmaker.shared.emulator.WaydroidDiagnostics.Finding;
 import com.botmaker.plugin.api.StudioServices;
@@ -85,7 +86,7 @@ public final class WaydroidReport {
      */
     private static VBox allClear() {
         Label title = new Label("No problems found.");
-        title.setStyle("-fx-font-weight: bold;");
+        Styles.on(title, Styles.STRONG_TEXT);
         Label detail = new Label("The container service, session, host networking, ARM translation layer and "
                 + "display size all look right. If a bot still can't reach Waydroid, the cause is somewhere "
                 + "else — start the session and check that the app is actually running.");
@@ -97,7 +98,7 @@ public final class WaydroidReport {
     private static VBox card(Finding finding) {
         Label symptom = new Label(finding.symptom());
         symptom.setWrapText(true);
-        symptom.setStyle("-fx-font-weight: bold;");
+        Styles.on(symptom, Styles.STRONG_TEXT);
 
         Label remedy = new Label(finding.remedy());
         remedy.setWrapText(true);
@@ -111,7 +112,7 @@ public final class WaydroidReport {
             commands.setEditable(false);
             commands.setWrapText(false);
             commands.setPrefRowCount(Math.min(finding.commands().size(), 12));
-            commands.setStyle("-fx-font-family: monospace;");
+            Styles.on(commands, Styles.MONO_TEXT);
 
             Button copy = new Button("Copy commands");
             copy.setOnAction(e -> {

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.pilot.ui;
 
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.pilot.NestedSessionLauncher;
 import com.botmaker.sdk.plugin.pilot.PilotProject;
 import com.botmaker.shared.capture.GenericWindow;
@@ -38,7 +39,7 @@ final class BackgroundModeBox {
     static Node create(NestedSessionLauncher launcher, PilotProject project) {
         VBox box = new VBox(6);
         Label title = new Label("Background mode — run the game in a private display (recommended)");
-        title.setStyle("-fx-font-weight: bold;");
+        Styles.on(title, Styles.STRONG_TEXT);
         Label help = PilotWidgets.wrapped("Launches the configured game into a private nested display the bot "
                 + "alone drives, so the pilot previews and controls that window while your real cursor stays "
                 + "free. The launched window is the target — no capture source to pick. Otherwise the pilot "
@@ -113,7 +114,7 @@ final class BackgroundModeBox {
                         + (size != null ? " at " + size.describe() : "")
                         + ". Interact drives it; your real cursor stays free.");
                 status.setTooltip(size == null ? null : new Tooltip(SessionBackends.FIXED_SIZE_NOTE));
-                status.setStyle("-fx-text-fill: #27ae60;"); // green — the good, isolated state
+                PilotWidgets.tone(status, Styles.OK_TEXT); // green — the good, isolated state
                 return;
             }
             LaunchSpec spec = launcher.configuredTarget();
@@ -131,7 +132,7 @@ final class BackgroundModeBox {
                 status.setText("● Mirroring your real desktop :0 — Interact moves your real cursor. Start "
                         + "background mode to run " + spec.describe() + " isolated.");
             }
-            status.setStyle("-fx-text-fill: #e67e22;"); // amber — cursor-moving / not-yet-isolated
+            PilotWidgets.tone(status, Styles.WARNING_TEXT); // amber — cursor-moving / not-yet-isolated
         };
         backend.setOnAction(e -> { refreshButtons.run(); refreshStatus.run(); });
         refreshButtons.run();
@@ -145,13 +146,13 @@ final class BackgroundModeBox {
                     // Loud failure (e.g. a host launcher stole the game onto :0) — show it, stay amber, and
                     // offer the one thing the user can do about it from here.
                     status.setText("● " + msg);
-                    status.setStyle("-fx-text-fill: #e67e22;");
+                    PilotWidgets.tone(status, Styles.WARNING_TEXT);
                     offerToCloseLauncher.run();
                 } else if (launcher.isRunning()) {
                     refreshStatus.run(); // terminal success → green "Isolated on :N"
                 } else {
                     status.setText(msg); // interim "Bringing up…"
-                    status.setStyle("-fx-text-fill: #7f8c8d;");
+                    PilotWidgets.tone(status, Styles.MUTED_TEXT);
                 }
                 refreshButtons.run();
             });
@@ -170,7 +171,7 @@ final class BackgroundModeBox {
                     ? "● Couldn't close " + kind.productName() + " — close it yourself, then start again."
                     : "● Asked " + kind.productName() + " to quit (" + closed + " process"
                             + (closed == 1 ? "" : "es") + "). Give it a moment, then start background mode.");
-            status.setStyle("-fx-text-fill: #e67e22;");
+            PilotWidgets.tone(status, Styles.WARNING_TEXT);
             offerToCloseLauncher.run();
         });
 
@@ -196,14 +197,14 @@ final class BackgroundModeBox {
         status.setText("● Already isolated — " + app + " runs inside " + instance
                 + ". The pilot streams the emulator over ADB and Interact taps land inside it; your real "
                 + "cursor stays free.");
-        status.setStyle("-fx-text-fill: #27ae60;"); // green — this target is isolated by construction
+        PilotWidgets.tone(status, Styles.OK_TEXT); // green — this target is isolated by construction
         Thread probe = new Thread(() -> {
             boolean up = EmulatorInstances.byName(instance).map(EmulatorProbe::isRunning).orElse(false);
             if (up) return;
             Platform.runLater(() -> {
                 status.setText("● " + instance + " isn't running — start it with ▶ Launch now (or the emulator "
                         + "picker). The pilot streams it over ADB as soon as it's up; no background mode needed.");
-                status.setStyle("-fx-text-fill: #e67e22;");
+                PilotWidgets.tone(status, Styles.WARNING_TEXT);
             });
         }, "emulator-liveness");
         probe.setDaemon(true);
@@ -229,7 +230,7 @@ final class BackgroundModeBox {
             NativeControllerFactory.get().focusWindow(host);
         } else {
             status.setText("● Couldn't find the Xephyr host window to raise — it may have been closed.");
-            status.setStyle("-fx-text-fill: #e67e22;");
+            PilotWidgets.tone(status, Styles.WARNING_TEXT);
         }
     }
 

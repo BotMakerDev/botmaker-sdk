@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.emulator;
 
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.shared.device.ScrcpyServer;
 import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.AdbTools;
@@ -100,7 +101,7 @@ public final class ConnectPhone {
     /** A titled block whose body is rebuilt in place by the refreshers; children[1..] are the body. */
     private static VBox section(String title) {
         Label heading = new Label(title);
-        heading.setStyle("-fx-font-weight: bold;");
+        Styles.on(heading, Styles.STRONG_TEXT);
         VBox box = new VBox(6, heading);
         return box;
     }
@@ -265,7 +266,7 @@ public final class ConnectPhone {
     private static HBox serverRow(AdbTools.ServerDevice phone) {
         Circle dot = new Circle(5, phone.online() ? ONLINE : TROUBLE);
         Label name = new Label(phone.displayName());
-        name.setStyle("-fx-font-weight: bold;");
+        Styles.on(name, Styles.STRONG_TEXT);
         Label where = new Label(phone.usb() ? "USB" : "network");
         where.getStyleClass().add("emulator-picker-state");
         Region spacer = new Region();
@@ -303,7 +304,7 @@ public final class ConnectPhone {
     private static HBox savedRow(VBox section, SavedDevices.SavedDevice device) {
         Circle dot = new Circle(5, OFFLINE);
         Label name = new Label(device.displayName());
-        name.setStyle("-fx-font-weight: bold;");
+        Styles.on(name, Styles.STRONG_TEXT);
         Label address = new Label(device.endpoint().label());
         address.getStyleClass().add("emulator-picker-state");
         Region spacer = new Region();
@@ -381,7 +382,7 @@ public final class ConnectPhone {
     private static VBox notes() {
         VBox box = new VBox(4);
         Label heading = new Label("Worth knowing");
-        heading.setStyle("-fx-font-weight: bold;");
+        Styles.on(heading, Styles.STRONG_TEXT);
         VBox scrcpy = new VBox(6);
         box.getChildren().addAll(heading, scrcpy);
         refreshScrcpy(scrcpy);
