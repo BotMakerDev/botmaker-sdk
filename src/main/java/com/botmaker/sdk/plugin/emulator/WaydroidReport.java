@@ -1,10 +1,10 @@
 package com.botmaker.sdk.plugin.emulator;
 
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.shared.emulator.WaydroidDiagnostics;
 import com.botmaker.shared.emulator.WaydroidDiagnostics.Finding;
 import com.botmaker.plugin.api.StudioServices;
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -24,7 +24,6 @@ import javafx.stage.Window;
 
 import java.awt.Desktop;
 import java.net.URI;
-import java.util.List;
 
 /**
  * What is wrong with the local Waydroid setup, and the commands that fix it — <b>to copy, not to run</b>.
@@ -63,18 +62,15 @@ public final class WaydroidReport {
         dialog.getDialogPane().setContent(scroll);
 
         // The probes shell out (systemctl, waydroid status, ip route) — never on the FX thread.
-        Workers.start("waydroid-diagnostics", () -> {
-            List<Finding> findings = WaydroidDiagnostics.run();
-            Platform.runLater(() -> {
-                body.getChildren().clear();
-                if (findings.isEmpty()) {
-                    body.getChildren().add(allClear());
-                    return;
-                }
-                for (Finding finding : findings) {
-                    body.getChildren().add(card(finding));
-                }
-            });
+        Async.load("waydroid-diagnostics", WaydroidDiagnostics::run, findings -> {
+            body.getChildren().clear();
+            if (findings.isEmpty()) {
+                body.getChildren().add(allClear());
+                return;
+            }
+            for (Finding finding : findings) {
+                body.getChildren().add(card(finding));
+            }
         });
 
         dialog.showAndWait();
@@ -143,7 +139,7 @@ public final class WaydroidReport {
      * worse than a link that took a second.
      */
     private static void browse(String url) {
-        Workers.start("waydroid-docs", () -> {
+        Async.run("waydroid-docs", () -> {
             try {
                 if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                     Desktop.getDesktop().browse(URI.create(url));
@@ -151,6 +147,6 @@ public final class WaydroidReport {
             } catch (Exception ignored) {
                 // A diagnostics panel that throws while opening a help page is worse than one that doesn't.
             }
-        });
+        }, null);
     }
 }

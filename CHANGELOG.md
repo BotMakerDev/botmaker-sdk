@@ -51,6 +51,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **The plugin's windows reopen at the size you left them.** The Activity Flow, Resource Manager, Tags,
   picture picker, New activity, Project Setup, Bot Settings and capture-source windows are built by the
   toolkit's `Modals.window`, and come back at the size they last closed at in the session.
+- **Background checks report their failures.** The emulator, phone, Remote Pilot, launch, text-reading and
+  picture-matching windows do their slow work through the toolkit's `Async`; a launch or a Remote Pilot start
+  that fails says why, as before, and a failed object-capture solve no longer leaves its spinner turning.
 - **Nothing changes for a bot.** The plugin half declares `Pictures`, `Activities` and `Outcomes` as open sets
   of `ImageTemplate`, `Activity` and `Outcome` (the plugin contract's typed open sets), and changes them through
   the toolkit's `ManagedSet`, so a constant of the wrong kind cannot be added to one.

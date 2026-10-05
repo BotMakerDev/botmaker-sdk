@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.pilot.ui;
 
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.pilot.NestedSessionLauncher;
 import com.botmaker.sdk.plugin.pilot.PilotProject;
@@ -12,7 +13,6 @@ import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.impl.NestedSession;
 import com.botmaker.shared.emulator.EmulatorProbe;
-import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
@@ -198,17 +198,13 @@ final class BackgroundModeBox {
                 + ". The pilot streams the emulator over ADB and Interact taps land inside it; your real "
                 + "cursor stays free.");
         PilotWidgets.tone(status, Styles.OK_TEXT); // green — this target is isolated by construction
-        Thread probe = new Thread(() -> {
-            boolean up = EmulatorInstances.byName(instance).map(EmulatorProbe::isRunning).orElse(false);
-            if (up) return;
-            Platform.runLater(() -> {
-                status.setText("● " + instance + " isn't running — start it with ▶ Launch now (or the emulator "
-                        + "picker). The pilot streams it over ADB as soon as it's up; no background mode needed.");
-                PilotWidgets.tone(status, Styles.WARNING_TEXT);
-            });
-        }, "emulator-liveness");
-        probe.setDaemon(true);
-        probe.start();
+        Async.load("emulator-liveness",
+                () -> EmulatorInstances.byName(instance).map(EmulatorProbe::isRunning).orElse(false), up -> {
+                    if (up) return;
+                    status.setText("● " + instance + " isn't running — start it with ▶ Launch now (or the emulator "
+                            + "picker). The pilot streams it over ADB as soon as it's up; no background mode needed.");
+                    PilotWidgets.tone(status, Styles.WARNING_TEXT);
+                });
     }
 
     /**

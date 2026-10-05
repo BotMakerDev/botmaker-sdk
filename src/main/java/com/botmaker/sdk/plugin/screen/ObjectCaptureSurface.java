@@ -1,8 +1,8 @@
 package com.botmaker.sdk.plugin.screen;
 
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.plugin.toolkit.ZoomPan;
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
@@ -252,30 +252,24 @@ public final class ObjectCaptureSurface {
         busy = true;
         busySpinner.setVisible(true);
         updateHud();
-        Thread t = new Thread(() -> {
-            MagicWand.Result r;
-            try {
-                r = work.get();
-            } catch (RuntimeException ex) {
-                r = null;
-                ex.printStackTrace();
-            }
-            MagicWand.Result done = r;
-            Platform.runLater(() -> {
-                busy = false;
-                busySpinner.setVisible(false);
-                clearStrokeTrail();
-                if (done != null) {
-                    lastResult = done;
-                    boxed = true;
-                    showPreview(done);
-                }
-                captureBtn.setDisable(lastResult == null || lastResult.isEmpty());
-                updateHud();
-            });
-        }, "grabcut-solve");
-        t.setDaemon(true);
-        t.start();
+        Async.load("grabcut-solve", work, this::solved, why -> {
+            System.err.println("GrabCut failed: " + why);
+            solved(null);
+        });
+    }
+
+    /** The FX half of {@link #solve}: the new preview, or the last one kept when the solve failed. */
+    private void solved(MagicWand.Result done) {
+        busy = false;
+        busySpinner.setVisible(false);
+        clearStrokeTrail();
+        if (done != null) {
+            lastResult = done;
+            boxed = true;
+            showPreview(done);
+        }
+        captureBtn.setDisable(lastResult == null || lastResult.isEmpty());
+        updateHud();
     }
 
     private void paintAt(double paneX, double paneY) {

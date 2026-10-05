@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.emulator;
 
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.shared.device.ScrcpyServer;
 import com.botmaker.shared.emulator.AdbEndpoint;
@@ -119,12 +120,12 @@ public final class ConnectPhone {
      */
     private static void refreshServer(VBox section) {
         setBody(section, List.of(new Label("Checking for an adb server…")));
-        Workers.start("connect-phone-adb-server", () -> {
+        Async.run("connect-phone-adb-server", () -> {
             boolean running = AdbTools.serverRunning();
             List<AdbTools.ServerDevice> devices = running ? AdbTools.devices() : List.of();
             boolean binary = AdbTools.binary().isPresent();
             Platform.runLater(() -> setBody(section, serverRows(section, running, devices, binary)));
-        });
+        }, null);
     }
 
     private static List<Region> serverRows(VBox section, boolean running,
@@ -140,10 +141,7 @@ public final class ConnectPhone {
                 // AdbTools.devices), so a background process is never a side effect of opening a dialog.
                 start.setOnAction(e -> {
                     start.setDisable(true);
-                    Workers.start("connect-phone-start-server", () -> {
-                        AdbTools.startServer();
-                        Platform.runLater(() -> refreshServer(section));
-                    });
+                    Async.run("connect-phone-start-server", AdbTools::startServer, () -> refreshServer(section));
                 });
                 rows.add(new HBox(start));
                 rows.add(pairBox(section));
@@ -241,17 +239,17 @@ public final class ConnectPhone {
                                    Supplier<AdbTools.Outcome> command, String threadName) {
         buttons.forEach(b -> b.setDisable(true));
         problem.setText("Working…");
-        Workers.start(threadName, () -> {
-            AdbTools.Outcome outcome = command.get();
-            Platform.runLater(() -> {
-                buttons.forEach(b -> b.setDisable(false));
-                problem.setText(outcome.message());
-                if (outcome.ok() && section != null) {
-                    // A connected phone is one the server now owns, so the list above is what has to change —
-                    // and re-running the query is how it learns.
-                    refreshServer(section);
-                }
-            });
+        Async.load(threadName, command, outcome -> {
+            buttons.forEach(b -> b.setDisable(false));
+            problem.setText(outcome.message());
+            if (outcome.ok() && section != null) {
+                // A connected phone is one the server now owns, so the list above is what has to change —
+                // and re-running the query is how it learns.
+                refreshServer(section);
+            }
+        }, why -> {
+            buttons.forEach(b -> b.setDisable(false));
+            problem.setText(why);
         });
     }
 
@@ -319,14 +317,11 @@ public final class ConnectPhone {
             refreshSaved(section);
         });
 
-        Workers.start("connect-phone-probe", () -> {
-            boolean reachable = device.endpoint().reachable();
-            Platform.runLater(() -> {
-                dot.setFill(reachable ? ONLINE : OFFLINE);
-                // "not answering" rather than "offline": nothing here can tell a phone that is switched off
-                // from one that has left tcpip mode, or from a Wi-Fi address that has since been reassigned.
-                state.setText(reachable ? "answering" : "not answering");
-            });
+        Async.load("connect-phone-probe", () -> device.endpoint().reachable(), reachable -> {
+            dot.setFill(reachable ? ONLINE : OFFLINE);
+            // "not answering" rather than "offline": nothing here can tell a phone that is switched off
+            // from one that has left tcpip mode, or from a Wi-Fi address that has since been reassigned.
+            state.setText(reachable ? "answering" : "not answering");
         });
 
         HBox row = new HBox(8, dot, name, address, spacer, state, forget);
@@ -402,25 +397,25 @@ public final class ConnectPhone {
      */
     private static void refreshScrcpy(VBox slot) {
         slot.getChildren().setAll(note("Checking for scrcpy…"));
-        Workers.start("connect-phone-scrcpy", () -> {
-            boolean present = ScrcpyServer.available();
-            Platform.runLater(() -> {
-                if (present) {
-                    slot.getChildren().setAll(note("The scrcpy server was found, so capture uses the "
-                            + "continuous video stream and injects input directly."));
-                    return;
-                }
-                slot.getChildren().setAll(
-                        note(ScrcpyServer.installHint()),
-                        downloadRow("Download scrcpy-server (" + size(ManagedTools.SCRCPY_SERVER) + ")",
-                                "connect-phone-download-scrcpy",
-                                ManagedTools::installScrcpyServer,
-                                () -> refreshScrcpy(slot)));
-            });
+        Async.load("connect-phone-scrcpy", ScrcpyServer::available, present -> {
+            if (present) {
+                slot.getChildren().setAll(note("The scrcpy server was found, so capture uses the "
+                        + "continuous video stream and injects input directly."));
+                return;
+            }
+            slot.getChildren().setAll(
+                    note(ScrcpyServer.installHint()),
+                    downloadRow("Download scrcpy-server (" + size(ManagedTools.SCRCPY_SERVER) + ")",
+                            "connect-phone-download-scrcpy",
+                            ManagedTools::installScrcpyServer,
+                            () -> refreshScrcpy(slot)));
         });
     }
 
     // --- the two downloads ---
+
+    private static final String DOWNLOAD_FAILED = "The download did not complete — check the connection and try "
+            + "again. Nothing was installed.";
 
     /**
      * A button that fetches one pinned tool, with the progress bar beside it and the failure in words.
@@ -445,23 +440,20 @@ public final class ConnectPhone {
             bar.setVisible(true);
             bar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
             problem.setText("");
-            Workers.start(threadName, () -> {
-                // total is -1 when the server sent no Content-Length; the bar then stays indeterminate rather
-                // than inventing a fraction.
-                boolean ok = install.apply((bytes, total) -> {
-                    double fraction = total > 0 ? (double) bytes / total : ProgressBar.INDETERMINATE_PROGRESS;
-                    Platform.runLater(() -> bar.setProgress(fraction));
-                });
-                Platform.runLater(() -> {
-                    bar.setVisible(false);
-                    button.setDisable(false);
-                    if (ok) {
-                        done.run();
-                    } else {
-                        problem.setText("The download did not complete — check the connection and try again. "
-                                + "Nothing was installed.");
-                    }
-                });
+            // total is -1 when the server sent no Content-Length; the bar then stays indeterminate rather than
+            // inventing a fraction.
+            Async.load(threadName, () -> install.apply((bytes, total) -> {
+                double fraction = total > 0 ? (double) bytes / total : ProgressBar.INDETERMINATE_PROGRESS;
+                Platform.runLater(() -> bar.setProgress(fraction));
+            }), ok -> {
+                bar.setVisible(false);
+                button.setDisable(false);
+                if (ok) done.run();
+                else problem.setText(DOWNLOAD_FAILED);
+            }, why -> {
+                bar.setVisible(false);
+                button.setDisable(false);
+                problem.setText(DOWNLOAD_FAILED);
             });
         });
 

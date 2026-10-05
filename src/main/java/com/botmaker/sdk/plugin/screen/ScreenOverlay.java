@@ -1,8 +1,8 @@
 package com.botmaker.sdk.plugin.screen;
 
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
@@ -137,19 +137,14 @@ public final class ScreenOverlay {
      * the screen chooser and hand the finished {@link ScreenShot} to {@code onShot}.
      */
     private void grabAsync(Window owner, Consumer<ScreenShot> onShot) {
-        Thread t = new Thread(() -> {
-            Grab grab;
+        Async.load("screen-capture-grab", () -> {
             try {
-                grab = source.grab(owner);
+                return source.grab(owner);
             } catch (Throwable ex) {
                 System.err.println("Screen capture failed: " + ex.getMessage());
-                grab = Grab.failed();
+                return Grab.failed();
             }
-            Grab result = grab;
-            Platform.runLater(() -> finishGrab(owner, result, onShot));
-        }, "screen-capture-grab");
-        t.setDaemon(true);
-        t.start();
+        }, grab -> finishGrab(owner, grab, onShot));
     }
 
     /**

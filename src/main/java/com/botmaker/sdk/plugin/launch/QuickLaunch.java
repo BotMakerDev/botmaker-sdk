@@ -4,6 +4,7 @@ import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.impl.NestedSession;
 import com.botmaker.session.launch.BackgroundLauncher;
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -123,38 +124,24 @@ public final class QuickLaunch {
             return;
         }
         report.accept(true, "Launching " + spec.describe() + "…");
-        Thread worker = new Thread(() -> {
-            String failure = null;
-            // The last thing the launcher said about its own progress. An emulator app narrates ("starting
-            // Waydroid…", "waiting for Android…"); every other kind says nothing and falls back to the generic
-            // line below. Written on this thread, read on FX after the join point, so no synchronisation is
-            // owed.
+        // The answer is the last thing the launcher said about its own progress. An emulator app narrates
+        // ("starting Waydroid…", "waiting for Android…"); every other kind says nothing (null) and falls back to
+        // the generic line. Launcher.start throws the underlying failure (Steam not installed, no protocol
+        // handler, an emulator that never finished booting) precisely so it can be shown here.
+        Async.load("quick-launch", () -> {
             String[] note = new String[1];
-            try {
-                Launcher.start(spec, message -> {
-                    note[0] = message;
-                    Platform.runLater(() -> report.accept(true, message));
-                });
-            } catch (Exception ex) {
-                // Launcher.start propagates the underlying failure (Steam not installed, no protocol handler,
-                // an emulator that never finished booting) precisely so it can be shown here.
-                failure = ex.getMessage() == null ? ex.toString() : ex.getMessage();
-            }
-            String message = failure;
-            String last = note[0];
-            Platform.runLater(() -> {
-                button.setDisable(false);
-                if (message != null) {
-                    report.accept(false, "Couldn't launch: " + message);
-                } else if (last != null) {
-                    report.accept(true, last + offDesktopNote(spec));
-                } else {
-                    report.accept(true, "Launched " + spec.describe() + "." + offDesktopNote(spec));
-                }
+            Launcher.start(spec, message -> {
+                note[0] = message;
+                Platform.runLater(() -> report.accept(true, message));
             });
-        }, "quick-launch");
-        worker.setDaemon(true);
-        worker.start();
+            return note[0];
+        }, last -> {
+            button.setDisable(false);
+            report.accept(true, (last != null ? last : "Launched " + spec.describe() + ".") + offDesktopNote(spec));
+        }, why -> {
+            button.setDisable(false);
+            report.accept(false, "Couldn't launch: " + why);
+        });
     }
 
     /**

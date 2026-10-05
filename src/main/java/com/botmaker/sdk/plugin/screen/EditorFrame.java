@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
@@ -9,7 +10,6 @@ import com.botmaker.shared.capture.ScreenCapture;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstances;
 import com.botmaker.shared.emulator.EmulatorProbe;
-import javafx.application.Platform;
 
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
@@ -147,18 +147,18 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
 
     private static void grabAsync(StudioServices services, CaptureSource chosen, boolean raise,
                                   Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {
-        Thread worker = new Thread(() -> {
+        Async.load("sdk-editor-frame", () -> {
             CaptureSource source = chosen != null ? chosen : defaultSource(services);
             EditorFrame frame = source == null ? null : grab(source, raise);
-            Failure failure = frame != null ? null : (source == null ? Failure.NO_TARGET : Failure.BLANK);
-            Platform.runLater(() -> {
-                if (frame != null) onFrame.accept(frame);
-                else onFailure.accept(failure);
-            });
-        }, "sdk-editor-frame");
-        worker.setDaemon(true);
-        worker.start();
+            return new Grabbed(frame, frame != null ? null : source == null ? Failure.NO_TARGET : Failure.BLANK);
+        }, grabbed -> {
+            if (grabbed.frame() != null) onFrame.accept(grabbed.frame());
+            else onFailure.accept(grabbed.failure());
+        }, why -> onFailure.accept(Failure.BLANK));
     }
+
+    /** One grab's answer: the frame, or why there is none. */
+    private record Grabbed(EditorFrame frame, Failure failure) {}
 
     /**
      * The project's capture source, or {@code null} when its Java names none this can read.

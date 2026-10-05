@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.plugin.toolkit.Styles;
@@ -12,7 +13,6 @@ import com.botmaker.sdk.api.text.Text;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.internal.ocr.OcrEngine;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
-import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
@@ -182,17 +182,11 @@ public final class OcrEditors {
             OcrOptions opts = read.get();
             tryIt.setDisable(true);
             result.setText("Reading…");
-            EditorFrame.grabAsync(services, frame -> {
-                Thread worker = new Thread(() -> {
-                    String text = readText(frame, opts);
-                    Platform.runLater(() -> {
+            EditorFrame.grabAsync(services, frame -> Async.load("sdk-ocr-try", () -> readText(frame, opts),
+                    text -> {
                         result.setText(text);
                         tryIt.setDisable(false);
-                    });
-                }, "sdk-ocr-try");
-                worker.setDaemon(true);
-                worker.start();
-            }, failure -> {
+                    }), failure -> {
                 result.setText(failure.headline() + " " + failure.detail());
                 tryIt.setDisable(false);
             });

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.pilot.ui;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.pilot.transport.PilotTransport.Availability;
@@ -197,17 +198,11 @@ final class RemotePilotDialog {
     private static Node phoneStatus() {
         Label label = PilotWidgets.wrapped("Checking whether your phone is on the tailnet…");
         PilotWidgets.tone(label, Styles.MUTED_TEXT);
-        Thread probe = new Thread(() -> {
-            List<TailnetPhones.Phone> phones = TailnetPhones.probe();
-            String text = phoneStatusText(phones, Instant.now());
-            boolean anyOnline = phones.stream().anyMatch(TailnetPhones.Phone::online);
-            javafx.application.Platform.runLater(() -> {
-                label.setText(text);
-                PilotWidgets.tone(label, anyOnline ? Styles.OK_TEXT : Styles.WARNING_TEXT);
-            });
-        }, "pilot-tailnet-phones");
-        probe.setDaemon(true);
-        probe.start();
+        Async.load("pilot-tailnet-phones", TailnetPhones::probe, phones -> {
+            label.setText(phoneStatusText(phones, Instant.now()));
+            PilotWidgets.tone(label, phones.stream().anyMatch(TailnetPhones.Phone::online)
+                    ? Styles.OK_TEXT : Styles.WARNING_TEXT);
+        });
         return label;
     }
 

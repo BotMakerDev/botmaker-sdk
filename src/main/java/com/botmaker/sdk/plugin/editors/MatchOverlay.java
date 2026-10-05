@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.editors;
 
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.plugin.toolkit.ZoomPan;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
@@ -7,7 +8,6 @@ import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import com.botmaker.shared.opencv.ColorMatcher;
 import com.botmaker.shared.opencv.RawColorMatch;
 import javafx.animation.PauseTransition;
-import javafx.application.Platform;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.canvas.Canvas;
@@ -212,29 +212,18 @@ final class MatchOverlay {
         java.awt.Color c = target;
         PrecisionEditors.Settings s = settings;
         long gen = generation.incrementAndGet();
-        Thread t = new Thread(() -> {
-            Pass pass;
-            try {
-                pass = search(image, c, s);
-            } catch (RuntimeException | LinkageError ex) {
-                Platform.runLater(() -> {
-                    if (generation.get() == gen) readout.setText("Could not search this frame: " + ex.getMessage());
-                });
-                return;
-            }
-            Platform.runLater(() -> {
-                if (generation.get() != gen) return;
-                last = pass;
-                boolean found = pass.present() >= s.minCount() && !pass.kept().isEmpty();
-                readout.setText(String.format("%s — %d blob%s kept, %d too small — coverage %,d px %s minCount %,d %s",
-                        PrecisionEditors.TargetColor.describe(c), pass.kept().size(),
-                        pass.kept().size() == 1 ? "" : "s", pass.small().size(), pass.present(),
-                        pass.present() >= s.minCount() ? "≥" : "<", s.minCount(), found ? "✓" : "✗"));
-                draw();
-            });
-        }, "precision-overlay");
-        t.setDaemon(true);
-        t.start();
+        Async.load("precision-overlay", () -> search(image, c, s), pass -> {
+            if (generation.get() != gen) return;
+            last = pass;
+            boolean found = pass.present() >= s.minCount() && !pass.kept().isEmpty();
+            readout.setText(String.format("%s — %d blob%s kept, %d too small — coverage %,d px %s minCount %,d %s",
+                    PrecisionEditors.TargetColor.describe(c), pass.kept().size(),
+                    pass.kept().size() == 1 ? "" : "s", pass.small().size(), pass.present(),
+                    pass.present() >= s.minCount() ? "≥" : "<", s.minCount(), found ? "✓" : "✗"));
+            draw();
+        }, why -> {
+            if (generation.get() == gen) readout.setText("Could not search this frame: " + why);
+        });
     }
 
     /**

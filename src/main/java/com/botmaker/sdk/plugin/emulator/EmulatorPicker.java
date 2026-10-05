@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.emulator;
 
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
@@ -144,22 +145,20 @@ public final class EmulatorPicker {
      */
     private static void populate(VBox rows, Dialog<Selection> dialog) {
         rows.getChildren().setAll(new Label("Scanning for emulators…"));
-        Workers.start("emulator-picker-scan", () -> {
-            EmulatorInstanceScanner.Scan scan = new EmulatorInstanceScanner().scan();
-            Platform.runLater(() -> {
-                rows.getChildren().clear();
-                if (scan.instances().isEmpty()) {
-                    // No instances — show what each product's discovery actually saw so the user can tell
-                    // "not installed" from "installed but nothing running / ADB off".
-                    rows.getChildren().add(buildStatusSummary(scan.statuses(), dialog));
-                } else {
-                    for (EmulatorInstance instance : scan.instances()) {
-                        rows.getChildren().add(buildRow(instance, dialog));
-                    }
+        Async.load("emulator-picker-scan", () -> new EmulatorInstanceScanner().scan(), scan -> {
+            rows.getChildren().clear();
+            if (scan.instances().isEmpty()) {
+                // No instances — show what each product's discovery actually saw so the user can tell
+                // "not installed" from "installed but nothing running / ADB off".
+                rows.getChildren().add(buildStatusSummary(scan.statuses(), dialog));
+            } else {
+                for (EmulatorInstance instance : scan.instances()) {
+                    rows.getChildren().add(buildRow(instance, dialog));
                 }
-                rows.getChildren().add(connectPhoneRow(rows, dialog));
-            });
-        });
+            }
+            rows.getChildren().add(connectPhoneRow(rows, dialog));
+        }, why -> rows.getChildren().setAll(new Label("Couldn't scan for emulators: " + why),
+                connectPhoneRow(rows, dialog)));
     }
 
     /**
@@ -263,7 +262,7 @@ public final class EmulatorPicker {
      * {@link #transition} re-runs it once the poll settles rather than assuming what it asked for happened.
      */
     private static void probeAndLoad(EmulatorInstance instance, RowUi ui, Dialog<Selection> dialog) {
-        Workers.start("emulator-probe-" + instance.name(), () -> {
+        Async.run("emulator-probe-" + instance.name(), () -> {
             boolean running = EmulatorProbe.isRunning(instance);
             List<EmulatorProbe.InstalledApp> live = running ? EmulatorProbe.installedAppsDetailed(instance) : null;
             BufferedImage shot = running ? EmulatorProbe.screencap(instance) : null;
@@ -277,7 +276,7 @@ public final class EmulatorPicker {
                 renderApps(ui.apps(), instance, show, emptyNote(running, live), dialog);
                 showAction(instance, ui, dialog, running);
             });
-        });
+        }, null);
     }
 
     /**
@@ -327,11 +326,11 @@ public final class EmulatorPicker {
         ui.state().setText(start ? "starting…" : "stopping…");
         ui.dot().setFill(Color.web("#fbbc04"));
         long timeout = start ? instance.platformId().bootTimeout().toMillis() : STOP_TIMEOUT_MS;
-        Thread[] self = new Thread[1];
-        self[0] = Workers.start("emulator-" + (start ? "start-" : "stop-") + instance.name(), () -> {
+        POLLS.add(Async.run("emulator-" + (start ? "start-" : "stop-") + instance.name(), () -> {
             boolean dispatched = start ? EmulatorLauncher.launch(instance) : EmulatorLauncher.stop(instance);
             boolean settled = dispatched && waitFor(instance, start, timeout);
-            POLLS.remove(self[0]);
+            // The thread itself, not a handle filled in after start(): the work can get here first.
+            POLLS.remove(Thread.currentThread());
             // Interrupted means the picker closed: there is no row to update, and a Waydroid report popping
             // up over whatever the user went back to would answer a question nobody is asking any more.
             if (Thread.currentThread().isInterrupted()) return;
@@ -348,8 +347,7 @@ public final class EmulatorPicker {
                 }
                 probeAndLoad(instance, ui, dialog);
             });
-        });
-        POLLS.add(self[0]);
+        }, null));
     }
 
     /**
@@ -455,7 +453,7 @@ public final class EmulatorPicker {
      * it fetched for — a start/stop or a re-probe can rebuild the list underneath a fetch in flight.
      */
     private static void loadIcons(EmulatorInstance instance, List<String> packages, VBox apps) {
-        Workers.start("emulator-icons-" + instance.name(), () -> {
+        Async.run("emulator-icons-" + instance.name(), () -> {
             for (int i = 0; i < packages.size(); i++) {
                 String pkg = packages.get(i);
                 String key = instance.identity() + "/" + pkg;
@@ -484,7 +482,7 @@ public final class EmulatorPicker {
                     }
                 });
             }
-        });
+        }, null);
     }
 
     /** Prompts for a package name and, if given, resolves the dialog to {@code (instance, package)}. */

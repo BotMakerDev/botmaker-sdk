@@ -2,12 +2,12 @@ package com.botmaker.sdk.plugin.pilot.ui;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.toolbar.ActionContext;
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.pilot.NestedSessionLauncher;
 import com.botmaker.sdk.plugin.pilot.PilotControlService;
 import com.botmaker.sdk.plugin.pilot.PilotProject;
 import com.botmaker.sdk.plugin.pilot.PilotServer;
-import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
@@ -265,34 +265,23 @@ public final class RemotePilotUi implements AutoCloseable {
         bringingUp = true;
         progress.show();
 
-        Thread t = new Thread(() -> {
-            PilotOutcome o = null;
-            String error = null;
-            try {
-                o = bringUpWith(asked);
-            } catch (Exception e) {
-                error = e.getMessage();
-            }
-            final PilotOutcome outcome = o;
-            final String err = error;
-            Platform.runLater(() -> {
-                bringingUp = false;
-                progress.setResult(ButtonType.CANCEL); // let close() dismiss a button-less alert
-                progress.close();
-                if (outcome == null) {
-                    services.status("Could not start Remote Pilot: " + err);
-                    return;
-                }
-                lastOutcome = outcome;
-                services.status("Remote Pilot (" + outcome.kind().displayName() + ") at " + outcome.url());
-                // Cancel can't unbind a server that has already come up, but it can honour what the user
-                // actually asked for: no dialog. The status line above says where it is, and the toolbar
-                // button re-shows the pairing dialog on demand.
-                if (!cancelled.get()) showDialog(outcome);
-            });
-        }, "remote-pilot-start");
-        t.setDaemon(true);
-        t.start();
+        Runnable settle = () -> {
+            bringingUp = false;
+            progress.setResult(ButtonType.CANCEL); // let close() dismiss a button-less alert
+            progress.close();
+        };
+        Async.load("remote-pilot-start", () -> bringUpWith(asked), outcome -> {
+            settle.run();
+            lastOutcome = outcome;
+            services.status("Remote Pilot (" + outcome.kind().displayName() + ") at " + outcome.url());
+            // Cancel can't unbind a server that has already come up, but it can honour what the user
+            // actually asked for: no dialog. The status line above says where it is, and the toolbar
+            // button re-shows the pairing dialog on demand.
+            if (!cancelled.get()) showDialog(outcome);
+        }, why -> {
+            settle.run();
+            services.status("Could not start Remote Pilot: " + why);
+        });
     }
 
     /** Indeterminate spinner shown while the (possibly multi-second) Tailscale bring-up runs off-thread. */
