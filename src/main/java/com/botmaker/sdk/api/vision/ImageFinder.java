@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.PopupGuard;
@@ -72,6 +73,34 @@ public class ImageFinder {
         MatchResult result = findInternal(template, source, confidence());
         Vision.setLastMatch(result);
         return result.isFound();
+    }
+
+    /**
+     * The best place {@code template} sits on {@code source} at <em>any</em> score, as a result whose
+     * {@link MatchResult#confidence()} is that score; a result that is not found only when nothing could be
+     * matched at all (no capture, a picture larger than the frame).
+     *
+     * <p>For the overlay editor's live probe, which shows how close a picture is rather than only whether it
+     * clears the bot's confidence. It stores nothing in {@link Vision}, sends no telemetry and writes no trace,
+     * so asking it twice a second leaves no mark. A bot asks {@link #find}.
+     */
+    @Hidden("the overlay editor's probe; a bot asks find(), which applies its confidence")
+    public static MatchResult bestMatch(ImageTemplate template, CaptureSource source) {
+        Mat background = null;
+        try {
+            BufferedImage screenshot = source.capture();
+            if (screenshot == null) return MatchResult.notFound();
+            background = OpencvManager.bufferedImageToMat(screenshot);
+            RawMatch best = OpencvManager.findBest(template.getMat(), background, false, template.authoredSize());
+            if (best == null) return MatchResult.notFound();
+            Point origin = source.origin();
+            return new MatchResult(new Point(best.x() + origin.x(), best.y() + origin.y()), best.width(),
+                    best.height(), best.score(), template.id());
+        } catch (RuntimeException e) {
+            return MatchResult.notFound();
+        } finally {
+            if (background != null) background.release();
+        }
     }
 
     /** The confidence every match uses: {@link BotSettings}'. */

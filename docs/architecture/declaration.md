@@ -1,10 +1,19 @@
 # Declaration
 
 - **`SdkPlugin` is one declaration** on the contract's `DeclaredPlugin`:
-  `StudioPlugin.id(ID).named(NAME).types(…).parts(…).editors(…).values(…).toolbar(…).recorded(…)` — suppliers,
-  so constructing it links nothing (`SdkPluginHeadlessTest`: a headless host constructs it too, and
-  `javafx-controls`, the toolkit, Javalin and ZXing are `optional` here). It adds only `projectClosing()`,
-  which releases the Remote Pilot.
+  `StudioPlugin.id(ID).named(NAME).types(…).parts(…).editors(…).values(…).toolbar(…).runOverlay(…)
+  .overlay(…).assistant(…).trial(Bot::trial).recorded(…)`. The surfaces are suppliers, so constructing it links
+  nothing (`SdkPluginHeadlessTest`: a headless host constructs it too, and `javafx-controls`, the toolkit,
+  Javalin and ZXing are `optional` here). It adds only `projectClosing()`, which releases the Remote Pilot.
+- **The overlay editor's part is `plugin/overlay/SdkOverlay`.**
+  - Targets come from the `ActivityBody` type.
+  - The watched screen is `Sdk.captureSource()`.
+  - The probes are `SdkProbes`, which use `ImageFinder.bestMatch` and the project's confidence. A click's
+    probe is `Probe.acting`.
+  - The tools are `SdkTools`, with `PictureCuts` for the save.
+- **The assistant's tools are `plugin/assist/SdkAssist`.**
+  - Writes hop to the FX thread through `FxCall`, the only class there that links JavaFX.
+  - Flow edits are `FlowEdits`, which 🔀 Activity Flow's save also uses.
 - **A type is declared once, in `plugin/types/SdkTypes`**, as a contract `PluginType.value(X.class)` whose
   steps ask for the fresh value, the editor (`() -> X::editor`) and the Java (`writtenAs(Owner::factory,
   X::part, …)`, `writtenAsRecord()`, `writtenAsEach`, `writtenAsConstant()`, or `filledBy(Vision::lastMatch)`

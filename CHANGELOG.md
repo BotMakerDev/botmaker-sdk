@@ -21,6 +21,23 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The overlay editor knows your bot.** In a Studio with the new overlay editor:
+  - each activity's body is a chip to edit;
+  - the panel opens over the window `Sdk.captureSource()` names, and ⇄ Change opens 🎯 Capture Source;
+  - a picture call says live whether its picture is on screen and where. For a click, it says where the click
+    would land, and nothing clicks;
+  - its Picture, Point and Flow tabs cut a picture straight into `Pictures`, insert a click at a point, and
+    open 🔀 Activity Flow.
+- **Claude can see and shape your bot from Studio.** The SDK offers it these tools:
+  - `screenshot`, `list_pictures`, `crop_picture` and `find_picture`, for what the bot sees and the pictures;
+  - `add_activity`, `rename_activity`, `remove_activity` and `connect`, for the flow;
+  - `set_capture_source`, for where the bot looks.
+
+  Each one writes through the same path as the SDK's own windows. None clicks or types.
+- **▶ Try one statement.** `Bot.trial(body, Sdk.class)` installs your values as `Bot.run` does and runs only
+  `body`, with no launch and no recovery. Studio calls it; a bot does not. `ImageFinder.bestMatch` answers the
+  best place a picture sits at any score, for the overlay's probe. It is hidden from the palette.
+
 - **Watch your bot over the desktop while it runs.** In a Studio with the run overlay, the bar names the
   activity your bot is in and what it just did there ("Collect · clicked · line 42"). The desktop gets a green
   box where it found a picture, with its confidence, and a dot where it clicked; each fades after a second

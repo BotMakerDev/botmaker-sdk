@@ -2,7 +2,10 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.DeclaredPlugin;
 import com.botmaker.plugin.api.StudioPlugin;
+import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.plugin.assist.SdkAssist;
+import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
 import com.botmaker.sdk.plugin.run.SdkRunOverlay;
@@ -65,6 +68,9 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .values(() -> SdkValues.ALL)
                 .toolbar(() -> SdkToolbarItems.ALL)
                 .runOverlay(() -> SdkRunOverlay.ALL)
+                .overlay(() -> SdkOverlay.PART)
+                .assistant(() -> SdkAssist.ALL)
+                .trial(Bot::trial)
                 .recorded(() -> PictureAt.ALL));
     }
 

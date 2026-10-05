@@ -78,6 +78,30 @@ public class Bot {
         lifecycle(() -> FlowWalker.run(Flows.installed(), goHome), goHome);
     }
 
+    /**
+     * Installs this bot's {@code @Managed} values as {@link #run} does, then runs {@code body} once and returns —
+     * what Studio's ▶ Try calls with one statement as the body, from a caller it writes outside the project's
+     * sources.
+     *
+     * <p>No launch, no {@code goHome}, no recovery: a try is the statement against the screen as it is now. An
+     * exception from {@code body} is the try's failure and propagates; {@link #stop()} ends it quietly.
+     *
+     * @param body   the statement, and the locals it reads
+     * @param values each plugin's values class, as {@link #run} takes them
+     */
+    @Hidden("the entry Studio's Try calls; a bot runs through run()")
+    @Untraced("holds the whole try")
+    public static void trial(Runnable body, Class<?>... values) {
+        observe();
+        SdkValues.claim();
+        ManagedValues.install(values);
+        try {
+            body.run();
+        } catch (BotStoppedException e) {
+            Debug.log("Stopped by request.");
+        }
+    }
+
     /** Why the supervisor invokes the start-up step: the first launch, or a recovery after a crash. */
     enum StartMode {
         /** First launch, before the loop: bring the game up only if it isn't already running. */

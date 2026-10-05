@@ -2,7 +2,6 @@ package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.bot.Outcome;
@@ -34,7 +33,6 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1003,20 +1001,11 @@ public final class ActivityFlowDialog {
 
         // The constants first, so the flow written next names them (FlowConstants has the order and why).
         List<String> notes = new ArrayList<>();
-        PluginValues values = services.pluginValues();
-        Set<String> activities = FlowConstants.activityLabels(flow);
-        Set<String> outcomes = FlowConstants.outcomeLabels(flow);
-        String refused = FlowConstants.prepare(values, FlowConstants.Kind.ACTIVITIES, activities,
-                activityRenames, notes);
+        String refused = FlowEdits.save(services.pluginValues(), value.orElse(null), flow,
+                new FlowEdits.Saved(savedActivities, savedOutcomes), activityRenames, outcomeRenames, notes);
         if (refused == null) {
-            refused = FlowConstants.prepare(values, FlowConstants.Kind.OUTCOMES, outcomes, outcomeRenames, notes);
-        }
-        if (refused == null) refused = FlowValue.write(value.orElse(null), flow);
-        if (refused == null) {
-            FlowConstants.forget(values, FlowConstants.Kind.ACTIVITIES, without(savedActivities, activities), notes);
-            FlowConstants.forget(values, FlowConstants.Kind.OUTCOMES, without(savedOutcomes, outcomes), notes);
-            savedActivities = activities;
-            savedOutcomes = outcomes;
+            savedActivities = FlowConstants.activityLabels(flow);
+            savedOutcomes = FlowConstants.outcomeLabels(flow);
         }
         Throwable failure = null;
         FlowLayout layout = currentLayout();
@@ -1031,13 +1020,6 @@ public final class ActivityFlowDialog {
             }
         }
         saved(refused, failure, notes);
-    }
-
-    /** The labels of {@code before} that {@code now} no longer has. */
-    private static Set<String> without(Set<String> before, Set<String> now) {
-        Set<String> gone = new java.util.LinkedHashSet<>(before);
-        gone.removeAll(now);
-        return gone;
     }
 
     /**
@@ -1122,45 +1104,7 @@ public final class ActivityFlowDialog {
      * declared.
      */
     public static String validate(Flow flow) {
-        Map<String, String> activityConstants = new HashMap<>();
-        Map<String, String> outcomeConstants = new HashMap<>();
-        for (Flow.Step step : flow.steps()) {
-            String name = step.label();
-            String constant = FlowNames.constantFor(name);
-            if (constant == null) {
-                return "'" + name + "' can't become a constant in Activities.java — start it with a letter.";
-            }
-            String clash = activityConstants.putIfAbsent(constant, name);
-            if (clash != null) {
-                return clash.equals(name) ? "Duplicate activity name: '" + name + "'."
-                        : "'" + name + "' and '" + clash + "' would both be Activities." + constant + ".";
-            }
-            // Checked against the declared list, not allOutcomes(): that one de-duplicates defensively, so
-            // validating it would report a clash as clean and leave the user with an outcome that silently
-            // has no port.
-            Set<String> own = new HashSet<>();
-            for (Outcome declared : step.outcomes()) {
-                String outcome = declared.label();
-                String outcomeConstant = FlowNames.constantFor(outcome);
-                if (outcomeConstant == null) {
-                    return "Invalid outcome in " + name + ": '" + outcome + "' can't become a constant in "
-                            + "Outcomes.java.";
-                }
-                if (Arrow.NEXT.equals(outcomeConstant)) {
-                    return name + " already has a NEXT outcome — every activity does.";
-                }
-                if (Arrow.DISABLED.equals(outcomeConstant)) {
-                    return name + " can't declare a DISABLED outcome — that port is always there, "
-                            + "and an activity can't report it because it didn't run.";
-                }
-                if (!own.add(outcomeConstant)) return "Duplicate outcome '" + outcome + "' in " + name + ".";
-                String other = outcomeConstants.putIfAbsent(outcomeConstant, outcome);
-                if (other != null && !other.equals(outcome)) {
-                    return "'" + outcome + "' and '" + other + "' would both be Outcomes." + outcomeConstant + ".";
-                }
-            }
-        }
-        return null;
+        return FlowEdits.validate(flow);
     }
 
     private static Label heading(String text) {
