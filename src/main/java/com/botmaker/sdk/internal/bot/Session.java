@@ -3,8 +3,8 @@ package com.botmaker.sdk.internal.bot;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 
 /**
- * Whether this bot runs in its own <b>private display</b>, and on which backend — the isolation switch. Internal
- * since 2026-10-01: a bot never names it, and {@code Bot.run} reads it from the settings and the run properties.
+ * Whether this bot runs in its own <b>private display</b>, and on which backend — the isolation switch. Internal:
+ * a bot never names it, and {@code Bot.run} reads it from the settings and the run properties.
  *
  * <p><b>What isolation buys.</b> An isolated bot brings up a nested {@code :N} X display, launches its target
  * into it and drives that display alone. The game's window is never on your desktop, so the bot doesn't steal

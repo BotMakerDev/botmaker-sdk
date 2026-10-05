@@ -29,8 +29,8 @@ import java.util.Optional;
  * <p><b>No raw pixels, no native handle.</b> {@link #capture()} is {@code @Hidden}: it is the
  * {@link CaptureSource} contract the vision layer calls, and a {@code BufferedImage} is nothing a bot block can
  * name, store or pass on — passing a {@code Window} straight into {@code ImageFinder.find} <em>is</em> how a bot
- * uses it. The native handle has no public method at all since 2026-09-30 ({@code targetWindow()}, which named
- * botmaker-shared's {@code GenericWindow}); keyboard routing reads it through {@code internal.capture}.
+ * uses it. The native handle has no public method at all, since it is botmaker-shared's
+ * {@code GenericWindow}; keyboard routing reads it through {@code internal.capture}.
  */
 public class Window implements CaptureSource {
 

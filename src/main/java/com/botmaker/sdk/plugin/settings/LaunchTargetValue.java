@@ -5,7 +5,7 @@ import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.launch.LaunchSpec;
 
 /**
- * What this machine launches for the open bot — the {@code botmaker.launch.target} run property (2026-09-27).
+ * What this machine launches for the open bot — the {@code botmaker.launch.target} run property.
  *
  * <p>A fact about this computer rather than the bot: a Steam app id or an emulator instance means nothing on
  * someone else's machine, so it is never in the bot's files. The host keeps it beside the project, out of git

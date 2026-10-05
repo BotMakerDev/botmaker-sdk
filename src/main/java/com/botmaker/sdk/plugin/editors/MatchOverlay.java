@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiPredicate;
 
 /**
- * What a {@code Precision} does to a real frame, drawn on it (2026-09-26): every pixel within ΔE of the target
+ * What a {@code Precision} does to a real frame, drawn on it: every pixel within ΔE of the target
  * tinted, each blob the search keeps in a solid box and each one too small in a dashed grey one, and the
  * coverage against {@code minCount} under it. The tint is {@link ColorMatcher#matchMask} and the boxes
  * {@link ColorMatcher#findClusters} — the pass the bot runs — computed off the FX thread, debounced, stale
@@ -89,9 +89,8 @@ final class MatchOverlay {
         node = new VBox(6, surface, hintLine(), probe, readout);
         debounce.setOnFinished(e -> run());
         // The canvas's own coordinates are image pixels whatever the zoom: ZoomPan transforms the group above it.
-        // Every left click answers (feedback 2, 2026-09-27): a crosshair where it landed, the pixel's colour
-        // beside the frame, and the blob it belongs to outlined — before, a click outside a pin mode did
-        // nothing at all, and a pin was a dot a few screen pixels wide on a frame drawn at a third of its size.
+        // Every left click answers, pin mode or not: a crosshair where it landed, the pixel's colour beside the
+        // frame, and the blob it belongs to outlined.
         marks.setOnMouseClicked(e -> {
             if (e.getButton() != MouseButton.PRIMARY || frame == null) return;
             int x = (int) e.getX(), y = (int) e.getY();

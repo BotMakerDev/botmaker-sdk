@@ -204,7 +204,7 @@ public final class SdkTypes {
 
     /**
      * One activity of the flow, {@code Activity.named("Collect")} — which the host writes as the bot's
-     * {@code Activities.COLLECT} whenever a constant holds the same label (2026-10-02). A fresh one is no
+     * {@code Activities.COLLECT} whenever a constant holds the same label. A fresh one is no
      * activity; the picker offers the flow's.
      */
     public static final DeclaredCallType<Activity> ACTIVITY = PluginType.value(Activity.class)
@@ -216,7 +216,7 @@ public final class SdkTypes {
     /**
      * What an activity reports, {@code Outcome.named("Won")} — written as the bot's {@code Outcomes.WON}
      * whenever a constant holds the same label, and as {@code Outcome.NEXT}/{@code Outcome.DISABLED} for the two
-     * every activity has (2026-10-02). A fresh one is {@code NEXT}, "nothing special to report".
+     * every activity has. A fresh one is {@code NEXT}, "nothing special to report".
      */
     public static final DeclaredCallType<Outcome> OUTCOME = PluginType.value(Outcome.class)
             .fresh(() -> Outcome.NEXT)

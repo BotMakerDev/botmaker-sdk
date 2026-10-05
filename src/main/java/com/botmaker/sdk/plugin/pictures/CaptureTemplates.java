@@ -534,8 +534,8 @@ public final class CaptureTemplates {
      * {@code image} inside its inscribed oval, transparent outside it, with a smooth rim.
      *
      * <p>The oval is painted as an anti-aliased mask and the image drawn into it ({@code SRC_IN}). Clipping to
-     * the oval instead, as this did until 2026-09-28, ignores anti-aliasing — a clip is all or nothing per pixel
-     * — so every oval picture had a stair-stepped edge the matcher had to forgive.
+     * the oval instead would ignore anti-aliasing — a clip is all or nothing per pixel
+     * — and give every oval picture a stair-stepped edge the matcher had to forgive.
      */
     static BufferedImage oval(BufferedImage image) {
         int w = image.getWidth(), h = image.getHeight();

@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.sound;
 
 /**
- * A cat's meow, synthesised: no recording ships in the jar (2026-09-26).
+ * A cat's meow, synthesised: no recording ships in the jar.
  *
  * <p>Built the way the sound is shaped, not the way a recording is played. A buzzy voiced tone (a band-limited
  * sawtooth) carries the pitch, which rises from about 500 Hz to 900 Hz and falls to 450 Hz — the "mi-AOU"

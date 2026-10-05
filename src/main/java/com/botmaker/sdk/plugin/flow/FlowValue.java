@@ -11,7 +11,7 @@ import com.botmaker.sdk.internal.bot.SdkValues;
  * The {@code @Managed("flow")} value and the card positions beside it, read and written as a {@link Flow} and
  * a {@link FlowLayout}.
  *
- * <p>Both are handles on {@link SdkValues}' declarations, so no id is spelled here (2026-09-28).
+ * <p>Both are handles on {@link SdkValues}' declarations, so no id is spelled here.
  *
  * <p><b>Reading may answer nothing, and that is ordinary.</b> A hand-written {@code flow()} body, a call to
  * something other than {@code Flow.of}, an activity whose body is a lambda rather than a method reference —
@@ -23,12 +23,8 @@ public final class FlowValue {
     /** The activity flow. */
     public static final ManagedHandle<Flow> FLOW = ManagedHandle.of(SdkValues.FLOW);
 
-    /** Where each card sits, {@code Sdk.flowLayout()} (2026-09-27). */
+    /** Where each card sits, {@code Sdk.flowLayout()}. */
     public static final ManagedHandle<FlowLayout> LAYOUT = ManagedHandle.of(SdkValues.FLOW_LAYOUT);
-
-    // The open project's services were held here in a static, set by SdkPlugin.projectOpened, until
-    // 2026-09-28, for the tag catalog behind Capture Templates. Every caller of that catalog had the services
-    // in hand already, so it takes them, and nothing here outlives a project.
 
     private FlowValue() {}
 

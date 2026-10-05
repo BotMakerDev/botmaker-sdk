@@ -49,11 +49,11 @@ import java.nio.file.Path;
  * application-modal checklist blocked the very toolbar its rows used to send the user to, and the ownerless
  * capture tool with it.
  *
- * <h2>The launch target is optional, and picked from the launchers (2026-09-29)</h2>
+ * <h2>The launch target is optional, and picked from the launchers</h2>
  *
  * <p>A game is started by its own launcher — Faugus or Heroic on Linux, Steam or Epic on Windows — or by the
  * bot's own {@code Game} blocks, and BotMaker does not grow a second launcher UI beside them (the maintainer's
- * call, 2026-09-28). So <b>Choose…</b> ({@link LaunchTargetChooser}) lists what those launchers already have
+ * call). So <b>Choose…</b> ({@link LaunchTargetChooser}) lists what those launchers already have
  * and stores which one; nothing about how to start it. An emulator app picked in an Emulators block sets it
  * too, and <b>▶ Launch now</b> then starts it. A value it cannot read is shown with a Clear button, never a ✓.
  *

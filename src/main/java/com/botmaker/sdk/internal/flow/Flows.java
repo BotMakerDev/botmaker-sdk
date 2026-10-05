@@ -9,8 +9,8 @@ import com.botmaker.sdk.api.flow.Flow;
  * <p>{@code Bot.run(goHome, Sdk.class)} installs the value your {@code @Managed("flow")} method returns and
  * walks it. {@link #use} is the same hand-off for a bot that builds its flow some other way.
  *
- * <p>Kept out of the insert menus (2026-09-29): a dropped {@code use} was written {@code Flows.use(null)} and
- * cleared the flow, {@code installed} hands back a {@code Flow} nothing in Studio takes, and {@code enabled} is
+ * <p>Kept out of the insert menus: a dropped {@code use} would be written {@code Flows.use(null)} and clear the
+ * flow, {@code installed} hands back a {@code Flow} nothing in Studio takes, and {@code enabled} is
  * {@code ActivitySwitch.active} without the overrides. Its members stay catalogued so the name resolves.
  */
 public final class Flows {

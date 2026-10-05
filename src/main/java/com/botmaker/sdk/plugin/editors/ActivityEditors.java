@@ -30,7 +30,7 @@ import java.util.function.Supplier;
  * The editors of the two values that tie a bot's code to its Activity Flow canvas: an {@link Activity}
  * ({@code ActivitySwitch.disable(Activities.MINING)}) and an {@link Outcome} ({@code return Outcomes.BAG_FULL;}).
  *
- * <p>Both are claimed by type since 2026-10-02, when the two stopped being strings: the editor hands back an
+ * <p>Both are claimed by type: the editor hands back an
  * {@code Activity.named("Mining")}, and the host writes a value equal to one of the bot's {@code Activities}
  * constants as that constant — {@code Activities.MINING} — so what the picker writes is bound, not spelled.
  *

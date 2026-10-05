@@ -66,7 +66,8 @@ public final class ColorEditors {
         }
 
         // A ColorPicker fires its action whenever its value changes, the eyedropper's setValue included, so
-        // this is the one place a colour is written: the eyedropper wrote it a second time until 2026-09-28.
+        // this is where a colour is written; the eyedropper commits itself only for an unchanged value, which
+        // fires no action.
         picker.setOnAction(e -> {
             commit(ctx, picker.getValue());
             box.getChildren().remove(written);
@@ -101,7 +102,7 @@ public final class ColorEditors {
      */
     private static void pick(ValueContext ctx, java.util.function.Consumer<Color> onPicked) {
         StudioServices services = ctx.services();
-        // Since 2026-09-26 the user says where first (SurfaceMenu), so the loupe and the patch's ΔE spread
+        // The user says where first (SurfaceMenu), so the loupe and the patch's ΔE spread
         // work on any window, screen or the desktop, not only on the bot's own source.
         SurfaceMenu.choose(services, surface -> {
             java.util.function.Consumer<EditorFrame> sample = frame -> ColorSampler.openOn(services, frame,

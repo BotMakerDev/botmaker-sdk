@@ -57,8 +57,7 @@ public final class TemplateGallery extends HBox {
     private static final double BAND_THRESHOLD = 4;
 
     /**
-     * The project's host services: the picture folder, and the flow whose activities are half the tag rail
-     * (2026-09-28; it held the folder alone while the flow was read through a static).
+     * The project's host services: the picture folder, and the flow whose activities are half the tag rail.
      */
     private final StudioServices services;
     private final Path resourcesDir;

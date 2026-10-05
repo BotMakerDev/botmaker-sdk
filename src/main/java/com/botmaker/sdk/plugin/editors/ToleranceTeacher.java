@@ -6,7 +6,7 @@ import java.awt.Color;
 import java.util.List;
 
 /**
- * Teaching a tolerance by example (2026-09-26): pixels that should match and pixels that should not, in; the
+ * Teaching a tolerance by example: pixels that should match and pixels that should not, in; the
  * smallest ΔE that takes every good one, out, with the bad ones it cannot keep out named. Uses
  * {@link ColorMatcher#deltaE}, the metric the bot's search thresholds on, so the number taught is the number
  * that works. Pure: no JavaFX, no frame.

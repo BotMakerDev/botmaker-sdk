@@ -15,9 +15,9 @@ import java.util.Optional;
  *
  * <p>A confidence and a delay are both a bare number, so the type cannot say that one is a place between 0 and 1
  * and the other is milliseconds. This table says it, keyed by the setter as a method reference, so renaming one
- * is a compile error here rather than a setting that quietly falls back to a free-typed number. It was a
- * {@code @Setting} annotation on the parameter from 2026-09-28 to 2026-10-01; no bot ever wrote it, and an
- * editor's hint is the plugin's business, not the API's. No JavaFX here: the host asks {@link #claims} headless.
+ * is a compile error here rather than a setting that quietly falls back to a free-typed number. It is not an
+ * annotation on the parameter: an editor's hint is the plugin's business, not the API's. No JavaFX here: the
+ * host asks {@link #claims} headless.
  */
 public final class SettingHints {
 

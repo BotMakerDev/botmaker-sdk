@@ -520,7 +520,4 @@ public final class TemplateLibrary {
                 .sorted()
                 .toList();
     }
-
-    // declaredTag(Path, String) stood here until 2026-09-28, for Studio's ImageTemplates.openActivityTag. Studio
-    // stopped depending on the SDK on 2026-09-02, so it had no caller.
 }

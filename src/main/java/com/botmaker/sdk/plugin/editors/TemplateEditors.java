@@ -65,8 +65,8 @@ public final class TemplateEditors {
      *
      * <p>A value the host could not read (a variable, a call) is shown as written and changed only by an
      * explicit pick. <em>Use the placeholder</em> goes back to what a fresh block holds: a picture that
-     * exists. It was <em>Clear</em> until 2026-09-28 and wrote {@code images/.png}, a file that never exists,
-     * so the bot failed to load it at run time.
+     * exists. There is no <em>Clear</em>: an empty picture is {@code images/.png}, a file that never exists, so
+     * the bot would fail to load it at run time.
      */
     public static Node template(ValueContext ctx) {
         String current = nameOf(ctx);

@@ -7,7 +7,7 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import java.util.List;
 
 /**
- * The calls a {@code @Managed("settings")} value is written as (2026-09-27):
+ * The calls a {@code @Managed("settings")} value is written as:
  * {@code BotSettings.of(BotSettings.clicks(…), BotSettings.vision(…), BotSettings.input(…),
  * BotSettings.session(…), retries, debug)}.
  *

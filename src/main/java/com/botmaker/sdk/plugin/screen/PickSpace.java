@@ -8,7 +8,7 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * Which numbers a screen pick writes (2026-09-26). A bare {@code Point} is absolute desktop pixels in
+ * Which numbers a screen pick writes. A bare {@code Point} is absolute desktop pixels in
  * {@code Mouse.click(Point)} and relative to a source in {@code Mouse.click(source, x, y)}, so the pick asks the
  * call it sits in. The overlay always reports a pick inside the frame it showed (its top-left is {@code 0,0});
  * this adds the frame's desktop origin back when the call wants desktop pixels.

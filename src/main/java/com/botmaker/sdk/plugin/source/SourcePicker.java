@@ -368,9 +368,8 @@ public final class SourcePicker {
      * dialog, and the desktop and each monitor used to be one each.
      *
      * <p><b>Monitors are numbered as {@code CaptureSource.monitor(i)} numbers them</b> — AWT's screen devices,
-     * the order the bot captures in — not JavaFX's {@code Screen} list, whose order is its own. Until
-     * 2026-09-28 the tiles followed JavaFX's, so on a machine where the two disagreed "Screen 2" wrote a bot that
-     * read screen 1. The thumbnail is cut from the grab with the same bounds the bot's monitor capture uses.
+     * the order the bot captures in — not JavaFX's {@code Screen} list, whose order is its own, so "Screen 2"
+     * writes a bot that reads screen 2 on a machine where the two disagree. The thumbnail is cut from the grab with the same bounds the bot's monitor capture uses.
      */
     private void loadDesktopAndScreens(FlowPane desktopInto, FlowPane monitorsInto) {
         VBox desktopTile = tile("Whole desktop", "All monitors combined");

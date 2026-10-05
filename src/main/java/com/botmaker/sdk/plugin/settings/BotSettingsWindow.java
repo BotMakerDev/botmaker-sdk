@@ -33,11 +33,9 @@ import java.util.Optional;
 
 /**
  * ⚙ Bot Settings: the bot's {@code @Managed("settings")} value — how it clicks and looks, whether it drives the
- * real mouse and keyboard, and whether it runs on a private display (2026-09-27).
+ * real mouse and keyboard, and whether it runs on a private display.
  *
- * <p>It was Studio's <i>Input &amp; Clicks</i> window until then, writing eight keys into a
- * {@code botmaker-project.properties} the bot read back at run time. The settings are Java the bot compiles
- * now, so the window belongs to the plugin that owns the type, and it edits the one expression
+ * <p>The settings are Java the bot compiles, so the window belongs to the plugin that owns the type, and it edits the one expression
  * {@code Sdk.settings()} returns through the host — the host writes the call, this window never sees Java.
  *
  * <p><b>A project whose {@code Sdk.java} has no {@code settings()}</b> — every project made before the method
@@ -56,9 +54,9 @@ public final class BotSettingsWindow {
     private final CheckBox realInput = new CheckBox("Drive the real mouse and keyboard (turn on for games)");
     private final CheckBox randomizeClicks = new CheckBox("Click a random point inside the match, not its centre");
     /**
-     * The bot's {@code debug}, kept as it was: the tick left this window on 2026-09-29, when debug output became
-     * the host's (Studio's 🐞 Debug, the {@code botmaker.debug} run property), and nothing here may change a value
-     * the user can no longer see.
+     * The bot's {@code debug}, kept as it was: debug output is the host's (Studio's 🐞 Debug, the
+     * {@code botmaker.debug} run property), so this window shows no tick for it, and nothing here may change a
+     * value the user cannot see.
      */
     @SuppressWarnings("deprecation")
     private boolean debug = BotSettings.DEFAULTS.debug();
@@ -258,7 +256,7 @@ public final class BotSettingsWindow {
      * What the controls say, as the value {@code Sdk.settings()} will return.
      *
      * <p>A number typed into a spinner reaches its value only on Enter or on leaving the field, so one typed
-     * and followed straight by Save was dropped (until 2026-09-28). Each field's text is committed first; text
+     * and followed straight by Save would be dropped. Each field's text is committed first; text
      * that is not a number leaves the last good value.
      */
     BotSettings collect() {

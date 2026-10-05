@@ -8,8 +8,8 @@ import java.util.function.Function;
  * The native window behind an {@code api} {@link Window}, for {@link WindowBacked#of} — without a public
  * method on {@code Window} that names botmaker-shared's {@code GenericWindow}.
  *
- * <p>{@code Window.targetWindow()} was that method until 2026-09-30: public because an interface method is,
- * and so on the surface a bot compiles against with a type a bot cannot name. {@code Window} grants its
+ * <p>Not a method on {@code Window}: an interface method is public, and so would put a type a bot cannot name
+ * on the surface a bot compiles against. {@code Window} grants its
  * accessor here once, from its own static initialiser, which has run by the time any instance exists to ask
  * about.
  */

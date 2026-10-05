@@ -38,8 +38,7 @@ import java.util.function.Consumer;
 
 /**
  * The input enums a bot's own API names — a {@link Key}, a {@link MouseButton} — drawn as the shapes they are
- * rather than as dropdowns. A {@link Combo} (2026-09-26) shares the key's drawn keyboard, in chord mode. The
- * direction pad went with {@code Direction} on 2026-10-01: no api method took one.
+ * rather than as dropdowns. A {@link Combo} shares the key's drawn keyboard, in chord mode.
  *
  * <h2>They were Studio's, and that was the back door this platform exists to close</h2>
  *
@@ -134,8 +133,7 @@ public final class InputEditors {
 
     /**
      * An enum drawn as a shape selects nothing for a value it cannot read — a variable, a call — so the value
-     * is shown as written under it until something is picked. It said nothing at all until 2026-09-28, and an
-     * empty pad reads as "not set".
+     * is shown as written under it until something is picked: an empty pad would read as "not set".
      */
     private static void showUnread(ValueContext ctx, Class<?> type, VBox box, ToggleGroup group) {
         String unread = unreadSource(ctx, type);
@@ -170,7 +168,7 @@ public final class InputEditors {
     /**
      * The chord the popup opens on: the value's, or nothing — never a guess at an expression the host could not
      * read, nor at a combo the keyboard cannot hold (one that repeats a key), which OK would otherwise rewrite
-     * with a key dropped. Since 2026-09-27 any other combo is held as written, in its own order.
+     * with a key dropped. Any other combo is held as written, in its own order.
      */
     static Chord chordOf(ValueContext ctx) {
         return ctx.value(Combo.class).map(InputEditors::chordOf).orElse(Chord.EMPTY);
@@ -215,8 +213,7 @@ public final class InputEditors {
 
     /**
      * A key, picked on a drawn keyboard ({@link KeyboardView}): click the cap, press the key, or search. The
-     * choice is the answer, so the window closes on it. It was a type-to-search dropdown of constant names
-     * until 2026-09-26; the search stays, and a name that matches no key still writes nothing.
+     * choice is the answer, so the window closes on it. A searched name that matches no key writes nothing.
      */
     public static Node key(ValueContext ctx) {
         Button[] pill = new Button[1];
@@ -237,7 +234,7 @@ public final class InputEditors {
 
     /**
      * A combination, picked on the same keyboard in chord mode: any keys, in the order clicked or pressed —
-     * shown as chips, each removable, with Clear (2026-09-27; modifiers plus one key until then). Written on OK
+     * shown as chips, each removable, with Clear. Written on OK
      * in that order; a dialog left with nothing chosen writes nothing.
      */
     public static Node combo(ValueContext ctx) {
@@ -250,7 +247,7 @@ public final class InputEditors {
     }
 
     /**
-     * The combination window: the keyboard in chord mode, and under it how long the keys are held (2026-09-27),
+     * The combination window: the keyboard in chord mode, and under it how long the keys are held,
      * typed in milliseconds or set with a preset. OK hands {@code onChosen} the combo; nothing chosen, or a hold
      * that is not a number, hands it nothing.
      */
@@ -279,9 +276,8 @@ public final class InputEditors {
     }
 
     /**
-     * A whole-millisecond field that takes digits only, blank meaning none. It accepted anything and marked it
-     * red until 2026-09-28, and OK closed the window regardless: a combination with a typo in its hold was
-     * dropped whole, and a step's wait kept its old value without a word.
+     * A whole-millisecond field that takes digits only, blank meaning none: a field that took anything would
+     * let OK drop a combination with a typo in its hold, or keep a step's old wait without a word.
      */
     private static TextField msField(Duration initial) {
         TextField field = new TextField(Long.toString(initial.toMillis()));
@@ -292,7 +288,7 @@ public final class InputEditors {
     }
 
     /**
-     * A key sequence (2026-09-27): a row per step — its combination as a pill that opens the combination
+     * A key sequence: a row per step — its combination as a pill that opens the combination
      * window, the wait after it in milliseconds, ✕ — dragged by ⠿ to change the order, and <i>Add step</i>.
      * Written on OK; a sequence left with no step writes nothing.
      */

@@ -17,9 +17,7 @@ import java.util.List;
  * me what the bot looks at</em>, is {@link EditorFrame}'s, handed to the overlay as a {@link FrameShotSource}.
  *
  * <p>The pixels come from {@code botmaker-shared}'s {@link ScreenCapture}, the one desktop grab a bot and an
- * editor share. Until 2026-09-28 this read them through a private {@code DesktopGrab} with its own list of
- * Wayland screenshot programs, so the overlay and the bot could disagree about whether the screen was
- * readable at all.
+ * editor share, so the overlay and the bot never disagree about whether the screen is readable at all.
  */
 public final class DesktopSource implements ShotSource {
 

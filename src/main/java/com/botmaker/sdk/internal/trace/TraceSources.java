@@ -10,7 +10,7 @@ import java.util.Set;
  * {@code [Name]} ({@code docs/refactor/40-run-trace.md}). The class is the first caller on the stack that is
  * not one of the tracing classes themselves; its name is its top-level class's simple name.
  *
- * <p>One name per class, and no other (2026-09-30: {@code @TraceSource} is deleted). The host traces a bot's
+ * <p>One name per class, and no other. The host traces a bot's
  * calls into a plugin under the called class's simple name, and filters every line by the class that wrote it,
  * so a second name only hid which class a line came from.
  *

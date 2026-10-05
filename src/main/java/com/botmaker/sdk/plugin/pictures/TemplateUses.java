@@ -18,10 +18,8 @@ import java.util.TreeSet;
  *
  * <h2>The host changes the Java, by binding; this class says which constant</h2>
  *
- * <p>Until 2026-09-28 this built token needles ({@code Pictures.ORE} and the path literal) and handed them to
- * the contract's {@code Sources}, a find-and-replace. That renamed each use and left the declaration named
- * {@code ORE}, so a picture rename stopped the bot compiling; and a use it could not spell — a static import,
- * a class the user renamed — was missed. Now a picture's uses are what javac resolves to its constant
+ * <p>A picture's uses are what javac resolves to its constant — not tokens found by text, which miss a static
+ * import, a class the user renamed, and the declaration itself —
  * ({@link PluginValues#uses}), and a rename, repoint or remove is the host's, compiled as the whole bot before
  * it lands. What stays here is the mapping from a file name to a constant ({@link TemplateNames#constantFor})
  * and the order of steps.

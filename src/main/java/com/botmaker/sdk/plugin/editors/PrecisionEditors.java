@@ -50,7 +50,7 @@ import java.util.function.Supplier;
  * <p>So the editor answers each of them by showing rather than telling: the ΔE slider is laid out against the
  * SDK's own named anchors, with the darkest and lightest shades it still accepts drawn beside the target; the
  * area spinner draws the blob <b>to scale</b> over a 1:1 grid (drawing it as a radius would teach exactly the
- * wrong model); and since 2026-09-26 the dialog opens on a frozen frame of the bot's source with every match
+ * wrong model); and the dialog opens on a frozen frame of the bot's source with every match
  * drawn on it ({@link MatchOverlay}) — the target colour read from the call itself
  * ({@link SlotContext#argumentValue}) — and learns the tolerance from pins the user drops on pixels that should
  * and should not match ({@link ToleranceTeacher}). Without a frame these are all abstractions.
@@ -247,7 +247,7 @@ public final class PrecisionEditors {
      * The tolerance a slider position means. At {@code position} — where the value the dialog opened with, or
      * the last one a lesson set, put the thumb — it is that {@code value}, untouched: a hand-written
      * {@code Precision.of(60)} sits at the slider's end and a {@code 12.34} between ticks, and pressing OK
-     * without moving either must write them back as they were (it wrote 40 and 12.3 until 2026-09-28).
+     * without moving either must write them back as they were, not as 40 and 12.3.
      * Anything else was dragged or clicked and lands on a whole number, so a drag near an anchor is the anchor
      * ({@code TIGHT} is 5, not 5.4).
      */
@@ -310,7 +310,7 @@ public final class PrecisionEditors {
         lesson.setMaxWidth(720);
 
         // Pins are distances from one target on one frame: a new frame or a new target takes them and their
-        // lesson away, which until 2026-09-28 a new target did not.
+        // lesson away.
         Runnable forget = () -> {
             good.clear();
             bad.clear();
@@ -432,9 +432,6 @@ public final class PrecisionEditors {
         return l;
     }
 
-    // The Preview class (a "Sample from game" button and a numbers-only readout) was deleted on 2026-09-26: the
-    // frame pane above draws the same pass on the frame itself, and takes the target from the call.
-
     // ------------------------------------------------------------------
     // the colour it is a tolerance around
     // ------------------------------------------------------------------
@@ -489,7 +486,7 @@ public final class PrecisionEditors {
     /**
      * The three values the value holds, or the SDK's own {@code DEFAULT} when the host could not read it.
      *
-     * <p>The host reads {@code new Precision(…)}, which is what this editor writes, and since 2026-09-23 the
+     * <p>The host reads {@code new Precision(…)}, which is what this editor writes, and the
      * chains a person writes by hand — {@code Precision.TIGHT.minArea(400)} — through
      * {@code SdkTypes.PRECISION_WITHERS}. Anything else it cannot read is shown as written ({@link #pillText})
      * and the dialog opens on the defaults.
@@ -614,7 +611,7 @@ public final class PrecisionEditors {
     }
 
     /**
-     * To a tenth, the step a taught tolerance is set in (2026-09-26; whole numbers before). Rounding a taught
+     * To a tenth, the step a taught tolerance is set in. Rounding a taught
      * 9.4 down to 9 would drop the green pin the lesson was made to take.
      */
     static double round(double v) {

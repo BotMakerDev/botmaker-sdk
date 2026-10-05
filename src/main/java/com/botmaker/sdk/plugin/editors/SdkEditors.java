@@ -16,8 +16,8 @@ import java.util.List;
  * <ul>
  *   <li><b>By parameter or call.</b> An emulator name and a setting are plain values; the api says which is
  *       which by annotating the parameter or by a table keyed on the method, and the editor is chosen by that.
- *       These are absent from the Parameters window, which has no call behind a row. The activity and outcome
- *       name annotations went on 2026-10-02, when both became types of their own ({@code SdkTypes}).</li>
+ *       These are absent from the Parameters window, which has no call behind a row. Activities and outcomes
+ *       are types of their own ({@code SdkTypes}), claimed by type.</li>
  *   <li><b>By a run of pictures</b>, which neither a parameter nor a type can say: only the host knows that
  *       several arguments are one list.</li>
  *   <li><b>By another plugin's type</b>: plugin-basics declares {@code java.awt.Color}; this plugin offers a

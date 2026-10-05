@@ -60,7 +60,7 @@ public final class SdkToolbarItems {
             .in(ToolbarGroup.TOOLS, 30)
             .onPress(() -> ResourceManagerDialog::open);
 
-    /** {@link ToolbarGroup#AUTHORING} at 10: the slot Studio's own 🔀 Flow button vacated on 2026-09-11. */
+    /** {@link ToolbarGroup#AUTHORING} at 10. */
     public static final ToolbarItem ACTIVITY_FLOW = ToolbarItem.id(ACTIVITY_FLOW_ID).label("🔀 Activity Flow")
             .tooltip("Define what this bot does, one card per activity, and wire each outcome to what "
                     + "runs next — the graph, its loop safety, and which activities are on")

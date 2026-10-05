@@ -27,7 +27,7 @@ import java.util.function.Consumer;
  * which project it belongs to. An editor that wants the bot's own frame asks {@code EditorFrame} for it by
  * name, which is what the colour and picture editors do.
  *
- * <p>That is still true of {@link #get()}. Since 2026-09-26 an editor holding a context asks
+ * <p>That is still true of {@link #get()}. An editor holding a context asks
  * {@link #forSlot} instead: the context has services, so the user chooses the surface per pick, and the call
  * the slot sits in decides whether the numbers are relative to it.
  *
@@ -66,7 +66,7 @@ public final class SdkScreenPicks implements ScreenPicks {
     }
 
     /**
-     * The picker for one slot or row (2026-09-26): asks where to pick ({@link SurfaceMenu}), grabs a frozen
+     * The picker for one slot or row: asks where to pick ({@link SurfaceMenu}), grabs a frozen
      * frame of that surface, runs the overlay on it, and hands the result back in the space the call reads
      * ({@link PickSpace}). A context with no services — a headless test — falls back to {@link #get()}.
      */
@@ -80,7 +80,7 @@ public final class SdkScreenPicks implements ScreenPicks {
     /**
      * A picker over the surface {@code chooser} settles on. The one {@link #forSlot} hands out asks with the
      * menu, and lists each of the menu's entries as a {@link ScreenPicks.Choice} bound to it, so a pill shows
-     * them in its own menu (feedback 2, 2026-09-27); a bound one offers no choices of its own.
+     * them in its own menu; a bound one offers no choices of its own.
      */
     private static ScreenPicks on(StudioServices services, PickSpace space,
                                   Consumer<Consumer<SurfaceMenu.Surface>> chooser, boolean offersChoices) {

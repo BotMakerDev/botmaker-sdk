@@ -42,9 +42,8 @@ import java.util.Optional;
  * yields a <b>disabled</b> button that says why in its tooltip, rather than an enabled one that silently does
  * nothing.
  *
- * <p><b>Where its two answers come from (2026-09-27).</b> The launch target is this machine's run property
- * ({@link LaunchTargetValue}), the isolation flag is the bot's own {@code Sdk.settings()}. Both were keys of a
- * {@code botmaker-project.properties} until then.
+ * <p><b>Where its two answers come from.</b> The launch target is this machine's run property
+ * ({@link LaunchTargetValue}), the isolation flag is the bot's own {@code Sdk.settings()}.
  */
 public final class QuickLaunch {
 

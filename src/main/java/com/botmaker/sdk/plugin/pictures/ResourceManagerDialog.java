@@ -56,8 +56,7 @@ import java.util.TreeSet;
  * <p><b>Renaming and deleting are compile-safe.</b> A picture is a constant of the bot's {@code Pictures}
  * class, and both go through {@link TemplateUses} to the host's {@link PluginValues}, which renames, repoints
  * and removes that constant by binding and refuses anything that would stop the bot compiling. So a rename
- * carries its uses with it — the declaration included, which the token find-and-replace before 2026-09-28
- * missed — and a delete either finds none or offers to point them at another template first.
+ * carries its uses with it — the declaration included — and a delete either finds none or offers to point them at another template first.
  *
  * <h2>Why it is here and not in the editor</h2>
  *

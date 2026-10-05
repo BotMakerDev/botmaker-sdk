@@ -39,11 +39,11 @@ import java.util.prefs.Preferences;
  * each click or keystroke adds a key, shown as a chip beneath ({@link Chord}). Every change goes to
  * {@code onChange}; the view writes nothing itself.
  *
- * <p><b>The board grows with its window (feedback 2, 2026-09-27).</b> The cap size is worked out from the
+ * <p><b>The board grows with its window.</b> The cap size is worked out from the
  * board's width ({@link KeyboardLayout#unitFor}), so a narrow window still shows every cap and a wide one
  * draws them large; the window is given a minimum size the smallest board fits in.
  *
- * <p><b>Feedback 3 (2026-09-27).</b> A cap shows its short face ({@link KeyboardLayout#face}) in a font that
+ * <p>A cap shows its short face ({@link KeyboardLayout#face}) in a font that
  * shrinks to fit ({@link KeyboardLayout#fontFor}) before anything is cut; QWERTY, AZERTY or QWERTZ is picked
  * above the board and remembered for this user; and a chip is dragged to change the order the keys are pressed
  * in, its ✕ taking it out.
@@ -121,8 +121,8 @@ final class KeyboardView {
             }
         }));
         board.setOnMousePressed(e -> board.requestFocus());
-        // The window gives its first field the focus, which was the search box: a key pressed on opening was
-        // typed into the search, while the hint says to press it (until 2026-09-28). The board takes it instead.
+        // The window gives its first field the focus, which is the search box, where a key pressed on opening
+        // would be typed while the hint says to press it. The board takes the focus instead.
         board.sceneProperty().addListener((o, was, is) -> {
             if (is != null) Platform.runLater(board::requestFocus);
         });

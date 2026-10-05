@@ -8,7 +8,7 @@ import com.botmaker.sdk.api.flow.Flow;
  * One arrow on the canvas, between two cards by label: what the canvas draws, moves and undoes, and what a
  * save turns into a {@link Flow.Edge} between the bot's {@code Activities} constants.
  *
- * <p>Labels and not constants on purpose (2026-10-02). A rename on the canvas is undoable until the save, and a
+ * <p>Labels and not constants on purpose. A rename on the canvas is undoable until the save, and a
  * snapshot of the arrows has to survive one: kept as labels, the canvas renames an arrow by rewriting two
  * strings. The constants are the save's to resolve, by binding, once.
  *

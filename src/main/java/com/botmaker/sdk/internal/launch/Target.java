@@ -21,7 +21,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * that hasn't picked a game yet simply doesn't launch anything. Override at runtime with
  * {@link #set(LaunchTarget)}.
  *
- * <p><b>Not in the palette</b> (2026-09-30): {@code Bot.start} launches the target itself, so a block doing it
+ * <p><b>Not in the palette</b>: {@code Bot.start} launches the target itself, so a block doing it
  * again is a second way to say what the run already does. The class stays public for a hand-written bot, and
  * its {@code @Hidden} members say what reaches nothing if a later palette class ever returns a {@code Target}.
  */
@@ -162,9 +162,8 @@ public final class Target {
     }
 
     /**
-     * Waits up to {@code timeout} for the current target's window to appear. The palette's lead since
-     * 2026-09-29: a dropped block starts at the editor's {@code Duration}, where the {@code long} shape started
-     * at 0 ms and gave up at once.
+     * Waits up to {@code timeout} for the current target's window to appear. The palette's lead: a dropped
+     * block starts at the editor's {@code Duration}, where a {@code long} would start at 0 ms and give up at once.
      */
     @PaletteDefault
     public static boolean waitForLaunch(java.time.Duration timeout) {

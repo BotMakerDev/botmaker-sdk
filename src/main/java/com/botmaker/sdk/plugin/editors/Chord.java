@@ -11,8 +11,7 @@ import java.util.Optional;
 /**
  * What the combination editor holds while it is open: keys in the order they were chosen, each once — which
  * is exactly what {@link Combo#of} writes, so a combo reads back as it was written. Any number of keys and
- * modifiers anywhere (feedback 2, 2026-09-27): it held modifiers plus one other key until then, and a combo of
- * two ordinary keys could not be picked at all. Pure: no JavaFX.
+ * modifiers anywhere, so a combo of two ordinary keys can be picked. Pure: no JavaFX.
  */
 record Chord(List<Key> keys) {
 

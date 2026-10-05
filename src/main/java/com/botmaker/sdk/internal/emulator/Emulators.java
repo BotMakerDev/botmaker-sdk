@@ -23,7 +23,7 @@ import java.util.Optional;
  * emu.use();                          // point the whole bot at it (Source.set)
  * }</pre>
  *
- * <p><b>Not in the palette</b> (2026-09-30). Which emulator a bot drives is the project's capture source and
+ * <p><b>Not in the palette</b>. Which emulator a bot drives is the project's capture source and
  * launch target, which the SDK sets up from the run's properties before the flow starts; a block that
  * connects to one by hand is a second way to say what the project already says. The class stays public and
  * supported for a hand-written bot.

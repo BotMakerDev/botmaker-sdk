@@ -11,7 +11,7 @@ import java.util.List;
  * — the side panel, {@link NewActivityDialog} and the return slot's <i>+ New outcome…</i> — and three copies
  * of "is this a legal name" do not stay identical.
  *
- * <h2>A label is free text; its constant is derived (2026-10-02)</h2>
+ * <h2>A label is free text; its constant is derived</h2>
  *
  * <p>An activity and an outcome are constants of the bot's own {@code Activities} and {@code Outcomes}
  * classes, each holding the label the canvas shows: {@code BAG_FULL = Outcome.named("Bag full")}. The user

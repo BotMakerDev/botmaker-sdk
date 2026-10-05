@@ -105,8 +105,8 @@ public final class TailscaleFunnelService {
      * Tears down the Funnel started by {@link #enable(int)}: the web handler on {@code :443} and the Funnel on
      * it, and nothing else the user serves. Best-effort, never throws.
      *
-     * <p>It ran {@code tailscale funnel reset} until 2026-09-29, which clears <em>every</em> serve and Funnel
-     * on the machine, the user's own included. {@code tailscale funnel --https=443 off} is not the narrow form:
+     * <p>Not {@code tailscale funnel reset}, which clears <em>every</em> serve and Funnel on the machine, the
+     * user's own included. {@code tailscale funnel --https=443 off} is not the narrow form:
      * on 1.102 it stops at the "Funnel is not enabled" gate and blocks like {@code enable} does.
      * {@code tailscale serve --https=443 off} passes no such gate and returns at once; a handler that is
      * already gone is reported and counts as done. No {@code reset} fallback: this runs as a project closes,

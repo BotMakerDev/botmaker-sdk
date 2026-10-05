@@ -51,8 +51,8 @@ public final class CaptureTypes {
             .writtenAs(CaptureSource::window, NamedWindow::titleSubstring);
 
     /**
-     * {@code CaptureSource.emulator("name")}. It was {@code new EmulatorSource("name")} until 2026-10-01, when
-     * the class moved to {@code internal}: a bot writes the factory, never the class behind it.
+     * {@code CaptureSource.emulator("name")}: the class behind it is {@code internal}, and a bot writes the
+     * factory, never the class.
      */
     public static final DeclaredCall<EmulatorSource> EMULATOR = ComponentType.part(EmulatorSource.class)
             .writtenAs(CaptureSource::emulator, EmulatorSource::instanceName);
@@ -65,7 +65,7 @@ public final class CaptureTypes {
      * {@code region(source, rect)} and an instance {@code source.region(rect)}, so {@code CaptureSource::region}
      * is ambiguous in javac. It is the one factory here that a reference cannot name.
      *
-     * <p><b>It stays (decided 2026-09-28).</b> Both {@code region}s are what a bot writes, and a new-named
+     * <p><b>It stays (decided).</b> Both {@code region}s are what a bot writes, and a new-named
      * static factory would still leave {@link #REGION_CHAIN} reading the instance one through
      * {@code Ref.member}.
      */

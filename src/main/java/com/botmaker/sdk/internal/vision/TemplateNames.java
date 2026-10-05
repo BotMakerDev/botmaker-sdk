@@ -41,7 +41,7 @@ public final class TemplateNames {
      * rather than a hope.
      *
      * <p>It is only a name for sentences now. The class is found by its {@code @Managed("pictures")}, and a
-     * picture's uses by binding (2026-09-28), so a user who renames the class loses nothing.
+     * picture's uses by binding, so a user who renames the class loses nothing.
      */
     public static final String CLASS_NAME = "Pictures";
 

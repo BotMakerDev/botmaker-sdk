@@ -21,8 +21,8 @@ import java.util.function.Consumer;
  * Epic, Heroic and Faugus — in one searchable grid, and a pick sets this machine's {@code botmaker.launch.target}.
  *
  * <p>It builds nothing. The launcher already knows how to start its game (Proton version, prefix, arguments),
- * so a target is only which launcher and which of its entries, {@code faugus:battlenet}; the user decided on
- * 2026-09-28 that BotMaker grows no launch UI of its own beside the launchers. What this adds over a Game block
+ * so a target is only which launcher and which of its entries, {@code faugus:battlenet}; the maintainer decided
+ * that BotMaker grows no launch UI of its own beside the launchers. What this adds over a Game block
  * is that a run knows the target, so background mode can start a PC game inside its own display.
  */
 public final class LaunchTargetChooser {

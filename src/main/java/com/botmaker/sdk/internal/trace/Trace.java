@@ -30,7 +30,7 @@ public final class Trace {
     /**
      * Prints {@code message} with how long the run lasted, and traces it as one line that happened
      * {@link Run#count()} times. The count is {@code Diag}'s to show ({@code (×47)}, on the console and in the
-     * trace alike), so it is not in the text, where the trace showed it twice until 2026-09-30.
+     * trace alike), so it is not in the text, where the trace would show it twice.
      */
     public static void log(String message, Runs.Run run) {
         if (!Diag.isEnabled()) return;

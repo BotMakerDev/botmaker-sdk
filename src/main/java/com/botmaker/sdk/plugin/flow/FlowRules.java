@@ -21,8 +21,7 @@ import java.util.Set;
  * again, a self-wire is a retry, and a cycle is how a bot repeats — the generated driver's step budget is
  * what bounds it now, not the editor. What is left is the one thing that genuinely cannot be drawn: <b>a
  * second wire on the same {@code (from, outcome)} pair</b>, because one result can't lead to two places.
- * Since 2026-09-29 that is not refused either: dragging from a port that has a wire <em>moves</em> the wire
- * ({@link #rewired}), where it used to be refused with "remove that wire first".
+ * That is not refused either: dragging from a port that has a wire <em>moves</em> the wire ({@link #rewired}).
  *
  * <p>Note there is nothing here about ending the run. An outcome with no wire ends it, so "stop" is the
  * absence of a rule rather than a node with rules of its own.

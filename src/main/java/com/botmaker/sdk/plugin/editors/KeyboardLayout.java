@@ -17,7 +17,7 @@ import static com.botmaker.sdk.api.input.Key.*;
  * cluster with the arrows, and the numpad. Pure data. A {@link Key} constant this table has no cap for is put
  * in a last row of its own, so a key added to the SDK is still drawn before anyone places it.
  *
- * <p><b>Three boards (feedback 3, 2026-09-27)</b>: QWERTY, AZERTY and QWERTZ differ in where the letters and
+ * <p><b>Three boards</b>: QWERTY, AZERTY and QWERTZ differ in where the letters and
  * the punctuation beside them sit; the function row, the navigation cluster and the numpad are shared. <b>A cap
  * writes its own key on every board</b>: the cap labelled A writes {@code Key.A} wherever it sits. A {@code Key}
  * is the key's value, and the operating system maps it through the user's layout when the bot presses it; a
@@ -118,8 +118,7 @@ final class KeyboardLayout {
 
     /**
      * How wide a one-unit cap is on a board {@code width} pixels wide: the whole keyboard fits, within
-     * {@link #MIN_UNIT} and {@link #MAX_UNIT} (feedback 2, 2026-09-27 — it was a fixed 34 px, so a small window
-     * cut caps off and a large one left the board small).
+     * {@link #MIN_UNIT} and {@link #MAX_UNIT}, so a small window cuts no cap off and a large one draws them large.
      */
     static double unitFor(double width) {
         return Math.max(MIN_UNIT, Math.min(MAX_UNIT, width / WIDTH));

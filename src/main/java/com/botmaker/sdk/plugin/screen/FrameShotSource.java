@@ -7,7 +7,7 @@ import javafx.stage.Window;
 import java.awt.Rectangle;
 
 /**
- * A frame already grabbed, as the overlay's source (2026-09-26): the pick is made on these frozen pixels, placed
+ * A frame already grabbed, as the overlay's source: the pick is made on these frozen pixels, placed
  * where they came from, so a point chosen on a game window is chosen on exactly what was captured. The overlay
  * reports picks inside the frame ({@code 0,0} its top-left); {@link PickSpace} adds the origin back when the
  * call wants desktop pixels.

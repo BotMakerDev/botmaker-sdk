@@ -38,7 +38,7 @@ import java.time.Duration;
  * missing) does it fall back to the host {@code :0} launch in {@code GameLauncher}. So a hand-written
  * {@code Game.launchHeroic("Firestone")} lands in the private display without the bot author doing anything.
  *
- * <p><b>Not in the palette</b> (2026-09-30): the run launches the project's target itself ({@code Bot.start},
+ * <p><b>Not in the palette</b>: the run launches the project's target itself ({@code Bot.start},
  * {@link Target}), so a block launching a game is a second way to say what the run already does. The class
  * stays public and supported for a hand-written bot; its game-id parameters keep their pickers.
  */
@@ -324,8 +324,8 @@ public class Game {
 
     /**
      * Blocks until {@code source}'s window appears, or {@code timeout} elapses. The palette's lead for
-     * {@code waitForLaunch} since 2026-09-29: a dropped block starts at the editor's {@code Duration}, where the
-     * {@code long} shape started at 0 ms and gave up at once.
+     * {@code waitForLaunch}: a dropped block starts at the editor's {@code Duration}, where a {@code long} would
+     * start at 0 ms and give up at once.
      */
     @PaletteDefault
     public static boolean waitForLaunch(CaptureSource source, Duration timeout) {

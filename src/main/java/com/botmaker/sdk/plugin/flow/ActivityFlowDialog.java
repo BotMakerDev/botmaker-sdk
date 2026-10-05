@@ -413,8 +413,8 @@ public final class ActivityFlowDialog {
         presets.removeIf(p -> p.name().equals(name)); // re-saving a name overwrites it
         presets.add(new Selection(name, on));
         refreshPresetCombo();
-        // The last item of the list, which is the built-ins then these: presets.size() - 1 selected the preset
-        // two before the one just saved (until 2026-09-28).
+        // The last item of the list, which is the built-ins then these — not presets.size() - 1, which is the
+        // preset two before the one just saved.
         presetCombo.getSelectionModel().select(presetCombo.getItems().size() - 1);
         error("");
         markDirty();
@@ -542,8 +542,8 @@ public final class ActivityFlowDialog {
         for (String outcome : List.copyOf(draft.outcomes())) {
             TextField field = new TextField(outcome);
             // What the row names now: a rename changes it without rebuilding the row, and the next commit or
-            // ✕ has to act on the outcome as it is, not as it was drawn (a second rename was refused as a
-            // duplicate of the first until 2026-10-02).
+            // ✕ has to act on the outcome as it is, not as it was drawn, or a second rename reads as a duplicate
+            // of the first.
             String[] current = {outcome};
             field.focusedProperty().addListener((o, was, is) -> {
                 if (is) return;
@@ -618,8 +618,7 @@ public final class ActivityFlowDialog {
             int at = d.outcomes().indexOf(oldName);
             if (at < 0) continue;
             // The arrow first, then the outcome. The card drops every arrow whose port has gone the moment the
-            // list changes, so renaming the outcome first dropped its arrow before it could be carried across
-            // (until 2026-09-28).
+            // list changes, so renaming the outcome first would drop its arrow before it could be carried across.
             canvas.edges().setAll(rewiredOutcome(canvas.edges(), d.name(), oldName, candidate));
             d.outcomes().set(at, candidate);
             if (d != draft) also.add(d.name());
@@ -660,7 +659,7 @@ public final class ActivityFlowDialog {
 
     /**
      * {@code presets} with the activity {@code oldName} called {@code newName}. A preset names its activities,
-     * so a rename that left them alone quietly took the renamed card out of every preset (until 2026-09-28).
+     * so a rename that left them alone would quietly take the renamed card out of every preset.
      */
     static List<Selection> renamedIn(List<Selection> presets, String oldName, String newName) {
         List<Selection> out = new ArrayList<>(presets.size());
@@ -878,9 +877,8 @@ public final class ActivityFlowDialog {
         closeButton.setDefaultButton(true);
         closeButton.setOnAction(e -> closeRequested());
 
-        // A "Create Sdk.java" button stood here until 2026-09-26. The host now writes the holder itself on every
-        // bind the project lacks one (Studio's HostPluginValues.createMissing), so the file exists the moment
-        // the SDK is in the project, and this window never has to ask.
+        // No "Create Sdk.java" button: the host writes the holder itself on every bind the project lacks one
+        // (Studio's HostPluginValues.createMissing), so this window never has to ask.
 
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -1118,7 +1116,7 @@ public final class ActivityFlowDialog {
      * javac is what has an opinion about the names. What is left checks the names this editor is still the
      * author of.
      *
-     * <p>Since 2026-10-02 a label is free text and the rule is about the constant it becomes
+     * <p>A label is free text and the rule is about the constant it becomes
      * ({@link FlowNames#constantFor}): every label must make one, and two labels making the same one are one
      * name spelled twice — across the whole flow for outcomes, since an outcome is one constant wherever it is
      * declared.

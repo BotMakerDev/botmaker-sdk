@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * Where a pick is made (2026-09-26): the bot's own source, another window or screen, or the whole desktop —
+ * Where a pick is made: the bot's own source, another window or screen, or the whole desktop —
  * a small menu at the pointer, opened by the pill item the user just clicked. The last other surface is
  * remembered per project for this session and offered first; nothing is written anywhere.
  *
@@ -47,7 +47,7 @@ public final class SurfaceMenu {
     /**
      * The entries, in menu order: the last other surface again, the bot's own source, another window or
      * screen, the whole desktop. What {@link #choose} shows, and what a widget with a menu of its own lists
-     * there instead (feedback 2, 2026-09-27). A choice is remembered as it resolves.
+     * there instead. A choice is remembered as it resolves.
      */
     public static List<Entry> entries(StudioServices services) {
         Window owner = Modals.owner(services);

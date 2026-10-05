@@ -18,7 +18,7 @@ import java.util.List;
 /**
  * The SDK's {@code @Managed} values, each declared once, and what a run does with each one.
  *
- * <p>Seven declarations, and every id is spelled here and nowhere else (2026-09-28): the plugin lists
+ * <p>Seven declarations, and every id is spelled here and nowhere else: the plugin lists
  * {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code "flow"} is the activity
  * flow, {@code "flow.layout"} where the flow editor draws each card (a run ignores it), {@code "capture"} where
@@ -69,7 +69,7 @@ public final class SdkValues {
                     + " use of it together.");
 
     /**
-     * The activity constants — {@code static final Activity COLLECT = Activity.named("Collect")} (2026-10-02).
+     * The activity constants — {@code static final Activity COLLECT = Activity.named("Collect")}.
      * 🔀 Activity Flow adds, renames and removes them with the cards, together with every step, wire, preset and
      * {@code ActivitySwitch} call naming them.
      */
@@ -80,7 +80,7 @@ public final class SdkValues {
                     + " together.");
 
     /**
-     * The outcome constants — {@code static final Outcome WON = Outcome.named("Won")} (2026-10-02). 🔀 Activity
+     * The outcome constants — {@code static final Outcome WON = Outcome.named("Won")}. 🔀 Activity
      * Flow adds, renames and removes them with the cards' outcomes, together with every body returning one.
      */
     public static final ManagedValue<Outcome> OUTCOMES = ManagedValue.openSet("outcomes")

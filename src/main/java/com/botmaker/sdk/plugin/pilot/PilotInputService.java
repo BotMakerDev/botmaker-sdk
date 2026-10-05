@@ -209,7 +209,7 @@ public final class PilotInputService implements AutoCloseable {
      * On the host {@code :0} it could be a terminal or Studio itself, and the pilot may be reachable over a
      * public Funnel URL, so a key is sent there only while the focused window <em>is</em> the streamed frame
      * ({@link #focusedIsFrame}); otherwise it is refused and the phone is told to tap the window first. (The
-     * user's call, 2026-09-29.)
+     * maintainer's call.)
      */
     public synchronized Typed type(PilotRoute route, Kind kind, String keyName, String text, Bounds bounds) {
         if (bounds == null) return Typed.FAILED;

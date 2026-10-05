@@ -28,8 +28,8 @@ import java.util.Objects;
  *
  * <p>{@code CaptureSource.region(window("G"), rect)} reads window G and crops it, so every question about
  * <em>which surface</em> — {@link #windowTitle}, {@link #monitorIndex}, {@link #emulatorName},
- * {@link #isDesktop} — is answered for {@link #whole} it, and {@link #region} says the crop. Until 2026-09-28
- * a region was answered as the whole desktop, so a narrowed project grabbed the desktop in every editor.
+ * {@link #isDesktop} — is answered for {@link #whole} it, and {@link #region} says the crop; answering a region
+ * as the whole desktop would make a narrowed project grab the desktop in every editor.
  *
  * <h2>Both label methods are total, and absent means the desktop</h2>
  *

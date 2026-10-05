@@ -62,7 +62,7 @@ public final class GeometryEditors {
 
     /**
      * A row's numbers are inside the surface it was picked on, and its pill says so; a slot's say nothing,
-     * because the call it sits in already says which (2026-09-26, {@code PickSpace}).
+     * because the call it sits in already says which ({@code PickSpace}).
      */
     static TupleSpec spec(TupleSpec base, ValueContext ctx) {
         if (ctx.slot().isPresent()) return base;
