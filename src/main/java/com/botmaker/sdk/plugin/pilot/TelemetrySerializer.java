@@ -175,6 +175,8 @@ public final class TelemetrySerializer {
                     "a question is not an event the pilot draws: " + a.prompt());
             case TelemetryEvent.Answer a -> throw new IllegalArgumentException(
                     "an answer is not an event the pilot draws: " + a.id());
+            case TelemetryEvent.Step s -> throw new IllegalArgumentException(
+                    "a step is not an event the pilot draws: " + s.activity());
         };
     }
 
