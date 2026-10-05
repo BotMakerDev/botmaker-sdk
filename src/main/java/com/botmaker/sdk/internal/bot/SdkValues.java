@@ -3,10 +3,13 @@ package com.botmaker.sdk.internal.bot;
 import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.Flows;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
@@ -59,7 +62,8 @@ public final class SdkValues {
      * Pictures renames the file, the constant and every use of it together; the canvas can only rename the one
      * it is looking at, which would leave the bot calling a name that is gone.
      */
-    public static final ManagedValue<Void> PICTURES = ManagedValue.openSet("pictures")
+    public static final ManagedValue<ImageTemplate> PICTURES = ManagedValue.openSet("pictures")
+            .of(ImageTemplate.class)
             .in(TemplateNames.CLASS_NAME)
             .because("Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every"
                     + " use of it together.");
@@ -69,7 +73,8 @@ public final class SdkValues {
      * 🔀 Activity Flow adds, renames and removes them with the cards, together with every step, wire, preset and
      * {@code ActivitySwitch} call naming them.
      */
-    public static final ManagedValue<Void> ACTIVITIES = ManagedValue.openSet("activities")
+    public static final ManagedValue<Activity> ACTIVITIES = ManagedValue.openSet("activities")
+            .of(Activity.class)
             .in("Activities")
             .because("Activities are managed in 🔀 Activity Flow, which renames the card and every use of it"
                     + " together.");
@@ -78,7 +83,8 @@ public final class SdkValues {
      * The outcome constants — {@code static final Outcome WON = Outcome.named("Won")} (2026-10-02). 🔀 Activity
      * Flow adds, renames and removes them with the cards' outcomes, together with every body returning one.
      */
-    public static final ManagedValue<Void> OUTCOMES = ManagedValue.openSet("outcomes")
+    public static final ManagedValue<Outcome> OUTCOMES = ManagedValue.openSet("outcomes")
+            .of(Outcome.class)
             .in("Outcomes")
             .because("Outcomes are managed in 🔀 Activity Flow, which renames the outcome and every use of it"
                     + " together.");

@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.flow;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
@@ -49,38 +50,39 @@ public final class FlowConstants {
 
     /** One of the two open sets, with what it holds. */
     public enum Kind {
-        ACTIVITIES(SdkValues.ACTIVITIES, Activity.class, Activity::named, v -> ((Activity) v).label()),
-        OUTCOMES(SdkValues.OUTCOMES, Outcome.class, Outcome::named, v -> ((Outcome) v).label());
+        ACTIVITIES(new Labelled<>(SdkValues.ACTIVITIES, Activity::named, Activity::label)),
+        OUTCOMES(new Labelled<>(SdkValues.OUTCOMES, Outcome::named, Outcome::label));
 
-        private final ManagedValue<?> set;
-        private final Class<?> type;
-        private final Function<String, Object> named;
-        private final Function<Object, String> label;
+        private final Labelled<?> constants;
 
-        Kind(ManagedValue<?> set, Class<?> type, Function<String, Object> named, Function<Object, String> label) {
-            this.set = set;
-            this.type = type;
-            this.named = named;
-            this.label = label;
-        }
-
-        /** The open set's id, {@code "activities"}. */
-        public String id() {
-            return set.id();
+        Kind(Labelled<?> constants) {
+            this.constants = constants;
         }
 
         /** The class it is, for sentences: {@code Activities}. */
         public String holder() {
-            return set.holder();
+            return constants.set().value().holder();
+        }
+    }
+
+    /** An open set whose every constant is a label, typed: what a label is written as, and read back from. */
+    private record Labelled<E>(ManagedSet<E> set, Function<String, E> named, Function<E, String> labelOf) {
+
+        Labelled(ManagedValue<E> value, Function<String, E> named, Function<E, String> labelOf) {
+            this(ManagedSet.of(value), named, labelOf);
         }
 
-        Object named(String label) {
-            return named.apply(label);
+        Optional<String> add(PluginValues values, String constant, String label) {
+            return set.add(values, constant, named.apply(label));
         }
 
         /** The label a constant's initialiser holds, or empty when it is not one the grammar reads. */
         Optional<String> label(ValueContext initializer) {
-            return initializer.value(type).map(label);
+            return set.read(initializer).map(labelOf);
+        }
+
+        void relabel(ValueContext initializer, String label) {
+            initializer.set(named.apply(label));
         }
     }
 
@@ -154,14 +156,13 @@ public final class FlowConstants {
             switch (op) {
                 case Op.Rename rename -> {
                     if (!rename.from().equals(rename.to())) {
-                        Optional<String> refused = values.rename(kind.id(), rename.from(), rename.to());
+                        Optional<String> refused = kind.constants.set().rename(values, rename.from(), rename.to());
                         if (refused.isPresent()) return refused.get();
                     }
                     relabel(values, kind, rename.to(), rename.label(), notes);
                     renames.remove(rename.original());
                 }
-                case Op.Add add -> values.add(kind.id(), add.constant(), kind.named(add.label()))
-                        .ifPresent(notes::add);
+                case Op.Add add -> kind.constants.add(values, add.constant(), add.label()).ifPresent(notes::add);
             }
         }
         return null;
@@ -189,7 +190,7 @@ public final class FlowConstants {
         for (String label : gone) {
             String constant = holding(members, label);
             if (constant == null) continue;
-            values.remove(kind.id(), constant).ifPresent(refused -> notes.add(kind.holder() + "." + constant
+            kind.constants.set().remove(values, constant).ifPresent(refused -> notes.add(kind.holder() + "." + constant
                     + " stays: " + refused));
         }
     }
@@ -197,8 +198,9 @@ public final class FlowConstants {
     /** Every constant of {@code kind}'s set, with the label it holds (null when unreadable), in file order. */
     static Map<String, String> members(PluginValues values, Kind kind) {
         Map<String, String> members = new LinkedHashMap<>();
-        for (String member : values.members(kind.id())) {
-            members.put(member, values.open(kind.id(), member).flatMap(kind::label).orElse(null));
+        Labelled<?> constants = kind.constants;
+        for (String member : constants.set().members(values)) {
+            members.put(member, constants.set().open(values, member).flatMap(constants::label).orElse(null));
         }
         return members;
     }
@@ -241,13 +243,13 @@ public final class FlowConstants {
     }
 
     private static void relabel(PluginValues values, Kind kind, String constant, String label, List<String> notes) {
-        Optional<ValueContext> initializer = values.open(kind.id(), constant);
+        Optional<ValueContext> initializer = kind.constants.set().open(values, constant);
         if (initializer.isEmpty()) {
             notes.add(kind.holder() + "." + constant + " was renamed, but its label could not be rewritten.");
             return;
         }
-        if (!Objects.equals(kind.label(initializer.get()).orElse(null), label)) {
-            initializer.get().set(kind.named(label));
+        if (!Objects.equals(kind.constants.label(initializer.get()).orElse(null), label)) {
+            kind.constants.relabel(initializer.get(), label);
         }
     }
 

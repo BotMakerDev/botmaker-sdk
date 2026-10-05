@@ -43,6 +43,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - The outcome picker in a `return` ends with **+ New outcome…**, which makes the constant and adds it to that
   activity's outcomes.
 
+### Changed
+
+- **Nothing changes for a bot.** The plugin half declares `Pictures`, `Activities` and `Outcomes` as open sets
+  of `ImageTemplate`, `Activity` and `Outcome` (the plugin contract's typed open sets), and changes them through
+  the toolkit's `ManagedSet`, so a constant of the wrong kind cannot be added to one.
+
 ## [1.2.3] — 2026-10-01
 
 ### Fixed

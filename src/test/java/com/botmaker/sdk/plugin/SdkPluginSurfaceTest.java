@@ -126,9 +126,13 @@ class SdkPluginSurfaceTest {
         assertEquals(com.botmaker.sdk.api.bot.BotSettings.class, settings.type());
         var pictures = byId.get("pictures");
         assertEquals("Pictures", pictures.holder());
-        assertNull(pictures.type());
+        assertTrue(pictures.isOpenSet());
+        assertEquals(com.botmaker.sdk.api.vision.ImageTemplate.class, pictures.type());
+        assertNull(pictures.initial());
         assertEquals("Activities", byId.get("activities").holder());
+        assertEquals(com.botmaker.sdk.api.flow.Activity.class, byId.get("activities").type());
         assertEquals("Outcomes", byId.get("outcomes").holder());
+        assertEquals(com.botmaker.sdk.api.bot.Outcome.class, byId.get("outcomes").type());
         assertEquals(7, byId.size());
     }
 
