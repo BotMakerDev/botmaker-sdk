@@ -36,9 +36,8 @@ The architecture is in `docs/architecture/`, one file per section (moved there u
 For large changes, write the plan to a dedicated plan file before starting implementation, so work
 can be resumed if a session is interrupted.
 
-**Always update `ROADMAP.md` whenever you add a feature or refactor code** — append a dated entry
-under "Done" (and add/adjust "Deferred / next" items as needed). It is the running history future
-sessions rely on to understand what changed and what's intentionally left for later.
+A finished change writes `CHANGELOG.md` under `## [Unreleased]`. `ROADMAP.md` holds open work only: add an
+item when work is left for later, remove it when done; never a dated done-entry.
 
 ## Commands
 
