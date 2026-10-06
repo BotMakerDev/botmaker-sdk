@@ -133,7 +133,12 @@ class SdkPluginSurfaceTest {
         assertEquals(com.botmaker.sdk.api.flow.Activity.class, byId.get("activities").type());
         assertEquals("Outcomes", byId.get("outcomes").holder());
         assertEquals(com.botmaker.sdk.api.bot.Outcome.class, byId.get("outcomes").type());
-        assertEquals(7, byId.size());
+        assertEquals("Points", byId.get("points").holder());
+        assertTrue(byId.get("points").isOpenSet());
+        assertEquals(com.botmaker.sdk.api.geometry.Point.class, byId.get("points").type());
+        assertEquals("Regions", byId.get("regions").holder());
+        assertEquals(com.botmaker.sdk.api.geometry.Rect.class, byId.get("regions").type());
+        assertEquals(9, byId.size());
     }
 
     /** The palette is the host's to discover from {@code @Palette}; {@link ApiCatalogTest} checks what it finds. */

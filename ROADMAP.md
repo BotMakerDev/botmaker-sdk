@@ -16,6 +16,8 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 - **`OcrOptions`**: `withLanguages(OcrLanguage...)` is not a declared chain (the host would need to read a
   varargs argument inside a receiver chain); `Text.DEFAULT_OPTIONS` shows as written — an `OcrOptions`
   constant plus `.constants(…)` would fix both reading and fresh blocks.
+- **`Points` and `Regions`**: only the assistant's `save_point`/`save_region` write them; Studio locks the
+  files as it locks every `@Managed` holder, and no window picks or moves a spot by hand.
 - **Read-only chains**: a hand-written capture chain (`CaptureSource.window("G").region(r)`) and a
   `Precision` wither chain; the host writes the one-call forms.
 - **Remote Pilot**: a quick tunnel's address changes at every start, so the APK's saved connection goes

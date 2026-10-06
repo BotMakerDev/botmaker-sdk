@@ -50,6 +50,28 @@ class FlowEditsTest {
     }
 
     @Test
+    void disconnectingRemovesOnlyThatArrowAndKeepsTheOutcome() {
+        Flow wired = FlowEdits.connect(FlowEdits.connect(TWO, "Collect", "bag full", "Battle"), "Collect", "",
+                "Collect");
+        Flow cut = FlowEdits.disconnect(wired, "collect", "Bag Full");
+        assertEquals(1, cut.edges().size());
+        assertEquals(Outcome.NEXT, cut.edges().getFirst().outcome());
+        assertEquals(List.of(Outcome.named("bag full")), cut.step(Activity.named("Collect")).outcomes(),
+                "a body may still return it");
+        assertTrue(FlowEdits.disconnect(cut, "Collect", null).edges().isEmpty(), "blank is NEXT");
+        assertThrows(IllegalArgumentException.class, () -> FlowEdits.disconnect(cut, "Battle", ""));
+        assertThrows(IllegalArgumentException.class, () -> FlowEdits.disconnect(cut, "Rest", ""));
+        assertThrows(IllegalArgumentException.class, () -> FlowEdits.disconnect(cut, "Collect", "1st"),
+                "no constant is not NEXT");
+    }
+
+    @Test
+    void theStartIsAnyActivity() {
+        assertEquals(Activity.named("Battle"), FlowEdits.setStart(TWO, "battle").start());
+        assertThrows(IllegalArgumentException.class, () -> FlowEdits.setStart(TWO, "Rest"));
+    }
+
+    @Test
     void renamingCarriesWiresAndTheStart() {
         Flow renamed = FlowEdits.renameActivity(FlowEdits.connect(TWO, "Collect", "", "Battle"), "Collect", "Gather");
         assertEquals(Set.of("Gather", "Battle"), FlowEdits.labels(renamed));

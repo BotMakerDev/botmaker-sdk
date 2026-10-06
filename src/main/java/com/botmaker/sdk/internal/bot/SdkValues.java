@@ -9,6 +9,8 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
+import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.Flows;
 import com.botmaker.sdk.internal.vision.TemplateNames;
@@ -18,12 +20,12 @@ import java.util.List;
 /**
  * The SDK's {@code @Managed} values, each declared once, and what a run does with each one.
  *
- * <p>Seven declarations, and every id is spelled here and nowhere else: the plugin lists
+ * <p>Nine declarations, and every id is spelled here and nowhere else: the plugin lists
  * {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code "flow"} is the activity
  * flow, {@code "flow.layout"} where the flow editor draws each card (a run ignores it), {@code "capture"} where
- * pixels are read from, {@code "settings"} how it clicks and looks, and {@code "pictures"}, {@code "activities"}
- * and {@code "outcomes"} the classes of picture, activity and outcome constants the bot grows.
+ * pixels are read from, {@code "settings"} how it clicks and looks, and {@code "pictures"}, {@code "activities"},
+ * {@code "outcomes"}, {@code "points"} and {@code "regions"} the classes of constants the bot grows.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract
  * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#run} calls
@@ -89,9 +91,30 @@ public final class SdkValues {
             .because("Outcomes are managed in 🔀 Activity Flow, which renames the outcome and every use of it"
                     + " together.");
 
-    /** All seven, in the order the plugin declares them. */
+    /**
+     * The named spots — {@code static final Point CLAIM = new Point(412, 230)}, in the bot's pixels, which is what
+     * {@code Mouse.click(Point)} takes. The assistant's {@code save_point} adds one, or moves one it names again.
+     */
+    public static final ManagedValue<Point> POINTS = ManagedValue.openSet("points")
+            .of(Point.class)
+            .in("Points")
+            .because("Points.java holds the bot's named spots. Ask Claude to save_point a spot again, under its"
+                    + " name, to move it.");
+
+    /**
+     * The named areas — {@code static final Rect BAG = new Rect(10, 20, 200, 120)}, in the capture source's own
+     * pixels, which is what {@code captureSource().region(Rect)} narrows. The assistant's {@code save_region} adds
+     * one, or moves one it names again.
+     */
+    public static final ManagedValue<Rect> REGIONS = ManagedValue.openSet("regions")
+            .of(Rect.class)
+            .in("Regions")
+            .because("Regions.java holds the bot's named areas. Ask Claude to save_region an area again, under"
+                    + " its name, to move it.");
+
+    /** All nine, in the order the plugin declares them. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOW, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            ACTIVITIES, OUTCOMES);
+            ACTIVITIES, OUTCOMES, POINTS, REGIONS);
 
     private static boolean claimed;
 

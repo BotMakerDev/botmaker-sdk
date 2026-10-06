@@ -23,21 +23,25 @@ final class FxCall {
     /**
      * {@code work}'s answer, computed on the FX thread; its exception is rethrown here. A call that times out
      * before the FX thread took it is cancelled, so it does not run late and a retry does not write twice; one
-     * already running is said to be.
+     * already running is said to be. A host with no FX thread at all — a headless one, a test — runs it here.
      */
     static <T> T call(Supplier<T> work) {
         if (Platform.isFxApplicationThread()) return work.get();
         CompletableFuture<T> answer = new CompletableFuture<>();
         // PENDING until the FX thread takes it; the waiter may cancel only work that has not started.
         AtomicInteger state = new AtomicInteger(PENDING);
-        Platform.runLater(() -> {
-            if (!state.compareAndSet(PENDING, RUNNING)) return;
-            try {
-                answer.complete(work.get());
-            } catch (RuntimeException | Error e) {
-                answer.completeExceptionally(e);
-            }
-        });
+        try {
+            Platform.runLater(() -> {
+                if (!state.compareAndSet(PENDING, RUNNING)) return;
+                try {
+                    answer.complete(work.get());
+                } catch (RuntimeException | Error e) {
+                    answer.completeExceptionally(e);
+                }
+            });
+        } catch (IllegalStateException noToolkit) {
+            return work.get();
+        }
         try {
             return answer.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (ExecutionException e) {

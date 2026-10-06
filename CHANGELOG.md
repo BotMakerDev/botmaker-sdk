@@ -32,11 +32,23 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - its Picture, Point and Flow tabs cut a picture straight into `Pictures`, insert a click at a point, and
     open 🔀 Activity Flow.
 - **Claude can see and shape your bot from Studio.** The SDK offers it these tools:
-  - `screenshot`, `list_pictures`, `crop_picture` and `find_picture`, for what the bot sees and the pictures;
-  - `add_activity`, `rename_activity`, `remove_activity` and `connect`, for the flow;
-  - `set_capture_source`, for where the bot looks.
+  - **seeing:** `screenshot` (a part of it, shrunk, or with a labelled grid), `find_picture`, `which_screen`
+    (every picture scored on one frame), `wait_for_picture`, `read_text`, `find_text`, `pixel_color` and
+    `find_color`;
+  - **pictures and places:** `list_pictures`, `crop_picture`, `show_picture`, `rename_picture`,
+    `delete_picture` (refused while in use, unless its uses move to another picture), `replace_picture`,
+    `save_point` and `save_region`;
+  - **the flow:** `read_flow`, `add_activity`, `rename_activity`, `remove_activity`, `connect`, `disconnect`
+    and `set_start`;
+  - **where it looks and how it runs:** `get_capture_source`, `set_capture_source`, `list_windows`,
+    `get_settings`, `set_setting`, `list_emulators`, `use_emulator`, `get_launch_target` and
+    `set_launch_target` (this computer's launch target, checked before it is kept).
 
-  Each one writes through the same path as the SDK's own windows. None clicks or types.
+  Each one writes through the same path as the SDK's own windows. None clicks, types or starts anything.
+- **Named spots and areas.** A bot can keep `Points` (`Points.CLAIM = new Point(412, 230)`, for
+  `Mouse.click`) and `Regions` (`Regions.BAG = new Rect(…)`, for `.region(…)`) constants, as it keeps
+  `Pictures`. Studio writes the two empty classes beside `Pictures.java`; Claude's `save_point` and
+  `save_region` fill them.
 - **▶ Try one statement.** `Bot.trial(body, Sdk.class)` installs your values as `Bot.run` does and runs only
   `body`, with no launch and no recovery. Studio calls it; a bot does not. `ImageFinder.bestMatch` answers the
   best place a picture sits at any score, for the overlay's probe. It is hidden from the palette.

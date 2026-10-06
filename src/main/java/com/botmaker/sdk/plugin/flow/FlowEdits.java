@@ -111,6 +111,38 @@ public final class FlowEdits {
     }
 
     /**
+     * {@code flow} without the wire from {@code from} on {@code outcome}; blank is {@code NEXT}. The outcome stays
+     * declared — a body may still return it, and the run then stops there — so only the arrow goes.
+     */
+    public static Flow disconnect(Flow flow, String from, String outcome) {
+        Flow.Step source = step(flow, from);
+        boolean next = outcome == null || outcome.isBlank();
+        String constant = next ? null : FlowNames.constantFor(FlowNames.label(outcome));
+        if (!next && constant == null) {
+            throw new IllegalArgumentException("'" + outcome.trim() + "' is not an outcome's name.");
+        }
+        List<Flow.Edge> kept = new ArrayList<>();
+        Flow.Edge gone = null;
+        for (Flow.Edge edge : flow.edges()) {
+            boolean match = edge.from().equals(source.activity()) && (constant == null
+                    ? edge.outcome().equals(Outcome.NEXT)
+                    : constant.equals(FlowNames.constantFor(edge.outcome().label())));
+            if (match && gone == null) gone = edge;
+            else kept.add(edge);
+        }
+        if (gone == null) {
+            throw new IllegalArgumentException(source.label() + " has no wire on "
+                    + (outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome.trim()) + ".");
+        }
+        return Flow.of(flow.steps(), kept, flow.presets(), flow.start(), flow.limits());
+    }
+
+    /** {@code flow} starting at the activity {@code name}. */
+    public static Flow setStart(Flow flow, String name) {
+        return Flow.of(flow.steps(), flow.edges(), flow.presets(), step(flow, name).activity(), flow.limits());
+    }
+
+    /**
      * Why {@code flow} cannot be written — a label that makes no constant, two labels making one, an outcome
      * that clashes — or null. 🔀 Activity Flow's rule (its {@code validate} says why it is this short), here so a
      * caller with no window checks the same.
