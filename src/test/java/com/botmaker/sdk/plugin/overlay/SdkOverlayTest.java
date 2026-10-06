@@ -29,6 +29,33 @@ class SdkOverlayTest {
         assertEquals(Optional.empty(), SdkOverlay.of(null));
     }
 
+    /** A source that captures {@code image} (null: a failed capture) at {@code 40,60}. */
+    private static CaptureSource fake(java.awt.image.BufferedImage image) {
+        return new CaptureSource() {
+            @Override public java.awt.image.BufferedImage capture() { return image; }
+            @Override public com.botmaker.sdk.api.geometry.Point origin() {
+                return new com.botmaker.sdk.api.geometry.Point(40, 60);
+            }
+        };
+    }
+
+    @Test
+    void theFrameIsTheSourcesOwnCaptureAtItsOrigin() {
+        java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(8, 6,
+                java.awt.image.BufferedImage.TYPE_INT_RGB);
+        OverlayPart.FrameSource frames = SdkOverlay.framesOf(fake(image)).orElseThrow();
+        com.botmaker.plugin.api.overlay.OverlayFrame frame = frames.grab().orElseThrow();
+        assertEquals(image, frame.image());
+        assertEquals(new com.botmaker.plugin.api.toolbar.ActionContext.Area(40, 60, 8, 6), frame.area());
+
+        assertEquals(Optional.empty(), SdkOverlay.framesOf(fake(null)).orElseThrow().grab(), "a failed capture");
+        assertEquals(Optional.empty(), SdkOverlay.framesOf(null), "no source: Studio grabs the window");
+        assertTrue(SdkOverlay.framesOf(CaptureSource.desktop().region(new Rect(0, 0, 10, 10))).isPresent(),
+                "a region is grabbed as the region");
+        assertEquals(Optional.empty(), SdkOverlay.framesOf(CaptureSource.emulator("Pixel")),
+                "an emulator is never grabbed from the editor: that connects adb, or launches it");
+    }
+
     @Test
     void activitiesAreTargetsByTypeAndClicksAreActing() throws NoSuchMethodException {
         OverlayPart part = SdkOverlay.PART;

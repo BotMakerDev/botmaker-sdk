@@ -24,6 +24,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **The overlay editor knows your bot.** In a Studio with the new overlay editor:
   - each activity's body is a chip to edit;
   - the panel opens over the window `Sdk.captureSource()` names, and ⇄ Change opens 🎯 Capture Source;
+  - what the panel checks, cuts and shows Claude is that capture source's own frame — a bot narrowed to a
+    region is checked in that region — not Studio's grab of the whole window. An emulator is still grabbed
+    by Studio, as its window: grabbing it here would connect adb or start it;
   - a picture call says live whether its picture is on screen and where. For a click, it says where the click
     would land, and nothing clicks;
   - its Picture, Point and Flow tabs cut a picture straight into `Pictures`, insert a click at a point, and
