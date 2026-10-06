@@ -306,8 +306,11 @@ final class SetupTools {
     private static final java.util.regex.Pattern PACKAGE =
             java.util.regex.Pattern.compile("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+");
 
-    /** A launcher's own id for a game, or an emulator's name: no character a command line gives a meaning to. */
-    private static final java.util.regex.Pattern PLAIN = java.util.regex.Pattern.compile("[A-Za-z0-9._ -]+");
+    /**
+     * A launcher's own id for a game: no character a command line gives a meaning to, and a letter or digit
+     * first, so it is never read as an option ({@code -…}).
+     */
+    private static final java.util.regex.Pattern PLAIN = java.util.regex.Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
 
     /**
      * Why {@code spec} may not be kept as the assistant wrote it, or null: its token reaches a launcher's
@@ -320,12 +323,14 @@ final class SetupTools {
             if (pkg == null || !PACKAGE.matcher(pkg).matches()) {
                 return "\"" + pkg + "\" is not an app's package, like com.example.game.";
             }
-            if (instance == null || instance.isBlank() || !PLAIN.matcher(instance).matches()) {
-                return "\"" + instance + "\" is not an emulator's name; list_emulators names them.";
+            // The name may hold spaces ("Pixel 7"), so it is held to the names the scan found, not to a pattern.
+            if (instance == null || new EmulatorInstanceScanner().instanceNames().stream()
+                    .noneMatch(instance::equals)) {
+                return "\"" + instance + "\" is not an emulator set up here; list_emulators names them.";
             }
             return null;
         }
-        return PLAIN.matcher(spec.token()).matches() && spec.token().indexOf(' ') < 0 ? null
+        return PLAIN.matcher(spec.token()).matches() ? null
                 : "\"" + spec.token() + "\" is not a " + spec.kind().displayName() + "'s id: letters, digits, '.', "
                         + "'_' and '-' only.";
     }

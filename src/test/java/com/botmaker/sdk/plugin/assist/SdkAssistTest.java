@@ -340,7 +340,9 @@ class SdkAssistTest {
         assertTrue(run("set_launch_target", "target", "exe:/tmp/payload").isRefused());
         assertTrue(run("set_launch_target", "target", "steam:570;reboot").isRefused());
         assertTrue(run("set_launch_target", "target", "emu-app:com.x;rm -rf /@Pixel").isRefused());
-        assertFalse(run("set_launch_target", "target", "emu-app:com.example.game@Pixel 7").isRefused());
+        assertTrue(run("set_launch_target", "target", "steam:-applaunch").isRefused(), "never an option");
+        assertTrue(text(run("set_launch_target", "target", "emu-app:com.example.game@no-such-emulator-here"))
+                .contains("not an emulator set up here"));
         assertFalse(run("set_launch_target", "target", "steam:570").isRefused());
         assertEquals("steam:570", host.properties.get("botmaker.launch.target"));
     }
