@@ -63,6 +63,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- The pom carries a real version and names its upstreams' versions, so a tag's pom says what it was built
+  against; `.deps.env` is gone and JitPack runs a plain `mvn install` (umbrella
+  `docs/refactor/43-real-versions.md`). A local build installs as `1.3.1-SNAPSHOT` and so on, no longer
+  `0.0.0-SNAPSHOT`: a bot pinned to `0.0.0-SNAPSHOT` keeps the last such jar until its pin moves.
 - Published as `com.github.BotMakerDev:botmaker-sdk` (was `com.github.LiQiyeDev`), and resolves shared,
   session, the contract, the toolkit and basics under the new groupId. A bot's pom names it as
   `com.github.BotMakerDev:botmaker-sdk`; tags already built under the old groupId still resolve under it.

@@ -175,7 +175,7 @@ jobs:
           source .github/mvn-retry.sh
           mvn_retry mvn -B -q -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
           mvn_retry mvn -B -q -f .deps/botmaker-cli/pom.xml package -DskipTests
-          java -jar .deps/botmaker-cli/target/botmaker-cli-0.0.0-SNAPSHOT-all.jar plugin validate . --no-build
+          java -jar .deps/botmaker-cli/target/botmaker-cli-*-all.jar plugin validate . --no-build
 
   # JitPack builds the artifact itself from the pushed tag; this just asks it to start eagerly so the
   # first consumer doesn't wait. No secrets required.

@@ -1,37 +1,10 @@
 jdk:
   - openjdk25
 install:
-  # The committed pom pins botmaker.shared.version / botmaker.session.version to 0.0.0-SNAPSHOT (the
-  # reactor/dev value). JitPack can't resolve a SNAPSHOT, so both tags are injected via -D at build time —
-  # the committed pom is never edited. They come from .deps.env, written by the umbrella release.sh in this
-  # release's own commit, so they are the shared/session releases this SDK tag was actually cut against
-  # rather than whatever `git ls-remote --tags | tail -1` happens to return. JitPack builds those tags on
-  # demand if their builds haven't run yet, which is what lets release.sh tag all three back to back.
-  #
-  # The -D reaches CONSUMERS only because pom.xml runs flatten-maven-plugin: Maven publishes the committed
-  # pom, not the effective one. That is also why the tags below are now REQUIRED rather than defaulted. The
-  # old `${SHARED_TAG:-v0.0.15}` fallbacks were harmless while the published pom kept the unresolved
-  # property (a stale -D only affected the build); with flatten they would be silently BAKED INTO the
-  # published pom, pointing every consumer of a hand-cut tag at a long-dead shared. Failing the build with
-  # a readable message is strictly better than publishing that.
-  #
-  # STUDIO_API_TAG is the plugin contract (com.botmaker.plugin.api). This SDK is Studio's plugin #1, and its
-  # plugin/ classes implement that contract, and api/ carries its annotations (@Param, @Managed, @Records), so
-  # it is a compile dependency. Required here for the same reason as the other two: flatten bakes whatever is
-  # injected into the published pom.
-  #
-  # There is no PLUGIN_PROCESSOR_TAG any more: the host discovers the palette from @Palette at load time, so
-  # this module compiles with no annotation processor at all.
-  #
-  # PLUGIN_TOOLKIT_TAG is the widget kit the slot editors under plugin/editors are built from. It
-  # IS an ordinary <dependencies> entry (optional, so it never reaches a bot), which means flatten bakes it
-  # into the published pom — so it is required for the same reason SHARED_TAG is, and a stale one would be
-  # published rather than merely used.
-  #
-  # PLUGIN_BASICS_TAG is plugin #2, which owns the nine JDK value types this SDK builds on, so this is an
-  # ordinary <dependencies> entry at compile scope, transitive
-  # onto a bot's classpath, and baked into the published pom by flatten. Required for the same reason as the
-  # four above, and the reason its own release FORCES an SDK release.
-  - . ./.deps.env
-  - '[ -n "${SHARED_TAG:-}" ] && [ -n "${SESSION_TAG:-}" ] && [ -n "${STUDIO_API_TAG:-}" ] && [ -n "${PLUGIN_TOOLKIT_TAG:-}" ] && [ -n "${PLUGIN_BASICS_TAG:-}" ] || { echo "ERROR: .deps.env must pin SHARED_TAG, SESSION_TAG, STUDIO_API_TAG, PLUGIN_TOOLKIT_TAG and PLUGIN_BASICS_TAG. Cut releases with the umbrella release.sh, which writes it into the release commit." >&2; exit 1; }'
-  - mvn install -DskipTests -Dmaven.javadoc.skip=true -B -Dbotmaker.shared.version=$SHARED_TAG -Dbotmaker.session.version=$SESSION_TAG -Dbotmaker.studioapi.version=$STUDIO_API_TAG -Dbotmaker.plugintoolkit.version=$PLUGIN_TOOLKIT_TAG -Dbotmaker.pluginbasics.version=$PLUGIN_BASICS_TAG
+  # A tag's pom names its upstreams' released versions, written by the umbrella release in the release
+  # commit (docs/refactor/43-real-versions.md), so the build needs nothing beside the checkout. JitPack
+  # builds an upstream tag on demand if its build has not run yet, which is what lets the release tag the
+  # chain back to back. flatten-maven-plugin writes the versions literally into the published pom. A tag
+  # cut by hand from main names -SNAPSHOT upstreams, which JitPack cannot resolve: the build fails rather
+  # than publishing.
+  - mvn install -DskipTests -Dmaven.javadoc.skip=true -B
