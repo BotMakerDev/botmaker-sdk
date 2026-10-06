@@ -55,7 +55,7 @@ goes in `src/test` with the JUnit the rest of the module uses.
 
 The SDK is consumed by **bot projects** (not by Studio), via JitPack as
 `com.github.BotMakerDev:botmaker-sdk:<tag>`. JitPack builds each git tag on demand and serves it under that
-coordinate regardless of this pom's `groupId`/`version` (so the pom `version` is cosmetic). **The maintainer
+coordinate; a tag's pom carries its release version and `main` a `-SNAPSHOT` (umbrella doc 43). **The maintainer
 owns the SDK → JitPack publish — don't push or publish the SDK yourself;** releases are cut from the
 umbrella with `../release.sh`. The whole `CHANGELOG.md` is copied into the jar as
 `META-INF/botmaker/whats-new.md`.
@@ -63,13 +63,13 @@ umbrella with `../release.sh`. The whole `CHANGELOG.md` is copied into the jar a
 ### Local dev (test SDK changes without pushing a tag)
 
 A bot pins `com.github.BotMakerDev:botmaker-sdk:<version>`, and `~/.m2` is checked before JitPack. Install
-the SDK and what it builds on at `0.0.0-SNAPSHOT` from the umbrella root:
+the SDK and what it builds on at their `main` `-SNAPSHOT` from the umbrella root:
 
 ```bash
 mvn -pl botmaker-sdk -am install     # shared, session, contract, toolkit, basics, then the SDK
 ```
 
-Re-run it after each SDK edit; a bot pinned to `0.0.0-SNAPSHOT` resolves the fresh jar on its next
+Re-run it after each SDK edit; a bot pinned to the SDK pom's `-SNAPSHOT` resolves the fresh jar on its next
 classpath resolve, and Studio's **Project ▸ Plugins & Libraries ▸ Reload plugins** re-opens the plugin loader over it. A dev-run
 Studio (`AppVersion.isDevBuild()`, no jar manifest) lists local `*-SNAPSHOT` SDK builds first in its version
 dropdowns, labelled `(local build)`; a packaged Studio never shows them.

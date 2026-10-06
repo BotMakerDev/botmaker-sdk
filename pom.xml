@@ -351,7 +351,7 @@
                  diff it showed before — the standing rule that every new reader degrades.
 
                  A copy rather than <resource> on the module root: the root is not a resource directory
-                 and making it one would sweep the pom, the LICENSE and .deps.env into the jar too. And
+                 and making it one would sweep the pom, the LICENSE and jitpack.yml into the jar too. And
                  antrun rather than maven-resources-plugin because the file has to be RENAMED — the entry
                  name is a contract with Studio's reader and must not follow whatever the file is called
                  in the repo — which copy-resources cannot do (it has no fileMappers on that goal).
@@ -405,9 +405,9 @@
             </plugin>
 
             <!-- Jar Plugin: stamp the manifest with Implementation-* (pom version/vendor) and a Build-Time
-                 so a running bot / Studio's editor can report exactly which SDK build was loaded. The pom
-                 version is cosmetic (0.0.0-SNAPSHOT for local dev; JitPack overrides it with the tag), so
-                 Build-Time is the signal that distinguishes local rebuilds sharing one jar file name. -->
+                 so a running bot / Studio's editor can report exactly which SDK build was loaded. A local
+                 build carries the pom's main -SNAPSHOT every time, so Build-Time is the signal that
+                 distinguishes local rebuilds sharing one jar file name. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>

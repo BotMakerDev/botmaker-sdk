@@ -16,7 +16,7 @@ name: CI
 # differs, which a job-level `if:` expresses just as well.
 #
 # All FIVE upstreams — botmaker-studio-api, botmaker-plugin-toolkit, botmaker-plugin-basics,
-# botmaker-shared, botmaker-session — are resolved from source, not from JitPack. This repo's pom pins every one at 0.0.0-SNAPSHOT — the
+# botmaker-shared, botmaker-session — are resolved from source, not from JitPack. This repo's pom pins every one at its main -SNAPSHOT — the
 # version the umbrella reactor and a local `mvn install` produce — so there is no published artifact under
 # those coordinates to download. Building their main branches here means CI compiles the same pairing a
 # maintainer builds locally.
@@ -24,7 +24,7 @@ name: CI
 # THE LIST BELOW MUST MATCH THE POM'S ${botmaker.*.version} PROPERTIES, and nothing about a local build
 # can tell you when it stops matching: in the umbrella reactor each of the five is a sibling module and
 # resolves for free. That is exactly how the toolkit went missing here for five days. The umbrella's
-# release.sh checks the two against each other (check_ci_deps) before it pushes a tag.
+# release checks the two against each other (CiDepsGate) before it pushes a tag.
 
 on:
   push:
@@ -50,7 +50,7 @@ jobs:
       # It went into the pom with phase 12a and this checkout list did not follow, which is a class of
       # break the umbrella reactor CANNOT catch: there the toolkit is a sibling module and resolves for
       # free, so `mvn install` at the root is green while this standalone build has been red on every push
-      # since. release.sh's check_ci_deps is the gate that now compares the two.
+      # since. The release's CiDepsGate is the gate that now compares the two.
       #
       # After studio-api, before this module's own build: the toolkit declares the contract `provided`,
       # so the contract has to be installed first rather than arriving transitively.
@@ -93,7 +93,7 @@ jobs:
       # RETRIED — Maven Central answers 429 Too Many Requests to GitHub-hosted runners often enough to have
       # failed a release (botmaker-studio, 2026-09-02, on the very first plugin descriptor of the first
       # upstream). See .github/mvn-retry.sh for why the retry cannot be a Maven flag.
-      - name: Install the five upstreams (0.0.0-SNAPSHOT)
+      - name: Install the five upstreams (their main -SNAPSHOT)
         run: |
           source .github/mvn-retry.sh
           mvn_retry mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
@@ -138,17 +138,18 @@ jobs:
       # defines the platform.
       #
       # botmaker-cli is built from source here for the same reason the other upstreams are: its pom pins
-      # the contract and the loader at 0.0.0-SNAPSHOT, so there is no published artifact under those
+      # the contract and the loader at their main -SNAPSHOT, so there is no published artifact under those
       # coordinates. It is NOT in this module's pom and is a dependency of nothing here — it is a TOOL this
       # job runs, which is why it and its own upstream are checked out and built in their own steps rather
-      # than added to the install list above. (check_ci_deps in the umbrella's release.sh compares that
+      # than added to the install list above. (the release's CiDepsGate compares that
       # list against this pom; a tool has no business in it.)
       #
       # botmaker-plugin-host comes with it and is easy to forget — it is the CLI's dependency, not this
       # module's, and this job's first run failed on exactly that:
       #   Could not resolve dependencies for project com.github.LiQiyeDev:botmaker-cli:jar:0.0.0-SNAPSHOT
       #   dependency: com.github.LiQiyeDev:botmaker-plugin-host:jar:0.0.0-SNAPSHOT (compile)
-      # The contract it also pins is already installed above, at the same 0.0.0-SNAPSHOT.
+      # (That was 2026-09, when every pom said 0.0.0-SNAPSHOT.) The contract it also pins is already
+      # installed above, at the same main -SNAPSHOT.
       #
       # `--no-build` because `mvn -B -DskipTests verify` two steps up has already compiled this module; the
       # validator would otherwise shell out to Maven and compile it a second time.
@@ -218,7 +219,7 @@ jobs:
           echo "JRELEASER_PROJECT_VERSION=$version" >> "$GITHUB_ENV"
 
       # The version comes from the tag via JRELEASER_PROJECT_VERSION above, never from the pom: JitPack
-      # serves every tag as com.github.BotMakerDev:<repo>:<tag> and the pom's <version> is cosmetic.
+      # serves every tag as com.github.BotMakerDev:<repo>:<tag> (the tag's pom agrees since 2026-10-06).
       - name: Publish the release
         uses: jreleaser/release-action@v2
         with:
