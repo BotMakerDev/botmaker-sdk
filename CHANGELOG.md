@@ -42,7 +42,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     and `set_start`;
   - **where it looks and how it runs:** `get_capture_source`, `set_capture_source`, `list_windows`,
     `get_settings`, `set_setting`, `list_emulators`, `use_emulator`, `get_launch_target` and
-    `set_launch_target` (this computer's launch target, checked before it is kept).
+    `set_launch_target` (this computer's launch target: a Steam, Epic, Heroic or Faugus game or an emulator app,
+    by a plain id — never a command line or an executable, which only you set).
 
   Each one writes through the same path as the SDK's own windows. None clicks, types or starts anything.
 - **Named spots and areas.** A bot can keep `Points` (`Points.CLAIM = new Point(412, 230)`, for

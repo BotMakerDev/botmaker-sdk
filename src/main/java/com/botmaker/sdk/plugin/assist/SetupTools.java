@@ -124,8 +124,8 @@ final class SetupTools {
                                optional = true) String app) {
     }
 
-    record Target(@Describe("what to launch: steam:<appId>, epic:<appName>, heroic:<appName>, faugus:<gameId>, "
-            + "cli:<command line>, exe:<path> or emu-app:<package>@<emulator>") String target) {
+    record Target(@Describe("what to launch: steam:<appId>, epic:<appName>, heroic:<appName>, faugus:<gameId> or "
+            + "emu-app:<package>@<emulator>; a command line or an executable is the user's to set") String target) {
     }
 
     static final List<AssistantTool<?>> TOOLS = List.of(
@@ -259,8 +259,10 @@ final class SetupTools {
         }
         String app = use.app() == null || use.app().isBlank() ? null : use.app().trim();
         String target = app == null ? null : "emu-app:" + app + "@" + known.get();
-        if (target != null && LaunchSpec.parse(target) == null) {
-            return AgentReply.refused("\"" + app + "\" is not an app's package.");
+        if (target != null) {
+            LaunchSpec spec = LaunchSpec.parse(target);
+            String unsafe = spec == null ? "\"" + app + "\" is not an app's package." : unsafe(spec);
+            if (unsafe != null) return AgentReply.refused(unsafe);
         }
         String refused = FxCall.call(() -> {
             String why = CaptureValue.CAPTURE.write(context.services(), CaptureSource.emulator(known.get()));
@@ -281,13 +283,51 @@ final class SetupTools {
 
     static AgentReply setLaunchTarget(Target target, AgentContext context) {
         LaunchSpec spec = LaunchSpec.parse(target.target());
-        if (spec == null || spec.kind() == LaunchKind.UNKNOWN) {
-            return AgentReply.refused("\"" + target.target() + "\" is not a launch target: it is kind:value, the "
-                    + "kind one of " + Arrays.stream(LaunchKind.values()).filter(k -> k != LaunchKind.UNKNOWN)
-                    .map(LaunchKind::id).toList() + ".");
+        if (spec == null || !ASSISTANT_KINDS.contains(spec.kind())) {
+            return AgentReply.refused("\"" + target.target() + "\" is not a launch target the assistant may set: it "
+                    + "is kind:value, the kind one of " + ASSISTANT_KINDS.stream().map(LaunchKind::id).toList()
+                    + ". A command line or an executable is set by you, in the launch chooser.");
         }
+        String unsafe = unsafe(spec);
+        if (unsafe != null) return AgentReply.refused(unsafe);
         LaunchTargetValue.set(context.services(), spec.spec());
         return AgentReply.text("This computer now launches " + spec.describe() + " when the bot starts.");
+    }
+
+    /**
+     * The launch kinds the assistant may set: each names an entry a launcher already knows. Not {@code cli:} or
+     * {@code exe:} — those run whatever they say on the next Run, and the assistant reads text off the game's
+     * screen, so a line there could have it plant a command. The user sets those in the launch chooser.
+     */
+    static final Set<LaunchKind> ASSISTANT_KINDS = Set.of(LaunchKind.STEAM, LaunchKind.EPIC, LaunchKind.HEROIC,
+            LaunchKind.FAUGUS, LaunchKind.EMULATOR_APP);
+
+    /** An Android package: dot-separated Java-like names, at least two. */
+    private static final java.util.regex.Pattern PACKAGE =
+            java.util.regex.Pattern.compile("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+");
+
+    /** A launcher's own id for a game, or an emulator's name: no character a command line gives a meaning to. */
+    private static final java.util.regex.Pattern PLAIN = java.util.regex.Pattern.compile("[A-Za-z0-9._ -]+");
+
+    /**
+     * Why {@code spec} may not be kept as the assistant wrote it, or null: its token reaches a launcher's
+     * command line or an {@code adb shell}, so only plain ids pass.
+     */
+    static String unsafe(LaunchSpec spec) {
+        if (spec.kind() == LaunchKind.EMULATOR_APP) {
+            String pkg = spec.emulatorPackage();
+            String instance = spec.emulatorInstance();
+            if (pkg == null || !PACKAGE.matcher(pkg).matches()) {
+                return "\"" + pkg + "\" is not an app's package, like com.example.game.";
+            }
+            if (instance == null || instance.isBlank() || !PLAIN.matcher(instance).matches()) {
+                return "\"" + instance + "\" is not an emulator's name; list_emulators names them.";
+            }
+            return null;
+        }
+        return PLAIN.matcher(spec.token()).matches() && spec.token().indexOf(' ') < 0 ? null
+                : "\"" + spec.token() + "\" is not a " + spec.kind().displayName() + "'s id: letters, digits, '.', "
+                        + "'_' and '-' only.";
     }
 
     private static BotSettings with(BotSettings s, BotSettings.Clicks clicks) {
