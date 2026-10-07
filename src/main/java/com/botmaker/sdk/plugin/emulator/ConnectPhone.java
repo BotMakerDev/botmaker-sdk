@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.emulator;
 
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.pilot.ui.QrCodes;
 import com.botmaker.shared.device.ScrcpyServer;
 import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.AdbTools;
@@ -12,6 +13,7 @@ import com.botmaker.plugin.api.StudioServices;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
@@ -20,6 +22,8 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -30,6 +34,7 @@ import javafx.stage.Window;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -48,7 +53,8 @@ import java.util.function.Supplier;
  * <ul>
  *   <li><b>Cable, or Android 11+ wireless debugging</b> — needs a host adb server, which is the one part of
  *       this stack that is not pure dadb. Nothing here <em>requires</em> it; when it is missing the section
- *       offers to download it rather than sending the user off to install it.</li>
+ *       offers to download it rather than sending the user off to install it. A phone pairs by scanning a QR
+ *       code, and one already paired is heard on the network (mDNS) and listed with a Connect button.</li>
  *   <li><b>By address</b> — a phone in legacy {@code adb tcpip} mode, dialled directly with no binary
  *       anywhere. This is the route that works on a machine with nothing installed, and it is the one that
  *       persists.</li>
@@ -97,6 +103,14 @@ public final class ConnectPhone {
         scroll.setPrefViewportWidth(520);
         dialog.getDialogPane().setContent(scroll);
         dialog.showAndWait();
+        stopQr(cable);
+    }
+
+    /** The section property holding a QR pairing's waiting thread, so a rebuild or a close can stop it. */
+    private static final String QR_THREAD = "connect-phone-qr";
+
+    private static void stopQr(VBox section) {
+        if (section.getProperties().remove(QR_THREAD) instanceof Thread waiting) waiting.interrupt();
     }
 
     /** A titled block whose body is rebuilt in place by the refreshers; children[1..] are the body. */
@@ -123,13 +137,15 @@ public final class ConnectPhone {
         Async.run("connect-phone-adb-server", () -> {
             boolean running = AdbTools.serverRunning();
             List<AdbTools.ServerDevice> devices = running ? AdbTools.devices() : List.of();
+            List<AdbTools.MdnsService> heard = running
+                    ? AdbTools.unconnected(AdbTools.mdnsServices(), devices) : List.of();
             boolean binary = AdbTools.binary().isPresent();
-            Platform.runLater(() -> setBody(section, serverRows(section, running, devices, binary)));
+            Platform.runLater(() -> setBody(section, serverRows(section, running, devices, heard, binary)));
         }, null);
     }
 
-    private static List<Region> serverRows(VBox section, boolean running,
-                                           List<AdbTools.ServerDevice> devices, boolean binary) {
+    private static List<Region> serverRows(VBox section, boolean running, List<AdbTools.ServerDevice> devices,
+                                           List<AdbTools.MdnsService> heard, boolean binary) {
         List<Region> rows = new java.util.ArrayList<>();
         if (!running) {
             rows.add(note(binary
@@ -166,8 +182,49 @@ public final class ConnectPhone {
             }
             rows.add(note("These are found automatically — they need no address and are not saved."));
         }
+        rows.add(heardBox(section, heard));
         rows.add(pairBox(section));
         return rows;
+    }
+
+    /**
+     * The phones on this network announcing wireless debugging that adb isn't connected to: a phone already
+     * paired once needs only its Connect here, with no port read off its screen. Look again re-asks, since a
+     * phone is heard a few seconds after its Wireless debugging is switched on.
+     */
+    private static VBox heardBox(VBox section, List<AdbTools.MdnsService> heard) {
+        Label problem = new Label();
+        problem.getStyleClass().add("emulator-picker-state");
+        problem.setWrapText(true);
+        problem.setMaxWidth(480);
+        Button again = new Button("Look again");
+        again.setOnAction(e -> refreshServer(section));
+        VBox box = new VBox(6);
+        List<Button> buttons = new java.util.ArrayList<>(List.of(again));
+        for (AdbTools.MdnsService phone : heard) {
+            Circle dot = new Circle(5, OFFLINE);
+            Label name = new Label(phone.displayName());
+            Styles.on(name, Styles.STRONG_TEXT);
+            Label where = new Label(phone.address() + " · " + phone.kind().displayName());
+            where.getStyleClass().add("emulator-picker-state");
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            Button connect = new Button("Connect");
+            buttons.add(connect);
+            connect.setOnAction(e -> adbCommand(section, problem, buttons,
+                    () -> AdbTools.connect(phone.address()), "connect-phone-connect"));
+            HBox row = new HBox(8, dot, name, where, spacer, connect);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setPadding(new Insets(4, 6, 4, 6));
+            row.getStyleClass().add("emulator-picker-row");
+            box.getChildren().add(row);
+        }
+        HBox foot = new HBox(8, note(heard.isEmpty()
+                ? "No other phone on this network is announcing wireless debugging."
+                : "Heard on this network. A phone not paired yet pairs below first."), again);
+        foot.setAlignment(Pos.CENTER_LEFT);
+        box.getChildren().addAll(foot, problem);
+        return box;
     }
 
     // --- wireless pairing, the route that never needs a cable ---
@@ -221,13 +278,62 @@ public final class ConnectPhone {
         HBox connectRow = new HBox(6, new Label("Connect"), connectAddress, connect);
         connectRow.setAlignment(Pos.CENTER_LEFT);
 
+        Button qr = new Button("Pair with QR code");
+        // The slot outlives a rebuild of the section, so a code being scanned stays on screen through one.
+        VBox qrSlot = (VBox) section.getProperties().computeIfAbsent(QR_SLOT, k -> new VBox(6));
+        qr.setDisable(section.getProperties().containsKey(QR_THREAD));
+        qr.setOnAction(e -> startQr(section, qrSlot));
+
         VBox box = new VBox(6,
-                note("Wireless, no cable: on the phone, Developer options ▸ Wireless debugging ▸ Pair device "
-                        + "with pairing code. Pair with the address and code in that popup, then connect to the "
+                note("Wireless, no cable (Android 11+): pair the phone once with a QR code, and it connects "
+                        + "by itself."),
+                new HBox(qr), qrSlot,
+                note("Or by hand: on the phone, Developer options ▸ Wireless debugging ▸ Pair device with "
+                        + "pairing code. Pair with the address and code in that popup, then connect to the "
                         + "address on the screen behind it — the ports differ."),
                 pairRow, connectRow, problem);
         box.setPadding(new Insets(4, 6, 4, 6));
         return box;
+    }
+
+    /** How long a shown QR code waits to be scanned. */
+    private static final java.time.Duration QR_WAIT = java.time.Duration.ofMinutes(3);
+    private static final int QR_PX = 200;
+    /** The section property holding the QR code's slot, kept across rebuilds of the section. */
+    private static final String QR_SLOT = "connect-phone-qr-slot";
+
+    /**
+     * Shows a fresh pairing QR code in {@code slot} and waits, off the FX thread, for a phone to scan it
+     * ({@link AdbTools#pairByQr}). Either way it ends, the section is rebuilt — pairing starts the adb server,
+     * and a phone that connected is in the list — and the slot says how it went. Cancel or closing the dialog
+     * stops the wait.
+     */
+    private static void startQr(VBox section, VBox slot) {
+        stopQr(section);
+        AdbTools.QrPairing pairing = AdbTools.QrPairing.random();
+        Image code = QrCodes.qr(pairing.payload(), QR_PX);
+        Label status = note("Starting adb…");
+        Button cancel = new Button("Cancel");
+        Node picture = code != null ? new ImageView(code)
+                : note("The QR code can't be drawn here. Pair by hand below.");
+        slot.getChildren().setAll(picture, status, cancel);
+        Thread[] waiting = new Thread[1];
+        Consumer<String> finish = said -> {
+            // Cancelled, or a newer code replaced this one: whatever did that already put the slot right.
+            if (!section.getProperties().remove(QR_THREAD, waiting[0])) return;
+            slot.getChildren().setAll(note(said));
+            refreshServer(section);
+        };
+        waiting[0] = Async.load(QR_THREAD,
+                () -> AdbTools.pairByQr(pairing, QR_WAIT, line -> Platform.runLater(() -> status.setText(line))),
+                outcome -> finish.accept(outcome.message()), finish);
+        cancel.setOnAction(e -> {
+            stopQr(section);
+            slot.getChildren().clear();
+            refreshServer(section);
+        });
+        section.getProperties().put(QR_THREAD, waiting[0]);
+        refreshServer(section);
     }
 
     /**

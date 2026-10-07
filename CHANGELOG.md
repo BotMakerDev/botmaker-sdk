@@ -84,6 +84,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   manager). The instance is started if needed, the game's Google Play page opens in it, and you press Install
   there. *Install from file…* does the same with an `.apk`, `.xapk` or `.apks` file. Either way the game
   becomes what this computer launches.
+- **A phone connects over Wi-Fi without typing an address.** In *Connect a phone*, *Pair with QR code* shows
+  a code to scan from the phone's *Wireless debugging ▸ Pair device with QR code* (Android 11+); the phone pairs
+  and connects, and appears in the list. A phone paired before, with Wireless debugging on, is listed under
+  the adb server's phones with a *Connect* button. Typing the pairing code and addresses still works.
 
 ### Changed — breaking
 
