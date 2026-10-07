@@ -23,10 +23,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - **🎮 Game: the game this bot plays, on the toolbar.** The button shows the current game's name and cover.
   It opens the game dialog, which Project Setup's launch row now opens too. The dialog shows:
-  - your recent picks first, then one section per launcher on this computer — Steam (without Proton and the
-    runtimes), Epic, Heroic (an Epic game once), Faugus, Lutris, GOG on Windows;
+  - a grid of small covers (Steam's portrait art, an Epic game's own icon), and above it a row of radio
+    buttons that picks what the grid shows: **All** (every game, each once), **Recent** picks, then one per
+    launcher on this computer — Steam (without Proton and the runtimes), Epic, Heroic (an Epic game once),
+    Faugus, Lutris, GOG on Windows;
   - then the Android apps Waydroid put in the menu, with the emulator picker for any other emulator or a
-    phone; then the menu's own games; then every other app, folded;
+    phone; the menu's own games; and every other app, which All leaves out;
   - a search box, **▶ Launch game** (starts it, honouring *Run the game in*, without running the bot), and a
     row to type a target.
 

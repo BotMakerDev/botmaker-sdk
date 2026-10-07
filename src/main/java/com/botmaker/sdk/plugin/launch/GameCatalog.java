@@ -40,7 +40,7 @@ public final class GameCatalog {
         ANDROID("Android apps (Waydroid)"),
         /** The menu's games that no launcher lists. */
         MENU_GAMES("Games in the app menu"),
-        /** Every other app in the menu; starts folded. */
+        /** Every other app in the menu; folded, so not in the dialog's All. */
         OTHER_APPS("Other apps");
 
         private final String title;
@@ -58,7 +58,7 @@ public final class GameCatalog {
     /** One tile: the target it sets, what it is called, and its picture or {@code null}. */
     public record Item(String spec, String name, Path artwork) {}
 
-    /** One section; {@code folded} ones start collapsed. */
+    /** One section; a {@code folded} one has its own radio in the dialog but is left out of All. */
     public record Section(Kind kind, String title, boolean folded, List<Item> items) {}
 
     /**
