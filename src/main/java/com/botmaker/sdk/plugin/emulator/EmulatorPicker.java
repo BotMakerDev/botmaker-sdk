@@ -155,6 +155,18 @@ public final class EmulatorPicker {
                 for (EmulatorInstance instance : scan.instances()) {
                     rows.getChildren().add(buildRow(instance, dialog));
                 }
+                // A product that is installed and listed nothing would otherwise be indistinguishable from one
+                // this picker can't see at all — which is how a machine with six emulators looked like it had one.
+                for (PlatformStatus s : scan.statuses()) {
+                    // Phones have their own way in, the button below.
+                    if (s.platformId() == PlatformId.PHYSICAL) continue;
+                    if ((s.installed() && s.instanceCount() == 0) || !s.ok()) {
+                        Label line = new Label(s.statusLine());
+                        line.getStyleClass().add("emulator-picker-state");
+                        line.setWrapText(true);
+                        rows.getChildren().add(line);
+                    }
+                }
             }
             rows.getChildren().add(connectPhoneRow(rows, dialog));
         }, why -> rows.getChildren().setAll(new Label("Couldn't scan for emulators: " + why),

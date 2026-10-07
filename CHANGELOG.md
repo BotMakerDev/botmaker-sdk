@@ -100,6 +100,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- The emulator picker lists LDPlayer, MEmu, MuMu and MSI App Player instances on Windows, not only
+  BlueStacks, under the names those products show. Below the list, an installed product with no instance says
+  so, and why when it can (GameLoop before its Android engine is downloaded).
 - A bot on a private display no longer takes over your desktop's mouse and keyboard. A ticked real-input
   setting escalated the desktop's input whatever the session.
 - A missing gamescope or Xephyr stops the run with the command that installs it. The run used to put the game
