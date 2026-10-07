@@ -18,6 +18,7 @@ import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
+import com.botmaker.shared.emulator.EmulatorLiveness;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -247,8 +248,10 @@ final class SetupTools {
         }
         List<String> lines = new ArrayList<>();
         for (EmulatorInstance instance : scan.instances()) {
-            lines.add("\"" + instance.name() + "\" — " + instance.brand() + ", "
-                    + (instance.reachable() ? "running" : "stopped"));
+            EmulatorLiveness liveness = EmulatorLiveness.check(instance, scan.instances());
+            String problem = liveness.problem(instance);
+            lines.add("\"" + instance.name() + "\" — " + instance.brand() + ", " + liveness.label()
+                    + (problem == null ? "" : " (" + problem + ")"));
         }
         return AgentReply.text(String.join("\n", lines));
     }

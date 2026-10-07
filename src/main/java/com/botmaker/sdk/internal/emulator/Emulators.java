@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.EmulatorLiveness;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.EmulatorLauncher;
 import com.botmaker.shared.emulator.Platforms;
@@ -170,6 +171,9 @@ public final class Emulators {
     }
 
     private static Optional<Emulator> tryConnect(EmulatorInstance instance) {
+        // A port that answers for a stopped instance is another emulator's: connecting would drive BlueStacks
+        // under LDPlayer's name. Same answer as the picker's (EmulatorLiveness).
+        if (!EmulatorLiveness.running(instance)) return Optional.empty();
         try {
             AdbDevice device = AdbDevice.connect(instance.adb());
             return Optional.of(new Emulator(device, instance));

@@ -4,7 +4,9 @@ import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
+import com.botmaker.shared.emulator.EmulatorLiveness;
 import com.botmaker.shared.emulator.EmulatorReadiness;
+import com.botmaker.shared.emulator.EmulatorState;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
 import com.botmaker.shared.emulator.EmulatorAppCache;
@@ -201,7 +203,7 @@ public final class EmulatorPicker {
     private static final long STOP_TIMEOUT_MS = 60_000;
 
     /** The mutable widgets of one instance row, so the probe and the start/stop poll can refresh them in place. */
-    private record RowUi(Circle dot, Label state, Button action, ImageView thumb, VBox apps) {}
+    private record RowUi(Circle dot, Label state, Label clash, Button action, ImageView thumb, VBox apps) {}
 
     /** One instance row: a clickable header (preview + dot + brand + name) plus a lazily-filled installed-apps list. */
     private static VBox buildRow(EmulatorInstance instance, Dialog<Selection> dialog) {
@@ -224,6 +226,16 @@ public final class EmulatorPicker {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         Label state = new Label("checking…");
         state.getStyleClass().add("emulator-picker-state");
+        // A long instance name gives way, not the brand or the state ("BlueSta…", "St…" on a narrow dialog).
+        brand.setMinWidth(Region.USE_PREF_SIZE);
+        state.setMinWidth(Region.USE_PREF_SIZE);
+        // Who holds this instance's port when it is stopped and the port answers anyway; hidden otherwise.
+        Label clash = new Label();
+        clash.getStyleClass().add("emulator-picker-state");
+        clash.setWrapText(true);
+        clash.setPadding(new Insets(0, 8, 0, 26));
+        clash.setVisible(false);
+        clash.setManaged(false);
 
         // Start / Stop. Hidden until the liveness probe says which of the two this row is offering — and left
         // hidden for an instance whose product ships no console tool we can drive. Like Diagnose below, it has
@@ -259,34 +271,49 @@ public final class EmulatorPicker {
         VBox apps = new VBox(2);
         apps.setPadding(new Insets(0, 8, 4, 26));
 
-        VBox row = new VBox(2, header, apps);
+        VBox row = new VBox(2, header, clash, apps);
 
         // Show any cached apps immediately (so a stopped instance still lists its last scan), then probe liveness
         // and — if up — refresh the apps from the live device and fill in the preview thumbnail.
         renderApps(apps, instance, cachedApps(instance), null, dialog);
-        probeAndLoad(instance, new RowUi(dot, state, action, thumb, apps), dialog);
+        probeAndLoad(instance, new RowUi(dot, state, clash, action, thumb, apps), dialog);
         return row;
     }
 
     /**
-     * Off-FX: TCP-probe the ADB port; if up, connect and list installed apps + grab one screencap for the row
-     * preview, caching + rendering the result. Also the row's way back to the truth after a start or a stop —
-     * {@link #transition} re-runs it once the poll settles rather than assuming what it asked for happened.
+     * Off-FX: ask whether the instance is up ({@link EmulatorLiveness}: its product's word, then its port); if
+     * up, connect and list installed apps + grab one screencap for the row preview, caching + rendering the
+     * result. Also the row's way back to the truth after a start or a stop — {@link #transition} re-runs it once
+     * the poll settles rather than assuming what it asked for happened.
+     *
+     * <p>A port that answers for a stopped instance belongs to another emulator: nothing is read from it, or the
+     * row would list BlueStacks' apps under LDPlayer's name. The row says who holds it instead.
      */
     private static void probeAndLoad(EmulatorInstance instance, RowUi ui, Dialog<Selection> dialog) {
         Async.run("emulator-probe-" + instance.name(), () -> {
-            boolean running = EmulatorProbe.isRunning(instance);
+            EmulatorLiveness liveness = EmulatorLiveness.check(instance);
+            boolean running = liveness.running();
             List<EmulatorProbe.InstalledApp> live = running ? EmulatorProbe.installedAppsDetailed(instance) : null;
             BufferedImage shot = running ? EmulatorProbe.screencap(instance) : null;
             Image preview = shot != null ? ScreenCapture.toFxImage(shot) : null;
             Platform.runLater(() -> {
-                ui.dot().setFill(running ? Color.web("#34a853") : Color.web("#9aa0a6"));
-                ui.state().setText(running ? "running" : "stopped");
-                if (preview != null) ui.thumb().setImage(preview);
+                boolean blocked = liveness.adbClosed()
+                        || (liveness.clash() != null && liveness.state() != EmulatorState.STOPPED);
+                ui.dot().setFill(Color.web(blocked ? "#ea4335" : switch (liveness.state()) {
+                    case RUNNING -> "#34a853";
+                    case STARTING -> "#fbbc04";
+                    default -> "#9aa0a6";
+                }));
+                ui.state().setText(liveness.label());
+                String problem = liveness.problem(instance);
+                ui.clash().setText(problem == null ? "" : "⚠ " + problem);
+                ui.clash().setVisible(problem != null);
+                ui.clash().setManaged(problem != null);
+                ui.thumb().setImage(preview);
                 if (running && live != null) cacheApps(instance, live);
                 List<EmulatorProbe.InstalledApp> show = running && live != null ? live : cachedApps(instance);
-                renderApps(ui.apps(), instance, show, emptyNote(running, live), dialog);
-                showAction(instance, ui, dialog, running);
+                renderApps(ui.apps(), instance, show, emptyNote(liveness, live), dialog);
+                showAction(instance, ui, dialog, liveness.state() != EmulatorState.STOPPED);
             });
         }, null);
     }
@@ -299,8 +326,15 @@ public final class EmulatorPicker {
      * the instance reads as running while every query fails. Reporting that as "no third-party apps found"
      * blames the device for the user's own dismissed dialog, and leaves the one action that fixes it unsaid.
      */
-    private static String emptyNote(boolean running, List<EmulatorProbe.InstalledApp> live) {
-        if (!running) return "Instance stopped — start it to list apps, or enter a package below.";
+    private static String emptyNote(EmulatorLiveness liveness, List<EmulatorProbe.InstalledApp> live) {
+        if (liveness.adbClosed()) return "Its apps are listed once ADB is on, or enter a package below.";
+        if (liveness.clash() != null && liveness.state() != EmulatorState.STOPPED) {
+            return "Its apps are listed once the port is its own, or enter a package below.";
+        }
+        if (liveness.state() == EmulatorState.STARTING) {
+            return "Android is still starting — its apps are listed once it is up.";
+        }
+        if (!liveness.running()) return "Instance stopped — start it to list apps, or enter a package below.";
         if (live == null) {
             return "The instance is up but ADB wouldn't answer — usually the \"Allow USB debugging?\" prompt "
                     + "inside Android was declined or is still waiting. Accept it there, then reopen this picker.";
@@ -387,7 +421,10 @@ public final class EmulatorPicker {
     }
 
     private static boolean settled(EmulatorInstance instance, boolean wantRunning) {
-        return wantRunning ? EmulatorReadiness.isReady(instance) : !EmulatorProbe.isRunning(instance);
+        // Stopped means the product says so (or, saying nothing, its port is closed) — not "not drivable", which
+        // an instance with its ADB off or still booting already is.
+        return wantRunning ? EmulatorReadiness.isReady(instance)
+                : EmulatorLiveness.check(instance).state() == EmulatorState.STOPPED;
     }
 
     /**

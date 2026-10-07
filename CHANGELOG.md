@@ -103,6 +103,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - The emulator picker lists LDPlayer, MEmu, MuMu and MSI App Player instances on Windows, not only
   BlueStacks, under the names those products show. Below the list, an installed product with no instance says
   so, and why when it can (GameLoop before its Android engine is downloaded).
+- An emulator row says running, starting or stopped as its product reports it. A stopped one whose port another
+  emulator holds says which ("port 5555 is in use by BlueStacks: …") and lists no apps from it; one that is up
+  with ADB turned off says where to turn it on. A bot's `running()` check and launch wait use the same answer, so
+  a bot no longer drives BlueStacks when it asked for LDPlayer. Long instance names no longer cut off the brand
+  and the state.
 - A bot on a private display no longer takes over your desktop's mouse and keyboard. A ticked real-input
   setting escalated the desktop's input whatever the session.
 - A missing gamescope or Xephyr stops the run with the command that installs it. The run used to put the game

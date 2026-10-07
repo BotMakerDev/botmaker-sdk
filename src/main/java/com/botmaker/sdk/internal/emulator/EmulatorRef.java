@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.emulator;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
+import com.botmaker.shared.emulator.EmulatorLiveness;
 
 
 /**
@@ -41,10 +42,12 @@ public final class EmulatorRef {
      *
      * <p>What "answering" means depends on where the instance is, which is why this delegates rather than
      * opening a socket: a TCP connect settles it for an emulator, but a phone on a cable is only visible as an
-     * online serial in the host adb server's list. See {@code AdbEndpoint}.
+     * online serial in the host adb server's list. See {@code AdbEndpoint}. An answering port counts only when it
+     * is this instance's own: a stopped LDPlayer whose port 5555 a running BlueStacks holds is not running
+     * ({@code EmulatorLiveness}).
      */
     public boolean running() {
-        return instance.reachable();
+        return EmulatorLiveness.running(instance);
     }
 
     /** Starts this instance via its host console tool. {@code false} if unsupported or the spawn fails. */
