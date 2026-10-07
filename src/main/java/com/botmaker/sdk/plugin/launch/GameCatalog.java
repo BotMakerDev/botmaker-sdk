@@ -1,5 +1,11 @@
 package com.botmaker.sdk.plugin.launch;
 
+import com.botmaker.shared.emulator.EmulatorAppCache;
+import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.EmulatorLiveness;
+import com.botmaker.shared.emulator.EmulatorProbe;
+import com.botmaker.shared.emulator.PlatformId;
+import com.botmaker.shared.emulator.Platforms;
 import com.botmaker.shared.game.DesktopEntryScanner;
 import com.botmaker.shared.game.EpicLibraryScanner;
 import com.botmaker.shared.game.GameLibraries;
@@ -9,18 +15,23 @@ import com.botmaker.shared.game.InstalledGame;
 import com.botmaker.shared.launch.DesktopEntries;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.platform.Os;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Predicate;
 
 /**
- * What {@link GameDialog} lists, as data: one section per launcher on this computer, sorted by name, then the
- * Android apps Waydroid put in the menu, the menu's own games, and every other app last and folded.
+ * What {@link GameDialog} lists, as data: one section per launcher on this computer, sorted by name, one per
+ * emulator instance whose apps were seen, then the Android apps Waydroid put in the menu, the menu's own games,
+ * and every other app last and folded.
  *
  * <p>Separate from the dialog so the sectioning is testable without JavaFX, and because building it reads
  * libraries off disk (and runs {@code lutris} once): {@link #scan()} is called off the JavaFX thread.
@@ -36,8 +47,13 @@ public final class GameCatalog {
     public enum Kind {
         /** One launcher's library; titled after the launcher. */
         LAUNCHER(""),
-        /** The Android apps Waydroid put in the menu; the dialog adds its emulator picker here. */
-        ANDROID("Android apps (Waydroid)"),
+        /** One emulator instance's apps, as last seen on it; titled after the instance. */
+        EMULATOR(""),
+        /**
+         * The Android apps Waydroid put in the menu; the dialog adds its emulator picker here. Off Linux there is
+         * no Waydroid, and the section is only the picker's way to another emulator or a phone.
+         */
+        ANDROID(Os.current() == Os.LINUX ? "Android apps (Waydroid)" : "Other emulator or phone"),
         /** The menu's games that no launcher lists. */
         MENU_GAMES("Games in the app menu"),
         /** Every other app in the menu; folded, so not in the dialog's All. */
@@ -58,12 +74,21 @@ public final class GameCatalog {
     /** One tile: the target it sets, what it is called, and its picture or {@code null}. */
     public record Item(String spec, String name, Path artwork) {}
 
-    /** One section; a {@code folded} one has its own radio in the dialog but is left out of All. */
-    public record Section(Kind kind, String title, boolean folded, List<Item> items) {}
+    /**
+     * One section; a {@code folded} one has its own radio in the dialog but is left out of All. A {@code stopped}
+     * one is an emulator instance that isn't running: picking one of its apps starts it first.
+     */
+    public record Section(Kind kind, String title, boolean folded, boolean stopped, List<Item> items) {
+
+        public Section(Kind kind, String title, boolean folded, List<Item> items) {
+            this(kind, title, folded, false, items);
+        }
+    }
 
     /**
-     * Every section with something in it, in display order, and the Android section always: its emulator
-     * picker reaches emulators and phones no library lists. Blocking; never throws.
+     * Every section with something in it, in display order — the launchers, the emulator instances, the app
+     * menu — and the Android section always: its emulator picker reaches emulators and phones no library lists.
+     * Blocking; never throws.
      */
     public static List<Section> scan() {
         Set<String> epicIds = new HashSet<>();
@@ -88,8 +113,89 @@ public final class GameCatalog {
         launchers.sort(Comparator.comparing(s -> s.title().toLowerCase()));
 
         List<Section> sections = new ArrayList<>(launchers);
+        sections.addAll(emulatorSections(emulators(), EmulatorAppCache.shared(), EmulatorLiveness::running));
         sections.addAll(menuSections(menu()));
         return sections.stream().filter(s -> !s.items().isEmpty() || s.kind() == Kind.ANDROID).toList();
+    }
+
+    /**
+     * One section per emulator instance, holding the apps last seen on it ({@link EmulatorAppCache}): under the
+     * names the apps show, with their icons, whether the instance runs or not. Waydroid's are left out, since
+     * the app menu already lists them ({@link Kind#ANDROID}). Pure but for the cache, for the tests.
+     */
+    static List<Section> emulatorSections(List<EmulatorInstance> instances, EmulatorAppCache cache,
+                                          Predicate<EmulatorInstance> running) {
+        List<Section> sections = new ArrayList<>();
+        for (EmulatorInstance instance : instances) {
+            if (instance.platformId() == PlatformId.WAYDROID) continue;
+            List<Item> items = new ArrayList<>();
+            for (EmulatorProbe.InstalledApp app : cache.packages(instance)) {
+                String spec = new LaunchSpec(LaunchKind.EMULATOR_APP, app.packageName() + "@" + instance.name()).spec();
+                items.add(new Item(spec, app.display(), cache.iconPath(instance, app.packageName())));
+            }
+            if (items.isEmpty()) continue;
+            sections.add(new Section(Kind.EMULATOR, instance.caption(), false, !running.test(instance),
+                    List.copyOf(items)));
+        }
+        return sections;
+    }
+
+    /**
+     * Asks every running emulator instance for its apps, their names and icons, and keeps them for the next
+     * {@link #scan()}: what makes a just-started instance's apps appear, and a new install's. Whether anything
+     * changed. Blocking (an app's name and icon are read once, out of its APK); never throws.
+     */
+    public static boolean refreshEmulators() {
+        // One at a time: a dialog closed and reopened mid-refresh would otherwise read every new APK twice.
+        if (!REFRESHING.tryLock()) return false;
+        try {
+            EmulatorAppCache cache = EmulatorAppCache.shared();
+            boolean changed = false;
+            for (EmulatorInstance instance : emulators()) {
+                if (instance.platformId() == PlatformId.WAYDROID || !EmulatorLiveness.running(instance)) continue;
+                changed |= EmulatorProbe.refresh(instance, cache);
+            }
+            return changed;
+        } finally {
+            REFRESHING.unlock();
+        }
+    }
+
+    private static final ReentrantLock REFRESHING = new ReentrantLock();
+
+    /**
+     * {@code scanned} with its emulator sections read again from the cache — what {@link #refreshEmulators()}
+     * changes, without looking through every launcher's library again. The new sections take the old ones' place.
+     * Blocking; never throws.
+     */
+    public static List<Section> withEmulatorsReread(List<Section> scanned) {
+        return replaceEmulators(scanned,
+                emulatorSections(emulators(), EmulatorAppCache.shared(), EmulatorLiveness::running));
+    }
+
+    /** {@code scanned} with {@code emulators} in place of its emulator sections, after the launchers. Pure. */
+    static List<Section> replaceEmulators(List<Section> scanned, List<Section> emulators) {
+        List<Section> sections = new ArrayList<>();
+        boolean placed = false;
+        for (Section section : scanned) {
+            if (section.kind() == Kind.EMULATOR || (!placed && section.kind() != Kind.LAUNCHER)) {
+                if (!placed) sections.addAll(emulators);
+                placed = true;
+                if (section.kind() == Kind.EMULATOR) continue;
+            }
+            sections.add(section);
+        }
+        if (!placed) sections.addAll(emulators);
+        return List.copyOf(sections);
+    }
+
+    /** The instances discovery found in the last few seconds — a picker or a refresh may have just asked. */
+    private static List<EmulatorInstance> emulators() {
+        try {
+            return Platforms.recent(Duration.ofSeconds(10));
+        } catch (RuntimeException e) {
+            return List.of();
+        }
     }
 
     /** Whether no section lists anything — the dialog then says so, above the emulator picker. */

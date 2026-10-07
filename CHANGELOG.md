@@ -103,6 +103,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - The emulator picker lists LDPlayer, MEmu, MuMu and MSI App Player instances on Windows, not only
   BlueStacks, under the names those products show. Below the list, an installed product with no instance says
   so, and why when it can (GameLoop before its Android engine is downloaded).
+- The game dialog (🎮) lists each emulator's apps as cards, one radio per instance ("MuMu Player: Android
+  Device"), under the names the apps show and with their icons — the ones last seen on it, so a stopped
+  instance's apps are there too, dimmed: picking one starts the instance first. Opening the dialog asks each
+  running instance for its apps again. The emulator picker's apps have names instead of package names, and off
+  Linux the Waydroid radio is "Other emulator or phone".
 - An emulator row says running, starting or stopped as its product reports it. A stopped one whose port another
   emulator holds says which ("port 5555 is in use by BlueStacks: …") and lists no apps from it; one that is up
   with ADB turned off says where to turn it on. A bot's `running()` check and launch wait use the same answer, so

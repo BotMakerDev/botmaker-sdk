@@ -275,7 +275,7 @@ public final class EmulatorPicker {
 
         // Show any cached apps immediately (so a stopped instance still lists its last scan), then probe liveness
         // and — if up — refresh the apps from the live device and fill in the preview thumbnail.
-        renderApps(apps, instance, cachedApps(instance), null, dialog);
+        renderApps(apps, instance, cachedApps(instance), null, false, dialog);
         probeAndLoad(instance, new RowUi(dot, state, clash, action, thumb, apps), dialog);
         return row;
     }
@@ -312,7 +312,7 @@ public final class EmulatorPicker {
                 ui.thumb().setImage(preview);
                 if (running && live != null) cacheApps(instance, live);
                 List<EmulatorProbe.InstalledApp> show = running && live != null ? live : cachedApps(instance);
-                renderApps(ui.apps(), instance, show, emptyNote(liveness, live), dialog);
+                renderApps(ui.apps(), instance, show, emptyNote(liveness, live), running && live != null, dialog);
                 showAction(instance, ui, dialog, liveness.state() != EmulatorState.STOPPED);
             });
         }, null);
@@ -432,9 +432,10 @@ public final class EmulatorPicker {
      * there are none, and always a "＋ Enter app package…" manual-entry fallback so a launch target is
      * achievable even when the live app list is empty (stopped instance, launcher-only app, or ADB blocked).
      * {@code emptyNote} of {@code null} suppresses the note (used for the initial cached render, before probing).
+     * {@code live}: the instance answered this listing, so names and icons not read yet are read from it.
      */
     private static void renderApps(VBox apps, EmulatorInstance instance, List<EmulatorProbe.InstalledApp> packages,
-                                   String emptyNote, Dialog<Selection> dialog) {
+                                   String emptyNote, boolean live, Dialog<Selection> dialog) {
         apps.getChildren().clear();
         if (packages != null && !packages.isEmpty()) {
             for (EmulatorProbe.InstalledApp app : packages) {
@@ -452,7 +453,7 @@ public final class EmulatorPicker {
                 });
                 apps.getChildren().add(appButton);
             }
-            loadIcons(instance, packages.stream().map(EmulatorProbe.InstalledApp::packageName).toList(), apps);
+            loadIcons(instance, packages, live, apps);
         } else if (emptyNote != null) {
             Label note = new Label(emptyNote);
             note.getStyleClass().add("emulator-picker-state");
@@ -471,13 +472,9 @@ public final class EmulatorPicker {
     private static final double ICON_SIZE = 24;
 
     /**
-     * Launcher icons already read, keyed {@code <instance identity>/<package>}. An {@link Optional#empty()}
-     * is a remembered <em>failure</em> — an app whose APK carries no icon we can decode must not be re-fetched
-     * on every re-render, and there are three of those per row (initial, post-probe, post-start).
-     *
-     * <p>The successes are also written through to {@link #DISK}; the failures deliberately are not. A
-     * permanent negative on disk would outlive the reason for it (an app updated, an ADB query that happened
-     * to fail), and re-deriving one costs a single query.
+     * Launcher icons already decoded for display, keyed {@code <instance identity>/<package>}; an
+     * {@link Optional#empty()} is an app with none. The source is {@link #DISK}, which keeps both the icons and
+     * the APKs read and found to have none — never a failed read, which is read again next time.
      */
     private static final Map<String, Optional<Image>> ICON_CACHE = new ConcurrentHashMap<>();
 
@@ -491,46 +488,54 @@ public final class EmulatorPicker {
     }
 
     /**
-     * Fills in each listed app's icon, off the FX thread, in list order.
+     * Fills in each listed app's icon and, on a live instance, the name it shows, off the FX thread, in list
+     * order; the names read are remembered with the list.
      *
      * <p>A package name is a reverse-DNS string and frequently says nothing about the game it belongs to; the
-     * icon is what makes the list readable. One thread walks the packages sequentially rather than one thread
-     * per app: each icon is several ADB round-trips (see {@code ApkIcon}) and a row with twenty apps would
-     * otherwise open twenty connections to the same device at once.
+     * name and icon are what make the list readable. Both come out of the app's APK in one read
+     * ({@link EmulatorProbe#appInfo}), and only once: {@link #DISK} keeps them, and an icon the APK doesn't have
+     * is remembered as missing there. One thread walks the apps sequentially rather than one thread per app: a
+     * row with twenty apps would otherwise open twenty connections to the same device at once.
      *
      * <p>It writes back by <em>position</em>, and re-checks that the button under that index is still the one
      * it fetched for — a start/stop or a re-probe can rebuild the list underneath a fetch in flight.
      */
-    private static void loadIcons(EmulatorInstance instance, List<String> packages, VBox apps) {
+    private static void loadIcons(EmulatorInstance instance, List<EmulatorProbe.InstalledApp> listed, boolean live,
+                                  VBox apps) {
         Async.run("emulator-icons-" + instance.name(), () -> {
-            for (int i = 0; i < packages.size(); i++) {
-                String pkg = packages.get(i);
+            List<EmulatorProbe.InstalledApp> named = new java.util.ArrayList<>(listed);
+            boolean renamed = false;
+            for (int i = 0; i < named.size(); i++) {
+                EmulatorProbe.InstalledApp app = named.get(i);
+                String pkg = app.packageName();
                 String key = instance.identity() + "/" + pkg;
-                Optional<Image> cached = ICON_CACHE.get(key);
-                if (cached == null) {
-                    // Disk first: an icon is several ADB round-trips through the APK, and it doesn't change.
-                    BufferedImage stored = DISK.icon(instance, pkg);
-                    if (stored == null) {
-                        stored = EmulatorProbe.appIcon(instance, pkg);
-                        DISK.putIcon(instance, pkg, stored);
+                if (live && EmulatorProbe.unsettled(instance, app, DISK)) {
+                    EmulatorProbe.InstalledApp settled = EmulatorProbe.settle(instance, app,
+                            EmulatorProbe.appInfo(instance, pkg, !DISK.iconKnown(instance, pkg)), DISK);
+                    ICON_CACHE.remove(key);
+                    if (!settled.equals(app)) {
+                        named.set(i, settled);
+                        renamed = true;
                     }
-                    cached = Optional.ofNullable(ScreenCapture.toFxImage(stored));
-                    ICON_CACHE.put(key, cached);
+                    app = settled;
                 }
-                if (cached.isEmpty()) continue;
-                Image icon = cached.get();
+                Optional<Image> cached = ICON_CACHE.computeIfAbsent(key,
+                        k -> Optional.ofNullable(ScreenCapture.toFxImage(DISK.icon(instance, pkg))));
+                String text = app.display();
+                Image icon = cached.orElse(null);
                 int index = i;
                 Platform.runLater(() -> {
                     if (index >= apps.getChildren().size()) return;
-                    // Identified by the tooltip, not the label: the label is now the app's display name, and
-                    // two apps can legitimately share one. The package is the identity.
+                    // Identified by the tooltip, not the label: the label is the app's display name, and two
+                    // apps can legitimately share one. The package is the identity.
                     if (apps.getChildren().get(index) instanceof Button button
-                            && button.getTooltip() != null && pkg.equals(button.getTooltip().getText())
-                            && button.getGraphic() instanceof ImageView view) {
-                        view.setImage(icon);
+                            && button.getTooltip() != null && pkg.equals(button.getTooltip().getText())) {
+                        button.setText(text);
+                        if (icon != null && button.getGraphic() instanceof ImageView view) view.setImage(icon);
                     }
                 });
             }
+            if (renamed) cacheApps(instance, named);
         }, null);
     }
 

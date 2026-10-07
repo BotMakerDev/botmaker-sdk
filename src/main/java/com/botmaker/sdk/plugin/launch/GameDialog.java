@@ -8,6 +8,8 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.EmulatorPicker;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.Spawn;
+import com.botmaker.shared.emulator.EmulatorAppCache;
+import com.botmaker.shared.emulator.EmulatorProbe;
 import com.botmaker.shared.game.FaugusEntries;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -55,7 +57,8 @@ import java.util.Map;
  *
  * <p>Opened from the toolbar's game button and from Project Setup's launch row. A row of radio buttons picks
  * what the grid of covers shows: <b>All</b> (every game, each once), <b>Recent</b> picks, one per launcher
- * (Steam, Epic, Heroic, Faugus, Lutris, …), Waydroid's Android apps, the menu's games, and every other app,
+ * (Steam, Epic, Heroic, Faugus, Lutris, …), one per emulator instance (its apps by name, dimmed while it is
+ * stopped), Waydroid's Android apps, the menu's games, and every other app,
  * which All leaves out. A pick sets this machine's {@code botmaker.launch.target}
  * ({@link LaunchTargetValue}) and is remembered in {@link RecentTargets}.
  *
@@ -94,6 +97,8 @@ public final class GameDialog {
     private final Label notice = Styles.on(new Label(), Styles.DIALOG_HINT);
     private Group shown;
     private String query = "";
+    private boolean emulatorsRefreshed;
+    private List<GameCatalog.Section> lastScan;
     private final Label current = Styles.on(new Label(), Styles.DIALOG_SUBHEADING);
     private final Label status = Styles.on(new Label(), Styles.SMALL_TEXT, Styles.MUTED_TEXT);
     private final Button launch;
@@ -223,6 +228,7 @@ public final class GameDialog {
      * when the remembered pick has none.
      */
     private void fill(List<GameCatalog.Section> scanned) {
+        lastScan = scanned;
         tiles.clear();
         Map<String, Path> art = new HashMap<>();
         for (GameCatalog.Section section : scanned) {
@@ -235,6 +241,9 @@ public final class GameDialog {
         List<Group> launchers = new ArrayList<>();
         for (GameCatalog.Section section : scanned) {
             List<Tile> own = section.items().stream().map(this::tileFor).toList();
+            if (section.kind() == GameCatalog.Kind.EMULATOR) {
+                for (Tile tile : own) stopped(tile, section.stopped() ? section.title() : null);
+            }
             Node extra = null;
             if (section.kind() == GameCatalog.Kind.ANDROID) {
                 emulator = emulatorTile();
@@ -272,6 +281,34 @@ public final class GameDialog {
         }
         showGroup(first);
         markCurrent();
+        refreshEmulatorsOnce();
+    }
+
+    /**
+     * Once per dialog, after the remembered apps are on screen: asks each running emulator for its apps now, and
+     * rescans if they changed — a game installed since, or an instance never listed before. Reading a new app's
+     * name and icon takes a moment, which is why the remembered ones are shown first.
+     */
+    private void refreshEmulatorsOnce() {
+        if (emulatorsRefreshed) return;
+        emulatorsRefreshed = true;
+        Async.load("game-dialog-emulators", GameCatalog::refreshEmulators, changed -> {
+            if (!changed || stage == null || !stage.isShowing() || lastScan == null) return;
+            // Only the emulator sections changed: the launchers' libraries aren't read again.
+            List<GameCatalog.Section> scanned = lastScan;
+            Async.load("game-dialog-emulator-sections", () -> GameCatalog.withEmulatorsReread(scanned), this::fill);
+        });
+    }
+
+    /**
+     * A stopped instance's app is shown dimmed, and says that picking it starts the instance — a launch starts it
+     * before the app ({@code EmulatorAppLauncher}). {@code instance} is its caption, or {@code null} when it runs.
+     */
+    private static void stopped(Tile tile, String instance) {
+        tile.button().setOpacity(instance == null ? 1 : 0.55);
+        tile.button().setTooltip(new javafx.scene.control.Tooltip(tile.item().name() + "\n"
+                + LaunchSpec.describe(tile.item().spec())
+                + (instance == null ? "" : "\n" + instance + " isn't running: launching starts it first")));
     }
 
     /** Puts {@code group}'s tiles in the grid, then hides those the search leaves out. */
@@ -315,7 +352,12 @@ public final class GameDialog {
             }
             String spec = new LaunchSpec(LaunchKind.EMULATOR_APP,
                     chosen.appPackage() + "@" + chosen.instance().name()).spec();
-            choose(new GameCatalog.Item(spec, chosen.appPackage(), null));
+            // The app's own name and icon when the picker has seen them, as its card in the instance's section has.
+            EmulatorAppCache cache = EmulatorAppCache.shared();
+            String name = cache.packages(chosen.instance()).stream()
+                    .filter(app -> app.packageName().equals(chosen.appPackage()))
+                    .map(EmulatorProbe.InstalledApp::display).findFirst().orElse(chosen.appPackage());
+            choose(new GameCatalog.Item(spec, name, cache.iconPath(chosen.instance(), chosen.appPackage())));
         }));
         return other;
     }

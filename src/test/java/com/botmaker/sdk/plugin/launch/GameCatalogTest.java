@@ -1,5 +1,9 @@
 package com.botmaker.sdk.plugin.launch;
 
+import com.botmaker.shared.emulator.EmulatorAppCache;
+import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.EmulatorProbe;
+import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.game.InstalledGame;
 import com.botmaker.shared.game.FaugusLibraryScanner;
 import com.botmaker.shared.game.GogLibraryScanner;
@@ -7,7 +11,9 @@ import com.botmaker.shared.game.LutrisLibraryScanner;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -83,6 +89,57 @@ class GameCatalogTest {
         assertEquals("1145350", GameButton.nameOf(null, "steam:1145350"));
         assertEquals("run.sh", GameButton.nameOf(null, "exe:/opt/game/run.sh"));
         assertEquals(new LaunchSpec(LaunchKind.LUTRIS, "3"), LaunchSpec.parse("lutris:3"));
+    }
+
+    @Test
+    void eachEmulatorInstanceWithRememberedAppsIsASectionOfItsAppsByNameDimmedWhenStopped(@TempDir Path root)
+            throws Exception {
+        EmulatorAppCache cache = new EmulatorAppCache(root);
+        EmulatorInstance ld = new EmulatorInstance(PlatformId.LDPLAYER, "LDPlayer", "127.0.0.1", 5555);
+        EmulatorInstance mumu = new EmulatorInstance(PlatformId.MUMU, "Android Device", "127.0.0.1", 16384);
+        EmulatorInstance memu = new EmulatorInstance(PlatformId.MEMU, "MEmu", "127.0.0.1", 21503);
+        EmulatorInstance waydroid = new EmulatorInstance(PlatformId.WAYDROID, "Waydroid", "192.168.240.112", 5555);
+        cache.putPackages(ld, List.of(new EmulatorProbe.InstalledApp("com.supercell.clashofclans", "Clash of Clans"),
+                new EmulatorProbe.InstalledApp("com.unnamed.game", null)));
+        cache.putPackages(mumu, List.of(new EmulatorProbe.InstalledApp("com.farm", "Farm")));
+        cache.putPackages(waydroid, List.of(new EmulatorProbe.InstalledApp("com.farm", "Farm")));
+        java.awt.image.BufferedImage icon = new java.awt.image.BufferedImage(4, 4, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        cache.putIcon(ld, "com.supercell.clashofclans", icon);
+
+        List<GameCatalog.Section> sections = GameCatalog.emulatorSections(List.of(ld, memu, mumu, waydroid), cache,
+                instance -> instance == mumu);
+
+        assertEquals(List.of("LDPlayer: LDPlayer", "MuMu Player: Android Device"),
+                sections.stream().map(GameCatalog.Section::title).toList(),
+                "MEmu was never listed, and Waydroid's apps are in the app menu's section");
+        GameCatalog.Section ldSection = sections.get(0);
+        assertEquals(GameCatalog.Kind.EMULATOR, ldSection.kind());
+        assertTrue(ldSection.stopped());
+        assertEquals(List.of("Clash of Clans", "com.unnamed.game"),
+                ldSection.items().stream().map(GameCatalog.Item::name).toList());
+        assertEquals(List.of("emu-app:com.supercell.clashofclans@LDPlayer", "emu-app:com.unnamed.game@LDPlayer"),
+                specs(ldSection));
+        assertTrue(ldSection.items().get(0).artwork() != null && Files.isRegularFile(ldSection.items().get(0).artwork()));
+        assertEquals(null, ldSection.items().get(1).artwork());
+        assertEquals(false, sections.get(1).stopped());
+    }
+
+    @Test
+    void reReadEmulatorSectionsTakeTheOldOnesPlaceAfterTheLaunchers() {
+        GameCatalog.Section steam = new GameCatalog.Section(GameCatalog.Kind.LAUNCHER, "Steam", false, List.of());
+        GameCatalog.Section oldLd = new GameCatalog.Section(GameCatalog.Kind.EMULATOR, "LDPlayer: LDPlayer", false,
+                true, List.of());
+        GameCatalog.Section android = new GameCatalog.Section(GameCatalog.Kind.ANDROID, "Android", false, List.of());
+        GameCatalog.Section newLd = new GameCatalog.Section(GameCatalog.Kind.EMULATOR, "LDPlayer: LDPlayer", false,
+                false, List.of());
+        GameCatalog.Section mumu = new GameCatalog.Section(GameCatalog.Kind.EMULATOR, "MuMu Player: Android Device",
+                false, false, List.of());
+
+        assertEquals(List.of(steam, newLd, mumu, android),
+                GameCatalog.replaceEmulators(List.of(steam, oldLd, android), List.of(newLd, mumu)));
+        assertEquals(List.of(steam, mumu, android),
+                GameCatalog.replaceEmulators(List.of(steam, android), List.of(mumu)), "none listed before");
+        assertEquals(List.of(steam, android), GameCatalog.replaceEmulators(List.of(steam, oldLd, android), List.of()));
     }
 
     private static List<String> specs(GameCatalog.Section section) {
