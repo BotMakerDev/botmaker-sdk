@@ -105,6 +105,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   install, through your system's password prompt.
 - ▶ Launch now and the Remote Pilot use the display backend your settings pin. The Pilot's own backend choice
   is gone. The *Automatic* label says what it does: gamescope, and Xephyr for emulator apps.
+- On a scaled screen, the Remote Pilot's desktop frame and the screen chooser's crop are in device pixels, the
+  pixels a tap lands in. The Pilot grabbed at the logical size, and the chooser scaled a second monitor's
+  offset by its own scale, so on mixed scales it cropped the wrong part.
 
 ### Changed
 

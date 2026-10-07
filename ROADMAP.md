@@ -11,8 +11,11 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   ("remove that wire first") instead of moving the arrow — a gesture change, waiting for a decision. A
   hand-chained flow is shown read-only.
 - **Launch targets**: `Target.set(String spec)` has no editor (a `@LaunchTargetSpec` could reuse the
-  chooser's grid); no picker for "what this computer launches" beyond an emulator app, so background mode
-  starts only for an emulator app on Waydroid. GOG and Lutris libraries are not scanned.
+  🎮 game dialog).
+- **Waydroid on the desktop**: a bot reads Android's frame through `adb screencap`, which writes nothing on a
+  hybrid AMD/NVIDIA laptop (`/vendor/etc/hwdata/amdgpu.ids: No such file or directory`). A private display
+  is unaffected (it reads through X); on the desktop the Waydroid window's own X capture, or the Pilot's
+  scrcpy stream, would be the fallback.
 - **`OcrOptions`**: `withLanguages(OcrLanguage...)` is not a declared chain (the host would need to read a
   varargs argument inside a receiver chain); `Text.DEFAULT_OPTIONS` shows as written — an `OcrOptions`
   constant plus `.constants(…)` would fix both reading and fresh blocks.

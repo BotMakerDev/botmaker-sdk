@@ -13,12 +13,14 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.session.launch.BackgroundLauncher;
 
-import java.awt.GraphicsDevice;
+import com.botmaker.shared.capture.RobotCapture;
+import com.botmaker.shared.capture.ScreenCapture;
 import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.awt.Robot;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.LongSupplier;
 
 /**
@@ -285,7 +287,7 @@ public final class TargetCapture {
         try {
             Robot robot = ROBOTS.get();
             if (robot == null) return null;
-            BufferedImage img = robot.createScreenCapture(b);
+            BufferedImage img = RobotCapture.capture(robot, b);
             return img == null ? null : new Capture(img, b.x, b.y, b.width, b.height);
         } catch (Throwable ex) {
             return null;
@@ -310,15 +312,15 @@ public final class TargetCapture {
     }
 
     /**
-     * The screen rects are asked of AWT, which throws {@link java.awt.HeadlessException} where there is no
-     * display at all — so each answers {@code null} instead, and {@link #captureBounds} reads that as "no frame
-     * this tick" like every other failure here. The frame loop must not die because a screen went away.
+     * The screen rects, in the device pixels the input path taps in ({@link ScreenCapture}). They are asked of
+     * AWT, which throws {@link java.awt.HeadlessException} where there is no display at all — so each answers
+     * {@code null} instead, and {@link #captureBounds} reads that as "no frame this tick" like every other
+     * failure here. The frame loop must not die because a screen went away.
      */
     private static Rectangle screenBounds(int index) {
         try {
-            GraphicsDevice[] devices = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
-            if (index >= 0 && index < devices.length) {
-                return devices[index].getDefaultConfiguration().getBounds();
+            if (index >= 0 && index < ScreenCapture.screens().size()) {
+                return ScreenCapture.monitorBounds(index);
             }
         } catch (Throwable ignored) {
             // fall through to the primary, which reports its own failure the same way
@@ -328,8 +330,10 @@ public final class TargetCapture {
 
     private static Rectangle primaryBounds() {
         try {
-            return GraphicsEnvironment.getLocalGraphicsEnvironment()
-                    .getDefaultScreenDevice().getDefaultConfiguration().getBounds();
+            GraphicsEnvironment env = GraphicsEnvironment.getLocalGraphicsEnvironment();
+            int primary = List.of(env.getScreenDevices()).indexOf(env.getDefaultScreenDevice());
+            // -1 when the screens changed between the two reads: no frame this tick, not the whole desktop.
+            return primary < 0 ? null : ScreenCapture.monitorBounds(primary);
         } catch (Throwable ignored) {
             return null;
         }
@@ -345,10 +349,7 @@ public final class TargetCapture {
 
     private static Rectangle virtualBounds() {
         try {
-            Rectangle bounds = new Rectangle();
-            for (GraphicsDevice gd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
-                bounds = bounds.union(gd.getDefaultConfiguration().getBounds());
-            }
+            Rectangle bounds = ScreenCapture.getVirtualScreenBounds();
             return bounds.isEmpty() ? new Rectangle(0, 0, 1920, 1080) : bounds;
         } catch (Throwable ignored) {
             return null;
