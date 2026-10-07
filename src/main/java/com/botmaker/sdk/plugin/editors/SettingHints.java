@@ -47,7 +47,7 @@ public final class SettingHints {
                     "How far the right template must beat a look-alike (0.0 – 1.0):", "", 0, 1, 0.01, 0.05),
             whole(BotSettings::maxRetryAttempts), new Hint("Max stuck checks",
                     "Checks before considered stuck (≥ 1):", "", 1, 600_000, 1, 20),
-            flag(BotSettings::realInput), Hint.flag("Drive the real mouse and keyboard"),
+            flag(BotSettings::takeOver), Hint.flag("Take over the mouse and keyboard"),
             flag(BotSettings::debug), Hint.flag("Debug logging"));
 
     private SettingHints() {}

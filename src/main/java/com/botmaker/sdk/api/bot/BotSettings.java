@@ -2,13 +2,17 @@ package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.meta.ReplacedBy;
 import com.botmaker.sdk.api.console.Debug;
+import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.capture.NativeControllerFactory;
 
+import java.util.Arrays;
+import java.util.Optional;
+
 /**
- * The bot's runtime tuning — how long it pauses around a match, how sure it has to be, whether it drives the
- * real mouse and keyboard, and whether it runs on a private display of its own. One value, written in the
- * bot's own Java:
+ * The bot's runtime tuning — how long it pauses around a match, how sure it has to be, and where the game runs:
+ * on a private display of its own, or on the user's desktop, where it may take over the mouse and keyboard. One
+ * value, written in the bot's own Java:
  *
  * <pre>{@code
  * @Managed("settings")
@@ -16,8 +20,8 @@ import com.botmaker.shared.capture.NativeControllerFactory;
  *     return BotSettings.of(
  *             BotSettings.clicks(500, 200, true),
  *             BotSettings.vision(0.8, 0.05),
- *             BotSettings.input(false, BotSettings.InputBackend.AUTO),
- *             BotSettings.session(true, BotSettings.DisplayBackend.AUTO),
+ *             BotSettings.runIn(BotSettings.Where.PRIVATE_DISPLAY, false,
+ *                     BotSettings.DisplayBackend.AUTO, BotSettings.InputBackend.AUTO),
  *             20, true);
  * }
  * }</pre>
@@ -37,16 +41,22 @@ import com.botmaker.shared.capture.NativeControllerFactory;
  * arrives as the {@code botmaker.launch.target} system property.
  *
  * @param clicks           the pauses around a match and where a click lands
+ * <h2>Where the game runs (2026-10-07)</h2>
+ *
+ * <p>Four settings used to answer one question — a real-input tick, its Linux backend, a private-display tick
+ * and its backend — and two of them silently did nothing in combination with the others: real input escalated
+ * the user's desktop even when the bot ran on a private display, and the Linux backend never applied there.
+ * {@link RunIn} asks the question once ({@link Where}), and the take-over tick only means something on the
+ * desktop. The two backends are kept, for a machine that needs one pinned.
+ *
  * @param vision           how sure a match has to be
- * @param input            real device input, and which Linux backend delivers it
- * @param session          whether the bot runs on a private display, and which kind
+ * @param runIn            where the game runs, and whether the bot takes over the mouse and keyboard there
  * @param maxRetryAttempts how many no-progress checks {@link Watchdog} tolerates before the bot is stuck; at
  *                         least 1
  * @param debug            whether the SDK's debug output starts on, for a run that does not say: a
  *                         {@code -Dbotmaker.debug=true|false} on the run (Studio's Debug output toggle) wins
  */
-public record BotSettings(Clicks clicks, Vision vision, Input input, Session session, int maxRetryAttempts,
-                          boolean debug) {
+public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetryAttempts, boolean debug) {
 
     /** Pause after a successful match, in ms — long enough for a game's animation to settle. */
     public static final int DEFAULT_FOUND_DELAY = 500;
@@ -95,23 +105,59 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
         }
     }
 
-    /** Whether the bot drives the real mouse and keyboard, and which Linux backend delivers it. */
-    public record Input(boolean real, InputBackend linuxBackend) {
-        public Input {
-            linuxBackend = linuxBackend == null ? InputBackend.AUTO : linuxBackend;
+    /**
+     * Where the game runs, and what the bot does to the mouse and keyboard there.
+     *
+     * @param where          a private display of the bot's own, or the user's desktop. Linux only: on Windows
+     *                       the game is always on the desktop
+     * @param takeOver       on the desktop, drive the real mouse and keyboard rather than send events to the
+     *                       game's window — some games ignore those. Nothing on a private display, which the bot
+     *                       has to itself
+     * @param displayBackend which private display, when {@link #where} is one
+     * @param inputBackend   which Linux backend delivers a take-over
+     */
+    public record RunIn(Where where, boolean takeOver, DisplayBackend displayBackend, InputBackend inputBackend) {
+        public RunIn {
+            where = where == null ? Where.PRIVATE_DISPLAY : where;
+            displayBackend = displayBackend == null ? DisplayBackend.AUTO : displayBackend;
+            inputBackend = inputBackend == null ? InputBackend.AUTO : inputBackend;
         }
     }
 
-    /** Whether the bot runs on a private display of its own, and which kind hosts it. */
-    public record Session(boolean isolated, DisplayBackend backend) {
-        public Session {
-            backend = backend == null ? DisplayBackend.AUTO : backend;
+    /** Where the game runs. */
+    public enum Where {
+        /** A display of the bot's own: the game never appears on the desktop and the user keeps the machine. */
+        PRIVATE_DISPLAY("private-display", "A private display — you keep using your computer"),
+        /** The user's desktop: the user watches the bot work, and shares the screen with it. */
+        MY_DESKTOP("my-desktop", "My desktop — watch it work");
+
+        private final String id;
+        private final String displayName;
+
+        Where(String id, String displayName) {
+            this.id = id;
+            this.displayName = displayName;
+        }
+
+        /** The {@code botmaker.session.where} run property's value. */
+        public String id() {
+            return id;
+        }
+
+        public String displayName() {
+            return displayName;
+        }
+
+        /** The value whose {@link #id()} is {@code id}, ignoring case; empty for anything else, blank included. */
+        public static Optional<Where> fromId(String id) {
+            return id == null ? Optional.empty() : Arrays.stream(values())
+                    .filter(w -> w.id.equalsIgnoreCase(id.trim())).findFirst();
         }
     }
 
     /**
-     * Which Linux backend delivers real input. {@link #AUTO} lets the controller choose; the others pin one,
-     * for a machine that only works with a particular one. Ignored on Windows.
+     * Which Linux backend delivers a take-over. {@link #AUTO} lets the controller choose; the others pin one,
+     * for a machine that only works with a particular one. Ignored on Windows and on a private display.
      */
     public enum InputBackend {
         AUTO("auto", "Automatic"),
@@ -121,11 +167,11 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
         UINPUT("uinput", "uinput — a kernel virtual device the system reports as real");
 
         private final String id;
-        private final String label;
+        private final String displayName;
 
-        InputBackend(String id, String label) {
+        InputBackend(String id, String displayName) {
             this.id = id;
-            this.label = label;
+            this.displayName = displayName;
         }
 
         /** The {@code botmaker.linux.input} value the controller reads. */
@@ -133,26 +179,26 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
             return id;
         }
 
-        public String label() {
-            return label;
+        public String displayName() {
+            return displayName;
         }
     }
 
     /**
-     * Which private display hosts an isolated bot. {@link #AUTO} is right almost always: a game gets gamescope,
-     * a plain command the lighter Xephyr.
+     * Which private display hosts the game. {@link #AUTO} is right almost always: gamescope, which puts a real
+     * GPU in the display, for everything but an emulator app, which gets Xephyr.
      */
     public enum DisplayBackend {
-        AUTO("auto", "Automatic (gamescope for games, Xephyr for commands)"),
+        AUTO("auto", "Automatic (gamescope; Xephyr for emulator apps)"),
         GAMESCOPE("gamescope", "gamescope — a real GPU in the private display (3D games)"),
         XEPHYR("xephyr", "Xephyr — software-rendered 2D (crashes 3D games)");
 
         private final String id;
-        private final String label;
+        private final String displayName;
 
-        DisplayBackend(String id, String label) {
+        DisplayBackend(String id, String displayName) {
             this.id = id;
-            this.label = label;
+            this.displayName = displayName;
         }
 
         /** The session module's backend id; {@code auto} names none and lets the launch kind pick. */
@@ -160,8 +206,8 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
             return id;
         }
 
-        public String label() {
-            return label;
+        public String displayName() {
+            return displayName;
         }
     }
 
@@ -169,8 +215,7 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
     public static final BotSettings DEFAULTS = of(
             clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS),
             vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN),
-            input(false, InputBackend.AUTO),
-            session(true, DisplayBackend.AUTO),
+            runIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO),
             DEFAULT_MAX_RETRY_ATTEMPTS, true);
 
     /** A missing part is its default, and fewer than one retry is one. */
@@ -178,8 +223,8 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
         clicks = clicks == null ? new Clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS)
                 : clicks;
         vision = vision == null ? new Vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN) : vision;
-        input = input == null ? new Input(false, InputBackend.AUTO) : input;
-        session = session == null ? new Session(true, DisplayBackend.AUTO) : session;
+        runIn = runIn == null ? new RunIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO)
+                : runIn;
         maxRetryAttempts = Math.max(1, maxRetryAttempts);
     }
 
@@ -201,9 +246,8 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
 
     // --- how the bot's Java writes it ---
 
-    public static BotSettings of(Clicks clicks, Vision vision, Input input, Session session, int maxRetryAttempts,
-                                 boolean debug) {
-        return new BotSettings(clicks, vision, input, session, maxRetryAttempts, debug);
+    public static BotSettings of(Clicks clicks, Vision vision, RunIn runIn, int maxRetryAttempts, boolean debug) {
+        return new BotSettings(clicks, vision, runIn, maxRetryAttempts, debug);
     }
 
     public static Clicks clicks(int foundDelay, int notFoundDelay, boolean randomize) {
@@ -214,12 +258,9 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
         return new Vision(confidence, compareMargin);
     }
 
-    public static Input input(boolean real, InputBackend linuxBackend) {
-        return new Input(real, linuxBackend);
-    }
-
-    public static Session session(boolean isolated, DisplayBackend backend) {
-        return new Session(isolated, backend);
+    public static RunIn runIn(Where where, boolean takeOver, DisplayBackend displayBackend,
+                              InputBackend inputBackend) {
+        return new RunIn(where, takeOver, displayBackend, inputBackend);
     }
 
     // --- the settings in force ---
@@ -234,26 +275,34 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
     /**
      * Makes {@code settings} the ones in force, from the next click on.
      *
-     * <p><b>Real input is one-way.</b> On Linux turning it on swaps the process-wide input backend, which cannot
-     * be swapped back, so a later value with {@code real = false} only stops a future escalation. That is why
+     * <p><b>A take-over is one-way.</b> On Linux it swaps the process-wide input backend, which cannot be swapped
+     * back, so a later value with {@code takeOver = false} only stops a future escalation. That is why
      * {@code Bot.run} installs the bot's settings before anything else runs: the swap has to precede the first
      * click, or the click is dropped silently. For the same reason the Linux backend is pinned only when nothing
      * has pinned it yet — an explicit {@code -Dbotmaker.linux.input} on the command line wins.
+     *
+     * <p><b>Nothing is taken over for a private display.</b> The swap is the user's own desktop's, and a bot on a
+     * private display drives that display alone; escalating the desktop anyway was the old real-input tick's
+     * bug. Where the bot runs is the resolved answer ({@code -Dbotmaker.session.where} included), not only
+     * these settings'.
      */
     public static void use(BotSettings settings) {
         BotSettings next = settings == null ? DEFAULTS : settings;
         synchronized (BotSettings.class) {
             BotSettings was = current;
             current = next;
-            if (next.input.linuxBackend != InputBackend.AUTO && System.getProperty(LINUX_INPUT) == null) {
-                System.setProperty(LINUX_INPUT, next.input.linuxBackend.id());
+            if (next.runIn.inputBackend != InputBackend.AUTO && System.getProperty(LINUX_INPUT) == null) {
+                System.setProperty(LINUX_INPUT, next.runIn.inputBackend.id());
             }
-            if (next.input.real && !was.input.real) {
+            boolean escalate = next.runIn.takeOver && onTheDesktop();
+            if (escalate && !takenOver) {
+                takenOver = true;
                 boolean ok = NativeControllerFactory.get().useReliableInput();
-                Debug.log("[Input] real device input " + (ok ? "active" : "UNAVAILABLE — clicks may not register"));
-            } else if (was.input.real && !next.input.real) {
+                Debug.log("[Input] taking over the mouse and keyboard: "
+                        + (ok ? "active" : "UNAVAILABLE — clicks may not register"));
+            } else if (takenOver && !next.runIn.takeOver) {
                 // Kept on: the backend it swapped in cannot be swapped back, and saying otherwise would lie.
-                current = next.realInput(true);
+                current = next.takeOver(true);
             }
         }
         // The run's -Dbotmaker.debug (a host's Debug output toggle) wins over the bot's own default.
@@ -263,9 +312,25 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
     /** The system property {@code LinuxController} reads its backend from. */
     private static final String LINUX_INPUT = "botmaker.linux.input";
 
-    /** Test seam: back to {@link #DEFAULTS} without touching the input backend or the debug switch. */
-    static void resetForTesting() {
+    /** Whether this process has swapped in the take-over backend — once, for good. Guarded by the class lock. */
+    private static boolean takenOver;
+
+    /**
+     * Whether the game runs on the user's desktop: always on Windows, which has no private display, and on Linux
+     * when the bot's resolved choice is {@link Where#MY_DESKTOP}. Asked again by {@code Session.set}, which can
+     * move the bot to the desktop after these settings were installed.
+     */
+    private static boolean onTheDesktop() {
+        return !SessionBootstrap.isolationRequested();
+    }
+
+    /**
+     * Test seam: back to {@link #DEFAULTS} without touching the input backend or the debug switch, and forgetting
+     * a take-over, which a test made on a stand-in controller.
+     */
+    static synchronized void resetForTesting() {
         current = DEFAULTS;
+        takenOver = false;
     }
 
     // --- reading one setting ---
@@ -295,9 +360,14 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
         return vision.compareMargin;
     }
 
-    /** Whether this bot drives the real mouse and keyboard. */
-    public boolean realInput() {
-        return input.real;
+    /** Where the game runs. */
+    public Where where() {
+        return runIn.where;
+    }
+
+    /** Whether, on the desktop, the bot drives the real mouse and keyboard. */
+    public boolean takeOver() {
+        return runIn.takeOver;
     }
 
     // --- one setting changed: a copy ---
@@ -315,30 +385,31 @@ public record BotSettings(Clicks clicks, Vision vision, Input input, Session ses
     }
 
     public BotSettings confidence(double confidence) {
-        return new BotSettings(clicks, new Vision(confidence, vision.compareMargin), input, session,
-                maxRetryAttempts, debug);
+        return new BotSettings(clicks, new Vision(confidence, vision.compareMargin), runIn, maxRetryAttempts, debug);
     }
 
     public BotSettings compareMargin(double margin) {
-        return new BotSettings(clicks, new Vision(vision.confidence, margin), input, session, maxRetryAttempts,
-                debug);
+        return new BotSettings(clicks, new Vision(vision.confidence, margin), runIn, maxRetryAttempts, debug);
     }
 
     public BotSettings maxRetryAttempts(int attempts) {
-        return new BotSettings(clicks, vision, input, session, attempts, debug);
+        return new BotSettings(clicks, vision, runIn, attempts, debug);
     }
 
-    public BotSettings realInput(boolean real) {
-        return new BotSettings(clicks, vision, new Input(real, input.linuxBackend), session, maxRetryAttempts,
-                debug);
+    public BotSettings takeOver(boolean takeOver) {
+        return withRunIn(new RunIn(runIn.where, takeOver, runIn.displayBackend, runIn.inputBackend));
     }
 
     public BotSettings debug(boolean on) {
-        return new BotSettings(clicks, vision, input, session, maxRetryAttempts, on);
+        return new BotSettings(clicks, vision, runIn, maxRetryAttempts, on);
     }
 
     private BotSettings withClicks(Clicks next) {
-        return new BotSettings(next, vision, input, session, maxRetryAttempts, debug);
+        return new BotSettings(next, vision, runIn, maxRetryAttempts, debug);
+    }
+
+    private BotSettings withRunIn(RunIn next) {
+        return new BotSettings(clicks, vision, next, maxRetryAttempts, debug);
     }
 
     private static double unit(double value, double fallback) {

@@ -5,6 +5,9 @@ import com.botmaker.session.impl.NestedSession;
 import com.botmaker.session.launch.BackgroundLauncher;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
+import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.internal.session.SessionBootstrap;
+import com.botmaker.sdk.plugin.settings.BackendInstallPrompt;
 import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -15,7 +18,6 @@ import javafx.scene.control.Tooltip;
 
 import java.awt.Dimension;
 import java.nio.file.Path;
-import java.util.Optional;
 
 /**
  * The "▶ Launch now" button: brings the project's configured {@code launch.target} up <em>without</em>
@@ -26,14 +28,14 @@ import java.util.Optional;
  * the point: an earlier attempt at this button copied the protocol URLs and CLI ladders into the editor, which
  * is documented as explicitly <em>not</em> their owner.
  *
- * <p><b>Background isolation.</b> When the project has {@code session.isolated} on (the default), the button
+ * <p><b>Background isolation.</b> When the bot's settings say a private display (the default), the button
  * does not launch on the real {@code :0} desktop — it brings the target up in a private nested display via
- * {@link BackgroundLauncher} (gamescope for games, Xephyr for a plain command, per {@link SessionBackends}),
- * so the real cursor stays free and the Remote Pilot's Stop and status reflect the same live session. Turning
- * the toggle off returns to a {@code :0} {@link Launcher#start}.
+ * {@link BackgroundLauncher}, on the backend the settings pin or else {@link SessionBackends}' choice, so the
+ * real cursor stays free and the Remote Pilot's Stop and status reflect the same live session. My desktop
+ * returns to a {@code :0} {@link Launcher#start}.
  *
  * <p>A target that does not run on a desktop at all — an {@code emu-app:}, driven over ADB inside the emulator
- * — takes the direct path whatever the toggle says ({@link #usesBackgroundSession}). It has no child process
+ * — takes the direct path whatever the settings say ({@link #usesBackgroundSession}). It has no child process
  * to hand a private {@code DISPLAY} to, so the background path could only ever refuse it.
  *
  * <p>Two things every call site gets by going through here rather than wiring its own button: the launch runs
@@ -87,8 +89,8 @@ public final class QuickLaunch {
     }
 
     /**
-     * Whether a launch of {@code spec} should go through a private nested display: the project's
-     * {@code session.isolated} setting, <em>except</em> for a target that does not run on a desktop at all.
+     * Whether a launch of {@code spec} should go through a private nested display: whether the settings say
+     * one, <em>except</em> for a target that does not run on a desktop at all.
      *
      * <p>That exception is the whole point of this predicate. An {@code emu-app:} target on most products is
      * started, captured and clicked over ADB inside the emulator; there is no child process of ours to hand a
@@ -106,20 +108,22 @@ public final class QuickLaunch {
     }
 
     /**
-     * The trailing half-sentence explaining why an off-desktop target ignored the "Run in background" toggle,
-     * or empty for every other kind. Said on success rather than hidden: the toggle is on by default, so
-     * without it the user is left wondering whether the launch respected the setting they can see.
+     * The trailing half-sentence explaining why an off-desktop target ignored "Run the game in", or empty for
+     * every other kind. Said on success rather than hidden: a private display is the default, so without it
+     * the user is left wondering whether the launch respected the setting they can see.
      */
     private static String offDesktopNote(LaunchSpec spec) {
         return spec.runsOffDesktop()
-                ? " It runs inside the emulator over ADB, so background mode doesn't apply to it."
+                ? " It runs inside the emulator over ADB, so the private display doesn't apply to it."
                 : "";
     }
 
     private static void launch(Button button, LaunchSpec spec, Report report, StudioServices services) {
         button.setDisable(true);
-        if (usesBackgroundSession(spec, BotSettingsWindow.current(services).session().isolated())) {
-            launchInBackground(button, spec, report, services.resourcesDir());
+        BotSettings settings = BotSettingsWindow.current(services);
+        if (usesBackgroundSession(spec, SessionBootstrap.wantsPrivateDisplay(settings))) {
+            launchInBackground(button, spec, report, services,
+                    SessionBootstrap.backendFor(spec, settings.runIn().displayBackend()));
             return;
         }
         report.accept(true, "Launching " + spec.describe() + "…");
@@ -144,20 +148,22 @@ public final class QuickLaunch {
     }
 
     /**
-     * The background path (project {@code session.isolated} on): bring the target up in a private nested
-     * display instead of the real {@code :0} desktop. The backend is chosen by kind — gamescope for games,
-     * Xephyr for a plain command; when the backend a game needs is not installed we fail <b>loudly</b> with
-     * the install hint rather than dropping to a Xephyr that would crash it.
+     * The background path (the settings say a private display): bring the target up there instead of on the
+     * real {@code :0} desktop, on the backend the settings pin or else the kind's. When it isn't installed the
+     * user is offered the install, and declining leaves the game where it was: never a Xephyr that would crash
+     * it, never the desktop they didn't ask for.
      */
-    private static void launchInBackground(Button button, LaunchSpec spec, Report report, Path resourcesDir) {
-        Optional<NestedSession.Backend> backend = SessionBackends.availableBackendFor(spec);
-        if (backend.isEmpty()) {
+    private static void launchInBackground(Button button, LaunchSpec spec, Report report, StudioServices services,
+                                           NestedSession.Backend backend) {
+        if (!SessionBackends.isAvailable(backend)) {
             button.setDisable(false);
-            report.accept(false, "Can't run " + spec.describe() + " in the background — "
-                    + SessionBackends.installHint(SessionBackends.preferredBackend(spec))
-                    + ". Turn off \"Run in a private display\" (⚙ Bot Settings) to launch on your desktop instead.");
+            report.accept(false, SessionBootstrap.missingBackend(backend));
+            BackendInstallPrompt.offer(services, button.getScene() == null ? null : button.getScene().getWindow(),
+                    backend, (installed, message) -> report.accept(installed, installed
+                            ? message + " Press ▶ Launch now again." : message));
             return;
         }
+        Path resourcesDir = services.resourcesDir();
         // The session is created at the project's standard resolution, not a fixed 1280x720: gamescope's -w/-h
         // *is* the screen the game inside sees, so a hardcoded size caps the game's own resolution options at
         // that size whatever the project is authored at — and makes the capture a scaled copy of what the
@@ -165,7 +171,7 @@ public final class QuickLaunch {
         // The authored size is gone and it was never there: capture.width / capture.height were read here
         // and written by nothing in any module, so this took the launcher's own default on every call.
         BackgroundLauncher.forProject(resourcesDir).start(
-                backend.get(), spec,
+                backend, spec,
                 BackgroundLauncher.DEFAULT_WIDTH,
                 BackgroundLauncher.DEFAULT_HEIGHT,
                 // The hop is the caller's: BackgroundLauncher lives in botmaker-session, which has no JavaFX,

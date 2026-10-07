@@ -36,7 +36,7 @@ class GameTest {
     @AfterEach
     void tearDown() {
         ActiveSession.clear();
-        System.clearProperty(SessionBootstrap.ISOLATED_PROPERTY);
+        System.clearProperty(SessionBootstrap.WHERE_PROPERTY);
     }
 
     @Test
@@ -108,7 +108,7 @@ class GameTest {
     void launchFallsToTheHostWhenIsolationIsOff() {
         // Explicitly opt out: no session is brought up, so the host path runs and hands back a real process.
         assumeTrue(new File("/bin/true").canExecute(), "needs a trivial executable to launch on the host");
-        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "false");
+        System.setProperty(SessionBootstrap.WHERE_PROPERTY, "my-desktop");
         Process p = Game.launch("/bin/true");
         try {
             org.junit.jupiter.api.Assertions.assertNotNull(p, "a non-isolated launch returns the host process");

@@ -29,12 +29,16 @@ public final class ProjectDefaults {
 
     /** Whether the bot's settings ask for a private display — {@code true} unless they say otherwise. */
     public static boolean sessionIsolated() {
-        return BotSettings.current().session().isolated();
+        return BotSettings.current().where() == BotSettings.Where.PRIVATE_DISPLAY;
     }
 
     /** The pinned display backend's id, or {@code null} when the settings let the launch kind pick. */
     public static String sessionBackend() {
-        BotSettings.DisplayBackend backend = BotSettings.current().session().backend();
+        return backendId(BotSettings.current().runIn().displayBackend());
+    }
+
+    /** {@code backend}'s session id, or {@code null} for {@link BotSettings.DisplayBackend#AUTO}. */
+    public static String backendId(BotSettings.DisplayBackend backend) {
         return backend == BotSettings.DisplayBackend.AUTO ? null : backend.id();
     }
 

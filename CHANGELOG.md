@@ -61,6 +61,32 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   own desktop only; one that drives an emulator or a private display still gets its line in the bar. Nothing
   changes in your bot's code.
 
+### Changed — breaking
+
+- **One "Run the game in" setting.** ⚙ Bot Settings used to have four overlapping settings: *Drive the real
+  mouse and keyboard*, its Linux backend, *Run in a private display* and its display backend. It now asks one
+  question: *A private display* (the default) or *My desktop*. *Take over the mouse and keyboard* shows only
+  for My desktop, with a hint that some games ignore the events sent to their window. The two backends are
+  under *Advanced*. On Windows the window shows the take-over tick only.
+  - In the bot's Java, `BotSettings.input(…)` and `BotSettings.session(…)` are replaced by
+    `BotSettings.runIn(Where, takeOver, DisplayBackend, InputBackend)`. `BotSettings.of` takes four parts
+    plus `debug`, `realInput()` is `takeOver()`, and the enums' `label()` is `displayName()`. A bot's
+    `Sdk.settings()` written with the old calls no longer compiles, and ⚙ Bot Settings can't read it. Replace
+    the two calls by hand: `input(real, inputBackend), session(isolated, displayBackend)` becomes
+    `runIn(isolated ? Where.PRIVATE_DISPLAY : Where.MY_DESKTOP, real, displayBackend, inputBackend)`.
+  - The run property is `botmaker.session.where=private-display|my-desktop` (`BOTMAKER_SESSION_WHERE`). It
+    replaces `botmaker.session.isolated`.
+
+### Fixed
+
+- A bot on a private display no longer takes over your desktop's mouse and keyboard. A ticked real-input
+  setting escalated the desktop's input whatever the session.
+- A missing gamescope or Xephyr stops the run with the command that installs it. The run used to put the game
+  on your desktop and only say so in the log. ⚙ Bot Settings, ▶ Launch now and the Remote Pilot offer the
+  install, through your system's password prompt.
+- ▶ Launch now and the Remote Pilot use the display backend your settings pin. The Pilot's own backend choice
+  is gone. The *Automatic* label says what it does: gamescope, and Xephyr for emulator apps.
+
 ### Changed
 
 - The pom carries a real version and names its upstreams' versions, so a tag's pom says what it was built

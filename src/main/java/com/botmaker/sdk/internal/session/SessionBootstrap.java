@@ -1,13 +1,16 @@
 package com.botmaker.sdk.internal.session;
 
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.Session;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.launch.LaunchIsolation;
+import com.botmaker.shared.platform.Os;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.ActiveSession;
 import com.botmaker.session.impl.AdoptedSession;
 import com.botmaker.session.impl.NestedSession;
+import com.botmaker.session.display.BackendInstall;
 import com.botmaker.session.display.SessionBackends;
 
 /**
@@ -22,26 +25,24 @@ import com.botmaker.session.display.SessionBackends;
  * Without that, the second bring-up would hand its launch to the copy already running (every store launcher is
  * single-instance) and the game would appear on a display nobody is watching.
  *
- * <p><b>On by default, with an opt-out.</b> Isolation resolves through one ladder, highest first: an explicit
- * {@link Session} call in bot code → the {@code botmaker.session.isolated} system property →
- * {@code BOTMAKER_SESSION_ISOLATED} → the project's {@code session.isolated} key → {@code true}. Bot code sits at
- * the top so a bot can force its own behaviour on a machine whose environment disagrees; the project key sits at
- * the bottom because it is the weakest statement of intent. When isolation is
- * off, {@link #launchIsolated} returns {@code false} and the caller runs its normal global {@code :0} launch. The
- * backend is <em>auto-selected from the launch kind</em> via {@link SessionBackends} — a game (store launcher /
- * Proton / exe) gets gamescope for a real GPU, a plain command gets Xephyr — with {@code
- * botmaker.session.backend} as an explicit override; the display is sized from the project's authored
- * resolution, falling back to {@value #DEFAULT_WIDTH}x{@value #DEFAULT_HEIGHT}. When a game needs gamescope and
- * it isn't installed, bring-up is declined (loud install hint, graceful {@code :0}) rather than crashing on
- * Xephyr's software GL. The gate keeps the seam testable and reversible without touching the project file
- * format.
+ * <p><b>On by default, with an opt-out.</b> Where the game runs resolves through one ladder, highest first: an
+ * explicit {@link Session} call in bot code → the {@code botmaker.session.where} run property →
+ * {@code BOTMAKER_SESSION_WHERE} → the bot's settings ({@code BotSettings.Where}) → a private display. Bot code
+ * sits at the top so a bot can force its own behaviour on a machine whose environment disagrees. On the desktop,
+ * {@link #launchIsolated} returns {@code false} and the caller runs its normal global {@code :0} launch. The
+ * backend is gamescope for everything but an emulator app ({@link SessionBackends#preferredBackend}), with the
+ * settings' display backend and {@code botmaker.session.backend} as explicit overrides.
+ *
+ * <p><b>A missing backend stops the run.</b> It used to log an install hint and run the game on the desktop,
+ * which was the opposite of what the user asked for and easy to miss in a log. Studio's ⚙ Bot Settings and
+ * ▶ Launch now offer to install it; a bot run says how and stops.
  */
 public final class SessionBootstrap {
 
-    /** System property (or {@code BOTMAKER_SESSION_ISOLATED} env) that opts a bot into a nested {@code :N} run. */
-    public static final String ISOLATED_PROPERTY = "botmaker.session.isolated";
-    /** The environment form of {@link #ISOLATED_PROPERTY}, for a bot started from a shell or a service unit. */
-    public static final String ISOLATED_ENV = "BOTMAKER_SESSION_ISOLATED";
+    /** The run property that says where the game runs: a {@code BotSettings.Where} id. Outranks the settings. */
+    public static final String WHERE_PROPERTY = "botmaker.session.where";
+    /** The environment form of {@link #WHERE_PROPERTY}, for a bot started from a shell or a service unit. */
+    public static final String WHERE_ENV = "BOTMAKER_SESSION_WHERE";
     /**
      * System property that <em>overrides</em> the default backend when isolated: {@code gamescope} for 3D,
      * {@code xephyr} for 2D. When unset the backend is {@link SessionBackends#preferredBackend(LaunchSpec)},
@@ -59,26 +60,51 @@ public final class SessionBootstrap {
     private SessionBootstrap() {}
 
     /**
-     * Whether this bot runs isolated on a private display. <b>Default: its settings' {@code session.isolated},
-     * which itself defaults to {@code true}</b> ({@link ProjectDefaults#sessionIsolated()}) — so a bot isolates
-     * unless it opts out. The {@link
-     * #ISOLATED_PROPERTY} system property (or {@code BOTMAKER_SESSION_ISOLATED} env) is an explicit override in
-     * either direction, winning over the project setting when set to a recognised boolean.
+     * Whether this bot runs on a private display. <b>Default: its settings' {@code BotSettings.Where}, which
+     * itself defaults to a private display</b> ({@link ProjectDefaults#sessionIsolated()}). The
+     * {@link #WHERE_PROPERTY} run property (or {@code BOTMAKER_SESSION_WHERE}) outranks it when it names a place.
      */
     public static boolean isolationRequested() {
+        if (Os.current() != Os.LINUX) {
+            // No private display outside Linux: the game is on the desktop whatever the settings say.
+            return false;
+        }
         Boolean override = Session.override();
         if (override == null) {
-            override = ProjectDefaults.parseBoolean(System.getProperty(ISOLATED_PROPERTY));
+            override = where(System.getProperty(WHERE_PROPERTY));
         }
         if (override == null) {
-            override = ProjectDefaults.parseBoolean(System.getenv(ISOLATED_ENV));
+            override = where(System.getenv(WHERE_ENV));
         }
         return override != null ? override : ProjectDefaults.sessionIsolated();
     }
 
     /**
+     * Whether Studio's launch surfaces put the game on a private display for {@code settings}: Linux, and the
+     * settings say one. Read from the bot's Java, so it has none of a run's property or code overrides.
+     */
+    public static boolean wantsPrivateDisplay(BotSettings settings) {
+        return Os.current() == Os.LINUX && settings.where() == BotSettings.Where.PRIVATE_DISPLAY;
+    }
+
+    /** Whether {@code id} names the private display; {@code null} when it names no place. */
+    private static Boolean where(String id) {
+        return BotSettings.Where.fromId(id).map(w -> w == BotSettings.Where.PRIVATE_DISPLAY).orElse(null);
+    }
+
+    /**
+     * The backend for {@code spec} when the settings pin {@code pinned}: that one, else
+     * {@link SessionBackends#preferredBackend}. What Studio's launch surfaces use, which read the bot's settings
+     * from its Java rather than from a running bot.
+     */
+    public static NestedSession.Backend backendFor(LaunchSpec spec, BotSettings.DisplayBackend pinned) {
+        return NestedSession.Backend.fromId(ProjectDefaults.backendId(pinned))
+            .orElseGet(() -> SessionBackends.preferredBackend(spec));
+    }
+
+    /**
      * The backend to isolate {@code spec} on, highest precedence first: a bot's {@link Session#useBackend} pin,
-     * the {@link #BACKEND_PROPERTY} system property, the project's {@code session.backend} key, else
+     * the {@link #BACKEND_PROPERTY} system property, the settings' display backend, else
      * {@link SessionBackends#preferredBackend(LaunchSpec)} — gamescope, for every kind. Defaulting to gamescope
      * rather than to Xephyr is what stops a store launcher SIGTRAPping on Xephyr's software GL; the three pins
      * above it exist so a Xephyr run remains possible, never so one can happen by accident.
@@ -117,6 +143,9 @@ public final class SessionBootstrap {
      * returning {@code true} so the caller skips its normal {@code :0} launch. Returns {@code false} when
      * isolation isn't requested (caller runs its normal launch) <em>or</em> when bring-up fails (graceful
      * fallback to {@code :0}). Idempotent: once a session is registered, later calls no-op and return {@code true}.
+     *
+     * @throws IllegalStateException when the backend the game needs is not installed: the run stops with the
+     *                               command that installs it rather than putting the game on the desktop
      */
     public static boolean launchIsolated(LaunchSpec spec) {
         if (!isolationRequested() || spec == null) {
@@ -157,11 +186,7 @@ public final class SessionBootstrap {
         }
         NestedSession.Backend chosen = backend(spec);
         if (!SessionBackends.isAvailable(chosen)) {
-            // The backend this target needs isn't installed. For a game that means gamescope: falling back to
-            // Xephyr is exactly the crash we're avoiding, so we run on :0 and tell the user what to install.
-            Debug.log("isolated launch needs " + chosen + " but it isn't installed — running on :0. Hint: "
-                + SessionBackends.installHint(chosen));
-            return false;
+            throw new IllegalStateException(missingBackend(chosen));
         }
         NestedSession session = null;
         try {
@@ -192,4 +217,15 @@ public final class SessionBootstrap {
         }
     }
 
+    /**
+     * Why a run on a private display can't start without {@code backend}, and the two ways on: the install
+     * command for this distro when one is known, and the desktop.
+     */
+    public static String missingBackend(NestedSession.Backend backend) {
+        String install = BackendInstall.forBackend(backend)
+            .map(i -> "Install it with: " + i.describe() + (i.needsReboot() ? ", then restart" : "") + ".")
+            .orElse("To fix it, " + SessionBackends.installHint(backend) + ".");
+        return backend.binaryName() + " isn't installed, so the game can't run in a private display. " + install
+            + " Or set ⚙ Bot Settings ▸ Run the game in ▸ My desktop.";
+    }
 }

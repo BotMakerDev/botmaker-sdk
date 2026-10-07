@@ -2,8 +2,10 @@ package com.botmaker.sdk.plugin.pilot.ui;
 
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.pilot.NestedSessionLauncher;
 import com.botmaker.sdk.plugin.pilot.PilotProject;
+import com.botmaker.sdk.plugin.settings.BackendInstallPrompt;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.emulator.EmulatorInstances;
@@ -15,11 +17,13 @@ import com.botmaker.session.impl.NestedSession;
 import com.botmaker.shared.emulator.EmulatorProbe;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * The "Background mode" controls — the pilot's <b>recommended</b> input path: launch the project's configured
@@ -45,17 +49,16 @@ final class BackgroundModeBox {
                 + "free. The launched window is the target — no capture source to pick. Otherwise the pilot "
                 + "mirrors your real desktop and Interact moves your actual cursor.");
 
-        ChoiceBox<NestedSession.Backend> backend = new ChoiceBox<>();
-        backend.getItems().addAll(NestedSession.Backend.GAMESCOPE, NestedSession.Backend.XEPHYR);
-        // Preselect the default — gamescope for everything now — single-sourced through SessionBackends so the
-        // pilot and the Launch buttons can't disagree. Xephyr stays in the list only as the manual escape hatch.
-        backend.setValue(SessionBackends.preferredBackend(launcher.configuredTarget()));
-        backend.setTooltip(new Tooltip(
-                "gamescope (recommended): its own window manager, a real GPU inside the display, and the "
-                + "geometry the pilot's capture and Interact agree on. Xephyr: 2D only and software GL — keep "
-                + "it for bisecting a gamescope problem."));
+        // No choice of its own: where the game runs and on which display is the bot's settings' to say, so the
+        // pilot, ▶ Launch now and a run can't disagree. Read each time, since ⚙ Bot Settings may change meanwhile.
+        Supplier<NestedSession.Backend> backend = () -> SessionBootstrap.backendFor(launcher.configuredTarget(),
+                project.settings().runIn().displayBackend());
+        BooleanSupplier onDesktop = () -> !SessionBootstrap.wantsPrivateDisplay(project.settings());
 
         Button start = new Button("Start background mode");
+        Button install = new Button();
+        install.setVisible(false);
+        install.setManaged(false);
         Button stop = new Button("Stop");
         // The one refusal the user can act on from here. HOST_LAUNCHER_OPEN used to be a dead end: a sentence
         // saying "close Heroic and try again" about a launcher that is often tray-resident or left over from an
@@ -73,17 +76,21 @@ final class BackgroundModeBox {
         // by the async callback isn't clobbered when we re-enable the buttons.
         Runnable refreshButtons = () -> {
             boolean running = launcher.isRunning();
-            boolean backendOk = SessionBackends.isAvailable(backend.getValue());
+            boolean backendOk = SessionBackends.isAvailable(backend.get());
             LaunchSpec configured = launcher.configuredTarget();
             // An ADB-driven emulator app is already off the desktop, so there is nothing for a private display
             // to add and NestedSessionLauncher would refuse anyway — don't offer a button whose only outcome is
             // a refusal. Waydroid is not one of those (it renders into a compositor we start), so it keeps it.
             boolean offDesktop = configured != null && configured.runsOffDesktop();
-            boolean canStart = configured != null && backendOk && !offDesktop;
+            boolean canStart = configured != null && backendOk && !offDesktop && !onDesktop.getAsBoolean();
             start.setDisable(running || !canStart);
             stop.setDisable(!running);
-            backend.setDisable(running);
-            boolean xephyr = backend.getValue() == NestedSession.Backend.XEPHYR;
+            boolean offerInstall = !running && !backendOk && !onDesktop.getAsBoolean() && !offDesktop
+                    && project.services() != null;
+            install.setText("Install " + backend.get().binaryName() + "…");
+            install.setVisible(offerInstall);
+            install.setManaged(offerInstall);
+            boolean xephyr = backend.get() == NestedSession.Backend.XEPHYR;
             showWin.setVisible(xephyr);
             showWin.setManaged(xephyr);
             showWin.setDisable(!running);
@@ -122,26 +129,40 @@ final class BackgroundModeBox {
                 emulatorIsolationStatus(spec, status);
                 return;
             }
-            if (spec == null) {
+            if (onDesktop.getAsBoolean()) {
+                status.setText("● ⚙ Bot Settings run the game on your desktop, so the pilot mirrors it and "
+                        + "Interact moves your real cursor. Choose Run the game in ▸ A private display to keep it.");
+            } else if (spec == null) {
                 status.setText("● Background mode needs a launch target on this computer — 📋 Project Setup "
                         + "shows what this one has.");
-            } else if (!SessionBackends.isAvailable(backend.getValue())) {
-                status.setText("● To use this backend for background mode, "
-                        + SessionBackends.installHint(backend.getValue()) + ".");
+            } else if (!SessionBackends.isAvailable(backend.get())) {
+                status.setText("● " + SessionBootstrap.missingBackend(backend.get()));
             } else {
                 status.setText("● Mirroring your real desktop :0 — Interact moves your real cursor. Start "
                         + "background mode to run " + spec.describe() + " isolated.");
             }
             PilotWidgets.tone(status, Styles.WARNING_TEXT); // amber — cursor-moving / not-yet-isolated
         };
-        backend.setOnAction(e -> { refreshButtons.run(); refreshStatus.run(); });
         refreshButtons.run();
         refreshStatus.run();
 
+        install.setOnAction(e -> BackendInstallPrompt.offer(project.services(),
+                install.getScene() == null ? null : install.getScene().getWindow(), backend.get(),
+                (installed, message) -> {
+                    status.setText("● " + message);
+                    PilotWidgets.tone(status, installed ? Styles.OK_TEXT : Styles.MUTED_TEXT);
+                    refreshButtons.run();
+                }));
         start.setOnAction(e -> {
+            // The box only hears its own events, so ⚙ Bot Settings may have changed since it last looked.
+            refreshButtons.run();
+            if (start.isDisabled()) {
+                refreshStatus.run();
+                return;
+            }
             SessionBackends.DisplaySize size = referenceSize(project);
             start.setDisable(true);
-            launcher.start(backend.getValue(), size.width(), size.height(), (ok, msg) -> {
+            launcher.start(backend.get(), size.width(), size.height(), (ok, msg) -> {
                 if (!ok) {
                     // Loud failure (e.g. a host launcher stole the game onto :0) — show it, stay amber, and
                     // offer the one thing the user can do about it from here.
@@ -176,7 +197,7 @@ final class BackgroundModeBox {
         });
 
         box.getChildren().addAll(title, help,
-                new HBox(8, new Label("Backend:"), backend, start, stop, showWin, closeLauncher), status);
+                new HBox(8, start, stop, install, showWin, closeLauncher), status);
         return box;
     }
 

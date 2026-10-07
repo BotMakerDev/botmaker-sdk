@@ -308,8 +308,11 @@ class SdkAssistTest {
         assertEquals(0.9, ((BotSettings) host.values.get("settings").value()).confidence());
         assertFalse(run("set_setting", "setting", "INPUT_BACKEND", "value", "xtest").isRefused());
         assertEquals(BotSettings.InputBackend.XTEST,
-                ((BotSettings) host.values.get("settings").value()).input().linuxBackend());
+                ((BotSettings) host.values.get("settings").value()).runIn().inputBackend());
         assertEquals(0.9, ((BotSettings) host.values.get("settings").value()).confidence(), "the others stay");
+        assertFalse(run("set_setting", "setting", "run_the_game_in", "value", "my-desktop").isRefused());
+        assertEquals(BotSettings.Where.MY_DESKTOP, ((BotSettings) host.values.get("settings").value()).where());
+        assertTrue(run("set_setting", "setting", "run_the_game_in", "value", "cloud").isRefused());
 
         assertTrue(run("set_setting", "setting", "confidence", "value", "2").isRefused());
         assertTrue(run("set_setting", "setting", "max_retry_attempts", "value", "0").isRefused());

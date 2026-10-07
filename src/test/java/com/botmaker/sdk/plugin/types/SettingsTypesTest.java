@@ -17,16 +17,15 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class SettingsTypesTest {
 
     private static final BotSettings TUNED = BotSettings.of(BotSettings.clicks(750, 125, false),
-            BotSettings.vision(0.62, 0.11), BotSettings.input(true, BotSettings.InputBackend.UINPUT),
-            BotSettings.session(false, BotSettings.DisplayBackend.XEPHYR), 7, false);
+            BotSettings.vision(0.62, 0.11), BotSettings.runIn(BotSettings.Where.MY_DESKTOP, true,
+                    BotSettings.DisplayBackend.XEPHYR, BotSettings.InputBackend.UINPUT), 7, false);
 
     @Test
     void everyPartRoundTrips() {
         assertEquals(TUNED, roundTrip(SettingsTypes.SETTINGS, TUNED));
         assertEquals(TUNED.clicks(), roundTrip(SettingsTypes.CLICKS, TUNED.clicks()));
         assertEquals(TUNED.vision(), roundTrip(SettingsTypes.VISION, TUNED.vision()));
-        assertEquals(TUNED.input(), roundTrip(SettingsTypes.INPUT, TUNED.input()));
-        assertEquals(TUNED.session(), roundTrip(SettingsTypes.SESSION, TUNED.session()));
+        assertEquals(TUNED.runIn(), roundTrip(SettingsTypes.RUN_IN, TUNED.runIn()));
     }
 
     @Test

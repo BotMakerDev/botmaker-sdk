@@ -1,7 +1,9 @@
 package com.botmaker.sdk.plugin.pilot;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 
@@ -57,5 +59,15 @@ public final class PilotProject {
     /** What this machine launches for the bot, or {@code null} when none is set. */
     public String launchTarget() {
         return LaunchTargetValue.current(services);
+    }
+
+    /** The bot's settings as its Java says them, {@link BotSettings#DEFAULTS} when it says none or no project. */
+    public BotSettings settings() {
+        return services == null ? BotSettings.DEFAULTS : BotSettingsWindow.current(services);
+    }
+
+    /** The services the pilot was opened with, for a dialog it shows; {@code null} when it serves no project. */
+    public StudioServices services() {
+        return services;
     }
 }

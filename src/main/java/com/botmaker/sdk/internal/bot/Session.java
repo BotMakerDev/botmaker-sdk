@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.bot;
 
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 
 /**
@@ -12,24 +13,22 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * machine while it runs. A non-isolated bot shares the real {@code :0} with you and has none of those
  * properties.
  *
- * <p><b>Default: on.</b> Isolation is the intended way to run, so it needs no code at all; only opting out does —
- * and a project that opts out in Studio does it through the {@code session.isolated} key below rather than a
- * generated call, so a default project's source stays free of session boilerplate either way.
+ * <p><b>Default: on.</b> Isolation is the intended way to run, so it needs no code at all; a project that opts
+ * out does it in its settings ({@code BotSettings.Where.MY_DESKTOP}).
  *
  * <p><b>Precedence</b>, highest first — an explicit call always wins so a bot can force its own behaviour on a
  * machine whose environment says otherwise:
  * <ol>
  *   <li>an explicit {@link #enable()} / {@link #disable()} / {@link #set(boolean)} call in bot code;</li>
- *   <li>the {@code botmaker.session.isolated} system property;</li>
- *   <li>the {@code BOTMAKER_SESSION_ISOLATED} environment variable;</li>
- *   <li>the bot's settings ({@code BotSettings.session(isolated, …)});</li>
- *   <li>{@code true}.</li>
+ *   <li>the {@code botmaker.session.where} run property;</li>
+ *   <li>the {@code BOTMAKER_SESSION_WHERE} environment variable;</li>
+ *   <li>the bot's settings ({@code BotSettings.runIn(where, …)});</li>
+ *   <li>a private display.</li>
  * </ol>
- * {@link #useBackend(String)} follows the same ladder against {@code botmaker.session.backend} /
- * {@code session.backend}, with one difference: its bottom rung is not a fixed value but the
- * <em>kind-driven</em> choice — a game gets gamescope (a real GPU in the private display), a plain command gets
- * the lighter Xephyr. That auto-selection is almost always what you want; pin a backend only to reproduce a
- * problem.
+ * {@link #useBackend(String)} follows the same ladder against {@code botmaker.session.backend} and the
+ * settings' display backend, with one difference: its bottom rung is not a fixed value but the
+ * <em>kind-driven</em> choice — gamescope (a real GPU in the private display), Xephyr for an emulator app. That
+ * auto-selection is almost always what you want; pin a backend only to reproduce a problem.
  *
  * <p><b>Call before the first {@code Target.start()}.</b> The session is brought up by the first launch and then
  * reused for the rest of the run, so a call made after that point changes nothing — it does not tear down a
@@ -92,6 +91,8 @@ public final class Session {
     /** Turns isolation on or off, outranking the system property, environment and project setting. */
     public static void set(boolean isolated) {
         isolatedOverride = isolated;
+        // A bot moved to the desktop after its settings were installed takes over now, if they say so.
+        BotSettings.use(BotSettings.current());
     }
 
     /**

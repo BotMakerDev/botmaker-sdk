@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.session;
 
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.bot.Session;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -20,7 +21,7 @@ class SessionBootstrapTest {
 
     @AfterEach
     void tearDown() {
-        System.clearProperty(SessionBootstrap.ISOLATED_PROPERTY);
+        System.clearProperty(SessionBootstrap.WHERE_PROPERTY);
         System.clearProperty(SessionBootstrap.BACKEND_PROPERTY);
         // Session's overrides are static and outrank everything below them — a leak would silently pin every
         // later test in this JVM.
@@ -32,11 +33,11 @@ class SessionBootstrapTest {
     void anExplicitSessionCallOutranksTheSystemProperty() {
         // The top rung of the ladder: bot code must be able to force its own behaviour on a machine whose
         // environment says the opposite, in both directions.
-        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "false");
+        System.setProperty(SessionBootstrap.WHERE_PROPERTY, "my-desktop");
         Session.enable();
         assertTrue(SessionBootstrap.isolationRequested());
 
-        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "true");
+        System.setProperty(SessionBootstrap.WHERE_PROPERTY, "private-display");
         Session.disable();
         assertFalse(SessionBootstrap.isolationRequested());
     }
@@ -44,7 +45,7 @@ class SessionBootstrapTest {
     @Test
     void isEnabledReportsTheResolvedAnswerNotJustWhatBotCodeAsked() {
         // Session.isEnabled() is the whole ladder, so a bot that never calls anything still reads the truth.
-        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "false");
+        System.setProperty(SessionBootstrap.WHERE_PROPERTY, "my-desktop");
         assertFalse(Session.isEnabled());
         Session.enable();
         assertTrue(Session.isEnabled());
@@ -78,29 +79,52 @@ class SessionBootstrapTest {
 
     @Test
     void isolationIsOnByDefault() {
-        // No project file on the test classpath → session.isolated defaults to true → isolation on by default.
-        System.clearProperty(SessionBootstrap.ISOLATED_PROPERTY);
+        // No settings installed → BotSettings.DEFAULTS → a private display.
+        System.clearProperty(SessionBootstrap.WHERE_PROPERTY);
         assertTrue(SessionBootstrap.isolationRequested());
     }
 
     @Test
     void systemPropertyOverridesToOff() {
         // The explicit override wins over the default-on project setting, in the off direction.
-        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "false");
+        System.setProperty(SessionBootstrap.WHERE_PROPERTY, "my-desktop");
         assertFalse(SessionBootstrap.isolationRequested());
     }
 
     @Test
     void isolationRequestedWhenPropertyIsTrue() {
-        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "true");
+        System.setProperty(SessionBootstrap.WHERE_PROPERTY, "private-display");
         assertTrue(SessionBootstrap.isolationRequested());
+    }
+
+    @Test
+    void aPropertyThatNamesNoPlaceLeavesTheSettingsInCharge() {
+        // The old boolean property is not a place: it must not be read as one, in either direction.
+        System.setProperty(SessionBootstrap.WHERE_PROPERTY, "false");
+        assertTrue(SessionBootstrap.isolationRequested());
+    }
+
+    @Test
+    void aPinnedDisplayBackendWinsOverTheKindsChoice() {
+        LaunchSpec game = new LaunchSpec(LaunchKind.STEAM, "570");
+        assertEquals(NestedSession.Backend.GAMESCOPE,
+                SessionBootstrap.backendFor(game, BotSettings.DisplayBackend.AUTO));
+        assertEquals(NestedSession.Backend.XEPHYR,
+                SessionBootstrap.backendFor(game, BotSettings.DisplayBackend.XEPHYR));
+    }
+
+    @Test
+    void aMissingBackendSaysHowToGetItAndTheWayAround() {
+        String why = SessionBootstrap.missingBackend(NestedSession.Backend.GAMESCOPE);
+        assertTrue(why.startsWith("gamescope isn't installed"), why);
+        assertTrue(why.contains("My desktop"), why);
     }
 
     @Test
     void launchIsolatedNoOpsWhenNotRequested() {
         // Explicitly opt out (the default is now on) — returns false so the caller runs its normal :0 launch,
         // and never registers a session.
-        System.setProperty(SessionBootstrap.ISOLATED_PROPERTY, "false");
+        System.setProperty(SessionBootstrap.WHERE_PROPERTY, "my-desktop");
         assertFalse(SessionBootstrap.launchIsolated(new LaunchSpec(LaunchKind.EXE, "/bin/true")));
         assertFalse(ActiveSession.isActive());
     }

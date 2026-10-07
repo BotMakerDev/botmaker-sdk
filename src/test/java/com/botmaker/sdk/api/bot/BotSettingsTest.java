@@ -9,8 +9,12 @@ import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.platform.Os;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,9 +44,16 @@ class BotSettingsTest {
         @Managed("settings")
         public static BotSettings settings() {
             return BotSettings.of(BotSettings.clicks(750, 125, false), BotSettings.vision(0.62, 0.11),
-                    BotSettings.input(false, BotSettings.InputBackend.AUTO),
-                    BotSettings.session(false, BotSettings.DisplayBackend.XEPHYR), 7, true);
+                    BotSettings.runIn(BotSettings.Where.MY_DESKTOP, false, BotSettings.DisplayBackend.XEPHYR,
+                            BotSettings.InputBackend.AUTO), 7, true);
         }
+    }
+
+    /** The defaults, on the user's desktop. */
+    private static BotSettings onDesktop(boolean takeOver) {
+        return BotSettings.of(BotSettings.DEFAULTS.clicks(), BotSettings.DEFAULTS.vision(),
+                BotSettings.runIn(BotSettings.Where.MY_DESKTOP, takeOver, BotSettings.DisplayBackend.AUTO,
+                        BotSettings.InputBackend.AUTO), BotSettings.DEFAULT_MAX_RETRY_ATTEMPTS, true);
     }
 
     @AfterEach
@@ -57,8 +68,8 @@ class BotSettingsTest {
         assertEquals(BotSettings.DEFAULTS, current);
         assertEquals(BotSettings.DEFAULT_FOUND_DELAY, current.foundDelay());
         assertEquals(BotSettings.DEFAULT_CONFIDENCE, current.confidence());
-        assertTrue(current.session().isolated(), "a bot isolates unless it says otherwise");
-        assertFalse(current.realInput());
+        assertEquals(BotSettings.Where.PRIVATE_DISPLAY, current.where(), "a bot isolates unless it says otherwise");
+        assertFalse(current.takeOver());
     }
 
     @Test
@@ -78,25 +89,45 @@ class BotSettingsTest {
     }
 
     @Test
-    void realInputEscalatesWhenItIsUsedAndOnlyOnce() {
+    void aTakeOverOnTheDesktopEscalatesWhenItIsUsedAndOnlyOnce() {
         RecordingInput input = new RecordingInput();
         NativeControllerFactory.setForTesting(input);
 
-        BotSettings.use(BotSettings.DEFAULTS.realInput(true));
-        assertEquals(1, input.escalations, "real input must swap the backend as it is installed");
+        BotSettings.use(onDesktop(true));
+        assertEquals(1, input.escalations, "a take-over must swap the backend as it is installed");
         BotSettings.use(BotSettings.current().confidence(0.9));
         assertEquals(1, input.escalations, "an unrelated change does not escalate again");
-        assertTrue(BotSettings.current().realInput());
+        assertTrue(BotSettings.current().takeOver());
     }
 
     @Test
-    void turningRealInputOffCannotUndoTheSwap() {
+    void aBotOnAPrivateDisplayNeverTakesOverTheDesktop() {
+        Assumptions.assumeTrue(Os.current() == Os.LINUX, "Windows has no private display");
+        RecordingInput input = new RecordingInput();
+        NativeControllerFactory.setForTesting(input);
+
+        BotSettings.use(BotSettings.DEFAULTS.takeOver(true));
+
+        assertEquals(0, input.escalations, "the user's desktop is not the bot's to take on a private display");
+        BotSettings.use(onDesktop(true));
+        assertEquals(1, input.escalations, "moving it to the desktop takes over then");
+    }
+
+    @Test
+    void turningTakeOverOffCannotUndoTheSwap() {
         NativeControllerFactory.setForTesting(new RecordingInput());
-        BotSettings.use(BotSettings.DEFAULTS.realInput(true));
+        BotSettings.use(onDesktop(true));
 
-        BotSettings.use(BotSettings.current().realInput(false));
+        BotSettings.use(BotSettings.current().takeOver(false));
 
-        assertTrue(BotSettings.current().realInput(), "the backend it swapped in is still delivering input");
+        assertTrue(BotSettings.current().takeOver(), "the backend it swapped in is still delivering input");
+    }
+
+    @Test
+    void whereIsReadByIdAndNothingElse() {
+        assertEquals(Optional.of(BotSettings.Where.MY_DESKTOP), BotSettings.Where.fromId(" My-Desktop "));
+        assertEquals(Optional.empty(), BotSettings.Where.fromId("true"));
+        assertEquals(Optional.empty(), BotSettings.Where.fromId(null));
     }
 
     @Test

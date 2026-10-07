@@ -63,20 +63,22 @@ final class SetupTools {
         COMPARE_MARGIN("compare_margin", "How far ahead the best of several pictures must be, 0 to 1",
                 s -> String.valueOf(s.vision().compareMargin()),
                 (s, v) -> with(s, BotSettings.vision(s.vision().confidence(), unit(v)))),
-        REAL_INPUT("real_input", "Drive the real mouse and keyboard",
-                s -> String.valueOf(s.input().real()),
-                (s, v) -> with(s, BotSettings.input(yes(v), s.input().linuxBackend()))),
-        INPUT_BACKEND("input_backend", "Which Linux backend delivers real input",
-                s -> s.input().linuxBackend().id(),
-                (s, v) -> with(s, BotSettings.input(s.input().real(), choice(BotSettings.InputBackend.values(), v,
-                        BotSettings.InputBackend::id)))),
-        PRIVATE_DISPLAY("private_display", "Run on a private display of its own",
-                s -> String.valueOf(s.session().isolated()),
-                (s, v) -> with(s, BotSettings.session(yes(v), s.session().backend()))),
-        DISPLAY_BACKEND("display_backend", "Which private display hosts it",
-                s -> s.session().backend().id(),
-                (s, v) -> with(s, BotSettings.session(s.session().isolated(), choice(
-                        BotSettings.DisplayBackend.values(), v, BotSettings.DisplayBackend::id)))),
+        RUN_THE_GAME_IN("run_the_game_in", "Where the game runs",
+                s -> s.where().id(),
+                (s, v) -> with(s, BotSettings.runIn(choice(BotSettings.Where.values(), v, BotSettings.Where::id),
+                        s.takeOver(), s.runIn().displayBackend(), s.runIn().inputBackend()))),
+        TAKE_OVER("take_over", "On my desktop, take over the mouse and keyboard (some games ignore window events)",
+                s -> String.valueOf(s.takeOver()),
+                (s, v) -> s.takeOver(yes(v))),
+        DISPLAY_BACKEND("display_backend", "Which private display hosts the game",
+                s -> s.runIn().displayBackend().id(),
+                (s, v) -> with(s, BotSettings.runIn(s.where(), s.takeOver(), choice(
+                        BotSettings.DisplayBackend.values(), v, BotSettings.DisplayBackend::id),
+                        s.runIn().inputBackend()))),
+        INPUT_BACKEND("input_backend", "Which Linux backend delivers a take-over",
+                s -> s.runIn().inputBackend().id(),
+                (s, v) -> with(s, BotSettings.runIn(s.where(), s.takeOver(), s.runIn().displayBackend(),
+                        choice(BotSettings.InputBackend.values(), v, BotSettings.InputBackend::id)))),
         MAX_RETRY_ATTEMPTS("max_retry_attempts", "No-progress checks before the bot is stuck, 1 or more",
                 s -> String.valueOf(s.maxRetryAttempts()),
                 (s, v) -> rebuilt(s, whole(v, 1)));
@@ -116,7 +118,8 @@ final class SetupTools {
     }
 
     record SetSetting(@Describe("which setting; get_settings lists them") Setting setting,
-                      @Describe("its new value: a number, true or false, or a backend's id") String value) {
+                      @Describe("its new value: a number, true or false, or a place's or backend's id")
+                      String value) {
     }
 
     record UseEmulator(@Describe("the emulator's name, as list_emulators gives it") String name,
@@ -201,9 +204,10 @@ final class SetupTools {
         for (Setting setting : Setting.values()) {
             lines.add(setting.id() + " = " + setting.read(settings) + " — " + setting.displayName());
         }
-        lines.add("input_backend is one of " + ids(BotSettings.InputBackend.values(), BotSettings.InputBackend::id)
+        lines.add("run_the_game_in is one of " + ids(BotSettings.Where.values(), BotSettings.Where::id)
+                + "; input_backend one of " + ids(BotSettings.InputBackend.values(), BotSettings.InputBackend::id)
                 + "; display_backend one of " + ids(BotSettings.DisplayBackend.values(),
-                BotSettings.DisplayBackend::id) + ".");
+                BotSettings.DisplayBackend::id) + ". take_over only applies to my-desktop.");
         return AgentReply.text(String.join("\n", lines));
     }
 
@@ -336,23 +340,19 @@ final class SetupTools {
     }
 
     private static BotSettings with(BotSettings s, BotSettings.Clicks clicks) {
-        return BotSettings.of(clicks, s.vision(), s.input(), s.session(), s.maxRetryAttempts(), debug(s));
+        return BotSettings.of(clicks, s.vision(), s.runIn(), s.maxRetryAttempts(), debug(s));
     }
 
     private static BotSettings with(BotSettings s, BotSettings.Vision vision) {
-        return BotSettings.of(s.clicks(), vision, s.input(), s.session(), s.maxRetryAttempts(), debug(s));
+        return BotSettings.of(s.clicks(), vision, s.runIn(), s.maxRetryAttempts(), debug(s));
     }
 
-    private static BotSettings with(BotSettings s, BotSettings.Input input) {
-        return BotSettings.of(s.clicks(), s.vision(), input, s.session(), s.maxRetryAttempts(), debug(s));
-    }
-
-    private static BotSettings with(BotSettings s, BotSettings.Session session) {
-        return BotSettings.of(s.clicks(), s.vision(), s.input(), session, s.maxRetryAttempts(), debug(s));
+    private static BotSettings with(BotSettings s, BotSettings.RunIn runIn) {
+        return BotSettings.of(s.clicks(), s.vision(), runIn, s.maxRetryAttempts(), debug(s));
     }
 
     private static BotSettings rebuilt(BotSettings s, int maxRetryAttempts) {
-        return BotSettings.of(s.clicks(), s.vision(), s.input(), s.session(), maxRetryAttempts, debug(s));
+        return BotSettings.of(s.clicks(), s.vision(), s.runIn(), maxRetryAttempts, debug(s));
     }
 
     /** The deprecated part is carried as it is: a value read is written back whole. */

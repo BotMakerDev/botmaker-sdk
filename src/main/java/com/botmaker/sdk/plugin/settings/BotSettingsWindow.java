@@ -8,16 +8,23 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.session.SessionBootstrap;
+import com.botmaker.session.display.SessionBackends;
+import com.botmaker.session.impl.NestedSession;
+import com.botmaker.shared.platform.Os;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TitledPane;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.GridPane;
@@ -32,8 +39,8 @@ import javafx.util.StringConverter;
 import java.util.Optional;
 
 /**
- * ⚙ Bot Settings: the bot's {@code @Managed("settings")} value — how it clicks and looks, whether it drives the
- * real mouse and keyboard, and whether it runs on a private display.
+ * ⚙ Bot Settings: the bot's {@code @Managed("settings")} value — how it clicks and looks, and where the game
+ * runs: a private display, or the desktop with or without taking over the mouse and keyboard.
  *
  * <p>The settings are Java the bot compiles, so the window belongs to the plugin that owns the type, and it edits the one expression
  * {@code Sdk.settings()} returns through the host — the host writes the call, this window never sees Java.
@@ -48,10 +55,18 @@ public final class BotSettingsWindow {
     /** The value, declared once in {@link SdkValues}. */
     public static final ManagedHandle<BotSettings> SETTINGS = ManagedHandle.of(SdkValues.SETTINGS);
 
+    /** Only Linux has a private display to offer. */
+    private static final boolean LINUX = Os.current() == Os.LINUX;
+
     private final StudioServices services;
     private final Window owner;
 
-    private final CheckBox realInput = new CheckBox("Drive the real mouse and keyboard (turn on for games)");
+    private final ToggleGroup where = new ToggleGroup();
+    private final RadioButton privateDisplay = new RadioButton(BotSettings.Where.PRIVATE_DISPLAY.displayName());
+    private final RadioButton myDesktop = new RadioButton(BotSettings.Where.MY_DESKTOP.displayName());
+    /** On Windows, where there is no private display, the choice is kept as the bot's Java says it. */
+    private BotSettings.Where windowsWhere = BotSettings.Where.PRIVATE_DISPLAY;
+    private final CheckBox takeOver = new CheckBox("Take over the mouse and keyboard");
     private final CheckBox randomizeClicks = new CheckBox("Click a random point inside the match, not its centre");
     /**
      * The bot's {@code debug}, kept as it was: debug output is the host's (Studio's 🐞 Debug, the
@@ -65,9 +80,10 @@ public final class BotSettingsWindow {
     private final Spinner<Double> confidence = new Spinner<>(0.0, 1.0, 0.8, 0.05);
     private final Spinner<Double> compareMargin = new Spinner<>(0.0, 1.0, 0.05, 0.01);
     private final Spinner<Integer> maxRetryAttempts = new Spinner<>(1, 600_000, 20, 1);
-    private final ComboBox<BotSettings.InputBackend> linuxInput = new ComboBox<>();
-    private final CheckBox isolatedSession = new CheckBox("Run in a private display (background)");
-    private final ComboBox<BotSettings.DisplayBackend> sessionBackend = new ComboBox<>();
+    private final ComboBox<BotSettings.InputBackend> inputBackend = new ComboBox<>();
+    private final ComboBox<BotSettings.DisplayBackend> displayBackend = new ComboBox<>();
+    private final Label backendStatus = note("");
+    private final Button installBackend = new Button();
 
     private BotSettingsWindow(StudioServices services, Window owner) {
         this.services = services;
@@ -138,8 +154,7 @@ public final class BotSettingsWindow {
                     + "window cannot rewrite it — it is your code, and stays as you wrote it. The defaults are "
                     + "shown."));
         }
-        body.getChildren().addAll(new Separator(), inputPane(), new Separator(), sessionPane(), new Separator(),
-                visionPane());
+        body.getChildren().addAll(new Separator(), runInPane(stage), new Separator(), visionPane());
         body.setPadding(new Insets(18));
         ScrollPane scroll = new ScrollPane(body);
         scroll.setFitToWidth(true);
@@ -174,46 +189,80 @@ public final class BotSettingsWindow {
     }
 
     /**
-     * The real-input section. The explanation is the only place that says <em>why</em> a game needs this — the
-     * events BotMaker sends by default are rejected by design, and no OS reports the drop, which is why it
-     * cannot be detected.
+     * Where the game runs, asked once. The take-over tick shows only for the desktop, the one place it does
+     * anything; the two backends sit under Advanced, for a machine that needs one pinned. Windows has no private
+     * display, so it shows the tick alone.
      */
-    private VBox inputPane() {
-        linuxInput.getItems().setAll(BotSettings.InputBackend.values());
-        linuxInput.setConverter(labels(BotSettings.InputBackend::label));
-        linuxInput.setMaxWidth(Double.MAX_VALUE);
+    private VBox runInPane(Stage stage) {
+        inputBackend.getItems().setAll(BotSettings.InputBackend.values());
+        inputBackend.setConverter(labels(BotSettings.InputBackend::displayName));
+        inputBackend.setMaxWidth(Double.MAX_VALUE);
+        displayBackend.getItems().setAll(BotSettings.DisplayBackend.values());
+        displayBackend.setConverter(labels(BotSettings.DisplayBackend::displayName));
+        displayBackend.setMaxWidth(Double.MAX_VALUE);
+        Label takeOverHint = note("Off: events are sent to the game's window, and some games don't notice them. "
+                + "Turn this on if clicks are ignored — the pointer then moves to each click and returns.");
+        if (!LINUX) {
+            return new VBox(8, title("Mouse and keyboard"), takeOver, takeOverHint);
+        }
+        privateDisplay.setToggleGroup(where);
+        myDesktop.setToggleGroup(where);
+        Label privateHint = note("The bot brings up a display of its own and launches the game there. The game "
+                + "never appears on your desktop, and the bot never takes your cursor or focus.");
+        installBackend.setOnAction(e -> BackendInstallPrompt.offer(services, stage, neededBackend(),
+                (installed, message) -> {
+                    backendStatus.setText(message);
+                    if (installed) refreshBackend();
+                }));
+        HBox missing = new HBox(8, backendStatus, installBackend);
+        missing.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(backendStatus, Priority.ALWAYS);
+        VBox onPrivate = new VBox(6, privateHint, missing);
+        onPrivate.setPadding(new Insets(0, 0, 0, 24));
+        VBox onDesktop = new VBox(6, takeOver, takeOverHint);
+        onDesktop.setPadding(new Insets(0, 0, 0, 24));
+        showWhen(onPrivate, privateDisplay);
+        showWhen(onDesktop, myDesktop);
+        displayBackend.disableProperty().bind(privateDisplay.selectedProperty().not());
+        inputBackend.disableProperty().bind(myDesktop.selectedProperty().and(takeOver.selectedProperty()).not());
+        displayBackend.valueProperty().addListener((o, was, now) -> refreshBackend());
+        privateDisplay.selectedProperty().addListener((o, was, now) -> refreshBackend());
+
         GridPane grid = grid();
-        grid.addRow(0, new Label("Linux backend"), linuxInput);
-        GridPane.setHgrow(linuxInput, Priority.ALWAYS);
-        return new VBox(8, title("Input"), realInput,
-                note("Games ignore the quiet background clicks BotMaker sends by default, so this drives the real "
-                        + "mouse and keyboard instead — the pointer moves to each click and returns, and the "
-                        + "game window is raised. Leave it off for an ordinary application you'd rather the bot "
-                        + "never took the cursor away from."),
-                grid,
-                note("Which Linux backend delivers that input. Pin one only if this machine works with a "
-                        + "particular one; a -Dbotmaker.linux.input on the command line still wins. Ignored on "
-                        + "Windows."));
+        grid.addRow(0, new Label("Private display"), displayBackend);
+        grid.addRow(1, new Label("Take-over input"), inputBackend);
+        GridPane.setHgrow(displayBackend, Priority.ALWAYS);
+        GridPane.setHgrow(inputBackend, Priority.ALWAYS);
+        TitledPane advanced = new TitledPane("Advanced", new VBox(8, grid,
+                note("Automatic is right almost always. gamescope puts a real GPU in the private display; Xephyr "
+                        + "renders in software, which crashes 3D games and store launchers. Pin an input backend "
+                        + "only if this machine works with one in particular; -Dbotmaker.linux.input on the "
+                        + "command line still wins.")));
+        advanced.setExpanded(false);
+        return new VBox(8, title("Run the game in"), privateDisplay, onPrivate, myDesktop, onDesktop, advanced);
     }
 
-    /** The private-display section, said in terms of what it decides: whether you can use the machine meanwhile. */
-    private VBox sessionPane() {
-        sessionBackend.getItems().setAll(BotSettings.DisplayBackend.values());
-        sessionBackend.setConverter(labels(BotSettings.DisplayBackend::label));
-        sessionBackend.setMaxWidth(Double.MAX_VALUE);
-        sessionBackend.disableProperty().bind(isolatedSession.selectedProperty().not());
-        GridPane grid = grid();
-        grid.addRow(0, new Label("Display backend"), sessionBackend);
-        GridPane.setHgrow(sessionBackend, Priority.ALWAYS);
-        return new VBox(8, title("Session"), isolatedSession,
-                note("On (the default), the bot brings up a private display of its own and launches the game "
-                        + "there. The window never appears on your desktop, the bot never steals your cursor or "
-                        + "focus, and your own clicks can't land in its window. Turn it off to watch the bot work "
-                        + "on your real desktop. Linux only; on Windows the bot runs on the desktop either way."),
-                grid,
-                note("Automatic is right almost always: a game gets gamescope, which puts a real GPU inside the "
-                        + "private display, and a plain command gets the lighter Xephyr. Xephyr renders in "
-                        + "software, which is what makes 3D games and store launchers crash."));
+    /** Shows {@code pane} only while {@code choice} is selected, taking no room otherwise. */
+    private static void showWhen(Region pane, RadioButton choice) {
+        pane.visibleProperty().bind(choice.selectedProperty());
+        pane.managedProperty().bind(choice.selectedProperty());
+    }
+
+    /** The private display the game would get with the window's current choices. */
+    private NestedSession.Backend neededBackend() {
+        BotSettings.DisplayBackend pinned = displayBackend.getValue();
+        return SessionBootstrap.backendFor(LaunchTargetValue.spec(services), pinned);
+    }
+
+    /** Says whether the private display's backend is installed, with the offer to install it when it isn't. */
+    private void refreshBackend() {
+        NestedSession.Backend needed = neededBackend();
+        boolean missing = privateDisplay.isSelected() && !SessionBackends.isAvailable(needed);
+        backendStatus.setText(missing ? "⚠ " + needed.binaryName() + " isn't installed — the game can't run in a "
+                + "private display without it." : "");
+        installBackend.setText("Install " + needed.binaryName() + "…");
+        installBackend.setVisible(missing);
+        installBackend.setManaged(missing);
     }
 
     /** Delays, confidence and retries — what the bot does around each match attempt. */
@@ -239,10 +288,12 @@ public final class BotSettingsWindow {
 
     @SuppressWarnings("deprecation")
     private void seed(BotSettings s) {
-        realInput.setSelected(s.input().real());
-        linuxInput.setValue(s.input().linuxBackend());
-        isolatedSession.setSelected(s.session().isolated());
-        sessionBackend.setValue(s.session().backend());
+        windowsWhere = s.where();
+        (s.where() == BotSettings.Where.MY_DESKTOP ? myDesktop : privateDisplay).setSelected(true);
+        takeOver.setSelected(s.takeOver());
+        inputBackend.setValue(s.runIn().inputBackend());
+        displayBackend.setValue(s.runIn().displayBackend());
+        if (LINUX) refreshBackend();
         foundDelay.getValueFactory().setValue(s.foundDelay());
         notFoundDelay.getValueFactory().setValue(s.notFoundDelay());
         confidence.getValueFactory().setValue(s.confidence());
@@ -267,9 +318,14 @@ public final class BotSettingsWindow {
         return BotSettings.of(
                 BotSettings.clicks(foundDelay.getValue(), notFoundDelay.getValue(), randomizeClicks.isSelected()),
                 BotSettings.vision(confidence.getValue(), compareMargin.getValue()),
-                BotSettings.input(realInput.isSelected(), linuxInput.getValue()),
-                BotSettings.session(isolatedSession.isSelected(), sessionBackend.getValue()),
+                BotSettings.runIn(chosenWhere(), takeOver.isSelected(), displayBackend.getValue(),
+                        inputBackend.getValue()),
                 maxRetryAttempts.getValue(), debug);
+    }
+
+    private BotSettings.Where chosenWhere() {
+        if (!LINUX) return windowsWhere;
+        return myDesktop.isSelected() ? BotSettings.Where.MY_DESKTOP : BotSettings.Where.PRIVATE_DISPLAY;
     }
 
     private static <T> void commitTyped(Spinner<T> spinner) {
