@@ -5,7 +5,7 @@ import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.plugin.launch.LaunchTargetChooser;
+import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
@@ -51,10 +51,11 @@ import java.nio.file.Path;
  *
  * <h2>The launch target is optional, and picked from the launchers</h2>
  *
- * <p>A game is started by its own launcher — Faugus or Heroic on Linux, Steam or Epic on Windows — or by the
- * bot's own {@code Game} blocks, and BotMaker does not grow a second launcher UI beside them (the maintainer's
- * call). So <b>Choose…</b> ({@link LaunchTargetChooser}) lists what those launchers already have
- * and stores which one; nothing about how to start it. An emulator app picked in an Emulators block sets it
+ * <p>A game is started by its own launcher — Faugus, Heroic or Lutris on Linux, Steam, Epic or GOG on Windows —
+ * or by the bot's own {@code Game} blocks, and BotMaker does not grow a second launcher UI beside them (the
+ * maintainer's call). So <b>Choose…</b> opens the game dialog ({@link GameDialog}, also the toolbar's game
+ * button), which lists what those launchers and the app menu already have and stores which one; nothing about
+ * how to start it. An emulator app picked in an Emulators block sets it
  * too, and <b>▶ Launch now</b> then starts it. A value it cannot read is shown with a Clear button, never a ✓.
  *
  * <h2>Refreshing</h2>
@@ -66,8 +67,8 @@ public final class ProjectSetup {
 
     /** What the launch row says when this computer has no launch target, which is a fine place to be. */
     static final String NO_LAUNCH_TARGET = "None on this computer, and none is needed: start your game from its "
-            + "own launcher, or let the bot start it with a Game block. Choose… picks a game Steam, Epic, Heroic "
-            + "or Faugus already has, so a run can start it — in its own display in background mode.";
+            + "own launcher, or let the bot start it with a Game block. Choose… picks a game your launchers or "
+            + "app menu already have, so a run can start it — in its own display when it runs on a private one.";
 
     /** The one open instance, so pressing the toolbar button twice focuses rather than stacks. */
     private static ProjectSetup active;
@@ -196,13 +197,10 @@ public final class ProjectSetup {
                                 launch.unreadable() ? clearLaunchButton() : quickLaunchButton())));
     }
 
-    /** Picks what this computer launches from the games its launchers already list. */
+    /** Opens the game dialog, the toolbar's game button's window; every change there re-checks these rows. */
     private Button chooseLaunchButton() {
         Button choose = new Button("Choose…");
-        choose.setOnAction(e -> LaunchTargetChooser.choose(services, described -> {
-            report(true, "Launch target on this computer: " + described + ".");
-            refresh();
-        }, reason -> report(false, reason)));
+        choose.setOnAction(e -> GameDialog.open(services, stage, this::refresh));
         return choose;
     }
 

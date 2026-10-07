@@ -1,8 +1,11 @@
 package com.botmaker.sdk.plugin;
 
+import com.botmaker.plugin.api.toolbar.EnabledWhen;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
+import com.botmaker.sdk.plugin.launch.GameButton;
+import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
 import com.botmaker.sdk.plugin.pictures.ResourceManagerDialog;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
@@ -33,6 +36,7 @@ public final class SdkToolbarItems {
     public static final String CAPTURE_SOURCE_ID = "capture-source";
     public static final String BOT_SETTINGS_ID = "bot-settings";
     public static final String PROJECT_SETUP_ID = "project-setup";
+    public static final String GAME_ID = "game";
     public static final String POINT_HERE_ID = "point-here";
     public static final String PICTURE_HERE_ID = "picture-here";
 
@@ -78,6 +82,19 @@ public final class SdkToolbarItems {
             .in(ToolbarGroup.PROJECT, 60)
             .onPress(() -> BotSettingsWindow::open);
 
+    /**
+     * At 30, first in the project group: you pick what the bot plays, then where it looks — and a game's window
+     * can only be picked as a capture source once the game is up. Says the current game's name and shows its
+     * cover ({@link GameButton}).
+     */
+    public static final ToolbarItem GAME = ToolbarItem.id(GAME_ID).label(GameButton::label)
+            .tooltip("Which game this bot plays on this computer — pick it from Steam, Heroic, Faugus, Lutris, "
+                    + "Waydroid or the app menu, and start it without running the bot")
+            .in(ToolbarGroup.PROJECT, 30)
+            .enabledWhen(EnabledWhen.PROJECT_OPEN)
+            .icon(GameButton::icon)
+            .onPress(() -> GameDialog::open);
+
     /** At 40, immediately before Capture Source, because it is the window that sends a user to that one. */
     public static final ToolbarItem PROJECT_SETUP = ToolbarItem.id(PROJECT_SETUP_ID).label("📋 Project Setup")
             .tooltip("What this project still needs before it can run — something to launch, something "
@@ -99,7 +116,7 @@ public final class SdkToolbarItems {
 
     /** Every item, in declaration order; the host sorts on each item's group and order. */
     public static final List<ToolbarItem> ALL = List.of(PILOT, CAPTURE_TEMPLATES, MANAGE_PICTURES, ACTIVITY_FLOW,
-            CAPTURE_SOURCE, BOT_SETTINGS, PROJECT_SETUP, POINT_HERE, PICTURE_HERE);
+            CAPTURE_SOURCE, BOT_SETTINGS, GAME, PROJECT_SETUP, POINT_HERE, PICTURE_HERE);
 
     private SdkToolbarItems() {}
 }

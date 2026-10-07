@@ -21,6 +21,21 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🎮 Game: the game this bot plays, on the toolbar.** The button shows the current game's name and cover.
+  It opens the game dialog, which Project Setup's launch row now opens too. The dialog shows:
+  - your recent picks first, then one section per launcher on this computer — Steam (without Proton and the
+    runtimes), Epic, Heroic (an Epic game once), Faugus, Lutris, GOG on Windows;
+  - then the Android apps Waydroid put in the menu, with the emulator picker for any other emulator or a
+    phone; then the menu's own games; then every other app, folded;
+  - a search box, **▶ Launch game** (starts it, honouring *Run the game in*, without running the bot), and a
+    row to type a target.
+
+  A pick is kept on this computer only, as before. The recent picks are the run property
+  `botmaker.launch.recent`.
+- **Add a Windows program…** (Linux): pick an `.exe`, and it is added to Faugus Launcher with Faugus's default
+  prefix and runner and becomes the target. Without Faugus, the dialog offers to install it from Flathub.
+- **Two new launch targets:** `lutris:<id>`, a Lutris game, and `desktop:<id>`, any app in the desktop's menu.
+  The game dialog replaces Project Setup's flat grid (`LaunchTargetChooser`, deleted).
 - **The overlay editor knows your bot.** In a Studio with the new overlay editor:
   - each activity's body is a chip to edit;
   - the panel opens over the window `Sdk.captureSource()` names, and ⇄ Change opens 🎯 Capture Source;

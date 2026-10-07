@@ -231,20 +231,20 @@ class SdkPluginSurfaceTest {
      * them: it is the host's, and this plugin takes part through {@code @Records} and {@code recordedValues()}.
      */
     @Test
-    void the_toolbar_contributes_nine_items_in_their_groups_and_orders() {
+    void the_toolbar_contributes_ten_items_in_their_groups_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();
 
         assertEquals(List.of("pilot", "capture-templates", "manage-templates",
-                        "activity-flow", "capture-source", "bot-settings", "project-setup",
+                        "activity-flow", "capture-source", "bot-settings", "game", "project-setup",
                         "point-here", "picture-here"),
                 items.stream().map(ToolbarItem::id).toList());
 
         assertEquals(List.of(ToolbarGroup.RUN, ToolbarGroup.TOOLS, ToolbarGroup.TOOLS,
                         ToolbarGroup.AUTHORING, ToolbarGroup.PROJECT, ToolbarGroup.PROJECT, ToolbarGroup.PROJECT,
-                        ToolbarGroup.OVERLAY, ToolbarGroup.OVERLAY),
+                        ToolbarGroup.PROJECT, ToolbarGroup.OVERLAY, ToolbarGroup.OVERLAY),
                 items.stream().map(ToolbarItem::group).toList());
 
-        assertEquals(List.of(10, 20, 30, 10, 50, 60, 40, 10, 20),
+        assertEquals(List.of(10, 20, 30, 10, 50, 60, 30, 40, 10, 20),
                 items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {

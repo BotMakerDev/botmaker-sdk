@@ -2,6 +2,8 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.DeclaredPlugin;
 import com.botmaker.plugin.api.StudioPlugin;
+import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
@@ -82,5 +84,12 @@ public final class SdkPlugin extends DeclaredPlugin {
     @Override
     public void projectClosing() {
         RemotePilotUi.release();
+        GameButton.unbind();
+    }
+
+    /** The toolbar's game button names what this project launches, so it is told which project that is. */
+    @Override
+    public void projectOpened(StudioServices services) {
+        GameButton.bind(services);
     }
 }

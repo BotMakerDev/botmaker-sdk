@@ -21,6 +21,8 @@ import com.botmaker.shared.launch.Launcher;
  *   epic:&lt;appName&gt;
  *   heroic:&lt;appName&gt;
  *   faugus:&lt;gameId&gt;
+ *   lutris:&lt;id&gt;
+ *   desktop:&lt;desktop-entry id&gt;
  *   cli:&lt;command line&gt;
  *   exe:&lt;path&gt;
  *   emu-app:&lt;package&gt;@&lt;instanceName&gt;
@@ -142,6 +144,8 @@ public sealed interface LaunchTarget {
             case EPIC -> new Epic(parsed.token());
             case HEROIC -> new Heroic(parsed.token());
             case FAUGUS -> new Faugus(parsed.token());
+            case LUTRIS -> new Lutris(parsed.token());
+            case DESKTOP -> new App(parsed.token());
             case CLI -> new Cli(parsed.token());
             case EXE -> new Exe(parsed.token());
             case EMULATOR_APP -> emulatorApp(parsed);
@@ -193,6 +197,22 @@ public sealed interface LaunchTarget {
         @Override
         public LaunchSpec launchSpec() {
             return new LaunchSpec(LaunchKind.FAUGUS, gameId);
+        }
+    }
+
+    /** A <a href="https://lutris.net/">Lutris</a> entry, launched by its library id. */
+    record Lutris(String id) implements LaunchTarget {
+        @Override
+        public LaunchSpec launchSpec() {
+            return new LaunchSpec(LaunchKind.LUTRIS, id);
+        }
+    }
+
+    /** An application from the desktop's menu, launched by its desktop-entry id the way the menu starts it. */
+    record App(String desktopId) implements LaunchTarget {
+        @Override
+        public LaunchSpec launchSpec() {
+            return new LaunchSpec(LaunchKind.DESKTOP, desktopId);
         }
     }
 
