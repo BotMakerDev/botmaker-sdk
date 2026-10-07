@@ -13,7 +13,7 @@ import com.botmaker.shared.launch.HostLauncherProbe;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.display.SessionBackends;
-import com.botmaker.session.impl.NestedSession;
+import com.botmaker.session.SessionBackend;
 import com.botmaker.shared.emulator.EmulatorProbe;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -51,7 +51,7 @@ final class BackgroundModeBox {
 
         // No choice of its own: where the game runs and on which display is the bot's settings' to say, so the
         // pilot, ▶ Launch now and a run can't disagree. Read each time, since ⚙ Bot Settings may change meanwhile.
-        Supplier<NestedSession.Backend> backend = () -> SessionBootstrap.backendFor(launcher.configuredTarget(),
+        Supplier<SessionBackend> backend = () -> SessionBootstrap.backendFor(launcher.configuredTarget(),
                 project.settings().runIn().displayBackend());
         BooleanSupplier onDesktop = () -> !SessionBootstrap.wantsPrivateDisplay(project.settings());
 
@@ -90,7 +90,7 @@ final class BackgroundModeBox {
             install.setText("Install " + backend.get().binaryName() + "…");
             install.setVisible(offerInstall);
             install.setManaged(offerInstall);
-            boolean xephyr = backend.get() == NestedSession.Backend.XEPHYR;
+            boolean xephyr = backend.get() == SessionBackend.XEPHYR;
             showWin.setVisible(xephyr);
             showWin.setManaged(xephyr);
             showWin.setDisable(!running);

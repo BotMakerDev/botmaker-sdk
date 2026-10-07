@@ -1,7 +1,7 @@
 package com.botmaker.sdk.plugin.launch;
 
 import com.botmaker.session.display.SessionBackends;
-import com.botmaker.session.impl.NestedSession;
+import com.botmaker.session.SessionBackend;
 import com.botmaker.session.launch.BackgroundLauncher;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
@@ -154,7 +154,7 @@ public final class QuickLaunch {
      * it, never the desktop they didn't ask for.
      */
     private static void launchInBackground(Button button, LaunchSpec spec, Report report, StudioServices services,
-                                           NestedSession.Backend backend) {
+                                           SessionBackend backend) {
         if (!SessionBackends.isAvailable(backend)) {
             button.setDisable(false);
             report.accept(false, SessionBootstrap.missingBackend(backend));

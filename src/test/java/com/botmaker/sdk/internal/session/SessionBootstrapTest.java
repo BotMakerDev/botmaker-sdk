@@ -5,8 +5,7 @@ import com.botmaker.sdk.internal.bot.Session;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.display.SessionBackends;
-import com.botmaker.session.ActiveSession;
-import com.botmaker.session.impl.NestedSession;
+import com.botmaker.session.SessionBackend;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The bot-runtime producer's gate and backend/size selection — the pure part that decides <em>whether</em> and
- * <em>how</em> to go isolated. The live bring-up ({@code NestedSession.start} → launch → register) needs a real
+ * <em>how</em> to go isolated. The live bring-up ({@code Sessions.startPrivate} → launch → register) needs a real
  * X server and is verified by the shared live suite / manually, exactly like Studio's launcher.
  */
 class SessionBootstrapTest {
@@ -26,7 +25,7 @@ class SessionBootstrapTest {
         // Session's overrides are static and outrank everything below them — a leak would silently pin every
         // later test in this JVM.
         Session.clearOverrides();
-        ActiveSession.clear();
+        BotSession.clear();
     }
 
     @Test
@@ -55,12 +54,12 @@ class SessionBootstrapTest {
     void useBackendOutranksThePropertyAndAutoUnpinsToTheRungBelow() {
         System.setProperty(SessionBootstrap.BACKEND_PROPERTY, "xephyr");
         Session.useBackend("gamescope");
-        assertEquals(NestedSession.Backend.GAMESCOPE,
+        assertEquals(SessionBackend.GAMESCOPE,
                 SessionBootstrap.backend(new LaunchSpec(LaunchKind.CLI, "echo hi")));
 
         // "auto" is not a backend: it un-pins, dropping to the next rung (here, the xephyr property).
         Session.useBackend("auto");
-        assertEquals(NestedSession.Backend.XEPHYR,
+        assertEquals(SessionBackend.XEPHYR,
                 SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")));
     }
 
@@ -71,7 +70,7 @@ class SessionBootstrapTest {
         // exact crash the kind-driven choice exists to prevent. Both must fall through to the kind.
         for (String value : new String[]{"auto", "gamescpoe", ""}) {
             System.setProperty(SessionBootstrap.BACKEND_PROPERTY, value);
-            assertEquals(NestedSession.Backend.GAMESCOPE,
+            assertEquals(SessionBackend.GAMESCOPE,
                     SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")),
                     "a game must still get gamescope with session.backend='" + value + "'");
         }
@@ -107,15 +106,15 @@ class SessionBootstrapTest {
     @Test
     void aPinnedDisplayBackendWinsOverTheKindsChoice() {
         LaunchSpec game = new LaunchSpec(LaunchKind.STEAM, "570");
-        assertEquals(NestedSession.Backend.GAMESCOPE,
+        assertEquals(SessionBackend.GAMESCOPE,
                 SessionBootstrap.backendFor(game, BotSettings.DisplayBackend.AUTO));
-        assertEquals(NestedSession.Backend.XEPHYR,
+        assertEquals(SessionBackend.XEPHYR,
                 SessionBootstrap.backendFor(game, BotSettings.DisplayBackend.XEPHYR));
     }
 
     @Test
     void aMissingBackendSaysHowToGetItAndTheWayAround() {
-        String why = SessionBootstrap.missingBackend(NestedSession.Backend.GAMESCOPE);
+        String why = SessionBootstrap.missingBackend(SessionBackend.GAMESCOPE);
         assertTrue(why.startsWith("gamescope isn't installed"), why);
         assertTrue(why.contains("My desktop"), why);
     }
@@ -126,23 +125,23 @@ class SessionBootstrapTest {
         // and never registers a session.
         System.setProperty(SessionBootstrap.WHERE_PROPERTY, "my-desktop");
         assertFalse(SessionBootstrap.launchIsolated(new LaunchSpec(LaunchKind.EXE, "/bin/true")));
-        assertFalse(ActiveSession.isActive());
+        assertFalse(BotSession.isActive());
     }
 
     @Test
     void backendDefaultsToGamescopeAndHonoursOverride() {
         System.clearProperty(SessionBootstrap.BACKEND_PROPERTY);
         // No override: gamescope, whatever the kind.
-        assertEquals(NestedSession.Backend.GAMESCOPE,
+        assertEquals(SessionBackend.GAMESCOPE,
                 SessionBootstrap.backend(new LaunchSpec(LaunchKind.CLI, "echo hi")));
-        assertEquals(NestedSession.Backend.GAMESCOPE,
+        assertEquals(SessionBackend.GAMESCOPE,
                 SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")));
         // The explicit override wins over the default (forces Xephyr even for a game).
         System.setProperty(SessionBootstrap.BACKEND_PROPERTY, "xephyr");
-        assertEquals(NestedSession.Backend.XEPHYR,
+        assertEquals(SessionBackend.XEPHYR,
                 SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")));
         System.setProperty(SessionBootstrap.BACKEND_PROPERTY, "gamescope");
-        assertEquals(NestedSession.Backend.GAMESCOPE,
+        assertEquals(SessionBackend.GAMESCOPE,
                 SessionBootstrap.backend(new LaunchSpec(LaunchKind.CLI, "echo hi")));
     }
 
@@ -160,8 +159,8 @@ class SessionBootstrapTest {
     @Test
     void optionsCarryTheSelectedBackendAndSize() {
         System.setProperty(SessionBootstrap.BACKEND_PROPERTY, "gamescope");
-        NestedSession.Options o = SessionBootstrap.options(new LaunchSpec(LaunchKind.CLI, "echo hi"));
-        assertEquals(NestedSession.Backend.GAMESCOPE, o.backend());
+        com.botmaker.session.SessionOptions o = SessionBootstrap.options(new LaunchSpec(LaunchKind.CLI, "echo hi"));
+        assertEquals(SessionBackend.GAMESCOPE, o.backend());
         assertEquals(SessionBootstrap.DEFAULT_WIDTH, o.width());
         assertEquals(SessionBootstrap.DEFAULT_HEIGHT, o.height());
     }
@@ -169,9 +168,9 @@ class SessionBootstrapTest {
     @Test
     void optionsFollowTheDefaultWithoutAnOverride() {
         System.clearProperty(SessionBootstrap.BACKEND_PROPERTY);
-        assertEquals(NestedSession.Backend.GAMESCOPE,
+        assertEquals(SessionBackend.GAMESCOPE,
                 SessionBootstrap.options(new LaunchSpec(LaunchKind.STEAM, "570")).backend());
-        assertEquals(NestedSession.Backend.GAMESCOPE,
+        assertEquals(SessionBackend.GAMESCOPE,
                 SessionBootstrap.options(new LaunchSpec(LaunchKind.CLI, "echo hi")).backend());
     }
 }

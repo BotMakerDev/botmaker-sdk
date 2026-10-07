@@ -13,7 +13,7 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
-import com.botmaker.shared.capture.GamescopeHost;
+import com.botmaker.session.display.GamescopeHost;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.emulator.EmulatorInstance;

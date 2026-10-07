@@ -1,9 +1,9 @@
 package com.botmaker.sdk.plugin.pilot;
 
-import com.botmaker.shared.launch.LaunchIsolation;
+import com.botmaker.session.launch.LaunchIsolation;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.display.SessionBackends;
-import com.botmaker.session.impl.NestedSession;
+import com.botmaker.session.SessionBackend;
 import com.botmaker.session.launch.BackgroundLauncher;
 import javafx.application.Platform;
 
@@ -99,7 +99,7 @@ public final class NestedSessionLauncher implements AutoCloseable {
      * the pilot through it. No-ops (reporting why) when a session is already running or no launch target is
      * configured. Runs off the FX thread; {@code report} is marshalled back onto it.
      */
-    public void start(NestedSession.Backend backend, int width, int height, Report report) {
+    public void start(SessionBackend backend, int width, int height, Report report) {
         LaunchSpec spec = configuredTarget();
         if (spec == null) {
             report.accept(false, "No launch target on this computer — pick an emulator app first.");

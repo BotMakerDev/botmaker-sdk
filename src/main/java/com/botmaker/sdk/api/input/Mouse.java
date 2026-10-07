@@ -11,7 +11,7 @@ import com.botmaker.sdk.internal.observe.Surface;
 import com.botmaker.sdk.internal.observe.SwipeEvent;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
-import com.botmaker.session.ActiveSession;
+import com.botmaker.sdk.internal.session.BotSession;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.PointerPolicy;
 
@@ -35,7 +35,7 @@ import com.botmaker.session.PointerPolicy;
 public class Mouse {
 
     /**
-     * The controller every method below drives through. When an {@link ActiveSession} is registered (an
+     * The controller every method below drives through. When a {@link BotSession} is registered (an
      * isolated bot on its private {@code :N} display) this is the session's {@code :N}-bound controller, so
      * the same click/move/type code targets the nested display; otherwise it is the process-wide {@code :0}
      * singleton — today's behaviour, unchanged whenever no session is active.
@@ -50,7 +50,7 @@ public class Mouse {
      * {@link PointerPolicy}. {@code null} means the user's own desktop, where the courtesy warp is the point.
      */
     private static DesktopSession session() {
-        return ActiveSession.get();
+        return BotSession.get();
     }
 
     /**

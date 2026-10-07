@@ -4,7 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.session.display.BackendInstall;
 import com.botmaker.session.display.SessionBackends;
-import com.botmaker.session.impl.NestedSession;
+import com.botmaker.session.SessionBackend;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
@@ -33,7 +33,7 @@ public final class BackendInstallPrompt {
      * Asks, then installs {@code backend} off the FX thread. {@code done} hears, on the FX thread, one sentence
      * on what happened and whether the backend is now there; it is not called when the user cancels.
      */
-    public static void offer(StudioServices services, Window owner, NestedSession.Backend backend,
+    public static void offer(StudioServices services, Window owner, SessionBackend backend,
                              Done done) {
         String name = backend.binaryName();
         Optional<BackendInstall> install = BackendInstall.forBackend(backend);

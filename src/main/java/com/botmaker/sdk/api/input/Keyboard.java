@@ -11,7 +11,7 @@ import com.botmaker.sdk.internal.capture.WindowBacked;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
-import com.botmaker.session.ActiveSession;
+import com.botmaker.sdk.internal.session.BotSession;
 import com.botmaker.session.DesktopSession;
 
 import java.time.Duration;
@@ -50,7 +50,7 @@ import java.util.function.Consumer;
 public class Keyboard {
 
     /**
-     * The controller keys are delivered through — the {@link ActiveSession}'s {@code :N}-bound controller when
+     * The controller keys are delivered through — the {@link BotSession}'s {@code :N}-bound controller when
      * an isolated session is registered, else the process-wide {@code :0} singleton (today's behaviour). See
      * {@link Mouse}'s equivalent choke point.
      */
@@ -67,7 +67,7 @@ public class Keyboard {
     };
 
     private static NativeController controller() {
-        DesktopSession session = ActiveSession.get();
+        DesktopSession session = BotSession.get();
         return session != null ? session.controller() : NativeControllerFactory.get();
     }
 

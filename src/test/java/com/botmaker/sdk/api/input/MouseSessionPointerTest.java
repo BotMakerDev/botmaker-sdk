@@ -6,11 +6,9 @@ import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.launch.LaunchSpec;
-import com.botmaker.session.ActiveSession;
+import com.botmaker.sdk.internal.session.BotSession;
 import com.botmaker.session.Capability;
 import com.botmaker.session.DesktopSession;
-import com.botmaker.session.SessionKeyboard;
-import com.botmaker.session.SessionPointer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,14 +39,14 @@ class MouseSessionPointerTest {
 
     @AfterEach
     void detach() {
-        ActiveSession.clear();
+        BotSession.clear();
         NativeControllerFactory.setForTesting(null);
     }
 
     @Test
     void aClickInASessionLeavesThePointerOnTheTarget() {
         Recording controller = new Recording();
-        ActiveSession.set(new StubSession(EnumSet.of(Capability.BACKGROUND_CLICK), controller));
+        BotSession.set(new StubSession(EnumSet.of(Capability.BACKGROUND_CLICK), controller));
 
         Mouse.click(new Point(100, 120));
 
@@ -71,7 +69,7 @@ class MouseSessionPointerTest {
     void aDragInASessionDoesNotWarpBackEither() {
         // Same defect one gesture over: the drag read the origin up front and restored it after the release.
         Recording controller = new Recording();
-        ActiveSession.set(new StubSession(EnumSet.of(Capability.BACKGROUND_CLICK), controller));
+        BotSession.set(new StubSession(EnumSet.of(Capability.BACKGROUND_CLICK), controller));
 
         Mouse.drag(new Point(10, 10), new Point(50, 50));
 
@@ -86,7 +84,7 @@ class MouseSessionPointerTest {
         // input once per frame can drop entirely. Asserts the elapsed time, since only a real wait counts.
         Recording controller = new Recording();
         controller.hold = 12;
-        ActiveSession.set(new StubSession(EnumSet.of(Capability.BACKGROUND_CLICK), controller));
+        BotSession.set(new StubSession(EnumSet.of(Capability.BACKGROUND_CLICK), controller));
 
         long start = System.nanoTime();
         Mouse.doubleClick(new Point(30, 40));
@@ -111,8 +109,7 @@ class MouseSessionPointerTest {
     /** A session that is only its capability set and its controller — all {@code Mouse} reads. */
     private record StubSession(Set<Capability> capabilities, NativeController controller) implements DesktopSession {
         @Override public Rectangle screen() { return new Rectangle(); }
-        @Override public SessionPointer pointer() { return null; }
-        @Override public SessionKeyboard keyboard() { return null; }
+        @Override public String displayName() { return ":9"; }
         @Override public void attach(GenericWindow window) { }
         @Override public GenericWindow attached() { return null; }
         @Override public void launch(LaunchSpec spec) { }

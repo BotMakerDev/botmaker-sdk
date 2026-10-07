@@ -6,8 +6,6 @@ import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.Capability;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.PreviewFrame;
-import com.botmaker.session.SessionKeyboard;
-import com.botmaker.session.SessionPointer;
 import com.botmaker.session.video.VideoPacket;
 import com.botmaker.session.video.VideoStream;
 import com.botmaker.shared.emulator.EmulatorSurface;
@@ -125,8 +123,7 @@ final class PilotFakes {
             videoOpens++;
             return videoSurface == null ? null : new FakeStream(videoSurface);
         }
-        @Override public SessionPointer pointer() { return null; }
-        @Override public SessionKeyboard keyboard() { return null; }
+        @Override public String displayName() { return ":9"; }
         @Override public void attach(GenericWindow window) { }
         @Override public GenericWindow attached() { return attached; }
         @Override public void launch(LaunchSpec spec) { }

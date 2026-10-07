@@ -13,7 +13,7 @@ import com.botmaker.sdk.plugin.screen.EditorFrame;
 import com.botmaker.sdk.plugin.screen.FrameShotSource;
 import com.botmaker.sdk.plugin.screen.ScreenOverlay;
 import com.botmaker.session.Preview;
-import com.botmaker.shared.capture.GamescopeHost;
+import com.botmaker.session.display.GamescopeHost;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.capture.ScreenCapture;

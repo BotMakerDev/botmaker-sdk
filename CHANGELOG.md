@@ -78,6 +78,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed — breaking
 
+- Internal, for plugin code that reached into the session module: the session a bot drives is now held by
+  `internal.session.BotSession` (was the session module's `ActiveSession`), sessions come from the session
+  module's `Sessions`, and its backend type is `SessionBackend` (was `NestedSession.Backend`). No bot code
+  changes.
 - **One "Run the game in" setting.** ⚙ Bot Settings used to have four overlapping settings: *Drive the real
   mouse and keyboard*, its Linux backend, *Run in a private display* and its display backend. It now asks one
   question: *A private display* (the default) or *My desktop*. *Take over the mouse and keyboard* shows only

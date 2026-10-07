@@ -4,24 +4,27 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.Session;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
-import com.botmaker.shared.launch.LaunchIsolation;
+import com.botmaker.session.launch.LaunchIsolation;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.shared.launch.LaunchSpec;
-import com.botmaker.session.ActiveSession;
-import com.botmaker.session.impl.AdoptedSession;
-import com.botmaker.session.impl.NestedSession;
+import com.botmaker.session.DesktopSession;
+import com.botmaker.session.PrivateSession;
+import com.botmaker.session.SessionBackend;
+import com.botmaker.session.SessionOptions;
+import com.botmaker.session.Sessions;
 import com.botmaker.session.display.BackendInstall;
 import com.botmaker.session.display.SessionBackends;
 
 /**
  * The bot-runtime producer: the one place that, for an <em>isolated</em> bot, brings up a private nested
- * {@code :N} display, registers it with {@link ActiveSession} (so {@code Mouse}/{@code Keyboard}/{@code Source}
+ * {@code :N} display, registers it with {@link BotSession} (so {@code Mouse}/{@code Keyboard}/{@code Source}
  * all follow it), and launches the target into it. The pilot's equivalent is Studio's {@code NestedSessionLauncher};
  * this is its bot-process twin, reached from the generated bot's {@code Target.start()}.
  *
  * <p><b>A session it is handed beats a session it builds.</b> When the process that spawned this bot already owns
  * a private display with the target up — Studio's background launcher does, after "▶ Launch now" — it passes it
- * through {@link AdoptedSession#DISPLAY_PROPERTY} and the bot joins it instead of bringing up a second one.
+ * through {@link Sessions#handoffArguments} and the bot joins it ({@link Sessions#offered()}) instead of bringing up
+ * a second one.
  * Without that, the second bring-up would hand its launch to the copy already running (every store launcher is
  * single-instance) and the game would appear on a display nobody is watching.
  *
@@ -97,8 +100,8 @@ public final class SessionBootstrap {
      * {@link SessionBackends#preferredBackend}. What Studio's launch surfaces use, which read the bot's settings
      * from its Java rather than from a running bot.
      */
-    public static NestedSession.Backend backendFor(LaunchSpec spec, BotSettings.DisplayBackend pinned) {
-        return NestedSession.Backend.fromId(ProjectDefaults.backendId(pinned))
+    public static SessionBackend backendFor(LaunchSpec spec, BotSettings.DisplayBackend pinned) {
+        return SessionBackend.fromId(ProjectDefaults.backendId(pinned))
             .orElseGet(() -> SessionBackends.preferredBackend(spec));
     }
 
@@ -109,20 +112,20 @@ public final class SessionBootstrap {
      * rather than to Xephyr is what stops a store launcher SIGTRAPping on Xephyr's software GL; the three pins
      * above it exist so a Xephyr run remains possible, never so one can happen by accident.
      *
-     * <p>Every rung parses through {@link NestedSession.Backend#fromId}, which is total and empty for anything
+     * <p>Every rung parses through {@link SessionBackend#fromId}, which is total and empty for anything
      * that isn't a backend id — {@code "auto"} included. That is a fix, not just tidying: the previous
      * {@code "gamescope".equalsIgnoreCase(x) ? GAMESCOPE : XEPHYR} mapped an explicit {@code auto} (and any typo)
      * onto Xephyr, i.e. onto the software GL that crashes the games this whole ladder exists to run.
      */
-    public static NestedSession.Backend backend(LaunchSpec spec) {
-        return NestedSession.Backend.fromId(Session.pinnedBackend())
-            .or(() -> NestedSession.Backend.fromId(System.getProperty(BACKEND_PROPERTY)))
-            .or(() -> NestedSession.Backend.fromId(ProjectDefaults.sessionBackend()))
+    public static SessionBackend backend(LaunchSpec spec) {
+        return SessionBackend.fromId(Session.pinnedBackend())
+            .or(() -> SessionBackend.fromId(System.getProperty(BACKEND_PROPERTY)))
+            .or(() -> SessionBackend.fromId(ProjectDefaults.sessionBackend()))
             .orElseGet(() -> SessionBackends.preferredBackend(spec));
     }
 
     /** The nested-display options for {@code spec}: its selected backend at the project (or fallback) resolution. */
-    public static NestedSession.Options options(LaunchSpec spec) {
+    public static SessionOptions options(LaunchSpec spec) {
         SessionBackends.DisplaySize size = size();
         return SessionBackends.optionsFor(spec, backend(spec), size.width(), size.height());
     }
@@ -151,7 +154,7 @@ public final class SessionBootstrap {
         if (!isolationRequested() || spec == null) {
             return false;
         }
-        if (ActiveSession.isActive()) {
+        if (BotSession.isActive()) {
             // Already brought up and launched on a prior call — don't relaunch.
             return true;
         }
@@ -159,7 +162,7 @@ public final class SessionBootstrap {
         // passes it when the game is already up in its background session — bringing up a second private display
         // would hand the launch to that first copy (the launcher is single-instance) and the game would end up
         // somewhere nobody is watching.
-        AdoptedSession adopted = AdoptedSession.fromProperties();
+        DesktopSession adopted = Sessions.offered().orElse(null);
         if (adopted != null && adopted.attached() == null) {
             // A private display with nothing on it is not the session anyone meant: the target isn't up there, so
             // adopting would give the bot a black frame and no way to fix it (an adopted session never launches).
@@ -168,15 +171,15 @@ public final class SessionBootstrap {
             adopted = null;
         }
         if (adopted != null) {
-            ActiveSession.set(adopted);
+            BotSession.set(adopted);
             Debug.log("adopted the live display " + adopted.displayName() + " — not launching "
                 + spec.spec() + " again");
             return true;
         }
         // Before the verdict, not after: the probes behind it read a dead session's leftovers as a launcher that is
         // up (measured — a bot refused to isolate because of a Heroic that had been closed for hours), and the only
-        // other sweep is inside a successful NestedSession.start, which a refusal never reaches.
-        NestedSession.reapOrphanSessions();
+        // other sweep is inside a successful Sessions.startPrivate, which a refusal never reaches.
+        Sessions.reapOrphans();
         LaunchIsolation.Verdict verdict = LaunchIsolation.check(spec);
         if (!verdict.isolatable()) {
             // Asked before anything is spawned: a target that cannot be confined would otherwise cost the full
@@ -184,14 +187,14 @@ public final class SessionBootstrap {
             Debug.log("isolated launch declined — running on :0. " + verdict.reason());
             return false;
         }
-        NestedSession.Backend chosen = backend(spec);
+        SessionBackend chosen = backend(spec);
         if (!SessionBackends.isAvailable(chosen)) {
             throw new IllegalStateException(missingBackend(chosen));
         }
-        NestedSession session = null;
+        PrivateSession session = null;
         try {
-            session = NestedSession.start(options(spec));
-            ActiveSession.set(session);
+            session = Sessions.startPrivate(options(spec));
+            BotSession.set(session);
             session.launch(spec);
             if (session.attached() == null) {
                 // Display came up but the game never mapped a window on :N — tear down and fall back to :0. What
@@ -199,7 +202,7 @@ public final class SessionBootstrap {
                 // Studio uses (shared owns the wording).
                 Debug.log("isolated launch: no window appeared on the nested display — falling back "
                     + "to :0. " + LaunchIsolation.noWindowDiagnosis(spec));
-                ActiveSession.clear();
+                BotSession.clear();
                 session.close();
                 return false;
             }
@@ -209,7 +212,7 @@ public final class SessionBootstrap {
         } catch (Exception e) {
             String why = e.getMessage() == null ? e.toString() : e.getMessage();
             Debug.log("isolated bring-up failed: " + why + " — falling back to :0");
-            ActiveSession.clear();
+            BotSession.clear();
             if (session != null) {
                 try { session.close(); } catch (Exception ignored) { /* best-effort teardown */ }
             }
@@ -221,7 +224,7 @@ public final class SessionBootstrap {
      * Why a run on a private display can't start without {@code backend}, and the two ways on: the install
      * command for this distro when one is known, and the desktop.
      */
-    public static String missingBackend(NestedSession.Backend backend) {
+    public static String missingBackend(SessionBackend backend) {
         String install = BackendInstall.forBackend(backend)
             .map(i -> "Install it with: " + i.describe() + (i.needsReboot() ? ", then restart" : "") + ".")
             .orElse("To fix it, " + SessionBackends.installHint(backend) + ".");

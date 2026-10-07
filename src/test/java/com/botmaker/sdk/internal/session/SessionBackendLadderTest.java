@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.session;
 
 import com.botmaker.sdk.internal.bot.Session;
-import com.botmaker.session.impl.NestedSession;
+import com.botmaker.session.SessionBackend;
 import com.botmaker.shared.launch.LaunchSpec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +57,7 @@ class SessionBackendLadderTest {
         System.setProperty(PROPERTY, "gamescope");
         Session.useBackend("xephyr");
 
-        assertEquals(NestedSession.Backend.XEPHYR, SessionBootstrap.backend(game()),
+        assertEquals(SessionBackend.XEPHYR, SessionBootstrap.backend(game()),
                 "bot code that pins a backend is reproducing a specific problem; nothing configured elsewhere "
                         + "may override it");
     }
@@ -66,7 +66,7 @@ class SessionBackendLadderTest {
     void thePropertyBeatsTheDefault() {
         System.setProperty(PROPERTY, "xephyr");
 
-        assertEquals(NestedSession.Backend.XEPHYR, SessionBootstrap.backend(game()),
+        assertEquals(SessionBackend.XEPHYR, SessionBootstrap.backend(game()),
                 "-Dbotmaker.session.backend is the operator's override and must beat the default");
     }
 
@@ -77,15 +77,15 @@ class SessionBackendLadderTest {
      */
     @Test
     void withNothingConfiguredEveryKindGetsGamescope() {
-        NestedSession.Backend forAGame = SessionBootstrap.backend(game());
-        NestedSession.Backend forACommand = SessionBootstrap.backend(plainCommand());
+        SessionBackend forAGame = SessionBootstrap.backend(game());
+        SessionBackend forACommand = SessionBootstrap.backend(plainCommand());
 
         assertNotNull(forAGame);
         assertNotNull(forACommand);
-        assertEquals(NestedSession.Backend.GAMESCOPE, forAGame,
+        assertEquals(SessionBackend.GAMESCOPE, forAGame,
                 "a store-launcher game must get gamescope: Xephyr is software GL and that is the SIGTRAP this "
                         + "ladder exists to avoid");
-        assertEquals(NestedSession.Backend.GAMESCOPE, forACommand,
+        assertEquals(SessionBackend.GAMESCOPE, forACommand,
                 "and a plain command gets it too — one path, the one that is actually exercised");
     }
 
@@ -100,7 +100,7 @@ class SessionBackendLadderTest {
     void anExplicitAutoFallsThroughToTheDefault() {
         Session.useBackend("auto");
 
-        assertEquals(NestedSession.Backend.GAMESCOPE, SessionBootstrap.backend(game()),
+        assertEquals(SessionBackend.GAMESCOPE, SessionBootstrap.backend(game()),
                 "'auto' means 'decide for me', not 'Xephyr'");
     }
 
@@ -111,15 +111,15 @@ class SessionBackendLadderTest {
         // Xephyr is now the only thing a *match* on this property could not produce by accident: the default is
         // gamescope, so seeing XEPHYR here would mean the unparseable value had been mapped onto a backend —
         // which is exactly the old bug.
-        assertEquals(NestedSession.Backend.GAMESCOPE, SessionBootstrap.backend(game()));
-        assertEquals(NestedSession.Backend.GAMESCOPE, SessionBootstrap.backend(plainCommand()));
+        assertEquals(SessionBackend.GAMESCOPE, SessionBootstrap.backend(game()));
+        assertEquals(SessionBackend.GAMESCOPE, SessionBootstrap.backend(plainCommand()));
     }
 
     @Test
     void aBlankPinIsNotAPin() {
         Session.useBackend("   ");
 
-        assertEquals(NestedSession.Backend.GAMESCOPE, SessionBootstrap.backend(game()),
+        assertEquals(SessionBackend.GAMESCOPE, SessionBootstrap.backend(game()),
                 "useBackend(\"\") must clear the pin, not set an unmatchable one");
     }
 
@@ -128,7 +128,7 @@ class SessionBackendLadderTest {
     void idsAreNormalisedBeforeMatching() {
         System.setProperty(PROPERTY, "  XePhyr  ");
 
-        assertEquals(NestedSession.Backend.XEPHYR, SessionBootstrap.backend(plainCommand()),
+        assertEquals(SessionBackend.XEPHYR, SessionBootstrap.backend(plainCommand()),
                 "everything defaults to gamescope, so seeing XEPHYR here proves the property was parsed "
                         + "despite its casing and padding");
     }
@@ -144,7 +144,7 @@ class SessionBackendLadderTest {
     void theOptionsBuiltForALaunchMatchTheBackendTheLadderChose() {
         System.setProperty(PROPERTY, "xephyr");
 
-        assertEquals(NestedSession.Backend.XEPHYR, SessionBootstrap.backend(game()));
+        assertEquals(SessionBackend.XEPHYR, SessionBootstrap.backend(game()));
         assertNotNull(SessionBootstrap.options(game()),
                 "options() must resolve through the same ladder, not a second copy of it");
     }

@@ -7,8 +7,9 @@ import com.botmaker.sdk.internal.capture.SessionSource;
 import com.botmaker.sdk.internal.capture.WindowBacked;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
-import com.botmaker.session.ActiveSession;
-import com.botmaker.session.impl.HostSession;
+import com.botmaker.sdk.internal.session.BotSession;
+import com.botmaker.session.DesktopSession;
+import com.botmaker.session.Sessions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Phase B routing: when an {@link ActiveSession} is registered the SDK's input facades drive the session's
+ * Phase B routing: when a {@link BotSession} is registered the SDK's input facades drive the session's
  * controller and the ambient {@link Source} follows the session's owned window — and with none registered the
  * behaviour is byte-for-byte today's (the global {@code :0} controller / project-default source).
  */
@@ -24,7 +25,7 @@ class SessionRoutingTest {
 
     private RecordingNativeController globalFake;
     private RecordingNativeController sessionFake;
-    private HostSession session;
+    private DesktopSession session;
 
     @BeforeEach
     void setUp() {
@@ -33,20 +34,20 @@ class SessionRoutingTest {
         sessionFake = new RecordingNativeController();
         // A HostSession over a distinct controller stands in for a NestedSession's :N-bound controller — same
         // DesktopSession seam, no live X server needed. Its attached window is the recording controller's.
-        session = new HostSession(sessionFake);
+        session = Sessions.host(sessionFake);
         session.attach(sessionFake.window);
     }
 
     @AfterEach
     void tearDown() {
-        ActiveSession.clear();
+        BotSession.clear();
         Source.set(null);
         NativeControllerFactory.setForTesting(null);
     }
 
     @Test
     void inputRoutesToTheSessionControllerWhenActive() {
-        ActiveSession.set(session);
+        BotSession.set(session);
         Mouse.click(new Point(10, 20));
         Keyboard.type("hi");
         assertFalse(sessionFake.events.isEmpty(), "input should have gone to the session controller");
@@ -62,7 +63,7 @@ class SessionRoutingTest {
 
     @Test
     void ambientSourceFollowsTheSessionWindow() {
-        ActiveSession.set(session);
+        BotSession.set(session);
         CaptureSource current = Source.current();
         assertInstanceOf(SessionSource.class, current);
         // origin is the attached window's on-screen top-left (RecordingNativeController's 100,50 rect)
@@ -74,8 +75,8 @@ class SessionRoutingTest {
     }
 
     @Test
-    void anExplicitPinWinsOverTheActiveSession() {
-        ActiveSession.set(session);
+    void anExplicitPinWinsOverTheBotSession() {
+        BotSession.set(session);
         CaptureSource pinned = CaptureSource.desktop();
         Source.set(pinned);
         assertSame(pinned, Source.current(), "an explicit Source.set must win even while a session is active");

@@ -10,7 +10,7 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.session.display.SessionBackends;
-import com.botmaker.session.impl.NestedSession;
+import com.botmaker.session.SessionBackend;
 import com.botmaker.shared.platform.Os;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -249,14 +249,14 @@ public final class BotSettingsWindow {
     }
 
     /** The private display the game would get with the window's current choices. */
-    private NestedSession.Backend neededBackend() {
+    private SessionBackend neededBackend() {
         BotSettings.DisplayBackend pinned = displayBackend.getValue();
         return SessionBootstrap.backendFor(LaunchTargetValue.spec(services), pinned);
     }
 
     /** Says whether the private display's backend is installed, with the offer to install it when it isn't. */
     private void refreshBackend() {
-        NestedSession.Backend needed = neededBackend();
+        SessionBackend needed = neededBackend();
         boolean missing = privateDisplay.isSelected() && !SessionBackends.isAvailable(needed);
         backendStatus.setText(missing ? "⚠ " + needed.binaryName() + " isn't installed — the game can't run in a "
                 + "private display without it." : "");
