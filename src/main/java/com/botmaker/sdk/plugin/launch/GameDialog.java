@@ -64,7 +64,8 @@ import java.util.Map;
  *
  * <p>It builds no launch settings of its own (the maintainer's call): a target is which launcher and which of
  * its entries, and the launcher already knows how to start it. The one thing it adds to a launcher is
- * <b>Add a Windows program…</b>, which puts an {@code .exe} into Faugus with Faugus's own defaults.
+ * <b>Add a Windows program…</b>, which puts an {@code .exe} into Faugus with Faugus's own defaults. An Android
+ * game on no instance yet is searched on Google Play or picked as a file and installed ({@link InstallGame}).
  */
 public final class GameDialog {
 
@@ -95,6 +96,7 @@ public final class GameDialog {
     private final FlowPane filters = new FlowPane(12, 6);
     private final FlowPane grid = new FlowPane(10, 10);
     private final Label notice = Styles.on(new Label(), Styles.DIALOG_HINT);
+    private final Button playSearch = new Button();
     private Group shown;
     private String query = "";
     private boolean emulatorsRefreshed;
@@ -164,12 +166,21 @@ public final class GameDialog {
         search.textProperty().addListener((obs, was, typedQuery) -> {
             query = typedQuery == null ? "" : typedQuery.trim().toLowerCase(Locale.ROOT);
             applySearch();
+            boolean any = !query.isEmpty();
+            playSearch.setText("Search Google Play for “" + (typedQuery == null ? "" : typedQuery.trim()) + "”…");
+            playSearch.setVisible(any);
+            playSearch.setManaged(any);
         });
 
         notice.setWrapText(true);
         notice.setText("Looking through this computer's launchers…");
         grid.setRowValignment(javafx.geometry.VPos.TOP);
-        VBox listing = new VBox(8, notice, grid);
+        // A game that is on no instance yet: found on Google Play, from this computer, and installed on one.
+        playSearch.setVisible(false);
+        playSearch.setManaged(false);
+        // What was typed, not the lowercased filter: a package name is case-sensitive.
+        playSearch.setOnAction(e -> InstallGame.searchPlay(services, stage, search.getText().strip(), this::installed));
+        VBox listing = new VBox(8, notice, grid, playSearch);
         listing.setPadding(new Insets(4));
         ScrollPane scroll = new ScrollPane(listing);
         scroll.setFitToWidth(true);
@@ -194,7 +205,11 @@ public final class GameDialog {
             addExe.setOnAction(e -> addWindowsProgram());
             bottom.getChildren().add(addExe);
         }
-        bottom.getChildren().addAll(typed, use);
+        Button fromFile = new Button("Install from file…");
+        fromFile.setTooltip(new javafx.scene.control.Tooltip("Pick an .apk, .xapk or .apks file and the emulator or "
+                + "phone to install it on; it becomes what this computer launches"));
+        fromFile.setOnAction(e -> InstallGame.fromFile(services, stage, this::report, this::installed));
+        bottom.getChildren().addAll(fromFile, typed, use);
 
         status.setWrapText(true);
         Button close = new Button("Close");
@@ -402,6 +417,17 @@ public final class GameDialog {
         VBox content = new VBox(TILE_GAP, frame, caption);
         content.setAlignment(Pos.TOP_CENTER);
         return content;
+    }
+
+    /**
+     * A game just installed on an emulator: it becomes what this computer launches, and its instance's section is
+     * read again so its card is there. The install already read its name and icon into the cache.
+     */
+    private void installed(GameCatalog.Item item) {
+        choose(item);
+        if (stage == null || !stage.isShowing() || lastScan == null) return;
+        List<GameCatalog.Section> scanned = lastScan;
+        Async.load("game-dialog-installed", () -> GameCatalog.withEmulatorsReread(scanned), this::fill);
     }
 
     /** Makes {@code item} what this computer launches, remembers it, and says so. */

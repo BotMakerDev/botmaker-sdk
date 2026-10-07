@@ -77,6 +77,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   and a half, and neither takes your clicks or the bot's. Boxes and dots are drawn for a bot that drives your
   own desktop only; one that drives an emulator or a private display still gets its line in the bar. Nothing
   changes in your bot's code.
+- **A game that isn't on any emulator yet can be found and installed from the game dialog (🎮).** Type its
+  name in the search field and press *Search Google Play for "…"*: the results come from Google Play, searched
+  from your computer, so no emulator has to run. *Install on…* lists your emulators and phones, says where the
+  game already is, and can create a new LDPlayer, MEmu or MuMu instance (BlueStacks and GameLoop open their own
+  manager). The instance is started if needed, the game's Google Play page opens in it, and you press Install
+  there. *Install from file…* does the same with an `.apk`, `.xapk` or `.apks` file. Either way the game
+  becomes what this computer launches.
 
 ### Changed — breaking
 
