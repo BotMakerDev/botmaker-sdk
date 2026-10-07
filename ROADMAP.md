@@ -12,6 +12,11 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   hand-chained flow is shown read-only.
 - **Launch targets**: `Target.set(String spec)` has no editor (a `@LaunchTargetSpec` could reuse the
   🎮 game dialog).
+- **The 🎮 game dialog's tiles are far too tall** (seen on Windows 2026-10-07, either theme): a tile without
+  cover art ("Firestone Online Idle RPG", Epic) is about 450 px tall for a 128 px cover and two caption lines,
+  and a shorter name ("Luto") makes a shorter tile, so the height follows the caption's length. `GameDialog.tile`
+  sets only a width and the caption wraps, so the tile's preferred height is probably measured before the
+  wrapping width is known. The `FlowPane`'s default centred rows also offset tiles of different heights.
 - **Waydroid on the desktop**: a bot reads Android's frame through `adb screencap`, which writes nothing on a
   hybrid AMD/NVIDIA laptop (`/vendor/etc/hwdata/amdgpu.ids: No such file or directory`). A private display
   is unaffected (it reads through X); on the desktop the Waydroid window's own X capture, or the Pilot's
