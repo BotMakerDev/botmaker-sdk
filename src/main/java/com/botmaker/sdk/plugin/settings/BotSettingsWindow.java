@@ -203,6 +203,10 @@ public final class BotSettingsWindow {
         Label takeOverHint = note("Off: events are sent to the game's window, and some games don't notice them. "
                 + "Turn this on if clicks are ignored — the pointer then moves to each click and returns.");
         if (!LINUX) {
+            // Windows watches a run's first background clicks and says so in the run's output when none of them
+            // changed the game's window (shared's IgnoredClickWatch).
+            takeOverHint.setText(takeOverHint.getText() + " A run says so in its output when its first clicks "
+                    + "change nothing in the game.");
             return new VBox(8, title("Mouse and keyboard"), takeOver, takeOverHint);
         }
         privateDisplay.setToggleGroup(where);

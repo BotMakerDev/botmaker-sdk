@@ -9,8 +9,9 @@ before touching `api/capture` or `internal/session`.
 
 ### Mouse clicks & the Wayland input limitation
 
-`api.input.Mouse.click` routes through `NativeControllerFactory.get()` (Windows → `Clicker`/
-`User32 PostMessage`; Linux → `LinuxController` XTest, with an AWT `Robot` fallback).
+`api.input.Mouse.click` routes through `NativeControllerFactory.get()` (Windows → `WindowsController`:
+posted messages, or `SendInput` once the bot takes over; Linux → `LinuxController` XTest, with an AWT
+`Robot` fallback).
 
 On Linux the click warps the real cursor, then restores it. **Restore is X11-only:** under native
 Wayland the JVM is an **XWayland** client that can *write* the pointer (warp + click work) but

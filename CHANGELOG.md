@@ -108,6 +108,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - On a scaled screen, the Remote Pilot's desktop frame and the screen chooser's crop are in device pixels, the
   pixels a tap lands in. The Pilot grabbed at the logical size, and the chooser scaled a second monitor's
   offset by its own scale, so on mixed scales it cropped the wrong part.
+- On Windows, with "Take over the mouse and keyboard" off, every mouse and key gesture now goes to the game window
+  in the background, not just left clicks. A run warns when its first three clicks change nothing in the game,
+  which means the game needs the setting on. Clicks on a windowed game no longer land a title bar's height too
+  high, and they line up on a scaled screen. ⚙ Bot Settings says so under the checkbox.
 
 ### Changed
 
