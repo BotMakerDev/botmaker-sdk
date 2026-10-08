@@ -264,16 +264,7 @@ final class VmSetupWindow {
     private void installQemu() {
         installQemu.setDisable(true);
         hypervisorStatus.setText("Installing QEMU with winget: Windows asks for administrator rights…");
-        Async.load("vm-install-qemu", () -> {
-            try {
-                return Qemu.install();
-            } catch (IOException e) {
-                throw new IllegalStateException(e.getMessage(), e);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException("Stopped.", e);
-            }
-        }, done -> {
+        Async.load("vm-install-qemu", () -> GuestCalls.unchecked(Qemu::install), done -> {
             installQemu.setDisable(false);
             if (!done.ok()) hypervisorStatus.setText("QEMU didn't install: " + lastLine(done));
             findHypervisor();
@@ -286,16 +277,7 @@ final class VmSetupWindow {
     private void turnPlatformOn() {
         platformOn.setDisable(true);
         hypervisorStatus.setText("Turning on the Windows Hypervisor Platform: Windows asks for administrator rights…");
-        Async.load("vm-platform", () -> {
-            try {
-                return VmSetup.enableHypervisorPlatform();
-            } catch (IOException e) {
-                throw new IllegalStateException(e.getMessage(), e);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException("Stopped.", e);
-            }
-        }, done -> {
+        Async.load("vm-platform", () -> GuestCalls.unchecked(VmSetup::enableHypervisorPlatform), done -> {
             platformOn.setDisable(false);
             hypervisorStatus.setText(done.ok()
                     ? "The Windows Hypervisor Platform turns on when Windows restarts. Restart, then open this "

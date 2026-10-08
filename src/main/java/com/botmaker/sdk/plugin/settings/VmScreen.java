@@ -4,12 +4,15 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
+import com.botmaker.shared.vm.GuestLauncher;
 import com.botmaker.shared.vm.VmCredentials;
 import com.botmaker.shared.vm.VmRecord;
 import com.botmaker.shared.vm.VmSetup;
 import com.botmaker.shared.vnc.VncController;
 import javafx.animation.AnimationTimer;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyEvent;
@@ -17,13 +20,16 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -33,11 +39,15 @@ import java.util.Set;
  */
 final class VmScreen {
 
-    private final VmRecord vm;
+    /** As the start left it; read off the JavaFX thread by the launcher checks. */
+    private volatile VmRecord vm;
     private final ImageView view = new ImageView();
     private final Label status = new Label();
     private volatile VncController screen;
     private long shown = -1;
+    /** How long the launcher check waits for a VM this window started to sign in. */
+    private static final java.time.Duration GUEST_READY = java.time.Duration.ofMinutes(5);
+    private final Map<GuestLauncher, Button> launcherButtons = new EnumMap<>(GuestLauncher.class);
     /** Keys pressed over the screen and not yet released, on the JavaFX thread. */
     private final Set<Integer> held = new HashSet<>();
 
@@ -59,6 +69,7 @@ final class VmScreen {
         view.fitHeightProperty().bind(picture.heightProperty());
         status.setText("Starting " + vm.name() + " and connecting to its screen…");
         BorderPane root = new BorderPane(picture);
+        root.setTop(launcherBar());
         root.setBottom(status);
         BorderPane.setMargin(status, new Insets(6, 10, 6, 10));
         Stage stage = Modals.window(services, owner,
@@ -92,28 +103,90 @@ final class VmScreen {
         });
         stage.show();
 
-        Async.load("vm-screen-" + vm.name(), () -> {
-            try {
-                VmCredentials credentials = VmCredentials.load(vm.folder())
-                        .orElseThrow(() -> new IOException("The VM has lost its passwords."));
-                return VmSetup.start(vm, credentials).screen();
-            } catch (IOException e) {
-                throw new IllegalStateException(e.getMessage(), e);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException("Stopped.", e);
-            }
-        }, connected -> {
+        Async.load("vm-screen-" + vm.name(), () -> GuestCalls.unchecked(() -> VmSetup.start(vm, credentials())), started -> {
             if (!stage.isShowing()) {
-                connected.close(); // closed while it was connecting
+                started.close(); // closed while it was connecting
                 return;
             }
-            screen = connected;
+            vm = started.vm(); // a start can move its ports
+            screen = started.screen();
             status.setText("Your mouse and keyboard go to the VM while the pointer is over its screen. Closing "
                     + "this window leaves the VM running.");
+            checkLaunchers(null);
             frames.start();
             view.requestFocus();
         }, why -> status.setText("The VM's screen didn't open: " + why));
+    }
+
+    /**
+     * The store launchers in the VM, one button each: ✓ when the guest has it, else Install, which downloads and
+     * installs it silently. The VM is a Windows of its own, so a Steam or Epic game needs its launcher there,
+     * signed in on this screen, and the game installed through it.
+     */
+    private HBox launcherBar() {
+        HBox bar = new HBox(8, new Label("Game launchers in the VM:"));
+        bar.setAlignment(Pos.CENTER_LEFT);
+        bar.setPadding(new Insets(6, 10, 6, 10));
+        for (GuestLauncher launcher : GuestLauncher.installable()) {
+            Button b = new Button(launcher.displayName() + " …");
+            b.setDisable(true);
+            b.setOnAction(e -> install(launcher));
+            launcherButtons.put(launcher, b);
+            bar.getChildren().add(b);
+        }
+        return bar;
+    }
+
+    /**
+     * Asks the guest which launchers it has, off the JavaFX thread, once its Windows has signed in and its tools
+     * answer: a VM this window just started has a screen long before that. {@code said} stays on the status line;
+     * a failed check is added to it.
+     */
+    private void checkLaunchers(String said) {
+        Async.load("vm-launchers-" + vm.name(), () -> GuestCalls.unchecked(() -> {
+            VmCredentials credentials = credentials();
+            long until = System.nanoTime() + GUEST_READY.toNanos();
+            while (!VmSetup.guestReady(vm, credentials)) {
+                if (System.nanoTime() > until) throw new IOException("its Windows hasn't signed in yet.");
+                Thread.sleep(3_000);
+            }
+            Map<GuestLauncher, Boolean> found = new EnumMap<>(GuestLauncher.class);
+            for (GuestLauncher l : GuestLauncher.installable()) found.put(l, VmSetup.guestHas(vm, credentials, l));
+            return found;
+        }), found -> found.forEach((l, has) -> {
+            Button b = launcherButtons.get(l);
+            b.setText(has ? "✓ " + l.displayName() : "Install " + l.displayName());
+            b.setDisable(has);
+        }), why -> {
+            // Offered again, so a failed look leaves something to press.
+            launcherButtons.forEach((l, b) -> {
+                b.setText("Install " + l.displayName());
+                b.setDisable(false);
+            });
+            status.setText((said == null ? "" : said + " ") + "Couldn't ask the VM for its launchers: " + why);
+        });
+    }
+
+    private void install(GuestLauncher launcher) {
+        launcherButtons.values().forEach(b -> b.setDisable(true));
+        status.setText("Installing " + launcher.displayName() + " in the VM: it downloads there, a few minutes…");
+        Async.load("vm-install-" + launcher.id(), () -> GuestCalls.unchecked(() -> {
+            VmSetup.installInGuest(vm, credentials(), launcher);
+            return true;
+        }), done -> {
+            String said = "✓ " + launcher.displayName() + " is installed in the VM. Open it on this screen and sign "
+                    + "in, then install the game through it.";
+            status.setText(said);
+            checkLaunchers(said);
+        }, why -> {
+            String said = launcher.displayName() + " didn't install: " + why;
+            status.setText(said);
+            checkLaunchers(said);
+        });
+    }
+
+    private VmCredentials credentials() throws IOException {
+        return VmCredentials.load(vm.folder()).orElseThrow(() -> new IOException("The VM has lost its passwords."));
     }
 
     /** Mouse and keys over the picture, in the guest's own pixels. */

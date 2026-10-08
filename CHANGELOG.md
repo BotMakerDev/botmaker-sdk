@@ -39,6 +39,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     on setting … up* resumes. *Run this bot's game in it* writes `Where.VM` and the VM's name.
   - **Open VM screen:** the VM's screen in a Studio window, with your mouse and keyboard going to it, to
     install the game and sign in to Steam. It starts the VM if it's off; closing it leaves the VM running.
+    Its bar shows the VM's store launchers, ✓ or *Install Steam* / *Install Epic Games Launcher*, which
+    installs it in the VM silently.
   - **▶ Launch game** starts the game in the VM. A run's recovery restarts it there, and asks the VM, not this
     computer, whether it runs.
   - The 5 `SessionBootstrapTest` cases about a private display run on Linux only.
