@@ -26,7 +26,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - **Linux**, for several games and bots at once, each on its own screen, with 2D games. It runs on QEMU, and
     Ubuntu downloads itself, so there is no disc to pick.
 
-  Bot Settings names each VM's system. A bot can't run in a Linux VM yet.
+  Bot Settings names each VM's system. A bot in a Linux VM gets a screen of its own there, so several bots
+  share one VM; `window("…")` and `desktop()` are that screen's. Its VM screen opens a screen of its own too,
+  where *Start Steam here* starts Steam to sign in.
 - **A game's life in a game VM.**
   - `Target.isRunning()` asks the guest whether the game runs. Before, it reported only that the VM was open,
     and it still does when the guest can't tell (a `cli:` target).

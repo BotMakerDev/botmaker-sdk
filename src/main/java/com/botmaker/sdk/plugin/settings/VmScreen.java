@@ -4,9 +4,11 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
+import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.vm.GameCopy;
 import com.botmaker.shared.vm.GuestLauncher;
 import com.botmaker.shared.vm.GuestOs;
+import com.botmaker.shared.vm.LinuxDisplay;
 import com.botmaker.shared.vm.VmCredentials;
 import com.botmaker.shared.vm.VmInventory;
 import com.botmaker.shared.vm.VmRecord;
@@ -16,6 +18,7 @@ import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
@@ -52,6 +55,10 @@ final class VmScreen {
     private final ImageView view = new ImageView();
     private final Label status = new Label();
     private volatile VncController screen;
+    /** What {@link #screen} belongs to, closed with the window; on the JavaFX thread. */
+    private Opened opened;
+    /** A Linux VM's: starts Steam on this window's display, to sign in. */
+    private final Button startSteam = new Button("Start Steam here");
     private long shown = -1;
     /** How long the launcher check waits for a VM this window started to sign in. */
     private static final java.time.Duration GUEST_READY = java.time.Duration.ofMinutes(5);
@@ -119,14 +126,15 @@ final class VmScreen {
                     // Before the frame check: a dropped screen sends no more frames to notice it by.
                     if (!stoppingOnPurpose) {
                         status.setText("The VM's screen closed.");
-                        // Most often the VM itself stopped (shut down elsewhere, or Windows restarting): that, not
+                        // Most often the VM itself stopped (shut down elsewhere, or its system restarting): that, not
                         // the connection's own error, is what to say.
                         String failure = s.failure();
                         VmRecord was = vm;
                         Async.load("vm-screen-why-" + was.name(), () -> VmInventory.running(was), running ->
                                 status.setText(running
                                         ? "The VM's screen closed" + (failure != null ? ": " + failure : ".")
-                                        : "The VM " + was.name() + " stopped (shut down, or Windows restarting). "
+                                        : "The VM " + was.name() + " stopped (shut down, or "
+                                                + was.guestOs().displayName() + " restarting). "
                                                 + "Open its screen again to start it."));
                     }
                     stop();
@@ -143,21 +151,26 @@ final class VmScreen {
         stage.setOnHidden(e -> {
             frames.stop();
             releaseKeys();
-            VncController s = screen;
+            Opened was = opened;
+            opened = null;
             screen = null;
-            if (s != null) s.close();
+            // Off the JavaFX thread: ending a Linux display waits on the guest and on QEMU.
+            if (was != null) Async.run("vm-screen-close-" + vm.name(), was::close, null);
         });
         stage.show();
 
-        Async.load("vm-screen-" + vm.name(), () -> GuestCalls.unchecked(() -> VmSetup.start(vm, credentials())), started -> {
+        Async.load("vm-screen-" + vm.name(), () -> GuestCalls.unchecked(this::connect), started -> {
             if (!stage.isShowing()) {
-                started.close(); // closed while it was connecting
+                Async.run("vm-screen-close-" + vm.name(), started::close, null); // closed while it was connecting
                 return;
             }
             vm = started.vm(); // a start can move its ports
+            opened = started;
             screen = started.screen();
             status.setText("Your mouse and keyboard go to the VM while the pointer is over its screen. Closing "
-                    + "this window leaves the VM running.");
+                    + "this window leaves the VM running" + (started.display() != null ? "; this screen closes, with "
+                    + "what runs on it." : "."));
+            show(startSteam, started.display() != null);
             checkLaunchers(null);
             frames.start();
             view.requestFocus();
@@ -165,18 +178,52 @@ final class VmScreen {
     }
 
     /**
+     * What this window shows: a Windows VM's own screen; a Linux VM's display of this window's own, as a bot has
+     * one, opened once its guest has signed in, so Steam signs in where the user sees it.
+     */
+    private record Opened(VmRecord vm, VncController screen, VmSetup.Running running, LinuxDisplay display)
+            implements AutoCloseable {
+
+        @Override
+        public void close() {
+            if (display != null) display.close();
+            running.close();
+        }
+    }
+
+    /** Starts the VM when it is off and opens what this window shows ({@link Opened}). Off the JavaFX thread. */
+    private Opened connect() throws IOException, InterruptedException {
+        VmSetup.Running running = VmSetup.start(vm, credentials());
+        if (running.vm().guestOs() != GuestOs.LINUX) return new Opened(running.vm(), running.screen(), running, null);
+        try {
+            long until = System.nanoTime() + GUEST_READY.toNanos();
+            while (!VmSetup.guestReady(running.vm(), credentials())) {
+                if (System.nanoTime() > until) throw new IOException("its Linux hasn't started yet.");
+                Thread.sleep(2_000);
+            }
+            LinuxDisplay display = LinuxDisplay.open(running.vm(), "Game VM — " + running.vm().name());
+            return new Opened(running.vm(), display.screen(), running, display);
+        } catch (IOException | InterruptedException | RuntimeException e) {
+            running.close();
+            throw e;
+        }
+    }
+
+    /**
      * The store launchers in the VM, one button each: ✓ when the guest has it, else Install, which downloads and
      * installs it silently. The VM is a Windows of its own, so a Steam or Epic game needs its launcher there,
      * signed in on this screen, and the game installed through it. A Linux VM has Steam and Legendary from its
-     * setup, and no buttons.
+     * setup: one button starts Steam on this window's display, to sign in.
      */
     private HBox launcherBar() {
         HBox bar = new HBox(8);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(6, 10, 6, 10));
-        if (vm.guestOs() != GuestOs.WINDOWS) {
-            bar.getChildren().add(new Label("Steam and Legendary (Epic) were installed with this "
-                    + vm.guestOs().displayName() + " VM."));
+        if (vm.guestOs() == GuestOs.LINUX) {
+            startSteam.setOnAction(e -> startSteam());
+            show(startSteam, false);
+            bar.getChildren().addAll(new Label("Steam and Legendary (Epic) were installed with this "
+                    + vm.guestOs().displayName() + " VM."), startSteam);
             return bar;
         }
         bar.getChildren().add(new Label("Game launchers in the VM:"));
@@ -271,6 +318,29 @@ final class VmScreen {
             copyGame.setDisable(false);
             status.setText((said == null ? "" : said + " ") + "Couldn't ask the VM for its launchers: " + why);
         });
+    }
+
+    /** Starts Steam on this window's Linux display, where its first start updates itself and asks to sign in. */
+    private void startSteam() {
+        Opened on = opened;
+        if (on == null || on.display() == null) return;
+        startSteam.setDisable(true);
+        status.setText("Starting Steam. The first time, click Install in its window; it then updates itself (about "
+                + "3 minutes) and asks you to sign in. Keep this window open while it does: closing it ends Steam.");
+        Async.load("vm-steam-" + vm.name(), () -> GuestCalls.unchecked(() -> {
+            // Closed meanwhile: its number may be another bot's now.
+            if (!on.display().alive()) throw new IOException("this screen closed.");
+            on.display().launch(LaunchSpec.parse("cli:steam"));
+            return true;
+        }), done -> startSteam.setDisable(false), why -> {
+            startSteam.setDisable(false);
+            status.setText("Steam didn't start: " + why);
+        });
+    }
+
+    private static void show(Node node, boolean on) {
+        node.setVisible(on);
+        node.setManaged(on);
     }
 
     private void install(GuestLauncher launcher) {

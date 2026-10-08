@@ -146,11 +146,9 @@ public final class BotSettingsWindow {
         save.setOnAction(e -> {
             BotSettings chosen = collect();
             // Which VM is this computer's fact, kept beside the project rather than in the bot's Java.
-            // Only a VM that is set up: one still installing would boot its installer disc for the bot. Only a
-            // Windows one, for now: a bot can't run in a Linux VM yet.
+            // Only a VM that is set up: one still installing would boot its installer disc for the bot.
             VmRecord picked = vms.getValue();
-            if (!LINUX && inVm.isSelected() && picked != null && picked.stage() == VmRecord.Stage.READY
-                    && picked.guestOs() == GuestOs.WINDOWS) {
+            if (!LINUX && inVm.isSelected() && picked != null && picked.stage() == VmRecord.Stage.READY) {
                 VmChoice.set(services, picked.name());
             }
             // The VM's own settings, whichever bot uses it: kept in its folder.
@@ -279,8 +277,8 @@ public final class BotSettingsWindow {
     private VBox windowsRunInPane(Stage stage, Label takeOverHint) {
         myDesktop.setToggleGroup(where);
         inVm.setToggleGroup(where);
-        Label vmHint = note("The game runs in a Windows of its own, which Studio sets up. You keep using your "
-                + "computer; the bot's clicks reach the game as a real mouse's.");
+        Label vmHint = note("The game runs in a computer of its own, Windows or Linux, which Studio sets up. You "
+                + "keep using yours; the bot's clicks reach the game as a real mouse's.");
         vms.setConverter(labels(vm -> vm.name() + " (" + vm.guestOs().displayName() + ")"
                 + (vm.stage() == VmRecord.Stage.READY ? "" : " — " + vm.stage().displayName())));
         vms.setMaxWidth(Double.MAX_VALUE);
@@ -295,8 +293,8 @@ public final class BotSettingsWindow {
             power.show(picked);
             setUpVm.setText(picked != null && !ready ? "Go on setting " + picked.name() + " up…" : "Set up a game VM…");
             vmStatus.setText(vms.getItems().isEmpty() ? "No game VM on this computer yet."
-                    : picked != null && picked.guestOs() != GuestOs.WINDOWS
-                    ? "A bot can't run in a " + picked.guestOs().displayName() + " VM yet: pick a Windows one." : "");
+                    : picked != null && picked.guestOs() == GuestOs.LINUX
+                    ? "Each bot gets a screen of its own in this VM, so several can share it." : "");
         };
         setUpVm.setOnAction(e -> {
             // Owned by the editor, not by this window: a setup takes 20–40 minutes and must outlive Save or

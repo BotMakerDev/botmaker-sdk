@@ -416,7 +416,7 @@ final class VmSetupWindow {
         setUp.setVisible(false);
         setUp.setManaged(false);
         show(openScreen, true);
-        show(use, ready.guestOs() == GuestOs.WINDOWS); // a bot can't run in a Linux VM yet
+        show(use, true);
         progress.setText("✓ " + ready.name() + " is ready: " + ready.guestOs().displayName() + " is installed"
                 + (ready.guestOs() == GuestOs.WINDOWS ? " and signed in." : "."));
     }
