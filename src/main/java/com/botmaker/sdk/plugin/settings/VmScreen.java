@@ -7,6 +7,7 @@ import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import com.botmaker.shared.vm.GameCopy;
 import com.botmaker.shared.vm.GuestLauncher;
 import com.botmaker.shared.vm.VmCredentials;
+import com.botmaker.shared.vm.VmInventory;
 import com.botmaker.shared.vm.VmRecord;
 import com.botmaker.shared.vm.VmSetup;
 import com.botmaker.shared.vnc.VncController;
@@ -115,7 +116,16 @@ final class VmScreen {
                 if (!s.alive()) {
                     // Before the frame check: a dropped screen sends no more frames to notice it by.
                     if (!stoppingOnPurpose) {
-                        status.setText("The VM's screen closed" + (s.failure() != null ? ": " + s.failure() : "."));
+                        status.setText("The VM's screen closed.");
+                        // Most often the VM itself stopped (shut down elsewhere, or Windows restarting): that, not
+                        // the connection's own error, is what to say.
+                        String failure = s.failure();
+                        VmRecord was = vm;
+                        Async.load("vm-screen-why-" + was.name(), () -> VmInventory.running(was), running ->
+                                status.setText(running
+                                        ? "The VM's screen closed" + (failure != null ? ": " + failure : ".")
+                                        : "The VM " + was.name() + " stopped (shut down, or Windows restarting). "
+                                                + "Open its screen again to start it."));
                     }
                     stop();
                     return;
