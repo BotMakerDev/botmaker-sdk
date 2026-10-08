@@ -1,11 +1,12 @@
 package com.botmaker.sdk.internal.capture;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.sdk.internal.session.BotSession;
+import com.botmaker.session.DesktopSession;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -44,8 +45,14 @@ public class Window implements CaptureSource {
         this.handle = handle;
     }
 
+    /**
+     * Where windows are found, as {@code Mouse} clicks: the {@link BotSession}'s when the bot drives one whose
+     * pixels can be read (a game VM's guest windows, a private display's), otherwise this computer's. A session
+     * whose pixels aren't on X11 (Waydroid's) has no window to find, as {@code Source.current()} knows.
+     */
     private static NativeController controller() {
-        return NativeControllerFactory.get();
+        DesktopSession session = BotSession.get();
+        return session != null && session.x11Capturable() ? session.controller() : NativeControllerFactory.get();
     }
 
     // --- Factories ---

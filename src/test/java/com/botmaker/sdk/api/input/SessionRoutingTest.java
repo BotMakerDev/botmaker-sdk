@@ -75,6 +75,21 @@ class SessionRoutingTest {
     }
 
     @Test
+    void aPinnedWindowOrDesktopIsFoundInTheSession() {
+        BotSession.set(session);
+        CaptureSource game = CaptureSource.window("game window");
+        Source.set(game);
+        assertTrue(game.isPresent(), "found among the session's windows (a game VM's guest windows)");
+        assertNotNull(game.capture());
+        assertEquals(100, game.origin().x());
+        CaptureSource desktop = CaptureSource.desktop();
+        assertNotNull(desktop.capture());
+        assertEquals(0, desktop.origin().x(), "the session's screen");
+        assertTrue(sessionFake.events.contains("getAllWindows"));
+        assertTrue(globalFake.events.isEmpty(), "nothing is looked for on this computer's desktop");
+    }
+
+    @Test
     void anExplicitPinWinsOverTheBotSession() {
         BotSession.set(session);
         CaptureSource pinned = CaptureSource.desktop();

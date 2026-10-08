@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A window inside the game VM as the capture source.** While the bot runs in a VM, `window("…")` finds the
+  window among the guest's own windows, and `desktop()` is the guest's whole screen. The bot captures and
+  clicks there in the guest's pixels, so several windows in one VM are each a source. The same holds in a
+  private display: `Window.find`/`all`/`foreground` ask the bot's session, as `Mouse` already did, and
+  `desktop()` reads the session's screen. 🎯 Capture Source gains a *Game VM* section when the bot's VM is
+  named on this computer: *Whole VM screen*, then one tile per guest window with its thumbnail, read from the
+  running VM. Live on `vmw`: `window("Notepad")` found and captured the guest's Notepad.
 - **Copy a game from this PC into the game VM.** The VM screen's *Copy a game from this PC* lists this PC's
   Steam and Epic games; the one chosen is copied into the VM (QEMU or VMware), with its progress, and recorded in the
   VM's launcher, which then checks its files instead of downloading it.

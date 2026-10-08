@@ -21,6 +21,14 @@ import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorProbe;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
+import com.botmaker.shared.vm.GuestWindows;
+import com.botmaker.shared.vm.VmCredentials;
+import com.botmaker.shared.vm.VmInventory;
+import com.botmaker.shared.vm.VmRecord;
+import com.botmaker.shared.vnc.GuestWindow;
+import com.botmaker.shared.vnc.Keysyms;
+import com.botmaker.shared.vnc.VncController;
+import com.botmaker.sdk.plugin.settings.VmChoice;
 import javafx.application.Platform;
 import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
@@ -44,6 +52,7 @@ import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -188,10 +197,14 @@ public final class SourcePicker {
         FlowPane monitors = category();
         FlowPane desktop = category();
         FlowPane emulators = category();
+        FlowPane vm = category();
+        String vmName = VmChoice.current(services);
 
         VBox content = new VBox(10);
         content.setPadding(new Insets(14));
         if (includeProjectDefault) content.getChildren().add(projectDefaultTile());
+        // The game VM leads when the bot's game runs in one: its windows are where the game is.
+        if (vmName != null) content.getChildren().addAll(sectionLabel("Game VM " + vmName), vm);
         // Desktop and monitors lead: they are the common picks, and below a hundred-window list nobody
         // scrolls far enough to find them.
         content.getChildren().addAll(
@@ -227,6 +240,10 @@ public final class SourcePicker {
             loadWindows(windows);
             emulators.getChildren().clear();
             loadEmulators(emulators);
+            if (vmName != null) {
+                vm.getChildren().clear();
+                loadVm(vm, vmName);
+            }
         });
         Button cancel = new Button("Cancel");
         cancel.setOnAction(e -> {
@@ -257,6 +274,7 @@ public final class SourcePicker {
         loadWindows(windows);
         loadDesktopAndScreens(desktop, monitors);
         loadEmulators(emulators);
+        if (vmName != null) loadVm(vm, vmName);
 
         stage.showAndWait();
         return Optional.ofNullable(selected);
@@ -472,6 +490,67 @@ public final class SourcePicker {
         for (PlatformStatus status : statuses) box.getChildren().add(hint("• " + status.statusLine()));
         box.getChildren().add(hint("Start an instance with ADB enabled, then press ↻ Refresh."));
         return box;
+    }
+
+    /** How long the picker waits for a guest's window list it has just started. */
+    private static final long GUEST_LIST_WAIT_MS = 4_000;
+
+    /**
+     * The bot's game VM, {@code name}: its whole screen, which {@code desktop()} reads while the bot runs in the VM,
+     * then one tile per window the guest lists, each {@code window(title)} found in the guest. Read from the
+     * running VM only: a VM that isn't running offers its screen without a preview, and says how to start it.
+     */
+    private void loadVm(FlowPane into, String name) {
+        VBox screenTile = tile("Whole VM screen", "The guest's desktop");
+        CaptureSource desktop = CaptureSource.desktop();
+        clickable(screenTile, desktop);
+        offer(screenTile, desktop);
+        into.getChildren().add(screenTile);
+        thumbs().submit(() -> {
+            Optional<VmRecord> found = VmInventory.find(name);
+            if (found.isEmpty() || !VmInventory.running(found.get())) {
+                show(screenTile, null);
+                Platform.runLater(() -> into.getChildren().add(hint(found.isEmpty()
+                        ? "There's no game VM named \"" + name + "\" on this computer."
+                        : "The VM isn't running: open its screen in ⚙ Bot Settings, then press ↻ Refresh to list "
+                                + "its windows.")));
+                return;
+            }
+            VmRecord vm = found.get();
+            try {
+                VmCredentials credentials = VmCredentials.load(vm.folder())
+                        .orElseThrow(() -> new IOException("The VM has lost its passwords."));
+                GuestWindows.start(vm, credentials);
+                // Straight to its screen: a bot's session may be using the VM, and VmSetup.start would open QEMU's
+                // monitor beside it.
+                try (VncController screen = VncController.connect("127.0.0.1", vm.vncPort(), credentials.vnc(),
+                        Keysyms.NativeKeys.VIRTUAL_KEY, vm.name(), GuestWindows.reader(vm, credentials), 10_000)) {
+                    long until = System.nanoTime() + GUEST_LIST_WAIT_MS * 1_000_000L;
+                    while (screen.guestWindows().isEmpty() && System.nanoTime() < until) Thread.sleep(250);
+                    show(screenTile, screen.captureScreen());
+                    java.util.Set<String> seen = new java.util.HashSet<>();
+                    for (GuestWindow window : screen.guestWindows()) {
+                        String title = window.title();
+                        if (title.isBlank() || !seen.add(title)) continue; // one tile per title, as below
+                        Image image = toFx(screen.captureWindow(new GenericWindow(window, title, window.rect())));
+                        Platform.runLater(() -> {
+                            VBox tile = tile(title, "In the VM" + (window.process().isEmpty() ? "" : " · " + window.process()));
+                            CaptureSource target = CaptureSource.window(title);
+                            clickable(tile, target);
+                            offer(tile, target);
+                            setThumb(tile, image, "No preview");
+                            into.getChildren().add(tile);
+                        });
+                    }
+                }
+            } catch (IOException | RuntimeException e) {
+                show(screenTile, null);
+                Platform.runLater(() -> into.getChildren().add(hint("The VM's windows couldn't be listed: "
+                        + e.getMessage())));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); // the picker closed
+            }
+        });
     }
 
     private void loadWindows(FlowPane into) {
