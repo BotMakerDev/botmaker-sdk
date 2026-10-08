@@ -220,6 +220,31 @@ class SessionBootstrapTest {
     }
 
     @Test
+    void aRecoveryDoesNotStartAgainAVmTheUserShutDown() {
+        java.util.List<LaunchSpec> launched = new java.util.ArrayList<>();
+        BotSession.set(new com.botmaker.session.DesktopSession() {
+            @Override public java.util.Set<com.botmaker.session.Capability> capabilities() { return java.util.Set.of(); }
+            @Override public java.awt.Rectangle screen() { return new java.awt.Rectangle(); }
+            @Override public String displayName() { return "VM game"; }
+            @Override public void attach(com.botmaker.shared.capture.GenericWindow window) { }
+            @Override public com.botmaker.shared.capture.GenericWindow attached() { return null; }
+            @Override public void launch(LaunchSpec spec) { launched.add(spec); }
+            @Override public java.awt.image.BufferedImage capture() { return null; }
+            @Override public com.botmaker.shared.capture.NativeController controller() { return null; }
+            @Override public com.botmaker.session.SessionHealth health() { return com.botmaker.session.SessionHealth.DEAD; }
+            @Override public java.util.Optional<String> endedBecause() {
+                return java.util.Optional.of("The game VM game was shut down (Windows shut down).");
+            }
+            @Override public void close() { }
+        });
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> SessionBootstrap.relaunchInVm(new LaunchSpec(LaunchKind.STEAM, "570")));
+        assertEquals("The game VM game was shut down (Windows shut down). Run the bot again to start it.", e.getMessage());
+        assertTrue(launched.isEmpty());
+        assertFalse(SessionBootstrap.vmAlive());
+    }
+
+    @Test
     void optionsFollowTheDefaultWithoutAnOverride() {
         System.clearProperty(SessionBootstrap.BACKEND_PROPERTY);
         assertEquals(SessionBackend.GAMESCOPE,

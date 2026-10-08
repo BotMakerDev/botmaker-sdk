@@ -11,6 +11,8 @@ import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
 import com.botmaker.sdk.plugin.run.SdkRunOverlay;
+import com.botmaker.sdk.plugin.settings.VmKeeper;
+import com.botmaker.shared.platform.Os;
 import com.botmaker.sdk.plugin.types.PictureAt;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 
@@ -85,11 +87,16 @@ public final class SdkPlugin extends DeclaredPlugin {
     public void projectClosing() {
         RemotePilotUi.release();
         GameButton.unbind();
+        VmKeeper.stop();
     }
 
-    /** The toolbar's game button names what this project launches, so it is told which project that is. */
+    /**
+     * The toolbar's game button names what this project launches, so it is told which project that is. On
+     * Windows, the game VMs' shutdown settings are applied while a project is open.
+     */
     @Override
     public void projectOpened(StudioServices services) {
         GameButton.bind(services);
+        if (Os.current() == Os.WINDOWS) VmKeeper.start(services);
     }
 }

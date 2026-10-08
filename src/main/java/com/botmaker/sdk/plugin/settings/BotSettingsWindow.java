@@ -73,6 +73,8 @@ public final class BotSettingsWindow {
     /** Windows: this computer's game VMs; the one picked is the {@link VmChoice} run property. */
     private final ComboBox<VmRecord> vms = new ComboBox<>();
     private final Label vmStatus = note("");
+    /** Windows: the picked VM's power; {@code null} on Linux. */
+    private VmPower power;
     /**
      * The bot's Java's choice, read on Windows: a private display is the desktop there and is kept when the
      * desktop is picked, for the bot on Linux. On Linux a VM bot shows as isolated, and is saved as what the
@@ -148,6 +150,8 @@ public final class BotSettingsWindow {
             if (!LINUX && inVm.isSelected() && picked != null && picked.stage() == VmRecord.Stage.READY) {
                 VmChoice.set(services, picked.name());
             }
+            // The VM's own settings, whichever bot uses it: kept in its folder.
+            if (power != null) power.save();
             // Nothing changed, nothing written: a Save that rewrote an untouched value was one more entry in the
             // project's history and, for BotSettings.DEFAULTS, a chance to spell it differently.
             if (chosen.equals(current)) {
@@ -280,10 +284,12 @@ public final class BotSettingsWindow {
         HBox.setHgrow(vms, Priority.ALWAYS);
         Button setUpVm = new Button("Set up a game VM…");
         Button openScreen = new Button("Open VM screen");
+        power = new VmPower(services);
         Runnable refresh = () -> {
             VmRecord picked = vms.getValue();
             boolean ready = picked != null && picked.stage() == VmRecord.Stage.READY;
             openScreen.setDisable(!ready);
+            power.show(picked);
             setUpVm.setText(picked != null && !ready ? "Go on setting " + picked.name() + " up…" : "Set up a game VM…");
             vmStatus.setText(vms.getItems().isEmpty() ? "No game VM on this computer yet." : "");
         };
@@ -308,7 +314,7 @@ public final class BotSettingsWindow {
 
         HBox vmRow = new HBox(8, vms, openScreen);
         vmRow.setAlignment(Pos.CENTER_LEFT);
-        VBox onVm = new VBox(6, vmHint, vmRow, new HBox(8, setUpVm, vmStatus));
+        VBox onVm = new VBox(6, vmHint, vmRow, new HBox(8, setUpVm, vmStatus), power.node());
         onVm.setPadding(new Insets(0, 0, 0, 24));
         VBox onDesktop = new VBox(6, takeOver, takeOverHint);
         onDesktop.setPadding(new Insets(0, 0, 0, 24));

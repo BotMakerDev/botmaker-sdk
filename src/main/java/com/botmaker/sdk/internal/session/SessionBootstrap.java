@@ -313,6 +313,9 @@ public final class SessionBootstrap {
      */
     public static void relaunchInVm(LaunchSpec spec) {
         DesktopSession session = BotSession.get();
+        // Shut down on purpose: the run ends, rather than start again the VM the user just stopped.
+        Optional<String> ended = session == null ? Optional.empty() : session.endedBecause();
+        if (ended.isPresent()) throw new IllegalStateException(ended.get() + " Run the bot again to start it.");
         if (session != null && session.health() == SessionHealth.DEAD) {
             // Given up on after restarts in a row: open the VM afresh rather than launch into nothing.
             BotSession.clear();

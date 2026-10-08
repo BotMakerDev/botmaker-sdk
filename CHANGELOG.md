@@ -41,8 +41,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     install the game and sign in to Steam. It starts the VM if it's off; closing it leaves the VM running.
     Its bar shows the VM's store launchers, ✓ or *Install Steam* / *Install Epic Games Launcher*, which
     installs it in the VM silently.
+  - **Shut down VM**, in Bot Settings' VM row and on the VM screen: Windows shuts down as for its power
+    button, and is powered off if it hasn't finished within three minutes. Bot Settings says whether the VM
+    runs, and keeps two settings of the VM's own, both off: *Shut it down when Studio closes*, and *when
+    nothing has used it for* some minutes (a bot running in it, or its screen open; QEMU only).
   - **▶ Launch game** starts the game in the VM. A run's recovery restarts it there, and asks the VM, not this
-    computer, whether it runs.
+    computer, whether it runs. A VM shut down while a bot runs ends the run, saying so, rather than being
+    started again.
   - The 5 `SessionBootstrapTest` cases about a private display run on Linux only.
 
 - **🎮 Game: the game this bot plays, on the toolbar.** The button shows the current game's name and cover.

@@ -21,6 +21,8 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -50,6 +52,8 @@ final class VmScreen {
     private final Map<GuestLauncher, Button> launcherButtons = new EnumMap<>(GuestLauncher.class);
     /** Keys pressed over the screen and not yet released, on the JavaFX thread. */
     private final Set<Integer> held = new HashSet<>();
+    /** Shut down from this window: the screen dropping is expected. On the JavaFX thread. */
+    private boolean stoppingOnPurpose;
 
     private VmScreen(VmRecord vm) {
         this.vm = vm;
@@ -69,11 +73,28 @@ final class VmScreen {
         view.fitHeightProperty().bind(picture.heightProperty());
         status.setText("Starting " + vm.name() + " and connecting to its screen…");
         BorderPane root = new BorderPane(picture);
-        root.setTop(launcherBar());
+        HBox bar = launcherBar();
+        root.setTop(bar);
         root.setBottom(status);
         BorderPane.setMargin(status, new Insets(6, 10, 6, 10));
         Stage stage = Modals.window(services, owner,
                 Modals.Frame.modeless("Game VM — " + vm.name(), 1040, 720, 480, 360), root);
+        Button shutDown = new Button("Shut down VM");
+        shutDown.setOnAction(e -> {
+            shutDown.setDisable(true);
+            launcherButtons.values().forEach(b -> b.setDisable(true));
+            stoppingOnPurpose = true;
+            status.setText("Shutting the VM down: Windows closes its programs first, up to 3 minutes…");
+            VmPower.shutDown(services, vm, done -> stage.close(), failed -> {
+                stoppingOnPurpose = false;
+                shutDown.setDisable(false);
+                status.setText(failed);
+                checkLaunchers(failed); // gives the launcher buttons back
+            });
+        });
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        bar.getChildren().addAll(spacer, shutDown);
 
         AnimationTimer frames = new AnimationTimer() {
             @Override
@@ -82,7 +103,9 @@ final class VmScreen {
                 if (s == null) return;
                 if (!s.alive()) {
                     // Before the frame check: a dropped screen sends no more frames to notice it by.
-                    status.setText("The VM's screen closed" + (s.failure() != null ? ": " + s.failure() : "."));
+                    if (!stoppingOnPurpose) {
+                        status.setText("The VM's screen closed" + (s.failure() != null ? ": " + s.failure() : "."));
+                    }
                     stop();
                     return;
                 }
