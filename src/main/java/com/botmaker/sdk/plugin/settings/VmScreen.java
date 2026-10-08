@@ -214,7 +214,7 @@ final class VmScreen {
         launcherButtons.values().forEach(b -> b.setDisable(true));
         status.setText("Copying " + game.name() + " into the VM…");
         Async.load("vm-copy-" + game.id(), () -> GuestCalls.unchecked(() -> {
-            GameCopy.copy(vm, game, said -> Platform.runLater(() -> status.setText(said)));
+            GameCopy.copy(vm, credentials(), game, said -> Platform.runLater(() -> status.setText(said)));
             return true;
         }), done -> ended("✓ " + game.name() + " is in the VM. Open " + game.launcher().displayName()
                 + " on this screen: it checks the game's files, then lists it installed."),
