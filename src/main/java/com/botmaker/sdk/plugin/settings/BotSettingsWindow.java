@@ -12,6 +12,8 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.SessionBackend;
 import com.botmaker.shared.platform.Os;
+import com.botmaker.shared.vm.VmInventory;
+import com.botmaker.shared.vm.VmRecord;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -36,11 +38,14 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.StringConverter;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * ⚙ Bot Settings: the bot's {@code @Managed("settings")} value — how it clicks and looks, and where the game
- * runs: a private display, or the desktop with or without taking over the mouse and keyboard.
+ * runs: a private display (Linux) or a game VM (Windows, {@link VmSetupWindow} sets one up), or the desktop with
+ * or without taking over the mouse and keyboard.
  *
  * <p>The settings are Java the bot compiles, so the window belongs to the plugin that owns the type, and it edits the one expression
  * {@code Sdk.settings()} returns through the host — the host writes the call, this window never sees Java.
@@ -64,9 +69,14 @@ public final class BotSettingsWindow {
     private final ToggleGroup where = new ToggleGroup();
     private final RadioButton privateDisplay = new RadioButton(BotSettings.Where.PRIVATE_DISPLAY.displayName());
     private final RadioButton myDesktop = new RadioButton(BotSettings.Where.MY_DESKTOP.displayName());
+    private final RadioButton inVm = new RadioButton(BotSettings.Where.VM.displayName());
+    /** Windows: this computer's game VMs; the one picked is the {@link VmChoice} run property. */
+    private final ComboBox<VmRecord> vms = new ComboBox<>();
+    private final Label vmStatus = note("");
     /**
-     * On Windows, where there is no private display, the choice is kept as the bot's Java says it, a game VM
-     * included. On Linux a VM bot shows as isolated, and is saved as what the window shows: a private display.
+     * The bot's Java's choice, read on Windows: a private display is the desktop there and is kept when the
+     * desktop is picked, for the bot on Linux. On Linux a VM bot shows as isolated, and is saved as what the
+     * window shows: a private display.
      */
     private BotSettings.Where windowsWhere = BotSettings.Where.PRIVATE_DISPLAY;
     private final CheckBox takeOver = new CheckBox("Take over the mouse and keyboard");
@@ -132,6 +142,12 @@ public final class BotSettingsWindow {
         save.setDefaultButton(true);
         save.setOnAction(e -> {
             BotSettings chosen = collect();
+            // Which VM is this computer's fact, kept beside the project rather than in the bot's Java.
+            // Only a VM that is set up: one still installing would boot its installer disc for the bot.
+            VmRecord picked = vms.getValue();
+            if (!LINUX && inVm.isSelected() && picked != null && picked.stage() == VmRecord.Stage.READY) {
+                VmChoice.set(services, picked.name());
+            }
             // Nothing changed, nothing written: a Save that rewrote an untouched value was one more entry in the
             // project's history and, for BotSettings.DEFAULTS, a chance to spell it differently.
             if (chosen.equals(current)) {
@@ -210,7 +226,7 @@ public final class BotSettingsWindow {
             // changed the game's window (shared's IgnoredClickWatch).
             takeOverHint.setText(takeOverHint.getText() + " A run says so in its output when its first clicks "
                     + "change nothing in the game.");
-            return new VBox(8, title("Mouse and keyboard"), takeOver, takeOverHint);
+            return windowsRunInPane(stage, takeOverHint);
         }
         privateDisplay.setToggleGroup(where);
         myDesktop.setToggleGroup(where);
@@ -247,6 +263,82 @@ public final class BotSettingsWindow {
                         + "command line still wins.")));
         advanced.setExpanded(false);
         return new VBox(8, title("Run the game in"), privateDisplay, onPrivate, myDesktop, onDesktop, advanced);
+    }
+
+    /**
+     * Windows: the desktop, or a game VM. The take-over tick is the desktop's alone: in a VM every click is the
+     * hypervisor's own mouse, which the guest takes as hardware.
+     */
+    private VBox windowsRunInPane(Stage stage, Label takeOverHint) {
+        myDesktop.setToggleGroup(where);
+        inVm.setToggleGroup(where);
+        Label vmHint = note("The game runs in a Windows of its own, which Studio sets up. You keep using your "
+                + "computer; the bot's clicks reach the game as a real mouse's.");
+        vms.setConverter(labels(vm -> vm.name() + (vm.stage() == VmRecord.Stage.READY ? ""
+                : " — " + vm.stage().displayName())));
+        vms.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(vms, Priority.ALWAYS);
+        Button setUpVm = new Button("Set up a game VM…");
+        Button openScreen = new Button("Open VM screen");
+        Runnable refresh = () -> {
+            VmRecord picked = vms.getValue();
+            boolean ready = picked != null && picked.stage() == VmRecord.Stage.READY;
+            openScreen.setDisable(!ready);
+            setUpVm.setText(picked != null && !ready ? "Go on setting " + picked.name() + " up…" : "Set up a game VM…");
+            vmStatus.setText(vms.getItems().isEmpty() ? "No game VM on this computer yet." : "");
+        };
+        setUpVm.setOnAction(e -> {
+            // Owned by the editor, not by this window: a setup takes 20–40 minutes and must outlive Save or
+            // Cancel here. Its "Use this VM" writes the choice itself, so nothing here waits for it.
+            VmRecord picked = vms.getValue();
+            Consumer<VmRecord> use = ready -> useVm(services, ready);
+            stage.close();
+            if (picked != null && picked.stage() != VmRecord.Stage.READY) {
+                VmSetupWindow.resume(services, owner, picked, use);
+            } else {
+                VmSetupWindow.open(services, owner, use);
+            }
+        });
+        openScreen.setOnAction(e -> {
+            if (vms.getValue() != null) VmScreen.open(services, stage, vms.getValue());
+        });
+        vms.valueProperty().addListener((o, was, now) -> refresh.run());
+        loadVms(VmChoice.current(services));
+        refresh.run();
+
+        HBox vmRow = new HBox(8, vms, openScreen);
+        vmRow.setAlignment(Pos.CENTER_LEFT);
+        VBox onVm = new VBox(6, vmHint, vmRow, new HBox(8, setUpVm, vmStatus));
+        onVm.setPadding(new Insets(0, 0, 0, 24));
+        VBox onDesktop = new VBox(6, takeOver, takeOverHint);
+        onDesktop.setPadding(new Insets(0, 0, 0, 24));
+        showWhen(onDesktop, myDesktop);
+        showWhen(onVm, inVm);
+        return new VBox(8, title("Run the game in"), myDesktop, onDesktop, inVm, onVm);
+    }
+
+    /**
+     * Runs the bot's game in {@code vm}: {@code Where.VM} in its Java, unless it says so already or isn't a
+     * value this window can rewrite, and {@code vm} as this computer's {@link VmChoice}.
+     */
+    static void useVm(StudioServices services, VmRecord vm) {
+        VmChoice.set(services, vm.name());
+        Optional<ValueContext> ctx = SETTINGS.openOrCreate(services);
+        BotSettings s = ctx.flatMap(SETTINGS::read).orElse(BotSettings.DEFAULTS);
+        if (ctx.isPresent() && SETTINGS.readable(ctx.get()) && s.where() != BotSettings.Where.VM) {
+            ctx.get().set(new BotSettings(s.clicks(), s.vision(), new BotSettings.RunIn(BotSettings.Where.VM,
+                    s.takeOver(), s.runIn().displayBackend(), s.runIn().inputBackend()), s.maxRetryAttempts(),
+                    s.debug()));
+        }
+        services.status("The bot's game runs in the game VM " + vm.name() + ".");
+    }
+
+    /** Lists this computer's game VMs, picking {@code preferred} when it is one, else the first. */
+    private void loadVms(String preferred) {
+        List<VmRecord> all = VmInventory.list();
+        vms.getItems().setAll(all);
+        vms.setValue(all.stream().filter(vm -> vm.name().equals(preferred)).findFirst()
+                .orElse(all.isEmpty() ? null : all.getFirst()));
     }
 
     /** Shows {@code pane} only while {@code choice} is selected, taking no room otherwise. */
@@ -296,7 +388,11 @@ public final class BotSettingsWindow {
     @SuppressWarnings("deprecation")
     private void seed(BotSettings s) {
         windowsWhere = s.where();
-        (s.where() == BotSettings.Where.MY_DESKTOP ? myDesktop : privateDisplay).setSelected(true);
+        if (LINUX) {
+            (s.where() == BotSettings.Where.MY_DESKTOP ? myDesktop : privateDisplay).setSelected(true);
+        } else {
+            (s.where() == BotSettings.Where.VM ? inVm : myDesktop).setSelected(true);
+        }
         takeOver.setSelected(s.takeOver());
         inputBackend.setValue(s.runIn().inputBackend());
         displayBackend.setValue(s.runIn().displayBackend());
@@ -331,7 +427,11 @@ public final class BotSettingsWindow {
     }
 
     private BotSettings.Where chosenWhere() {
-        if (!LINUX) return windowsWhere;
+        if (!LINUX) {
+            if (inVm.isSelected()) return BotSettings.Where.VM;
+            // The desktop, which a private display also is on Windows: that one is kept for the bot on Linux.
+            return windowsWhere == BotSettings.Where.VM ? BotSettings.Where.MY_DESKTOP : windowsWhere;
+        }
         return myDesktop.isSelected() ? BotSettings.Where.MY_DESKTOP : BotSettings.Where.PRIVATE_DISPLAY;
     }
 

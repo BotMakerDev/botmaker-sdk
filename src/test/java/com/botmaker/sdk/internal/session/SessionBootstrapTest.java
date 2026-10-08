@@ -10,6 +10,8 @@ import com.botmaker.shared.platform.Os;
 import com.botmaker.shared.tools.UserDirs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
@@ -35,6 +37,7 @@ class SessionBootstrapTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX) // isolated means a private display, which only Linux has
     void anExplicitSessionCallOutranksTheSystemProperty() {
         // The top rung of the ladder: bot code must be able to force its own behaviour on a machine whose
         // environment says the opposite, in both directions.
@@ -48,6 +51,7 @@ class SessionBootstrapTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void isEnabledReportsTheResolvedAnswerNotJustWhatBotCodeAsked() {
         // Session.isEnabled() is the whole ladder, so a bot that never calls anything still reads the truth.
         System.setProperty(SessionBootstrap.WHERE_PROPERTY, "my-desktop");
@@ -124,6 +128,7 @@ class SessionBootstrapTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void isolationIsOnByDefault() {
         // No settings installed → BotSettings.DEFAULTS → a private display.
         System.clearProperty(SessionBootstrap.WHERE_PROPERTY);
@@ -138,12 +143,14 @@ class SessionBootstrapTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void isolationRequestedWhenPropertyIsTrue() {
         System.setProperty(SessionBootstrap.WHERE_PROPERTY, "private-display");
         assertTrue(SessionBootstrap.isolationRequested());
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void aPropertyThatNamesNoPlaceLeavesTheSettingsInCharge() {
         // The old boolean property is not a place: it must not be read as one, in either direction.
         System.setProperty(SessionBootstrap.WHERE_PROPERTY, "false");

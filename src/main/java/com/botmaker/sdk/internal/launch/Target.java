@@ -108,15 +108,24 @@ public final class Target {
      */
     public static boolean isRunning() {
         LaunchTarget t = current();
-        return t != null && t.isRunning();
+        if (t == null) return false;
+        // In a game VM the game's processes are the guest's: this computer's process table never has them.
+        if (SessionBootstrap.inVm()) return SessionBootstrap.vmAlive();
+        return t.isRunning();
     }
 
-    /** Restarts the current target from a clean state (see {@link LaunchTarget#restart()}). No-op when none. */
+    /**
+     * Restarts the current target from a clean state (see {@link LaunchTarget#restart()}). No-op when none. In a
+     * game VM it starts the game again in the guest; what the guest runs can't be stopped from here.
+     */
     public static void restart() {
         LaunchTarget t = current();
-        if (t != null) {
-            t.restart();
+        if (t == null) return;
+        if (SessionBootstrap.inVm()) {
+            SessionBootstrap.relaunchInVm(t.launchSpec());
+            return;
         }
+        t.restart();
     }
 
     /**

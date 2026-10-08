@@ -10,6 +10,7 @@ import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.PrivateSession;
 import com.botmaker.session.SessionBackend;
+import com.botmaker.session.SessionHealth;
 import com.botmaker.session.SessionOptions;
 import com.botmaker.session.SessionStartException;
 import com.botmaker.session.Sessions;
@@ -21,6 +22,7 @@ import com.botmaker.session.display.BackendInstall;
 import com.botmaker.session.display.SessionBackends;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The bot-runtime producer: the one place that, for an <em>isolated</em> bot, brings up a private nested
@@ -121,6 +123,21 @@ public final class SessionBootstrap {
      */
     public static boolean wantsPrivateDisplay(BotSettings settings) {
         return Os.current() == Os.LINUX && settings.where() == BotSettings.Where.PRIVATE_DISPLAY;
+    }
+
+    /** Whether Studio's launch surfaces put the game in a game VM for {@code settings}: Windows, and they say one. */
+    public static boolean wantsVm(BotSettings settings) {
+        return Os.current() == Os.WINDOWS && settings.where() == BotSettings.Where.VM;
+    }
+
+    /**
+     * Why a game VM can't start {@code spec}, or empty when it can: asked before a VM boots, which can take
+     * minutes, rather than after.
+     */
+    public static Optional<String> vmRefusal(LaunchSpec spec) {
+        return GuestLaunch.command(spec).isPresent() ? Optional.empty()
+            : Optional.of("A game VM can't start " + spec.describe()
+                + ": it runs a Windows game by path, command, Steam or Epic." + OR_THE_DESKTOP);
     }
 
     /**
@@ -257,11 +274,9 @@ public final class SessionBootstrap {
      * be opened stops the run, as a missing backend does: the user asked for the game off their desktop.
      */
     private static boolean launchInVm(LaunchSpec spec) {
-        if (GuestLaunch.command(spec).isEmpty()) {
-            // Before a boot that can take minutes: the launch would refuse it afterwards anyway.
-            throw new IllegalStateException("A game VM can't start " + spec.describe()
-                + ": it runs a Windows game by path, command, Steam or Epic." + OR_THE_DESKTOP);
-        }
+        vmRefusal(spec).ifPresent(why -> {
+            throw new IllegalStateException(why);
+        });
         String name = vmName();
         DesktopSession session;
         try {
@@ -281,6 +296,36 @@ public final class SessionBootstrap {
         return true;
     }
 
+    /** Whether this bot's game runs in a game VM: Windows, and {@link #where()} says one. */
+    public static boolean inVm() {
+        return Os.current() == Os.WINDOWS && where() == BotSettings.Where.VM;
+    }
+
+    /** Whether this bot's game VM is open and hasn't been given up on. */
+    public static boolean vmAlive() {
+        DesktopSession session = BotSession.get();
+        return session != null && session.health() != SessionHealth.DEAD;
+    }
+
+    /**
+     * Starts {@code spec} again in the game VM, opening the VM first when this run hasn't yet: a recovery's
+     * restart, which can't stop what the guest runs, so a game already up is asked to start again.
+     */
+    public static void relaunchInVm(LaunchSpec spec) {
+        DesktopSession session = BotSession.get();
+        if (session != null && session.health() == SessionHealth.DEAD) {
+            // Given up on after restarts in a row: open the VM afresh rather than launch into nothing.
+            BotSession.clear();
+            session.close();
+            session = null;
+        }
+        if (session == null) {
+            launchIsolated(spec);
+            return;
+        }
+        session.launch(spec);
+    }
+
     /**
      * The game VM to run in: the {@link #VM_PROPERTY} run property, then {@link #VM_ENV}, else the one VM set up on
      * this computer.
@@ -288,9 +333,18 @@ public final class SessionBootstrap {
      * @throws IllegalStateException when none is named and there isn't exactly one
      */
     static String vmName() {
-        for (String named : new String[] {System.getProperty(VM_PROPERTY), System.getenv(VM_ENV)}) {
-            if (named != null && !named.isBlank()) return named.trim();
-        }
+        String named = System.getProperty(VM_PROPERTY);
+        return vmName(named != null && !named.isBlank() ? named : System.getenv(VM_ENV));
+    }
+
+    /**
+     * {@code named} when it names a VM, else the one VM set up on this computer: what Studio, which holds the
+     * run property itself, asks.
+     *
+     * @throws IllegalStateException when none is named and there isn't exactly one
+     */
+    public static String vmName(String named) {
+        if (named != null && !named.isBlank()) return named.trim();
         List<VmRecord> ready = VmInventory.list().stream()
             .filter(vm -> vm.stage() == VmRecord.Stage.READY).toList();
         if (ready.size() == 1) return ready.get(0).name();

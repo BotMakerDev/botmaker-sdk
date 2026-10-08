@@ -28,8 +28,20 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   (`SessionBootstrap.where()`), and a place this computer doesn't have puts the game on the desktop: a private
   display on Windows, a VM on Linux. `Session.enable()` means a private display on Linux, and the settings'
   VM on Windows when they name one. A target a Windows guest can't start (Heroic, an emulator app) stops the
-  run before the VM boots. Bot Settings keeps a VM bot's choice on Windows; Studio offers the choice later,
-  with the VM's setup window.
+  run before the VM boots.
+  - **⚙ Bot Settings on Windows:** *Run the game in: My desktop / A virtual machine*. The VM row lists the
+    game VMs on this computer (one still setting up says so), with *Open VM screen*, and *Set up a game VM…*.
+    The take-over tick is the desktop's alone.
+  - **Set up a game VM…:** finds VMware Workstation or QEMU, installs QEMU (one administrator prompt) and
+    turns the Windows Hypervisor Platform on. It links Microsoft's Windows 11 page and takes the `.iso`, sizes
+    the VM from this computer, then installs Windows by itself (20–40 minutes), one sentence per step with the
+    guest's screen. It opens beside the editor and outlives Bot Settings; closing it stops following, and *Go
+    on setting … up* resumes. *Run this bot's game in it* writes `Where.VM` and the VM's name.
+  - **Open VM screen:** the VM's screen in a Studio window, with your mouse and keyboard going to it, to
+    install the game and sign in to Steam. It starts the VM if it's off; closing it leaves the VM running.
+  - **▶ Launch game** starts the game in the VM. A run's recovery restarts it there, and asks the VM, not this
+    computer, whether it runs.
+  - The 5 `SessionBootstrapTest` cases about a private display run on Linux only.
 
 - **🎮 Game: the game this bot plays, on the toolbar.** The button shows the current game's name and cover.
   It opens the game dialog, which Project Setup's launch row now opens too. The dialog shows:

@@ -1,7 +1,11 @@
 package com.botmaker.sdk.plugin.launch;
 
 import com.botmaker.session.display.SessionBackends;
+import com.botmaker.session.DesktopSession;
 import com.botmaker.session.SessionBackend;
+import com.botmaker.session.SessionStartException;
+import com.botmaker.session.Sessions;
+import com.botmaker.session.VmOptions;
 import com.botmaker.session.launch.BackgroundLauncher;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
@@ -10,6 +14,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.settings.BackendInstallPrompt;
 import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
+import com.botmaker.sdk.plugin.settings.VmChoice;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
 import javafx.application.Platform;
@@ -18,6 +23,7 @@ import javafx.scene.control.Tooltip;
 
 import java.awt.Dimension;
 import java.nio.file.Path;
+import java.util.Optional;
 
 /**
  * The "▶ Launch now" button: brings the project's configured {@code launch.target} up <em>without</em>
@@ -121,6 +127,10 @@ public final class QuickLaunch {
     private static void launch(Button button, LaunchSpec spec, Report report, StudioServices services) {
         button.setDisable(true);
         BotSettings settings = BotSettingsWindow.current(services);
+        if (SessionBootstrap.wantsVm(settings)) {
+            launchInVm(button, spec, report, VmChoice.current(services));
+            return;
+        }
         if (usesBackgroundSession(spec, SessionBootstrap.wantsPrivateDisplay(settings))) {
             launchInBackground(button, spec, report, services,
                     SessionBootstrap.backendFor(spec, settings.runIn().displayBackend()));
@@ -141,6 +151,35 @@ public final class QuickLaunch {
         }, last -> {
             button.setDisable(false);
             report.accept(true, (last != null ? last : "Launched " + spec.describe() + ".") + offDesktopNote(spec));
+        }, why -> {
+            button.setDisable(false);
+            report.accept(false, "Couldn't launch: " + why);
+        });
+    }
+
+    /**
+     * The VM path (Windows, the settings say a game VM): start the VM if it is off, start the game on its
+     * desktop, and disconnect. The game goes on running there for the bot's run to drive.
+     */
+    private static void launchInVm(Button button, LaunchSpec spec, Report report, String vmName) {
+        Optional<String> refused = SessionBootstrap.vmRefusal(spec);
+        if (refused.isPresent()) {
+            button.setDisable(false);
+            report.accept(false, refused.get());
+            return;
+        }
+        report.accept(true, "Starting the game VM and " + spec.describe() + " in it…");
+        Async.load("quick-launch-vm", () -> {
+            String name = SessionBootstrap.vmName(vmName);
+            try (DesktopSession session = Sessions.startVm(VmOptions.of(name))) {
+                session.launch(spec);
+            } catch (SessionStartException e) {
+                throw new IllegalStateException(e.getMessage(), e);
+            }
+            return name;
+        }, name -> {
+            button.setDisable(false);
+            report.accept(true, "Launched " + spec.describe() + " in the game VM " + name + ".");
         }, why -> {
             button.setDisable(false);
             report.accept(false, "Couldn't launch: " + why);
