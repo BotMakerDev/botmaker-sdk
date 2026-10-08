@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Copy a game from this PC into the game VM.** The VM screen's *Copy a game from this PC* lists this PC's
+  Steam and Epic games; the one chosen is copied into the VM (QEMU), with its progress, and recorded in the
+  VM's launcher, which then checks its files instead of downloading it.
 - **Run the game in a virtual machine, on Windows.** `BotSettings.Where.VM` (`vm`): the bot runs the game
   in a game VM that Studio set up, and drives it while the user keeps their computer. The VM is the
   `botmaker.session.vm` run property, or the only one set up on this computer. A VM that can't be opened

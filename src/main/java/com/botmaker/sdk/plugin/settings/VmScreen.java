@@ -4,16 +4,20 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
+import com.botmaker.shared.vm.GameCopy;
 import com.botmaker.shared.vm.GuestLauncher;
 import com.botmaker.shared.vm.VmCredentials;
 import com.botmaker.shared.vm.VmRecord;
 import com.botmaker.shared.vm.VmSetup;
 import com.botmaker.shared.vnc.VncController;
 import javafx.animation.AnimationTimer;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
@@ -50,6 +54,12 @@ final class VmScreen {
     /** How long the launcher check waits for a VM this window started to sign in. */
     private static final java.time.Duration GUEST_READY = java.time.Duration.ofMinutes(5);
     private final Map<GuestLauncher, Button> launcherButtons = new EnumMap<>(GuestLauncher.class);
+    /** This PC's Steam and Epic games, listed when first opened, each copied into the VM when chosen. */
+    private final MenuButton copyGame = new MenuButton("Copy a game from this PC");
+    /** Studio's, set when the window shows. */
+    private StudioServices services;
+    /** Not while a game is copied: the copy would end mid-way. */
+    private final Button shutDown = new Button("Shut down VM");
     /** Keys pressed over the screen and not yet released, on the JavaFX thread. */
     private final Set<Integer> held = new HashSet<>();
     /** Shut down from this window: the screen dropping is expected. On the JavaFX thread. */
@@ -65,6 +75,7 @@ final class VmScreen {
     }
 
     private void show(StudioServices services, Window owner) {
+        this.services = services;
         view.setPreserveRatio(true);
         view.setFocusTraversable(true);
         StackPane picture = new StackPane(view);
@@ -79,10 +90,10 @@ final class VmScreen {
         BorderPane.setMargin(status, new Insets(6, 10, 6, 10));
         Stage stage = Modals.window(services, owner,
                 Modals.Frame.modeless("Game VM — " + vm.name(), 1040, 720, 480, 360), root);
-        Button shutDown = new Button("Shut down VM");
         shutDown.setOnAction(e -> {
             shutDown.setDisable(true);
             launcherButtons.values().forEach(b -> b.setDisable(true));
+            copyGame.setDisable(true);
             stoppingOnPurpose = true;
             status.setText("Shutting the VM down: Windows closes its programs first, up to 3 minutes…");
             VmPower.shutDown(services, vm, done -> stage.close(), failed -> {
@@ -157,7 +168,55 @@ final class VmScreen {
             launcherButtons.put(launcher, b);
             bar.getChildren().add(b);
         }
+        copyGame.setDisable(true);
+        // Listed afresh at each opening: a game installed on this PC meanwhile shows up.
+        copyGame.setOnShowing(e -> {
+            copyGame.getItems().setAll(note("Looking for this PC's games…"));
+            Async.load("vm-copy-games", GameCopy::onThisPc, games -> {
+                copyGame.getItems().clear();
+                for (GameCopy.Source game : games) {
+                    MenuItem item = new MenuItem(game.toString());
+                    item.setOnAction(chosen -> copy(game));
+                    copyGame.getItems().add(item);
+                }
+                if (games.isEmpty()) copyGame.getItems().add(note("No Steam or Epic game on this PC."));
+            });
+        });
+        bar.getChildren().add(copyGame);
         return bar;
+    }
+
+    /** A menu row that only says something. */
+    private static MenuItem note(String text) {
+        MenuItem item = new MenuItem(text);
+        item.setDisable(true);
+        return item;
+    }
+
+    /**
+     * Copies {@code game} from this PC into the VM and records it in the VM's launcher, so the launcher there
+     * checks the files instead of downloading them. Off the JavaFX thread; its progress on the status line. The
+     * window closed meanwhile, the copy goes on and says how it ended in Studio's status bar.
+     */
+    private void copy(GameCopy.Source game) {
+        copyGame.setDisable(true);
+        shutDown.setDisable(true);
+        launcherButtons.values().forEach(b -> b.setDisable(true));
+        status.setText("Copying " + game.name() + " into the VM…");
+        Async.load("vm-copy-" + game.id(), () -> GuestCalls.unchecked(() -> {
+            GameCopy.copy(vm, game, said -> Platform.runLater(() -> status.setText(said)));
+            return true;
+        }), done -> ended("✓ " + game.name() + " is in the VM. Open " + game.launcher().displayName()
+                + " on this screen: it checks the game's files, then lists it installed."),
+                why -> ended(game.name() + " wasn't copied: " + why));
+    }
+
+    private void ended(String said) {
+        services.status(said);
+        if (screen == null) return; // the window has closed
+        status.setText(said);
+        shutDown.setDisable(false);
+        checkLaunchers(said); // gives the launcher buttons and the copy back
     }
 
     /**
@@ -176,22 +235,27 @@ final class VmScreen {
             Map<GuestLauncher, Boolean> found = new EnumMap<>(GuestLauncher.class);
             for (GuestLauncher l : GuestLauncher.installable()) found.put(l, VmSetup.guestHas(vm, credentials, l));
             return found;
-        }), found -> found.forEach((l, has) -> {
-            Button b = launcherButtons.get(l);
-            b.setText(has ? "✓ " + l.displayName() : "Install " + l.displayName());
-            b.setDisable(has);
-        }), why -> {
+        }), found -> {
+            found.forEach((l, has) -> {
+                Button b = launcherButtons.get(l);
+                b.setText(has ? "✓ " + l.displayName() : "Install " + l.displayName());
+                b.setDisable(has);
+            });
+            copyGame.setDisable(false);
+        }, why -> {
             // Offered again, so a failed look leaves something to press.
             launcherButtons.forEach((l, b) -> {
                 b.setText("Install " + l.displayName());
                 b.setDisable(false);
             });
+            copyGame.setDisable(false);
             status.setText((said == null ? "" : said + " ") + "Couldn't ask the VM for its launchers: " + why);
         });
     }
 
     private void install(GuestLauncher launcher) {
         launcherButtons.values().forEach(b -> b.setDisable(true));
+        copyGame.setDisable(true);
         status.setText("Installing " + launcher.displayName() + " in the VM: it downloads there, a few minutes…");
         Async.load("vm-install-" + launcher.id(), () -> GuestCalls.unchecked(() -> {
             VmSetup.installInGuest(vm, credentials(), launcher);
