@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A game's life in a game VM.**
+  - `Target.isRunning()` asks the guest whether the game runs. Before, it reported only that the VM was open,
+    and it still does when the guest can't tell (a `cli:` target).
+  - A recovery's `Target.restart()` ends the game's processes in the guest, then starts it again. Before, it
+    asked a running game to start once more.
+  - Opening the VM no longer starts a second copy of a game the last run left running there (the session's
+    `launch` checks).
 - **A window inside the game VM as the capture source.** While the bot runs in a VM, `window("…")` finds the
   window among the guest's own windows, and `desktop()` is the guest's whole screen. The bot captures and
   clicks there in the guest's pixels, so several windows in one VM are each a source. The same holds in a

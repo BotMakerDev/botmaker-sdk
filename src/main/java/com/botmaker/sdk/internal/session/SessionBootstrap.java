@@ -308,8 +308,23 @@ public final class SessionBootstrap {
     }
 
     /**
+     * Whether {@code spec} runs in this bot's game VM, as its guest says; where the guest can't tell (a command
+     * line, a guest not answering), whether the VM is open ({@link #vmAlive()}). Not before this run opened the VM.
+     */
+    public static boolean runningInVm(LaunchSpec spec) {
+        DesktopSession session = BotSession.get();
+        if (session == null) return false;
+        return switch (session.running(spec)) {
+            case RUNNING -> true;
+            case STOPPED -> false;
+            case UNKNOWN -> vmAlive();
+        };
+    }
+
+    /**
      * Starts {@code spec} again in the game VM, opening the VM first when this run hasn't yet: a recovery's
-     * restart, which can't stop what the guest runs, so a game already up is asked to start again.
+     * restart, which ends the game's processes in the guest first. A game the guest can't tell apart (a command
+     * line) is asked to start again.
      */
     public static void relaunchInVm(LaunchSpec spec) {
         DesktopSession session = BotSession.get();
@@ -326,6 +341,7 @@ public final class SessionBootstrap {
             launchIsolated(spec);
             return;
         }
+        if (session.stop(spec)) Debug.log("stopped " + spec.spec() + " in the game VM");
         session.launch(spec);
     }
 

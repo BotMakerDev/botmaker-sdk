@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.bot.Session;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.launch.RunState;
 import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.SessionBackend;
 import com.botmaker.shared.platform.Os;
@@ -242,6 +243,37 @@ class SessionBootstrapTest {
         assertEquals("The game VM game was shut down (Windows shut down). Run the bot again to start it.", e.getMessage());
         assertTrue(launched.isEmpty());
         assertFalse(SessionBootstrap.vmAlive());
+    }
+
+    @Test
+    void aRecoveryEndsTheGameInTheVmThenStartsItAndTheGuestSaysWhetherItRuns() {
+        java.util.List<String> did = new java.util.ArrayList<>();
+        java.util.concurrent.atomic.AtomicReference<RunState> state = new java.util.concurrent.atomic.AtomicReference<>();
+        BotSession.set(new com.botmaker.session.DesktopSession() {
+            @Override public java.util.Set<com.botmaker.session.Capability> capabilities() { return java.util.Set.of(); }
+            @Override public java.awt.Rectangle screen() { return new java.awt.Rectangle(); }
+            @Override public String displayName() { return "VM game"; }
+            @Override public void attach(com.botmaker.shared.capture.GenericWindow window) { }
+            @Override public com.botmaker.shared.capture.GenericWindow attached() { return null; }
+            @Override public void launch(LaunchSpec spec) { did.add("launch " + spec.spec()); }
+            @Override public RunState running(LaunchSpec spec) { return state.get(); }
+            @Override public boolean stop(LaunchSpec spec) { did.add("stop " + spec.spec()); return true; }
+            @Override public java.awt.image.BufferedImage capture() { return null; }
+            @Override public com.botmaker.shared.capture.NativeController controller() { return null; }
+            @Override public void close() { }
+        });
+        LaunchSpec game = new LaunchSpec(LaunchKind.EXE, "C:\\Games\\g.exe");
+        SessionBootstrap.relaunchInVm(game);
+        assertEquals(java.util.List.of("stop exe:C:\\Games\\g.exe", "launch exe:C:\\Games\\g.exe"), did);
+
+        state.set(RunState.RUNNING);
+        assertTrue(SessionBootstrap.runningInVm(game));
+        state.set(RunState.STOPPED);
+        assertFalse(SessionBootstrap.runningInVm(game));
+        state.set(RunState.UNKNOWN);
+        assertTrue(SessionBootstrap.runningInVm(game), "the guest can't tell: the VM is open");
+        BotSession.clear();
+        assertFalse(SessionBootstrap.runningInVm(game), "no VM opened yet");
     }
 
     @Test
