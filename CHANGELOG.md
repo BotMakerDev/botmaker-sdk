@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Set up a Linux game VM.** *Set up a game VM…* starts with *1. System*:
+  - **Windows**, for 3D and DirectX games, one at a time;
+  - **Linux**, for several games and bots at once, each on its own screen, with 2D games. It runs on QEMU, and
+    Ubuntu downloads itself, so there is no disc to pick.
+
+  Bot Settings names each VM's system. A bot can't run in a Linux VM yet.
 - **A game's life in a game VM.**
   - `Target.isRunning()` asks the guest whether the game runs. Before, it reported only that the VM was open,
     and it still does when the guest can't tell (a `cli:` target).

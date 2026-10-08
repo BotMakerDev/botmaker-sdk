@@ -6,6 +6,7 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import com.botmaker.shared.vm.GameCopy;
 import com.botmaker.shared.vm.GuestLauncher;
+import com.botmaker.shared.vm.GuestOs;
 import com.botmaker.shared.vm.VmCredentials;
 import com.botmaker.shared.vm.VmInventory;
 import com.botmaker.shared.vm.VmRecord;
@@ -96,7 +97,8 @@ final class VmScreen {
             launcherButtons.values().forEach(b -> b.setDisable(true));
             copyGame.setDisable(true);
             stoppingOnPurpose = true;
-            status.setText("Shutting the VM down: Windows closes its programs first, up to 3 minutes…");
+            status.setText("Shutting the VM down: " + vm.guestOs().displayName()
+                    + " closes its programs first, up to 3 minutes…");
             VmPower.shutDown(services, vm, done -> stage.close(), failed -> {
                 stoppingOnPurpose = false;
                 shutDown.setDisable(false);
@@ -165,12 +167,19 @@ final class VmScreen {
     /**
      * The store launchers in the VM, one button each: ✓ when the guest has it, else Install, which downloads and
      * installs it silently. The VM is a Windows of its own, so a Steam or Epic game needs its launcher there,
-     * signed in on this screen, and the game installed through it.
+     * signed in on this screen, and the game installed through it. A Linux VM has Steam and Legendary from its
+     * setup, and no buttons.
      */
     private HBox launcherBar() {
-        HBox bar = new HBox(8, new Label("Game launchers in the VM:"));
+        HBox bar = new HBox(8);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(6, 10, 6, 10));
+        if (vm.guestOs() != GuestOs.WINDOWS) {
+            bar.getChildren().add(new Label("Steam and Legendary (Epic) were installed with this "
+                    + vm.guestOs().displayName() + " VM."));
+            return bar;
+        }
+        bar.getChildren().add(new Label("Game launchers in the VM:"));
         for (GuestLauncher launcher : GuestLauncher.installable()) {
             Button b = new Button(launcher.displayName() + " …");
             b.setDisable(true);
@@ -235,6 +244,7 @@ final class VmScreen {
      * a failed check is added to it.
      */
     private void checkLaunchers(String said) {
+        if (launcherButtons.isEmpty()) return; // a Linux VM: nothing to ask
         Async.load("vm-launchers-" + vm.name(), () -> GuestCalls.unchecked(() -> {
             VmCredentials credentials = credentials();
             long until = System.nanoTime() + GUEST_READY.toNanos();

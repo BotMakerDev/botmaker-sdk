@@ -7,6 +7,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import com.botmaker.shared.Spawn;
 import com.botmaker.shared.launch.UriLauncher;
+import com.botmaker.shared.vm.GuestOs;
 import com.botmaker.shared.vm.Hypervisor;
 import com.botmaker.shared.vm.Qemu;
 import com.botmaker.shared.vm.VmInventory;
@@ -17,12 +18,15 @@ import com.botmaker.shared.vm.VmwareWorkstation;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -42,13 +46,16 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * "Set up a game VM…": from nothing to a Windows VM a bot can run its game in, in one window.
+ * "Set up a game VM…": from nothing to a VM a bot can run its game in, in one window.
  * <ol>
- *   <li>the hypervisor: VMware Workstation when it is installed, else QEMU, which this window installs (one
- *       administrator prompt), with the Windows Hypervisor Platform it runs on;</li>
- *   <li>the Windows disc image, which the user downloads from Microsoft and picks;</li>
+ *   <li>the system: Windows, for 3D games, one at a time; or Linux, for several games and bots at once, 2D;</li>
+ *   <li>the hypervisor: for Windows, VMware Workstation when it is installed, else QEMU, which this window
+ *       installs (one administrator prompt), with the Windows Hypervisor Platform it runs on; Linux runs on
+ *       QEMU;</li>
+ *   <li>the disc: the Windows disc image, which the user downloads from Microsoft and picks; Ubuntu downloads
+ *       itself;</li>
  *   <li>its size, from this computer's;</li>
- *   <li>the setup itself: one sentence per step and the guest's screen as Windows installs, 20–40 minutes.</li>
+ *   <li>the setup itself: one sentence per step and the guest's screen as the system installs.</li>
  * </ol>
  * Closing the window or Cancel stops following the setup, and the VM stays as far as it got: Bot Settings
  * lists it, and this window resumes it ({@link #resume}).
@@ -65,6 +72,12 @@ final class VmSetupWindow {
     private final Button installQemu = new Button("Install QEMU");
     private final Button platformOn = new Button("Turn on the Windows Hypervisor Platform");
     private final Label isoPath = note("No disc image chosen.");
+    private final RadioButton windowsOs = new RadioButton("Windows: 3D and DirectX games, one game at a time");
+    private final RadioButton linuxOs = new RadioButton("Linux: several games and bots at once, each on its own "
+            + "screen; 2D games");
+    private final VBox windowsDisc = new VBox(8);
+    private final Label linuxDisc = note("BotMaker downloads Ubuntu Server (about 4 GB) and installs it with Steam "
+            + "and Legendary, Epic's launcher for Linux.");
     private final Spinner<Integer> memoryGb = new Spinner<>();
     private final Spinner<Integer> cores = new Spinner<>();
     private final Spinner<Integer> diskGb = new Spinner<>();
@@ -76,7 +89,8 @@ final class VmSetupWindow {
     private final Button use = new Button("Run this bot's game in it");
 
     private Stage stage;
-    private Hypervisor hypervisor = Hypervisor.UNKNOWN;
+    /** What {@link #findHypervisor} found; {@code null} until then. */
+    private Found found;
     private Path iso;
     private VmRecord vm;
     /** The setup thread this window follows; a stopped one's late answer is not its. Set on the FX thread. */
@@ -101,13 +115,13 @@ final class VmSetupWindow {
     private void show(Window owner) {
         Label heading = new Label(vm == null ? "Set up a game VM" : "Set up " + vm.name());
         Styles.on(heading, Styles.DIALOG_HEADING);
-        Label intro = note("A Windows of its own for the game: the bot plays there while you keep using your "
-                + "computer. Windows installs by itself, in 20–40 minutes; the VM then stays on this computer.");
+        Label intro = note("A computer of its own for the game: the bot plays there while you keep using yours. "
+                + "Its system installs by itself, in 20–40 minutes; the VM then stays on this computer.");
 
         VBox body = new VBox(14, heading, intro);
         if (vm == null) {
-            body.getChildren().addAll(new Separator(), nameRow(), hypervisorPane(), new Separator(), isoPane(),
-                    new Separator(), sizePane());
+            body.getChildren().addAll(new Separator(), nameRow(), systemPane(), new Separator(), hypervisorPane(),
+                    new Separator(), isoPane(), new Separator(), sizePane());
         }
         body.getChildren().addAll(new Separator(), setupPane());
         body.setPadding(new Insets(18));
@@ -152,6 +166,27 @@ final class VmSetupWindow {
         }
     }
 
+    private VBox systemPane() {
+        ToggleGroup system = new ToggleGroup();
+        windowsOs.setToggleGroup(system);
+        linuxOs.setToggleGroup(system);
+        windowsOs.setSelected(true);
+        system.selectedToggleProperty().addListener((o, was, now) -> showSystem());
+        return new VBox(8, title("1. System"), windowsOs, linuxOs);
+    }
+
+    private GuestOs guestOs() {
+        return linuxOs.isSelected() ? GuestOs.LINUX : GuestOs.WINDOWS;
+    }
+
+    /** The disc and hypervisor panes for the system picked. */
+    private void showSystem() {
+        boolean linux = guestOs() == GuestOs.LINUX;
+        show(windowsDisc, !linux);
+        show(linuxDisc, linux);
+        showHypervisor();
+    }
+
     private VBox hypervisorPane() {
         installQemu.setOnAction(e -> installQemu());
         platformOn.setOnAction(e -> turnPlatformOn());
@@ -161,11 +196,12 @@ final class VmSetupWindow {
             b.setVisible(false);
             b.setManaged(false);
         }
-        Label which = note("QEMU installs from here and suits 2D and click-driven games: its Windows draws in "
-                + "software. For 3D games, install VMware Workstation (a free download behind a Broadcom sign-in), "
-                + "then open this window again: its Windows gets a DirectX 11 GPU.");
+        Label which = note("QEMU installs from here and suits 2D and click-driven games: its system draws in "
+                + "software. For 3D games in Windows, install VMware Workstation (a free download behind a Broadcom "
+                + "sign-in), then open this window again: its Windows gets a DirectX 11 GPU. A Linux VM runs on "
+                + "QEMU.");
         HBox buttons = new HBox(8, installQemu, platformOn, vmware);
-        return new VBox(8, title("1. Hypervisor"), hypervisorStatus, buttons, which);
+        return new VBox(8, title("2. Hypervisor"), hypervisorStatus, buttons, which);
     }
 
     private VBox isoPane() {
@@ -184,7 +220,9 @@ final class VmSetupWindow {
         });
         Label how = note("On Microsoft's page, under \"Download Windows 11 Disk Image (ISO)\", pick Windows 11 and "
                 + "your language, and download the 64-bit file (about 7 GB). Then choose it here.");
-        return new VBox(8, title("2. Windows"), how, new HBox(8, page, choose), isoPath);
+        windowsDisc.getChildren().setAll(how, new HBox(8, page, choose), isoPath);
+        show(linuxDisc, false);
+        return new VBox(8, title("3. Disc"), windowsDisc, linuxDisc);
     }
 
     private VBox sizePane() {
@@ -201,7 +239,7 @@ final class VmSetupWindow {
         grid.addRow(0, new Label("Memory (GB)"), memoryGb, note("This computer has " + hostGb + " GB."));
         grid.addRow(1, new Label("Cores"), cores, note("This computer has " + hostCores + "."));
         grid.addRow(2, new Label("Disk (GB)"), diskGb, note("Windows 11's minimum. It takes only what is written."));
-        return new VBox(8, title("3. Size"), grid);
+        return new VBox(8, title("4. Size"), grid);
     }
 
     private static void setRange(Spinner<Integer> spinner, int min, int max, int value) {
@@ -233,31 +271,49 @@ final class VmSetupWindow {
         }
         Label done = note("Once it's ready, Open VM screen lets you use the VM by hand: install the game, sign in "
                 + "to Steam or Epic. The bot then starts the game there itself.");
-        return new VBox(8, title(vm == null ? "4. Set up" : "Setup"), new HBox(8, setUp, stop, openScreen, use),
+        return new VBox(8, title(vm == null ? "5. Set up" : "Setup"), new HBox(8, setUp, stop, openScreen, use),
                 progress, guest, done);
     }
 
-    /** The hypervisor found, and whether what it runs on is on: always for VMware, which brings its own. */
-    private record Found(Hypervisor hypervisor, boolean platformOn) {}
+    /**
+     * The hypervisor a Windows VM gets ({@link Hypervisor#detect}), whether QEMU is installed, and whether the
+     * Windows Hypervisor Platform it runs on is on.
+     */
+    private record Found(Hypervisor detected, boolean qemu, boolean platformOn) {}
 
-    /** Finds the hypervisor and what it lacks, off the JavaFX thread: the platform check runs PowerShell. */
+    /** Finds the hypervisors and what QEMU lacks, off the JavaFX thread: the platform check runs PowerShell. */
     private void findHypervisor() {
         Async.load("vm-hypervisor", () -> {
-            Hypervisor found = Hypervisor.detect();
-            return new Found(found, found != Hypervisor.QEMU || VmSetup.hypervisorPlatformOn());
+            boolean qemu = Qemu.find().isPresent();
+            return new Found(Hypervisor.detect(), qemu, qemu && VmSetup.hypervisorPlatformOn());
         }, found -> {
-            hypervisor = found.hypervisor();
-            boolean platform = found.platformOn();
-            show(installQemu, hypervisor == Hypervisor.UNKNOWN);
-            show(platformOn, hypervisor == Hypervisor.QEMU && !platform);
-            hypervisorStatus.setText(switch (hypervisor) {
-                case VMWARE -> "✓ VMware Workstation: its Windows gets a GPU, for 2D and 3D games.";
-                case QEMU -> platform ? "✓ QEMU, on the Windows Hypervisor Platform."
-                        : "QEMU is installed, but the Windows Hypervisor Platform it runs on is off. Turn it on, "
-                        + "then restart Windows.";
-                case UNKNOWN -> "Neither VMware Workstation nor QEMU is installed. Install QEMU from here (Windows "
-                        + "asks once for administrator rights).";
-            });
+            this.found = found;
+            showHypervisor();
+        });
+    }
+
+    /** The hypervisor the system picked runs on, until it is found; {@link Hypervisor#UNKNOWN} before then. */
+    private Hypervisor hypervisor() {
+        if (found == null) return Hypervisor.UNKNOWN;
+        if (guestOs() == GuestOs.LINUX) return found.qemu() ? Hypervisor.QEMU : Hypervisor.UNKNOWN;
+        return found.detected();
+    }
+
+    /** What the hypervisor pane says, for the system picked. */
+    private void showHypervisor() {
+        if (found == null) return;
+        Hypervisor hypervisor = hypervisor();
+        boolean platform = found.platformOn();
+        show(installQemu, hypervisor == Hypervisor.UNKNOWN);
+        show(platformOn, hypervisor == Hypervisor.QEMU && !platform);
+        hypervisorStatus.setText(switch (hypervisor) {
+            case VMWARE -> "✓ VMware Workstation: its Windows gets a GPU, for 2D and 3D games.";
+            case QEMU -> platform ? "✓ QEMU, on the Windows Hypervisor Platform."
+                    : "QEMU is installed, but the Windows Hypervisor Platform it runs on is off. Turn it on, "
+                    + "then restart Windows.";
+            case UNKNOWN -> (guestOs() == GuestOs.LINUX ? "A Linux VM runs on QEMU, which isn't installed."
+                    : "Neither VMware Workstation nor QEMU is installed.")
+                    + " Install QEMU from here (Windows asks once for administrator rights).";
         });
     }
 
@@ -299,7 +355,8 @@ final class VmSetupWindow {
             progress.setText(e.getMessage());
             return;
         }
-        Hypervisor chosenHypervisor = hypervisor;
+        Hypervisor chosenHypervisor = hypervisor();
+        GuestOs chosenOs = guestOs();
         Path chosenIso = iso;
         showRunning(true);
         progress.setText("Starting…");
@@ -325,7 +382,7 @@ final class VmSetupWindow {
             Thread me = Thread.currentThread();
             try {
                 VmRecord made = known != null ? known
-                        : VmSetup.prepare(chosenName, chosenIso, chosenHypervisor, size, listener);
+                        : VmSetup.prepare(chosenName, chosenOs, chosenIso, chosenHypervisor, size, listener);
                 Platform.runLater(() -> vm = made);
                 VmRecord ready = VmSetup.install(made, listener, INSTALL_TIMEOUT);
                 Platform.runLater(() -> {
@@ -359,8 +416,9 @@ final class VmSetupWindow {
         setUp.setVisible(false);
         setUp.setManaged(false);
         show(openScreen, true);
-        show(use, true);
-        progress.setText("✓ " + ready.name() + " is ready: Windows is installed and signed in.");
+        show(use, ready.guestOs() == GuestOs.WINDOWS); // a bot can't run in a Linux VM yet
+        progress.setText("✓ " + ready.name() + " is ready: " + ready.guestOs().displayName() + " is installed"
+                + (ready.guestOs() == GuestOs.WINDOWS ? " and signed in." : "."));
     }
 
     private void failed(String why) {
@@ -374,9 +432,9 @@ final class VmSetupWindow {
         show(stop, on);
     }
 
-    private static void show(Button button, boolean on) {
-        button.setVisible(on);
-        button.setManaged(on);
+    private static void show(Node node, boolean on) {
+        node.setVisible(on);
+        node.setManaged(on);
     }
 
     private static String lastLine(Spawn.Completed done) {
