@@ -28,7 +28,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
   Bot Settings names each VM's system. A bot in a Linux VM gets a screen of its own there, so several bots
   share one VM; `window("…")` and `desktop()` are that screen's. Its VM screen opens a screen of its own too,
-  where *Start Steam here* starts Steam to sign in.
+  where *Start Steam here* starts Steam to sign in, and *Sign in to Epic…* signs Legendary in (Epic's page
+  opens in your browser; paste back the code it shows). *Copy a game from this PC* copies a Steam or Epic game
+  into a Linux VM too.
 - **A game's life in a game VM.**
   - `Target.isRunning()` asks the guest whether the game runs. Before, it reported only that the VM was open,
     and it still does when the guest can't tell (a `cli:` target).

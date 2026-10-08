@@ -5,9 +5,11 @@ import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.launch.UriLauncher;
 import com.botmaker.shared.vm.GameCopy;
 import com.botmaker.shared.vm.GuestLauncher;
 import com.botmaker.shared.vm.GuestOs;
+import com.botmaker.shared.vm.Legendary;
 import com.botmaker.shared.vm.LinuxDisplay;
 import com.botmaker.shared.vm.VmCredentials;
 import com.botmaker.shared.vm.VmInventory;
@@ -23,6 +25,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.PasswordField;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
@@ -33,6 +36,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -41,6 +45,7 @@ import java.io.IOException;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -59,6 +64,8 @@ final class VmScreen {
     private Opened opened;
     /** A Linux VM's: starts Steam on this window's display, to sign in. */
     private final Button startSteam = new Button("Start Steam here");
+    /** A Linux VM's: signs its Legendary in to the user's Epic account. */
+    private final Button signInEpic = new Button("Sign in to Epic…");
     private long shown = -1;
     /** How long the launcher check waits for a VM this window started to sign in. */
     private static final java.time.Duration GUEST_READY = java.time.Duration.ofMinutes(5);
@@ -103,6 +110,7 @@ final class VmScreen {
             shutDown.setDisable(true);
             launcherButtons.values().forEach(b -> b.setDisable(true));
             copyGame.setDisable(true);
+            signInEpic.setDisable(true);
             stoppingOnPurpose = true;
             status.setText("Shutting the VM down: " + vm.guestOs().displayName()
                     + " closes its programs first, up to 3 minutes…");
@@ -213,7 +221,8 @@ final class VmScreen {
      * The store launchers in the VM, one button each: ✓ when the guest has it, else Install, which downloads and
      * installs it silently. The VM is a Windows of its own, so a Steam or Epic game needs its launcher there,
      * signed in on this screen, and the game installed through it. A Linux VM has Steam and Legendary from its
-     * setup: one button starts Steam on this window's display, to sign in.
+     * setup: one button starts Steam on this window's display, to sign in, and one signs Legendary in to Epic.
+     * Either system copies a game of this PC in.
      */
     private HBox launcherBar() {
         HBox bar = new HBox(8);
@@ -222,17 +231,19 @@ final class VmScreen {
         if (vm.guestOs() == GuestOs.LINUX) {
             startSteam.setOnAction(e -> startSteam());
             show(startSteam, false);
-            bar.getChildren().addAll(new Label("Steam and Legendary (Epic) were installed with this "
-                    + vm.guestOs().displayName() + " VM."), startSteam);
-            return bar;
-        }
-        bar.getChildren().add(new Label("Game launchers in the VM:"));
-        for (GuestLauncher launcher : GuestLauncher.installable()) {
-            Button b = new Button(launcher.displayName() + " …");
-            b.setDisable(true);
-            b.setOnAction(e -> install(launcher));
-            launcherButtons.put(launcher, b);
-            bar.getChildren().add(b);
+            signInEpic.setOnAction(e -> signInEpic());
+            signInEpic.setDisable(true);
+            bar.getChildren().addAll(new Label("Steam and Legendary (Epic) are in this "
+                    + vm.guestOs().displayName() + " VM."), startSteam, signInEpic);
+        } else {
+            bar.getChildren().add(new Label("Game launchers in the VM:"));
+            for (GuestLauncher launcher : GuestLauncher.installable()) {
+                Button b = new Button(launcher.displayName() + " …");
+                b.setDisable(true);
+                b.setOnAction(e -> install(launcher));
+                launcherButtons.put(launcher, b);
+                bar.getChildren().add(b);
+            }
         }
         copyGame.setDisable(true);
         // Listed afresh at each opening: a game installed on this PC meanwhile shows up.
@@ -268,13 +279,12 @@ final class VmScreen {
         copyGame.setDisable(true);
         shutDown.setDisable(true);
         launcherButtons.values().forEach(b -> b.setDisable(true));
+        signInEpic.setDisable(true);
         status.setText("Copying " + game.name() + " into the VM…");
-        Async.load("vm-copy-" + game.id(), () -> GuestCalls.unchecked(() -> {
-            GameCopy.copy(vm, credentials(), game, said -> Platform.runLater(() -> status.setText(said)));
-            return true;
-        }), done -> ended("✓ " + game.name() + " is in the VM. Open " + game.launcher().displayName()
-                + " on this screen: it checks the game's files, then lists it installed."),
-                why -> ended(game.name() + " wasn't copied: " + why));
+        Async.load("vm-copy-" + game.id(), () -> GuestCalls.unchecked(() -> GameCopy.copy(vm,
+                        vm.guestOs() == GuestOs.LINUX ? null : credentials(), game,
+                        said -> Platform.runLater(() -> status.setText(said)))),
+                outcome -> ended(outcome.said(game)), why -> ended(game.name() + " wasn't copied: " + why));
     }
 
     private void ended(String said) {
@@ -291,7 +301,11 @@ final class VmScreen {
      * a failed check is added to it.
      */
     private void checkLaunchers(String said) {
-        if (launcherButtons.isEmpty()) return; // a Linux VM: nothing to ask
+        if (launcherButtons.isEmpty()) { // a Linux VM: its launchers came with it, and its guest has answered
+            copyGame.setDisable(false);
+            signInEpic.setDisable(false);
+            return;
+        }
         Async.load("vm-launchers-" + vm.name(), () -> GuestCalls.unchecked(() -> {
             VmCredentials credentials = credentials();
             long until = System.nanoTime() + GUEST_READY.toNanos();
@@ -335,6 +349,39 @@ final class VmScreen {
         }), done -> startSteam.setDisable(false), why -> {
             startSteam.setDisable(false);
             status.setText("Steam didn't start: " + why);
+        });
+    }
+
+    /**
+     * Signs the Linux VM's Legendary in to Epic: Epic's page opens in this PC's browser, and the code it shows once
+     * the user has signed in is pasted here. The code goes to the VM and nowhere else.
+     */
+    private void signInEpic() {
+        Async.run("open-browser", () -> UriLauncher.open(Legendary.SIGN_IN_PAGE), null);
+        PasswordField pasted = new PasswordField();
+        pasted.setPromptText("authorizationCode");
+        Label hint = new Label("Epic's sign-in opened in your browser. Once you've signed in, it shows a few lines: "
+                + "copy the authorizationCode's value (or all of it) and paste it here. The code works once, for a "
+                + "few minutes.");
+        hint.setWrapText(true);
+        VBox body = new VBox(8, hint, pasted);
+        body.setPrefWidth(460);
+        Modals.form(services, "Sign in to Epic in the VM", body, () -> {
+            Optional<String> code = Legendary.code(pasted.getText());
+            if (code.isEmpty()) {
+                status.setText("That isn't Epic's code: sign in to Epic again and paste the authorizationCode.");
+                return;
+            }
+            // Not with a copy, which asks whether Legendary is signed in, nor a shutdown.
+            signInEpic.setDisable(true);
+            copyGame.setDisable(true);
+            shutDown.setDisable(true);
+            status.setText("Signing the VM's Legendary in to Epic…");
+            Async.load("vm-epic-" + vm.name(), () -> GuestCalls.unchecked(() -> {
+                Legendary.signIn(vm, code.get());
+                return true;
+            }), done -> ended("✓ The VM's Legendary is signed in to Epic. A game copied in before is recorded when "
+                    + "you copy it again."), why -> ended("Epic sign-in didn't work: " + why));
         });
     }
 
