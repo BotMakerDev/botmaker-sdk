@@ -21,6 +21,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Run the game in a virtual machine, on Windows.** `BotSettings.Where.VM` (`vm`): the bot runs the game
+  in a game VM that Studio set up, and drives it while the user keeps their computer. The VM is the
+  `botmaker.session.vm` run property, or the only one set up on this computer. A VM that can't be opened
+  stops the run and says why; it doesn't fall back to the desktop. Where the game runs now resolves to a place
+  (`SessionBootstrap.where()`), and a place this computer doesn't have puts the game on the desktop: a private
+  display on Windows, a VM on Linux. `Session.enable()` means a private display on Linux, and the settings'
+  VM on Windows when they name one. A target a Windows guest can't start (Heroic, an emulator app) stops the
+  run before the VM boots. Bot Settings keeps a VM bot's choice on Windows; Studio offers the choice later,
+  with the VM's setup window.
+
 - **🎮 Game: the game this bot plays, on the toolbar.** The button shows the current game's name and cover.
   It opens the game dialog, which Project Setup's launch row now opens too. The dialog shows:
   - a grid of small covers (Steam's portrait art, an Epic game's own icon), and above it a row of radio

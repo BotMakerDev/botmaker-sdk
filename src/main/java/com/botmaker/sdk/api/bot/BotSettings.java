@@ -108,8 +108,9 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
     /**
      * Where the game runs, and what the bot does to the mouse and keyboard there.
      *
-     * @param where          a private display of the bot's own, or the user's desktop. Linux only: on Windows
-     *                       the game is always on the desktop
+     * @param where          a private display of the bot's own (Linux), a game VM (Windows), or the user's
+     *                       desktop, which is where the game runs when the place asked for isn't this
+     *                       computer's
      * @param takeOver       on the desktop, drive the real mouse and keyboard rather than send events to the
      *                       game's window — some games ignore those. Nothing on a private display, which the bot
      *                       has to itself
@@ -129,7 +130,12 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
         /** A display of the bot's own: the game never appears on the desktop and the user keeps the machine. */
         PRIVATE_DISPLAY("private-display", "A private display — you keep using your computer"),
         /** The user's desktop: the user watches the bot work, and shares the screen with it. */
-        MY_DESKTOP("my-desktop", "My desktop — watch it work");
+        MY_DESKTOP("my-desktop", "My desktop — watch it work"),
+        /**
+         * A game VM that Studio set up, on Windows: the game runs in the VM's Windows and the bot drives its
+         * screen. Which VM is the {@code botmaker.session.vm} run property, or the only one set up.
+         */
+        VM("vm", "A virtual machine — you keep using your computer");
 
         private final String id;
         private final String displayName;
@@ -316,8 +322,8 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
     private static boolean takenOver;
 
     /**
-     * Whether the game runs on the user's desktop: always on Windows, which has no private display, and on Linux
-     * when the bot's resolved choice is {@link Where#MY_DESKTOP}. Asked again by {@code Session.set}, which can
+     * Whether the game runs on the user's desktop: unless the bot's resolved choice is a private display on
+     * Linux or a game VM on Windows. Asked again by {@code Session.set}, which can
      * move the bot to the desktop after these settings were installed.
      */
     private static boolean onTheDesktop() {

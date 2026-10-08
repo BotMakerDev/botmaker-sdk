@@ -84,7 +84,7 @@ class BotSettingsTest {
         assertEquals(0.62, current.confidence());
         assertEquals(0.11, current.compareMargin());
         assertEquals(7, current.maxRetryAttempts());
-        assertFalse(ProjectDefaults.sessionIsolated());
+        assertEquals(BotSettings.Where.MY_DESKTOP, current.where());
         assertEquals("xephyr", ProjectDefaults.sessionBackend());
     }
 

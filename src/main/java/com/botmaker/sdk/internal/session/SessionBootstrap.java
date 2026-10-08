@@ -11,9 +11,16 @@ import com.botmaker.session.DesktopSession;
 import com.botmaker.session.PrivateSession;
 import com.botmaker.session.SessionBackend;
 import com.botmaker.session.SessionOptions;
+import com.botmaker.session.SessionStartException;
 import com.botmaker.session.Sessions;
+import com.botmaker.session.VmOptions;
+import com.botmaker.shared.vm.GuestLaunch;
+import com.botmaker.shared.vm.VmInventory;
+import com.botmaker.shared.vm.VmRecord;
 import com.botmaker.session.display.BackendInstall;
 import com.botmaker.session.display.SessionBackends;
+
+import java.util.List;
 
 /**
  * The bot-runtime producer: the one place that, for an <em>isolated</em> bot, brings up a private nested
@@ -46,6 +53,10 @@ public final class SessionBootstrap {
     public static final String WHERE_PROPERTY = "botmaker.session.where";
     /** The environment form of {@link #WHERE_PROPERTY}, for a bot started from a shell or a service unit. */
     public static final String WHERE_ENV = "BOTMAKER_SESSION_WHERE";
+    /** The run property naming the game VM, for {@code BotSettings.Where.VM}: a fact about this computer. */
+    public static final String VM_PROPERTY = "botmaker.session.vm";
+    /** The environment form of {@link #VM_PROPERTY}. */
+    public static final String VM_ENV = "BOTMAKER_SESSION_VM";
     /**
      * System property that <em>overrides</em> the default backend when isolated: {@code gamescope} for 3D,
      * {@code xephyr} for 2D. When unset the backend is {@link SessionBackends#preferredBackend(LaunchSpec)},
@@ -63,23 +74,45 @@ public final class SessionBootstrap {
     private SessionBootstrap() {}
 
     /**
-     * Whether this bot runs on a private display. <b>Default: its settings' {@code BotSettings.Where}, which
-     * itself defaults to a private display</b> ({@link ProjectDefaults#sessionIsolated()}). The
-     * {@link #WHERE_PROPERTY} run property (or {@code BOTMAKER_SESSION_WHERE}) outranks it when it names a place.
+     * Whether this bot's game runs off the desktop: on a private display (Linux) or in a game VM (Windows), as
+     * {@link #where()} resolves it. <b>Default: its settings' {@code BotSettings.Where}, which itself defaults to
+     * a private display</b>.
      */
     public static boolean isolationRequested() {
-        if (Os.current() != Os.LINUX) {
-            // No private display outside Linux: the game is on the desktop whatever the settings say.
-            return false;
-        }
+        return isolatedOn(where(), Os.current());
+    }
+
+    /**
+     * Whether {@code where} keeps the game off the desktop on {@code os}: a private display on Linux, a game VM on
+     * Windows. A place this computer doesn't have puts the game on the desktop.
+     */
+    static boolean isolatedOn(BotSettings.Where where, Os os) {
+        return switch (where) {
+            case PRIVATE_DISPLAY -> os == Os.LINUX;
+            case VM -> os == Os.WINDOWS;
+            case MY_DESKTOP -> false;
+        };
+    }
+
+    /**
+     * Where this bot's game runs, highest first: bot code ({@link Session#override()}: off is the desktop; on is a
+     * private display, or on Windows the settings' VM when they name one), the {@link #WHERE_PROPERTY} run
+     * property, {@link #WHERE_ENV}, the settings.
+     */
+    public static BotSettings.Where where() {
+        return where(BotSettings.current().where(), Os.current());
+    }
+
+    static BotSettings.Where where(BotSettings.Where settings, Os os) {
         Boolean override = Session.override();
-        if (override == null) {
-            override = where(System.getProperty(WHERE_PROPERTY));
+        if (override != null) {
+            if (!override) return BotSettings.Where.MY_DESKTOP;
+            return os == Os.WINDOWS && settings == BotSettings.Where.VM
+                ? BotSettings.Where.VM : BotSettings.Where.PRIVATE_DISPLAY;
         }
-        if (override == null) {
-            override = where(System.getenv(WHERE_ENV));
-        }
-        return override != null ? override : ProjectDefaults.sessionIsolated();
+        return BotSettings.Where.fromId(System.getProperty(WHERE_PROPERTY))
+            .or(() -> BotSettings.Where.fromId(System.getenv(WHERE_ENV)))
+            .orElse(settings);
     }
 
     /**
@@ -88,11 +121,6 @@ public final class SessionBootstrap {
      */
     public static boolean wantsPrivateDisplay(BotSettings settings) {
         return Os.current() == Os.LINUX && settings.where() == BotSettings.Where.PRIVATE_DISPLAY;
-    }
-
-    /** Whether {@code id} names the private display; {@code null} when it names no place. */
-    private static Boolean where(String id) {
-        return BotSettings.Where.fromId(id).map(w -> w == BotSettings.Where.PRIVATE_DISPLAY).orElse(null);
     }
 
     /**
@@ -148,7 +176,8 @@ public final class SessionBootstrap {
      * fallback to {@code :0}). Idempotent: once a session is registered, later calls no-op and return {@code true}.
      *
      * @throws IllegalStateException when the backend the game needs is not installed: the run stops with the
-     *                               command that installs it rather than putting the game on the desktop
+     *                               command that installs it rather than putting the game on the desktop. For a
+     *                               game VM, when it can't be opened or the game can't be started in it
      */
     public static boolean launchIsolated(LaunchSpec spec) {
         if (!isolationRequested() || spec == null) {
@@ -157,6 +186,9 @@ public final class SessionBootstrap {
         if (BotSession.isActive()) {
             // Already brought up and launched on a prior call — don't relaunch.
             return true;
+        }
+        if (where() == BotSettings.Where.VM) {
+            return launchInVm(spec);
         }
         // Above every other rung: a live session we were handed is better than any session we could build. Studio
         // passes it when the game is already up in its background session — bringing up a second private display
@@ -219,6 +251,55 @@ public final class SessionBootstrap {
             return false;
         }
     }
+
+    /**
+     * Opens the game VM ({@link #vmName()}), registers it and starts {@code spec} in its Windows. A VM that can't
+     * be opened stops the run, as a missing backend does: the user asked for the game off their desktop.
+     */
+    private static boolean launchInVm(LaunchSpec spec) {
+        if (GuestLaunch.command(spec).isEmpty()) {
+            // Before a boot that can take minutes: the launch would refuse it afterwards anyway.
+            throw new IllegalStateException("A game VM can't start " + spec.describe()
+                + ": it runs a Windows game by path, command, Steam or Epic." + OR_THE_DESKTOP);
+        }
+        String name = vmName();
+        DesktopSession session;
+        try {
+            session = Sessions.startVm(VmOptions.of(name));
+        } catch (SessionStartException e) {
+            throw new IllegalStateException(e.getMessage() + OR_THE_DESKTOP, e);
+        }
+        BotSession.set(session);
+        try {
+            session.launch(spec);
+        } catch (RuntimeException e) {
+            BotSession.clear();
+            session.close();
+            throw new IllegalStateException(e.getMessage(), e);
+        }
+        Debug.log("running " + spec.spec() + " in the game VM " + name);
+        return true;
+    }
+
+    /**
+     * The game VM to run in: the {@link #VM_PROPERTY} run property, then {@link #VM_ENV}, else the one VM set up on
+     * this computer.
+     *
+     * @throws IllegalStateException when none is named and there isn't exactly one
+     */
+    static String vmName() {
+        for (String named : new String[] {System.getProperty(VM_PROPERTY), System.getenv(VM_ENV)}) {
+            if (named != null && !named.isBlank()) return named.trim();
+        }
+        List<VmRecord> ready = VmInventory.list().stream()
+            .filter(vm -> vm.stage() == VmRecord.Stage.READY).toList();
+        if (ready.size() == 1) return ready.get(0).name();
+        throw new IllegalStateException(ready.isEmpty()
+            ? "There's no game VM on this computer. Set one up in ⚙ Bot Settings." + OR_THE_DESKTOP
+            : "There are " + ready.size() + " game VMs on this computer: name one with -D" + VM_PROPERTY + "=<name>.");
+    }
+
+    private static final String OR_THE_DESKTOP = " Or set ⚙ Bot Settings ▸ Run the game in ▸ My desktop.";
 
     /**
      * Why a run on a private display can't start without {@code backend}, and the two ways on: the install

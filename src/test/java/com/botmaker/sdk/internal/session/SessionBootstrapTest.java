@@ -6,8 +6,13 @@ import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.SessionBackend;
+import com.botmaker.shared.platform.Os;
+import com.botmaker.shared.tools.UserDirs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,6 +27,7 @@ class SessionBootstrapTest {
     void tearDown() {
         System.clearProperty(SessionBootstrap.WHERE_PROPERTY);
         System.clearProperty(SessionBootstrap.BACKEND_PROPERTY);
+        System.clearProperty(SessionBootstrap.VM_PROPERTY);
         // Session's overrides are static and outrank everything below them — a leak would silently pin every
         // later test in this JVM.
         Session.clearOverrides();
@@ -73,6 +79,47 @@ class SessionBootstrapTest {
             assertEquals(SessionBackend.GAMESCOPE,
                     SessionBootstrap.backend(new LaunchSpec(LaunchKind.HEROIC, "Firestone")),
                     "a game must still get gamescope with session.backend='" + value + "'");
+        }
+    }
+
+    @Test
+    void eachPlaceIsOffTheDesktopOnlyWhereThisComputerHasIt() {
+        assertTrue(SessionBootstrap.isolatedOn(BotSettings.Where.PRIVATE_DISPLAY, Os.LINUX));
+        assertFalse(SessionBootstrap.isolatedOn(BotSettings.Where.PRIVATE_DISPLAY, Os.WINDOWS));
+        assertTrue(SessionBootstrap.isolatedOn(BotSettings.Where.VM, Os.WINDOWS));
+        assertFalse(SessionBootstrap.isolatedOn(BotSettings.Where.VM, Os.LINUX));
+        assertFalse(SessionBootstrap.isolatedOn(BotSettings.Where.MY_DESKTOP, Os.WINDOWS));
+    }
+
+    @Test
+    void thePropertyNamesTheVmAndBotCodeOutranksIt() {
+        System.setProperty(SessionBootstrap.WHERE_PROPERTY, "vm");
+        assertEquals(BotSettings.Where.VM, SessionBootstrap.where());
+        Session.disable();
+        assertEquals(BotSettings.Where.MY_DESKTOP, SessionBootstrap.where());
+        Session.enable();
+        assertEquals(BotSettings.Where.PRIVATE_DISPLAY, SessionBootstrap.where(),
+                "on is the settings' own isolated place, a private display by default");
+        assertEquals(BotSettings.Where.VM, SessionBootstrap.where(BotSettings.Where.VM, Os.WINDOWS));
+        assertEquals(BotSettings.Where.PRIVATE_DISPLAY, SessionBootstrap.where(BotSettings.Where.VM, Os.LINUX),
+                "on Linux, on is a private display whatever the settings say");
+    }
+
+    @Test
+    void theVmIsTheOneNamedElseTheOnlyOneSetUp(@TempDir Path config) {
+        System.setProperty(SessionBootstrap.VM_PROPERTY, " live ");
+        assertEquals("live", SessionBootstrap.vmName());
+
+        System.clearProperty(SessionBootstrap.VM_PROPERTY);
+        String before = System.getProperty(UserDirs.CONFIG_PROPERTY);
+        System.setProperty(UserDirs.CONFIG_PROPERTY, config.toString());
+        try {
+            IllegalStateException none = assertThrows(IllegalStateException.class, SessionBootstrap::vmName);
+            assertTrue(none.getMessage().contains("no game VM"), none.getMessage());
+            assertTrue(none.getMessage().contains("My desktop"), none.getMessage());
+        } finally {
+            if (before == null) System.clearProperty(UserDirs.CONFIG_PROPERTY);
+            else System.setProperty(UserDirs.CONFIG_PROPERTY, before);
         }
     }
 

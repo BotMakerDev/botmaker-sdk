@@ -34,8 +34,8 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * reused for the rest of the run, so a call made after that point changes nothing — it does not tear down a
  * live session.
  *
- * <p>Linux-only in substance: on Windows there is no nested-display backend, bring-up declines and the bot runs
- * on the normal desktop. Calling these methods there is harmless.
+ * <p>On Windows the place off the desktop is a game VM ({@code BotSettings.Where.VM}), and {@link #enable()} keeps
+ * the bot there only when its settings name one; a private display isn't there, and the bot runs on the desktop.
  *
  * <p><b>Curated for the palette</b> (see {@code @Palette}): four of the eight are offered, and the split here
  * is unusually clean because this class already says which half is which in its own javadoc. The vocabulary —

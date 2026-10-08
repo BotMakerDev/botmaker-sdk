@@ -64,7 +64,10 @@ public final class BotSettingsWindow {
     private final ToggleGroup where = new ToggleGroup();
     private final RadioButton privateDisplay = new RadioButton(BotSettings.Where.PRIVATE_DISPLAY.displayName());
     private final RadioButton myDesktop = new RadioButton(BotSettings.Where.MY_DESKTOP.displayName());
-    /** On Windows, where there is no private display, the choice is kept as the bot's Java says it. */
+    /**
+     * On Windows, where there is no private display, the choice is kept as the bot's Java says it, a game VM
+     * included. On Linux a VM bot shows as isolated, and is saved as what the window shows: a private display.
+     */
     private BotSettings.Where windowsWhere = BotSettings.Where.PRIVATE_DISPLAY;
     private final CheckBox takeOver = new CheckBox("Take over the mouse and keyboard");
     private final CheckBox randomizeClicks = new CheckBox("Click a random point inside the match, not its centre");

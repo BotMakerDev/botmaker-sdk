@@ -27,11 +27,6 @@ public final class ProjectDefaults {
         return spec == null || spec.isBlank() ? null : spec.trim();
     }
 
-    /** Whether the bot's settings ask for a private display — {@code true} unless they say otherwise. */
-    public static boolean sessionIsolated() {
-        return BotSettings.current().where() == BotSettings.Where.PRIVATE_DISPLAY;
-    }
-
     /** The pinned display backend's id, or {@code null} when the settings let the launch kind pick. */
     public static String sessionBackend() {
         return backendId(BotSettings.current().runIn().displayBackend());
