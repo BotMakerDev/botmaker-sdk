@@ -43,7 +43,7 @@ import java.util.function.Consumer;
  * case — because <b>a type the host answers is a type no plugin is ever offered</b>.
  *
  * <p><b>It reads and writes {@link ImageTemplate} values, never Java.</b> The host reads
- * {@code new ImageTemplate("…")} and a constant of the bot's {@code @Managed} pictures class alike, and writes
+ * {@code new ImageTemplate("…")} and a constant of the bot's {@code @SdkValue} pictures class alike, and writes
  * a picked picture back as that constant when the bot has one.
  *
  * <p>The pictures come from {@link TemplateLibrary} over {@link StudioServices#resourcesDir()} — the folder is

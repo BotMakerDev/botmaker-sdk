@@ -6,13 +6,13 @@
   `TextMatch`, `TextResult`, `OcrOptions`, `OcrLanguage`. `Precision` is `Pixel`'s knobs as one value (`EXACT`/`TIGHT`/`DEFAULT`/`LOOSE`, a validating
   `of(…)`, withers): a type because ΔE has no obvious scale and the pixel count is an *area* routinely misread
   as a width, and because an editor is claimed by **type**, never by a method and an argument index.
-- `api.bot` — `Bot.run(Home::goHome, Sdk.class)` (installs every `@Managed` value it is handed and walks the
+- `api.bot` — `Bot.run(Home::goHome, Sdk.class)` (installs every managed value in the classes it is handed, `@SdkValue` or another plugin's mark, and walks the
   flow, `internal/flow/FlowWalker`), `Outcome` (a body is `public static Outcome body()` returning one of the
   bot's `Outcomes` constants or `Outcome.NEXT`; `FlowWalker.current()` says which activity runs and logs an
   unwired outcome the step does not declare), `ActivitySwitch` (`enable`/`disable`/`active` an `Activity` —
   the facade was `Activities` until 2026-10-02, when that name became the bot's own class of constants), and
   **`BotSettings`**, the runtime tuning
-  as an immutable value: `@Managed("settings")` in `Sdk.java`, read as `BotSettings.current()`, changed for a
+  as an immutable value: `@SdkValue(SdkValue.Id.SETTINGS)` in `Sdk.java`, read as `BotSettings.current()`, changed for a
   while with `BotSettings.use(…)`, edited in ⚙ Bot Settings (`plugin/settings/BotSettingsWindow`).
 - `api.flow` — `Flow` (`steps`, `edges`, `presets`, `start`, `limits`), `Flow.activity(Activities.COLLECT,
   Collect::body)` building a `Flow.Step`, each other part a named link written only when not the default

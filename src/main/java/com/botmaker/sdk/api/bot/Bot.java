@@ -49,7 +49,8 @@ public class Bot {
     protected Bot() {}
 
     /**
-     * Installs this bot's {@code @Managed} values and runs its flow — the whole of a bot's {@code main}.
+     * Installs this bot's managed values (the SDK's {@code @SdkValue} ones and any other plugin's) and runs its
+     * flow — the whole of a bot's {@code main}.
      *
      * <pre>{@code
      * public final class Gamebot extends Bot {
@@ -79,7 +80,7 @@ public class Bot {
     }
 
     /**
-     * Installs this bot's {@code @Managed} values as {@link #run} does, then runs {@code body} once and returns —
+     * Installs this bot's managed values as {@link #run} does, then runs {@code body} once and returns —
      * what Studio's ▶ Try calls with one statement as the body, from a caller it writes outside the project's
      * sources.
      *

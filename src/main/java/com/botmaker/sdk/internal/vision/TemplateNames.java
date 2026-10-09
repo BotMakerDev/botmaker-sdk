@@ -40,7 +40,7 @@ public final class TemplateNames {
      * ({@code SdkPlugin.pluginSources()}), which is what makes matching {@code Pictures.COLLECT} a fact
      * rather than a hope.
      *
-     * <p>It is only a name for sentences now. The class is found by its {@code @Managed("pictures")}, and a
+     * <p>It is only a name for sentences now. The class is found by its {@code @SdkValue(SdkValue.Id.PICTURES)}, and a
      * picture's uses by binding, so a user who renames the class loses nothing.
      */
     public static final String CLASS_NAME = "Pictures";

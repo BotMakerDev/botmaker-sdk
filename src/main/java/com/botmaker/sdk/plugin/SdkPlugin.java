@@ -46,7 +46,7 @@ public final class SdkPlugin extends DeclaredPlugin {
 
     /**
      * The whole plugin, stated once: the types it owns and the parts inside its values ({@link SdkTypes}), the
-     * editors a type cannot choose for itself ({@link SdkEditors}), the {@code @Managed} values its windows keep
+     * editors a type cannot choose for itself ({@link SdkEditors}), the {@code @SdkValue} values its windows keep
      * ({@link SdkValues}), its buttons ({@link SdkToolbarItems}), its part of the run overlay
      * ({@link SdkRunOverlay}) and the picture under a recorded click ({@link PictureAt}).
      *

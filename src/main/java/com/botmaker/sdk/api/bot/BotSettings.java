@@ -38,7 +38,7 @@ import java.util.Optional;
  * <p>Until then this class was a set of static setters seeded from eight keys in a
  * {@code botmaker-project.properties} Studio wrote beside the bot's sources — a second file, in a second
  * format, that nothing but those two readers knew about, and that the compiler could not check. The settings
- * are a {@code @Managed} value now, like the flow and the capture source: Java the bot compiles, which a
+ * are an {@code @SdkValue} value now, like the flow and the capture source: Java the bot compiles, which a
  * developer with no BotMaker installed can read and change. A project without the method runs on
  * {@link #DEFAULTS}. What the bot <em>launches</em> is not here: that is a fact about this machine, and it
  * arrives as the {@code botmaker.launch.target} system property.

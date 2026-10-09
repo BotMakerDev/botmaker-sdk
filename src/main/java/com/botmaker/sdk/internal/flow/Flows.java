@@ -6,7 +6,7 @@ import com.botmaker.sdk.api.flow.Flow;
 /**
  * The flow a bot runs.
  *
- * <p>{@code Bot.run(goHome, Sdk.class)} installs the value your {@code @Managed("flow")} method returns and
+ * <p>{@code Bot.run(goHome, Sdk.class)} installs the value your {@code @SdkValue(SdkValue.Id.FLOW)} method returns and
  * walks it. {@link #use} is the same hand-off for a bot that builds its flow some other way.
  *
  * <p>Kept out of the insert menus: a dropped {@code use} would be written {@code Flows.use(null)} and clear the

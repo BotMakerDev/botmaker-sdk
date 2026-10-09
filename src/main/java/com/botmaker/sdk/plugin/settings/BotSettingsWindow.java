@@ -44,7 +44,7 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * ⚙ Bot Settings: the bot's {@code @Managed("settings")} value — how it clicks and looks, and where the game
+ * ⚙ Bot Settings: the bot's {@code @SdkValue(SdkValue.Id.SETTINGS)} value — how it clicks and looks, and where the game
  * runs: a private display (Linux) or a game VM (Windows, {@link VmSetupWindow} sets one up), or the desktop with
  * or without taking over the mouse and keyboard.
  *

@@ -8,8 +8,8 @@ import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.internal.bot.SdkValues;
 
 /**
- * The {@code @Managed("flow")} value and the card positions beside it, read and written as a {@link Flow} and
- * a {@link FlowLayout}.
+ * The {@code @SdkValue(SdkValue.Id.FLOW)} value and the card positions beside it, read and written as a
+ * {@link Flow} and a {@link FlowLayout}.
  *
  * <p>Both are handles on {@link SdkValues}' declarations, so no id is spelled here.
  *

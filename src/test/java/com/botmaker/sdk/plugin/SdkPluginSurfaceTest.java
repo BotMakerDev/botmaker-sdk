@@ -227,7 +227,7 @@ class SdkPluginSurfaceTest {
 
     /**
      * The nine buttons, their sections and their order within them. ⚙ Bot Settings joined on 2026-09-27, when
-     * the settings became this plugin's {@code @Managed} value.
+     * the settings became this plugin's managed value.
      *
      * <p>The order values are asserted rather than only the sequence, because a bar assembled from two
      * plugins interleaves by order and ties break on the plugin id — so a wrong number here moves a button

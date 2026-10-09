@@ -179,7 +179,7 @@ public final class SessionBootstrap {
      * The nested display size, which is {@link SessionBackends}' own default.
      *
      * <p>The shape is kept rather than inlined at the call site, because a display size a bot did choose is
-     * a plausible thing to want — as a {@code @Managed} value beside the capture source, so it would have
+     * a plausible thing to want — as an {@code @SdkValue} value beside the capture source, so it would have
      * exactly one author.
      */
     static SessionBackends.DisplaySize size() {

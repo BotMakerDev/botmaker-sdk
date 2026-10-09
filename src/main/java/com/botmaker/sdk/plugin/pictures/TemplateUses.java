@@ -14,7 +14,7 @@ import java.util.TreeSet;
 
 /**
  * A picture as the bot's Java names it — the constant {@code Pictures.ORE} in the open set
- * {@code @Managed("pictures")} — and the four changes the picture library makes to it.
+ * {@code @SdkValue(SdkValue.Id.PICTURES)} — and the four changes the picture library makes to it.
  *
  * <h2>The host changes the Java, by binding; this class says which constant</h2>
  *

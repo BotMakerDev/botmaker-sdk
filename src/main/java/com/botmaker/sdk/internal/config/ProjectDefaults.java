@@ -6,7 +6,7 @@ import com.botmaker.sdk.api.bot.BotSettings;
  * What a running bot was told about itself from outside its own code: the launch target this machine gave it,
  * and the session half of its {@link BotSettings}.
  *
- * <p>The session answers are the bot's {@code @Managed("settings")} value, which
+ * <p>The session answers are the bot's {@code @SdkValue(SdkValue.Id.SETTINGS)} value, which
  * {@code Bot.run} installs before anything reads them; the launch target is a fact about <em>this machine</em>
  * rather than the bot, so it is never in the bot's files at all — Studio starts the bot with
  * {@code -D}{@value #LAUNCH_TARGET}, and a bot run by hand passes its own.

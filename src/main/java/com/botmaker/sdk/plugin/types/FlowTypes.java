@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The shapes a {@code @Managed} value of this plugin's takes: the flow's five records, as the components
+ * The shapes an {@code @SdkValue} value of this plugin's takes: the flow's five records, as the components
  * that go inside the calls that write them.
  *
  * <h2>Why a flow is five declarations and not one type</h2>
@@ -128,7 +128,7 @@ public final class FlowTypes {
             .writtenAs(Flow::limits, Flow.Limits::maxSteps, Flow.Limits::stepDelayMs);
 
     /**
-     * {@code FlowLayout.of(Map<String, Spot>, boolean)}: the card positions, the {@code @Managed("flow.layout")}
+     * {@code FlowLayout.of(Map<String, Spot>, boolean)}: the card positions, the {@code FLOW_LAYOUT}
      * value beside the flow. The map is the host's to write ({@code Map.ofEntries}); its values
      * are {@link #SPOT_SHAPE}s. A flow nobody has laid out is written {@code FlowLayout.NONE}.
      */

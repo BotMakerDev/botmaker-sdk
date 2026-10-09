@@ -9,7 +9,7 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 
 /**
- * The {@code @Managed("capture")} value — where a bot reads pixels from, written as the one expression
+ * The {@code @SdkValue(SdkValue.Id.CAPTURE)} value — where a bot reads pixels from, written as the one expression
  * {@code Sdk.captureSource()} returns.
  *
  * <p>This is the only copy of the answer. {@code Sdk.captureSource()} is Java the bot compiles, so a

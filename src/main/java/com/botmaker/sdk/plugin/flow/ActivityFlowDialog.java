@@ -80,7 +80,7 @@ public final class ActivityFlowDialog {
     private final List<Selection> presets = new ArrayList<>();
 
     /**
-     * The {@code @Managed("flow")} value this window edits, or empty when the project has none — no
+     * The {@code @SdkValue(SdkValue.Id.FLOW)} value this window edits, or empty when the project has none — no
      * {@code Sdk.java}, or a {@code flow()} whose body somebody wrote by hand.
      */
     private Optional<ValueContext> value = Optional.empty();
@@ -89,8 +89,8 @@ public final class ActivityFlowDialog {
     private String readOnlyReason;
 
     /**
-     * The {@code @Managed("flow.layout")} value, or empty when the project has no {@code flowLayout()} or one
-     * somebody wrote by hand — the cards are then placed for the session and their positions are not kept.
+     * The {@code @SdkValue(SdkValue.Id.FLOW_LAYOUT)} value, or empty when the project has no {@code flowLayout()}
+     * or one somebody wrote by hand — the cards are then placed for the session and their positions are not kept.
      */
     private Optional<ValueContext> layoutValue = Optional.empty();
 

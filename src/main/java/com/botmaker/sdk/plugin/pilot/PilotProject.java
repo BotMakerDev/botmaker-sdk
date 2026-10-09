@@ -20,9 +20,10 @@ import java.nio.file.Path;
  *
  * <h2>It reads the bot's own Java</h2>
  *
- * <p>The project's capture source is the expression {@code Sdk.captureSource()} returns — the {@code @Managed("capture")}
- * value — so this asks {@link com.botmaker.plugin.api.source.PluginValues} for it, as a value the host
- * read. One author, and it is the one the user can see in their own editor.
+ * <p>The project's capture source is the expression {@code Sdk.captureSource()} returns — the
+ * {@code @SdkValue(SdkValue.Id.CAPTURE)} value — so this asks
+ * {@link com.botmaker.plugin.api.source.PluginValues} for it, as a value the host read. One author, and it is
+ * the one the user can see in their own editor.
  *
  * <p><b>Read on demand, never cached.</b> The user changes the source in another window while the pilot is
  * streaming, and a cache is how the pilot ends up pointing at the previous one.

@@ -6,7 +6,7 @@ The **BotMaker SDK** is the runtime library that user bots compile against, **an
 The sibling **botmaker-studio** app (`../botmaker-studio`) loads it as a plugin off an open project's
 classpath and never depends on it. The SDK depends on **botmaker-shared** (`../botmaker-shared`,
 cross-platform native window plumbing), **botmaker-session**, the contract (`botmaker-studio-api`, at
-`compile` so a bot has `@Param`/`@Managed`), **botmaker-plugin-basics** and, for its plugin half only,
+`compile` so a bot has `@Param` and `@SdkValue`'s `@ManagedMarker`), **botmaker-plugin-basics** and, for its plugin half only,
 **botmaker-plugin-toolkit**.
 
 This file states what is true now. How it got here — the generated sources, `activities.json`, `Wire`,
