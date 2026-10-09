@@ -94,9 +94,9 @@ class FlowConstantsTest {
     @Test
     void a_new_outcome_is_declared_on_the_card_whose_body_holds_the_slot() {
         Flow flow = Flow.of(List.of(
-                        Flow.activity(Activity.named("Battle"), FlowTypes.body("Battle::body"), "", true, true, true,
-                                List.of(Outcome.named("Won"))),
-                        Flow.activity(Activity.named("Rest"), ActivityBody.NONE, "", true, false, false, List.of())),
+                        Flow.activity(Activity.named("Battle"), FlowTypes.body("Battle::body")).goesHome()
+                                .checksPopups().reports(List.of(Outcome.named("Won"))),
+                        Flow.activity(Activity.named("Rest"), ActivityBody.NONE)),
                 List.of(), List.of(), Activity.named("Battle"), Flow.Limits.DEFAULT);
         String method = FlowValue.bodySource(flow.steps().getFirst());
 

@@ -154,7 +154,7 @@ public final class BotSettingsWindow {
             // The VM's own settings, whichever bot uses it: kept in its folder.
             if (power != null) power.save();
             // Nothing changed, nothing written: a Save that rewrote an untouched value was one more entry in the
-            // project's history and, for BotSettings.DEFAULTS, a chance to spell it differently.
+            // project's history and, for a bot still writing BotSettings.DEFAULTS, a respelling as defaults().
             if (chosen.equals(current)) {
                 services.status("Bot settings unchanged.");
             } else {
@@ -174,7 +174,7 @@ public final class BotSettingsWindow {
             body.getChildren().add(missing());
         } else if (!SETTINGS.readable(ctx.get())) {
             save.setDisable(true);
-            body.getChildren().add(note("Sdk.settings() is not a single `return BotSettings.of(…);`, so this "
+            body.getChildren().add(note("Sdk.settings() is not a single `return BotSettings.defaults()…;`, so this "
                     + "window cannot rewrite it — it is your code, and stays as you wrote it. The defaults are "
                     + "shown."));
         }
@@ -193,7 +193,7 @@ public final class BotSettingsWindow {
         String snippet = """
                 @SdkValue(SdkValue.Id.SETTINGS)
                 public static BotSettings settings() {
-                    return BotSettings.DEFAULTS;
+                    return BotSettings.defaults();
                 }""";
         Label says = note("This project's Sdk.java has no settings() method, so the bot runs on the defaults "
                 + "below and there is nothing here to save into. Paste this into the class Sdk (importing "
@@ -335,9 +335,7 @@ public final class BotSettingsWindow {
         Optional<ValueContext> ctx = SETTINGS.openOrCreate(services);
         BotSettings s = ctx.flatMap(SETTINGS::read).orElse(BotSettings.DEFAULTS);
         if (ctx.isPresent() && SETTINGS.readable(ctx.get()) && s.where() != BotSettings.Where.VM) {
-            ctx.get().set(new BotSettings(s.clicks(), s.vision(), new BotSettings.RunIn(BotSettings.Where.VM,
-                    s.takeOver(), s.runIn().displayBackend(), s.runIn().inputBackend()), s.maxRetryAttempts(),
-                    s.debug()));
+            ctx.get().set(s.where(BotSettings.Where.VM));
         }
         services.status("The bot's game runs in the game VM " + vm.name() + ".");
     }
@@ -427,10 +425,10 @@ public final class BotSettingsWindow {
                 maxRetryAttempts}) {
             commitTyped(s);
         }
-        return BotSettings.of(
-                BotSettings.clicks(foundDelay.getValue(), notFoundDelay.getValue(), randomizeClicks.isSelected()),
-                BotSettings.vision(confidence.getValue(), compareMargin.getValue()),
-                BotSettings.runIn(chosenWhere(), takeOver.isSelected(), displayBackend.getValue(),
+        return new BotSettings(
+                new BotSettings.Clicks(foundDelay.getValue(), notFoundDelay.getValue(), randomizeClicks.isSelected()),
+                new BotSettings.Vision(confidence.getValue(), compareMargin.getValue()),
+                new BotSettings.RunIn(chosenWhere(), takeOver.isSelected(), displayBackend.getValue(),
                         inputBackend.getValue()),
                 maxRetryAttempts.getValue(), debug);
     }

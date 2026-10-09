@@ -36,7 +36,7 @@ public final class FlowEdits {
         String label = FlowNames.label(typed);
         String problem = FlowNames.activityNameProblem(label, labels(flow));
         if (problem != null) throw new IllegalArgumentException(problem);
-        Flow.Step step = Flow.activity(Activity.named(label), body(bodySource), "", true, false, false, List.of());
+        Flow.Step step = Flow.activity(Activity.named(label), body(bodySource));
         List<Flow.Step> steps = new ArrayList<>(flow.steps());
         steps.add(step);
         Activity start = flow.start() == Activity.NONE || flow.start().label().isEmpty() ? step.activity() : flow.start();
@@ -54,7 +54,7 @@ public final class FlowEdits {
         Activity was = step.activity();
         Activity now = Activity.named(label);
         List<Flow.Step> steps = flow.steps().stream().map(s -> s.activity().equals(was)
-                ? Flow.activity(now, s.body(), s.description(), s.enabled(), s.goHome(), s.popupCheck(), s.outcomes())
+                ? new Flow.Step(now, s.body(), s.description(), s.enabled(), s.goHome(), s.popupCheck(), s.outcomes())
                 : s).toList();
         List<Flow.Edge> edges = flow.edges().stream().map(e -> Flow.edge(swap(e.from(), was, now), swap(e.to(), was, now),
                 e.outcome())).toList();
@@ -97,8 +97,7 @@ public final class FlowEdits {
         if (!builtIn && !source.outcomes().contains(wired)) {
             List<Outcome> outcomes = new ArrayList<>(source.outcomes());
             outcomes.add(wired);
-            Flow.Step grown = Flow.activity(source.activity(), source.body(), source.description(), source.enabled(),
-                    source.goHome(), source.popupCheck(), outcomes);
+            Flow.Step grown = source.reports(outcomes);
             steps = flow.steps().stream().map(s -> s == source ? grown : s).toList();
         }
         List<Flow.Edge> edges = new ArrayList<>(flow.edges().stream()

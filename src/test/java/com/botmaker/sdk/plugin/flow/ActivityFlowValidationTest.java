@@ -27,8 +27,8 @@ class ActivityFlowValidationTest {
     }
 
     private static Flow.Step activity(String name, String... outcomes) {
-        return Flow.activity(Activity.named(name), ActivityBody.NONE, "", true, false, true,
-                List.of(outcomes).stream().map(Outcome::named).toList());
+        return Flow.activity(Activity.named(name), ActivityBody.NONE).checksPopups()
+                .reports(List.of(outcomes).stream().map(Outcome::named).toList());
     }
 
     @Test

@@ -17,14 +17,17 @@ import java.util.Optional;
  * <pre>{@code
  * @SdkValue(SdkValue.Id.SETTINGS)
  * public static BotSettings settings() {
- *     return BotSettings.of(
- *             BotSettings.clicks(500, 200, true),
- *             BotSettings.vision(0.8, 0.05),
- *             BotSettings.runIn(BotSettings.Where.PRIVATE_DISPLAY, false,
- *                     BotSettings.DisplayBackend.AUTO, BotSettings.InputBackend.AUTO),
- *             20, true);
+ *     return BotSettings.defaults()
+ *             .foundDelay(400)
+ *             .confidence(0.85)
+ *             .where(BotSettings.Where.MY_DESKTOP)
+ *             .takesOver();
  * }
  * }</pre>
+ *
+ * <p>Each setting is a named link after {@link #defaults()}, written only when it is not the default
+ * (2026-10-09), so the method says what this bot changed and nothing else. A setting that is on by default is
+ * turned off by a link with a negative name ({@link #centredClicks()}, {@link #debugOff()}).
  *
  * <p>{@code Bot.run(…, Sdk.class)} hands it to {@link #use} before anything runs, so a click never happens on
  * the defaults and then on the bot's own values. Studio's ⚙ Bot Settings window edits the expression; a bot
@@ -218,10 +221,10 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
     }
 
     /** What a bot runs with when it declares no settings. */
-    public static final BotSettings DEFAULTS = of(
-            clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS),
-            vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN),
-            runIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO),
+    public static final BotSettings DEFAULTS = new BotSettings(
+            new Clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS),
+            new Vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN),
+            new RunIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO),
             DEFAULT_MAX_RETRY_ATTEMPTS, true);
 
     /** A missing part is its default, and fewer than one retry is one. */
@@ -252,21 +255,9 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
 
     // --- how the bot's Java writes it ---
 
-    public static BotSettings of(Clicks clicks, Vision vision, RunIn runIn, int maxRetryAttempts, boolean debug) {
-        return new BotSettings(clicks, vision, runIn, maxRetryAttempts, debug);
-    }
-
-    public static Clicks clicks(int foundDelay, int notFoundDelay, boolean randomize) {
-        return new Clicks(foundDelay, notFoundDelay, randomize);
-    }
-
-    public static Vision vision(double confidence, double compareMargin) {
-        return new Vision(confidence, compareMargin);
-    }
-
-    public static RunIn runIn(Where where, boolean takeOver, DisplayBackend displayBackend,
-                              InputBackend inputBackend) {
-        return new RunIn(where, takeOver, displayBackend, inputBackend);
+    /** {@link #DEFAULTS}, as the call each changed setting is a link after. */
+    public static BotSettings defaults() {
+        return DEFAULTS;
     }
 
     // --- the settings in force ---
@@ -408,6 +399,44 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
 
     public BotSettings debug(boolean on) {
         return new BotSettings(clicks, vision, runIn, maxRetryAttempts, on);
+    }
+
+    /** Clicks land on the match's centre rather than a random point of it. */
+    public BotSettings centredClicks() {
+        return randomizeClicks(false);
+    }
+
+    /** The game runs {@code where}. */
+    public BotSettings where(Where where) {
+        return withRunIn(new RunIn(where, runIn.takeOver, runIn.displayBackend, runIn.inputBackend));
+    }
+
+    /** On the desktop, the bot drives the real mouse and keyboard. */
+    public BotSettings takesOver() {
+        return takeOver(true);
+    }
+
+    /** Which private display hosts the game, when it runs on one. */
+    public BotSettings displayBackend(DisplayBackend backend) {
+        return withRunIn(new RunIn(runIn.where, runIn.takeOver, backend, runIn.inputBackend));
+    }
+
+    /** Which Linux backend delivers a take-over. */
+    public BotSettings inputBackend(InputBackend backend) {
+        return withRunIn(new RunIn(runIn.where, runIn.takeOver, runIn.displayBackend, backend));
+    }
+
+    /**
+     * The SDK's debug output starts off, for a run no host started.
+     *
+     * @deprecated as {@link #debug()} is: debug output is the host's to decide. Kept so a value read is written
+     * back whole.
+     */
+    @Deprecated
+    @ReplacedBy(note = "Debug output is chosen with Studio's Debug button (the botmaker.debug run property); "
+            + "this value only applies to a run no host started.")
+    public BotSettings debugOff() {
+        return debug(false);
     }
 
     private BotSettings withClicks(Clicks next) {

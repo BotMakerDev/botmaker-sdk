@@ -73,7 +73,7 @@ class DebugTraceTest {
     /** One activity reporting {@code reported}, declaring BAG_FULL, with nothing wired, so the run ends after it. */
     private static Flow mining(Outcome reported) {
         Activity mining = Activity.named("Mining");
-        return Flow.of(List.of(Flow.activity(mining, () -> reported, "", true, false, false, List.of(BAG_FULL))),
+        return Flow.of(List.of(Flow.activity(mining, () -> reported).reports(List.of(BAG_FULL))),
                 List.of(), List.of(), mining, Flow.limits(10, 0));
     }
 

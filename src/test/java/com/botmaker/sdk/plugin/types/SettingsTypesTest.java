@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin.types;
 
-import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.bot.BotSettings;
 import org.junit.jupiter.api.Test;
 
@@ -8,40 +7,40 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The host takes a settings value apart through these and puts it back: {@code build(components(v))} is the
- * same value at every level, a call of another arity builds nothing, and {@code BotSettings.DEFAULTS} is the
- * constant a default is written as.
+ * The host takes a settings value apart through this and puts it back: {@code build(components(v))} is the same
+ * value with every setting changed or none, and {@code BotSettings.defaults()} with no part is the defaults.
  */
 class SettingsTypesTest {
 
-    private static final BotSettings TUNED = BotSettings.of(BotSettings.clicks(750, 125, false),
-            BotSettings.vision(0.62, 0.11), BotSettings.runIn(BotSettings.Where.MY_DESKTOP, true,
-                    BotSettings.DisplayBackend.XEPHYR, BotSettings.InputBackend.UINPUT), 7, false);
+    @SuppressWarnings("deprecation")
+    private static final BotSettings TUNED = BotSettings.defaults().foundDelay(750).notFoundDelay(125)
+            .centredClicks().confidence(0.62).compareMargin(0.11).where(BotSettings.Where.MY_DESKTOP).takesOver()
+            .displayBackend(BotSettings.DisplayBackend.XEPHYR).inputBackend(BotSettings.InputBackend.UINPUT)
+            .maxRetryAttempts(7).debugOff();
 
     @Test
-    void everyPartRoundTrips() {
-        assertEquals(TUNED, roundTrip(SettingsTypes.SETTINGS, TUNED));
-        assertEquals(TUNED.clicks(), roundTrip(SettingsTypes.CLICKS, TUNED.clicks()));
-        assertEquals(TUNED.vision(), roundTrip(SettingsTypes.VISION, TUNED.vision()));
-        assertEquals(TUNED.runIn(), roundTrip(SettingsTypes.RUN_IN, TUNED.runIn()));
+    void everySettingRoundTrips() {
+        assertEquals(TUNED, roundTrip(TUNED));
+        assertEquals(BotSettings.DEFAULTS, roundTrip(BotSettings.DEFAULTS));
+        assertEquals(BotSettings.DEFAULTS.confidence(0.9), roundTrip(BotSettings.DEFAULTS.confidence(0.9)));
     }
 
     @Test
-    void eachFactoryTakesExactlyItsParts() {
-        for (ComponentType<?> type : SettingsTypes.ALL) {
-            assertEquals(type.factory().getParameterCount(), type.componentTypes().size(), type.type().getName());
-        }
-        assertNull(SettingsTypes.CLICKS.build(List.of(1, 2)), "another arity is not this call");
+    void everySettingIsALinkAfterTheDefaults() {
+        assertEquals(0, SettingsTypes.SETTINGS.factory().getParameterCount());
+        assertEquals(11, SettingsTypes.SETTINGS.withers().size());
+        assertEquals(SettingsTypes.SETTINGS.withers().size(), SettingsTypes.SETTINGS.componentTypes().size());
+        assertEquals(BotSettings.DEFAULTS, SettingsTypes.SETTINGS.build(List.of()), "no part: the defaults");
+        assertNull(SettingsTypes.SETTINGS.build(List.of(1, 2)), "neither no part nor every part: not this call");
+        assertTrue(SettingsTypes.SETTINGS.withers().stream().filter(w -> w.flag())
+                .map(w -> w.method().getName()).toList()
+                .containsAll(List.of("centredClicks", "takesOver", "debugOff")));
     }
 
-    @Test
-    void theDefaultsAreWrittenAsTheirConstant() {
-        assertEquals(List.of("DEFAULTS"), SettingsTypes.SETTINGS.constants().stream().map(f -> f.getName()).toList());
-    }
-
-    private static <T> T roundTrip(ComponentType<T> type, T value) {
-        return type.build(type.components(value));
+    private static BotSettings roundTrip(BotSettings value) {
+        return SettingsTypes.SETTINGS.build(SettingsTypes.SETTINGS.components(value));
     }
 }

@@ -42,17 +42,15 @@ class BotSettingsTest {
     public static final class Values {
         @SdkValue(SdkValue.Id.SETTINGS)
         public static BotSettings settings() {
-            return BotSettings.of(BotSettings.clicks(750, 125, false), BotSettings.vision(0.62, 0.11),
-                    BotSettings.runIn(BotSettings.Where.MY_DESKTOP, false, BotSettings.DisplayBackend.XEPHYR,
-                            BotSettings.InputBackend.AUTO), 7, true);
+            return BotSettings.defaults().foundDelay(750).notFoundDelay(125).centredClicks().confidence(0.62)
+                    .compareMargin(0.11).where(BotSettings.Where.MY_DESKTOP)
+                    .displayBackend(BotSettings.DisplayBackend.XEPHYR).maxRetryAttempts(7);
         }
     }
 
     /** The defaults, on the user's desktop. */
     private static BotSettings onDesktop(boolean takeOver) {
-        return BotSettings.of(BotSettings.DEFAULTS.clicks(), BotSettings.DEFAULTS.vision(),
-                BotSettings.runIn(BotSettings.Where.MY_DESKTOP, takeOver, BotSettings.DisplayBackend.AUTO,
-                        BotSettings.InputBackend.AUTO), BotSettings.DEFAULT_MAX_RETRY_ATTEMPTS, true);
+        return BotSettings.defaults().where(BotSettings.Where.MY_DESKTOP).takeOver(takeOver);
     }
 
     @AfterEach

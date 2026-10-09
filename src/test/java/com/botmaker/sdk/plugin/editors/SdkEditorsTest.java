@@ -47,11 +47,12 @@ class SdkEditorsTest {
         assertTrue(claimed(TestContexts.slot(confidence, 0, "0.8")));
         assertTrue(claimed(TestContexts.slot(TestContexts.method(BotSettings.class, "debug", boolean.class), 0,
                 "true")));
-        // Every wither that takes one value is in the table: a new one without a hint is a free-typed number.
+        // Every wither that takes one number or flag is in the table: a new one without a hint is a free-typed
+        // number. One taking an enum needs none, its constants say what it can be.
         for (Method wither : BotSettings.class.getDeclaredMethods()) {
             if (java.lang.reflect.Modifier.isStatic(wither.getModifiers()) || wither.getParameterCount() != 1
                     || wither.getReturnType() != BotSettings.class || !java.lang.reflect.Modifier.isPublic(
-                    wither.getModifiers())) continue;
+                    wither.getModifiers()) || wither.getParameterTypes()[0].isEnum()) continue;
             assertNotNull(SettingHints.of(wither.getParameters()[0]), wither.getName() + " has no hint");
         }
     }

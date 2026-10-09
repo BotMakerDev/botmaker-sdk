@@ -17,10 +17,11 @@ import java.util.List;
  * @SdkValue(SdkValue.Id.FLOW)
  * public static Flow flow() {
  *     return Flow.of(
- *             List.of(Flow.activity(Activities.COLLECT, Collect::body, "Click collect while there is one.",
- *                             true, false, true, List.of(Outcomes.NOTHING_LEFT)),
- *                     Flow.activity(Activities.REST, Rest::body, "Wait, then go round again.",
- *                             true, false, false, List.of())),
+ *             List.of(Flow.activity(Activities.COLLECT, Collect::body)
+ *                             .described("Click collect while there is one.")
+ *                             .checksPopups()
+ *                             .reports(List.of(Outcomes.NOTHING_LEFT)),
+ *                     Flow.activity(Activities.REST, Rest::body).described("Wait, then go round again.")),
  *             List.of(Flow.edge(Activities.COLLECT, Activities.COLLECT, Outcome.NEXT),
  *                     Flow.edge(Activities.COLLECT, Activities.REST, Outcomes.NOTHING_LEFT),
  *                     Flow.edge(Activities.REST, Activities.COLLECT, Outcome.NEXT)),
@@ -37,6 +38,13 @@ import java.util.List;
  * name the same constants a body returns and an {@code ActivitySwitch} call switches, so the canvas renames them
  * by binding and javac catches a typo. They used to be strings matched by spelling, and a rename on the canvas
  * left every body still reporting the old one.
+ *
+ * <h2>A step names what it sets</h2>
+ *
+ * <p>{@link #activity} takes the two things every step has, the activity and its work, and each other part is a
+ * named link after it, written only when it is not the default (2026-10-09): {@code .described("…")},
+ * {@code .off()}, {@code .goesHome()}, {@code .checksPopups()}, {@code .reports(List.of(…))}. A step used to be
+ * seven positional arguments, three of them bare booleans nobody could tell apart without the declaration open.
  *
  * <h2>Five parts, fixed, and no varargs</h2>
  *
@@ -84,20 +92,15 @@ public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Act
     }
 
     /**
-     * One activity's step.
+     * One activity's step, switched on, with no description, no go-home, no popup check and no outcome of its
+     * own; each of those is a link after it ({@link Step#described}, {@link Step#off}, {@link Step#goesHome},
+     * {@link Step#checksPopups}, {@link Step#reports}).
      *
-     * @param activity    which activity this is — an {@code Activities} constant
-     * @param body        the work, as a method reference — {@code Collect::body}
-     * @param description one line, shown on the canvas and nowhere else
-     * @param enabled     whether it runs; a disabled activity takes its disabled wire rather than its work
-     * @param goHome      whether the bot's "get back to a known screen" step runs before this activity
-     * @param popupCheck  whether the popup guard runs while it does
-     * @param outcomes    the outcomes this activity can report — {@code Outcomes} constants — which is what the
-     *                    editor offers as wires
+     * @param activity which activity this is — an {@code Activities} constant
+     * @param body     the work, as a method reference — {@code Collect::body}
      */
-    public static Step activity(Activity activity, ActivityBody body, String description, boolean enabled,
-                                boolean goHome, boolean popupCheck, List<Outcome> outcomes) {
-        return new Step(activity, body, description, enabled, goHome, popupCheck, outcomes);
+    public static Step activity(Activity activity, ActivityBody body) {
+        return new Step(activity, body, "", true, false, false, List.of());
     }
 
     /** One named selection of enable flags: the activities it lists are on, every other one is off. */
@@ -130,6 +133,15 @@ public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Act
      * as a call and read back out of it, and a value with identity would have nothing for the second half to
      * reconstruct. Called a step rather than an activity because {@link Activity} is the name, and this is
      * what the flow does under it.
+     *
+     * @param activity    which activity this is — an {@code Activities} constant
+     * @param body        the work, as a method reference — {@code Collect::body}
+     * @param description one line, shown on the canvas and nowhere else
+     * @param enabled     whether it runs; a disabled activity takes its disabled wire rather than its work
+     * @param goHome      whether the bot's "get back to a known screen" step runs before this activity
+     * @param popupCheck  whether the popup guard runs while it does
+     * @param outcomes    the outcomes this activity can report — {@code Outcomes} constants — which is what the
+     *                    editor offers as wires
      */
     public record Step(Activity activity, ActivityBody body, String description, boolean enabled,
                        boolean goHome, boolean popupCheck, List<Outcome> outcomes) {
@@ -138,6 +150,31 @@ public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Act
             activity = activity == null ? Activity.NONE : activity;
             description = description == null ? "" : description;
             outcomes = outcomes == null ? List.of() : List.copyOf(outcomes);
+        }
+
+        /** This step with {@code description}, the one line the canvas shows. */
+        public Step described(String description) {
+            return new Step(activity, body, description, enabled, goHome, popupCheck, outcomes);
+        }
+
+        /** This step switched off: the run takes its disabled wire rather than its work. */
+        public Step off() {
+            return new Step(activity, body, description, false, goHome, popupCheck, outcomes);
+        }
+
+        /** This step with the bot's "get back to a known screen" step run before it. */
+        public Step goesHome() {
+            return new Step(activity, body, description, enabled, true, popupCheck, outcomes);
+        }
+
+        /** This step with the popup guard running while it does. */
+        public Step checksPopups() {
+            return new Step(activity, body, description, enabled, goHome, true, outcomes);
+        }
+
+        /** This step reporting {@code outcomes}, which the editor offers as its wires. */
+        public Step reports(List<Outcome> outcomes) {
+            return new Step(activity, body, description, enabled, goHome, popupCheck, outcomes);
         }
 
         /** The activity's label, which is what the canvas and the trace show. */

@@ -64,7 +64,7 @@ class FlowWalkerTest {
 
     private static Flow.Step step(ActivityBody body, String name, boolean enabled, boolean goHome,
                                   boolean popupCheck) {
-        return Flow.activity(Activity.named(name), body, "", enabled, goHome, popupCheck, List.of());
+        return new Flow.Step(Activity.named(name), body, "", enabled, goHome, popupCheck, List.of());
     }
 
     private Flow.Step on(String name, String... outcomes) {

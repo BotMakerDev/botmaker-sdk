@@ -22,7 +22,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  *   <li>an explicit {@link #enable()} / {@link #disable()} / {@link #set(boolean)} call in bot code;</li>
  *   <li>the {@code botmaker.session.where} run property;</li>
  *   <li>the {@code BOTMAKER_SESSION_WHERE} environment variable;</li>
- *   <li>the bot's settings ({@code BotSettings.runIn(where, …)});</li>
+ *   <li>the bot's settings ({@code BotSettings.defaults().where(…)});</li>
  *   <li>a private display.</li>
  * </ol>
  * {@link #useBackend(String)} follows the same ladder against {@code botmaker.session.backend} and the

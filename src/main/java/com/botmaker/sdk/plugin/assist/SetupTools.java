@@ -51,38 +51,35 @@ final class SetupTools {
     enum Setting {
         FOUND_DELAY("found_delay", "Pause after a match, ms",
                 s -> String.valueOf(s.clicks().foundDelay()),
-                (s, v) -> with(s, BotSettings.clicks(whole(v, 0), s.clicks().notFoundDelay(), s.clicks().randomize()))),
+                (s, v) -> s.foundDelay(whole(v, 0))),
         NOT_FOUND_DELAY("not_found_delay", "Pause after a miss, ms",
                 s -> String.valueOf(s.clicks().notFoundDelay()),
-                (s, v) -> with(s, BotSettings.clicks(s.clicks().foundDelay(), whole(v, 0), s.clicks().randomize()))),
+                (s, v) -> s.notFoundDelay(whole(v, 0))),
         RANDOMIZE_CLICKS("randomize_clicks", "Click a random point inside a match",
                 s -> String.valueOf(s.clicks().randomize()),
-                (s, v) -> with(s, BotSettings.clicks(s.clicks().foundDelay(), s.clicks().notFoundDelay(), yes(v)))),
+                (s, v) -> s.randomizeClicks(yes(v))),
         CONFIDENCE("confidence", "How sure a picture match must be, 0 to 1",
                 s -> String.valueOf(s.vision().confidence()),
-                (s, v) -> with(s, BotSettings.vision(unit(v), s.vision().compareMargin()))),
+                (s, v) -> s.confidence(unit(v))),
         COMPARE_MARGIN("compare_margin", "How far ahead the best of several pictures must be, 0 to 1",
                 s -> String.valueOf(s.vision().compareMargin()),
-                (s, v) -> with(s, BotSettings.vision(s.vision().confidence(), unit(v)))),
+                (s, v) -> s.compareMargin(unit(v))),
         RUN_THE_GAME_IN("run_the_game_in", "Where the game runs",
                 s -> s.where().id(),
-                (s, v) -> with(s, BotSettings.runIn(choice(BotSettings.Where.values(), v, BotSettings.Where::id),
-                        s.takeOver(), s.runIn().displayBackend(), s.runIn().inputBackend()))),
+                (s, v) -> s.where(choice(BotSettings.Where.values(), v, BotSettings.Where::id))),
         TAKE_OVER("take_over", "On my desktop, take over the mouse and keyboard (some games ignore window events)",
                 s -> String.valueOf(s.takeOver()),
                 (s, v) -> s.takeOver(yes(v))),
         DISPLAY_BACKEND("display_backend", "Which private display hosts the game",
                 s -> s.runIn().displayBackend().id(),
-                (s, v) -> with(s, BotSettings.runIn(s.where(), s.takeOver(), choice(
-                        BotSettings.DisplayBackend.values(), v, BotSettings.DisplayBackend::id),
-                        s.runIn().inputBackend()))),
+                (s, v) -> s.displayBackend(choice(BotSettings.DisplayBackend.values(), v,
+                        BotSettings.DisplayBackend::id))),
         INPUT_BACKEND("input_backend", "Which Linux backend delivers a take-over",
                 s -> s.runIn().inputBackend().id(),
-                (s, v) -> with(s, BotSettings.runIn(s.where(), s.takeOver(), s.runIn().displayBackend(),
-                        choice(BotSettings.InputBackend.values(), v, BotSettings.InputBackend::id)))),
+                (s, v) -> s.inputBackend(choice(BotSettings.InputBackend.values(), v, BotSettings.InputBackend::id))),
         MAX_RETRY_ATTEMPTS("max_retry_attempts", "No-progress checks before the bot is stuck, 1 or more",
                 s -> String.valueOf(s.maxRetryAttempts()),
-                (s, v) -> rebuilt(s, whole(v, 1)));
+                (s, v) -> s.maxRetryAttempts(whole(v, 1)));
 
         private final String id;
         private final String displayName;
@@ -220,8 +217,8 @@ final class SetupTools {
             if (ctx.isEmpty()) return AgentReply.refused("This project has no Sdk.settings() to write to.");
             Optional<BotSettings> before = SETTINGS.read(ctx.get());
             if (before.isEmpty()) {
-                return AgentReply.refused("Sdk.settings() is not a single `return BotSettings.of(…);`, so it is left "
-                        + "as you wrote it.");
+                return AgentReply.refused("Sdk.settings() is not a single `return BotSettings.defaults()…;`, so it is "
+                        + "left as you wrote it.");
             }
             BotSettings after;
             try {
@@ -340,28 +337,6 @@ final class SetupTools {
         return PLAIN.matcher(spec.token()).matches() ? null
                 : "\"" + spec.token() + "\" is not a " + spec.kind().displayName() + "'s id: letters, digits, '.', "
                         + "'_' and '-' only.";
-    }
-
-    private static BotSettings with(BotSettings s, BotSettings.Clicks clicks) {
-        return BotSettings.of(clicks, s.vision(), s.runIn(), s.maxRetryAttempts(), debug(s));
-    }
-
-    private static BotSettings with(BotSettings s, BotSettings.Vision vision) {
-        return BotSettings.of(s.clicks(), vision, s.runIn(), s.maxRetryAttempts(), debug(s));
-    }
-
-    private static BotSettings with(BotSettings s, BotSettings.RunIn runIn) {
-        return BotSettings.of(s.clicks(), s.vision(), runIn, s.maxRetryAttempts(), debug(s));
-    }
-
-    private static BotSettings rebuilt(BotSettings s, int maxRetryAttempts) {
-        return BotSettings.of(s.clicks(), s.vision(), s.runIn(), maxRetryAttempts, debug(s));
-    }
-
-    /** The deprecated part is carried as it is: a value read is written back whole. */
-    @SuppressWarnings("deprecation")
-    private static boolean debug(BotSettings s) {
-        return s.debug();
     }
 
     private static int whole(String typed, int least) {

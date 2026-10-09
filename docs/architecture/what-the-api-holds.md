@@ -15,7 +15,9 @@
   as an immutable value: `@Managed("settings")` in `Sdk.java`, read as `BotSettings.current()`, changed for a
   while with `BotSettings.use(…)`, edited in ⚙ Bot Settings (`plugin/settings/BotSettingsWindow`).
 - `api.flow` — `Flow` (`steps`, `edges`, `presets`, `start`, `limits`), `Flow.activity(Activities.COLLECT,
-  Collect::body, …)` building a `Flow.Step` (an activity's work is a **method reference**, so a rename is a
+  Collect::body)` building a `Flow.Step`, each other part a named link written only when not the default
+  (`.described(…)`, `.off()`, `.goesHome()`, `.checksPopups()`, `.reports(…)`; 2026-10-09, as
+  `BotSettings.defaults().foundDelay(…)…` is) (an activity's work is a **method reference**, so a rename is a
   compile error naming `Sdk.java`), `Activity`, `FlowLayout` (the editor's card positions, keyed by label,
   which a run ignores), `ActivityBody`; `internal.flow.Flows.enabled(activity)` reads an activity's switch.
 - **Activities and outcomes are constants, never strings (2026-10-02).** `Activity.named("Collect")` and

@@ -14,6 +14,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -45,10 +46,10 @@ class FlowTypesTest {
 
     private static Flow gamebot() {
         return Flow.of(
-                List.of(Flow.activity(COLLECT, new FlowTypes.Named("Collect::body"),
-                                "Click collect, then battle.", true, false, true, List.of(NOTHING_LEFT)),
-                        Flow.activity(REST, new FlowTypes.Named("Rest::body"),
-                                "Wait, then go round again.", false, true, false, List.of())),
+                List.of(Flow.activity(COLLECT, new FlowTypes.Named("Collect::body"))
+                                .described("Click collect, then battle.").checksPopups().reports(List.of(NOTHING_LEFT)),
+                        Flow.activity(REST, new FlowTypes.Named("Rest::body"))
+                                .described("Wait, then go round again.").off().goesHome()),
                 List.of(Flow.edge(COLLECT, COLLECT, Outcome.NEXT),
                         Flow.edge(COLLECT, REST, NOTHING_LEFT),
                         Flow.edge(REST, COLLECT, Outcome.NEXT)),
@@ -77,6 +78,9 @@ class FlowTypesTest {
     void eachShapeInsideAFlowRoundTripsOnItsOwn() {
         Flow flow = gamebot();
         assertEquals(flow.steps().getFirst(), roundTrip(FlowTypes.STEP_SHAPE, flow.steps().getFirst()));
+        assertEquals(flow.steps().getLast(), roundTrip(FlowTypes.STEP_SHAPE, flow.steps().getLast()));
+        assertNull(FlowTypes.STEP_SHAPE.build(List.of(COLLECT, "Collect::body", "a description")),
+                "a part count that is neither the call's nor the call's and every link's is not this shape");
         // The activity with no outcomes: an empty list is a value, not an absent one.
         assertEquals(flow.steps().get(1), roundTrip(FlowTypes.STEP_SHAPE, flow.steps().get(1)));
         assertEquals(flow.edges().getFirst(), roundTrip(FlowTypes.EDGE_SHAPE, flow.edges().getFirst()));
@@ -166,8 +170,7 @@ class FlowTypesTest {
     /** The enable flag is part of the flow, because a run reads it. */
     @Test
     void anActivitySwitchedOffIsStillPartOfTheFlow() {
-        Flow off = Flow.of(List.of(Flow.activity(REST, new FlowTypes.Named("Rest::body"), "",
-                        false, false, false, List.of())),
+        Flow off = Flow.of(List.of(Flow.activity(REST, new FlowTypes.Named("Rest::body")).off()),
                 List.of(), List.of(), REST, Flow.Limits.DEFAULT);
         Flow read = roundTrip(FlowTypes.FLOW_SHAPE, off);
         assertFalse(read.steps().getFirst().enabled());

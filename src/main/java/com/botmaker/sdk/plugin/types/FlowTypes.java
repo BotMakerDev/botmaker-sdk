@@ -79,7 +79,10 @@ public final class FlowTypes {
             .writtenAs(Flow::of, Flow::steps, Flow::edges, Flow::presets, Flow::start, Flow::limits);
 
     /**
-     * {@code Flow.activity(Activity, ActivityBody, String, boolean, boolean, boolean, List<Outcome>)}.
+     * {@code Flow.activity(Activity, ActivityBody)} and its links: {@code .described(String)}, {@code .off()},
+     * {@code .goesHome()}, {@code .checksPopups()}, {@code .reports(List<Outcome>)}, each written only when the
+     * step is not as {@code Flow.activity} makes it (2026-10-09). A new step is on, so its flag is the negative
+     * {@code off()}: a flag only turns a thing on.
      *
      * <p>A body crosses as the source it is written as, never as the functional object. An
      * {@link ActivityBody} the editor read out of a file is a {@code String} — it was never instantiated,
@@ -91,24 +94,25 @@ public final class FlowTypes {
      *
      * <p>So this is the one part here taken apart and built back by hand ({@code components} and
      * {@code build}): the text is not an {@code ActivityBody}, and no accessor or factory could hand it over.
-     * It is the last place a plugin's value carries Java text, and it is known.
+     * It is the last place a plugin's value carries Java text, and it is known. The links' parts follow these
+     * two, as every wither's does.
      */
     public static final DeclaredCall<Flow.Step> STEP_SHAPE = ComponentType.part(Flow.Step.class)
-            .writtenAs(Flow::activity, Flow.Step::activity, Flow.Step::body, Flow.Step::description,
-                    Flow.Step::enabled, Flow.Step::goHome, Flow.Step::popupCheck, Flow.Step::outcomes)
-            .components(value -> List.of(value.activity(), bodyLiteral(sourceOf(value.body())), value.description(),
-                    value.enabled(), value.goHome(), value.popupCheck(), value.outcomes()))
-            .build(FlowTypes::step);
+            .writtenAs(Flow::activity, Flow.Step::activity, Flow.Step::body)
+            .components(value -> List.of(value.activity(), bodyLiteral(sourceOf(value.body()))))
+            .build(FlowTypes::step)
+            .with(Flow.Step::described, Flow.Step::description)
+            .flag(Flow.Step::off, step -> !step.enabled())
+            .flag(Flow.Step::goesHome, Flow.Step::goHome)
+            .flag(Flow.Step::checksPopups, Flow.Step::popupCheck)
+            .with(Flow.Step::reports, Flow.Step::outcomes);
 
     private static Flow.Step step(List<Object> parts) {
-        if (parts.size() != 7 || !(parts.get(0) instanceof Activity activity)
-                || !(parts.get(1) instanceof String body) || !(parts.get(2) instanceof String description)
-                || !(parts.get(3) instanceof Boolean enabled) || !(parts.get(4) instanceof Boolean goHome)
-                || !(parts.get(5) instanceof Boolean popupCheck)) {
+        if (parts.size() != 2 || !(parts.get(0) instanceof Activity activity)
+                || !(parts.get(1) instanceof String body)) {
             return null;
         }
-        return new Flow.Step(activity, new Named(bodyOf(body)), description, enabled, goHome, popupCheck,
-                list(parts.get(6)));
+        return Flow.activity(activity, new Named(bodyOf(body)));
     }
 
     /** {@code Flow.preset(String, List<Activity>)}. */
@@ -186,10 +190,5 @@ public final class FlowTypes {
             throw new UnsupportedOperationException(
                     "\"" + source + "\" was read out of a file by the editor and is a name, not a body");
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <T> List<T> list(Object part) {
-        return part instanceof List<?> items ? List.copyOf((List<T>) items) : List.of();
     }
 }

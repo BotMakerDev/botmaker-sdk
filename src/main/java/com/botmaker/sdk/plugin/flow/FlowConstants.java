@@ -236,8 +236,7 @@ public final class FlowConstants {
             }
             List<Outcome> outcomes = new ArrayList<>(step.outcomes());
             outcomes.add(outcome);
-            steps.add(Flow.activity(step.activity(), step.body(), step.description(), step.enabled(),
-                    step.goHome(), step.popupCheck(), outcomes));
+            steps.add(step.reports(outcomes));
         }
         return Flow.of(steps, flow.edges(), flow.presets(), flow.start(), flow.limits());
     }

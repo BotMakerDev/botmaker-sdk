@@ -33,7 +33,8 @@ class ActivitySwitchTest {
     }
 
     private static Flow.Step step(Activity activity, boolean enabled) {
-        return Flow.activity(activity, ActivityBody.NONE, "", enabled, false, false, List.of());
+        Flow.Step step = Flow.activity(activity, ActivityBody.NONE);
+        return enabled ? step : step.off();
     }
 
     // ---- enablement -------------------------------------------------------------------------------------

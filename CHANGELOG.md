@@ -153,6 +153,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   (`com.botmaker.sdk.api.bot.SdkValue`). A misspelt one is a compile error. The contract dropped `@Managed`, so a
   bot written for an earlier SDK changes each `@Managed("flow")` to `@SdkValue(SdkValue.Id.FLOW)` and its
   import to `com.botmaker.sdk.api.bot.SdkValue`.
+- **A flow step and the bot's settings are written as named links.** A step is
+  `Flow.activity(Activities.COLLECT, Collect::body)` followed by `.described("…")`, `.off()`, `.goesHome()`,
+  `.checksPopups()` and `.reports(List.of(…))`, each only when it is not the default; the bot's settings are
+  `BotSettings.defaults()` followed by `.foundDelay(…)`, `.notFoundDelay(…)`, `.centredClicks()`,
+  `.confidence(…)`, `.compareMargin(…)`, `.where(…)`, `.takesOver()`, `.displayBackend(…)`,
+  `.inputBackend(…)`, `.maxRetryAttempts(…)` and `.debugOff()`. The seven-argument `Flow.activity`,
+  `BotSettings.of`, `BotSettings.clicks`, `BotSettings.vision` and `BotSettings.runIn` are gone: a bot written
+  for an earlier SDK rewrites each step and its `settings()` this way. `.debugOff()` is deprecated with the
+  `debug` setting it writes.
 - Internal, for plugin code that reached into the session module: the session a bot drives is now held by
   `internal.session.BotSession` (was the session module's `ActiveSession`), sessions come from the session
   module's `Sessions`, and its backend type is `SessionBackend` (was `NestedSession.Backend`). No bot code
