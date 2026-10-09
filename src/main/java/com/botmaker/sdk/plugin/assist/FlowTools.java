@@ -171,8 +171,9 @@ final class FlowTools {
         });
     }
 
+    /** The outcome as the canvas labels it: its constant's words, "Bag full" for "bag full". */
     private static String outcome(String typed) {
-        return typed == null || typed.isBlank() ? "NEXT" : typed.trim();
+        return typed == null || typed.isBlank() ? "NEXT" : FlowNames.outcome(typed).label();
     }
 
     private static String handWritten() {

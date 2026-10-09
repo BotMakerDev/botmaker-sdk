@@ -97,8 +97,8 @@ public final class ActivityDraft {
      * on the canvas would come to unwire a card from the code behind it.
      */
     public Flow.Step toStep() {
-        return new Flow.Step(Activity.named(name.get()), FlowTypes.body(body), description.get(), enabled.get(),
-                goHome.get(), popupCheck.get(), outcomes.stream().map(Outcome::named).toList());
+        return new Flow.Step(FlowNames.activity(name.get()), FlowTypes.body(body), description.get(), enabled.get(),
+                goHome.get(), popupCheck.get(), outcomes.stream().map(FlowNames::outcome).toList());
     }
 
     /**

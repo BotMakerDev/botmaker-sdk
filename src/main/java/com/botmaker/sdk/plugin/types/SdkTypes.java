@@ -26,6 +26,7 @@ import com.botmaker.sdk.api.vision.Matches;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.capture.CurrentSource;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.editors.ActivityEditors;
 import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
@@ -203,25 +204,28 @@ public final class SdkTypes {
             .writtenAsParts();
 
     /**
-     * One activity of the flow, {@code Activity.named("Collect")} — which the host writes as the bot's
-     * {@code Activities.COLLECT} whenever a constant holds the same label. A fresh one is no
-     * activity; the picker offers the flow's.
+     * One activity of the flow: the bot's {@code Activities.COLLECT}, which an editor holds by name
+     * ({@link BotConstants#activity}) and the host writes as that constant. A fresh one is no activity; the
+     * picker offers the flow's.
+     *
+     * <p>The call is what the host compares a value with a constant through, never what it writes: every value
+     * the editors hand back is a constant's, declared first ({@code FlowConstants}).
      */
     public static final DeclaredCallType<Activity> ACTIVITY = PluginType.value(Activity.class)
             .fresh(() -> Activity.NONE)
             .editor(() -> ActivityEditors::activity)
-            .writtenAs(Activity::named, Activity::label)
+            .writtenAs(BotConstants::activity, Activity::name)
             .constants(Activity.NONE);
 
     /**
-     * What an activity reports, {@code Outcome.named("Won")} — written as the bot's {@code Outcomes.WON}
-     * whenever a constant holds the same label, and as {@code Outcome.NEXT}/{@code Outcome.DISABLED} for the two
-     * every activity has. A fresh one is {@code NEXT}, "nothing special to report".
+     * What an activity reports: the bot's {@code Outcomes.WON}, held and written as {@link #ACTIVITY} is, and
+     * {@code Outcome.NEXT}/{@code Outcome.DISABLED} for the two every activity has. A fresh one is
+     * {@code NEXT}, "nothing special to report".
      */
     public static final DeclaredCallType<Outcome> OUTCOME = PluginType.value(Outcome.class)
             .fresh(() -> Outcome.NEXT)
             .editor(() -> ActivityEditors::outcome)
-            .writtenAs(Outcome::named, Outcome::label)
+            .writtenAs(BotConstants::outcome, Outcome::name)
             .constants(Outcome.NEXT, Outcome.DISABLED);
 
     /**

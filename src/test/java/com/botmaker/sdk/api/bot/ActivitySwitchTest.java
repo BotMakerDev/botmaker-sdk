@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.Flows;
 import org.junit.jupiter.api.AfterEach;
@@ -19,8 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Switching the flow's activities on and off, and the activity and outcome values. */
 class ActivitySwitchTest {
 
-    private static final Activity MINING = Activity.named("Mining");
-    private static final Activity SELLING = Activity.named("Selling");
+    /** A bot's activities, as its {@code Activities.java} holds them. */
+    enum Activities implements Activity { MINING, SELLING, NOTHING }
+
+    private static final Activity MINING = Activities.MINING;
+    private static final Activity SELLING = Activities.SELLING;
 
     @AfterEach
     void tearDown() {
@@ -69,21 +73,12 @@ class ActivitySwitchTest {
         assertFalse(ActivitySwitch.active(MINING), "the override outranks the switch on the canvas");
     }
 
-    /** An activity equal by label is the same activity: a constant and a value read off a file agree. */
-    @Test
-    void anActivityIsItsLabel() {
-        install(step(MINING, false));
-
-        assertFalse(ActivitySwitch.active(Activity.named("Mining")));
-        assertNotEquals(MINING, Activity.named("mining"), "the label is compared exactly");
-    }
-
     /** A stale constant must never stop a running bot: one console line, and the flow is untouched. */
     @Test
     void anActivityTheFlowLacksIsANoOp() {
         install(step(MINING, true));
 
-        ActivitySwitch.disable(Activity.named("Minnig"));
+        ActivitySwitch.disable(Activities.NOTHING);
 
         assertTrue(ActivitySwitch.active(MINING));
     }
@@ -91,24 +86,35 @@ class ActivitySwitchTest {
     /** An activity the flow does not mention is on — reading an absent one as off would silently stop it. */
     @Test
     void anActivityTheFlowDoesNotMentionIsOn() {
-        assertTrue(ActivitySwitch.active(Activity.named("Nothing")));
+        assertTrue(ActivitySwitch.active(Activities.NOTHING));
     }
 
-    // ---- the outcome value type -------------------------------------------------------------------------
+    // ---- the activity and outcome values ----------------------------------------------------------------
 
+    /** A bot's constant is its name, and the label the canvas and the trace show is that name as words. */
     @Test
-    void outcomesAreEqualWhenTheirLabelsAre() {
-        assertEquals(Outcome.named("Bag full"), Outcome.named("Bag full"));
-        assertEquals(Outcome.named("Bag full").hashCode(), Outcome.named("Bag full").hashCode());
-        assertNotEquals(Outcome.named("Bag full"), Outcome.named("bag full"), "the label is compared exactly");
-        assertEquals("Bag full", Outcome.named("Bag full").toString());
+    void aLabelIsTheConstantsNameAsWords() {
+        assertEquals("Mining", MINING.label());
+        assertEquals("Bag full", Outcomes.BAG_FULL.label());
+        assertEquals("Hp below 50", Outcomes.HP_BELOW_50.label());
+        assertEquals("NEXT", Outcome.NEXT.label(), "the two every activity has are labelled as written");
+        assertEquals("DISABLED", Outcome.DISABLED.label());
+        assertEquals("", Activity.NONE.label());
     }
 
+    /** What an editor holds for a bot's constant it cannot load, and the built-in ones by their names. */
     @Test
-    void aBlankOrMissingLabelIsNext() {
-        assertSame(Outcome.NEXT, Outcome.named(null));
-        assertSame(Outcome.NEXT, Outcome.named(" "));
-        assertSame(Outcome.NEXT, Outcome.named("NEXT"));
-        assertSame(Outcome.DISABLED, Outcome.named("DISABLED"));
+    void aConstantHeldByNameIsEqualByName() {
+        assertEquals(BotConstants.outcome("BAG_FULL"), BotConstants.outcome("BAG_FULL"));
+        assertNotEquals(BotConstants.outcome("BAG_FULL"), BotConstants.outcome("BAG_FUL"));
+        assertEquals("Bag full", BotConstants.outcome("BAG_FULL").label());
+        assertSame(Outcome.NEXT, BotConstants.outcome(null));
+        assertSame(Outcome.NEXT, BotConstants.outcome(" "));
+        assertSame(Outcome.NEXT, BotConstants.outcome("NEXT"));
+        assertSame(Outcome.DISABLED, BotConstants.outcome("DISABLED"));
+        assertSame(Activity.NONE, BotConstants.activity(""));
     }
+
+    /** A bot's outcomes, as its {@code Outcomes.java} holds them. */
+    enum Outcomes implements Outcome { BAG_FULL, HP_BELOW_50 }
 }

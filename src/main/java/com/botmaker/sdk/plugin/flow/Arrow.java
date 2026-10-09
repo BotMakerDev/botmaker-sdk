@@ -1,7 +1,6 @@
 package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.sdk.api.bot.Outcome;
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 
 /**
@@ -46,6 +45,6 @@ public record Arrow(String from, String to, String outcome) {
 
     /** The edge this arrow is saved as: each label as the value its constant holds. */
     public Flow.Edge toEdge() {
-        return Flow.edge(Activity.named(from), Activity.named(to), Outcome.named(outcome));
+        return Flow.edge(FlowNames.activity(from), FlowNames.activity(to), FlowNames.outcome(outcome));
     }
 }

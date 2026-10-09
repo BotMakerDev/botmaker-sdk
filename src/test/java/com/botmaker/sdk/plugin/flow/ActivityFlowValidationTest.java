@@ -27,8 +27,8 @@ class ActivityFlowValidationTest {
     }
 
     private static Flow.Step activity(String name, String... outcomes) {
-        return Flow.activity(Activity.named(name), ActivityBody.NONE).checksPopups()
-                .reports(List.of(outcomes).stream().map(Outcome::named).toList());
+        return Flow.activity(FlowNames.activity(name), ActivityBody.NONE).checksPopups()
+                .reports(List.of(outcomes).stream().map(FlowNames::outcome).toList());
     }
 
     @Test
@@ -37,22 +37,20 @@ class ActivityFlowValidationTest {
     }
 
     @Test
-    void anOutcomeLabelIsFreeTextButMustMakeAConstant() {
+    void anOutcomeLabelIsTypedFreelyButMustMakeAConstant() {
         // "Bag full" is Outcomes.BAG_FULL; a label with no letter first makes no constant at all.
         assertNull(ActivityFlowDialog.validate(of(activity("Mining", "Bag full"))));
-        String problem = ActivityFlowDialog.validate(of(activity("Mining", "2nd try")));
+        String problem = FlowNames.outcomeProblem(List.of(), List.of(), "Mining", "2nd try", null);
         assertNotNull(problem);
         assertTrue(problem.contains("2nd try"), problem);
     }
 
     @Test
-    void twoSpellingsOfOneOutcomeAcrossActivitiesAreRejected() {
-        // An outcome is one constant wherever it is declared: the same label twice is shared, two are a clash.
-        assertNull(ActivityFlowDialog.validate(of(activity("Mining", "Bag full"), activity("Fishing", "Bag full"))));
-        String problem = ActivityFlowDialog.validate(of(activity("Mining", "Bag full"),
-                activity("Fishing", "bag-full")));
-        assertNotNull(problem);
-        assertTrue(problem.contains("BAG_FULL"), problem);
+    void twoSpellingsOfOneOutcomeAreOneOutcome() {
+        // An outcome is one constant wherever it is declared, and its label is that constant's words.
+        assertEquals("Bag full", FlowNames.label("bag-full"));
+        assertEquals(FlowNames.outcome("Bag full"), FlowNames.outcome("bag-full"));
+        assertNull(ActivityFlowDialog.validate(of(activity("Mining", "Bag full"), activity("Fishing", "bag-full"))));
     }
 
     @Test
@@ -111,7 +109,8 @@ class ActivityFlowValidationTest {
         // Two cards that read nearly the same, and one Activities.MINING for both.
         String problem = ActivityFlowDialog.validate(of(activity("Mining"), activity("MINING")));
         assertNotNull(problem);
-        assertTrue(problem.contains("Activities.MINING"), problem);
+        assertTrue(problem.contains("Duplicate activity name: 'Mining'"), problem);
+        assertTrue(FlowNames.activityNameProblem("mining!", List.of("Mining")).contains("Activities.MINING"));
     }
 
     /** Naming a card refuses what saving would refuse, so a flow never sits unsaved over a name. */
@@ -163,14 +162,14 @@ class ActivityFlowValidationTest {
     @Test
     void an_arrow_and_a_selection_save_as_typed_values_and_back() {
         Arrow plain = new Arrow("Mining", "Bank", "");
-        assertEquals(Flow.edge(Activity.named("Mining"), Activity.named("Bank"), Outcome.NEXT), plain.toEdge());
+        assertEquals(Flow.edge(FlowNames.activity("Mining"), FlowNames.activity("Bank"), Outcome.NEXT), plain.toEdge());
         assertEquals(plain, Arrow.of(plain.toEdge()));
         Arrow off = new Arrow("Mining", "Bank", Arrow.DISABLED);
         assertTrue(off.toEdge().isDisabled());
         assertEquals(off, Arrow.of(off.toEdge()));
 
         Selection night = new Selection("Night", List.of("Mining"));
-        assertTrue(night.toPreset().enables(Activity.named("Mining")));
+        assertTrue(night.toPreset().enables(FlowNames.activity("Mining")));
         assertEquals(night, Selection.of(night.toPreset()));
     }
 }

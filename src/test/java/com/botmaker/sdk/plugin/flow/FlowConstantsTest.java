@@ -1,9 +1,10 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.sdk.api.bot.Outcome;
-import com.botmaker.sdk.api.flow.Activity;
+import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.flow.FlowConstants.Kind;
 import com.botmaker.sdk.plugin.flow.FlowConstants.Op;
 import com.botmaker.sdk.plugin.flow.FlowConstants.Plan;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -32,7 +34,7 @@ class FlowConstantsTest {
     void a_label_no_constant_holds_is_added() {
         Plan plan = FlowConstants.plan(Kind.OUTCOMES, members("WON", "Won"), List.of("Won", "Bag full"), Map.of());
         assertNull(plan.refusal());
-        assertEquals(List.of(new Op.Add("BAG_FULL", "Bag full")), plan.ops());
+        assertEquals(List.of(new Op.Add("BAG_FULL")), plan.ops());
     }
 
     /** A constant whose name is not the label's is still the label's: it is matched by what it holds. */
@@ -48,14 +50,14 @@ class FlowConstantsTest {
         Plan plan = FlowConstants.plan(Kind.ACTIVITIES, members("BATTLE", "Battle", "REST", "Rest"),
                 List.of("Fight", "Rest"), Map.of("Battle", "Fight"));
         assertNull(plan.refusal());
-        assertEquals(List.of(new Op.Rename("Battle", "BATTLE", "FIGHT", "Fight")), plan.ops());
+        assertEquals(List.of(new Op.Rename("Battle", "BATTLE", "FIGHT")), plan.ops());
     }
 
-    /** "Won" to "WON!" keeps Outcomes.WON and only rewrites the label it holds. */
+    /** "Won" to "WON!" is still Outcomes.WON: nothing is renamed, and the canvas's rename is spent. */
     @Test
-    void a_rename_to_the_same_constant_only_relabels() {
+    void a_rename_to_the_same_constant_renames_nothing() {
         Plan plan = FlowConstants.plan(Kind.OUTCOMES, members("WON", "Won"), List.of("WON!"), Map.of("Won", "WON!"));
-        assertEquals(List.of(new Op.Rename("Won", "WON", "WON", "WON!")), plan.ops());
+        assertEquals(List.of(new Op.Rename("Won", "WON", "WON")), plan.ops());
     }
 
     /** A card renamed and a new card given the old name: the constant follows the rename, the new card gets one. */
@@ -63,8 +65,7 @@ class FlowConstantsTest {
     void a_rename_then_a_new_card_of_the_old_name() {
         Plan plan = FlowConstants.plan(Kind.ACTIVITIES, members("BATTLE", "Battle"), List.of("Fight", "Battle"),
                 Map.of("Battle", "Fight"));
-        assertEquals(List.of(new Op.Rename("Battle", "BATTLE", "FIGHT", "Fight"), new Op.Add("BATTLE", "Battle")),
-                plan.ops());
+        assertEquals(List.of(new Op.Rename("Battle", "BATTLE", "FIGHT"), new Op.Add("BATTLE")), plan.ops());
     }
 
     @Test
@@ -87,26 +88,64 @@ class FlowConstantsTest {
     @Test
     void a_rename_of_an_undeclared_label_adds_instead() {
         Plan plan = FlowConstants.plan(Kind.OUTCOMES, members(), List.of("Victory"), Map.of("Won", "Victory"));
-        assertEquals(List.of(new Op.Add("VICTORY", "Victory")), plan.ops());
+        assertEquals(List.of(new Op.Add("VICTORY")), plan.ops());
     }
 
     /** + New outcome… in a body's return slot puts a port on that body's card, and only there. */
     @Test
     void a_new_outcome_is_declared_on_the_card_whose_body_holds_the_slot() {
         Flow flow = Flow.of(List.of(
-                        Flow.activity(Activity.named("Battle"), FlowTypes.body("Battle::body")).goesHome()
-                                .checksPopups().reports(List.of(Outcome.named("Won"))),
-                        Flow.activity(Activity.named("Rest"), ActivityBody.NONE)),
-                List.of(), List.of(), Activity.named("Battle"), Flow.Limits.DEFAULT);
+                        Flow.activity(FlowNames.activity("Battle"), FlowTypes.body("Battle::body")).goesHome()
+                                .checksPopups().reports(List.of(FlowNames.outcome("Won"))),
+                        Flow.activity(FlowNames.activity("Rest"), ActivityBody.NONE)),
+                List.of(), List.of(), FlowNames.activity("Battle"), Flow.Limits.DEFAULT);
         String method = FlowValue.bodySource(flow.steps().getFirst());
 
-        Flow added = FlowConstants.withOutcome(flow, method, Outcome.named("Timeout"));
+        Flow added = FlowConstants.withOutcome(flow, method, FlowNames.outcome("Timeout"));
 
-        assertEquals(List.of(Outcome.named("Won"), Outcome.named("Timeout")), added.steps().get(0).outcomes());
+        assertEquals(List.of(FlowNames.outcome("Won"), FlowNames.outcome("Timeout")), added.steps().get(0).outcomes());
         assertEquals(List.of(), added.steps().get(1).outcomes());
-        assertEquals(added, FlowConstants.withOutcome(added, method, Outcome.named("Timeout")),
+        assertEquals(added, FlowConstants.withOutcome(added, method, FlowNames.outcome("Timeout")),
                 "declared once, however often it is asked");
-        assertEquals(flow, FlowConstants.withOutcome(flow, "", Outcome.named("Timeout")),
+        assertEquals(flow, FlowConstants.withOutcome(flow, "", FlowNames.outcome("Timeout")),
                 "a slot in no activity's body declares nothing — not on every card with no body");
+    }
+
+    /**
+     * A constant written by hand in another case ({@code Collect}) is shown, but the card names it back as
+     * {@code COLLECT}: the save refuses rather than write a value no constant holds.
+     */
+    @Test
+    void a_flow_naming_a_constant_the_enum_lacks_is_not_written() {
+        Flow flow = Flow.of(List.of(Flow.activity(FlowNames.activity("Collect"), ActivityBody.NONE)
+                        .reports(List.of(FlowNames.outcome("Won")))),
+                List.of(), List.of(), FlowNames.activity("Collect"), Flow.Limits.DEFAULT);
+
+        assertNull(FlowConstants.unheld(holding(List.of("COLLECT"), List.of("WON")), Kind.ACTIVITIES, flow));
+        assertNull(FlowConstants.unheld(holding(List.of("COLLECT"), List.of("WON")), Kind.OUTCOMES, flow));
+        String refused = FlowConstants.unheld(holding(List.of("Collect"), List.of("WON")), Kind.ACTIVITIES, flow);
+        assertNotNull(refused);
+        assertTrue(refused.contains("Activities.COLLECT"), refused);
+    }
+
+    /** A project whose {@code Activities} and {@code Outcomes} enums hold these constants. */
+    private static PluginValues holding(List<String> activities, List<String> outcomes) {
+        return new PluginValues() {
+            @Override
+            public List<String> ids() {
+                return List.of();
+            }
+
+            @Override
+            public Optional<ValueContext> open(String id) {
+                return Optional.empty();
+            }
+
+            @Override
+            public List<String> members(String id) {
+                return id.equals(SdkValues.ACTIVITIES.id()) ? activities
+                        : id.equals(SdkValues.OUTCOMES.id()) ? outcomes : List.of();
+            }
+        };
     }
 }

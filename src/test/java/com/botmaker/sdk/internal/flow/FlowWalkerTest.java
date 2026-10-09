@@ -3,7 +3,6 @@ package com.botmaker.sdk.internal.flow;
 import com.botmaker.sdk.api.bot.ActivitySwitch;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.bot.PopupGuard;
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import org.junit.jupiter.api.AfterEach;
@@ -26,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>A run always ends in {@code Bot.stop()}, which throws — so {@link #walk} asserts the throw, and a test
  * that never reached the end would fail rather than pass by accident.
  *
- * <p>Activities and outcomes are written by label here ({@link #edge}, {@link #on}): a label is the value a
- * bot's constant holds, so {@code Activity.named("A")} is what {@code Activities.A} would be.
+ * <p>Activities and outcomes are written by name here ({@link #edge}, {@link #on}), as an editor holds a bot's
+ * constant: {@code BotConstants.activity("A")} stands for {@code Activities.A}, and two are equal by name.
  */
 class FlowWalkerTest {
 
@@ -57,14 +56,14 @@ class FlowWalkerTest {
         Deque<String> script = new ArrayDeque<>(List.of(outcomes));
         return () -> {
             log.add(name + (PopupGuard.isEnabled() ? "+popup" : "-popup"));
-            assertEquals(Activity.named(name), FlowWalker.current(), "the walk says which activity is running");
-            return script.isEmpty() ? Outcome.NEXT : Outcome.named(script.removeFirst());
+            assertEquals(BotConstants.activity(name), FlowWalker.current(), "the walk says which activity is running");
+            return script.isEmpty() ? Outcome.NEXT : BotConstants.outcome(script.removeFirst());
         };
     }
 
     private static Flow.Step step(ActivityBody body, String name, boolean enabled, boolean goHome,
                                   boolean popupCheck) {
-        return new Flow.Step(Activity.named(name), body, "", enabled, goHome, popupCheck, List.of());
+        return new Flow.Step(BotConstants.activity(name), body, "", enabled, goHome, popupCheck, List.of());
     }
 
     private Flow.Step on(String name, String... outcomes) {
@@ -76,7 +75,7 @@ class FlowWalkerTest {
     }
 
     private static Flow.Edge edge(String from, String to, String outcome) {
-        return Flow.edge(Activity.named(from), Activity.named(to), Outcome.named(outcome));
+        return Flow.edge(BotConstants.activity(from), BotConstants.activity(to), BotConstants.outcome(outcome));
     }
 
     private static Flow flow(String start, List<Flow.Step> steps, Flow.Edge... edges) {
@@ -84,7 +83,7 @@ class FlowWalkerTest {
     }
 
     private static Flow flow(String start, Flow.Limits limits, List<Flow.Step> steps, Flow.Edge... edges) {
-        return Flow.of(steps, List.of(edges), List.of(), Activity.named(start), limits);
+        return Flow.of(steps, List.of(edges), List.of(), BotConstants.activity(start), limits);
     }
 
     /** Installs and walks {@code flow} to its end, with no pause between activities. */
@@ -134,7 +133,7 @@ class FlowWalkerTest {
     /** {@code Outcome.NEXT} follows the plain arrow, which a blank label also names. */
     @Test
     void nextFollowsThePlainEdge() {
-        walk(flow("A", List.of(on("A"), on("B")), Flow.edge(Activity.named("A"), Activity.named("B"),
+        walk(flow("A", List.of(on("A"), on("B")), Flow.edge(BotConstants.activity("A"), BotConstants.activity("B"),
                 Outcome.NEXT)));
 
         assertEquals(List.of("A+popup", "B+popup"), log);
@@ -173,13 +172,13 @@ class FlowWalkerTest {
 
     @Test
     void keepsTheStartWhenItNamesAnActivity() {
-        assertEquals(Activity.named("B"), FlowWalker.start(flow("B", List.of(on("A"), on("B")))));
+        assertEquals(BotConstants.activity("B"), FlowWalker.start(flow("B", List.of(on("A"), on("B")))));
     }
 
     /** A deleted or renamed start activity must not be the reason a bot does nothing. */
     @Test
     void fallsBackToTheFirstActivityWhenTheStartIsStale() {
-        assertEquals(Activity.named("A"), FlowWalker.start(flow("Deleted", List.of(on("A"), on("B")))));
+        assertEquals(BotConstants.activity("A"), FlowWalker.start(flow("Deleted", List.of(on("A"), on("B")))));
         assertNull(FlowWalker.start(Flow.NONE));
     }
 
@@ -212,7 +211,7 @@ class FlowWalkerTest {
     void anOverrideMadeMidRunIsReadOnTheNextPass() {
         ActivityBody once = () -> {
             log.add("once");
-            ActivitySwitch.disable(Activity.named("Once"));
+            ActivitySwitch.disable(BotConstants.activity("Once"));
             return Outcome.NEXT;
         };
         walk(flow("Once", List.of(step(once, "Once", true, false, false), on("B")),

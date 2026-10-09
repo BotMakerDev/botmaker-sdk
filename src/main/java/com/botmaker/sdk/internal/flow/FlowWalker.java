@@ -83,7 +83,8 @@ public final class FlowWalker {
      */
     public static void setEnabled(Activity activity, boolean enabled) {
         if (activity == null || Flows.installed().step(activity) == null) {
-            Debug.error("[Activity] setEnabled: the flow has no activity '" + activity + "'. Ignoring.");
+            Debug.error("[Activity] setEnabled: the flow has no activity '"
+                    + (activity == null ? "null" : activity.label()) + "'. Ignoring.");
             return;
         }
         OVERRIDES.put(activity, enabled);
@@ -124,7 +125,7 @@ public final class FlowWalker {
         Outcome outcome = execute(step, body);
         Activity next = target(flow, activity, outcome);
         if (next == null && !outcome.equals(Outcome.NEXT) && !step.outcomes().contains(outcome)) {
-            Debug.error("[Activity] " + step.label() + " reported '" + outcome + "', which it does not declare in "
+            Debug.error("[Activity] " + step.label() + " reported '" + outcome.label() + "', which it does not declare in "
                     + "the Activity Flow — nothing is wired to it, so the run ends here.");
         }
         return next;
@@ -153,8 +154,8 @@ public final class FlowWalker {
             CURRENT.set(outer);
         }
         if (outcome == null) outcome = Outcome.NEXT;
-        Debug.log("[Activity] " + step.label() + " → " + outcome
-                + " (" + Trace.elapsed(System.currentTimeMillis() - startedAt) + ")");
+        Debug.log("[Activity] " + step.label() + " → " + outcome.label()
+                + " ("+ Trace.elapsed(System.currentTimeMillis() - startedAt) + ")");
         return outcome;
     }
 

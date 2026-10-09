@@ -36,7 +36,7 @@ public final class FlowEdits {
         String label = FlowNames.label(typed);
         String problem = FlowNames.activityNameProblem(label, labels(flow));
         if (problem != null) throw new IllegalArgumentException(problem);
-        Flow.Step step = Flow.activity(Activity.named(label), body(bodySource));
+        Flow.Step step = Flow.activity(FlowNames.activity(label), body(bodySource));
         List<Flow.Step> steps = new ArrayList<>(flow.steps());
         steps.add(step);
         Activity start = flow.start() == Activity.NONE || flow.start().label().isEmpty() ? step.activity() : flow.start();
@@ -52,7 +52,7 @@ public final class FlowEdits {
         String problem = FlowNames.activityNameProblem(label, others);
         if (problem != null) throw new IllegalArgumentException(problem);
         Activity was = step.activity();
-        Activity now = Activity.named(label);
+        Activity now = FlowNames.activity(label);
         List<Flow.Step> steps = flow.steps().stream().map(s -> s.activity().equals(was)
                 ? new Flow.Step(now, s.body(), s.description(), s.enabled(), s.goHome(), s.popupCheck(), s.outcomes())
                 : s).toList();
@@ -83,15 +83,13 @@ public final class FlowEdits {
     public static Flow connect(Flow flow, String from, String outcome, String to) {
         Flow.Step source = step(flow, from);
         Activity target = step(flow, to).activity();
-        Outcome typed = Outcome.named(FlowNames.label(outcome == null ? "" : outcome));
-        // An outcome is its constant: "bag full" is the declared "Bag full", not a second outcome beside it, and
+        // An outcome is its constant: "bag full" is the declared BAG_FULL, not a second outcome beside it, and
         // "next" or "disabled" is the port every activity has, never one it declares.
-        String constant = FlowNames.constantFor(typed.label());
-        Outcome wired = Arrow.NEXT.equals(constant) ? Outcome.NEXT
-                : Arrow.DISABLED.equals(constant) ? Outcome.DISABLED
-                : source.outcomes().stream()
-                        .filter(o -> constant != null && constant.equals(FlowNames.constantFor(o.label())))
-                        .findFirst().orElse(typed);
+        String typed = outcome == null ? "" : outcome.trim();
+        if (!typed.isEmpty() && FlowNames.constantFor(typed) == null) {
+            throw new IllegalArgumentException("'" + typed + "' is not an outcome's name.");
+        }
+        Outcome wired = FlowNames.outcome(typed);
         boolean builtIn = wired.equals(Outcome.NEXT) || wired.equals(Outcome.DISABLED);
         List<Flow.Step> steps = flow.steps();
         if (!builtIn && !source.outcomes().contains(wired)) {
@@ -211,11 +209,12 @@ public final class FlowEdits {
         if (problem != null) return problem;
         Set<String> activities = FlowConstants.activityLabels(flow);
         Set<String> outcomes = FlowConstants.outcomeLabels(flow);
-        String refused = FlowConstants.prepare(values, FlowConstants.Kind.ACTIVITIES, activities, activityRenames,
-                notes);
+        String refused = FlowConstants.prepare(values, FlowConstants.Kind.ACTIVITIES, activities, activityRenames);
         if (refused == null) {
-            refused = FlowConstants.prepare(values, FlowConstants.Kind.OUTCOMES, outcomes, outcomeRenames, notes);
+            refused = FlowConstants.prepare(values, FlowConstants.Kind.OUTCOMES, outcomes, outcomeRenames);
         }
+        if (refused == null) refused = FlowConstants.unheld(values, FlowConstants.Kind.ACTIVITIES, flow);
+        if (refused == null) refused = FlowConstants.unheld(values, FlowConstants.Kind.OUTCOMES, flow);
         if (refused == null) refused = FlowValue.write(value, flow);
         if (refused == null) {
             FlowConstants.forget(values, FlowConstants.Kind.ACTIVITIES, without(saved.activities(), activities), notes);

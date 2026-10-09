@@ -30,9 +30,9 @@ import java.util.function.Supplier;
  * The editors of the two values that tie a bot's code to its Activity Flow canvas: an {@link Activity}
  * ({@code ActivitySwitch.disable(Activities.MINING)}) and an {@link Outcome} ({@code return Outcomes.BAG_FULL;}).
  *
- * <p>Both are claimed by type: the editor hands back an
- * {@code Activity.named("Mining")}, and the host writes a value equal to one of the bot's {@code Activities}
- * constants as that constant — {@code Activities.MINING} — so what the picker writes is bound, not spelled.
+ * <p>Both are claimed by type: the editor hands back the constant a label names, held by name
+ * ({@code FlowNames.activity("Mining")}), and the host writes it as the bot's constant — {@code Activities.MINING}
+ * — so what the picker writes is bound, not spelled.
  *
  * <p><b>The list is read from the project's own {@code Sdk.flow()}, not from a running bot.</b> The canvas
  * is the source of truth and what it writes is one expression in the bot's Java, so {@link FlowValue} is the
@@ -40,8 +40,8 @@ import java.util.function.Supplier;
  * activity added in the flow window a moment ago is offered without reopening anything.
  *
  * <p><b>Both boxes stay typeable.</b> Writing the body before drawing the activity is an ordinary way to work;
- * a label no constant holds is written {@code Outcome.named("…")}, which compiles and is matched by its label.
- * The outcome box also offers <i>+ New outcome…</i>, which makes the constant, declares it on the activity whose
+ * a label no constant holds has nothing to be written as, so it is refused until the constant exists. The
+ * outcome box also offers <i>+ New outcome…</i>, which makes the constant, declares it on the activity whose
  * body this is, and writes it — the one way to name a new outcome without leaving the body.
  */
 public final class ActivityEditors {
@@ -54,7 +54,7 @@ public final class ActivityEditors {
     /** An activity — the project's activities, as drawn. */
     public static Node activity(ValueContext ctx) {
         return labelBox(ctx, () -> activityLabels(flow(ctx)), "Activity",
-                ctx.value(Activity.class).map(Activity::label).orElse(""), Activity::named, null);
+                ctx.value(Activity.class).map(Activity::label).orElse(""), FlowNames::activity, null);
     }
 
     /**
@@ -69,7 +69,7 @@ public final class ActivityEditors {
      */
     public static Node outcome(ValueContext ctx) {
         return labelBox(ctx, () -> outcomeLabels(ctx), "Outcome",
-                ctx.value(Outcome.class).map(Outcome::label).orElse(""), Outcome::named, () -> newOutcome(ctx));
+                ctx.value(Outcome.class).map(Outcome::label).orElse(""), FlowNames::outcome, () -> newOutcome(ctx));
     }
 
     /**
@@ -86,6 +86,7 @@ public final class ActivityEditors {
         box.setEditable(true);
         box.setPromptText(prompt);
         if (!current.isBlank()) box.setValue(current);
+        boolean[] reverting = {false};
 
         box.setOnShowing(event -> {
             List<String> items = new ArrayList<>(options.get());
@@ -105,7 +106,23 @@ public final class ActivityEditors {
                 return;
             }
             if (NEW_OUTCOME.equals(was)) return;   // the step back above, not an edit
-            if (now != null && !now.isBlank() && !now.equals(was)) ctx.set(value.apply(now));
+            if (reverting[0] || now == null || now.isBlank() || now.equals(was)) return;
+            // Typed or picked, it is the option naming the same constant: "next" is NEXT, "bag full" Bag full.
+            // A label that makes no constant ("!!") names nothing, rather than the NEXT it would fall back to.
+            List<String> known = options.get();
+            Object typed = known.contains(now) || FlowNames.constantFor(now) != null ? value.apply(now) : null;
+            String chosen = typed == null ? null : known.stream()
+                    .filter(option -> value.apply(option).equals(typed)).findFirst().orElse(null);
+            if (chosen == null) {
+                // No constant holds it, so there is nothing to write it as: the box goes back, writing nothing.
+                Platform.runLater(() -> {
+                    reverting[0] = true;
+                    box.setValue(was);
+                    reverting[0] = false;
+                });
+                return;
+            }
+            ctx.set(value.apply(chosen));
         });
         // An editable ComboBox commits its editor on Enter only; clicking away would lose a typed label.
         box.focusedProperty().addListener((obs, was, focused) -> {
@@ -150,7 +167,7 @@ public final class ActivityEditors {
                 : FlowConstants.declare(services.pluginValues(), FlowConstants.Kind.OUTCOMES, label);
         if (refused.isEmpty() && !own.isEmpty()) {
             refused = Optional.ofNullable(FlowValue.FLOW.write(services,
-                    FlowConstants.withOutcome(flow, method, Outcome.named(label))));
+                    FlowConstants.withOutcome(flow, method, FlowNames.outcome(label))));
         }
         if (refused.isPresent()) {
             Alert alert = services.theme().alert(Alert.AlertType.INFORMATION, refused.get(), ButtonType.OK);

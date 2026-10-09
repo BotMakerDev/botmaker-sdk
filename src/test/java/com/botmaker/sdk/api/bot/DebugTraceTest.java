@@ -68,11 +68,16 @@ class DebugTraceTest {
 
     // --- Activity ---
 
-    private static final Outcome BAG_FULL = Outcome.named("BAG_FULL");
+    /** A bot's outcomes, BAG_FUL being the typo nothing declares. */
+    enum Outcomes implements Outcome { BAG_FULL, BAG_FUL }
+
+    enum Activities implements Activity { MINING }
+
+    private static final Outcome BAG_FULL = Outcomes.BAG_FULL;
 
     /** One activity reporting {@code reported}, declaring BAG_FULL, with nothing wired, so the run ends after it. */
     private static Flow mining(Outcome reported) {
-        Activity mining = Activity.named("Mining");
+        Activity mining = Activities.MINING;
         return Flow.of(List.of(Flow.activity(mining, () -> reported).reports(List.of(BAG_FULL))),
                 List.of(), List.of(), mining, Flow.limits(10, 0));
     }
@@ -99,9 +104,9 @@ class DebugTraceTest {
     void anUndeclaredOutcomeSaysSoWhenTheRunEndsOnIt() {
         Debug.disable();
 
-        String output = printed(() -> run(mining(Outcome.named("BAG_FUL"))));
+        String output = printed(() -> run(mining(Outcomes.BAG_FUL)));
 
-        assertTrue(output.contains("Mining reported 'BAG_FUL', which it does not declare"), output);
+        assertTrue(output.contains("Mining reported 'Bag ful', which it does not declare"), output);
     }
 
     @Test
@@ -117,7 +122,7 @@ class DebugTraceTest {
 
         List<String> lines = linesMatching(output, "[Activity]");
         assertEquals(1, lines.size(), "one activity, one line: " + output);
-        assertTrue(lines.get(0).contains("Mining → BAG_FULL"),
+        assertTrue(lines.get(0).contains("Mining → Bag full"),
                 "the line names the activity and the outcome the flow will route on: " + lines.get(0));
     }
 

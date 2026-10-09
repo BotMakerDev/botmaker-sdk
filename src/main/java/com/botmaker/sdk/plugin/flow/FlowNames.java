@@ -1,5 +1,10 @@
 package com.botmaker.sdk.plugin.flow;
 
+import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.api.flow.Activity;
+import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.flow.Labels;
+
 import java.util.Collection;
 import java.util.List;
 
@@ -11,13 +16,14 @@ import java.util.List;
  * — the side panel, {@link NewActivityDialog} and the return slot's <i>+ New outcome…</i> — and three copies
  * of "is this a legal name" do not stay identical.
  *
- * <h2>A label is free text; its constant is derived</h2>
+ * <h2>A label is typed; its constant is derived, and the label shown is the constant's</h2>
  *
- * <p>An activity and an outcome are constants of the bot's own {@code Activities} and {@code Outcomes}
- * classes, each holding the label the canvas shows: {@code BAG_FULL = Outcome.named("Bag full")}. The user
- * types the label; {@link #constantFor} is the one mechanical step from it to the constant's name. So the
- * rules are about the <em>constant</em>: a label that yields none is refused, and two labels that yield the
- * same one are one name twice — "Bag full" and "bag-full" would both be {@code Outcomes.BAG_FULL}.
+ * <p>An activity and an outcome are constants of the bot's own {@code Activities} and {@code Outcomes} enums,
+ * and the label the canvas shows is the constant's name as words ({@code BAG_FULL} is "Bag full",
+ * {@code Labels}). The user types a label; {@link #constantFor} is the one mechanical step from it to the
+ * constant's name. So the rules are about the <em>constant</em>: a label that yields none is refused, and two
+ * labels that yield the same one are one name twice — "Bag full" and "bag-full" would both be
+ * {@code Outcomes.BAG_FULL}, shown as "Bag full".
  */
 public final class FlowNames {
 
@@ -31,11 +37,14 @@ public final class FlowNames {
     static final String OUTCOMES = "Outcomes";
 
     /**
-     * A typed label as it is kept: trimmed, with runs of whitespace collapsed to one space. Nothing else is
-     * changed — the label is what the user reads on the card, in their own spelling.
+     * A typed label as it is kept: the words of the constant it makes — "bag-full" is "Bag full", because a
+     * card shows its constant's name and the constant is all the bot holds. A label that makes no constant is
+     * kept trimmed, with runs of whitespace collapsed to one space, so the refusal can quote it.
      */
     public static String label(String typed) {
-        return typed == null ? "" : typed.strip().replaceAll("\\s+", " ");
+        if (typed == null) return "";
+        String constant = constantFor(typed);
+        return constant == null ? typed.strip().replaceAll("\\s+", " ") : Labels.of(constant);
     }
 
     /**
@@ -65,6 +74,22 @@ public final class FlowNames {
         }
         if (out.isEmpty() || !Character.isJavaIdentifierStart(out.charAt(0))) return null;
         return out.toString();
+    }
+
+    /**
+     * The activity a typed label names: the bot's constant {@link #constantFor} makes of it, held by name, and
+     * {@link Activity#NONE} for a label that makes none.
+     */
+    public static Activity activity(String label) {
+        return BotConstants.activity(constantFor(label));
+    }
+
+    /**
+     * The outcome a typed label names, as {@link #activity} does: {@link Outcome#NEXT} for blank, "next" or a
+     * label that makes no constant, {@link Outcome#DISABLED} for "disabled".
+     */
+    public static Outcome outcome(String label) {
+        return BotConstants.outcome(constantFor(label));
     }
 
     /**

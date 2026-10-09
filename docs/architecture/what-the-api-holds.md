@@ -20,14 +20,18 @@
   `BotSettings.defaults().foundDelay(…)…` is) (an activity's work is a **method reference**, so a rename is a
   compile error naming `Sdk.java`), `Activity`, `FlowLayout` (the editor's card positions, keyed by label,
   which a run ignores), `ActivityBody`; `internal.flow.Flows.enabled(activity)` reads an activity's switch.
-- **Activities and outcomes are constants, never strings (2026-10-02).** `Activity.named("Collect")` and
-  `Outcome.named("Won")` are values equal by label; a bot holds them as `@Managed("activities")
-  Activities` and `@Managed("outcomes") Outcomes` open sets in `plugins/sdk/` (`SdkValues.ACTIVITIES`/
-  `OUTCOMES`), and the host writes a value equal to a constant as the constant. The flow canvas works on
-  labels (`plugin/flow/Arrow`, `Selection`) and converts at load and save. A label is free text and its
-  constant is `FlowNames.constantFor` (`"Bag full"` → `BAG_FULL`); a save keeps the two classes in step by
-  binding (`plugin/flow/FlowConstants`: rename, add, write the flow, remove), and an outcome is one constant
-  however many cards declare it.
+- **Activities and outcomes are enum constants, never strings (2026-10-02; enums since 2026-10-10).**
+  `Activity` and `Outcome` are interfaces a bot's `@SdkValue(ACTIVITIES) enum Activities implements Activity
+  { COLLECT }` and `@SdkValue(OUTCOMES) enum Outcomes implements Outcome { WON }` implement, in `plugins/sdk/`
+  (`SdkValues.ACTIVITIES`/`OUTCOMES`, enum sets). The name is the whole constant: `label()` is the name as
+  words (`internal.flow.Labels`, `NOTHING_LEFT` → "Nothing left"); `Outcome.NEXT`/`DISABLED` and
+  `Activity.NONE` are the SDK's own enums. An editor cannot load the bot's enum, so it holds a constant by
+  name (`internal.flow.BotConstants`, equal by name) and the host writes it back as the constant. The flow
+  canvas works on labels (`plugin/flow/Arrow`, `Selection`) and converts at load and save through
+  `FlowNames.activity`/`outcome`; a typed label is kept as its constant's words (`FlowNames.label`), so
+  "bag full" is `BAG_FULL`, shown "Bag full". A save keeps the two enums in step by binding
+  (`plugin/flow/FlowConstants`: rename, add, write the flow, remove), and an outcome is one constant however
+  many cards declare it.
 - `api.capture` — `CaptureSource` (`desktop()`, `monitor(i)`, `window(title)`, `emulator(name)`, `region(…)`;
   `capture()` and `origin()` go together), `Source.current()` (what `Bot.run` installed, or the whole desktop).
 - `api.input` (`Mouse`, `Keyboard`, …), `api.time` (`Wait`, `Time`), `api.sound`, `api.geometry`.

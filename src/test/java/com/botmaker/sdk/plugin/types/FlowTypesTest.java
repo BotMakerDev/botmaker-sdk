@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -40,9 +41,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class FlowTypesTest {
 
-    private static final Activity COLLECT = Activity.named("Collect");
-    private static final Activity REST = Activity.named("Rest");
-    private static final Outcome NOTHING_LEFT = Outcome.named("Nothing left");
+    private static final Activity COLLECT = BotConstants.activity("COLLECT");
+    private static final Activity REST = BotConstants.activity("REST");
+    private static final Outcome NOTHING_LEFT = BotConstants.outcome("NOTHING_LEFT");
 
     private static Flow gamebot() {
         return Flow.of(

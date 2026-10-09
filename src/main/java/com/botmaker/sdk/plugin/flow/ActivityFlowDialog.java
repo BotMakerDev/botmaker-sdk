@@ -933,7 +933,7 @@ public final class ActivityFlowDialog {
         List<Flow.Step> steps = new ArrayList<>();
         for (ActivityDraft d : canvas.drafts()) steps.add(d.toStep());
         return Flow.of(steps, canvas.edges().stream().map(Arrow::toEdge).toList(),
-                presets.stream().map(Selection::toPreset).toList(), Activity.named(canvas.start()),
+                presets.stream().map(Selection::toPreset).toList(), FlowNames.activity(canvas.start()),
                 Flow.limits(maxSteps, stepDelayMs));
     }
 

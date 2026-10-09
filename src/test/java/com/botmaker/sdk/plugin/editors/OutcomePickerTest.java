@@ -1,8 +1,7 @@
 package com.botmaker.sdk.plugin.editors;
 
-import com.botmaker.sdk.api.bot.Outcome;
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 import org.junit.jupiter.api.Test;
 
@@ -18,13 +17,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class OutcomePickerTest {
 
     private static Flow.Step read(String body, String name, String... outcomes) {
-        return FlowTypes.STEP_SHAPE.build(List.of(Activity.named(name), body, "", true, false, false,
-                List.of(outcomes).stream().map(Outcome::named).toList()));
+        return FlowTypes.STEP_SHAPE.build(List.of(FlowNames.activity(name), body, "", true, false, false,
+                List.of(outcomes).stream().map(FlowNames::outcome).toList()));
     }
 
     private static final Flow FLOW = Flow.of(
             List.of(read("Collect::body", "Collect", "Bag full", "No ore"), read("Battle::body", "Battle", "Won")),
-            List.of(), List.of(), Activity.named("Collect"), Flow.limits(0, 0));
+            List.of(), List.of(), FlowNames.activity("Collect"), Flow.limits(0, 0));
 
     @Test
     void aBodyIsOfferedItsOwnActivitysOutcomes() {

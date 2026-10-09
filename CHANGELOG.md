@@ -147,6 +147,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed — breaking
 
+- **Activities and outcomes are enums, and a label is the constant's name.** A bot's `Activities.java` is
+  `@SdkValue(SdkValue.Id.ACTIVITIES) public enum Activities implements Activity { COLLECT, BATTLE }`, and its
+  `Outcomes.java` is the same for `Outcome`. `Activity` and `Outcome` are interfaces now. `label()` is the
+  constant's name as words: `NOTHING_LEFT` is "Nothing left". `Outcome.NEXT`, `Outcome.DISABLED` and
+  `Activity.NONE` stay. `Activity.named` and `Outcome.named` are deleted, so rewrite each
+  `static final Outcome X = Outcome.named("…")` as the constant `X`. The Activity Flow keeps a typed label as
+  its constant's words, so "bag full" becomes `BAG_FULL`, shown as "Bag full". A refused add now stops a save
+  instead of writing the value spelled out. So does a flow naming a constant the enum lacks: one written by hand
+  in another case (`bagFull`) is shown, but no card can name it back. `Activity` and `Outcome` share `label()`
+  through `api.flow.Labelled`. An outcome box in a body's return slot refuses a label that no
+  constant holds; *+ New outcome…* makes the constant. The run's trace prints an outcome's label.
 - **`@SdkValue` marks the SDK's values in a bot, instead of `@Managed("…")`.** `Sdk.java`'s methods are
   `@SdkValue(SdkValue.Id.FLOW)`, `FLOW_LAYOUT`, `CAPTURE` and `SETTINGS`, and the `Pictures`, `Activities`,
   `Outcomes`, `Points` and `Regions` classes `@SdkValue(SdkValue.Id.PICTURES)` and so on

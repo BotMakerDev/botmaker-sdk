@@ -16,11 +16,11 @@ import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
+import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -260,15 +260,15 @@ class SdkAssistTest {
         assertFalse(run("connect", "from", "Battle", "to", "Collect").isRefused());
         String read = text(run("read_flow"));
         assertTrue(read.startsWith("Starts at Collect;"), read);
-        assertTrue(read.contains("• Collect — Collect::body; outcomes [bag full]"), read);
-        assertTrue(read.contains("    on bag full → Battle"), read);
+        assertTrue(read.contains("• Collect — Collect::body; outcomes [Bag full]"), read);
+        assertTrue(read.contains("    on Bag full → Battle"), read);
         assertTrue(read.contains("• Battle — no body yet"), read);
 
-        assertEquals("Collect on bag full now goes nowhere. Activities: [Collect, Battle].",
+        assertEquals("Collect on Bag full now goes nowhere. Activities: [Collect, Battle].",
                 text(run("disconnect", "from", "Collect", "outcome", "bag full")));
         assertTrue(run("disconnect", "from", "Collect", "outcome", "bag full").isRefused());
         assertFalse(run("set_start", "name", "Battle").isRefused());
-        assertEquals(Activity.named("Battle"), flow().start());
+        assertEquals(FlowNames.activity("Battle"), flow().start());
         assertFalse(run("rename_activity", "from", "Battle", "to", "Fight").isRefused());
         assertFalse(run("remove_activity", "name", "Collect").isRefused());
         assertEquals(List.of("Fight"), flow().steps().stream().map(Flow.Step::label).toList());

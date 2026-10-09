@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.Flows;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
@@ -72,22 +73,22 @@ public final class SdkValues {
                     + " use of it together.");
 
     /**
-     * The activity constants — {@code static final Activity COLLECT = Activity.named("Collect")}.
-     * 🔀 Activity Flow adds, renames and removes them with the cards, together with every step, wire, preset and
+     * The activity constants — {@code enum Activities implements Activity { COLLECT, BATTLE }}. 🔀 Activity Flow
+     * adds, renames and removes them with the cards, together with every step, wire, preset and
      * {@code ActivitySwitch} call naming them.
      */
     public static final ManagedValue<Activity> ACTIVITIES = ManagedValue.openSet(SdkValue.Id.ACTIVITIES)
-            .of(Activity.class)
+            .ofEnum(Activity.class, BotConstants::activity)
             .in("Activities")
             .because("Activities are managed in 🔀 Activity Flow, which renames the card and every use of it"
                     + " together.");
 
     /**
-     * The outcome constants — {@code static final Outcome WON = Outcome.named("Won")}. 🔀 Activity
-     * Flow adds, renames and removes them with the cards' outcomes, together with every body returning one.
+     * The outcome constants — {@code enum Outcomes implements Outcome { WON, LOST }}. 🔀 Activity Flow adds,
+     * renames and removes them with the cards' outcomes, together with every body returning one.
      */
     public static final ManagedValue<Outcome> OUTCOMES = ManagedValue.openSet(SdkValue.Id.OUTCOMES)
-            .of(Outcome.class)
+            .ofEnum(Outcome.class, BotConstants::outcome)
             .in("Outcomes")
             .because("Outcomes are managed in 🔀 Activity Flow, which renames the outcome and every use of it"
                     + " together.");

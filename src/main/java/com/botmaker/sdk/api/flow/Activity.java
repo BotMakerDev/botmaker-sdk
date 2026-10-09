@@ -1,58 +1,29 @@
 package com.botmaker.sdk.api.flow;
 
+import com.botmaker.sdk.internal.flow.NoActivity;
+
 /**
- * One activity of the bot's flow, by name — a constant of your bot's {@code Activities} class (2026-10-02),
- * the file BotMaker keeps beside {@code Sdk.java}:
+ * One activity of the bot's flow — a constant of your bot's {@code Activities} enum (2026-10-10), the file
+ * BotMaker keeps beside {@code Sdk.java}:
  *
  * <pre>{@code
  * @SdkValue(SdkValue.Id.ACTIVITIES)
- * public final class Activities {
- *     public static final Activity COLLECT = Activity.named("Collect");
+ * public enum Activities implements Activity {
+ *     COLLECT, BATTLE
  * }
  *
  * ActivitySwitch.disable(Activities.COLLECT);
  * }</pre>
  *
  * <p>The flow's steps, wires, presets and start all name the constant, so renaming a card on the Activity Flow
- * canvas renames the constant and every use of it by binding, and a typo is a compile error. An activity used to
- * be its label, spelled again at every wire and every {@code disable("…")}.
+ * canvas renames the constant and every use of it by binding, and a typo is a compile error.
  *
- * <p>The label is what the canvas draws on the card and what the run's trace prints. Two activities are equal
- * when their labels are, compared exactly, because the label is the value a constant holds.
+ * <p><b>The name is the activity.</b> What the canvas draws on the card and the run's trace prints is the name
+ * read as words ({@link Labelled#label()}) — {@code COLLECT} is "Collect" — so the constant holds nothing else.
+ * It used to hold its label, {@code Activity.named("Collect")}.
  */
-public final class Activity {
+public interface Activity extends Labelled {
 
-    /** No activity: the start of a flow with nothing in it. */
-    public static final Activity NONE = new Activity("");
-
-    private final String label;
-
-    private Activity(String label) {
-        this.label = label;
-    }
-
-    /** The activity with this label — what an {@code Activities} constant is initialised with. */
-    public static Activity named(String label) {
-        return label == null || label.isEmpty() ? NONE : new Activity(label);
-    }
-
-    /** What the canvas draws on the card and the trace prints. */
-    public String label() {
-        return label;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        return o instanceof Activity other && label.equals(other.label);
-    }
-
-    @Override
-    public int hashCode() {
-        return label.hashCode();
-    }
-
-    @Override
-    public String toString() {
-        return label;
-    }
+    /** No activity: the start of a flow with nothing in it. Labelled blank. */
+    Activity NONE = NoActivity.NONE;
 }

@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.toolkit.ManagedSet;
@@ -8,6 +7,8 @@ import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.flow.Labels;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,7 +16,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -27,22 +27,22 @@ import java.util.function.Function;
  *
  * <h2>Three moves around one write</h2>
  *
- * <p>The canvas works on labels. A save turns what changed into constants, in an order where every step
- * leaves a bot that compiles:
+ * <p>The canvas works on labels, and a label is its constant's name as words ({@code Labels}): the constant is
+ * all a bot's enum holds. A save turns what changed into constants, in an order where every step leaves a bot
+ * that compiles:
  * <ol>
  *   <li><b>Rename</b> each relabelled constant — the host renames it and every use (a body's
  *       {@code return Outcomes.WON;}, an {@code ActivitySwitch.disable(Activities.BATTLE)}, {@code Sdk.flow()}
- *       itself) — then sets its label. First, so the label the canvas now shows lands on the constant the code
- *       already names, rather than on a fresh one beside it.</li>
+ *       itself). First, so the label the canvas now shows lands on the constant the code already names, rather
+ *       than on a fresh one beside it.</li>
  *   <li><b>Add</b> a constant for every label none holds.</li>
- *   <li>The caller writes the flow; a value equal to a constant is written as that constant.</li>
+ *   <li>The caller writes the flow; each activity and outcome is written as its constant.</li>
  *   <li><b>Remove</b> the constant of each label the flow dropped ({@link #forget}). The host refuses while code
  *       still names it, and the constant stays with the refusal said.</li>
  * </ol>
  *
- * <p>A refused rename stops the save: writing the flow under the new label would leave the code returning a
- * constant whose label no arrow leaves from. A refused add or remove does not — the flow is then written with
- * the value spelled out ({@code Outcome.named("…")}), which compiles and routes the same.
+ * <p>A refused rename or add stops the save: a value no constant holds has nothing to be written as. A refused
+ * remove does not — the constant is only left over.
  */
 public final class FlowConstants {
 
@@ -50,12 +50,12 @@ public final class FlowConstants {
 
     /** One of the two open sets, with what it holds. */
     public enum Kind {
-        ACTIVITIES(new Labelled<>(SdkValues.ACTIVITIES, Activity::named, Activity::label)),
-        OUTCOMES(new Labelled<>(SdkValues.OUTCOMES, Outcome::named, Outcome::label));
+        ACTIVITIES(new Named<>(SdkValues.ACTIVITIES, BotConstants::activity)),
+        OUTCOMES(new Named<>(SdkValues.OUTCOMES, BotConstants::outcome));
 
-        private final Labelled<?> constants;
+        private final Named<?> constants;
 
-        Kind(Labelled<?> constants) {
+        Kind(Named<?> constants) {
             this.constants = constants;
         }
 
@@ -65,42 +65,32 @@ public final class FlowConstants {
         }
     }
 
-    /** An open set whose every constant is a label, typed: what a label is written as, and read back from. */
-    private record Labelled<E>(ManagedSet<E> set, Function<String, E> named, Function<E, String> labelOf) {
+    /** An enum set of the bot's, and the value each of its constants stands for. */
+    private record Named<E>(ManagedSet<E> set, Function<String, E> byName) {
 
-        Labelled(ManagedValue<E> value, Function<String, E> named, Function<E, String> labelOf) {
-            this(ManagedSet.of(value), named, labelOf);
+        Named(ManagedValue<E> value, Function<String, E> byName) {
+            this(ManagedSet.of(value), byName);
         }
 
-        Optional<String> add(PluginValues values, String constant, String label) {
-            return set.add(values, constant, named.apply(label));
-        }
-
-        /** The label a constant's initialiser holds, or empty when it is not one the grammar reads. */
-        Optional<String> label(ValueContext initializer) {
-            return set.read(initializer).map(labelOf);
-        }
-
-        void relabel(ValueContext initializer, String label) {
-            initializer.set(named.apply(label));
+        Optional<String> add(PluginValues values, String constant) {
+            return set.add(values, constant, byName.apply(constant));
         }
     }
 
     /** One change to an open set. */
     sealed interface Op {
-        /** {@code from} becomes {@code to} holding {@code label}; {@code original} is the rename's key. */
-        record Rename(String original, String from, String to, String label) implements Op {}
+        /** {@code from} becomes {@code to}; {@code original} is the rename's key. */
+        record Rename(String original, String from, String to) implements Op {}
 
-        record Add(String constant, String label) implements Op {}
+        record Add(String constant) implements Op {}
     }
 
     /** What to do before the flow is written, or why it cannot be. */
     record Plan(List<Op> ops, String refusal) {}
 
     /**
-     * The renames and adds that bring an open set holding {@code members} (constant → label, null when
-     * unreadable) to one holding every label in {@code wanted}, given the canvas renames {@code renames}
-     * (label at last save → label now).
+     * The renames and adds that bring an open set holding {@code members} (constant → its label) to one holding
+     * every label in {@code wanted}, given the canvas renames {@code renames} (label at last save → label now).
      */
     static Plan plan(Kind kind, Map<String, String> members, Collection<String> wanted,
                      Map<String, String> renames) {
@@ -112,13 +102,8 @@ public final class FlowConstants {
             String label = rename.getValue();
             String to = FlowNames.constantFor(label);
             if (to == null) return refused(label, kind);
-            if (!to.equals(from) && working.containsKey(to)) {
-                if (label.equals(working.get(to))) continue;   // already declared; the old one goes on forget
-                return new Plan(List.of(), kind.holder() + "." + to + " already holds '" + working.get(to)
-                        + "', so " + kind.holder() + "." + from + " can't be renamed to it for '" + label
-                        + "'. Rename or remove that constant in " + kind.holder() + ".java first.");
-            }
-            ops.add(new Op.Rename(rename.getKey(), from, to, label));
+            if (!to.equals(from) && working.containsKey(to)) continue;   // declared already; the old one is forgotten
+            ops.add(new Op.Rename(rename.getKey(), from, to));
             working.remove(from);
             working.put(to, label);
         }
@@ -131,7 +116,7 @@ public final class FlowConstants {
                         + working.get(constant) + "', so '" + label + "' has no constant of its own. Rename one "
                         + "of them.");
             }
-            ops.add(new Op.Add(constant, label));
+            ops.add(new Op.Add(constant));
             working.put(constant, label);
         }
         return new Plan(List.copyOf(ops), null);
@@ -145,11 +130,10 @@ public final class FlowConstants {
      * Renames and adds what {@link #plan} says, against the project's own constants. A rename that lands is
      * taken out of {@code renames}, so a later refusal does not run it twice.
      *
-     * @param notes collects what was not done and did not need to stop the save
      * @return null when the flow may be written, else why it may not
      */
     public static String prepare(PluginValues values, Kind kind, Collection<String> wanted,
-                                 Map<String, String> renames, List<String> notes) {
+                                 Map<String, String> renames) {
         Plan plan = plan(kind, members(values, kind), wanted, renames);
         if (plan.refusal() != null) return plan.refusal();
         for (Op op : plan.ops()) {
@@ -159,10 +143,12 @@ public final class FlowConstants {
                         Optional<String> refused = kind.constants.set().rename(values, rename.from(), rename.to());
                         if (refused.isPresent()) return refused.get();
                     }
-                    relabel(values, kind, rename.to(), rename.label(), notes);
                     renames.remove(rename.original());
                 }
-                case Op.Add add -> kind.constants.add(values, add.constant(), add.label()).ifPresent(notes::add);
+                case Op.Add add -> {
+                    Optional<String> refused = kind.constants.add(values, add.constant());
+                    if (refused.isPresent()) return refused.get();
+                }
             }
         }
         return null;
@@ -175,10 +161,7 @@ public final class FlowConstants {
      * @return empty when it is declared now or already was; else why not
      */
     public static Optional<String> declare(PluginValues values, Kind kind, String label) {
-        List<String> notes = new ArrayList<>();
-        String refused = prepare(values, kind, List.of(label), new LinkedHashMap<>(), notes);
-        if (refused != null) return Optional.of(refused);
-        return notes.isEmpty() ? Optional.empty() : Optional.of(notes.getFirst());
+        return Optional.ofNullable(prepare(values, kind, List.of(label), new LinkedHashMap<>()));
     }
 
     /**
@@ -195,13 +178,38 @@ public final class FlowConstants {
         }
     }
 
-    /** Every constant of {@code kind}'s set, with the label it holds (null when unreadable), in file order. */
+    /**
+     * Why {@code flow} cannot be written over {@code kind}'s enum as it stands — it names a constant the enum does
+     * not declare — or null. Asked after {@link #prepare}, so what is left is a constant the canvas cannot name
+     * back: one written by hand in another case ({@code bagFull}), whose label makes {@code BAG_FULL}. Written
+     * anyway, the value would have no constant to be spelled as.
+     */
+    public static String unheld(PluginValues values, Kind kind, Flow flow) {
+        Set<String> members = members(values, kind).keySet();
+        Set<String> named = new LinkedHashSet<>();
+        for (Flow.Step step : flow.steps()) {
+            if (kind == Kind.ACTIVITIES) named.add(step.activity().name());
+            else step.outcomes().forEach(outcome -> named.add(outcome.name()));
+        }
+        if (kind == Kind.OUTCOMES) {
+            for (Flow.Edge edge : flow.edges()) {
+                Outcome outcome = edge.outcome();
+                if (outcome != Outcome.NEXT && outcome != Outcome.DISABLED) named.add(outcome.name());
+            }
+        }
+        for (String name : named) {
+            if (members.contains(name)) continue;
+            return "The flow names " + kind.holder() + "." + name + ", which " + kind.holder() + ".java does not "
+                    + "declare. The Activity Flow names constants in upper case: rename the one written in another "
+                    + "case to " + name + " in " + kind.holder() + ".java.";
+        }
+        return null;
+    }
+
+    /** Every constant of {@code kind}'s set, with its label — its name as words — in file order. */
     static Map<String, String> members(PluginValues values, Kind kind) {
         Map<String, String> members = new LinkedHashMap<>();
-        Labelled<?> constants = kind.constants;
-        for (String member : constants.set().members(values)) {
-            members.put(member, constants.set().open(values, member).flatMap(constants::label).orElse(null));
-        }
+        for (String member : kind.constants.set().members(values)) members.put(member, Labels.of(member));
         return members;
     }
 
@@ -239,17 +247,6 @@ public final class FlowConstants {
             steps.add(step.reports(outcomes));
         }
         return Flow.of(steps, flow.edges(), flow.presets(), flow.start(), flow.limits());
-    }
-
-    private static void relabel(PluginValues values, Kind kind, String constant, String label, List<String> notes) {
-        Optional<ValueContext> initializer = kind.constants.set().open(values, constant);
-        if (initializer.isEmpty()) {
-            notes.add(kind.holder() + "." + constant + " was renamed, but its label could not be rewritten.");
-            return;
-        }
-        if (!Objects.equals(kind.constants.label(initializer.get()).orElse(null), label)) {
-            kind.constants.relabel(initializer.get(), label);
-        }
     }
 
     /** The constant holding {@code label}, or null. */
