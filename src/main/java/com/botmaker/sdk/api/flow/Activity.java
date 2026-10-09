@@ -5,7 +5,7 @@ package com.botmaker.sdk.api.flow;
  * the file BotMaker keeps beside {@code Sdk.java}:
  *
  * <pre>{@code
- * @Managed("activities")
+ * @SdkValue(SdkValue.Id.ACTIVITIES)
  * public final class Activities {
  *     public static final Activity COLLECT = Activity.named("Collect");
  * }

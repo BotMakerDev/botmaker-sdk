@@ -191,13 +191,13 @@ public final class BotSettingsWindow {
     /** What to paste into an {@code Sdk.java} that predates the method, with a button that copies it. */
     private VBox missing() {
         String snippet = """
-                @Managed("settings")
+                @SdkValue(SdkValue.Id.SETTINGS)
                 public static BotSettings settings() {
                     return BotSettings.DEFAULTS;
                 }""";
         Label says = note("This project's Sdk.java has no settings() method, so the bot runs on the defaults "
                 + "below and there is nothing here to save into. Paste this into the class Sdk (importing "
-                + "com.botmaker.sdk.api.bot.BotSettings and com.botmaker.plugin.api.managed.Managed), then open "
+                + "com.botmaker.sdk.api.bot.BotSettings and com.botmaker.sdk.api.bot.SdkValue), then open "
                 + "this window again:");
         TextArea code = new TextArea(snippet);
         code.setEditable(false);

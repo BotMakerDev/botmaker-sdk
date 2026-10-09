@@ -4,7 +4,6 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
-import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
@@ -257,7 +256,7 @@ public final class ActivityFlowDialog {
      */
     private Flow readFlow() {
         if (value.isEmpty()) {
-            readOnly("This project has no Sdk.java with a @Managed(\"flow\") method, so there is nothing to "
+            readOnly("This project has no Sdk.java with an @SdkValue(FLOW) method, so there is nothing to "
                     + "save the flow into. BotMaker writes plugins/sdk/Sdk.java when the project opens and has "
                     + "no Sdk class anywhere; reopen the project to get it.");
             return Flow.NONE;

@@ -10,11 +10,11 @@ import java.util.List;
  *
  * <p><b>A flow is Java, so a renamed activity method is a compile error</b> rather than a silently empty
  * value three screens into a run. It is written in the file BotMaker gave your project —
- * {@code plugins/sdk/Sdk.java} — and the editor rewrites the one expression the {@code @Managed("flow")}
+ * {@code plugins/sdk/Sdk.java} — and the editor rewrites the one expression the {@code @SdkValue(FLOW)}
  * method returns, leaving everything around it exactly as you wrote it.
  *
  * <pre>{@code
- * @Managed("flow")
+ * @SdkValue(SdkValue.Id.FLOW)
  * public static Flow flow() {
  *     return Flow.of(
  *             List.of(Flow.activity(Activities.COLLECT, Collect::body, "Click collect while there is one.",

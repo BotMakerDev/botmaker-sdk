@@ -147,6 +147,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed — breaking
 
+- **`@SdkValue` marks the SDK's values in a bot, instead of `@Managed("…")`.** `Sdk.java`'s methods are
+  `@SdkValue(SdkValue.Id.FLOW)`, `FLOW_LAYOUT`, `CAPTURE` and `SETTINGS`, and the `Pictures`, `Activities`,
+  `Outcomes`, `Points` and `Regions` classes `@SdkValue(SdkValue.Id.PICTURES)` and so on
+  (`com.botmaker.sdk.api.bot.SdkValue`). A misspelt one is a compile error. The contract dropped `@Managed`, so a
+  bot written for an earlier SDK changes each `@Managed("flow")` to `@SdkValue(SdkValue.Id.FLOW)` and its
+  import to `com.botmaker.sdk.api.bot.SdkValue`.
 - Internal, for plugin code that reached into the session module: the session a bot drives is now held by
   `internal.session.BotSession` (was the session module's `ActiveSession`), sessions come from the session
   module's `Sessions`, and its backend type is `SessionBackend` (was `NestedSession.Backend`). No bot code

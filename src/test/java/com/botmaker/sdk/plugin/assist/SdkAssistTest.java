@@ -9,10 +9,12 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.overlay.Marks;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
@@ -38,6 +40,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
@@ -474,8 +477,14 @@ class SdkAssistTest {
             this.resources = resources;
         }
 
-        Map<String, TestContexts.Recording> set(String id) {
-            return sets.computeIfAbsent(id, k -> new LinkedHashMap<>());
+        /** The set under its short name, {@code "pictures"}. */
+        Map<String, TestContexts.Recording> set(String name) {
+            return sets.computeIfAbsent(name, k -> new LinkedHashMap<>());
+        }
+
+        /** An id's short name, the key every map here and every recorded call uses: {@code …$Id.PICTURES} is {@code "pictures"}. */
+        private static String name(String id) {
+            return id.substring(id.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
         }
 
         @Override public Path projectDir() { return resources.getParent(); }
@@ -507,28 +516,33 @@ class SdkAssistTest {
             };
         }
 
-        @Override public List<String> ids() { return List.copyOf(values.keySet()); }
-        @Override public Optional<ValueContext> open(String id) { return Optional.ofNullable(values.get(id)); }
+        @Override
+        public List<String> ids() {
+            return values.keySet().stream()
+                    .map(name -> ManagedValue.idOf(SdkValue.Id.valueOf(name.toUpperCase(Locale.ROOT)))).toList();
+        }
+
+        @Override public Optional<ValueContext> open(String id) { return Optional.ofNullable(values.get(name(id))); }
 
         @Override
         public Optional<String> create(String id) {
-            calls.add("create " + id);
-            set(id);
+            calls.add("create " + name(id));
+            set(name(id));
             return Optional.empty();
         }
 
-        @Override public List<String> members(String id) { return List.copyOf(set(id).keySet()); }
+        @Override public List<String> members(String id) { return List.copyOf(set(name(id)).keySet()); }
 
         @Override
         public Optional<ValueContext> open(String id, String member) {
-            return Optional.ofNullable(set(id).get(member));
+            return Optional.ofNullable(set(name(id)).get(member));
         }
 
         @Override
         public Optional<String> add(String id, String member, Object value) {
-            if (set(id).containsKey(member)) return Optional.of(member + " is taken.");
-            calls.add("add " + id + " " + member);
-            set(id).put(member, TestContexts.row(Object.class, "").withValue(value));
+            if (set(name(id)).containsKey(member)) return Optional.of(member + " is taken.");
+            calls.add("add " + name(id) + " " + member);
+            set(name(id)).put(member, TestContexts.row(Object.class, "").withValue(value));
             return Optional.empty();
         }
 
@@ -536,14 +550,14 @@ class SdkAssistTest {
 
         @Override
         public Optional<String> rename(String id, String member, String newName) {
-            calls.add("rename " + id + " " + member + " " + newName);
-            set(id).put(newName, set(id).remove(member));
+            calls.add("rename " + name(id) + " " + member + " " + newName);
+            set(name(id)).put(newName, set(name(id)).remove(member));
             return Optional.empty();
         }
 
         @Override
         public Optional<String> repoint(String id, String member, String replacement, String note) {
-            calls.add("repoint " + id + " " + member + " " + replacement);
+            calls.add("repoint " + name(id) + " " + member + " " + replacement);
             uses.put(replacement, uses.remove(member));
             return Optional.empty();
         }
@@ -551,8 +565,8 @@ class SdkAssistTest {
         @Override
         public Optional<String> remove(String id, String member) {
             if (!uses(id, member).isEmpty()) return Optional.of(member + " is still used.");
-            calls.add("remove " + id + " " + member);
-            set(id).remove(member);
+            calls.add("remove " + name(id) + " " + member);
+            set(name(id)).remove(member);
             return Optional.empty();
         }
     }

@@ -1,7 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.Runs;
-import com.botmaker.plugin.api.managed.Managed;
 import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
@@ -22,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link BotSettings} is the bot's {@code @Managed("settings")} value (2026-09-27): what it declares is in force
+ * {@link BotSettings} is the bot's {@code @SdkValue(SETTINGS)} value (2026-09-27): what it declares is in force
  * once {@code Bot.run} installs it, and — the part that fails <em>silently</em> — real input has escalated the
  * input backend by then, before the first click.
  */
@@ -41,7 +40,7 @@ class BotSettingsTest {
 
     /** What a bot's {@code Sdk.java} declares. */
     public static final class Values {
-        @Managed("settings")
+        @SdkValue(SdkValue.Id.SETTINGS)
         public static BotSettings settings() {
             return BotSettings.of(BotSettings.clicks(750, 125, false), BotSettings.vision(0.62, 0.11),
                     BotSettings.runIn(BotSettings.Where.MY_DESKTOP, false, BotSettings.DisplayBackend.XEPHYR,

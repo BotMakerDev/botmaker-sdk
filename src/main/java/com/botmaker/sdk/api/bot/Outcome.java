@@ -9,7 +9,7 @@ package com.botmaker.sdk.api.bot;
  * keeps beside {@code Sdk.java}:
  *
  * <pre>{@code
- * @Managed("outcomes")
+ * @SdkValue(SdkValue.Id.OUTCOMES)
  * public final class Outcomes {
  *     public static final Outcome BAG_FULL = Outcome.named("Bag full");
  * }

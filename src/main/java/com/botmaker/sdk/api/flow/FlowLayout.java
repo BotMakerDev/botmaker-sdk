@@ -8,10 +8,10 @@ import java.util.Map;
  * Where each card sits on the Activity Flow canvas, as a value (2026-09-27).
  *
  * <p>It is written in {@code plugins/sdk/Sdk.java} beside the flow, and the flow editor rewrites the one
- * expression the {@code @Managed("flow.layout")} method returns:
+ * expression the {@code @SdkValue(FLOW_LAYOUT)} method returns:
  *
  * <pre>{@code
- * @Managed("flow.layout")
+ * @SdkValue(SdkValue.Id.FLOW_LAYOUT)
  * public static FlowLayout flowLayout() {
  *     return FlowLayout.of(Map.ofEntries(
  *             Map.entry("Collect", FlowLayout.at(40, 120)),

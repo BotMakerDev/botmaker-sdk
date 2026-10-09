@@ -15,7 +15,7 @@ import java.util.Optional;
  * value, written in the bot's own Java:
  *
  * <pre>{@code
- * @Managed("settings")
+ * @SdkValue(SdkValue.Id.SETTINGS)
  * public static BotSettings settings() {
  *     return BotSettings.of(
  *             BotSettings.clicks(500, 200, true),

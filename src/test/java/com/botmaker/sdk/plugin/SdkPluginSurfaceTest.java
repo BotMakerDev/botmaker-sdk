@@ -1,12 +1,14 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.slot.SlotEditor;
+import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
+import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -108,37 +110,43 @@ class SdkPluginSurfaceTest {
      */
     @Test
     void each_managed_value_says_where_the_host_creates_it() {
-        var byId = new java.util.HashMap<String, com.botmaker.plugin.api.source.ManagedValue<?>>();
-        plugin.managedValues().forEach(v -> byId.put(v.id(), v));
-        var flow = byId.get("flow");
+        var byId = new java.util.HashMap<SdkValue.Id, com.botmaker.plugin.api.source.ManagedValue<?>>();
+        for (SdkValue.Id id : SdkValue.Id.values()) {
+            plugin.managedValues().stream().filter(v -> v.id().equals(ManagedValue.idOf(id))).findFirst()
+                    .ifPresent(v -> byId.put(id, v));
+        }
+        var flow = byId.get(SdkValue.Id.FLOW);
+        assertEquals(SdkValue.class.getName(), flow.marker());
         assertEquals("Sdk", flow.holder());
         assertEquals(com.botmaker.sdk.api.flow.Flow.class, flow.type());
         assertEquals(com.botmaker.sdk.api.flow.Flow.NONE, flow.initial());
-        var layout = byId.get("flow.layout");
+        var layout = byId.get(SdkValue.Id.FLOW_LAYOUT);
         assertEquals("Sdk", layout.holder());
         assertEquals(com.botmaker.sdk.api.flow.FlowLayout.class, layout.type());
         assertEquals(com.botmaker.sdk.api.flow.FlowLayout.NONE, layout.initial());
-        var capture = byId.get("capture");
+        var capture = byId.get(SdkValue.Id.CAPTURE);
         assertEquals("Sdk", capture.holder());
         assertEquals(CaptureSource.class, capture.type());
         assertEquals(CaptureSource.desktop().getClass(), capture.initial().getClass());
-        var settings = byId.get("settings");
+        var settings = byId.get(SdkValue.Id.SETTINGS);
         assertEquals(com.botmaker.sdk.api.bot.BotSettings.class, settings.type());
-        var pictures = byId.get("pictures");
+        var pictures = byId.get(SdkValue.Id.PICTURES);
         assertEquals("Pictures", pictures.holder());
         assertTrue(pictures.isOpenSet());
         assertEquals(com.botmaker.sdk.api.vision.ImageTemplate.class, pictures.type());
         assertNull(pictures.initial());
-        assertEquals("Activities", byId.get("activities").holder());
-        assertEquals(com.botmaker.sdk.api.flow.Activity.class, byId.get("activities").type());
-        assertEquals("Outcomes", byId.get("outcomes").holder());
-        assertEquals(com.botmaker.sdk.api.bot.Outcome.class, byId.get("outcomes").type());
-        assertEquals("Points", byId.get("points").holder());
-        assertTrue(byId.get("points").isOpenSet());
-        assertEquals(com.botmaker.sdk.api.geometry.Point.class, byId.get("points").type());
-        assertEquals("Regions", byId.get("regions").holder());
-        assertEquals(com.botmaker.sdk.api.geometry.Rect.class, byId.get("regions").type());
-        assertEquals(9, byId.size());
+        assertEquals("Activities", byId.get(SdkValue.Id.ACTIVITIES).holder());
+        assertEquals(com.botmaker.sdk.api.flow.Activity.class, byId.get(SdkValue.Id.ACTIVITIES).type());
+        assertEquals("Outcomes", byId.get(SdkValue.Id.OUTCOMES).holder());
+        assertEquals(com.botmaker.sdk.api.bot.Outcome.class, byId.get(SdkValue.Id.OUTCOMES).type());
+        assertEquals("Points", byId.get(SdkValue.Id.POINTS).holder());
+        assertTrue(byId.get(SdkValue.Id.POINTS).isOpenSet());
+        assertEquals(com.botmaker.sdk.api.geometry.Point.class, byId.get(SdkValue.Id.POINTS).type());
+        assertEquals("Regions", byId.get(SdkValue.Id.REGIONS).holder());
+        assertEquals(com.botmaker.sdk.api.geometry.Rect.class, byId.get(SdkValue.Id.REGIONS).type());
+        // One declaration per constant, and nothing else.
+        assertEquals(SdkValue.Id.values().length, byId.size());
+        assertEquals(SdkValue.Id.values().length, plugin.managedValues().size());
     }
 
     /** The palette is the host's to discover from {@code @Palette}; {@link ApiCatalogTest} checks what it finds. */
