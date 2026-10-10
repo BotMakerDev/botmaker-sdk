@@ -19,7 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
-No source changes since v1.4.1; re-released for updated upstream pins.
+No source changes since v1.4.1; re-released for updated upstream pins. The JitPack build now survives the
+builders that refuse the `statx` syscall, which lost v1.4.0.
 
 No source changes since v1.4.0, which never built on JitPack: it landed on a broken builder, and a tag that
 built `Error` stays broken. This is v1.4.0 as it was meant to resolve; read v1.4.0's notes below.
