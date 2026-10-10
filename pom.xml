@@ -43,7 +43,7 @@
              Same contract as the four above and the same
              flatten reason — it is an ordinary <dependencies> entry, so the published pom must carry a
              resolvable version, and cutting plugin-basics therefore forces an SDK release. -->
-        <botmaker.pluginbasics.version>0.2.1-SNAPSHOT</botmaker.pluginbasics.version>
+        <botmaker.pluginbasics.version>0.3.1-SNAPSHOT</botmaker.pluginbasics.version>
         <!-- JavaFX, for the slot editors only. Held in one place because the two artifacts must move
              together — javafx-controls is compiled against one exact javafx-graphics. -->
         <javafx.version>25.0.4</javafx.version>
