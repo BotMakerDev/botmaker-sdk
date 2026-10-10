@@ -30,7 +30,7 @@
         <botmaker.session.version>0.1.3-SNAPSHOT</botmaker.session.version>
         <!-- botmaker-studio-api version: the Studio plugin contract. Same contract again.
              This one moves far more slowly than the other two on purpose — see the dependency below. -->
-        <botmaker.studioapi.version>0.5.1-SNAPSHOT</botmaker.studioapi.version>
+        <botmaker.studioapi.version>0.6.1-SNAPSHOT</botmaker.studioapi.version>
         <!-- botmaker-plugin-toolkit version: the widgets this module's slot editors are built from. Same
              contract as the three above, and the same flatten reason — it IS in
              <dependencies>, so the published pom must carry a resolvable version.
