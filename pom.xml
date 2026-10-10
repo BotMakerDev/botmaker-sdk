@@ -25,7 +25,7 @@
              effective one, and without flatten the published pom said botmaker-shared:${botmaker.shared.version}
              with the property at 0.0.0-SNAPSHOT, so every released SDK failed to resolve on any machine that
              had never built this repo locally. -->
-        <botmaker.shared.version>0.2.3-SNAPSHOT</botmaker.shared.version>
+        <botmaker.shared.version>0.2.4-SNAPSHOT</botmaker.shared.version>
         <!-- botmaker-session version. Same contract as botmaker.shared.version above. -->
         <botmaker.session.version>0.2.2-SNAPSHOT</botmaker.session.version>
         <!-- botmaker-studio-api version: the Studio plugin contract. Same contract again.
