@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Build
+
+- JitPack builds with a Temurin 25 and a Maven 3.9.9 the build downloads itself, not the builder's: some
+  builders fail their JDK download or ship a Maven that cannot start.
+
 ### Added
 
 - **Set up a Linux game VM.** *Set up a game VM…* starts with *1. System*:
