@@ -33,4 +33,47 @@ public final class Labels {
         String words = out.toString().strip();
         return words.isEmpty() ? "" : words.substring(0, 1).toUpperCase(Locale.ROOT) + words.substring(1);
     }
+
+    /**
+     * An activity's enum as the canvas labels it: {@code DailyReward} as "Daily reward" — or, when those words
+     * would name another enum ({@link #typeOf} of "Xpfarm" is not {@code XPFarm}), the name itself. So a card's
+     * label always names its enum back, and an enum named in capitals keeps its name through a save.
+     */
+    public static String ofType(String type) {
+        if (type == null) return "";
+        String words = of(type);
+        return type.equals(typeOf(words)) ? words : type;
+    }
+
+    /**
+     * The enum a typed activity label names — {@code "Daily reward"} to {@code DailyReward}, {@code "DailyReward"}
+     * to itself — or null when it can be none (no letter, or a digit first).
+     *
+     * <p>A label that is already a Java name starting with a capital ({@code "XPFarm"}, {@code "COLLECT"},
+     * {@code "Daily_Reward"}) is that name, so {@code typeOf(ofType(name))} is {@code name} for every such enum.
+     * Otherwise each run of letters and digits is a word, its first letter upper-cased; a word typed all in
+     * capitals ({@code "BAG full"}) is lower-cased after its first letter, and any other keeps its case.
+     */
+    public static String typeOf(String label) {
+        if (label == null) return null;
+        String stripped = label.strip();
+        if (isTypeName(stripped)) return stripped;
+        StringBuilder out = new StringBuilder();
+        for (String word : label.strip().split("[^\\p{L}\\p{N}]+")) {
+            if (word.isEmpty()) continue;
+            String rest = word.substring(1);
+            if (rest.equals(rest.toUpperCase(Locale.ROOT))) rest = rest.toLowerCase(Locale.ROOT);
+            out.append(Character.toUpperCase(word.charAt(0))).append(rest);
+        }
+        if (out.isEmpty() || !Character.isJavaIdentifierStart(out.charAt(0))) return null;
+        return out.toString();
+    }
+
+    private static boolean isTypeName(String s) {
+        if (s.isEmpty() || !Character.isUpperCase(s.charAt(0))) return false;
+        for (int i = 1; i < s.length(); i++) {
+            if (!Character.isJavaIdentifierPart(s.charAt(i)) || s.charAt(i) == '$') return false;
+        }
+        return true;
+    }
 }

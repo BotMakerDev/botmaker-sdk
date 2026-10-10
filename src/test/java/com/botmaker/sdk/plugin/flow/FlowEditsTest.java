@@ -38,7 +38,8 @@ class FlowEditsTest {
         assertEquals(new Activity("DailyReward"), added.flow().steps().getFirst().activity());
         assertEquals(Set.of("Daily reward"), FlowEdits.labels(added.flow()));
         assertEquals("DailyReward", FlowNames.typeFor("DailyReward"));
-        assertEquals("Bag", FlowNames.typeFor("BAG"));
+        assertEquals("BAG", FlowNames.typeFor("BAG"), "a type name typed is that name");
+        assertEquals("BagFull", FlowNames.typeFor("BAG full"));
     }
 
     @Test
@@ -94,9 +95,9 @@ class FlowEditsTest {
                 "Collect");
         Board cut = FlowEdits.disconnect(wired, "collect", "Bag Full");
         assertEquals(1, cut.flow().edges().size());
-        assertEquals(FlowNames.outcome("Collect", ""), cut.flow().edges().getFirst().on());
+        assertEquals(FlowNames.outcome("Collect", Arrow.NEXT), cut.flow().edges().getFirst().on());
         assertEquals(List.of(Arrow.NEXT, "Bag full"), cut.exitsOf("Collect"), "a body may still return it");
-        assertTrue(FlowEdits.disconnect(cut, "Collect", null).flow().edges().isEmpty(), "blank is NEXT");
+        assertTrue(FlowEdits.disconnect(cut, "Collect", null).flow().edges().isEmpty(), "blank is its first outcome");
         assertThrows(IllegalArgumentException.class, () -> FlowEdits.disconnect(cut, "Battle", ""));
         assertThrows(IllegalArgumentException.class, () -> FlowEdits.disconnect(cut, "Rest", ""));
         assertThrows(IllegalArgumentException.class, () -> FlowEdits.disconnect(cut, "Collect", "1st"),

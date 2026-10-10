@@ -65,6 +65,19 @@ public final class FlowConstants {
     }
 
     /**
+     * The enum the bot's method {@code reference} ({@code Collect::body}) returns, by its name, or empty when it
+     * returns none of them — asked of the host, which reads the method's return type, so a body the flow does not
+     * link yet is still its activity's.
+     */
+    public static Optional<String> returnedBy(PluginValues values, String reference) {
+        if (values == null || reference == null || reference.isBlank()) return Optional.empty();
+        for (String group : values.groups(id())) {
+            if (values.methods(id(), group).contains(reference)) return Optional.of(group);
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Renames and adds what bringing the project's enums to {@code board} takes, given the canvas renames —
      * {@code activityRenames} (label at last save → label now) and {@code outcomeRenames} (activity's label now →
      * outcome label at last save → label now). A rename that lands is taken out of its map, so a later refusal
@@ -95,7 +108,9 @@ public final class FlowConstants {
                 if (constant == null) return refused(label, FlowNames.ACTIVITIES + "." + type);
                 if (!wanted.contains(constant)) wanted.add(constant);
             }
-            if (wanted.isEmpty()) wanted.add(FlowNames.constantFor(Arrow.NEXT));
+            if (wanted.isEmpty()) {
+                return activity.getKey() + " needs an outcome: an enum with no constant has nothing to return.";
+            }
             List<String> held = declared.get(type);
             if (held == null) {
                 Optional<String> refused = values.addGroup(id(), type, wanted);
@@ -154,7 +169,7 @@ public final class FlowConstants {
             String type = FlowNames.typeFor(activity.getKey());
             if (type == null) continue;
             drawn.add(type);
-            // An enum keeps a constant, for a body to return: prepare seeded one into an empty list.
+            // An enum keeps a constant, for a body to return: prepare refuses an empty list.
             if (activity.getValue().isEmpty()) continue;
             Set<String> wanted = new LinkedHashSet<>();
             for (String label : activity.getValue()) wanted.add(FlowNames.constantFor(label));

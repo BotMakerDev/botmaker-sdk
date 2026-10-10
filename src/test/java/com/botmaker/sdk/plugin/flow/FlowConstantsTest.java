@@ -106,6 +106,21 @@ class FlowConstantsTest {
             enums.get(parts[0]).remove(parts[1]);
             return Optional.empty();
         }
+
+        /** Each enum's methods: {@code Collect::body} returns {@code Collect}, whether a flow links it or not. */
+        @Override
+        public List<String> methods(String id, String group) {
+            return group == null ? List.of("Gamebot::goHome") : List.of(group + "::body");
+        }
+    }
+
+    /** The activity a body belongs to is the enum it returns, which the host reads off its declaration. */
+    @Test
+    void a_method_belongs_to_the_enum_it_returns() {
+        Project project = new Project(Set.of(), "Collect NEXT", "Battle NEXT");
+        assertEquals(Optional.of("Battle"), FlowConstants.returnedBy(project, "Battle::body"));
+        assertEquals(Optional.empty(), FlowConstants.returnedBy(project, "Gamebot::goHome"));
+        assertEquals(Optional.empty(), FlowConstants.returnedBy(project, null));
     }
 
     private static Board board(Map<String, List<String>> exits) {

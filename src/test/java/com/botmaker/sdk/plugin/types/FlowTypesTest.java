@@ -121,7 +121,9 @@ class FlowTypesTest {
     void namesAreWrittenByName() throws ReflectiveOperationException {
         assertEquals(COLLECT, SdkTypes.ACTIVITY.build(SdkTypes.ACTIVITY.components(COLLECT)));
         assertEquals(NOTHING_LEFT, SdkTypes.OUTCOME.build(SdkTypes.OUTCOME.components(NOTHING_LEFT)));
-        assertEquals(List.of(), SdkTypes.OUTCOME.constants(), "no outcome is the SDK's own");
+        assertEquals(List.of(Outcome.class.getField("NONE")), SdkTypes.OUTCOME.constants(),
+                "the SDK's one outcome is none, what a fresh one is written as");
+        assertEquals(Outcome.NONE, SdkTypes.OUTCOME.fresh());
         assertEquals(List.of(Activity.class.getField("NONE")), SdkTypes.ACTIVITY.constants());
     }
 

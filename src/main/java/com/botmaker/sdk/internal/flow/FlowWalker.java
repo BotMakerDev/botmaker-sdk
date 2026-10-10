@@ -125,7 +125,7 @@ public final class FlowWalker {
         // After the active() check: there is nothing to go home for if the activity won't run.
         if (step.goHome() && goHome != null) goHome.run();
         Outcome outcome = execute(step, body);
-        if (outcome == null) {
+        if (outcome == null || Outcome.NONE.equals(outcome)) {
             Debug.error("[Activity] " + step.label() + " reported nothing, so the run ends here.");
             return null;
         }

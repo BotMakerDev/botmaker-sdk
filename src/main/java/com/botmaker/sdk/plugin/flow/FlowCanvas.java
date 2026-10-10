@@ -423,7 +423,7 @@ public final class FlowCanvas extends StackPane {
             ActivityDraft draft = cards.get(name).draft();
             for (String outcome : draft.allOutcomes()) {
                 boolean wired = edges.stream()
-                        .anyMatch(e -> e.from().equals(name) && e.outcomeOrNext().equals(outcome));
+                        .anyMatch(e -> e.from().equals(name) && e.outcome().equals(outcome));
                 if (!wired) unwired.add(name + "." + outcome);
             }
         }
@@ -901,7 +901,7 @@ public final class FlowCanvas extends StackPane {
             edges.clear();
             edges.addAll(next);
             onMessage.accept(old.isPresent() ? "Arrow moved: " + from.name() + " — "
-                    + old.get().outcomeOrNext() + " → " + to + ". ↶ puts it back." : "");
+                    + old.get().outcome() + " → " + to + ". ↶ puts it back." : "");
             refresh();
         });
     }
@@ -918,7 +918,7 @@ public final class FlowCanvas extends StackPane {
     }
 
     private Node buildArrow(Arrow edge, NodeCard from, NodeCard to) {
-        Point2D start = from.outPortCenter(edge.outcomeOrNext());
+        Point2D start = from.outPortCenter(edge.outcome());
         Point2D end = to.inPortCenter();
         CubicCurve curve = styledCurve();
         curve.setStartX(start.getX());
@@ -957,7 +957,7 @@ public final class FlowCanvas extends StackPane {
 
         Group wire = new Group(hit, curve, head);
         wire.getStyleClass().add("flow-wire-group");
-        Tooltip.install(wire, new Tooltip(edge.from() + " — " + edge.outcomeOrNext() + " → " + edge.to()
+        Tooltip.install(wire, new Tooltip(edge.from() + " — " + edge.outcome() + " → " + edge.to()
                 + "  (click to remove it)"));
         // One click, gone. This was a two-step select-then-Delete for a while, because a click used to remove
         // the wire outright and brushing one while reaching for a card silently unwired the flow with nothing
@@ -979,7 +979,7 @@ public final class FlowCanvas extends StackPane {
     private void removeEdge(Arrow edge) {
         history.mutate("remove the wire from " + edge.from(), () -> {
             edges.remove(edge);
-            onMessage.accept("Arrow removed: " + edge.from() + " — " + edge.outcomeOrNext() + " → " + edge.to()
+            onMessage.accept("Arrow removed: " + edge.from() + " — " + edge.outcome() + " → " + edge.to()
                     + ". ↶ puts it back.");
             refresh();
         });
@@ -1209,7 +1209,7 @@ public final class FlowCanvas extends StackPane {
                 }
                 installPortHandlers(circle, outcome);
                 outPorts.put(outcome, circle);
-                Label label = new Label(FlowNames.outcomeLabel(outcome));
+                Label label = new Label(outcome);
                 label.getStyleClass().add("flow-port-label");
                 HBox row = new HBox(3, label, circle);
                 row.setAlignment(Pos.CENTER_RIGHT);
@@ -1222,7 +1222,7 @@ public final class FlowCanvas extends StackPane {
             // flowPorts(), not allOutcomes(): DISABLED is a port with no declared outcome behind it, so
             // pruning against the enum list would delete every DISABLED wire the moment it was drawn.
             Set<String> live = new LinkedHashSet<>(draft.flowPorts());
-            edges.removeIf(e -> e.from().equals(draft.name()) && !live.contains(e.outcomeOrNext()));
+            edges.removeIf(e -> e.from().equals(draft.name()) && !live.contains(e.outcome()));
         }
 
         Point2D inPortCenter() {
@@ -1297,9 +1297,6 @@ public final class FlowCanvas extends StackPane {
 
         /** What one output port promises, in the user's terms rather than the enum's. */
         private String portTooltip(String outcome) {
-            if (Arrow.NEXT.equals(outcome)) {
-                return "Drag to the activity that runs next when there's nothing special to report";
-            }
             if (Arrow.DISABLED.equals(outcome)) {
                 return "Drag to the activity that runs next when " + draft.name() + " is switched off. "
                         + "Leave it unwired and the run stops there.";

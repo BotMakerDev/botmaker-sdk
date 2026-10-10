@@ -32,8 +32,8 @@ public final class ActivityDraft {
     private final BooleanProperty enabled = new SimpleBooleanProperty();
 
     /**
-     * The named outcomes this activity can report, excluding the implicit
-     * {@link Arrow#NEXT}. Observable because the card grows one output port per outcome —
+     * The outcomes this activity can report — its enum's constants, as labels, {@link Arrow#NEXT} among them
+     * only while the enum holds it. Observable because the card grows one output port per outcome —
      * adding one in the side panel has to put a port on the card immediately, or there is nothing to drag a
      * wire from.
      */
@@ -83,13 +83,11 @@ public final class ActivityDraft {
 
     /**
      * A draft of an activity of the stored flow, placed at {@code (x, y)} — carrying its body reference.
-     * {@code exits} are its enum's outcomes ({@link Board#exitsOf}); {@link Arrow#NEXT} is the card's plain port,
-     * not one of {@link #outcomes()}.
+     * {@code exits} are its enum's outcomes ({@link Board#exitsOf}).
      */
     public static ActivityDraft of(Flow.Step step, List<String> exits, double x, double y) {
-        return new ActivityDraft(step.label(), step.description(), step.enabled(),
-                exits.stream().filter(label -> !Arrow.NEXT.equals(label)).toList(), step.goHome(), step.popupCheck(),
-                x, y, FlowTypes.sourceOf(step.body()));
+        return new ActivityDraft(step.label(), step.description(), step.enabled(), exits, step.goHome(),
+                step.popupCheck(), x, y, FlowTypes.sourceOf(step.body()));
     }
 
     /**
@@ -105,12 +103,9 @@ public final class ActivityDraft {
                 goHome.get(), popupCheck.get(), whenOff);
     }
 
-    /**
-     * Every outcome this activity can report: the implicit default first, then the declared ones.
-     */
+    /** Every outcome this activity can report, in its enum's order, each once. */
     public List<String> allOutcomes() {
-        List<String> all = new ArrayList<>(outcomes.size() + 1);
-        all.add(Arrow.NEXT);
+        List<String> all = new ArrayList<>(outcomes.size());
         for (String o : outcomes) {
             if (Arrow.DISABLED.equals(o)) continue; // a port, never an Outcome constant
             if (!all.contains(o)) all.add(o);

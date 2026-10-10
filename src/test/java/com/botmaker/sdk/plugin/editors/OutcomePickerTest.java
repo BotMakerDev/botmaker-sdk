@@ -1,9 +1,8 @@
 package com.botmaker.sdk.plugin.editors;
 
-import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.plugin.flow.FlowNames;
-import com.botmaker.sdk.plugin.types.FlowTypes;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -13,9 +12,9 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * The outcome picker lists the constants of the activity whose body the slot sits in — the flow links
- * {@code Collect::body} to "Collect", and the host reports the slot's method as the same text — and every
- * activity's, each with its activity, when no activity's body is that method.
+ * The outcome picker lists the constants of the activity whose body the slot sits in — the enum the slot's
+ * method returns, which the host answers ({@code FlowConstants.returnedBy}) — and every activity's, each with its
+ * activity, when the method returns none of them.
  */
 class OutcomePickerTest {
 
@@ -45,11 +44,12 @@ class OutcomePickerTest {
         assertEquals(BotConstants.outcome("Battle", "NEXT"), ActivityEditors.outcomeOf(null, "Battle: Next"));
     }
 
+    /** Every enum is offered, drawn or not, each by a label that names it back — {@code XPFarm} as itself. */
     @Test
-    void theActivityPickerOffersTheFlowsActivities() {
-        Flow flow = new Flow(List.of(FlowTypes.step(FlowNames.activity("Collect"), FlowTypes.body("Collect::body")),
-                FlowTypes.step(FlowNames.activity("Battle"), FlowTypes.body(""))), List.of(), List.of(), null,
-                Flow.limits(0, 0), null);
-        assertEquals(List.of("Collect", "Battle"), ActivityEditors.activityLabels(flow));
+    void theActivityPickerOffersTheDeclaredActivities() {
+        assertEquals(List.of("Collect", "Daily reward", "XPFarm"),
+                ActivityEditors.activityLabels(List.of("Collect", "DailyReward", "XPFarm")));
+        assertEquals("XPFarm", FlowNames.typeFor("XPFarm"));
+        assertEquals(new Activity("XPFarm"), FlowNames.activity(new Activity("XPFarm").label()));
     }
 }

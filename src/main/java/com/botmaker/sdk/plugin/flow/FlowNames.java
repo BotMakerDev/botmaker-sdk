@@ -84,28 +84,20 @@ public final class FlowNames {
      * The enum an activity label is written as — {@code "Daily reward"} to {@code DailyReward},
      * {@code "DailyReward"} to itself — or null when it can be none (no letter, or a digit first).
      *
-     * <p>Each run of letters and digits is a word, its first letter upper-cased; a word typed all in capitals
-     * ({@code "BAG"}) is lower-cased after its first letter, and any other keeps its case, so a type name typed
-     * as one is its own. {@code Labels.of} goes the other way.
+     * <p>{@link Labels#typeOf}; {@link Labels#ofType} goes the other way, and the two agree on every enum name.
      */
     public static String typeFor(String label) {
-        if (label == null) return null;
-        StringBuilder out = new StringBuilder();
-        for (String word : label.strip().split("[^\\p{L}\\p{N}]+")) {
-            if (word.isEmpty()) continue;
-            String rest = word.substring(1);
-            if (rest.equals(rest.toUpperCase(java.util.Locale.ROOT))) rest = rest.toLowerCase(java.util.Locale.ROOT);
-            out.append(Character.toUpperCase(word.charAt(0))).append(rest);
-        }
-        if (out.isEmpty() || !Character.isJavaIdentifierStart(out.charAt(0))) return null;
-        return out.toString();
+        return Labels.typeOf(label);
     }
 
-    /** An activity's label as it is kept: the words of the enum it makes, "daily-reward" as "Daily reward". */
+    /**
+     * An activity's label as it is kept: the label of the enum it makes, "daily-reward" as "Daily reward" and
+     * "XPFarm" as itself ({@link Labels#ofType}).
+     */
     public static String activityLabel(String typed) {
         if (typed == null) return "";
         String type = typeFor(typed);
-        return type == null ? typed.strip().replaceAll("\\s+", " ") : Labels.of(type);
+        return type == null ? typed.strip().replaceAll("\\s+", " ") : Labels.ofType(type);
     }
 
     /**
@@ -118,11 +110,10 @@ public final class FlowNames {
 
     /**
      * The outcome {@code label} of the activity labelled {@code activity}: its enum's constant {@link #constantFor}
-     * makes of the label, held by the two names. Blank is {@link Arrow#NEXT}.
+     * makes of the label, held by the two names.
      */
     public static Outcome outcome(String activity, String label) {
-        String constant = constantFor(label == null || label.isBlank() ? Arrow.NEXT : label);
-        return BotConstants.outcome(typeFor(activity), constant);
+        return BotConstants.outcome(typeFor(activity), constantFor(label));
     }
 
     /**
@@ -148,14 +139,6 @@ public final class FlowNames {
     }
 
     /**
-     * How an outcome is written for the user — a port chip, a tooltip, a dialog row: its label, and
-     * {@link Arrow#NEXT} for the implicit one.
-     */
-    public static String outcomeLabel(String outcome) {
-        return outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome;
-    }
-
-    /**
      * Why {@code candidate} can't be an outcome of the activity called {@code owner}, or null when it can.
      *
      * <p>{@code own} is that activity's outcomes: an outcome is a constant of its activity's enum, so another
@@ -167,9 +150,6 @@ public final class FlowNames {
         String constant = constantFor(candidate);
         String holder = ACTIVITIES + "." + (typeFor(owner) == null ? owner : typeFor(owner));
         if (constant == null) return noConstant(candidate, holder);
-        if (constantFor(Arrow.NEXT).equals(constant) && replacing == null) {
-            return "Every activity already has a " + constant + " outcome — it is always there.";
-        }
         if (Arrow.DISABLED.equals(constant)) {
             return "DISABLED is the port for this activity being switched off — it is always there, "
                     + "and an activity can't report it because it didn't run.";
@@ -231,8 +211,9 @@ public final class FlowNames {
 
     /** The outcomes section's explanation. */
     public static final String OUTCOMES_HINT = "What this activity can report: the constants of its enum in "
-            + "Activities.java. Its body returns one of them, and each gets an arrow on the canvas. Every "
-            + "activity starts with NEXT, and any outcome you leave without an arrow ends the run.";
+            + "Activities.java. Its body returns one of them, and each gets an arrow on the canvas. A new "
+            + "activity starts with NEXT, an outcome like any other; it keeps one at least, and any outcome you "
+            + "leave without an arrow ends the run.";
 
     /** The go-home tick's tooltip. */
     public static final String GO_HOME_TIP = "Run the flow's home method (Flow.home(…)) immediately before "

@@ -34,13 +34,13 @@ public final class FlowRules {
     private FlowRules() {}
 
     /**
-     * The wire {@code from}'s {@code outcome} port already has, if any. A blank outcome and {@code NEXT} are the
-     * same port.
+     * The wire {@code from}'s {@code outcome} port already has, if any. Two spellings of one constant are the same
+     * port.
      */
     public static Optional<Arrow> held(List<Arrow> edges, String from, String outcome) {
-        String label = outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome;
+        String label = Arrow.DISABLED.equals(outcome) ? outcome : FlowNames.label(outcome);
         for (Arrow e : edges) {
-            if (e.from().equals(from) && e.outcomeOrNext().equals(label)) return Optional.of(e);
+            if (e.from().equals(from) && e.outcome().equals(label)) return Optional.of(e);
         }
         return Optional.empty();
     }

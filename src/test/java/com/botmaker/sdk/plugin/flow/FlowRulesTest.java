@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class FlowRulesTest {
 
     private static Arrow wire(String from, String to) {
-        return new Arrow(from, to, "");
+        return new Arrow(from, to, Arrow.NEXT);
     }
 
     private static Arrow wire(String from, String to, String outcome) {
@@ -28,8 +28,8 @@ public class FlowRulesTest {
 
     @Test
     void aFreshWireBetweenUnconnectedActivitiesIsAdded() {
-        assertEquals(List.of(wire("A", "B")), FlowRules.rewired(List.of(), "A", "", "B"));
-        assertEquals(List.of(wire("A", "B"), wire("B", "C")), FlowRules.rewired(A_TO_B, "B", "", "C"));
+        assertEquals(List.of(wire("A", "B")), FlowRules.rewired(List.of(), "A", Arrow.NEXT, "B"));
+        assertEquals(List.of(wire("A", "B"), wire("B", "C")), FlowRules.rewired(A_TO_B, "B", Arrow.NEXT, "C"));
     }
 
     @Test
@@ -67,11 +67,12 @@ public class FlowRulesTest {
     }
 
     @Test
-    void aBlankOutcomeIsTheSameWireAsAnExplicitNext() {
-        // Persisted blank vs. "Next" must not become two competing wires out of the same port: every spelling
-        // of the NEXT constant is the one blank port.
-        assertEquals(List.of(wire("A", "C", "")), FlowRules.rewired(List.of(wire("A", "B", "")), "A", Arrow.NEXT, "C"));
-        assertEquals(List.of(wire("A", "C", "")), FlowRules.rewired(List.of(wire("A", "B", "NEXT")), "A", "", "C"));
+    void twoSpellingsOfOneOutcomeAreOneWire() {
+        // "NEXT" and "Next" must not become two competing wires out of the same port: every spelling of one
+        // constant is its one port.
+        assertEquals(List.of(wire("A", "C")), FlowRules.rewired(List.of(wire("A", "B", "NEXT")), "A", "next", "C"));
+        assertEquals(List.of(wire("A", "C", "Bag full")),
+                FlowRules.rewired(List.of(wire("A", "B", "BAG_FULL")), "A", "bag-full", "C"));
     }
 
     @Test

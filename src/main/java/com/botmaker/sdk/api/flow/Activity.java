@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.flow;
 
 import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.internal.flow.Labels;
 
 /**
  * One activity of the bot's flow, as the flow holds it: the name of one of the enums nested in your bot's
@@ -44,6 +45,15 @@ public record Activity(String name) implements Labelled {
     /** Whether this is {@link #NONE}. */
     public boolean isNone() {
         return name.isEmpty();
+    }
+
+    /**
+     * The name as words, {@code DailyReward} as "Daily reward" — or the name itself when those words would name
+     * another enum, as {@code XPFarm}'s "Xpfarm" would.
+     */
+    @Override
+    public String label() {
+        return Labels.ofType(name);
     }
 
     @Override

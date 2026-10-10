@@ -34,12 +34,10 @@ import java.util.Optional;
  * <p>Opened from the "Add activity" button and from a double-click on empty canvas; the caller supplies the
  * point the card should land on, so a double-click drops it under the cursor.
  *
- * <p>The two implicit outcomes — {@link Arrow#NEXT} first and
- * {@link Arrow#DISABLED} last, the order their ports appear in — are shown as fixed rows that
- * can't be edited or removed. Neither is part of the declared outcome list ({@link ActivityDraft#outcomes()}
- * excludes them and {@link ActivityDraft#flowPorts()} puts them back), so showing either as an ordinary row
- * would lose it on save or duplicate it — but hiding them makes the card grow ports the dialog never
- * mentioned.
+ * <p>The list starts with {@link Arrow#NEXT}, an ordinary outcome the user may remove once there is another:
+ * the activity's enum needs one constant for its body to return. {@link Arrow#DISABLED} is shown last as a
+ * fixed row, because it is a port and not an outcome ({@link ActivityDraft#flowPorts()} adds it) — hiding it
+ * makes the card grow a port the dialog never mentioned.
  */
 public final class NewActivityDialog {
 
@@ -66,6 +64,7 @@ public final class NewActivityDialog {
         this.services = services;
         this.taken = taken;
         this.goHomeByDefault = goHomeByDefault;
+        outcomes.add(Arrow.NEXT);
     }
 
     /**
@@ -149,16 +148,17 @@ public final class NewActivityDialog {
         return new VBox(6, explain, outcomeRows, addRow);
     }
 
-    /** The fixed NEXT row, one removable row per declared outcome, then the fixed DISABLED row. */
+    /** One removable row per outcome, the last one kept, then the fixed DISABLED row. */
     private void rebuildOutcomeRows() {
         outcomeRows.getChildren().clear();
-        outcomeRows.getChildren().add(fixedRow(Arrow.NEXT, "always present"));
 
         for (String outcome : List.copyOf(outcomes)) {
             Label label = new Label(outcome);
             HBox spacer = new HBox();
             HBox.setHgrow(spacer, Priority.ALWAYS);
             Button remove = new Button("✕");
+            // The enum keeps one constant at least: the body has to return something.
+            remove.setDisable(outcomes.size() <= 1);
             remove.setOnAction(e -> {
                 outcomes.remove(outcome);
                 rebuildOutcomeRows();
@@ -174,7 +174,7 @@ public final class NewActivityDialog {
 
     /** A row for an outcome the user neither adds nor removes, in the order its port appears on the card. */
     private static HBox fixedRow(String outcome, String note) {
-        Label label = new Label(FlowNames.outcomeLabel(outcome));
+        Label label = new Label(outcome);
         label.getStyleClass().add("dialog-hint-text");
         Label hint = new Label(note);
         hint.getStyleClass().add("dialog-hint-text");

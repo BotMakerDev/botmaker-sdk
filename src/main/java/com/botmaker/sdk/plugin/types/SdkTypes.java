@@ -219,13 +219,14 @@ public final class SdkTypes {
 
     /**
      * What an activity reports: a constant of its enum, {@code Activities.Collect.NOTHING_LEFT}, held by its two
-     * names ({@link BotConstants#outcome}) and written as that constant. A fresh one is none; the picker offers
-     * the activity's.
+     * names ({@link BotConstants#outcome}) and written as that constant. A fresh one is
+     * {@link Outcome#NONE}, written so; the picker offers the activity's.
      */
     public static final DeclaredCallType<Outcome> OUTCOME = PluginType.value(Outcome.class)
-            .fresh(() -> BotConstants.outcome("", ""))
+            .fresh(() -> Outcome.NONE)
             .editor(() -> ActivityEditors::outcome)
-            .writtenAs(BotConstants::outcome, outcome -> outcome.activity().name(), Outcome::name);
+            .writtenAs(BotConstants::outcome, outcome -> outcome.activity().name(), Outcome::name)
+            .constants(Outcome.NONE);
 
     /**
      * Types a bot author may <b>hold</b> but nobody edits, whose fresh form is a call the bot re-evaluates.

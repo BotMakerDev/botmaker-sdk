@@ -227,9 +227,12 @@ public final class ActivityFlowDialog {
         home = flow.home();
         FlowLayout layout = loadLayout();
         boolean anyPlaced = false;
-        List<Arrow> arrows = new ArrayList<>(flow.edges().stream().map(Arrow::of).toList());
+        List<Arrow> arrows = new ArrayList<>(flow.edges().stream().map(Arrow::of)
+                .filter(arrow -> !arrow.outcome().isBlank()).toList());
         for (Flow.Step step : flow.steps()) {
-            FlowLayout.Spot placed = layout.spot(step.label());
+            // By the enum's name; a layout saved before 2026-10-10 keyed a card by its label.
+            FlowLayout.Spot placed = layout.spot(step.activity().name());
+            if (placed == null) placed = layout.spot(step.label());
             anyPlaced |= placed != null;
             Point2D at = placed == null ? canvas.nextFreeSpot() : new Point2D(placed.x(), placed.y());
             canvas.add(ActivityDraft.of(step, board.exitsOf(step.label()), at.getX(), at.getY()));
@@ -553,9 +556,14 @@ public final class ActivityFlowDialog {
                 e.consume();
             });
             Button remove = new Button("✕");
-            remove.setTooltip(new javafx.scene.control.Tooltip(
-                    "Remove this outcome from this activity. Any arrow leaving it is removed too."));
+            // The enum keeps one constant at least: the body has to return something.
+            boolean last = draft.outcomes().size() <= 1;
+            remove.setDisable(last);
+            remove.setTooltip(new javafx.scene.control.Tooltip(last
+                    ? "An activity keeps one outcome at least: its body has to return one. Add another first."
+                    : "Remove this outcome from this activity. Any arrow leaving it is removed too."));
             remove.setOnAction(e -> {
+                if (draft.outcomes().size() <= 1) return;
                 draft.outcomes().remove(current[0]);
                 showInSidePanel(draft);
             });
@@ -639,7 +647,7 @@ public final class ActivityFlowDialog {
     static List<Arrow> rewiredOutcome(List<Arrow> edges, String activity, String oldName, String newName) {
         List<Arrow> rewired = new ArrayList<>(edges.size());
         for (Arrow e : edges) {
-            boolean mine = e.from().equals(activity) && e.outcomeOrNext().equals(oldName);
+            boolean mine = e.from().equals(activity) && e.outcome().equals(oldName);
             rewired.add(mine ? new Arrow(e.from(), e.to(), newName) : e);
         }
         return rewired;
@@ -941,7 +949,9 @@ public final class ActivityFlowDialog {
             steps.add(d.toStep(off));
             exits.put(d.name(), d.allOutcomes());
         }
-        List<Flow.Edge> edges = arrows.stream().filter(a -> !a.isDisabled()).map(Arrow::toEdge).toList();
+        // A blank arrow leaves on no outcome, so it names no constant to be written as.
+        List<Flow.Edge> edges = arrows.stream().filter(a -> !a.isDisabled() && !a.outcome().isBlank())
+                .map(Arrow::toEdge).toList();
         // A start is a class literal, so a flow with cards always names one: the first card when none is set.
         Activity first = steps.isEmpty() ? Activity.NONE : steps.getFirst().activity();
         Activity begin = start == null || start.isBlank() ? first : FlowNames.activity(start);
@@ -965,11 +975,15 @@ public final class ActivityFlowDialog {
         return written;
     }
 
-    /** Where every card sits, plus the one editor preference that rides along with them. */
+    /**
+     * Where every card sits, keyed by its enum's name as the layout's javadoc says, plus the one editor preference
+     * that rides along with them.
+     */
     private FlowLayout currentLayout() {
         Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
         for (ActivityDraft d : canvas.drafts()) {
-            spots.put(d.name(), FlowLayout.at((int) Math.round(d.x()), (int) Math.round(d.y())));
+            String type = FlowNames.typeFor(d.name());
+            spots.put(type == null ? d.name() : type, FlowLayout.at((int) Math.round(d.x()), (int) Math.round(d.y())));
         }
         return FlowLayout.of(spots, goHomeByDefault);
     }

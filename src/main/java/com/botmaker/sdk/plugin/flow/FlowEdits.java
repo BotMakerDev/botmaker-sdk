@@ -33,7 +33,8 @@ public final class FlowEdits {
 
     /**
      * {@code board} with a new activity called {@code typed}, its body the method {@code bodySource} names
-     * ({@code Collect::body}), or none yet when blank, and the one exit {@link Arrow#NEXT}. The first activity of
+     * ({@code Collect::body}), or none yet when blank, and the one exit {@link Arrow#NEXT} Studio seeds every new
+     * activity with — an ordinary outcome, renamed or removed like any other. The first activity of
      * an empty flow is its start.
      */
     public static Board addActivity(Board board, String typed, String bodySource) {
@@ -95,14 +96,14 @@ public final class FlowEdits {
 
     /**
      * {@code board} with the wire from {@code from} on {@code outcome} going to {@code to}, replacing the one that
-     * outcome had. An outcome {@code from} does not have yet is added to its exits; blank is {@link Arrow#NEXT},
+     * outcome had. An outcome {@code from} does not have yet is added to its exits; blank is its first outcome,
      * and "disabled" is where it goes switched off.
      */
     public static Board connect(Board board, String from, String outcome, String to) {
         Flow flow = board.flow();
         Flow.Step source = step(flow, from);
         Activity target = step(flow, to).activity();
-        String typed = outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome.trim();
+        String typed = typed(board, source, outcome);
         String constant = FlowNames.constantFor(typed);
         if (constant == null) throw new IllegalArgumentException("'" + typed + "' is not an outcome's name.");
         if (Arrow.DISABLED.equals(constant)) {
@@ -124,13 +125,13 @@ public final class FlowEdits {
     }
 
     /**
-     * {@code board} without the wire from {@code from} on {@code outcome}; blank is {@link Arrow#NEXT}. The outcome
+     * {@code board} without the wire from {@code from} on {@code outcome}; blank is its first outcome. The outcome
      * stays — a body may still return it, and the run then stops there — so only the arrow goes.
      */
     public static Board disconnect(Board board, String from, String outcome) {
         Flow flow = board.flow();
         Flow.Step source = step(flow, from);
-        String typed = outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome.trim();
+        String typed = typed(board, source, outcome);
         String constant = FlowNames.constantFor(FlowNames.label(typed));
         if (constant == null) throw new IllegalArgumentException("'" + typed + "' is not an outcome's name.");
         if (Arrow.DISABLED.equals(constant)) {
@@ -146,6 +147,14 @@ public final class FlowEdits {
         }
         if (gone == null) throw new IllegalArgumentException(source.label() + " has no wire on " + typed + ".");
         return board.with(with(flow, flow.steps(), kept, flow.presets(), flow.start()));
+    }
+
+    /** The outcome {@code outcome} names, trimmed: blank is {@code source}'s first, NEXT in a new activity. */
+    private static String typed(Board board, Flow.Step source, String outcome) {
+        if (outcome != null && !outcome.isBlank()) return outcome.trim();
+        List<String> own = board.exitsOf(source.label());
+        if (own.isEmpty()) throw new IllegalArgumentException(source.label() + " has no outcome to leave on.");
+        return own.getFirst();
     }
 
     /** {@code board} starting at the activity {@code name}. */
@@ -170,6 +179,10 @@ public final class FlowEdits {
             if (clash != null) {
                 return clash.equals(name) ? "Duplicate activity name: '" + name + "'."
                         : "'" + name + "' and '" + clash + "' would both be " + FlowNames.ACTIVITIES + "." + type + ".";
+            }
+            if (board.exitsOf(name).isEmpty()) {
+                return name + " needs an outcome: its body returns one of " + FlowNames.ACTIVITIES + "." + type
+                        + "'s constants, and an enum with none has nothing to return.";
             }
             Set<String> own = new HashSet<>();
             for (String outcome : board.exitsOf(name)) {

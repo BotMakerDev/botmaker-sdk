@@ -35,6 +35,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `.home(Gamebot::goHome)`. `runFlow` is in the insert menu, inside `main` only, as "Run activity flow".
 - A run ends on an outcome nothing is wired to, or a body returning `null`, and says which.
 
+### Changed
+
+- **NEXT is no longer a fixed port.** On the Activity Flow canvas and in *New activity*, NEXT is an ordinary
+  outcome: rename it or remove it once the activity has another. An activity keeps one outcome at least, for
+  its body to return.
+- The `return` picker lists the outcomes of the enum the method returns, whether or not the flow links that
+  method yet; the activity picker lists every enum in `Activities.java`, drawn or not.
+- A fresh `Outcome` is written `Outcome.NONE`, which ends a run like `null`.
+- An activity named in capitals (`XPFarm`) keeps its name through a save, and card positions are kept by the
+  enum's name.
+
 No source changes since v1.4.1; re-released for updated upstream pins. The JitPack build now survives the
 builders that refuse the `statx` syscall, which lost v1.4.0.
 

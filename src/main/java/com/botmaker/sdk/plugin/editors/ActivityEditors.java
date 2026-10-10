@@ -7,11 +7,9 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
-import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.flow.Labels;
 import com.botmaker.sdk.plugin.flow.FlowConstants;
 import com.botmaker.sdk.plugin.flow.FlowNames;
-import com.botmaker.sdk.plugin.flow.FlowValue;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
@@ -20,9 +18,11 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.TextInputDialog;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -35,10 +35,10 @@ import java.util.function.Supplier;
  * ({@code FlowNames.activity("Mining")}), and the host writes it as the bot's own — {@code Activities.Mining.class},
  * {@code Activities.Mining.BAG_FULL} — so what the picker writes is bound, not spelled.
  *
- * <p><b>The list is read from the project's own {@code Sdk.flow()}, not from a running bot.</b> The canvas
- * is the source of truth and what it writes is one expression in the bot's Java, so {@link FlowValue} is the
- * whole implementation. It is read when the dropdown is opened rather than when the block is drawn, so an
- * activity added in the flow window a moment ago is offered without reopening anything.
+ * <p><b>The list is read from the project's own {@code Activities} class, not from a running bot</b>
+ * ({@link FlowConstants#declared}): an activity is its enum, so an enum is offered whether or not the canvas
+ * draws it yet. It is read when the dropdown is opened rather than when the block is drawn, so an activity added
+ * in the flow window a moment ago is offered without reopening anything.
  *
  * <p><b>Both boxes stay typeable.</b> Writing the body before drawing the activity is an ordinary way to work;
  * a label no constant holds has nothing to be written as, so it is refused until the constant exists. The
@@ -52,25 +52,31 @@ public final class ActivityEditors {
 
     private ActivityEditors() {}
 
-    /** An activity — the project's activities, as drawn. */
+    /** An activity — the enums the project's {@code Activities} class declares, drawn on the canvas or not. */
     public static Node activity(ValueContext ctx) {
-        return labelBox(ctx, () -> activityLabels(flow(ctx)), "Activity",
+        return labelBox(ctx, () -> activityLabels(FlowConstants.declared(ctx.services().pluginValues()).keySet()),
+                () -> false, "Activity",
                 ctx.value(Activity.class).map(Activity::label).orElse(""), FlowNames::activity, null);
     }
 
     /**
      * An outcome — a constant of the activity whose body the slot sits in.
      *
-     * <p>The flow links a body by the same text the host reports as the slot's enclosing method
-     * ({@code Collect::body}), so the activity whose body is that method is the one asked, and its enum's
-     * constants are listed by their labels. When none is — a helper method a body calls, a body not wired yet, a
-     * slot outside a method — the list is every activity's, each as {@code "Activity: Outcome"}.
+     * <p>That activity is the enum the slot's enclosing method ({@code Collect::body}) returns, which the host
+     * reads off the method's declaration ({@link FlowConstants#returnedBy}) — so a body the flow does not link
+     * yet lists its own constants just the same, by their labels. A method returning none of them — a helper
+     * taking parameters, a slot outside a method — lists every activity's, each as {@code "Activity: Outcome"}.
      */
     public static Node outcome(ValueContext ctx) {
-        String owner = owner(ctx);
-        String current = ctx.value(Outcome.class).map(outcome -> qualified(owner, outcome)).orElse("");
-        return labelBox(ctx, () -> outcomeLabels(ctx.services(), owner), "Outcome", current,
-                label -> outcomeOf(owner, label), owner == null ? null : () -> newOutcome(ctx, owner));
+        // Asked again whenever the list opens: the method's return type may have changed since the block was drawn.
+        String[] owner = {owner(ctx)};
+        String current = ctx.value(Outcome.class).filter(outcome -> !Outcome.NONE.equals(outcome))
+                .map(outcome -> qualified(owner[0], outcome)).orElse("");
+        Supplier<List<String>> options = () -> outcomeLabels(ctx.services(), owner[0]);
+        return labelBox(ctx, options, () -> {
+                    owner[0] = owner(ctx);
+                    return owner[0] != null;
+                }, "Outcome", current, label -> outcomeOf(owner[0], label), () -> newOutcome(ctx, owner[0]));
     }
 
     /**
@@ -78,11 +84,12 @@ public final class ActivityEditors {
      * holds is kept on the list even when the flow no longer offers it — correcting what somebody wrote to
      * match the canvas would silently edit a bot.
      *
-     * @param create when non-null, {@link #NEW_OUTCOME} ends the list and picking it runs this; the label it
-     *               answers is then written like a picked one
+     * @param opening run as the list opens, before {@code options}; true when {@link #NEW_OUTCOME} ends the list
+     * @param create  what picking {@link #NEW_OUTCOME} runs; the label it answers is then written like a picked one
      */
-    private static Node labelBox(ValueContext ctx, Supplier<List<String>> options, String prompt, String current,
-                                 Function<String, Object> value, Supplier<Optional<String>> create) {
+    private static Node labelBox(ValueContext ctx, Supplier<List<String>> options, BooleanSupplier opening,
+                                 String prompt, String current, Function<String, Object> value,
+                                 Supplier<Optional<String>> create) {
         ComboBox<String> box = Styles.on(new ComboBox<>(), Styles.INSET_FIELD_FLAT);
         box.setEditable(true);
         box.setPromptText(prompt);
@@ -90,10 +97,11 @@ public final class ActivityEditors {
         boolean[] reverting = {false};
 
         box.setOnShowing(event -> {
+            boolean creates = opening.getAsBoolean();
             List<String> items = new ArrayList<>(options.get());
             String now = box.getValue();
             if (now != null && !now.isBlank() && !items.contains(now)) items.add(now);
-            if (create != null) items.add(NEW_OUTCOME);
+            if (creates) items.add(NEW_OUTCOME);
             box.getItems().setAll(items);
         });
         box.valueProperty().addListener((obs, was, now) -> {
@@ -166,10 +174,11 @@ public final class ActivityEditors {
         return typed;
     }
 
-    static List<String> activityLabels(Flow flow) {
+    /** The labels of the activity enums {@code types}, by their names. */
+    static List<String> activityLabels(Collection<String> types) {
         List<String> labels = new ArrayList<>();
-        for (Flow.Step step : flow.steps()) {
-            if (!step.label().isBlank()) labels.add(step.label());
+        for (String type : types) {
+            if (!type.isBlank()) labels.add(Labels.ofType(type));
         }
         return labels;
     }
@@ -189,7 +198,7 @@ public final class ActivityEditors {
             boolean own = owner != null && activity.getKey().equals(FlowNames.typeFor(owner));
             if (owner != null && !own) continue;
             for (String constant : activity.getValue()) {
-                labels.add(own ? Labels.of(constant) : Labels.of(activity.getKey()) + SEPARATOR + Labels.of(constant));
+                labels.add(own ? Labels.of(constant) : Labels.ofType(activity.getKey()) + SEPARATOR + Labels.of(constant));
             }
         }
         return labels;
@@ -213,20 +222,12 @@ public final class ActivityEditors {
     }
 
     /**
-     * The label of the activity whose body holds the slot: the step whose body is written as the slot's
-     * enclosing method. Null for a slot in no activity's body.
+     * The label of the activity whose body holds the slot: the enum the slot's enclosing method returns. Null for
+     * a slot in a method returning none of them.
      */
     private static String owner(ValueContext ctx) {
         String method = ctx.slot().flatMap(SlotContext::enclosingMethodSource).orElse(null);
-        if (method == null || method.isEmpty()) return null;
-        for (Flow.Step step : flow(ctx).steps()) {
-            if (method.equals(FlowValue.bodySource(step))) return step.label();
-        }
-        return null;
+        return FlowConstants.returnedBy(ctx.services().pluginValues(), method).map(Labels::ofType).orElse(null);
     }
 
-    /** The open project's flow, or {@link Flow#NONE}: a project with no flow yet draws an empty list. */
-    private static Flow flow(ValueContext ctx) {
-        return FlowValue.read(ctx.services());
-    }
 }

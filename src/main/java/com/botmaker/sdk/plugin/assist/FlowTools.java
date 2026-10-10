@@ -40,12 +40,12 @@ final class FlowTools {
 
     /** One arrow between two activities, on one outcome. */
     record Arrow(@Describe("the activity the arrow leaves") String from,
-                 @Describe(value = "the outcome it leaves on; leave out for NEXT", optional = true) String outcome,
+                 @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome,
                  @Describe("the activity it goes to") String to) {
     }
 
     record Leaving(@Describe("the activity the arrow leaves") String from,
-                   @Describe(value = "the outcome it leaves on; leave out for NEXT", optional = true) String outcome) {
+                   @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome) {
     }
 
     static final List<AssistantTool<?>> TOOLS = List.of(
@@ -175,7 +175,7 @@ final class FlowTools {
 
     /** The outcome as the canvas labels it: its constant's words, "Bag full" for "bag full". */
     private static String outcome(String typed) {
-        return FlowNames.label(typed == null || typed.isBlank() ? com.botmaker.sdk.plugin.flow.Arrow.NEXT : typed);
+        return typed == null || typed.isBlank() ? "its first outcome" : FlowNames.label(typed);
     }
 
     private static String handWritten() {

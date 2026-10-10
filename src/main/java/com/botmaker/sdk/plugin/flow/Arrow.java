@@ -12,12 +12,15 @@ import com.botmaker.sdk.internal.flow.Labels;
  * snapshot of the arrows has to survive one: kept as labels, the canvas renames an arrow by rewriting two
  * strings. The constants are the save's to resolve, by binding, once.
  *
- * @param outcome {@code ""} for the {@link #NEXT} arrow, {@link #DISABLED} for the switched-off one, else the
- *                outcome's label
+ * @param outcome the outcome's label, as {@link FlowNames#label} keeps it — "next" is {@link #NEXT} — or
+ *                {@link #DISABLED} for the switched-off arrow
  */
 public record Arrow(String from, String to, String outcome) {
 
-    /** The outcome every new activity starts with, as the canvas labels it. An arrow stores it blank. */
+    /**
+     * The outcome Studio seeds every new activity's enum with, as the canvas labels it. An ordinary outcome
+     * since 2026-10-10: renamed or removed like any other, once the activity has another.
+     */
     public static final String NEXT = Labels.of("NEXT");
 
     /** The switched-off port: where the flow goes when the activity is off or has no body. */
@@ -26,8 +29,8 @@ public record Arrow(String from, String to, String outcome) {
     public Arrow {
         from = from == null ? "" : from;
         to = to == null ? "" : to;
-        // "Next", "NEXT" and "next" are one constant, so one port: kept blank.
-        outcome = outcome == null || "NEXT".equals(FlowNames.constantFor(outcome)) ? "" : outcome;
+        // "Next", "NEXT" and "next" are one constant, so one port.
+        outcome = outcome == null ? "" : DISABLED.equals(outcome) ? outcome : FlowNames.label(outcome);
     }
 
     /** The arrow a stored edge is drawn as. */
@@ -40,11 +43,6 @@ public record Arrow(String from, String to, String outcome) {
         return step.whenOff().isNone() ? null : new Arrow(step.label(), step.whenOff().label(), DISABLED);
     }
 
-    /** The outcome this arrow routes, with blank read as {@link #NEXT}. */
-    public String outcomeOrNext() {
-        return outcome.isBlank() ? NEXT : outcome;
-    }
-
     /** Whether this is the "switched off, go here instead" arrow. */
     public boolean isDisabled() {
         return DISABLED.equals(outcome);
@@ -52,6 +50,6 @@ public record Arrow(String from, String to, String outcome) {
 
     /** The edge this arrow is saved as: its outcome as {@code from}'s constant. Not for {@link #isDisabled}. */
     public Flow.Edge toEdge() {
-        return new Flow.Edge(FlowNames.outcome(from, outcomeOrNext()), FlowNames.activity(to));
+        return new Flow.Edge(FlowNames.outcome(from, outcome), FlowNames.activity(to));
     }
 }

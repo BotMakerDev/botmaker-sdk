@@ -33,6 +33,15 @@ import com.botmaker.sdk.api.flow.Labelled;
  */
 public interface Outcome extends Labelled {
 
+    /**
+     * No outcome: what a fresh {@code Outcome} holds until one is picked, labelled blank. It belongs to no
+     * activity, so no wire leaves on it, and a run reaching it ends there as on {@code null}.
+     *
+     * <p>A lambda, not one of the SDK's {@code Outcome} classes: a constant of a class implementing this interface
+     * would make the two classes' initialisation wait on each other, and two threads could deadlock on it.
+     */
+    Outcome NONE = () -> "";
+
     /** The activity this outcome belongs to: the enum that declares it. */
     default Activity activity() {
         return this instanceof Enum<?> constant ? Activity.of(owner(constant)) : Activity.NONE;
