@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.4.1] — 2026-10-10
 
 No source changes since v1.4.0, which never built on JitPack: it landed on a broken builder, and a tag that
 built `Error` stays broken. This is v1.4.0 as it was meant to resolve; read v1.4.0's notes below.
