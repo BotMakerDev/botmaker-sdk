@@ -78,6 +78,31 @@ public final class FlowConstants {
     }
 
     /**
+     * The bot's methods that can be the body of the activity {@code type}: each {@code public static} one with no
+     * parameter returning its enum, as the reference a flow writes ({@code Collect::body}). None while the enum
+     * is not declared yet.
+     */
+    public static List<String> bodies(PluginValues values, String type) {
+        return values == null || type == null ? List.of() : values.methods(id(), type);
+    }
+
+    /** The bot's methods that can be the flow's way home: each {@code public static void} one with no parameter. */
+    public static List<String> homes(PluginValues values) {
+        return values == null ? List.of() : values.methods(null, null);
+    }
+
+    /**
+     * Writes {@code public static <type> method() { return <type>.<its first constant>; }} into the bot's class
+     * {@code className} — or, with {@code type} null, {@code public static void method() {}} — creating the class
+     * when there is none.
+     */
+    public static PluginValues.MethodWrite createMethod(PluginValues values, String type, String className,
+                                                        String method) {
+        if (values == null) return new PluginValues.MethodWrite(null, PluginValues.NO_SOURCE_TREE);
+        return values.createMethod(type == null ? null : id(), type, className, method);
+    }
+
+    /**
      * Renames and adds what bringing the project's enums to {@code board} takes, given the canvas renames —
      * {@code activityRenames} (label at last save → label now) and {@code outcomeRenames} (activity's label now →
      * outcome label at last save → label now). A rename that lands is taken out of its map, so a later refusal

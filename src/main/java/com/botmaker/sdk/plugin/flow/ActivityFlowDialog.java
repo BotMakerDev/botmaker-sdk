@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.flow.Activity;
@@ -459,6 +460,7 @@ public final class ActivityFlowDialog {
 
         if (draft == null) {
             sidePanel.getChildren().addAll(heading("Variables"), buildParametersNote());
+            sidePanel.getChildren().addAll(new Separator(), buildHomeSection());
             sidePanel.getChildren().addAll(new Separator(), buildFlowLimitsSection());
             return;
         }
@@ -488,19 +490,19 @@ public final class ActivityFlowDialog {
         popupCheck.selectedProperty().addListener((o, was, is) -> markDirty());
         popupCheck.setTooltip(new javafx.scene.control.Tooltip(FlowNames.POPUP_TIP));
 
-        TextField body = new TextField(draft.body());
-        body.setPromptText("Collect::body");
-        body.setTooltip(new javafx.scene.control.Tooltip(
-                "The method that does this activity's work, as a method reference. Leave it blank and the "
-                        + "card is a placeholder: the flow walks through it and it does nothing."));
-        body.focusedProperty().addListener((o, was, is) -> {
-            if (is) return;
-            commitBody(draft, body);
-        });
-        body.setOnAction(e -> {
-            commitBody(draft, body);
-            e.consume();
-        });
+        // The methods returning this activity's enum, read as the list opens. A card whose enum is not written yet
+        // has none, and nothing can be created for it until the flow's next save declares the enum.
+        PluginValues values = services.pluginValues();
+        String type = FlowNames.typeFor(draft.name());
+        HBox body = MethodPicker.of(services, () -> FlowConstants.bodies(values, FlowNames.typeFor(draft.name())),
+                draft.body(), (type == null ? "Activity" : type) + "::body",
+                (className, method) -> FlowConstants.createMethod(values, FlowNames.typeFor(draft.name()), className,
+                        method),
+                () -> createBlocked(values, draft), reference -> commitBody(draft, reference));
+        javafx.scene.control.Tooltip.install(body, new javafx.scene.control.Tooltip(
+                "The method that does this activity's work: one returning its enum in " + FlowNames.ACTIVITIES
+                        + ".java. Leave it at (none) and the card is a placeholder: the flow walks through it and "
+                        + "it does nothing."));
 
         GridPane head = new GridPane();
         head.setHgap(8);
@@ -694,6 +696,50 @@ public final class ActivityFlowDialog {
     }
 
     /**
+     * The flow's way home — {@code .home(Gamebot::goHome)}, run at start-up, after anything unexpected and before
+     * each activity whose ⌂ is ticked — picked among the bot's {@code public static void} methods, and how a bot
+     * starts the flow at all.
+     *
+     * <p>A home written otherwise than as a method reference is not this window's to show or replace: it says so
+     * and keeps it, rather than offering a list that would read "(none)" over it.
+     *
+     * <p>Where the run starts is the bot's own {@code main}, which this window does not write: the sentence says
+     * which block to insert there. Studio offers it in {@code main} only, filled with the bot's values classes.
+     */
+    private Node buildHomeSection() {
+        VBox box = new VBox(6);
+        box.getChildren().add(heading("Home"));
+        Label explain = new Label("The method that gets the game back to a known screen: run when the bot "
+                + "starts, after anything unexpected, and before each activity whose ⌂ is ticked.");
+        explain.setWrapText(true);
+        explain.getStyleClass().add("dialog-hint-text");
+        box.getChildren().add(explain);
+
+        String source = home == null ? "" : com.botmaker.sdk.plugin.types.FlowTypes.sourceOf(home);
+        if (home != null && source.isBlank()) {
+            Label kept = new Label("Sdk.flow()'s .home(…) is written in code, not as a method reference, and is "
+                    + "kept as it is. Change it there.");
+            kept.setWrapText(true);
+            box.getChildren().add(kept);
+        } else {
+            PluginValues values = services.pluginValues();
+            box.getChildren().add(MethodPicker.of(services, () -> FlowConstants.homes(values), source,
+                    "Home::goHome", (className, method) -> FlowConstants.createMethod(values, null, className, method),
+                    () -> null, reference -> {
+                        home = reference.isBlank() ? null : com.botmaker.sdk.plugin.types.FlowTypes.home(reference);
+                        markDirty();
+                    }));
+        }
+
+        Label start = new Label("To start the flow, insert Bot ▸ Run activity flow in your bot's main. It is "
+                + "offered there only, already naming your values classes: Bot.runFlow(Sdk.class).");
+        start.setWrapText(true);
+        start.getStyleClass().add("dialog-hint-text");
+        box.getChildren().add(start);
+        return box;
+    }
+
+    /**
      * The two loop-safety controls, both about a flow that legitimately cycles.
      *
      * <p>The <b>step budget</b> is how many activities one run may hand off to before the generated driver
@@ -792,26 +838,25 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * Points {@code draft} at the method that does its work, or says why the text is not one.
-     *
-     * <p>Checked here and not only on save, because it is the one field in this window whose value is
-     * <em>code</em>: what is typed goes into the bot's own Java verbatim, and a form with a space in it
-     * would be a file that does not compile. Blank is legal and means the card is a placeholder.
-     *
-     * <p>What is <b>not</b> checked is whether the class and method exist. This editor has no classpath for
-     * the bot it is drawing, and javac says so in the user's own file, on the line, far better than a
-     * dialog could.
+     * Why no body can be written for {@code draft} yet — its name makes no enum, or the enum is not in
+     * {@code Activities.java} until the flow's next save — or null when one can. Asked at the click, so a save in
+     * between is seen.
      */
-    private void commitBody(ActivityDraft draft, TextField field) {
-        String candidate = field.getText() == null ? "" : field.getText().trim();
-        if (candidate.equals(draft.body())) return;
-        if (!candidate.isEmpty() && !FlowNames.isMethodReference(candidate)) {
-            error("“Runs” has to be a method reference like Collect::body — reverted.");
-            field.setText(draft.body());
-            return;
-        }
-        draft.setBody(candidate);
-        field.setText(candidate);
+    private static String createBlocked(PluginValues values, ActivityDraft draft) {
+        String type = FlowNames.typeFor(draft.name());
+        if (type == null) return "'" + draft.name() + "' makes no enum name, so no method can return it.";
+        if (FlowConstants.declared(values).containsKey(type)) return null;
+        return FlowNames.ACTIVITIES + "." + type + " is not written yet: it is declared when the flow is next "
+                + "saved. Try again once it is.";
+    }
+
+    /**
+     * Links {@code draft} to the method {@code reference} picked or created, blank for none — a placeholder card.
+     * The reference is one the host listed or wrote, so there is nothing left to check here.
+     */
+    private void commitBody(ActivityDraft draft, String reference) {
+        if (reference.equals(draft.body())) return;
+        draft.setBody(reference);
         error("");
         markDirty();
     }

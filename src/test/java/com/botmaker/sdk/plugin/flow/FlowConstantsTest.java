@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -112,6 +113,28 @@ class FlowConstantsTest {
         public List<String> methods(String id, String group) {
             return group == null ? List.of("Gamebot::goHome") : List.of(group + "::body");
         }
+
+        @Override
+        public MethodWrite createMethod(String id, String group, String className, String method) {
+            asked.add("createMethod " + group + " " + className + "::" + method);
+            return group != null && !enums.containsKey(group) ? new MethodWrite(null, "no enum " + group)
+                    : new MethodWrite(className + "::" + method, null);
+        }
+    }
+
+    /** A body is one of the methods returning its enum; home one returning nothing; either can be written. */
+    @Test
+    void the_methods_a_card_can_run_and_the_way_home() {
+        Project project = new Project(Set.of(), "Collect NEXT");
+        assertEquals(List.of("Collect::body"), FlowConstants.bodies(project, "Collect"));
+        assertEquals(List.of("Gamebot::goHome"), FlowConstants.homes(project));
+        assertEquals("Collect::gather", FlowConstants.createMethod(project, "Collect", "Collect", "gather").reference());
+        assertEquals("Home::goHome", FlowConstants.createMethod(project, null, "Home", "goHome").reference());
+        assertFalse(FlowConstants.createMethod(project, "Battle", "Battle", "body").written());
+        assertEquals(List.of("createMethod Collect Collect::gather", "createMethod null Home::goHome",
+                "createMethod Battle Battle::body"), project.asked);
+        assertEquals(List.of(MethodPicker.NONE, "Collect::body", "Old::gone"),
+                MethodPicker.items(List.of("Collect::body"), "Old::gone"), "what the bot holds stays listed");
     }
 
     /** The activity a body belongs to is the enum it returns, which the host reads off its declaration. */

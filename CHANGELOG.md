@@ -37,6 +37,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **"Runs" is a list, not a text field.** An activity's side panel lists the methods returning its enum, and
+  *Create method…* writes one (`Collect::body`, returning the enum's first outcome) and picks it. With no card
+  selected, **Home** picks the flow's way home the same way, among the bot's `public static void` methods.
 - **NEXT is no longer a fixed port.** On the Activity Flow canvas and in *New activity*, NEXT is an ordinary
   outcome: rename it or remove it once the activity has another. An activity keeps one outcome at least, for
   its body to return.
