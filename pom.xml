@@ -27,7 +27,7 @@
              had never built this repo locally. -->
         <botmaker.shared.version>0.2.3-SNAPSHOT</botmaker.shared.version>
         <!-- botmaker-session version. Same contract as botmaker.shared.version above. -->
-        <botmaker.session.version>0.2.1-SNAPSHOT</botmaker.session.version>
+        <botmaker.session.version>0.2.2-SNAPSHOT</botmaker.session.version>
         <!-- botmaker-studio-api version: the Studio plugin contract. Same contract again.
              This one moves far more slowly than the other two on purpose — see the dependency below. -->
         <botmaker.studioapi.version>0.7.1-SNAPSHOT</botmaker.studioapi.version>
