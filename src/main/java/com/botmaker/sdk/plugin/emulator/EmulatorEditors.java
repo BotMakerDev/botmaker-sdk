@@ -64,7 +64,7 @@ public final class EmulatorEditors {
     /**
      * Drilling into a specific app inside an emulator also points the whole project at it: the launch target
      * becomes {@code emu-app:<package>@<instance>} and the default capture target that instance, so
-     * {@code Bot.run} brings the app up and a vision call with no source of its own looks at the right screen.
+     * {@code Bot.runFlow} brings the app up and a vision call with no source of its own looks at the right screen.
      * The status line says so, since both change outside the block the user clicked.
      *
      * <p>Best effort — the inline call the user just wrote stands either way, and an editor that threw here

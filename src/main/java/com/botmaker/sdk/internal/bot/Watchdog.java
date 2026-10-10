@@ -22,7 +22,7 @@ import com.botmaker.sdk.internal.observe.MatchEvent;
  * activities. {@link #progress()} lets logic the vision layer can't see reset the counter, and the supervisor
  * calls {@link #reset()} after a restart. All state is per-thread.
  *
- * <p>Internal: a bot never names it, and {@code Bot.run} turns it on.
+ * <p>Internal: a bot never names it, and {@code Bot.runFlow} turns it on.
  */
 public final class Watchdog {
 

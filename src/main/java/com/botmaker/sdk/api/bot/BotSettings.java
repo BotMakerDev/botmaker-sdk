@@ -29,7 +29,7 @@ import java.util.Optional;
  * (2026-10-09), so the method says what this bot changed and nothing else. A setting that is on by default is
  * turned off by a link with a negative name ({@link #centredClicks()}, {@link #debugOff()}).
  *
- * <p>{@code Bot.run(…, Sdk.class)} hands it to {@link #use} before anything runs, so a click never happens on
+ * <p>{@code Bot.runFlow(Sdk.class)} hands it to {@link #use} before anything runs, so a click never happens on
  * the defaults and then on the bot's own values. Studio's ⚙ Bot Settings window edits the expression; a bot
  * that wants another value for a while calls {@code BotSettings.use(BotSettings.current().confidence(0.9))}.
  *
@@ -264,7 +264,7 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
 
     private static volatile BotSettings current = DEFAULTS;
 
-    /** The settings the bot is running with: its own once {@code Bot.run} has installed them. */
+    /** The settings the bot is running with: its own once {@code Bot.runFlow} has installed them. */
     public static BotSettings current() {
         return current;
     }
@@ -274,7 +274,7 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
      *
      * <p><b>A take-over is one-way.</b> On Linux it swaps the process-wide input backend, which cannot be swapped
      * back, so a later value with {@code takeOver = false} only stops a future escalation. That is why
-     * {@code Bot.run} installs the bot's settings before anything else runs: the swap has to precede the first
+     * {@code Bot.runFlow} installs the bot's settings before anything else runs: the swap has to precede the first
      * click, or the click is dropped silently. For the same reason the Linux backend is pinned only when nothing
      * has pinned it yet — an explicit {@code -Dbotmaker.linux.input} on the command line wins.
      *

@@ -116,7 +116,7 @@ public final class SdkValues {
 
     /**
      * Registers this plugin's values with {@link ManagedValues}. Idempotent, and cheap enough to be called on
-     * every {@code Bot.run} rather than guarded by its caller.
+     * every {@code Bot.runFlow} rather than guarded by its caller.
      */
     public static synchronized void claim() {
         if (claimed) {

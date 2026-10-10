@@ -14,7 +14,7 @@ import com.botmaker.session.DesktopSession;
  *
  * <p>On first use the current source initialises to the whole {@link Desktop}. <b>A bot's own project
  * default is {@link #set(CaptureSource)}</b>, called with the expression {@code Sdk.captureSource()}
- * returns before the bot starts — {@code Bot.run} does it, and it is the {@code @SdkValue(SdkValue.Id.CAPTURE)}
+ * returns before the bot starts — {@code Bot.runFlow} does it, and it is the {@code @SdkValue(SdkValue.Id.CAPTURE)}
  * value the user edits in <i>Project ▸ Settings</i>. Set it yourself at runtime for anything else — to
  * point the whole bot at a game {@link Window} once, up front — and every subsequent no-source call
  * follows until it is changed again.
@@ -91,7 +91,7 @@ public final class Source {
      * What the source is before anything sets it: the whole {@link Desktop}.
      *
      * <p>The bot's capture source is the expression {@code Sdk.captureSource()} returns, which
-     * {@code Bot.run} hands to {@link #set} before the bot starts. Nothing else is read here: a second
+     * {@code Bot.runFlow} hands to {@link #set} before the bot starts. Nothing else is read here: a second
      * source of the answer would race the one the user can see in their own Java. So a bot that installs its
      * {@code @SdkValue} values captures what its Java says, and a bot that does not captures the whole desktop.
      */

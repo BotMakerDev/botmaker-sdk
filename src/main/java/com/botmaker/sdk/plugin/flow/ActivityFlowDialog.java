@@ -64,9 +64,9 @@ import java.util.Set;
  * {@link FlowLayout} {@code Sdk.flowLayout()} returns, written after the flow and only when they moved, so a
  * renamed card keeps its place.
  *
- * <p>Before the flow, the names in it: each activity and outcome is a constant of the bot's {@code Activities}
- * and {@code Outcomes} classes, renamed, added and removed by binding as the canvas changes
- * ({@link FlowConstants}), so a card renamed here renames the constant and every line of code naming it.
+ * <p>Before the flow, the names in it: each activity is an enum nested in the bot's {@code Activities} class and
+ * each of its outcomes a constant of that enum, renamed, added and removed by binding as the canvas changes
+ * ({@link FlowConstants}), so a card renamed here renames the enum and every line of code naming it.
  *
  * <p>A flow whose expression the plugin cannot read — hand-written, or a call to something else — is
  * <b>shown empty and refused</b> rather than overwritten, which is the same rule every other value editor

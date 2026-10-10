@@ -4,10 +4,10 @@
 meta-annotated `@ManagedMarker`), so a misspelt id is a compile error. A project gets its files from its
 template, in `src/main/java/<bot package>/plugins/sdk/`: **`Sdk.java`** — `FLOW` returning a `Flow`,
 `CAPTURE` a `CaptureSource`, `SETTINGS` a `BotSettings`, `FLOW_LAYOUT` a `FlowLayout`, each written as a chain
-of named calls (`Flow.activity(Activities.COLLECT, Collect::body).described("…").goesHome()`) — then
-**`Pictures.java`**, `PICTURES` on the type, one `ImageTemplate` constant per picture, and the enums
-**`Activities.java`** and **`Outcomes.java`** (`ACTIVITIES`, `OUTCOMES`: `enum Outcomes implements Outcome {
-WON }`, each constant's label its name read as words). Beside them the host writes **`Points.java`** and
+of named calls (`Flow.activity(Activities.Collect.class, Collect::body).described("…").goesHome()`) — then
+**`Pictures.java`**, `PICTURES` on the type, one `ImageTemplate` constant per picture, and
+**`Activities.java`** (`ACTIVITIES`: one nested `enum Collect implements Outcome { NEXT, NOTHING_LEFT }` per
+activity, each name's label its words). Beside them the host writes **`Points.java`** and
 **`Regions.java`** (`POINTS`, `REGIONS`, 2026-10-06): named `Point`s in the bot's pixels and `Rect`s in the
 capture source's, which the assistant's `save_point` and `save_region` add. They are the user's: the host
 rewrites the expression a marked method returns and the constants of a marked type, and nothing else,

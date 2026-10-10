@@ -6,34 +6,37 @@
   `TextMatch`, `TextResult`, `OcrOptions`, `OcrLanguage`. `Precision` is `Pixel`'s knobs as one value (`EXACT`/`TIGHT`/`DEFAULT`/`LOOSE`, a validating
   `of(…)`, withers): a type because ΔE has no obvious scale and the pixel count is an *area* routinely misread
   as a width, and because an editor is claimed by **type**, never by a method and an argument index.
-- `api.bot` — `Bot.run(Home::goHome, Sdk.class)` (installs every managed value in the classes it is handed, `@SdkValue` or another plugin's mark, and walks the
-  flow, `internal/flow/FlowWalker`), `Outcome` (a body is `public static Outcome body()` returning one of the
-  bot's `Outcomes` constants or `Outcome.NEXT`; `FlowWalker.current()` says which activity runs and logs an
-  unwired outcome the step does not declare), `ActivitySwitch` (`enable`/`disable`/`active` an `Activity` —
-  the facade was `Activities` until 2026-10-02, when that name became the bot's own class of constants), and
+- `api.bot` — `Bot.runFlow(Sdk.class)`, "Run activity flow", offered in `main` only (`@EntryPoint`; installs
+  every managed value in the classes it is handed, `@SdkValue` or another plugin's mark, and walks the flow,
+  `internal/flow/FlowWalker`; it was `Bot.run(goHome, …)` until 2026-10-10, when what gets home moved onto
+  the flow), `Outcome` (the interface each activity's enum implements; `Outcome.NONE` is "no outcome yet",
+  what a fresh editor value holds), `ActivitySwitch` (`enable`/`disable`/`active` an activity by its class,
+  `Activities.Battle.class`, `@ActivityClass` for its picker), and
   **`BotSettings`**, the runtime tuning
   as an immutable value: `@SdkValue(SdkValue.Id.SETTINGS)` in `Sdk.java`, read as `BotSettings.current()`, changed for a
   while with `BotSettings.use(…)`, edited in ⚙ Bot Settings (`plugin/settings/BotSettingsWindow`).
-- `api.flow` — `Flow` (`steps`, `edges`, `presets`, `start`, `limits`), `Flow.activity(Activities.COLLECT,
-  Collect::body)` building a `Flow.Step`, each other part a named link written only when not the default
-  (`.described(…)`, `.off()`, `.goesHome()`, `.checksPopups()`, `.reports(…)`; 2026-10-09, as
-  `BotSettings.defaults().foundDelay(…)…` is) (an activity's work is a **method reference**, so a rename is a
-  compile error naming `Sdk.java`), `Activity`, `FlowLayout` (the editor's card positions, keyed by label,
-  which a run ignores), `ActivityBody`; `internal.flow.Flows.enabled(activity)` reads an activity's switch.
-- **Activities and outcomes are enum constants, never strings (2026-10-02; enums since 2026-10-10).**
-  `Activity` and `Outcome` are interfaces a bot's `@SdkValue(ACTIVITIES) enum Activities implements Activity
-  { COLLECT }` and `@SdkValue(OUTCOMES) enum Outcomes implements Outcome { WON }` implement, in `plugins/sdk/`
-  (`SdkValues.ACTIVITIES`/`OUTCOMES`, enum sets). The name is the whole constant: `label()` is the name as
-  words (`internal.flow.Labels`, `NOTHING_LEFT` → "Nothing left"); `Outcome.NEXT`/`DISABLED` and
-  `Activity.NONE` are the SDK's own enums. An editor cannot load the bot's enum, so it holds a constant by
-  name (`internal.flow.BotConstants`, equal by name) and the host writes it back as the constant. The flow
-  canvas works on labels (`plugin/flow/Arrow`, `Selection`) and converts at load and save through
-  `FlowNames.activity`/`outcome`; a typed label is kept as its constant's words (`FlowNames.label`), so
-  "bag full" is `BAG_FULL`, shown "Bag full". A save keeps the two enums in step by binding
-  (`plugin/flow/FlowConstants`: rename, add, write the flow, remove), and an outcome is one constant however
-  many cards declare it.
+- `api.flow` — `Flow` (`steps`, `edges`, `presets`, `start`, `limits`, `home`),
+  `Flow.activity(Activities.Collect.class, Collect::body)` building a `Flow.Step`, each other part a named
+  link written only when not the default (`.described(…)`, `.off()`, `.goesHome()`, `.checksPopups()`,
+  `.whenOff(…)`; 2026-10-09, as `BotSettings.defaults().foundDelay(…)…` is), `Flow.edge(Activities.Collect.
+  NOTHING_LEFT, Activities.Battle.class)` (its source is the outcome's enum), the flow's `.home(Gamebot::goHome)`
+  (an activity's work and the way home are **method references**, so a rename is a compile error naming
+  `Sdk.java`), `Activity` (an activity by its enum's simple name, the key runtime and editor agree on),
+  `ActivityBody<O>` (a body returns its own activity's enum), `FlowLayout` (the editor's card positions, keyed
+  by activity name, which a run ignores); `internal.flow.Flows.enabled(activity)` reads an activity's switch.
+- **An activity is its outcome enum (2026-10-10; constants since 2026-10-02, never strings).** The bot's
+  `@SdkValue(ACTIVITIES) final class Activities` in `plugins/sdk/` nests one `enum Collect implements Outcome
+  { NEXT, NOTHING_LEFT }` per activity (`SdkValues.ACTIVITIES`, an `ofEnums` grouped open set); its constants
+  are the activity's exits. A body is `public static Activities.Collect body()`, so javac refuses another
+  activity's outcome. `NEXT` is an ordinary constant the editor seeds and the user may rename or remove;
+  `DISABLED` is internal to the walker. A label is the name as words (`internal.flow.Labels`, `NOTHING_LEFT` →
+  "Nothing left", `DailyReward` → "Daily reward"; a typed Java type name stays as typed). An editor cannot
+  load the bot's enum, so it holds a constant by name (`internal.flow.BotConstants`, equal by name) and the
+  host writes it back as the constant. The flow canvas works on labels (`plugin/flow/Arrow`, `Selection`) and
+  converts at load and save through `FlowNames`. A save keeps the enums in step by binding
+  (`plugin/flow/FlowConstants`: rename, add, write the flow, remove); an enum keeps at least one constant.
 - `api.capture` — `CaptureSource` (`desktop()`, `monitor(i)`, `window(title)`, `emulator(name)`, `region(…)`;
-  `capture()` and `origin()` go together), `Source.current()` (what `Bot.run` installed, or the whole desktop).
+  `capture()` and `origin()` go together), `Source.current()` (what `Bot.runFlow` installed, or the whole desktop).
 - `api.input` (`Mouse`, `Keyboard`, …), `api.time` (`Wait`, `Time`), `api.sound`, `api.geometry`.
 - `api.console.Ask` — asks the user (`text`, `number`, `whole`, `yesNo`, `choice`). Under Studio it sends a
   `TelemetryEvent.Ask` on the run's telemetry socket (`IpcObserver.client()`) and blocks on the `Answer` Studio

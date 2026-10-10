@@ -6,7 +6,7 @@ import java.util.Locale;
  * What an activity or an outcome is called on the canvas and in the trace: its constant's name read as words,
  * {@code NOTHING_LEFT} as "Nothing left" (2026-10-10).
  *
- * <p>The name is the whole of an {@code Activities} or {@code Outcomes} constant — a bot's enum has nothing else
+ * <p>The name is the whole of an activity's enum and of each of its constants — a bot's enum has nothing else
  * to hold a label in — so the label is derived, never stored. Each {@code _} is a space, and so, in a name with
  * a lower-case letter, is each step from a lower-case letter or digit to an upper-case one; the words are
  * lower-cased and the first letter capitalised. {@code FlowNames.constantFor} goes the other way, and the two
