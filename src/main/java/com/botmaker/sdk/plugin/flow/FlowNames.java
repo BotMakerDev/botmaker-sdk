@@ -18,23 +18,27 @@ import java.util.List;
  *
  * <h2>A label is typed; its constant is derived, and the label shown is the constant's</h2>
  *
- * <p>An activity and an outcome are constants of the bot's own {@code Activities} and {@code Outcomes} enums,
- * and the label the canvas shows is the constant's name as words ({@code BAG_FULL} is "Bag full",
- * {@code Labels}). The user types a label; {@link #constantFor} is the one mechanical step from it to the
- * constant's name. So the rules are about the <em>constant</em>: a label that yields none is refused, and two
- * labels that yield the same one are one name twice — "Bag full" and "bag-full" would both be
- * {@code Outcomes.BAG_FULL}, shown as "Bag full".
+ * <p>An activity is an enum nested in the bot's {@code Activities} class and an outcome a constant of it, and
+ * the label the canvas shows is the name as words ({@code BAG_FULL} is "Bag full", {@code DailyReward} "Daily
+ * reward", {@code Labels}). The user types a label; {@link #typeFor} and {@link #constantFor} are the one
+ * mechanical step from it to the name. So the rules are about the <em>name</em>: a label that yields none is
+ * refused, and two labels that yield the same one are one name twice — "Bag full" and "bag-full" would both be
+ * {@code BAG_FULL}, shown as "Bag full".
  */
 public final class FlowNames {
 
     private FlowNames() {
     }
 
-    /** The class the activity constants live in, for sentences. */
+    /** The class the activity enums live in, for sentences. */
     static final String ACTIVITIES = "Activities";
 
-    /** The class the outcome constants live in, for sentences. */
-    static final String OUTCOMES = "Outcomes";
+    /**
+     * Names an activity's enum may not take: the class holding it, and the types its declaration and its
+     * neighbours name ({@code enum X implements Outcome}), which a nested enum of that name would hide.
+     */
+    private static final java.util.Set<String> RESERVED = java.util.Set.of(ACTIVITIES, "Outcome", "Object",
+            "String", "Class", "Enum", "Override", "SdkValue");
 
     /**
      * A typed label as it is kept: the words of the constant it makes — "bag-full" is "Bag full", because a
@@ -77,19 +81,48 @@ public final class FlowNames {
     }
 
     /**
-     * The activity a typed label names: the bot's constant {@link #constantFor} makes of it, held by name, and
-     * {@link Activity#NONE} for a label that makes none.
+     * The enum an activity label is written as — {@code "Daily reward"} to {@code DailyReward},
+     * {@code "DailyReward"} to itself — or null when it can be none (no letter, or a digit first).
+     *
+     * <p>Each run of letters and digits is a word, its first letter upper-cased; a word typed all in capitals
+     * ({@code "BAG"}) is lower-cased after its first letter, and any other keeps its case, so a type name typed
+     * as one is its own. {@code Labels.of} goes the other way.
      */
-    public static Activity activity(String label) {
-        return BotConstants.activity(constantFor(label));
+    public static String typeFor(String label) {
+        if (label == null) return null;
+        StringBuilder out = new StringBuilder();
+        for (String word : label.strip().split("[^\\p{L}\\p{N}]+")) {
+            if (word.isEmpty()) continue;
+            String rest = word.substring(1);
+            if (rest.equals(rest.toUpperCase(java.util.Locale.ROOT))) rest = rest.toLowerCase(java.util.Locale.ROOT);
+            out.append(Character.toUpperCase(word.charAt(0))).append(rest);
+        }
+        if (out.isEmpty() || !Character.isJavaIdentifierStart(out.charAt(0))) return null;
+        return out.toString();
+    }
+
+    /** An activity's label as it is kept: the words of the enum it makes, "daily-reward" as "Daily reward". */
+    public static String activityLabel(String typed) {
+        if (typed == null) return "";
+        String type = typeFor(typed);
+        return type == null ? typed.strip().replaceAll("\\s+", " ") : Labels.of(type);
     }
 
     /**
-     * The outcome a typed label names, as {@link #activity} does: {@link Outcome#NEXT} for blank, "next" or a
-     * label that makes no constant, {@link Outcome#DISABLED} for "disabled".
+     * The activity a typed label names: the bot's enum {@link #typeFor} makes of it, held by name, and
+     * {@link Activity#NONE} for a label that makes none.
      */
-    public static Outcome outcome(String label) {
-        return BotConstants.outcome(constantFor(label));
+    public static Activity activity(String label) {
+        return BotConstants.activity(typeFor(label));
+    }
+
+    /**
+     * The outcome {@code label} of the activity labelled {@code activity}: its enum's constant {@link #constantFor}
+     * makes of the label, held by the two names. Blank is {@link Arrow#NEXT}.
+     */
+    public static Outcome outcome(String activity, String label) {
+        String constant = constantFor(label == null || label.isBlank() ? Arrow.NEXT : label);
+        return BotConstants.outcome(typeFor(activity), constant);
     }
 
     /**
@@ -125,18 +158,17 @@ public final class FlowNames {
     /**
      * Why {@code candidate} can't be an outcome of the activity called {@code owner}, or null when it can.
      *
-     * <p>{@code own} is that activity's outcomes and {@code elsewhere} every other activity's. An outcome is
-     * one {@code Outcomes} constant however many activities report it, so adding one another activity already
-     * declares is fine — it is the same outcome — but a second spelling of it is not, and neither is
-     * <em>renaming</em> onto it ({@code replacing} non-null), which would merge two constants.
+     * <p>{@code own} is that activity's outcomes: an outcome is a constant of its activity's enum, so another
+     * activity's outcome of the same name is another constant, and only a second spelling of one of its own is
+     * refused — as is <em>renaming</em> onto one ({@code replacing} non-null), which would merge two.
      */
-    public static String outcomeProblem(List<String> own, Collection<String> elsewhere, String owner,
-                                        String candidate, String replacing) {
+    public static String outcomeProblem(List<String> own, String owner, String candidate, String replacing) {
         if (candidate == null || candidate.isEmpty()) return "Give the outcome a name.";
         String constant = constantFor(candidate);
-        if (constant == null) return noConstant(candidate, OUTCOMES);
-        if (Arrow.NEXT.equals(constant)) {
-            return "Every activity already has a NEXT outcome — it is always there.";
+        String holder = ACTIVITIES + "." + (typeFor(owner) == null ? owner : typeFor(owner));
+        if (constant == null) return noConstant(candidate, holder);
+        if (constantFor(Arrow.NEXT).equals(constant) && replacing == null) {
+            return "Every activity already has a " + constant + " outcome — it is always there.";
         }
         if (Arrow.DISABLED.equals(constant)) {
             return "DISABLED is the port for this activity being switched off — it is always there, "
@@ -145,16 +177,7 @@ public final class FlowNames {
         for (String existing : own) {
             if (existing.equals(replacing) || !constant.equals(constantFor(existing))) continue;
             return existing.equals(candidate) ? "'" + candidate + "' is already an outcome of " + owner + "."
-                    : sameConstant(candidate, existing, OUTCOMES, constant);
-        }
-        for (String existing : elsewhere) {
-            if (existing.equals(replacing) || !constant.equals(constantFor(existing))) continue;
-            if (replacing != null) {
-                return "'" + existing + "' is already an outcome (" + OUTCOMES + "." + constant + "), and "
-                        + "renaming onto it would merge the two. Remove this one and add '" + existing
-                        + "' instead.";
-            }
-            if (!existing.equals(candidate)) return sameConstant(candidate, existing, OUTCOMES, constant);
+                    : sameConstant(candidate, existing, holder, constant);
         }
         return null;
     }
@@ -166,11 +189,15 @@ public final class FlowNames {
      */
     public static String activityNameProblem(String candidate, Collection<String> taken) {
         if (candidate == null || candidate.isEmpty()) return "Give the activity a name.";
-        String constant = constantFor(candidate);
-        if (constant == null) return noConstant(candidate, ACTIVITIES);
+        String type = typeFor(candidate);
+        if (type == null) return noConstant(candidate, ACTIVITIES);
+        if (RESERVED.contains(type)) {
+            return "'" + candidate + "' would be an enum named " + type + " inside " + ACTIVITIES + ".java, hiding the "
+                    + "type of that name its code needs — pick another name.";
+        }
         if (taken.contains(candidate)) return "Activity '" + candidate + "' already exists.";
         for (String other : taken) {
-            if (constant.equals(constantFor(other))) return sameConstant(candidate, other, ACTIVITIES, constant);
+            if (type.equals(typeFor(other))) return sameConstant(candidate, other, ACTIVITIES, type);
         }
         return null;
     }
@@ -191,7 +218,7 @@ public final class FlowNames {
     }
 
     private static String noConstant(String candidate, String holder) {
-        return "'" + candidate + "' can't become a constant in " + holder + ".java — start it with a letter.";
+        return "'" + candidate + "' can't become a name in " + holder + " — start it with a letter.";
     }
 
     private static String sameConstant(String candidate, String existing, String holder, String constant) {
@@ -203,13 +230,12 @@ public final class FlowNames {
     // both named a GoHome.run() and a Popups.run() that no project has had since the flow became Java.
 
     /** The outcomes section's explanation. */
-    public static final String OUTCOMES_HINT = "What this activity can report. Its body returns one of the "
-            + "Outcomes constants, and each gets an arrow on the canvas. An outcome is one constant however "
-            + "many activities report it, so renaming one renames it everywhere. Every activity also has a "
-            + "NEXT outcome (Outcome.NEXT), and any outcome you leave without an arrow ends the run.";
+    public static final String OUTCOMES_HINT = "What this activity can report: the constants of its enum in "
+            + "Activities.java. Its body returns one of them, and each gets an arrow on the canvas. Every "
+            + "activity starts with NEXT, and any outcome you leave without an arrow ends the run.";
 
     /** The go-home tick's tooltip. */
-    public static final String GO_HOME_TIP = "Run the home method handed to Bot.run(…) immediately before "
+    public static final String GO_HOME_TIP = "Run the flow's home method (Flow.home(…)) immediately before "
             + "this activity, so it starts from a known screen.";
 
     /** The popup tick's tooltip. */

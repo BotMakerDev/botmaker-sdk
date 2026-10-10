@@ -5,8 +5,8 @@ import com.botmaker.sdk.api.bot.Outcome;
 import java.util.List;
 
 /**
- * A bot's activity flow, as a value: what its activities are, how they are wired, where a run starts, and
- * what stops it.
+ * A bot's activity flow, as a value: what its activities are, how they are wired, where a run starts, what
+ * stops it, and how the bot gets back to a known screen.
  *
  * <p><b>A flow is Java, so a renamed activity method is a compile error</b> rather than a silently empty
  * value three screens into a run. It is written in the file BotMaker gave your project —
@@ -17,51 +17,38 @@ import java.util.List;
  * @SdkValue(SdkValue.Id.FLOW)
  * public static Flow flow() {
  *     return Flow.of(
- *             List.of(Flow.activity(Activities.COLLECT, Collect::body)
+ *             List.of(Flow.activity(Activities.Collect.class, Collect::body)
  *                             .described("Click collect while there is one.")
- *                             .checksPopups()
- *                             .reports(List.of(Outcomes.NOTHING_LEFT)),
- *                     Flow.activity(Activities.REST, Rest::body).described("Wait, then go round again.")),
- *             List.of(Flow.edge(Activities.COLLECT, Activities.COLLECT, Outcome.NEXT),
- *                     Flow.edge(Activities.COLLECT, Activities.REST, Outcomes.NOTHING_LEFT),
- *                     Flow.edge(Activities.REST, Activities.COLLECT, Outcome.NEXT)),
+ *                             .checksPopups(),
+ *                     Flow.activity(Activities.Rest.class, Rest::body).whenOff(Activities.Collect.class)),
+ *             List.of(Flow.edge(Activities.Collect.NEXT, Activities.Collect.class),
+ *                     Flow.edge(Activities.Collect.NOTHING_LEFT, Activities.Rest.class),
+ *                     Flow.edge(Activities.Rest.NEXT, Activities.Collect.class)),
  *             List.of(),
- *             Activities.COLLECT,
- *             Flow.limits(1000, 1000));
+ *             Activities.Collect.class,
+ *             Flow.limits(1000, 1000))
+ *         .home(Gamebot::goHome);
  * }
  * }</pre>
  *
- * <h2>Every name is a constant</h2>
+ * <h2>An activity is its outcome enum</h2>
  *
- * <p>An activity is an {@link Activity} constant of the bot's {@code Activities} class and an outcome an
- * {@link Outcome} constant of its {@code Outcomes} class (2026-10-02). A step, a wire, a preset and the start
- * name the same constants a body returns and an {@code ActivitySwitch} call switches, so the canvas renames them
- * by binding and javac catches a typo. They used to be strings matched by spelling, and a rename on the canvas
- * left every body still reporting the old one.
+ * <p>Each activity is an enum nested in the bot's {@code Activities} class, and its constants are its exits
+ * (2026-10-10). A step, a preset, the start and an {@code ActivitySwitch} call name the enum by its class
+ * literal; a wire names the outcome it leaves on, whose enum is the activity it leaves. A body returns its
+ * activity's enum, and {@link #activity} ties the two, so javac refuses a body reporting another activity's
+ * outcome. The canvas renames them by binding.
  *
  * <h2>A step names what it sets</h2>
  *
  * <p>{@link #activity} takes the two things every step has, the activity and its work, and each other part is a
- * named link after it, written only when it is not the default (2026-10-09): {@code .described("…")},
- * {@code .off()}, {@code .goesHome()}, {@code .checksPopups()}, {@code .reports(List.of(…))}. A step used to be
- * seven positional arguments, three of them bare booleans nobody could tell apart without the declaration open.
+ * named link after it, written only when it is not the default: {@code .described("…")}, {@code .off()},
+ * {@code .goesHome()}, {@code .checksPopups()}, {@code .whenOff(…)}. The flow's own {@link #home} is one too.
  *
  * <h2>Five parts, fixed, and no varargs</h2>
  *
  * <p>Each of the five has a type the editor knows, which is what lets it take the expression apart, change
- * one activity and put it back without re-writing the rest. Varargs would make the arity a property of the
- * call rather than of the type, and a heterogeneous part list would make it unreadable — both were tried in
- * earlier designs and both are why this one is a record with fixed components.
- *
- * <h2>What is here, and what is deliberately not</h2>
- *
- * <p>Everything a <em>run</em> depends on is here, {@link Step#enabled()} included: an activity switched off is
- * not missing from the flow, it is one the run walks through by its disabled wire, so the flag is part of what
- * the bot does and belongs in the bot's own source.
- *
- * <p>{@link Preset}s are here too although nothing at runtime reads one. A preset is a named set of enable
- * flags, so it is about the same fact this record already carries; keeping it beside them is what stops a
- * saved selection from being lost the moment a project is cloned.
+ * one activity and put it back without re-writing the rest.
  *
  * <p><b>Card positions are not here.</b> They change without the bot changing, so they are a value of their
  * own, the {@link FlowLayout} {@code Sdk.flowLayout()} returns, which nothing at runtime reads.
@@ -71,11 +58,14 @@ import java.util.List;
  * @param presets named selections of enable flags, saved by whoever drew the flow
  * @param start   the activity a run begins at; {@link Activity#NONE} for a flow that runs nothing
  * @param limits  what stops a run that never finishes
+ * @param home    what gets the game back to a known screen: before a step that {@link Step#goHome() goes home},
+ *                at start-up and after anything unexpected; {@code null} for nothing
  */
-public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Activity start, Limits limits) {
+public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Activity start, Limits limits,
+                   Runnable home) {
 
     /** The empty flow: nothing to run, which is what a project with nothing drawn should do. */
-    public static final Flow NONE = new Flow(List.of(), List.of(), List.of(), Activity.NONE, Limits.DEFAULT);
+    public static final Flow NONE = new Flow(List.of(), List.of(), List.of(), Activity.NONE, Limits.DEFAULT, null);
 
     public Flow {
         steps = steps == null ? List.of() : List.copyOf(steps);
@@ -85,32 +75,39 @@ public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Act
         limits = limits == null ? Limits.DEFAULT : limits;
     }
 
-    /** The flow, spelled the way the editor writes it. */
-    public static Flow of(List<Step> steps, List<Edge> edges, List<Preset> presets, Activity start,
-                          Limits limits) {
-        return new Flow(steps, edges, presets, start, limits);
+    /** The flow, spelled the way the editor writes it, with no {@link #home} yet. */
+    public static Flow of(List<Step> steps, List<Edge> edges, List<Preset> presets,
+                          Class<? extends Outcome> start, Limits limits) {
+        return new Flow(steps, edges, presets, Activity.of(start), limits, null);
+    }
+
+    /** This flow, getting the game back to a known screen with {@code home} — {@code Gamebot::goHome}. */
+    public Flow home(Runnable home) {
+        return new Flow(steps, edges, presets, start, limits, home);
     }
 
     /**
-     * One activity's step, switched on, with no description, no go-home, no popup check and no outcome of its
-     * own; each of those is a link after it ({@link Step#described}, {@link Step#off}, {@link Step#goesHome},
-     * {@link Step#checksPopups}, {@link Step#reports}).
+     * One activity's step, switched on, with no description, no go-home, no popup check and no off-wire; each
+     * of those is a link after it ({@link Step#described}, {@link Step#off}, {@link Step#goesHome},
+     * {@link Step#checksPopups}, {@link Step#whenOff}).
      *
-     * @param activity which activity this is — an {@code Activities} constant
-     * @param body     the work, as a method reference — {@code Collect::body}
+     * @param activity which activity this is — {@code Activities.Collect.class}
+     * @param body     the work, as a method reference returning that enum — {@code Collect::body}; or
+     *                 {@link ActivityBody#none()} for a card not written yet
+     * @param <O>      the activity's enum, which the body returns
      */
-    public static Step activity(Activity activity, ActivityBody body) {
-        return new Step(activity, body, "", true, false, false, List.of());
+    public static <O extends Outcome> Step activity(Class<O> activity, ActivityBody<O> body) {
+        return new Step(Activity.of(activity), body, "", true, false, false, Activity.NONE);
     }
 
     /** One named selection of enable flags: the activities it lists are on, every other one is off. */
-    public static Preset preset(String name, List<Activity> activities) {
-        return new Preset(name, activities);
+    public static Preset preset(String name, List<Class<? extends Outcome>> activities) {
+        return new Preset(name, activities == null ? List.of() : activities.stream().map(Activity::of).toList());
     }
 
-    /** One wire: leaving {@code from} on {@code outcome}, arriving at {@code to}. */
-    public static Edge edge(Activity from, Activity to, Outcome outcome) {
-        return new Edge(from, to, outcome);
+    /** One wire: leaving {@code on}'s activity when it reports {@code on}, arriving at {@code to}. */
+    public static Edge edge(Outcome on, Class<? extends Outcome> to) {
+        return new Edge(on, Activity.of(to));
     }
 
     /** What stops a run that never finishes. */
@@ -129,52 +126,47 @@ public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Act
     /**
      * One activity of a flow: the work, and everything the canvas says about it.
      *
-     * <p>A record and not a class, for the reason every value here is one: it is written into a user's file
-     * as a call and read back out of it, and a value with identity would have nothing for the second half to
-     * reconstruct. Called a step rather than an activity because {@link Activity} is the name, and this is
-     * what the flow does under it.
-     *
-     * @param activity    which activity this is — an {@code Activities} constant
+     * @param activity    which activity this is
      * @param body        the work, as a method reference — {@code Collect::body}
      * @param description one line, shown on the canvas and nowhere else
-     * @param enabled     whether it runs; a disabled activity takes its disabled wire rather than its work
-     * @param goHome      whether the bot's "get back to a known screen" step runs before this activity
+     * @param enabled     whether it runs; a disabled activity takes its off-wire rather than its work
+     * @param goHome      whether the flow's {@link Flow#home} runs before this activity
      * @param popupCheck  whether the popup guard runs while it does
-     * @param outcomes    the outcomes this activity can report — {@code Outcomes} constants — which is what the
-     *                    editor offers as wires
+     * @param whenOff     where the run goes when this activity is switched off or has no body yet;
+     *                    {@link Activity#NONE} ends the run there
      */
-    public record Step(Activity activity, ActivityBody body, String description, boolean enabled,
-                       boolean goHome, boolean popupCheck, List<Outcome> outcomes) {
+    public record Step(Activity activity, ActivityBody<?> body, String description, boolean enabled,
+                       boolean goHome, boolean popupCheck, Activity whenOff) {
 
         public Step {
             activity = activity == null ? Activity.NONE : activity;
             description = description == null ? "" : description;
-            outcomes = outcomes == null ? List.of() : List.copyOf(outcomes);
+            whenOff = whenOff == null ? Activity.NONE : whenOff;
         }
 
         /** This step with {@code description}, the one line the canvas shows. */
         public Step described(String description) {
-            return new Step(activity, body, description, enabled, goHome, popupCheck, outcomes);
+            return new Step(activity, body, description, enabled, goHome, popupCheck, whenOff);
         }
 
-        /** This step switched off: the run takes its disabled wire rather than its work. */
+        /** This step switched off: the run takes its off-wire rather than its work. */
         public Step off() {
-            return new Step(activity, body, description, false, goHome, popupCheck, outcomes);
+            return new Step(activity, body, description, false, goHome, popupCheck, whenOff);
         }
 
-        /** This step with the bot's "get back to a known screen" step run before it. */
+        /** This step with the flow's {@link Flow#home} run before it. */
         public Step goesHome() {
-            return new Step(activity, body, description, enabled, true, popupCheck, outcomes);
+            return new Step(activity, body, description, enabled, true, popupCheck, whenOff);
         }
 
         /** This step with the popup guard running while it does. */
         public Step checksPopups() {
-            return new Step(activity, body, description, enabled, goHome, true, outcomes);
+            return new Step(activity, body, description, enabled, goHome, true, whenOff);
         }
 
-        /** This step reporting {@code outcomes}, which the editor offers as its wires. */
-        public Step reports(List<Outcome> outcomes) {
-            return new Step(activity, body, description, enabled, goHome, popupCheck, outcomes);
+        /** This step going on to {@code to} when it is switched off or has no body yet. */
+        public Step whenOff(Class<? extends Outcome> to) {
+            return new Step(activity, body, description, enabled, goHome, popupCheck, Activity.of(to));
         }
 
         /** The activity's label, which is what the canvas and the trace show. */
@@ -186,9 +178,7 @@ public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Act
     /**
      * A named selection of which activities are switched on.
      *
-     * <p>Applying one sets {@link Step#enabled()} from this list and touches nothing else: the wiring, the
-     * outcomes and the limits are the same flow either way. It is a way of saying "just the gathering ones
-     * tonight" without redrawing anything.
+     * <p>Applying one sets {@link Step#enabled()} from this list and touches nothing else.
      *
      * @param name       what the editor's preset menu calls it
      * @param activities the activities this preset switches on; every other one is switched off
@@ -207,29 +197,23 @@ public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Act
     }
 
     /**
-     * One wire between two activities. {@code outcome} is {@link Outcome#NEXT} for the wire an activity takes
-     * when it reports nothing in particular, and {@link Outcome#DISABLED} for the one it takes switched off.
+     * One wire: an activity reporting {@code on} goes on to {@code to}. The activity it leaves is
+     * {@code on}'s enum ({@link #from()}).
      */
-    public record Edge(Activity from, Activity to, Outcome outcome) {
+    public record Edge(Outcome on, Activity to) {
 
         public Edge {
-            from = from == null ? Activity.NONE : from;
             to = to == null ? Activity.NONE : to;
-            outcome = outcome == null ? Outcome.NEXT : outcome;
         }
 
-        /** Whether this is the "switched off, go here instead" edge. */
-        public boolean isDisabled() {
-            return Outcome.DISABLED.equals(outcome);
+        /** The activity this wire leaves: the enum that declares {@link #on()}. */
+        public Activity from() {
+            return on == null ? Activity.NONE : on.activity();
         }
     }
 
     /**
      * What stops a run that never finishes: how many activities may run, and how long to wait between them.
-     *
-     * <p>Both were fields of the flow file and both are here rather than on the bot, because they are
-     * properties of <em>this</em> flow: a bot with a tight loop and a bot with a slow one want different
-     * numbers, and neither wants to recompile to change them.
      *
      * @param maxSteps    how many activities may run before the bot gives up; {@code 0} for no limit
      * @param stepDelayMs how long to wait between activities, in milliseconds

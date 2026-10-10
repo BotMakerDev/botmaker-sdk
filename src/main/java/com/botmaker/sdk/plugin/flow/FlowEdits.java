@@ -6,11 +6,13 @@ import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -21,166 +23,166 @@ import java.util.Set;
  * Changes to a flow as values, and the one way a changed flow is saved — the operations 🔀 Activity Flow
  * performs, for a caller with no window: the assistant's activity tools.
  *
- * <p>Each change answers a new {@link Flow} or throws {@link IllegalArgumentException} with the sentence the
- * window would show; nothing is written until {@link #save}. Links no JavaFX.
+ * <p>Each change answers a new {@link Board} — the flow and each activity's exits — or throws
+ * {@link IllegalArgumentException} with the sentence the window would show; nothing is written until
+ * {@link #save}. Links no JavaFX.
  */
 public final class FlowEdits {
 
     private FlowEdits() {}
 
     /**
-     * {@code flow} with a new activity called {@code typed}, its body the method {@code bodySource} names
-     * ({@code Collect::body}), or none yet when blank. The first activity of an empty flow is its start.
+     * {@code board} with a new activity called {@code typed}, its body the method {@code bodySource} names
+     * ({@code Collect::body}), or none yet when blank, and the one exit {@link Arrow#NEXT}. The first activity of
+     * an empty flow is its start.
      */
-    public static Flow addActivity(Flow flow, String typed, String bodySource) {
-        String label = FlowNames.label(typed);
+    public static Board addActivity(Board board, String typed, String bodySource) {
+        Flow flow = board.flow();
+        String label = FlowNames.activityLabel(typed);
         String problem = FlowNames.activityNameProblem(label, labels(flow));
         if (problem != null) throw new IllegalArgumentException(problem);
-        Flow.Step step = Flow.activity(FlowNames.activity(label), body(bodySource));
+        Flow.Step step = FlowTypes.step(FlowNames.activity(label), body(bodySource));
         List<Flow.Step> steps = new ArrayList<>(flow.steps());
         steps.add(step);
-        Activity start = flow.start() == Activity.NONE || flow.start().label().isEmpty() ? step.activity() : flow.start();
-        return Flow.of(steps, flow.edges(), flow.presets(), start, flow.limits());
+        Activity start = flow.start().isNone() ? step.activity() : flow.start();
+        Map<String, List<String>> exits = new LinkedHashMap<>(board.exits());
+        exits.put(step.label(), List.of(Arrow.NEXT));
+        return new Board(with(flow, steps, flow.edges(), flow.presets(), start), exits);
     }
 
-    /** {@code flow} with the activity {@code from} called {@code typed}, in every step, wire, preset and the start. */
-    public static Flow renameActivity(Flow flow, String from, String typed) {
+    /** {@code board} with the activity {@code from} called {@code typed}, in every step, wire, preset and the start. */
+    public static Board renameActivity(Board board, String from, String typed) {
+        Flow flow = board.flow();
         Flow.Step step = step(flow, from);
-        String label = FlowNames.label(typed);
+        String label = FlowNames.activityLabel(typed);
         Set<String> others = labels(flow);
         others.remove(step.label());
         String problem = FlowNames.activityNameProblem(label, others);
         if (problem != null) throw new IllegalArgumentException(problem);
         Activity was = step.activity();
         Activity now = FlowNames.activity(label);
-        List<Flow.Step> steps = flow.steps().stream().map(s -> s.activity().equals(was)
-                ? new Flow.Step(now, s.body(), s.description(), s.enabled(), s.goHome(), s.popupCheck(), s.outcomes())
-                : s).toList();
-        List<Flow.Edge> edges = flow.edges().stream().map(e -> Flow.edge(swap(e.from(), was, now), swap(e.to(), was, now),
-                e.outcome())).toList();
-        List<Flow.Preset> presets = flow.presets().stream().map(p -> Flow.preset(p.name(),
+        List<Flow.Step> steps = flow.steps().stream().map(s -> new Flow.Step(swap(s.activity(), was, now), s.body(),
+                s.description(), s.enabled(), s.goHome(), s.popupCheck(), swap(s.whenOff(), was, now))).toList();
+        List<Flow.Edge> edges = flow.edges().stream().map(e -> new Flow.Edge(
+                e.from().equals(was) ? BotConstants.outcome(now.name(), e.on().name()) : e.on(),
+                swap(e.to(), was, now))).toList();
+        List<Flow.Preset> presets = flow.presets().stream().map(p -> new Flow.Preset(p.name(),
                 p.activities().stream().map(a -> swap(a, was, now)).toList())).toList();
-        return Flow.of(steps, edges, presets, swap(flow.start(), was, now), flow.limits());
+        Map<String, List<String>> exits = new LinkedHashMap<>();
+        board.exits().forEach((activity, outcomes) -> exits.put(activity.equals(step.label()) ? now.label() : activity,
+                outcomes));
+        return new Board(with(flow, steps, edges, presets, swap(flow.start(), was, now)), exits);
     }
 
-    /** {@code flow} without the activity {@code name}, its wires, its place in presets, and the start if it was. */
-    public static Flow removeActivity(Flow flow, String name) {
-        Activity gone = step(flow, name).activity();
-        List<Flow.Step> steps = flow.steps().stream().filter(s -> !s.activity().equals(gone)).toList();
+    /** {@code board} without the activity {@code name}, its wires, its place in presets, and the start if it was. */
+    public static Board removeActivity(Board board, String name) {
+        Flow flow = board.flow();
+        Flow.Step removed = step(flow, name);
+        Activity gone = removed.activity();
+        List<Flow.Step> steps = flow.steps().stream().filter(s -> !s.activity().equals(gone))
+                .map(s -> s.whenOff().equals(gone) ? new Flow.Step(s.activity(), s.body(), s.description(),
+                        s.enabled(), s.goHome(), s.popupCheck(), Activity.NONE) : s).toList();
         List<Flow.Edge> edges = flow.edges().stream()
                 .filter(e -> !e.from().equals(gone) && !e.to().equals(gone)).toList();
-        List<Flow.Preset> presets = flow.presets().stream().map(p -> Flow.preset(p.name(),
+        List<Flow.Preset> presets = flow.presets().stream().map(p -> new Flow.Preset(p.name(),
                 p.activities().stream().filter(a -> !a.equals(gone)).toList())).toList();
         Activity start = flow.start().equals(gone) ? (steps.isEmpty() ? Activity.NONE : steps.getFirst().activity())
                 : flow.start();
-        return Flow.of(steps, edges, presets, start, flow.limits());
+        Map<String, List<String>> exits = new LinkedHashMap<>(board.exits());
+        exits.remove(removed.label());
+        return new Board(with(flow, steps, edges, presets, start), exits);
     }
 
     /**
-     * {@code flow} with the wire from {@code from} on {@code outcome} going to {@code to}, replacing the one that
-     * outcome had. An outcome {@code from} does not declare yet is added to it; blank is {@code NEXT}.
+     * {@code board} with the wire from {@code from} on {@code outcome} going to {@code to}, replacing the one that
+     * outcome had. An outcome {@code from} does not have yet is added to its exits; blank is {@link Arrow#NEXT},
+     * and "disabled" is where it goes switched off.
      */
-    public static Flow connect(Flow flow, String from, String outcome, String to) {
+    public static Board connect(Board board, String from, String outcome, String to) {
+        Flow flow = board.flow();
         Flow.Step source = step(flow, from);
         Activity target = step(flow, to).activity();
-        // An outcome is its constant: "bag full" is the declared BAG_FULL, not a second outcome beside it, and
-        // "next" or "disabled" is the port every activity has, never one it declares.
-        String typed = outcome == null ? "" : outcome.trim();
-        if (!typed.isEmpty() && FlowNames.constantFor(typed) == null) {
-            throw new IllegalArgumentException("'" + typed + "' is not an outcome's name.");
+        String typed = outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome.trim();
+        String constant = FlowNames.constantFor(typed);
+        if (constant == null) throw new IllegalArgumentException("'" + typed + "' is not an outcome's name.");
+        if (Arrow.DISABLED.equals(constant)) {
+            return board.with(withOff(flow, source, target));
         }
-        Outcome wired = FlowNames.outcome(typed);
-        boolean builtIn = wired.equals(Outcome.NEXT) || wired.equals(Outcome.DISABLED);
-        List<Flow.Step> steps = flow.steps();
-        if (!builtIn && !source.outcomes().contains(wired)) {
-            List<Outcome> outcomes = new ArrayList<>(source.outcomes());
-            outcomes.add(wired);
-            Flow.Step grown = source.reports(outcomes);
-            steps = flow.steps().stream().map(s -> s == source ? grown : s).toList();
+        Outcome wired = BotConstants.outcome(source.activity().name(), constant);
+        Map<String, List<String>> exits = new LinkedHashMap<>(board.exits());
+        List<String> own = new ArrayList<>(board.exitsOf(source.label()));
+        if (own.stream().noneMatch(label -> constant.equals(FlowNames.constantFor(label)))) {
+            own.add(wired.label());
+            exits.put(source.label(), own);
         }
-        List<Flow.Edge> edges = new ArrayList<>(flow.edges().stream()
-                .filter(e -> !(e.from().equals(source.activity()) && e.outcome().equals(wired))).toList());
-        edges.add(Flow.edge(source.activity(), target, wired));
-        Flow next = Flow.of(steps, edges, flow.presets(), flow.start(), flow.limits());
+        List<Flow.Edge> edges = new ArrayList<>(flow.edges().stream().filter(e -> !e.on().equals(wired)).toList());
+        edges.add(new Flow.Edge(wired, target));
+        Board next = new Board(with(flow, flow.steps(), edges, flow.presets(), flow.start()), exits);
         String problem = validate(next);
         if (problem != null) throw new IllegalArgumentException(problem);
         return next;
     }
 
     /**
-     * {@code flow} without the wire from {@code from} on {@code outcome}; blank is {@code NEXT}. The outcome stays
-     * declared — a body may still return it, and the run then stops there — so only the arrow goes.
+     * {@code board} without the wire from {@code from} on {@code outcome}; blank is {@link Arrow#NEXT}. The outcome
+     * stays — a body may still return it, and the run then stops there — so only the arrow goes.
      */
-    public static Flow disconnect(Flow flow, String from, String outcome) {
+    public static Board disconnect(Board board, String from, String outcome) {
+        Flow flow = board.flow();
         Flow.Step source = step(flow, from);
-        boolean next = outcome == null || outcome.isBlank();
-        String constant = next ? null : FlowNames.constantFor(FlowNames.label(outcome));
-        if (!next && constant == null) {
-            throw new IllegalArgumentException("'" + outcome.trim() + "' is not an outcome's name.");
+        String typed = outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome.trim();
+        String constant = FlowNames.constantFor(FlowNames.label(typed));
+        if (constant == null) throw new IllegalArgumentException("'" + typed + "' is not an outcome's name.");
+        if (Arrow.DISABLED.equals(constant)) {
+            if (source.whenOff().isNone()) throw new IllegalArgumentException(source.label() + " has no wire on " + typed + ".");
+            return board.with(withOff(flow, source, Activity.NONE));
         }
         List<Flow.Edge> kept = new ArrayList<>();
         Flow.Edge gone = null;
         for (Flow.Edge edge : flow.edges()) {
-            boolean match = edge.from().equals(source.activity()) && (constant == null
-                    ? edge.outcome().equals(Outcome.NEXT)
-                    : constant.equals(FlowNames.constantFor(edge.outcome().label())));
+            boolean match = edge.from().equals(source.activity()) && constant.equals(edge.on().name());
             if (match && gone == null) gone = edge;
             else kept.add(edge);
         }
-        if (gone == null) {
-            throw new IllegalArgumentException(source.label() + " has no wire on "
-                    + (outcome == null || outcome.isBlank() ? Arrow.NEXT : outcome.trim()) + ".");
-        }
-        return Flow.of(flow.steps(), kept, flow.presets(), flow.start(), flow.limits());
+        if (gone == null) throw new IllegalArgumentException(source.label() + " has no wire on " + typed + ".");
+        return board.with(with(flow, flow.steps(), kept, flow.presets(), flow.start()));
     }
 
-    /** {@code flow} starting at the activity {@code name}. */
-    public static Flow setStart(Flow flow, String name) {
-        return Flow.of(flow.steps(), flow.edges(), flow.presets(), step(flow, name).activity(), flow.limits());
+    /** {@code board} starting at the activity {@code name}. */
+    public static Board setStart(Board board, String name) {
+        Flow flow = board.flow();
+        return board.with(with(flow, flow.steps(), flow.edges(), flow.presets(), step(flow, name).activity()));
     }
 
     /**
-     * Why {@code flow} cannot be written — a label that makes no constant, two labels making one, an outcome
-     * that clashes — or null. 🔀 Activity Flow's rule (its {@code validate} says why it is this short), here so a
-     * caller with no window checks the same.
+     * Why {@code board} cannot be written — a label that makes no name, two labels making one, an outcome that
+     * clashes — or null. 🔀 Activity Flow's rule, here so a caller with no window checks the same.
      */
-    public static String validate(Flow flow) {
-        Map<String, String> activityConstants = new HashMap<>();
-        Map<String, String> outcomeConstants = new HashMap<>();
-        for (Flow.Step step : flow.steps()) {
+    public static String validate(Board board) {
+        Map<String, String> activityTypes = new HashMap<>();
+        for (Flow.Step step : board.flow().steps()) {
             String name = step.label();
-            String constant = FlowNames.constantFor(name);
-            if (constant == null) {
-                return "'" + name + "' can't become a constant in Activities.java — start it with a letter.";
+            String type = FlowNames.typeFor(name);
+            if (type == null) {
+                return "'" + name + "' can't become a name in " + FlowNames.ACTIVITIES + ".java — start it with a letter.";
             }
-            String clash = activityConstants.putIfAbsent(constant, name);
+            String clash = activityTypes.putIfAbsent(type, name);
             if (clash != null) {
                 return clash.equals(name) ? "Duplicate activity name: '" + name + "'."
-                        : "'" + name + "' and '" + clash + "' would both be Activities." + constant + ".";
+                        : "'" + name + "' and '" + clash + "' would both be " + FlowNames.ACTIVITIES + "." + type + ".";
             }
-            // Checked against the declared list, not allOutcomes(): that one de-duplicates defensively, so
-            // validating it would report a clash as clean and leave the user with an outcome that silently
-            // has no port.
             Set<String> own = new HashSet<>();
-            for (Outcome declared : step.outcomes()) {
-                String outcome = declared.label();
-                String outcomeConstant = FlowNames.constantFor(outcome);
-                if (outcomeConstant == null) {
+            for (String outcome : board.exitsOf(name)) {
+                String constant = FlowNames.constantFor(outcome);
+                if (constant == null) {
                     return "Invalid outcome in " + name + ": '" + outcome + "' can't become a constant in "
-                            + "Outcomes.java.";
+                            + FlowNames.ACTIVITIES + "." + type + ".";
                 }
-                if (Arrow.NEXT.equals(outcomeConstant)) {
-                    return name + " already has a NEXT outcome — every activity does.";
-                }
-                if (Arrow.DISABLED.equals(outcomeConstant)) {
-                    return name + " can't declare a DISABLED outcome — that port is always there, "
+                if (Arrow.DISABLED.equals(constant)) {
+                    return name + " can't have a DISABLED outcome — that port is always there, "
                             + "and an activity can't report it because it didn't run.";
                 }
-                if (!own.add(outcomeConstant)) return "Duplicate outcome '" + outcome + "' in " + name + ".";
-                String other = outcomeConstants.putIfAbsent(outcomeConstant, outcome);
-                if (other != null && !other.equals(outcome)) {
-                    return "'" + outcome + "' and '" + other + "' would both be Outcomes." + outcomeConstant + ".";
-                }
+                if (!own.add(constant)) return "Duplicate outcome '" + outcome + "' in " + name + ".";
             }
         }
         return null;
@@ -194,51 +196,26 @@ public final class FlowEdits {
     }
 
     /**
-     * Writes {@code flow} into {@code value}: the {@code Activities} and {@code Outcomes} constants first, then
-     * the flow, then the constants it no longer names — the order 🔀 Activity Flow's save keeps (see
-     * {@link FlowConstants}). A rename that lands is taken out of its map. On the FX thread.
+     * Writes {@code board} into {@code value}: the {@code Activities} enums first, then the flow, then what it no
+     * longer names — the order 🔀 Activity Flow's save keeps (see {@link FlowConstants}). A rename that lands is
+     * taken out of its map. On the FX thread.
      *
-     * @param saved    the activity and outcome labels the project held before
-     * @param notes    collects what was left undone without stopping the save
+     * @param saved           the activity labels the project held before
+     * @param activityRenames activity label at last save → label now
+     * @param outcomeRenames  activity label now → outcome label at last save → label now
+     * @param notes           collects what was left undone without stopping the save
      * @return null when written, else why not
      */
-    public static String save(PluginValues values, ValueContext value, Flow flow, Saved saved,
-                              Map<String, String> activityRenames, Map<String, String> outcomeRenames,
+    public static String save(PluginValues values, ValueContext value, Board board, Set<String> saved,
+                              Map<String, String> activityRenames, Map<String, Map<String, String>> outcomeRenames,
                               List<String> notes) {
-        String problem = validate(flow);
+        String problem = validate(board);
         if (problem != null) return problem;
-        Set<String> activities = FlowConstants.activityLabels(flow);
-        Set<String> outcomes = FlowConstants.outcomeLabels(flow);
-        String refused = FlowConstants.prepare(values, FlowConstants.Kind.ACTIVITIES, activities, activityRenames);
-        if (refused == null) {
-            refused = FlowConstants.prepare(values, FlowConstants.Kind.OUTCOMES, outcomes, outcomeRenames);
-        }
-        if (refused == null) refused = FlowConstants.unheld(values, FlowConstants.Kind.ACTIVITIES, flow);
-        if (refused == null) refused = FlowConstants.unheld(values, FlowConstants.Kind.OUTCOMES, flow);
-        if (refused == null) refused = FlowValue.write(value, flow);
-        if (refused == null) {
-            FlowConstants.forget(values, FlowConstants.Kind.ACTIVITIES, without(saved.activities(), activities), notes);
-            FlowConstants.forget(values, FlowConstants.Kind.OUTCOMES, without(saved.outcomes(), outcomes), notes);
-        }
+        String refused = FlowConstants.prepare(values, board, activityRenames, outcomeRenames);
+        if (refused == null) refused = FlowConstants.unheld(values, board.flow());
+        if (refused == null) refused = FlowValue.write(value, board.flow());
+        if (refused == null) FlowConstants.forget(values, board, saved, notes);
         return refused;
-    }
-
-    /** The activity and outcome labels a project held when a flow was last read or written. */
-    public record Saved(Set<String> activities, Set<String> outcomes) {
-        public Saved {
-            activities = Set.copyOf(activities);
-            outcomes = Set.copyOf(outcomes);
-        }
-
-        public static Saved of(Flow flow) {
-            return new Saved(FlowConstants.activityLabels(flow), FlowConstants.outcomeLabels(flow));
-        }
-    }
-
-    private static Set<String> without(Set<String> before, Set<String> now) {
-        Set<String> gone = new LinkedHashSet<>(before);
-        gone.removeAll(now);
-        return gone;
     }
 
     /** The label {@code flow} holds for the activity {@code name} names, matched as every change here matches it. */
@@ -257,12 +234,25 @@ public final class FlowEdits {
         throw new IllegalArgumentException("No activity called '" + name + "'; there are " + labels(flow));
     }
 
+    /** {@code flow} with these parts, its limits and home kept. */
+    static Flow with(Flow flow, List<Flow.Step> steps, List<Flow.Edge> edges, List<Flow.Preset> presets,
+                     Activity start) {
+        return new Flow(steps, edges, presets, start, flow.limits(), flow.home());
+    }
+
+    private static Flow withOff(Flow flow, Flow.Step source, Activity to) {
+        List<Flow.Step> steps = flow.steps().stream().map(s -> s == source ? new Flow.Step(s.activity(), s.body(),
+                s.description(), s.enabled(), s.goHome(), s.popupCheck(), to) : s).toList();
+        return with(flow, steps, flow.edges(), flow.presets(), flow.start());
+    }
+
     private static Activity swap(Activity activity, Activity was, Activity now) {
         return activity.equals(was) ? now : activity;
     }
 
-    private static ActivityBody body(String source) {
-        if (source == null || source.isBlank()) return ActivityBody.NONE;
+    private static ActivityBody<?> body(String source) {
+        // Blank is the card not written yet, held as the editor reads one back: written ActivityBody.none().
+        if (source == null || source.isBlank()) return FlowTypes.body("");
         String trimmed = source.trim();
         if (!FlowNames.isMethodReference(trimmed)) {
             throw new IllegalArgumentException("'" + trimmed + "' is not a method reference like Collect::body");

@@ -4,45 +4,39 @@ import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 
 /**
- * A constant of the bot's own {@code Activities} or {@code Outcomes} enum, by its name — what an editor that
- * cannot load the bot's classes holds instead of {@code Outcomes.WON} (2026-10-10).
+ * The bot's own activities and outcomes by name — what an editor that cannot load the bot's classes holds
+ * instead of {@code Activities.Collect.class} and {@code Activities.Collect.WON} (2026-10-10).
  *
- * <p>The host reads each constant of those enums as {@link #outcome} or {@link #activity} of its name
- * ({@code ManagedValue.byName}), and writes a value equal to one back as that constant. Two of these are equal
- * when their names are; a bot's own constants never meet one at run time, where a flow holds the enum's.
+ * <p>The host reads each enum nested in the bot's {@code Activities} class as {@link #activity} of its name
+ * ({@code ManagedValue.groupedAs}) and each of its constants as {@link #outcome} of the two names
+ * ({@code ManagedValue.ofEnums}), and writes a value equal to one back as that class literal or constant. An
+ * outcome carries its enum's name, so {@code Battle.NEXT} and {@code Collect.NEXT} stay two outcomes. A bot's own
+ * constants never meet one at run time, where a flow holds the enums'.
  */
 public final class BotConstants {
 
     private BotConstants() {}
 
-    /** The bot's outcome constant {@code name}, as an editor holds it. */
-    public record OutcomeConstant(String name) implements Outcome {
+    /** The bot's constant {@code name} of the activity enum {@code activity}, as an editor holds it. */
+    public record OutcomeConstant(String activityName, String name) implements Outcome {
+        @Override
+        public Activity activity() {
+            return new Activity(activityName);
+        }
+
         @Override
         public String toString() {
-            return name;
+            return activityName + "." + name;
         }
     }
 
-    /** The bot's activity constant {@code name}, as an editor holds it. */
-    public record ActivityConstant(String name) implements Activity {
-        @Override
-        public String toString() {
-            return name;
-        }
+    /** The constant {@code name} of the activity enum {@code activity}. */
+    public static Outcome outcome(String activity, String name) {
+        return new OutcomeConstant(activity == null ? "" : activity, name == null ? "" : name);
     }
 
-    /**
-     * The outcome the constant {@code name} stands for: {@link Outcome#NEXT} for none or {@code "NEXT"},
-     * {@link Outcome#DISABLED} for {@code "DISABLED"}, else the bot's constant of that name.
-     */
-    public static Outcome outcome(String name) {
-        if (name == null || name.isBlank() || name.equals(Outcome.NEXT.name())) return Outcome.NEXT;
-        if (name.equals(Outcome.DISABLED.name())) return Outcome.DISABLED;
-        return new OutcomeConstant(name);
-    }
-
-    /** The activity the constant {@code name} stands for: {@link Activity#NONE} for none. */
+    /** The activity enum {@code name}: {@link Activity#NONE} for none. */
     public static Activity activity(String name) {
-        return name == null || name.isBlank() ? Activity.NONE : new ActivityConstant(name);
+        return name == null || name.isBlank() ? Activity.NONE : new Activity(name);
     }
 }

@@ -27,7 +27,7 @@ import java.lang.annotation.Target;
  * }
  * }</pre>
  *
- * <p>{@code Bot.run(…, Sdk.class)} reads each marked method off the class it is given and applies the value
+ * <p>{@code Bot.runFlow(Sdk.class)} reads each marked method off the class it is given and applies the value
  * before the first click. Everywhere else a marked member is ordinary Java: a misspelt {@link Id} is a
  * compile error, and a developer with no BotMaker installed reads the whole bot by opening its files.
  */
@@ -52,10 +52,8 @@ public @interface SdkValue {
         SETTINGS,
         /** The pictures the bot looks for — a class of {@code ImageTemplate} constants. */
         PICTURES,
-        /** The cards of the Activity Flow — a class of {@code Activity} constants. */
+        /** The cards of the Activity Flow — a class of enums, one per activity, whose {@link Outcome} constants are its exits. */
         ACTIVITIES,
-        /** What activities report — a class of {@link Outcome} constants. */
-        OUTCOMES,
         /** Named spots — a class of {@code Point} constants. */
         POINTS,
         /** Named areas — a class of {@code Rect} constants. */

@@ -8,6 +8,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.internal.flow.Labels;
 import com.botmaker.sdk.plugin.flow.FlowConstants;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
@@ -19,20 +20,20 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.TextInputDialog;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
  * The editors of the two values that tie a bot's code to its Activity Flow canvas: an {@link Activity}
- * ({@code ActivitySwitch.disable(Activities.MINING)}) and an {@link Outcome} ({@code return Outcomes.BAG_FULL;}).
+ * (an activity's enum, {@code Activities.Mining.class}) and an {@link Outcome} ({@code return
+ * Activities.Mining.BAG_FULL;}).
  *
- * <p>Both are claimed by type: the editor hands back the constant a label names, held by name
- * ({@code FlowNames.activity("Mining")}), and the host writes it as the bot's constant — {@code Activities.MINING}
- * — so what the picker writes is bound, not spelled.
+ * <p>Both are claimed by type: the editor hands back the name a label makes, held by name
+ * ({@code FlowNames.activity("Mining")}), and the host writes it as the bot's own — {@code Activities.Mining.class},
+ * {@code Activities.Mining.BAG_FULL} — so what the picker writes is bound, not spelled.
  *
  * <p><b>The list is read from the project's own {@code Sdk.flow()}, not from a running bot.</b> The canvas
  * is the source of truth and what it writes is one expression in the bot's Java, so {@link FlowValue} is the
@@ -58,18 +59,18 @@ public final class ActivityEditors {
     }
 
     /**
-     * An outcome — the outcomes of the activity whose body the slot sits in.
+     * An outcome — a constant of the activity whose body the slot sits in.
      *
      * <p>The flow links a body by the same text the host reports as the slot's enclosing method
-     * ({@code Collect::body}), so the activities whose body is that method are the ones asked. When none is —
-     * a helper method a body calls, a body not wired yet, a slot outside a method — the list is every outcome
-     * the project declares, duplicates collapsed.
-     *
-     * <p>{@code NEXT} heads the list: it is the outcome every activity has without declaring one.
+     * ({@code Collect::body}), so the activity whose body is that method is the one asked, and its enum's
+     * constants are listed by their labels. When none is — a helper method a body calls, a body not wired yet, a
+     * slot outside a method — the list is every activity's, each as {@code "Activity: Outcome"}.
      */
     public static Node outcome(ValueContext ctx) {
-        return labelBox(ctx, () -> outcomeLabels(ctx), "Outcome",
-                ctx.value(Outcome.class).map(Outcome::label).orElse(""), FlowNames::outcome, () -> newOutcome(ctx));
+        String owner = owner(ctx);
+        String current = ctx.value(Outcome.class).map(outcome -> qualified(owner, outcome)).orElse("");
+        return labelBox(ctx, () -> outcomeLabels(ctx.services(), owner), "Outcome", current,
+                label -> outcomeOf(owner, label), owner == null ? null : () -> newOutcome(ctx, owner));
     }
 
     /**
@@ -134,41 +135,26 @@ public final class ActivityEditors {
     }
 
     /**
-     * Asks for an outcome's label, declares its {@code Outcomes} constant, and adds it to the outcomes of the
-     * activity whose body holds the slot — so the canvas draws its port. Empty when cancelled or refused, the
-     * refusal said in an alert.
+     * Asks for an outcome's label and declares it in the enum of the activity {@code owner} — so its body may
+     * return it and the canvas draws its port. Empty when cancelled or refused, the refusal said in an alert.
      */
-    private static Optional<String> newOutcome(ValueContext ctx) {
+    private static Optional<String> newOutcome(ValueContext ctx, String owner) {
         StudioServices services = ctx.services();
         TextInputDialog prompt = new TextInputDialog();
         services.theme().apply(prompt);
         prompt.initOwner(Modals.owner(services));
         prompt.setTitle("New outcome");
-        prompt.setHeaderText("What can this activity report?");
+        prompt.setHeaderText("What can " + owner + " report?");
         prompt.setContentText("Outcome:");
         Optional<String> typed = prompt.showAndWait().map(FlowNames::label).filter(label -> !label.isEmpty());
         if (typed.isEmpty()) return Optional.empty();
         String label = typed.get();
 
-        String method = ctx.slot().flatMap(SlotContext::enclosingMethodSource).orElse(null);
-        Flow flow = flow(ctx);
-        List<Flow.Step> own = ownSteps(flow, method);
-        List<String> declared = new ArrayList<>();
-        Set<String> elsewhere = new LinkedHashSet<>();
-        for (Flow.Step step : flow.steps()) {
-            List<String> labels = step.outcomes().stream().map(Outcome::label).toList();
-            if (own.contains(step)) declared.addAll(labels);
-            else elsewhere.addAll(labels);
-        }
-        String owner = own.isEmpty() ? "this activity" : own.getFirst().label();
-        String problem = FlowNames.outcomeProblem(declared, elsewhere, owner, label, null);
-        if (problem == null && declared.contains(label)) return typed;   // already this activity's: just pick it
+        List<String> declared = outcomeLabels(services, owner);
+        String problem = FlowNames.outcomeProblem(declared, owner, label, null);
+        if (declared.contains(label)) return typed;   // already this activity's: just pick it
         Optional<String> refused = problem != null ? Optional.of(problem)
-                : FlowConstants.declare(services.pluginValues(), FlowConstants.Kind.OUTCOMES, label);
-        if (refused.isEmpty() && !own.isEmpty()) {
-            refused = Optional.ofNullable(FlowValue.FLOW.write(services,
-                    FlowConstants.withOutcome(flow, method, FlowNames.outcome(label))));
-        }
+                : FlowConstants.declare(services.pluginValues(), FlowNames.typeFor(owner), label);
         if (refused.isPresent()) {
             Alert alert = services.theme().alert(Alert.AlertType.INFORMATION, refused.get(), ButtonType.OK);
             alert.initOwner(Modals.owner(services));
@@ -188,27 +174,55 @@ public final class ActivityEditors {
         return labels;
     }
 
-    private static List<String> outcomeLabels(ValueContext ctx) {
-        String method = ctx.slot().flatMap(SlotContext::enclosingMethodSource).orElse(null);
-        return outcomeLabels(flow(ctx), method);
+    /**
+     * The outcomes the project's enums declare: the labels of {@code owner}'s constants, or every activity's as
+     * {@code "Activity: Outcome"} when {@code owner} is null.
+     */
+    private static List<String> outcomeLabels(StudioServices services, String owner) {
+        return outcomeLabels(FlowConstants.declared(services.pluginValues()), owner);
     }
 
-    /** {@code NEXT}, then the outcomes of the steps whose body is {@code method}, or every step's when none is. */
-    static List<String> outcomeLabels(Flow flow, String method) {
-        List<Flow.Step> own = ownSteps(flow, method);
-        Set<String> labels = new LinkedHashSet<>();
-        labels.add(Outcome.NEXT.label());
-        for (Flow.Step step : own.isEmpty() ? flow.steps() : own) {
-            for (Outcome outcome : step.outcomes()) labels.add(outcome.label());
+    /** {@link #outcomeLabels(StudioServices, String)} over the enums {@code declared}, name → constants. */
+    static List<String> outcomeLabels(Map<String, List<String>> declared, String owner) {
+        List<String> labels = new ArrayList<>();
+        for (Map.Entry<String, List<String>> activity : declared.entrySet()) {
+            boolean own = owner != null && activity.getKey().equals(FlowNames.typeFor(owner));
+            if (owner != null && !own) continue;
+            for (String constant : activity.getValue()) {
+                labels.add(own ? Labels.of(constant) : Labels.of(activity.getKey()) + SEPARATOR + Labels.of(constant));
+            }
         }
-        return List.copyOf(labels);
+        return labels;
     }
 
-    /** The steps whose body is written {@code method}; empty for a slot in no activity's body. */
-    private static List<Flow.Step> ownSteps(Flow flow, String method) {
-        return method == null || method.isEmpty() ? List.of() : flow.steps().stream()
-                .filter(step -> method.equals(FlowValue.bodySource(step)))
-                .toList();
+    /** Between an activity and an outcome in a label that names both. */
+    private static final String SEPARATOR = ": ";
+
+    /** {@code outcome} as the box shows it: bare when it is {@code owner}'s, else with its activity. */
+    private static String qualified(String owner, Outcome outcome) {
+        String activity = outcome.activity().label();
+        return owner != null && owner.equals(activity) ? outcome.label() : activity + SEPARATOR + outcome.label();
+    }
+
+    /** The outcome a label in the box names: one of {@code owner}'s, or {@code "Activity: Outcome"}. */
+    static Outcome outcomeOf(String owner, String label) {
+        if (owner != null) return FlowNames.outcome(owner, label);
+        int at = label.indexOf(SEPARATOR);
+        return at < 0 ? FlowNames.outcome("", label)
+                : FlowNames.outcome(label.substring(0, at), label.substring(at + SEPARATOR.length()));
+    }
+
+    /**
+     * The label of the activity whose body holds the slot: the step whose body is written as the slot's
+     * enclosing method. Null for a slot in no activity's body.
+     */
+    private static String owner(ValueContext ctx) {
+        String method = ctx.slot().flatMap(SlotContext::enclosingMethodSource).orElse(null);
+        if (method == null || method.isEmpty()) return null;
+        for (Flow.Step step : flow(ctx).steps()) {
+            if (method.equals(FlowValue.bodySource(step))) return step.label();
+        }
+        return null;
     }
 
     /** The open project's flow, or {@link Flow#NONE}: a project with no flow yet draws an empty list. */

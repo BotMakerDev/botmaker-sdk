@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.types.FlowTypes;
@@ -40,7 +39,7 @@ public final class ActivityDraft {
      */
     private final ObservableList<String> outcomes = FXCollections.observableArrayList();
 
-    /** Run the home method handed to {@code Bot.run} before this activity. On by default; see the card's tick. */
+    /** Run the flow's home method ({@code Flow.home}) before this activity. On by default; see the card's tick. */
     private final BooleanProperty goHome = new SimpleBooleanProperty(true);
 
     /** Let the popup guard dismiss popups during this activity. On by default; see the card's tick. */
@@ -57,7 +56,7 @@ public final class ActivityDraft {
      * one fact, checked by the compiler, instead of a second key kept in step by hand.
      *
      * <p>Blank for a card added on the canvas whose method has not been written yet, which is an ordinary
-     * way to work: it is written as {@code ActivityBody.NONE}, the flow walks through the card, and the card
+     * way to work: it is written as {@code ActivityBody.none()}, the flow walks through the card, and the card
      * does nothing until the "Runs" box names a method.
      *
      * <p>Not a property, because nothing may observe it and nothing may bind to it.
@@ -82,23 +81,28 @@ public final class ActivityDraft {
         this.y = y;
     }
 
-    /** A draft of an activity of the stored flow, placed at {@code (x, y)} — carrying its body reference. */
-    public static ActivityDraft of(Flow.Step step, double x, double y) {
+    /**
+     * A draft of an activity of the stored flow, placed at {@code (x, y)} — carrying its body reference.
+     * {@code exits} are its enum's outcomes ({@link Board#exitsOf}); {@link Arrow#NEXT} is the card's plain port,
+     * not one of {@link #outcomes()}.
+     */
+    public static ActivityDraft of(Flow.Step step, List<String> exits, double x, double y) {
         return new ActivityDraft(step.label(), step.description(), step.enabled(),
-                step.outcomes().stream().map(Outcome::label).toList(), step.goHome(), step.popupCheck(), x, y,
-                FlowTypes.sourceOf(step.body()));
+                exits.stream().filter(label -> !Arrow.NEXT.equals(label)).toList(), step.goHome(), step.popupCheck(),
+                x, y, FlowTypes.sourceOf(step.body()));
     }
 
     /**
-     * The value this draft currently describes, <b>with the body reference it came in with</b>.
+     * The value this draft currently describes, <b>with the body reference it came in with</b>, and going
+     * nowhere when switched off: the canvas's {@link Arrow#DISABLED} arrow is the caller's to set.
      *
      * <p>Carrying the body through is the whole reason {@link #body} is a field. Rebuilding the activity
      * from the draft's visible fields alone would hand back one whose work was blank, which is how a rename
      * on the canvas would come to unwire a card from the code behind it.
      */
-    public Flow.Step toStep() {
+    public Flow.Step toStep(Activity whenOff) {
         return new Flow.Step(FlowNames.activity(name.get()), FlowTypes.body(body), description.get(), enabled.get(),
-                goHome.get(), popupCheck.get(), outcomes.stream().map(FlowNames::outcome).toList());
+                goHome.get(), popupCheck.get(), whenOff);
     }
 
     /**

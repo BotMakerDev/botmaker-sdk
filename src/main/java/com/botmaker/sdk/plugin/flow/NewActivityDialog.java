@@ -47,8 +47,6 @@ public final class NewActivityDialog {
     private final StudioServices services;
     /** The activity names already on the canvas — a new one may not collide with them. */
     private final Collection<String> taken;
-    /** The outcomes the other cards declare: reusing one is fine, a second spelling of one is not. */
-    private final Collection<String> knownOutcomes;
     private final boolean goHomeByDefault;
 
     private final ObservableList<String> outcomes = FXCollections.observableArrayList();
@@ -63,11 +61,10 @@ public final class NewActivityDialog {
     private ActivityDraft created;
 
     public NewActivityDialog(Window owner, StudioServices services, Collection<String> taken,
-                             Collection<String> knownOutcomes, boolean goHomeByDefault) {
+                             boolean goHomeByDefault) {
         this.owner = owner;
         this.services = services;
         this.taken = taken;
-        this.knownOutcomes = knownOutcomes;
         this.goHomeByDefault = goHomeByDefault;
     }
 
@@ -132,7 +129,7 @@ public final class NewActivityDialog {
         Button add = new Button("Add");
         Runnable addOutcome = () -> {
             String candidate = FlowNames.label(newOutcome.getText());
-            String problem = FlowNames.outcomeProblem(outcomes, knownOutcomes, activityLabel(), candidate, null);
+            String problem = FlowNames.outcomeProblem(outcomes, activityLabel(), candidate, null);
             if (problem != null) { error.setText(problem); return; }
             outcomes.add(candidate);
             newOutcome.clear();
@@ -187,7 +184,7 @@ public final class NewActivityDialog {
     }
 
     private void commit(double x, double y) {
-        String candidate = FlowNames.label(name.getText());
+        String candidate = FlowNames.activityLabel(name.getText());
         String problem = FlowNames.activityNameProblem(candidate, taken);
         if (problem != null) {
             error.setText(problem);
@@ -199,7 +196,7 @@ public final class NewActivityDialog {
         // the canvas already shows a disabled card greyed out if you change your mind.
         //
         // No body yet, which is an ordinary state and not a half-made card: drawing the flow before writing
-        // the methods is a way people work, the card is written as ActivityBody.NONE, and the "Runs" box in
+        // the methods is a way people work, the card is written as ActivityBody.none(), and the "Runs" box in
         // the side panel is where the method reference goes when it exists.
         created = new ActivityDraft(candidate, text, true, List.copyOf(outcomes),
                 goHome.isSelected(), popupCheck.isSelected(), x, y);

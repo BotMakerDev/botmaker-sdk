@@ -22,15 +22,15 @@ import java.util.List;
 /**
  * The SDK's managed values, each declared once, and what a run does with each one.
  *
- * <p>Nine declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
+ * <p>Eight declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
  * plugin lists {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOW} is the activity
  * flow, {@code FLOW_LAYOUT} where the flow editor draws each card (a run ignores it), {@code CAPTURE} where
  * pixels are read from, {@code SETTINGS} how it clicks and looks, and {@code PICTURES}, {@code ACTIVITIES},
- * {@code OUTCOMES}, {@code POINTS} and {@code REGIONS} the classes of constants the bot grows.
+ * {@code POINTS} and {@code REGIONS} the classes of constants the bot grows.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract
- * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#run} calls
+ * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
  * {@link #claim()} before installing, which is the only ordering anyone has to get right.
  */
 public final class SdkValues {
@@ -73,25 +73,17 @@ public final class SdkValues {
                     + " use of it together.");
 
     /**
-     * The activity constants — {@code enum Activities implements Activity { COLLECT, BATTLE }}. 🔀 Activity Flow
-     * adds, renames and removes them with the cards, together with every step, wire, preset and
-     * {@code ActivitySwitch} call naming them.
+     * The activities, each an enum of its outcomes nested in one class —
+     * {@code final class Activities { enum Collect implements Outcome { NEXT, NOTHING_LEFT } }} (2026-10-10).
+     * 🔀 Activity Flow adds, renames and removes an enum with its card and a constant with its exit, together with
+     * every step, wire, preset, body and {@code ActivitySwitch} call naming them.
      */
-    public static final ManagedValue<Activity> ACTIVITIES = ManagedValue.openSet(SdkValue.Id.ACTIVITIES)
-            .ofEnum(Activity.class, BotConstants::activity)
+    public static final ManagedValue<Outcome> ACTIVITIES = ManagedValue.openSet(SdkValue.Id.ACTIVITIES)
+            .ofEnums(Outcome.class, BotConstants::outcome)
+            .groupedAs(Activity.class, BotConstants::activity)
             .in("Activities")
-            .because("Activities are managed in 🔀 Activity Flow, which renames the card and every use of it"
-                    + " together.");
-
-    /**
-     * The outcome constants — {@code enum Outcomes implements Outcome { WON, LOST }}. 🔀 Activity Flow adds,
-     * renames and removes them with the cards' outcomes, together with every body returning one.
-     */
-    public static final ManagedValue<Outcome> OUTCOMES = ManagedValue.openSet(SdkValue.Id.OUTCOMES)
-            .ofEnum(Outcome.class, BotConstants::outcome)
-            .in("Outcomes")
-            .because("Outcomes are managed in 🔀 Activity Flow, which renames the outcome and every use of it"
-                    + " together.");
+            .because("Activities and their outcomes are managed in 🔀 Activity Flow, which renames the card or the"
+                    + " exit and every use of it together.");
 
     /**
      * The named spots — {@code static final Point CLAIM = new Point(412, 230)}, in the bot's pixels, which is what
@@ -114,9 +106,9 @@ public final class SdkValues {
             .because("Regions.java holds the bot's named areas. Ask Claude to save_region an area again, under"
                     + " its name, to move it.");
 
-    /** All nine, in the order the plugin declares them. */
+    /** All eight, in the order the plugin declares them. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOW, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            ACTIVITIES, OUTCOMES, POINTS, REGIONS);
+            ACTIVITIES, POINTS, REGIONS);
 
     private static boolean claimed;
 

@@ -20,11 +20,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Switching the flow's activities on and off, and the activity and outcome values. */
 class ActivitySwitchTest {
 
-    /** A bot's activities, as its {@code Activities.java} holds them. */
-    enum Activities implements Activity { MINING, SELLING, NOTHING }
+    /** A bot's activities, as its {@code Activities.java} holds them: one enum of outcomes each. */
+    static final class Activities {
+        enum Mining implements Outcome { NEXT, BAG_FULL, HP_BELOW_50 }
 
-    private static final Activity MINING = Activities.MINING;
-    private static final Activity SELLING = Activities.SELLING;
+        enum Selling implements Outcome { NEXT }
+
+        enum DailyReward implements Outcome { NEXT }
+    }
 
     @AfterEach
     void tearDown() {
@@ -33,11 +36,11 @@ class ActivitySwitchTest {
     }
 
     private static void install(Flow.Step... steps) {
-        Flows.use(Flow.of(List.of(steps), List.of(), List.of(), Activity.NONE, Flow.Limits.DEFAULT));
+        Flows.use(Flow.of(List.of(steps), List.of(), List.of(), null, Flow.Limits.DEFAULT));
     }
 
-    private static Flow.Step step(Activity activity, boolean enabled) {
-        Flow.Step step = Flow.activity(activity, ActivityBody.NONE);
+    private static Flow.Step step(Class<? extends Outcome> activity, boolean enabled) {
+        Flow.Step step = Flow.activity(activity, ActivityBody.none());
         return enabled ? step : step.off();
     }
 
@@ -45,76 +48,79 @@ class ActivitySwitchTest {
 
     @Test
     void anActivityDefersToTheFlowsOwnSwitch() {
-        install(step(MINING, false), step(SELLING, true));
+        install(step(Activities.Mining.class, false), step(Activities.Selling.class, true));
 
-        assertFalse(ActivitySwitch.active(MINING));
-        assertTrue(ActivitySwitch.active(SELLING));
+        assertFalse(ActivitySwitch.active(Activities.Mining.class));
+        assertTrue(ActivitySwitch.active(Activities.Selling.class));
     }
 
     @Test
     void anOverrideOutranksTheFlowInBothDirections() {
-        install(step(MINING, false));
+        install(step(Activities.Mining.class, false));
 
-        ActivitySwitch.enable(MINING);
-        assertTrue(ActivitySwitch.active(MINING));
-        ActivitySwitch.disable(MINING);
-        assertFalse(ActivitySwitch.active(MINING));
-        ActivitySwitch.setEnabled(MINING, true);
-        assertTrue(ActivitySwitch.active(MINING));
+        ActivitySwitch.enable(Activities.Mining.class);
+        assertTrue(ActivitySwitch.active(Activities.Mining.class));
+        ActivitySwitch.disable(Activities.Mining.class);
+        assertFalse(ActivitySwitch.active(Activities.Mining.class));
+        ActivitySwitch.setEnabled(Activities.Mining.class, true);
+        assertTrue(ActivitySwitch.active(Activities.Mining.class));
     }
 
     /** The "do this once, then stop" pattern, from inside the body. */
     @Test
     void aBodyCanSwitchItsOwnActivityOff() {
-        install(step(MINING, true));
+        install(step(Activities.Mining.class, true));
 
-        ActivitySwitch.disable(MINING);
+        ActivitySwitch.disable(Activities.Mining.class);
 
-        assertFalse(ActivitySwitch.active(MINING), "the override outranks the switch on the canvas");
+        assertFalse(ActivitySwitch.active(Activities.Mining.class), "the override outranks the switch on the canvas");
     }
 
-    /** A stale constant must never stop a running bot: one console line, and the flow is untouched. */
+    /** A stale activity must never stop a running bot: one console line, and the flow is untouched. */
     @Test
     void anActivityTheFlowLacksIsANoOp() {
-        install(step(MINING, true));
+        install(step(Activities.Mining.class, true));
 
-        ActivitySwitch.disable(Activities.NOTHING);
+        ActivitySwitch.disable(Activities.DailyReward.class);
 
-        assertTrue(ActivitySwitch.active(MINING));
+        assertTrue(ActivitySwitch.active(Activities.Mining.class));
     }
 
     /** An activity the flow does not mention is on — reading an absent one as off would silently stop it. */
     @Test
     void anActivityTheFlowDoesNotMentionIsOn() {
-        assertTrue(ActivitySwitch.active(Activities.NOTHING));
+        assertTrue(ActivitySwitch.active(Activities.DailyReward.class));
     }
 
     // ---- the activity and outcome values ----------------------------------------------------------------
 
-    /** A bot's constant is its name, and the label the canvas and the trace show is that name as words. */
+    /** An activity is its enum's simple name, an outcome its constant, and each label is the name as words. */
     @Test
-    void aLabelIsTheConstantsNameAsWords() {
-        assertEquals("Mining", MINING.label());
-        assertEquals("Bag full", Outcomes.BAG_FULL.label());
-        assertEquals("Hp below 50", Outcomes.HP_BELOW_50.label());
-        assertEquals("NEXT", Outcome.NEXT.label(), "the two every activity has are labelled as written");
-        assertEquals("DISABLED", Outcome.DISABLED.label());
+    void aLabelIsTheNameAsWords() {
+        assertEquals("Mining", Activity.of(Activities.Mining.class).label());
+        assertEquals("Daily reward", Activity.of(Activities.DailyReward.class).label());
+        assertEquals("Bag full", Activities.Mining.BAG_FULL.label());
+        assertEquals("Hp below 50", Activities.Mining.HP_BELOW_50.label());
+        assertEquals("Next", Activities.Mining.NEXT.label(), "NEXT is an ordinary constant");
         assertEquals("", Activity.NONE.label());
     }
 
-    /** What an editor holds for a bot's constant it cannot load, and the built-in ones by their names. */
+    /** An outcome's activity is the enum declaring it, so two enums' NEXTs are two outcomes. */
     @Test
-    void aConstantHeldByNameIsEqualByName() {
-        assertEquals(BotConstants.outcome("BAG_FULL"), BotConstants.outcome("BAG_FULL"));
-        assertNotEquals(BotConstants.outcome("BAG_FULL"), BotConstants.outcome("BAG_FUL"));
-        assertEquals("Bag full", BotConstants.outcome("BAG_FULL").label());
-        assertSame(Outcome.NEXT, BotConstants.outcome(null));
-        assertSame(Outcome.NEXT, BotConstants.outcome(" "));
-        assertSame(Outcome.NEXT, BotConstants.outcome("NEXT"));
-        assertSame(Outcome.DISABLED, BotConstants.outcome("DISABLED"));
-        assertSame(Activity.NONE, BotConstants.activity(""));
+    void anOutcomeBelongsToItsEnum() {
+        assertEquals(Activity.of(Activities.Mining.class), Activities.Mining.NEXT.activity());
+        assertEquals(new Activity("Selling"), Activities.Selling.NEXT.activity());
+        assertNotEquals(Activities.Mining.NEXT.activity(), Activities.Selling.NEXT.activity());
     }
 
-    /** A bot's outcomes, as its {@code Outcomes.java} holds them. */
-    enum Outcomes implements Outcome { BAG_FULL, HP_BELOW_50 }
+    /** What an editor holds for a bot's name it cannot load: equal by both names, its activity its enum's. */
+    @Test
+    void aConstantHeldByNameIsEqualByName() {
+        assertEquals(BotConstants.outcome("Mining", "BAG_FULL"), BotConstants.outcome("Mining", "BAG_FULL"));
+        assertNotEquals(BotConstants.outcome("Mining", "NEXT"), BotConstants.outcome("Selling", "NEXT"));
+        assertEquals("Bag full", BotConstants.outcome("Mining", "BAG_FULL").label());
+        assertEquals(Activity.of(Activities.Mining.class), BotConstants.outcome("Mining", "NEXT").activity());
+        assertSame(Activity.NONE, BotConstants.activity(""));
+        assertEquals(Activity.of(Activities.Mining.class), BotConstants.activity("Mining"));
+    }
 }

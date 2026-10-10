@@ -260,7 +260,7 @@ class SdkAssistTest {
         assertFalse(run("connect", "from", "Battle", "to", "Collect").isRefused());
         String read = text(run("read_flow"));
         assertTrue(read.startsWith("Starts at Collect;"), read);
-        assertTrue(read.contains("• Collect — Collect::body; outcomes [Bag full]"), read);
+        assertTrue(read.contains("• Collect — Collect::body; outcomes [Next, Bag full]"), read);
         assertTrue(read.contains("    on Bag full → Battle"), read);
         assertTrue(read.contains("• Battle — no body yet"), read);
 
@@ -272,7 +272,9 @@ class SdkAssistTest {
         assertFalse(run("rename_activity", "from", "Battle", "to", "Fight").isRefused());
         assertFalse(run("remove_activity", "name", "Collect").isRefused());
         assertEquals(List.of("Fight"), flow().steps().stream().map(Flow.Step::label).toList());
-        assertTrue(host.set("activities").containsKey("FIGHT"), host.calls.toString());
+        assertEquals(List.of("Fight.NEXT"), List.copyOf(host.set("activities").keySet()), host.calls.toString());
+        assertTrue(host.calls.contains("add activities Collect.BAG_FULL"), host.calls.toString());
+        assertTrue(host.calls.contains("renameGroup activities Battle Fight"), host.calls.toString());
     }
 
     @Test
@@ -551,7 +553,44 @@ class SdkAssistTest {
         @Override
         public Optional<String> rename(String id, String member, String newName) {
             calls.add("rename " + name(id) + " " + member + " " + newName);
-            set(name(id)).put(newName, set(name(id)).remove(member));
+            // A grouped member, "Group.NAME", is renamed within its group.
+            String renamed = member.contains(".") ? member.substring(0, member.indexOf('.') + 1) + newName : newName;
+            set(name(id)).put(renamed, set(name(id)).remove(member));
+            return Optional.empty();
+        }
+
+        // A grouped set's enums: the prefixes of its "Group.NAME" members.
+
+        @Override
+        public List<String> groups(String id) {
+            return set(name(id)).keySet().stream().filter(m -> m.contains("."))
+                    .map(m -> m.substring(0, m.indexOf('.'))).distinct().toList();
+        }
+
+        @Override
+        public Optional<String> addGroup(String id, String group, List<String> constants) {
+            calls.add("addGroup " + name(id) + " " + group + " " + constants);
+            for (String constant : constants) {
+                set(name(id)).put(group + "." + constant, TestContexts.row(Object.class, "").withValue(null));
+            }
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> renameGroup(String id, String group, String newName) {
+            calls.add("renameGroup " + name(id) + " " + group + " " + newName);
+            for (String member : List.copyOf(set(name(id)).keySet())) {
+                if (member.startsWith(group + ".")) {
+                    set(name(id)).put(newName + member.substring(group.length()), set(name(id)).remove(member));
+                }
+            }
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> removeGroup(String id, String group) {
+            calls.add("removeGroup " + name(id) + " " + group);
+            set(name(id)).keySet().removeIf(member -> member.startsWith(group + "."));
             return Optional.empty();
         }
 

@@ -22,41 +22,35 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A flow taken apart and put back together.
  *
  * <p><b>{@code build(components(v))} equals {@code v} is the whole claim</b>, and it is asserted over a flow
- * with the shapes that broke every earlier encoding: a comma inside a description, an activity with no
- * outcomes, a body named by method reference, and three container levels (a flow holding a list of
- * activities each holding a list of outcomes).
+ * with the shapes that broke every earlier encoding: a comma inside a description, a body named by method
+ * reference, an off-wire and a home, and three container levels.
  *
  * <p>A body is kept exactly as the file writes it, a lambda included: this plugin checks nothing it reads.
  *
  * <h2>It asserted through {@code ValueCatalog} until 2026-09-22, and that was the wrong side of the line</h2>
  *
- * <p>It used to spell the whole call — {@code CATALOG.initializer(FLOW, flow)} — and split it back with
- * {@code valueOf}, which asserted the SDK's shapes and the <em>host's grammar</em> in one breath. The
- * grammar is {@code botmaker-studio}'s now, because nothing outside a host ever walked one, so from here
- * the honest subject is the pair this module actually declares: {@code components} and {@code build}. The
- * spell-and-split round trip is asserted where the speller lives.
- *
- * <p>Nothing about the claim weakened. A part that {@code components} hands over wrong is still caught, and
- * it is caught without a second module's writer having to agree first.
+ * <p>The grammar is {@code botmaker-studio}'s, so the honest subject here is the pair this module declares:
+ * {@code components} and {@code build}. The spell-and-split round trip is asserted where the speller lives.
  */
 class FlowTypesTest {
 
-    private static final Activity COLLECT = BotConstants.activity("COLLECT");
-    private static final Activity REST = BotConstants.activity("REST");
-    private static final Outcome NOTHING_LEFT = BotConstants.outcome("NOTHING_LEFT");
+    /** What the host hands over for {@code Activities.Collect.class} and {@code Activities.Collect.NOTHING_LEFT}. */
+    private static final Activity COLLECT = BotConstants.activity("Collect");
+    private static final Activity REST = BotConstants.activity("Rest");
+    private static final Outcome NOTHING_LEFT = BotConstants.outcome("Collect", "NOTHING_LEFT");
 
     private static Flow gamebot() {
-        return Flow.of(
-                List.of(Flow.activity(COLLECT, new FlowTypes.Named("Collect::body"))
-                                .described("Click collect, then battle.").checksPopups().reports(List.of(NOTHING_LEFT)),
-                        Flow.activity(REST, new FlowTypes.Named("Rest::body"))
-                                .described("Wait, then go round again.").off().goesHome()),
-                List.of(Flow.edge(COLLECT, COLLECT, Outcome.NEXT),
-                        Flow.edge(COLLECT, REST, NOTHING_LEFT),
-                        Flow.edge(REST, COLLECT, Outcome.NEXT)),
-                List.of(Flow.preset("Gathering only", List.of(COLLECT))),
-                COLLECT,
-                Flow.limits(1000, 1000));
+        Flow.Step collect = FlowTypes.step(COLLECT, FlowTypes.body("Collect::body"))
+                .described("Click collect, then battle.").checksPopups();
+        Flow.Step rest = FlowTypes.step(REST, FlowTypes.body("Rest::body"))
+                .described("Wait, then go round again.").off().goesHome();
+        rest = (Flow.Step) FlowTypes.STEP_SHAPE.withers().getLast().applyTo(rest, COLLECT);
+        return new Flow(List.of(collect, rest),
+                List.of(new Flow.Edge(BotConstants.outcome("Collect", "NEXT"), COLLECT),
+                        new Flow.Edge(NOTHING_LEFT, REST),
+                        new Flow.Edge(BotConstants.outcome("Rest", "NEXT"), COLLECT)),
+                List.of(new Flow.Preset("Gathering only", List.of(COLLECT))),
+                COLLECT, Flow.limits(1000, 1000), FlowTypes.home("Gamebot::goHome"));
     }
 
     /** {@code build(components(v))} for one shape, which is the law every {@code ComponentType} owes. */
@@ -67,11 +61,16 @@ class FlowTypesTest {
     @Test
     void aFlowComesApartAndGoesBackTogetherWhole() {
         assertEquals(gamebot(), roundTrip(FlowTypes.FLOW_SHAPE, gamebot()));
+        assertEquals("Gamebot::goHome", FlowTypes.sourceOf(roundTrip(FlowTypes.FLOW_SHAPE, gamebot()).home()));
     }
 
     @Test
     void anEmptyFlowSurvives() {
         assertEquals(Flow.NONE, roundTrip(FlowTypes.FLOW_SHAPE, Flow.NONE));
+        assertEquals(1, FlowTypes.FLOW_SHAPE.constants().size(), "written as Flow.NONE: no start to name");
+        Flow emptied = new Flow(List.of(), List.of(), List.of(), null, Flow.limits(5, 5), null);
+        assertEquals(Flow.NONE, FlowTypes.written(emptied), "a flow with no activity left has nothing to start at");
+        assertEquals(gamebot(), FlowTypes.written(gamebot()));
     }
 
     /** Every nested shape owes the law too — a flow's parts are values, not text. */
@@ -80,99 +79,88 @@ class FlowTypesTest {
         Flow flow = gamebot();
         assertEquals(flow.steps().getFirst(), roundTrip(FlowTypes.STEP_SHAPE, flow.steps().getFirst()));
         assertEquals(flow.steps().getLast(), roundTrip(FlowTypes.STEP_SHAPE, flow.steps().getLast()));
+        assertEquals(COLLECT, roundTrip(FlowTypes.STEP_SHAPE, flow.steps().getLast()).whenOff());
         assertNull(FlowTypes.STEP_SHAPE.build(List.of(COLLECT, "Collect::body", "a description")),
                 "a part count that is neither the call's nor the call's and every link's is not this shape");
-        // The activity with no outcomes: an empty list is a value, not an absent one.
-        assertEquals(flow.steps().get(1), roundTrip(FlowTypes.STEP_SHAPE, flow.steps().get(1)));
-        assertEquals(flow.edges().getFirst(), roundTrip(FlowTypes.EDGE_SHAPE, flow.edges().getFirst()));
-        assertEquals(flow.presets().getFirst(),
-                roundTrip(FlowTypes.PRESET_SHAPE, flow.presets().getFirst()));
+        assertEquals(flow.edges().get(1), roundTrip(FlowTypes.EDGE_SHAPE, flow.edges().get(1)));
+        assertEquals(flow.presets().getFirst(), roundTrip(FlowTypes.PRESET_SHAPE, flow.presets().getFirst()));
         assertEquals(flow.limits(), roundTrip(FlowTypes.LIMITS_SHAPE, flow.limits()));
     }
 
+    /** An activity is no part's {@code Class} the editor could hold: each shape refuses one that is not a name. */
+    @Test
+    void anActivityIsHeldAsItsName() {
+        assertNull(FlowTypes.STEP_SHAPE.build(List.of(Outcome.class, "Collect::body")));
+        assertNull(FlowTypes.EDGE_SHAPE.build(List.of(NOTHING_LEFT, Outcome.class)));
+        assertNull(FlowTypes.STEP_SHAPE.build(List.of(Activity.NONE, "Collect::body")), "a step is of an activity");
+    }
+
     /**
-     * A flow is five components, and which five is the fact the host writes the call from.
-     *
-     * <p>Asserted by class rather than by a rendered type name: the host takes the name off the object, and
-     * a list crosses as {@code List.class} because that is all its erasure can say. What the elements of
-     * each list are is answered by the {@code ComponentType} whose own prefix the host reads them back with.
+     * A flow is five components, and which five is the fact the host writes the call from: the start is a
+     * {@code Class}, which the host reads and writes as the class literal of a managed enum.
      */
     @Test
-    void aFlowIsFiveComponents() {
-        assertEquals(List.of(List.class, List.class, List.class, Activity.class, Flow.Limits.class),
+    void aFlowIsFiveComponentsAndAHome() {
+        assertEquals(List.of(List.class, List.class, List.class, Class.class, Flow.Limits.class, Runnable.class),
                 FlowTypes.FLOW_SHAPE.componentTypes());
-        assertEquals(5, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
+        assertEquals(6, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
+        assertEquals(List.of(Class.class, ActivityBody.class, String.class, boolean.class, boolean.class,
+                boolean.class, Class.class), FlowTypes.STEP_SHAPE.componentTypes());
+        assertEquals(List.of(Outcome.class, Class.class), FlowTypes.EDGE_SHAPE.componentTypes());
     }
 
     /** A flow is one call on {@code Flow} itself, which is what the host identifies it by. */
     @Test
     void aFlowIsWrittenAsACallOnFlow() throws NoSuchMethodException {
-        assertEquals(Flow.class.getMethod("of", List.class, List.class, List.class, Activity.class,
+        assertEquals(Flow.class.getMethod("of", List.class, List.class, List.class, Class.class,
                 Flow.Limits.class), FlowTypes.FLOW_SHAPE.factory());
     }
 
-    /**
-     * An activity and an outcome are their label, written {@code X.named("…")} — which the host replaces with the
-     * bot's constant holding the same label — and the two outcomes every activity has are written as theirs.
-     */
+    /** An activity and an outcome are written by their names, which the host spells as the bot's own. */
     @Test
-    void namesAreWrittenAsTheirLabelOrTheSdksConstant() throws ReflectiveOperationException {
+    void namesAreWrittenByName() throws ReflectiveOperationException {
         assertEquals(COLLECT, SdkTypes.ACTIVITY.build(SdkTypes.ACTIVITY.components(COLLECT)));
         assertEquals(NOTHING_LEFT, SdkTypes.OUTCOME.build(SdkTypes.OUTCOME.components(NOTHING_LEFT)));
-        assertEquals(List.of(Outcome.class.getField("NEXT"), Outcome.class.getField("DISABLED")),
-                SdkTypes.OUTCOME.constants());
+        assertEquals(List.of(), SdkTypes.OUTCOME.constants(), "no outcome is the SDK's own");
         assertEquals(List.of(Activity.class.getField("NONE")), SdkTypes.ACTIVITY.constants());
     }
 
-    /** A body the file writes is kept exactly as written, whatever it is; only the "none yet" constant reads blank. */
+    /** A body the file writes is kept exactly as written, whatever it is; only the "none yet" call reads blank. */
     @Test
     void aBodyIsKeptAsWritten() {
-        for (String written : List.of("Collect::body", "() -> Outcome.NEXT")) {
-            Flow.Step read = FlowTypes.STEP_SHAPE.build(
-                    List.of(COLLECT, written, "", true, false, false, List.of()));
+        for (String written : List.of("Collect::body", "() -> Activities.Collect.NEXT")) {
+            Flow.Step read = FlowTypes.STEP_SHAPE.build(List.of(COLLECT, written));
             assertEquals(written, FlowTypes.sourceOf(read.body()));
         }
-        Flow.Step none = FlowTypes.STEP_SHAPE.build(
-                List.of(COLLECT, "ActivityBody.NONE", "", true, false, false, List.of()));
+        Flow.Step none = FlowTypes.STEP_SHAPE.build(List.of(COLLECT, "ActivityBody.none()"));
         assertEquals("", FlowTypes.sourceOf(none.body()));
+        assertEquals("com.botmaker.sdk.api.flow.ActivityBody.none()",
+                FlowTypes.STEP_SHAPE.components(none).get(1), "and is written back as the call that says so");
     }
 
-    /**
-     * An activity whose body the editor read out of a file is a <em>name</em>, and running one says so.
-     *
-     * <p>Rather than doing nothing: a flow the editor assembled was never meant to run, and a body that
-     * silently returned would be a bot walking its flow reporting nothing.
-     */
+    /** An activity whose body the editor read out of a file is a <em>name</em>, and running one says so. */
     @Test
     void aNamedBodyRefusesToRun() {
         FlowTypes.Named named = new FlowTypes.Named("Collect::body");
-        assertEquals("Collect::body", named.source());
         assertEquals("Collect::body", FlowTypes.sourceOf(named));
+        org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class, named::run);
         org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class,
-                named::run);
+                FlowTypes.home("Gamebot::goHome")::run);
     }
 
-    /**
-     * A card drawn but not written yet round-trips as the constant that says so.
-     *
-     * <p>The alternative was writing a blank where the method reference goes, which is a file that does not
-     * compile — and the reason this had to be sayable at all is that drawing the flow first is an ordinary
-     * way to work.
-     */
     @Test
     void anActivityWithNoBodyYetReadsAndWritesAsBlank() {
         assertEquals("", FlowTypes.sourceOf(FlowTypes.body("")));
         assertEquals("", FlowTypes.sourceOf(FlowTypes.body(null)));
-        // A live body has nothing to spell it back as, which is the same blank the editor reads as
-        // "no body named yet" -- and what the host writes for it is ActivityBody.NONE.
-        assertEquals("", FlowTypes.sourceOf(ActivityBody.NONE));
+        assertEquals("", FlowTypes.sourceOf(ActivityBody.none()));
+        assertNull(FlowTypes.home(""), "no home is none, not a blank name");
     }
 
     /** The enable flag is part of the flow, because a run reads it. */
     @Test
     void anActivitySwitchedOffIsStillPartOfTheFlow() {
-        Flow off = Flow.of(List.of(Flow.activity(REST, new FlowTypes.Named("Rest::body")).off()),
-                List.of(), List.of(), REST, Flow.Limits.DEFAULT);
+        Flow off = new Flow(List.of(FlowTypes.step(REST, FlowTypes.body("Rest::body")).off()), List.of(), List.of(),
+                REST, Flow.Limits.DEFAULT, null);
         Flow read = roundTrip(FlowTypes.FLOW_SHAPE, off);
         assertFalse(read.steps().getFirst().enabled());
         assertEquals(off, read);

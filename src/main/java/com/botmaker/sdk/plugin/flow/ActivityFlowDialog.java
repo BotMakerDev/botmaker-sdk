@@ -98,21 +98,24 @@ public final class ActivityFlowDialog {
     private FlowLayout written = FlowLayout.NONE;
 
     /**
-     * The activity and outcome labels the flow held when it was last read or written — what the bot's
-     * {@code Activities} and {@code Outcomes} constants were kept in step with. A label that leaves the flow
-     * has its constant removed on the next save ({@link FlowConstants#forget}).
+     * The activity labels the flow held when it was last read or written — what the bot's {@code Activities}
+     * enums were kept in step with. An activity that leaves the flow has its enum removed on the next save
+     * ({@link FlowConstants#forget}).
      */
     private Set<String> savedActivities = Set.of();
-    private Set<String> savedOutcomes = Set.of();
+
+    /** The flow's home as read, {@code Gamebot::goHome}: the canvas does not draw it, and a save keeps it. */
+    private Runnable home;
 
     /**
-     * Canvas renames not yet saved, label at last save → label now. A save renames the constant holding the
-     * first, and every use of it, before writing the flow under the second; without this a rename would read
-     * as a removal plus an addition, and the code naming the old constant would stop matching the canvas.
-     * Renames clear the canvas's undo history, so nothing here has to be taken back.
+     * Canvas renames not yet saved, label at last save → label now; an outcome's keyed first by its activity's
+     * label now. A save renames the enum or constant holding the first, and every use of it, before writing the
+     * flow under the second; without this a rename would read as a removal plus an addition, and the code
+     * naming the old one would stop matching the canvas. Renames clear the canvas's undo history, so nothing
+     * here has to be taken back.
      */
     private final Map<String, String> activityRenames = new LinkedHashMap<>();
-    private final Map<String, String> outcomeRenames = new LinkedHashMap<>();
+    private final Map<String, Map<String, String>> outcomeRenames = new LinkedHashMap<>();
 
     private final Label statusLabel = new Label();
 
@@ -220,25 +223,29 @@ public final class ActivityFlowDialog {
     private void loadCurrent() {
         value = FlowValue.FLOW.open(services);
         Flow flow = readFlow();
+        Board board = Board.read(services.pluginValues(), flow);
+        home = flow.home();
         FlowLayout layout = loadLayout();
         boolean anyPlaced = false;
+        List<Arrow> arrows = new ArrayList<>(flow.edges().stream().map(Arrow::of).toList());
         for (Flow.Step step : flow.steps()) {
             FlowLayout.Spot placed = layout.spot(step.label());
             anyPlaced |= placed != null;
             Point2D at = placed == null ? canvas.nextFreeSpot() : new Point2D(placed.x(), placed.y());
-            canvas.add(ActivityDraft.of(step, at.getX(), at.getY()));
+            canvas.add(ActivityDraft.of(step, board.exitsOf(step.label()), at.getX(), at.getY()));
+            Arrow off = Arrow.off(step);
+            if (off != null) arrows.add(off);
         }
         // Only when nothing at all was placed: one saved position is enough to mean someone laid this out.
         arrangeOnOpen = !anyPlaced && !flow.steps().isEmpty();
-        canvas.edges().setAll(flow.edges().stream().map(Arrow::of).toList());
+        canvas.edges().setAll(arrows);
         canvas.setStart(flow.start().label());
         maxSteps = flow.limits().maxSteps();
         stepDelayMs = flow.limits().stepDelayMs();
         goHomeByDefault = layout.goHomeByDefault();
         canvas.select(null);
         presets.addAll(flow.presets().stream().map(Selection::of).toList());
-        savedActivities = FlowConstants.activityLabels(flow);
-        savedOutcomes = FlowConstants.outcomeLabels(flow);
+        savedActivities = FlowEdits.labels(flow);
         canvas.refresh();
     }
 
@@ -368,8 +375,8 @@ public final class ActivityFlowDialog {
      * (under the cursor). The dialog itself owns the name and outcome validation.
      */
     private void createActivityAt(Point2D at) {
-        Optional<ActivityDraft> made = new NewActivityDialog(stage, services, placedNames(),
-                outcomesElsewhere(null), goHomeByDefault).showAt(at.getX(), at.getY());
+        Optional<ActivityDraft> made = new NewActivityDialog(stage, services, placedNames(), goHomeByDefault)
+                .showAt(at.getX(), at.getY());
         if (made.isEmpty()) return;
         canvas.add(made.get());
         refreshPresetCombo();   // the built-in "Everything" preset is derived from what's on the canvas
@@ -380,13 +387,6 @@ public final class ActivityFlowDialog {
         Set<String> names = new HashSet<>();
         for (ActivityDraft d : canvas.drafts()) names.add(d.name());
         return names;
-    }
-
-    /** The outcomes every card but {@code except} declares — one {@code Outcomes} constant each. */
-    private Set<String> outcomesElsewhere(ActivityDraft except) {
-        Set<String> labels = new java.util.LinkedHashSet<>();
-        for (ActivityDraft d : canvas.drafts()) if (d != except) labels.addAll(d.outcomes());
-        return labels;
     }
 
     private void saveCurrentSelectionAsPreset() {
@@ -463,7 +463,7 @@ public final class ActivityFlowDialog {
         TextField name = new TextField(draft.name());
         name.focusedProperty().addListener((o, was, is) -> {
             if (is) return;
-            renameDraft(draft, FlowNames.label(name.getText()), name);
+            renameDraft(draft, FlowNames.activityLabel(name.getText()), name);
         });
         TextField description = new TextField(draft.description());
         description.textProperty().addListener((o, was, is) -> {
@@ -570,8 +570,7 @@ public final class ActivityFlowDialog {
         Button add = new Button("Add");
         Runnable addOutcome = () -> {
             String candidate = FlowNames.label(newOutcome.getText());
-            String problem = FlowNames.outcomeProblem(draft.outcomes(), outcomesElsewhere(draft), draft.name(),
-                    candidate, null);
+            String problem = FlowNames.outcomeProblem(draft.outcomes(), draft.name(), candidate, null);
             if (problem != null) { error(problem); return; }
             draft.outcomes().add(candidate);
             newOutcome.clear();
@@ -591,11 +590,8 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * Renames an outcome on every card that declares it, carrying each arrow across, and answers the name the
-     * row now holds.
-     *
-     * <p>Every card, because an outcome is one {@code Outcomes} constant: the save renames that constant and
-     * every {@code return} of it, so a card left on the old label would be declaring a constant that is gone.
+     * Renames one of {@code draft}'s outcomes, carrying its arrow across, and answers the name the row now holds.
+     * The outcome is a constant of that activity's enum alone, so no other card changes.
      */
     private String renameOutcome(ActivityDraft draft, String oldName, String typed, TextField field) {
         String candidate = FlowNames.label(typed);
@@ -603,27 +599,22 @@ public final class ActivityFlowDialog {
             field.setText(oldName);   // trimming may have changed the text without changing the outcome
             return oldName;
         }
-        String problem = FlowNames.outcomeProblem(draft.outcomes(), outcomesElsewhere(draft), draft.name(),
-                candidate, oldName);
+        String problem = FlowNames.outcomeProblem(draft.outcomes(), draft.name(), candidate, oldName);
         if (problem != null) {
             error(problem);
             field.setText(oldName);
             return oldName;
         }
-        List<String> also = new ArrayList<>();
-        for (ActivityDraft d : canvas.drafts()) {
-            int at = d.outcomes().indexOf(oldName);
-            if (at < 0) continue;
+        int at = draft.outcomes().indexOf(oldName);
+        if (at >= 0) {
             // The arrow first, then the outcome. The card drops every arrow whose port has gone the moment the
             // list changes, so renaming the outcome first would drop its arrow before it could be carried across.
-            canvas.edges().setAll(rewiredOutcome(canvas.edges(), d.name(), oldName, candidate));
-            d.outcomes().set(at, candidate);
-            if (d != draft) also.add(d.name());
+            canvas.edges().setAll(rewiredOutcome(canvas.edges(), draft.name(), oldName, candidate));
+            draft.outcomes().set(at, candidate);
         }
-        renamed(outcomeRenames, oldName, candidate);
+        renamed(outcomeRenames.computeIfAbsent(draft.name(), activity -> new LinkedHashMap<>()), oldName, candidate);
         field.setText(candidate);
-        error(also.isEmpty() ? "" : "Renamed on " + String.join(", ", also)
-                + " too — an outcome is one Outcomes constant.");
+        error("");
         canvas.refresh();
         return candidate;
     }
@@ -834,6 +825,9 @@ public final class ActivityFlowDialog {
         presets.clear();
         presets.addAll(renamed);
         renamed(activityRenames, was, candidate);
+        // An outcome's pending renames are keyed by its activity's label now.
+        Map<String, String> outcomes = outcomeRenames.remove(was);
+        if (outcomes != null) outcomeRenames.put(candidate, outcomes);
         draft.nameProperty().set(candidate); // the card re-labels and its arrows follow the new name
         refreshPresetCombo();
         error("");
@@ -928,13 +922,31 @@ public final class ActivityFlowDialog {
         autosaveDelay.playFromStart();
     }
 
-    /** The flow as it currently stands, ready to be written into the bot's Java. */
-    private Flow currentFlow() {
+    /** The flow as it currently stands, with each card's outcomes, ready to be written into the bot's Java. */
+    private Board currentBoard() {
+        return board(canvas.drafts(), canvas.edges(), presets, canvas.start(), Flow.limits(maxSteps, stepDelayMs), home);
+    }
+
+    /**
+     * The board {@code drafts} and {@code arrows} draw: a step per card, switched off to where its
+     * {@link Arrow#DISABLED} arrow goes, an edge per other arrow, and each card's ports as its outcomes.
+     */
+    static Board board(List<ActivityDraft> drafts, List<Arrow> arrows, List<Selection> presets, String start,
+                       Flow.Limits limits, Runnable home) {
         List<Flow.Step> steps = new ArrayList<>();
-        for (ActivityDraft d : canvas.drafts()) steps.add(d.toStep());
-        return Flow.of(steps, canvas.edges().stream().map(Arrow::toEdge).toList(),
-                presets.stream().map(Selection::toPreset).toList(), FlowNames.activity(canvas.start()),
-                Flow.limits(maxSteps, stepDelayMs));
+        Map<String, List<String>> exits = new LinkedHashMap<>();
+        for (ActivityDraft d : drafts) {
+            Activity off = arrows.stream().filter(a -> a.isDisabled() && a.from().equals(d.name())).findFirst()
+                    .map(a -> FlowNames.activity(a.to())).orElse(Activity.NONE);
+            steps.add(d.toStep(off));
+            exits.put(d.name(), d.allOutcomes());
+        }
+        List<Flow.Edge> edges = arrows.stream().filter(a -> !a.isDisabled()).map(Arrow::toEdge).toList();
+        // A start is a class literal, so a flow with cards always names one: the first card when none is set.
+        Activity first = steps.isEmpty() ? Activity.NONE : steps.getFirst().activity();
+        Activity begin = start == null || start.isBlank() ? first : FlowNames.activity(start);
+        Flow flow = new Flow(steps, edges, presets.stream().map(Selection::toPreset).toList(), begin, limits, home);
+        return new Board(flow, exits);
     }
 
     /**
@@ -982,8 +994,8 @@ public final class ActivityFlowDialog {
             refused(readOnlyReason);
             return;
         }
-        Flow flow = currentFlow();
-        String problem = validate(flow);
+        Board board = currentBoard();
+        String problem = validate(board);
         if (problem != null) {
             // Refused, not failed — a duplicate name or a bad identifier. Stay dirty so the fix saves it, and
             // let go of any pending close unless the user says to drop the edit (see refused).
@@ -1000,12 +1012,9 @@ public final class ActivityFlowDialog {
 
         // The constants first, so the flow written next names them (FlowConstants has the order and why).
         List<String> notes = new ArrayList<>();
-        String refused = FlowEdits.save(services.pluginValues(), value.orElse(null), flow,
-                new FlowEdits.Saved(savedActivities, savedOutcomes), activityRenames, outcomeRenames, notes);
-        if (refused == null) {
-            savedActivities = FlowConstants.activityLabels(flow);
-            savedOutcomes = FlowConstants.outcomeLabels(flow);
-        }
+        String refused = FlowEdits.save(services.pluginValues(), value.orElse(null), board, savedActivities,
+                activityRenames, outcomeRenames, notes);
+        if (refused == null) savedActivities = FlowEdits.labels(board.flow());
         Throwable failure = null;
         FlowLayout layout = currentLayout();
         if (refused == null && layoutValue.isPresent() && !layout.equals(written)) {
@@ -1097,13 +1106,12 @@ public final class ActivityFlowDialog {
      * javac is what has an opinion about the names. What is left checks the names this editor is still the
      * author of.
      *
-     * <p>A label is free text and the rule is about the constant it becomes
-     * ({@link FlowNames#constantFor}): every label must make one, and two labels making the same one are one
-     * name spelled twice — across the whole flow for outcomes, since an outcome is one constant wherever it is
-     * declared.
+     * <p>A label is free text and the rule is about the name it becomes ({@link FlowNames#typeFor},
+     * {@link FlowNames#constantFor}): every label must make one, and two labels making the same one are one
+     * name spelled twice — among the activities, and among one activity's outcomes.
      */
-    public static String validate(Flow flow) {
-        return FlowEdits.validate(flow);
+    public static String validate(Board board) {
+        return FlowEdits.validate(board);
     }
 
     private static Label heading(String text) {

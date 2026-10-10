@@ -1,12 +1,14 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.sdk.api.bot.Outcome;
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.plugin.types.FlowTypes;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -14,21 +16,31 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * What the flow dialog refuses to save. Every rule here exists because the generator would otherwise emit
- * Java that doesn't compile — the point is to say so in the dialog rather than in a build log.
+ * What the flow dialog refuses to save. Every rule here exists because the save would otherwise write Java
+ * that doesn't compile — the point is to say so in the dialog rather than in a build log.
  *
- * <p>It was the host's until 2026-09-11, over the editor's own record set; it is over {@link Flow} since
- * 2026-09-21, which is the value the editor actually reads and writes.
+ * <p>Over a {@link Board} since 2026-10-10: an activity's outcomes are its enum's constants, which the flow
+ * no longer lists.
  */
 class ActivityFlowValidationTest {
 
-    private static Flow of(Flow.Step... steps) {
-        return Flow.of(List.of(steps), List.of(), List.of(), Activity.NONE, Flow.Limits.DEFAULT);
+    /** One activity: its label, then its outcome labels. */
+    private record Card(String name, List<String> outcomes) {}
+
+    private static Card activity(String name, String... outcomes) {
+        List<String> all = new ArrayList<>(List.of(Arrow.NEXT));
+        all.addAll(List.of(outcomes));
+        return new Card(name, all);
     }
 
-    private static Flow.Step activity(String name, String... outcomes) {
-        return Flow.activity(FlowNames.activity(name), ActivityBody.NONE).checksPopups()
-                .reports(List.of(outcomes).stream().map(FlowNames::outcome).toList());
+    private static Board of(Card... cards) {
+        List<Flow.Step> steps = new ArrayList<>();
+        Map<String, List<String>> exits = new LinkedHashMap<>();
+        for (Card card : cards) {
+            steps.add(FlowTypes.step(FlowNames.activity(card.name()), ActivityBody.none()));
+            exits.put(card.name(), card.outcomes());
+        }
+        return new Board(new Flow(steps, List.of(), List.of(), null, Flow.Limits.DEFAULT, null), exits);
     }
 
     @Test
@@ -38,98 +50,95 @@ class ActivityFlowValidationTest {
 
     @Test
     void anOutcomeLabelIsTypedFreelyButMustMakeAConstant() {
-        // "Bag full" is Outcomes.BAG_FULL; a label with no letter first makes no constant at all.
+        // "Bag full" is BAG_FULL; a label with no letter first makes no constant at all.
         assertNull(ActivityFlowDialog.validate(of(activity("Mining", "Bag full"))));
-        String problem = FlowNames.outcomeProblem(List.of(), List.of(), "Mining", "2nd try", null);
+        String problem = FlowNames.outcomeProblem(List.of(), "Mining", "2nd try", null);
         assertNotNull(problem);
         assertTrue(problem.contains("2nd try"), problem);
     }
 
+    /** Two activities' outcomes of one name are two constants, one in each enum. */
     @Test
-    void twoSpellingsOfOneOutcomeAreOneOutcome() {
-        // An outcome is one constant wherever it is declared, and its label is that constant's words.
+    void twoActivitiesMayEachHaveAnOutcomeOfOneName() {
         assertEquals("Bag full", FlowNames.label("bag-full"));
-        assertEquals(FlowNames.outcome("Bag full"), FlowNames.outcome("bag-full"));
+        assertEquals(FlowNames.outcome("Mining", "Bag full"), FlowNames.outcome("Mining", "bag-full"));
         assertNull(ActivityFlowDialog.validate(of(activity("Mining", "Bag full"), activity("Fishing", "bag-full"))));
+        assertNull(FlowNames.outcomeProblem(List.of("Next"), "Fishing", "Bag full", null));
     }
 
     @Test
     void anOutcomeCannotBeDeclaredTwice() {
         assertNotNull(ActivityFlowDialog.validate(of(activity("Mining", "BAG_FULL", "BAG_FULL"))));
+        assertNotNull(ActivityFlowDialog.validate(of(activity("Mining", "NEXT"))), "NEXT is there already");
     }
 
     @Test
-    void anOutcomeCannotRedeclareTheImplicitNext() {
-        // allOutcomes() de-duplicates it, so this must be caught as a clash rather than silently swallowed —
-        // otherwise the user adds a NEXT outcome, gets no port for it, and has nothing to explain why.
-        assertNotNull(ActivityFlowDialog.validate(of(activity("Mining", "NEXT"))));
-    }
-
-    @Test
-    void anOutcomeCannotRedeclareTheImplicitDisabled() {
-        // Same reasoning as NEXT, one step further: an activity can't report being switched off, because it
-        // didn't run. Declaring it would ask for an enum constant nothing could ever return.
+    void anOutcomeCannotBeTheSwitchedOffPort() {
+        // An activity can't report being switched off, because it didn't run.
         String problem = ActivityFlowDialog.validate(of(activity("Mining", "DISABLED")));
         assertNotNull(problem);
         assertTrue(problem.contains("DISABLED"), problem);
-        assertNull(FlowNames.outcomeProblem(List.of(), List.of(), "Mining", "Bag full", null));
-        assertNotNull(FlowNames.outcomeProblem(List.of(), List.of(), "Mining", "DISABLED", null),
+        assertNull(FlowNames.outcomeProblem(List.of(), "Mining", "Bag full", null));
+        assertNotNull(FlowNames.outcomeProblem(List.of(), "Mining", "DISABLED", null),
                 "the dialog must refuse the name while it is being typed, not only on save");
-        assertNotNull(FlowNames.outcomeProblem(List.of(), List.of(), "Mining", "next", null),
-                "a label whose constant would be NEXT is the implicit outcome in another spelling");
+        assertNotNull(FlowNames.outcomeProblem(List.of(), "Mining", "next", null),
+                "every activity starts with NEXT");
     }
 
-    /** The one step from a label to its constant. */
+    /** The one step from a label to its constant, and to an activity's enum. */
     @Test
-    void a_label_becomes_its_constant() {
+    void a_label_becomes_its_name() {
         assertEquals("BAG_FULL", FlowNames.constantFor("Bag full"));
         assertEquals("BAG_FULL", FlowNames.constantFor("  bag-full "));
         assertEquals("NO_ORE", FlowNames.constantFor("no.ore"));
         assertEquals("NOTHING_LEFT", FlowNames.constantFor("NOTHING_LEFT"));
         assertEquals("HANDLE_FULL_INVENTORY", FlowNames.constantFor("HandleFullInventory"));
-        assertEquals("COLLECT", FlowNames.constantFor("Collect"));
         assertNull(FlowNames.constantFor("2nd try"));
         assertNull(FlowNames.constantFor("—"));
         assertEquals("Bag full", FlowNames.label("  Bag   full "));
+        assertEquals("HandleFullInventory", FlowNames.typeFor("Handle full inventory"));
+        assertEquals("Collect", FlowNames.typeFor("COLLECT"));
+        assertNull(FlowNames.typeFor("2nd try"));
+        assertEquals("Daily reward", FlowNames.activityLabel("daily-reward"));
     }
 
-    /** Adding an outcome another card declares is sharing it; a second spelling of it is a clash. */
+    /** A second spelling of one of its own outcomes is a clash, and so is renaming onto one. */
     @Test
-    void an_outcome_may_be_shared_but_not_respelled_or_merged_by_a_rename() {
-        assertNull(FlowNames.outcomeProblem(List.of(), List.of("Won"), "Fishing", "Won", null));
-        assertNotNull(FlowNames.outcomeProblem(List.of(), List.of("Won"), "Fishing", "WON", null));
-        assertNotNull(FlowNames.outcomeProblem(List.of("Lost"), List.of("Won"), "Fishing", "Won", "Lost"),
+    void an_outcome_may_not_be_respelled_or_merged_by_a_rename() {
+        assertNotNull(FlowNames.outcomeProblem(List.of("Won"), "Fishing", "WON", null));
+        assertNotNull(FlowNames.outcomeProblem(List.of("Lost", "Won"), "Fishing", "Won", "Lost"),
                 "renaming onto another outcome would merge two constants");
-        assertNull(FlowNames.outcomeProblem(List.of("Lost"), List.of("Lost"), "Fishing", "Defeat", "Lost"),
-                "another card declaring the outcome being renamed is renamed with it");
+        assertNull(FlowNames.outcomeProblem(List.of("Lost"), "Fishing", "Defeat", "Lost"));
     }
 
     @Test
-    void twoActivitiesMakingOneConstantAreRejected() {
-        // Two cards that read nearly the same, and one Activities.MINING for both.
+    void twoActivitiesMakingOneEnumAreRejected() {
         String problem = ActivityFlowDialog.validate(of(activity("Mining"), activity("MINING")));
         assertNotNull(problem);
-        assertTrue(problem.contains("Duplicate activity name: 'Mining'"), problem);
-        assertTrue(FlowNames.activityNameProblem("mining!", List.of("Mining")).contains("Activities.MINING"));
+        assertTrue(problem.contains("Duplicate activity name: 'Mining'") || problem.contains("Activities.Mining"),
+                problem);
+        assertTrue(FlowNames.activityNameProblem("mining!", List.of("Mining")).contains("Activities.Mining"));
     }
 
     /** Naming a card refuses what saving would refuse, so a flow never sits unsaved over a name. */
     @Test
-    void a_name_making_a_taken_constant_is_refused_where_it_is_typed() {
+    void a_name_making_a_taken_enum_is_refused_where_it_is_typed() {
         assertNotNull(FlowNames.activityNameProblem("MINING", List.of("Mining")));
         assertNotNull(FlowNames.activityNameProblem("Bag full", List.of("bag-full")));
         // A card renamed to its own name in another spelling: its own name is not among the others.
         assertNull(FlowNames.activityNameProblem("MINING", List.of("Fishing")));
         assertNull(FlowNames.activityNameProblem("Handle full inventory", List.of("Fishing")));
+        assertNotNull(FlowNames.activityNameProblem("Outcome", List.of()), "it would hide the interface");
+        assertNotNull(FlowNames.activityNameProblem("activities", List.of()), "it would hide its own class");
     }
 
     /** Two renames before a save are one; renaming back is none. */
     @Test
     void pending_renames_compose() {
-        java.util.Map<String, String> renames = new java.util.LinkedHashMap<>();
+        Map<String, String> renames = new LinkedHashMap<>();
         ActivityFlowDialog.renamed(renames, "Battle", "Fight");
         ActivityFlowDialog.renamed(renames, "Fight", "Duel");
-        assertEquals(java.util.Map.of("Battle", "Duel"), renames);
+        assertEquals(Map.of("Battle", "Duel"), renames);
         ActivityFlowDialog.renamed(renames, "Duel", "Battle");
         assertTrue(renames.isEmpty());
     }
@@ -158,18 +167,32 @@ class ActivityFlowValidationTest {
                 ActivityFlowDialog.renamedIn(presets, "Mining", "Digging"));
     }
 
-    /** What the canvas draws by label is saved as the values the bot's constants hold, and read back the same. */
+    /** What the canvas draws by label is saved as the values the bot's names hold, and read back the same. */
     @Test
     void an_arrow_and_a_selection_save_as_typed_values_and_back() {
         Arrow plain = new Arrow("Mining", "Bank", "");
-        assertEquals(Flow.edge(FlowNames.activity("Mining"), FlowNames.activity("Bank"), Outcome.NEXT), plain.toEdge());
+        assertEquals(new Flow.Edge(FlowNames.outcome("Mining", "NEXT"), FlowNames.activity("Bank")), plain.toEdge());
         assertEquals(plain, Arrow.of(plain.toEdge()));
-        Arrow off = new Arrow("Mining", "Bank", Arrow.DISABLED);
-        assertTrue(off.toEdge().isDisabled());
-        assertEquals(off, Arrow.of(off.toEdge()));
 
         Selection night = new Selection("Night", List.of("Mining"));
         assertTrue(night.toPreset().enables(FlowNames.activity("Mining")));
         assertEquals(night, Selection.of(night.toPreset()));
+    }
+
+    /** The canvas's cards and arrows make the board a save writes: a DISABLED arrow is its card's off-wire. */
+    @Test
+    void the_canvas_makes_a_board() {
+        ActivityDraft mining = new ActivityDraft("Mining", "", true, List.of("Bag full"), false, true, 0, 0, "Mining::body");
+        ActivityDraft bank = new ActivityDraft("Bank", "", false, List.of(), false, true, 0, 0);
+        Board board = ActivityFlowDialog.board(List.of(mining, bank), List.of(new Arrow("Mining", "Bank", "Bag full"),
+                        new Arrow("Bank", "Mining", Arrow.DISABLED)), List.of(), "Mining", Flow.Limits.DEFAULT,
+                null);
+
+        assertEquals(List.of(new Flow.Edge(FlowNames.outcome("Mining", "Bag full"), FlowNames.activity("Bank"))),
+                board.flow().edges());
+        assertEquals(FlowNames.activity("Mining"), board.flow().steps().get(1).whenOff());
+        assertEquals(List.of(Arrow.NEXT, "Bag full"), board.exitsOf("Mining"));
+        assertEquals(List.of(Arrow.NEXT), board.exitsOf("Bank"));
+        assertEquals("Mining::body", FlowValue.bodySource(board.flow().steps().getFirst()));
     }
 }

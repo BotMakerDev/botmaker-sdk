@@ -19,7 +19,21 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
-No source changes since v1.4.2; re-released for updated upstream pins.
+### Changed (breaking)
+
+- **An activity is its outcome enum.** `Activities.java` is a class of enums, one per activity, whose constants
+  are its outcomes: `public enum Collect implements Outcome { NEXT, NOTHING_LEFT }`. `Outcomes.java`, the
+  `Activity` interface you implemented, `Outcome.NEXT`, `Outcome.DISABLED` and `Step.reports(…)` are gone;
+  `NEXT` is an ordinary constant Studio puts in each new activity.
+- **A body returns its own activity's enum** — `public static Activities.Collect body()` — and
+  `Flow.activity(Activities.Collect.class, Collect::body)` ties the two, so a body reporting another activity's
+  outcome does not compile. `ActivityBody<O>`; a card not written yet is `ActivityBody.none()`.
+- A wire is `Flow.edge(Activities.Collect.NOTHING_LEFT, Activities.Battle.class)`: it leaves the outcome's own
+  activity. Where a switched-off activity goes is the step's `.whenOff(Activities.Collect.class)`.
+- The start, a preset and `ActivitySwitch.enable/disable/active` name an activity by its class literal.
+- **`Bot.runFlow(Sdk.class)` replaces `Bot.run(goHome, Sdk.class)`**, and what gets the game home is the flow's
+  `.home(Gamebot::goHome)`. `runFlow` is in the insert menu, inside `main` only, as "Run activity flow".
+- A run ends on an outcome nothing is wired to, or a body returning `null`, and says which.
 
 No source changes since v1.4.1; re-released for updated upstream pins. The JitPack build now survives the
 builders that refuse the `statx` syscall, which lost v1.4.0.

@@ -204,8 +204,8 @@ public final class SdkTypes {
             .writtenAsParts();
 
     /**
-     * One activity of the flow: the bot's {@code Activities.COLLECT}, which an editor holds by name
-     * ({@link BotConstants#activity}) and the host writes as that constant. A fresh one is no activity; the
+     * One activity of the flow: the bot's {@code Activities.Collect} enum, which an editor holds by name
+     * ({@link BotConstants#activity}) and the host writes as its class literal. A fresh one is no activity; the
      * picker offers the flow's.
      *
      * <p>The call is what the host compares a value with a constant through, never what it writes: every value
@@ -218,15 +218,14 @@ public final class SdkTypes {
             .constants(Activity.NONE);
 
     /**
-     * What an activity reports: the bot's {@code Outcomes.WON}, held and written as {@link #ACTIVITY} is, and
-     * {@code Outcome.NEXT}/{@code Outcome.DISABLED} for the two every activity has. A fresh one is
-     * {@code NEXT}, "nothing special to report".
+     * What an activity reports: a constant of its enum, {@code Activities.Collect.NOTHING_LEFT}, held by its two
+     * names ({@link BotConstants#outcome}) and written as that constant. A fresh one is none; the picker offers
+     * the activity's.
      */
     public static final DeclaredCallType<Outcome> OUTCOME = PluginType.value(Outcome.class)
-            .fresh(() -> Outcome.NEXT)
+            .fresh(() -> BotConstants.outcome("", ""))
             .editor(() -> ActivityEditors::outcome)
-            .writtenAs(BotConstants::outcome, Outcome::name)
-            .constants(Outcome.NEXT, Outcome.DISABLED);
+            .writtenAs(BotConstants::outcome, outcome -> outcome.activity().name(), Outcome::name);
 
     /**
      * Types a bot author may <b>hold</b> but nobody edits, whose fresh form is a call the bot re-evaluates.

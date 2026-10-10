@@ -29,6 +29,6 @@ public record Selection(String name, List<String> activities) {
 
     /** The preset this selection is saved as. */
     public Flow.Preset toPreset() {
-        return Flow.preset(name, activities.stream().map(FlowNames::activity).toList());
+        return new Flow.Preset(name, activities.stream().map(FlowNames::activity).toList());
     }
 }

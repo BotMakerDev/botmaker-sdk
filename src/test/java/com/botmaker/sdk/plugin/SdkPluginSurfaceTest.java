@@ -136,9 +136,10 @@ class SdkPluginSurfaceTest {
         assertEquals(com.botmaker.sdk.api.vision.ImageTemplate.class, pictures.type());
         assertNull(pictures.initial());
         assertEquals("Activities", byId.get(SdkValue.Id.ACTIVITIES).holder());
-        assertEquals(com.botmaker.sdk.api.flow.Activity.class, byId.get(SdkValue.Id.ACTIVITIES).type());
-        assertEquals("Outcomes", byId.get(SdkValue.Id.OUTCOMES).holder());
-        assertEquals(com.botmaker.sdk.api.bot.Outcome.class, byId.get(SdkValue.Id.OUTCOMES).type());
+        assertEquals(com.botmaker.sdk.api.bot.Outcome.class, byId.get(SdkValue.Id.ACTIVITIES).type());
+        assertTrue(byId.get(SdkValue.Id.ACTIVITIES).isGrouped(), "one enum of outcomes per activity");
+        assertEquals("Collect", ((com.botmaker.sdk.api.flow.Activity) byId.get(SdkValue.Id.ACTIVITIES)
+                .byGroup("Collect")).name());
         assertEquals("Points", byId.get(SdkValue.Id.POINTS).holder());
         assertTrue(byId.get(SdkValue.Id.POINTS).isOpenSet());
         assertEquals(com.botmaker.sdk.api.geometry.Point.class, byId.get(SdkValue.Id.POINTS).type());

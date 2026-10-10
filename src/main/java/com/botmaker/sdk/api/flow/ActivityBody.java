@@ -1,25 +1,25 @@
 package com.botmaker.sdk.api.flow;
 
 import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.internal.flow.NoBody;
 
 /**
- * The work one activity does, as a <b>method reference</b> — {@code Collect::body}.
+ * The work one activity does, as a <b>method reference</b> — {@code Collect::body} — returning one of that
+ * activity's outcomes.
  *
  * <p>This is the type an activity's body has inside a {@code Flow}. A method reference is a token sequence
- * javac resolves, so renaming or deleting the method is a <b>compile error</b> that names the file it broke.
- *
- * <p>It is an ordinary functional interface and nothing about it is special-cased:
+ * javac resolves, so renaming or deleting the method is a <b>compile error</b> that names the file it broke;
+ * and since {@code Flow.activity(Activities.Collect.class, Collect::body)} ties {@code O} to the activity's enum,
+ * so is a body returning another activity's enum.
  *
  * <pre>{@code
  * public final class Collect {
- *     public static Outcome body() {
- *         if (nothingLeft()) return Outcomes.NOTHING_LEFT;
+ *     public static Activities.Collect body() {
+ *         if (nothingLeft()) return Activities.Collect.NOTHING_LEFT;
  *         clickCollect();
- *         return Outcome.NEXT;
+ *         return Activities.Collect.NEXT;
  *     }
  * }
- *
- * ActivityBody collect = Collect::body;   // compiles, which is the point
  * }</pre>
  *
  * <p><b>Why a method and not a lambda.</b> BotMaker writes a flow back into your own source, so what it
@@ -28,34 +28,27 @@ import com.botmaker.sdk.api.bot.Outcome;
  * and the flow editor will show that activity read-only, because it will not rewrite code you wrote.
  *
  * <p><b>The name is still yours.</b> The class and the method are named by you, wherever you like. Nothing
- * requires {@code body}, nothing requires one class per activity, and an activity's <em>label</em> on the
- * canvas is a separate string precisely so that renaming one does not force the other.
+ * requires {@code body}, and nothing requires one class per activity.
+ *
+ * @param <O> the activity's enum, whose constants are what the body can report
  */
 @FunctionalInterface
-public interface ActivityBody {
+public interface ActivityBody<O extends Outcome> {
 
     /**
-     * The work of an activity that has been <b>drawn but not written</b>.
-     *
-     * <p>Drawing the flow first and writing the bodies afterwards is an ordinary way to work, so a card on
-     * the canvas with no method behind it yet has to be sayable. This is how it is said: the flow editor
-     * writes {@code ActivityBody.NONE} where a method reference will go, and the activity is a node like any
-     * other — it simply does nothing, and the run takes the wire it would take for one switched off.
-     *
-     * <p>Comparable by identity on purpose, and the one place in this vocabulary where that is true: it is a
-     * constant, not a value read back out of a file, so {@code body == ActivityBody.NONE} is exactly the
-     * question the flow asks. Calling it is harmless and reports nothing in particular.
+     * The work of an activity that has been <b>drawn but not written</b>: the flow editor writes
+     * {@code ActivityBody.none()} where a method reference will go, and the run takes the activity's off-wire,
+     * as it does for one switched off. Always the same object, so {@code body == ActivityBody.none()} is the
+     * question the flow asks.
      */
-    ActivityBody NONE = () -> Outcome.NEXT;
+    static <O extends Outcome> ActivityBody<O> none() {
+        return NoBody.none();
+    }
 
     /**
-     * Does the work and says what happened — one of the bot's {@code Outcomes} constants, or
-     * {@link Outcome#NEXT}.
+     * Does the work and says what happened.
      *
-     * <p>No argument since SDK 2.0.0: the flow knows which activity is running without being told.
-     *
-     * @return what the flow routes on; {@code null} is read as {@link Outcome#NEXT}, for the same reason a
-     *         lambda whose last statement fell through has nothing special to report
+     * @return the outcome the flow routes on; {@code null} reports nothing, and the run ends there
      */
-    Outcome run();
+    O run();
 }

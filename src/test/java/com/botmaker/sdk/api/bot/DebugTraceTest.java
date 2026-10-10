@@ -5,7 +5,6 @@ import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.Flows;
@@ -68,49 +67,46 @@ class DebugTraceTest {
 
     // --- Activity ---
 
-    /** A bot's outcomes, BAG_FUL being the typo nothing declares. */
-    enum Outcomes implements Outcome { BAG_FULL, BAG_FUL }
+    /** The activity, an enum of its outcomes; {@code Gone} is one the flow no longer has. */
+    enum Mining implements Outcome { NEXT, BAG_FULL }
 
-    enum Activities implements Activity { MINING }
+    enum Gone implements Outcome { NEXT }
 
-    private static final Outcome BAG_FULL = Outcomes.BAG_FULL;
-
-    /** One activity reporting {@code reported}, declaring BAG_FULL, with nothing wired, so the run ends after it. */
-    private static Flow mining(Outcome reported) {
-        Activity mining = Activities.MINING;
-        return Flow.of(List.of(Flow.activity(mining, () -> reported).reports(List.of(BAG_FULL))),
-                List.of(), List.of(), mining, Flow.limits(10, 0));
+    /** Mining reporting {@code reported}; BAG_FULL leads to an activity the flow lacks, which ends the run quietly. */
+    private static Flow mining(Mining reported) {
+        return Flow.of(List.of(Flow.activity(Mining.class, () -> reported)),
+                List.of(Flow.edge(Mining.BAG_FULL, Gone.class)), List.of(), Mining.class, Flow.limits(10, 0));
     }
 
     /** Walks {@code flow} to its end, which is {@code Bot.stop()} throwing. */
     private static void run(Flow flow) {
         Flows.use(flow);
         try {
-            FlowWalker.run(flow, null);
+            FlowWalker.run(flow);
         } catch (RuntimeException ended) {
             // the run is over; only what it printed matters here
         }
     }
 
     private static void runMining() {
-        run(mining(BAG_FULL));
+        run(mining(Mining.BAG_FULL));
     }
 
     /**
-     * An outcome the card does not offer is not refused — a bot must not die over its flow's bookkeeping — but
-     * the run says why it ended there, debugging on or off.
+     * An outcome nothing is wired to ends the run — a bot must not die over its flow's bookkeeping — and the run
+     * says why it ended there, debugging on or off.
      */
     @Test
-    void anUndeclaredOutcomeSaysSoWhenTheRunEndsOnIt() {
+    void anUnwiredOutcomeSaysSoWhenTheRunEndsOnIt() {
         Debug.disable();
 
-        String output = printed(() -> run(mining(Outcomes.BAG_FUL)));
+        String output = printed(() -> run(mining(Mining.NEXT)));
 
-        assertTrue(output.contains("Mining reported 'Bag ful', which it does not declare"), output);
+        assertTrue(output.contains("Mining reported 'Next', and nothing is wired to it"), output);
     }
 
     @Test
-    void aDeclaredUnwiredOutcomeEndsTheRunQuietly() {
+    void aWiredOutcomeEndsTheRunQuietly() {
         Debug.disable();
 
         assertEquals("", printed(DebugTraceTest::runMining));

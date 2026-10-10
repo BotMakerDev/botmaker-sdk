@@ -68,16 +68,16 @@ public class FlowRulesTest {
 
     @Test
     void aBlankOutcomeIsTheSameWireAsAnExplicitNext() {
-        // Persisted blank vs. "NEXT" must not become two competing wires out of the same port, and the moved
-        // wire keeps the spelling the file already had.
-        assertEquals(List.of(wire("A", "C", "")), FlowRules.rewired(List.of(wire("A", "B", "")), "A", "NEXT", "C"));
-        assertEquals(List.of(wire("A", "C", "NEXT")), FlowRules.rewired(List.of(wire("A", "B", "NEXT")), "A", "", "C"));
+        // Persisted blank vs. "Next" must not become two competing wires out of the same port: every spelling
+        // of the NEXT constant is the one blank port.
+        assertEquals(List.of(wire("A", "C", "")), FlowRules.rewired(List.of(wire("A", "B", "")), "A", Arrow.NEXT, "C"));
+        assertEquals(List.of(wire("A", "C", "")), FlowRules.rewired(List.of(wire("A", "B", "NEXT")), "A", "", "C"));
     }
 
     @Test
     void aPortWithoutAWireHoldsNothing() {
         assertTrue(FlowRules.held(A_TO_B, "A", "BAG_FULL").isEmpty());
-        assertEquals(wire("A", "B"), FlowRules.held(A_TO_B, "A", "NEXT").orElseThrow());
+        assertEquals(wire("A", "B"), FlowRules.held(A_TO_B, "A", Arrow.NEXT).orElseThrow());
     }
 
     @Test

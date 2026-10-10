@@ -6,8 +6,8 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.plugin.flow.Board;
 import com.botmaker.sdk.plugin.flow.FlowEdits;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
@@ -22,7 +22,7 @@ import java.util.function.UnaryOperator;
 
 /**
  * The assistant's activity flow: read it, and change it as 🔀 Activity Flow does — each change through
- * {@link FlowEdits}, saved with the {@code Activities} and {@code Outcomes} constants it needs, on the FX thread.
+ * {@link FlowEdits}, saved with the {@code Activities} enums it needs, on the FX thread.
  */
 final class FlowTools {
 
@@ -82,12 +82,13 @@ final class FlowTools {
             Optional<ValueContext> value = FlowValue.FLOW.open(services);
             if (value.isEmpty()) return AgentReply.refused("This project has no Sdk.flow().");
             if (!FlowValue.FLOW.readable(value.get())) return AgentReply.refused(handWritten());
-            return AgentReply.text(describe(FlowValue.read(value.get())));
+            return AgentReply.text(describe(Board.read(services.pluginValues(), FlowValue.read(value.get()))));
         });
     }
 
-    /** {@code flow} as the lines {@code read_flow} answers. */
-    static String describe(Flow flow) {
+    /** {@code board} as the lines {@code read_flow} answers. */
+    static String describe(Board board) {
+        Flow flow = board.flow();
         if (flow.steps().isEmpty()) return "The flow has no activities yet; add_activity adds one.";
         List<String> lines = new ArrayList<>();
         lines.add("Starts at " + (flow.start().label().isEmpty() ? "nothing" : flow.start().label()) + "; at most "
@@ -100,13 +101,13 @@ final class FlowTools {
             if (step.popupCheck()) switches.add("checks popups");
             lines.add("• " + step.label() + " — " + (body.isEmpty() ? "no body yet" : body)
                     + (switches.isEmpty() ? "" : ", " + String.join(", ", switches))
-                    + (step.outcomes().isEmpty() ? "" : "; outcomes " + step.outcomes().stream().map(Outcome::label)
-                    .toList())
+                    + "; outcomes " + board.exitsOf(step.label())
                     + (step.description().isBlank() ? "" : ". " + step.description()));
             for (Flow.Edge edge : flow.edges()) {
                 if (!edge.from().equals(step.activity())) continue;
-                lines.add("    on " + edge.outcome().label() + " → " + edge.to().label());
+                lines.add("    on " + edge.on().label() + " → " + edge.to().label());
             }
+            if (!step.whenOff().isNone()) lines.add("    when off → " + step.whenOff().label());
         }
         return String.join("\n", lines);
     }
@@ -121,7 +122,7 @@ final class FlowTools {
         // plan looks up: "collect" typed for the activity "Collect" still renames Activities.COLLECT.
         return editFlow(context, flow -> FlowEdits.renameActivity(flow, rename.from(), rename.to()),
                 flow -> FlowEdits.labelOf(flow, rename.from()).<Map<String, String>>map(
-                        held -> Map.of(held, FlowNames.label(rename.to()))).orElse(Map.of()),
+                        held -> Map.of(held, FlowNames.activityLabel(rename.to()))).orElse(Map.of()),
                 "Renamed " + rename.from() + " to " + rename.to() + ".");
     }
 
@@ -146,7 +147,7 @@ final class FlowTools {
     }
 
     /** Reads the flow, changes it, and saves it as 🔀 Activity Flow does — all on the FX thread. */
-    private static AgentReply editFlow(AgentContext context, UnaryOperator<Flow> change,
+    private static AgentReply editFlow(AgentContext context, UnaryOperator<Board> change,
                                        Function<Flow, Map<String, String>> activityRenames, String done) {
         StudioServices services = context.services();
         return FxCall.call(() -> {
@@ -155,25 +156,26 @@ final class FlowTools {
             // A flow the user wrote by hand reads as none, and writing over it would lose it: 🔀 Activity Flow
             // opens read-only for the same reason.
             if (!FlowValue.FLOW.readable(value.get())) return AgentReply.refused(handWritten());
-            Flow before = FlowValue.read(value.get());
-            Flow after;
+            Board before = Board.read(services.pluginValues(), FlowValue.read(value.get()));
+            Board after;
             try {
                 after = change.apply(before);
             } catch (IllegalArgumentException e) {
                 return AgentReply.refused(e.getMessage());
             }
             List<String> notes = new ArrayList<>();
-            String refused = FlowEdits.save(services.pluginValues(), value.get(), after, FlowEdits.Saved.of(before),
-                    new LinkedHashMap<>(activityRenames.apply(before)), new LinkedHashMap<>(), notes);
+            String refused = FlowEdits.save(services.pluginValues(), value.get(), after,
+                    FlowEdits.labels(before.flow()), new LinkedHashMap<>(activityRenames.apply(before.flow())),
+                    new LinkedHashMap<>(), notes);
             if (refused != null) return AgentReply.refused(refused);
             return AgentReply.text(done + (notes.isEmpty() ? "" : " " + String.join(" ", notes))
-                    + " Activities: " + FlowEdits.labels(after) + ".");
+                    + " Activities: " + FlowEdits.labels(after.flow()) + ".");
         });
     }
 
     /** The outcome as the canvas labels it: its constant's words, "Bag full" for "bag full". */
     private static String outcome(String typed) {
-        return typed == null || typed.isBlank() ? "NEXT" : FlowNames.outcome(typed).label();
+        return FlowNames.label(typed == null || typed.isBlank() ? com.botmaker.sdk.plugin.flow.Arrow.NEXT : typed);
     }
 
     private static String handWritten() {

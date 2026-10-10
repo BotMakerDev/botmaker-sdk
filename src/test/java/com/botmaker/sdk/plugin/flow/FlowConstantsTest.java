@@ -4,148 +4,221 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.internal.bot.SdkValues;
-import com.botmaker.sdk.plugin.flow.FlowConstants.Kind;
-import com.botmaker.sdk.plugin.flow.FlowConstants.Op;
-import com.botmaker.sdk.plugin.flow.FlowConstants.Plan;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** What a save asks of the bot's {@code Activities} and {@code Outcomes} classes, before the flow is written. */
+/** What a save asks of the bot's {@code Activities} class — one enum per activity — around writing the flow. */
 class FlowConstantsTest {
 
-    private static Map<String, String> members(String... constantThenLabel) {
-        Map<String, String> members = new LinkedHashMap<>();
-        for (int i = 0; i < constantThenLabel.length; i += 2) members.put(constantThenLabel[i], constantThenLabel[i + 1]);
-        return members;
+    /** A project's {@code Activities} class, held as enum → constants, recording each change asked of it. */
+    private static final class Project implements PluginValues {
+        final Map<String, List<String>> enums = new LinkedHashMap<>();
+        final List<String> asked = new ArrayList<>();
+        /** Members a remove is refused for: code still uses them. */
+        final Set<String> used;
+
+        Project(Set<String> used, String... enumThenConstants) {
+            this.used = used;
+            for (String declaration : enumThenConstants) {
+                String[] parts = declaration.split(" ");
+                enums.put(parts[0], new ArrayList<>(List.of(parts).subList(1, parts.length)));
+            }
+        }
+
+        @Override
+        public List<String> ids() {
+            return List.of();
+        }
+
+        @Override
+        public Optional<ValueContext> open(String id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<String> groups(String id) {
+            return List.copyOf(enums.keySet());
+        }
+
+        @Override
+        public List<String> members(String id) {
+            List<String> members = new ArrayList<>();
+            enums.forEach((group, constants) -> constants.forEach(c -> members.add(group + "." + c)));
+            return members;
+        }
+
+        @Override
+        public Optional<String> addGroup(String id, String group, List<String> constants) {
+            asked.add("addGroup " + group + " " + constants);
+            enums.put(group, new ArrayList<>(constants));
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> renameGroup(String id, String group, String newName) {
+            asked.add("renameGroup " + group + " " + newName);
+            enums.put(newName, enums.remove(group));
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> removeGroup(String id, String group) {
+            asked.add("removeGroup " + group);
+            if (used.contains(group)) return Optional.of("used in Gamebot.java");
+            enums.remove(group);
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> add(String id, String member, Object value) {
+            asked.add("add " + member);
+            String[] parts = member.split("\\.");
+            enums.get(parts[0]).add(parts[1]);
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> rename(String id, String member, String newName) {
+            asked.add("rename " + member + " " + newName);
+            String[] parts = member.split("\\.");
+            List<String> constants = enums.get(parts[0]);
+            constants.set(constants.indexOf(parts[1]), newName);
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> remove(String id, String member) {
+            asked.add("remove " + member);
+            if (used.contains(member)) return Optional.of("returned by Collect.java");
+            String[] parts = member.split("\\.");
+            enums.get(parts[0]).remove(parts[1]);
+            return Optional.empty();
+        }
+    }
+
+    private static Board board(Map<String, List<String>> exits) {
+        List<Flow.Step> steps = new ArrayList<>();
+        for (String activity : exits.keySet()) {
+            steps.add(FlowTypes.step(FlowNames.activity(activity), ActivityBody.none()));
+        }
+        return new Board(new Flow(steps, List.of(), List.of(), steps.isEmpty() ? null : steps.getFirst().activity(),
+                Flow.Limits.DEFAULT, null), exits);
+    }
+
+    private static <K, V> Map<K, V> ordered(K k1, V v1, K k2, V v2) {
+        Map<K, V> map = new LinkedHashMap<>();
+        map.put(k1, v1);
+        map.put(k2, v2);
+        return map;
     }
 
     @Test
-    void a_label_no_constant_holds_is_added() {
-        Plan plan = FlowConstants.plan(Kind.OUTCOMES, members("WON", "Won"), List.of("Won", "Bag full"), Map.of());
-        assertNull(plan.refusal());
-        assertEquals(List.of(new Op.Add("BAG_FULL")), plan.ops());
+    void the_project_is_read_as_enums_of_constants() {
+        Project project = new Project(Set.of(), "Collect NEXT NOTHING_LEFT", "Rest NEXT");
+        assertEquals(Map.of("Collect", List.of("NEXT", "NOTHING_LEFT"), "Rest", List.of("NEXT")),
+                FlowConstants.declared(project));
     }
 
-    /** A constant whose name is not the label's is still the label's: it is matched by what it holds. */
     @Test
-    void a_constant_holding_the_label_is_reused_whatever_it_is_called() {
-        Plan plan = FlowConstants.plan(Kind.ACTIVITIES, members("FARM", "Collect"), List.of("Collect"), Map.of());
-        assertEquals(List.of(), plan.ops());
+    void a_new_activity_is_an_enum_seeded_with_its_outcomes() {
+        Project project = new Project(Set.of(), "Collect NEXT");
+        String refused = FlowConstants.prepare(project, board(ordered("Collect", List.of("Next"),
+                "Daily reward", List.of("Next", "Done"))), new LinkedHashMap<>(), new LinkedHashMap<>());
+        assertNull(refused);
+        assertEquals(List.of("addGroup DailyReward [NEXT, DONE]"), project.asked);
     }
 
-    /** A rename renames the constant that held the old label, rather than adding one beside it. */
     @Test
-    void a_canvas_rename_renames_the_constant() {
-        Plan plan = FlowConstants.plan(Kind.ACTIVITIES, members("BATTLE", "Battle", "REST", "Rest"),
-                List.of("Fight", "Rest"), Map.of("Battle", "Fight"));
-        assertNull(plan.refusal());
-        assertEquals(List.of(new Op.Rename("Battle", "BATTLE", "FIGHT")), plan.ops());
+    void a_new_outcome_is_a_constant_of_its_activitys_enum() {
+        Project project = new Project(Set.of(), "Collect NEXT", "Battle NEXT");
+        assertNull(FlowConstants.prepare(project, board(ordered("Collect", List.of("Next", "Bag full"),
+                "Battle", List.of("Next"))), new LinkedHashMap<>(), new LinkedHashMap<>()));
+        assertEquals(List.of("add Collect.BAG_FULL"), project.asked);
     }
 
-    /** "Won" to "WON!" is still Outcomes.WON: nothing is renamed, and the canvas's rename is spent. */
+    /** A rename renames the enum or the constant that held the old label, rather than adding one beside it. */
+    @Test
+    void a_canvas_rename_renames_the_enum_and_the_constant() {
+        Project project = new Project(Set.of(), "Battle NEXT WON");
+        Map<String, String> activityRenames = new LinkedHashMap<>(Map.of("Battle", "Fight"));
+        Map<String, Map<String, String>> outcomeRenames = new LinkedHashMap<>();
+        outcomeRenames.put("Fight", new LinkedHashMap<>(Map.of("Won", "Victory")));
+        assertNull(FlowConstants.prepare(project, board(Map.of("Fight", List.of("Next", "Victory"))),
+                activityRenames, outcomeRenames));
+        assertEquals(List.of("renameGroup Battle Fight", "rename Fight.WON VICTORY"), project.asked);
+        assertTrue(activityRenames.isEmpty(), "a rename that landed is spent");
+        assertTrue(outcomeRenames.get("Fight").isEmpty());
+    }
+
+    /** "Won" to "WON!" is still WON: nothing is renamed, and the canvas's rename is spent. */
     @Test
     void a_rename_to_the_same_constant_renames_nothing() {
-        Plan plan = FlowConstants.plan(Kind.OUTCOMES, members("WON", "Won"), List.of("WON!"), Map.of("Won", "WON!"));
-        assertEquals(List.of(new Op.Rename("Won", "WON", "WON")), plan.ops());
+        Project project = new Project(Set.of(), "Battle NEXT WON");
+        Map<String, Map<String, String>> outcomeRenames = new LinkedHashMap<>();
+        outcomeRenames.put("Battle", new LinkedHashMap<>(Map.of("Won", "WON!")));
+        assertNull(FlowConstants.prepare(project, board(Map.of("Battle", List.of("Next", "WON!"))),
+                new LinkedHashMap<>(), outcomeRenames));
+        assertEquals(List.of(), project.asked);
     }
 
-    /** A card renamed and a new card given the old name: the constant follows the rename, the new card gets one. */
+    /** What the canvas dropped goes after the write; what code still uses stays, said. */
     @Test
-    void a_rename_then_a_new_card_of_the_old_name() {
-        Plan plan = FlowConstants.plan(Kind.ACTIVITIES, members("BATTLE", "Battle"), List.of("Fight", "Battle"),
-                Map.of("Battle", "Fight"));
-        assertEquals(List.of(new Op.Rename("Battle", "BATTLE", "FIGHT"), new Op.Add("BATTLE")), plan.ops());
+    void forgetting_removes_what_the_canvas_dropped_and_keeps_what_is_used() {
+        Project project = new Project(Set.of("Collect.WON", "Rest"), "Collect NEXT WON LOST", "Rest NEXT", "Old NEXT");
+        List<String> notes = new ArrayList<>();
+        FlowConstants.forget(project, board(Map.of("Collect", List.of("Next"))), List.of("Collect", "Rest", "Old"),
+                notes);
+        assertEquals(List.of("remove Collect.WON", "remove Collect.LOST", "removeGroup Rest", "removeGroup Old"),
+                project.asked);
+        assertEquals(Map.of("Collect", List.of("NEXT", "WON"), "Rest", List.of("NEXT")), project.enums);
+        assertEquals(2, notes.size(), notes.toString());
+        assertTrue(notes.getFirst().contains("Activities.Collect.WON stays"), notes.getFirst());
     }
 
+    /** An enum the last save did not have is not the canvas's to remove. */
     @Test
-    void a_rename_onto_a_constant_holding_something_else_is_refused() {
-        Plan plan = FlowConstants.plan(Kind.ACTIVITIES, members("BATTLE", "Battle", "FIGHT", "Fight club"),
-                List.of("Fight"), Map.of("Battle", "Fight"));
-        assertNotNull(plan.refusal());
-        assertTrue(plan.refusal().contains("Activities.FIGHT"), plan.refusal());
-        assertEquals(List.of(), plan.ops());
+    void forgetting_leaves_an_enum_the_canvas_never_drew() {
+        Project project = new Project(Set.of(), "Collect NEXT", "Mine NEXT");
+        FlowConstants.forget(project, board(Map.of("Collect", List.of("Next"))), Set.of("Collect"), new ArrayList<>());
+        assertEquals(List.of(), project.asked);
     }
 
+    /** + New outcome… in a body's return slot declares it in that activity's enum, once. */
     @Test
-    void an_add_onto_a_constant_holding_something_else_is_refused() {
-        Plan plan = FlowConstants.plan(Kind.OUTCOMES, members("BAG_FULL", "Bag full"), List.of("bag-full"), Map.of());
-        assertNotNull(plan.refusal());
-        assertTrue(plan.refusal().contains("Outcomes.BAG_FULL"), plan.refusal());
-    }
-
-    /** A rename of a label nothing declared yet is nothing to rename: the label is simply added. */
-    @Test
-    void a_rename_of_an_undeclared_label_adds_instead() {
-        Plan plan = FlowConstants.plan(Kind.OUTCOMES, members(), List.of("Victory"), Map.of("Won", "Victory"));
-        assertEquals(List.of(new Op.Add("VICTORY")), plan.ops());
-    }
-
-    /** + New outcome… in a body's return slot puts a port on that body's card, and only there. */
-    @Test
-    void a_new_outcome_is_declared_on_the_card_whose_body_holds_the_slot() {
-        Flow flow = Flow.of(List.of(
-                        Flow.activity(FlowNames.activity("Battle"), FlowTypes.body("Battle::body")).goesHome()
-                                .checksPopups().reports(List.of(FlowNames.outcome("Won"))),
-                        Flow.activity(FlowNames.activity("Rest"), ActivityBody.NONE)),
-                List.of(), List.of(), FlowNames.activity("Battle"), Flow.Limits.DEFAULT);
-        String method = FlowValue.bodySource(flow.steps().getFirst());
-
-        Flow added = FlowConstants.withOutcome(flow, method, FlowNames.outcome("Timeout"));
-
-        assertEquals(List.of(FlowNames.outcome("Won"), FlowNames.outcome("Timeout")), added.steps().get(0).outcomes());
-        assertEquals(List.of(), added.steps().get(1).outcomes());
-        assertEquals(added, FlowConstants.withOutcome(added, method, FlowNames.outcome("Timeout")),
-                "declared once, however often it is asked");
-        assertEquals(flow, FlowConstants.withOutcome(flow, "", FlowNames.outcome("Timeout")),
-                "a slot in no activity's body declares nothing — not on every card with no body");
+    void a_new_outcome_is_declared_in_one_enum_once() {
+        Project project = new Project(Set.of(), "Battle NEXT");
+        assertEquals(Optional.empty(), FlowConstants.declare(project, "Battle", "Timeout"));
+        assertEquals(Optional.empty(), FlowConstants.declare(project, "Battle", "timeout"));
+        assertEquals(List.of("add Battle.TIMEOUT"), project.asked);
+        assertTrue(FlowConstants.declare(project, "Battle", "!!").isPresent());
     }
 
     /**
-     * A constant written by hand in another case ({@code Collect}) is shown, but the card names it back as
-     * {@code COLLECT}: the save refuses rather than write a value no constant holds.
+     * A name written by hand in another case ({@code Collect.won}) is shown, but the card names it back as
+     * {@code WON}: the save refuses rather than write a value nothing holds.
      */
     @Test
-    void a_flow_naming_a_constant_the_enum_lacks_is_not_written() {
-        Flow flow = Flow.of(List.of(Flow.activity(FlowNames.activity("Collect"), ActivityBody.NONE)
-                        .reports(List.of(FlowNames.outcome("Won")))),
-                List.of(), List.of(), FlowNames.activity("Collect"), Flow.Limits.DEFAULT);
+    void a_flow_naming_what_the_enums_lack_is_not_written() {
+        Flow flow = new Flow(List.of(FlowTypes.step(FlowNames.activity("Collect"), ActivityBody.none())),
+                List.of(new Flow.Edge(FlowNames.outcome("Collect", "Won"), FlowNames.activity("Collect"))), List.of(),
+                FlowNames.activity("Collect"), Flow.Limits.DEFAULT, null);
 
-        assertNull(FlowConstants.unheld(holding(List.of("COLLECT"), List.of("WON")), Kind.ACTIVITIES, flow));
-        assertNull(FlowConstants.unheld(holding(List.of("COLLECT"), List.of("WON")), Kind.OUTCOMES, flow));
-        String refused = FlowConstants.unheld(holding(List.of("Collect"), List.of("WON")), Kind.ACTIVITIES, flow);
+        assertNull(FlowConstants.unheld(new Project(Set.of(), "Collect NEXT WON"), flow));
+        String refused = FlowConstants.unheld(new Project(Set.of(), "Collect NEXT won"), flow);
         assertNotNull(refused);
-        assertTrue(refused.contains("Activities.COLLECT"), refused);
-    }
-
-    /** A project whose {@code Activities} and {@code Outcomes} enums hold these constants. */
-    private static PluginValues holding(List<String> activities, List<String> outcomes) {
-        return new PluginValues() {
-            @Override
-            public List<String> ids() {
-                return List.of();
-            }
-
-            @Override
-            public Optional<ValueContext> open(String id) {
-                return Optional.empty();
-            }
-
-            @Override
-            public List<String> members(String id) {
-                return id.equals(SdkValues.ACTIVITIES.id()) ? activities
-                        : id.equals(SdkValues.OUTCOMES.id()) ? outcomes : List.of();
-            }
-        };
+        assertTrue(refused.contains("Activities.Collect.WON"), refused);
+        assertNotNull(FlowConstants.unheld(new Project(Set.of()), flow));
     }
 }

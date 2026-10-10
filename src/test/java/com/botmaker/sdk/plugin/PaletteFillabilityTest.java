@@ -40,6 +40,12 @@ class PaletteFillabilityTest {
      */
     private static final Set<String> NULL_MEANS_DEFAULT = Set.of();
 
+    /**
+     * Offered members whose parameter the host fills itself: an entry point's ({@code @EntryPoint}) run of
+     * classes is the bot's classes holding managed values, which only the host knows ({@code Sdk.class}).
+     */
+    private static final Set<String> FILLED_BY_THE_HOST = Set.of("Bot#runFlow(Class[])");
+
     @Test
     void every_offered_parameter_can_be_filled() {
         Set<Class<?>> declared = new HashSet<>();
@@ -59,6 +65,7 @@ class PaletteFillabilityTest {
                     if (fillable(p, declared)) continue;
                     String key = facade.type().getSimpleName() + "#" + m.getName() + "("
                             + p.getType().getSimpleName() + ")";
+                    if (FILLED_BY_THE_HOST.contains(key)) continue;
                     if (NULL_MEANS_DEFAULT.contains(key)) excused.add(key);
                     else unfillable.add(key);
                 }

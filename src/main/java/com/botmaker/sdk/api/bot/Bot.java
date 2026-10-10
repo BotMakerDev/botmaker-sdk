@@ -1,7 +1,9 @@
 package com.botmaker.sdk.api.bot;
 import com.botmaker.plugin.api.managed.ManagedValues;
+import com.botmaker.plugin.api.palette.EntryPoint;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.palette.PaletteLabel;
 import com.botmaker.plugin.api.palette.Untraced;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
@@ -23,8 +25,8 @@ import java.util.function.Consumer;
  * back to a known-good state before restarting. This is the "restart the bot on failure" machinery a game
  * bot needs; the body, the recovery hooks and the per-activity logic stay in editable user code.
  *
- * <p>{@link #run} also runs a start-up sequence <em>once</em> before the first loop pass — launch the
- * project's configured target, then {@code goHome()} — so a fresh launch actually opens the game and reaches a
+ * <p>{@link #runFlow} also runs a start-up sequence <em>once</em> before the first loop pass — launch the
+ * project's configured target, then the flow's {@code home} — so a fresh launch actually opens the game and reaches a
  * known screen instead of assuming it is already running. A first launch leaves an already-open game alone; a
  * recovery shuts a frozen one down first.
  *
@@ -33,54 +35,60 @@ import java.util.function.Consumer;
  * {@code supervise} returns, rather than treating it as a crash to recover from.
  *
  * <p><b>Curated for the palette</b> (see {@code @Palette}): {@link #stop()} is offered — it is exactly the
- * statement an activity that has finished its work writes, from anywhere in the call stack. {@link #run} is not:
- * it <em>is</em> the bot, written once in its {@code main}, and it does not return. The two {@code start}
- * overloads and their {@code StartMode} went on 2026-10-01: {@code run} replaced them, and a bot never called
- * either.
+ * statement an activity that has finished its work writes, from anywhere in the call stack. {@link #runFlow}
+ * is offered inside {@code main} only: it <em>is</em> the bot, and it does not return. It replaced
+ * {@code run(goHome, values…)} on 2026-10-10, when what gets home moved onto the flow.
  */
 @Palette(category = "bot", categoryLabel = "Bot", icon = "🤖")
 public class Bot {
 
     /**
-     * For {@code extends Bot} alone — see {@link #run}. There is nothing to construct here and nothing to
-     * override; the class is extendable so a bot's entry point can call {@code run(…)} unqualified, and so
+     * For {@code extends Bot} alone — see {@link #runFlow}. There is nothing to construct here and nothing to
+     * override; the class is extendable so a bot's entry point can call {@code runFlow(…)} unqualified, and so
      * that <em>this class is a bot's entry point</em> is a fact javac knows rather than a convention.
      */
     protected Bot() {}
 
     /**
      * Installs this bot's managed values (the SDK's {@code @SdkValue} ones and any other plugin's) and runs its
-     * flow — the whole of a bot's {@code main}.
+     * activity flow — the whole of a bot's {@code main}.
      *
      * <pre>{@code
      * public final class Gamebot extends Bot {
      *
      *     public static void main(String[] args) {
-     *         run(Gamebot::goHome, Sdk.class);
+     *         runFlow(Sdk.class);
      *     }
      * }
      * }</pre>
      *
      * <p>The bot names each plugin's values class, which is a fact only it has and one javac checks; what it
-     * does not write is what to do with them.
+     * does not write is what to do with them. What gets the game back to a known screen is the flow's own
+     * {@link com.botmaker.sdk.api.flow.Flow#home}, run at start-up, after anything unexpected and before each
+     * step that goes home; a flow with none goes nowhere.
      *
-     * @param goHome what gets the game back to a known screen, between activities and after anything
-     *               unexpected
+     * <p>Offered in the insert menu inside {@code main} only ({@link EntryPoint}): anywhere else it would start
+     * a second supervised run inside the first.
+     *
      * @param values each plugin's values class in this bot — {@code Sdk.class}, the file that plugin shipped
      *               and this project now owns. None is legal: the bot runs with whatever the SDK defaults to.
      */
-    @Hidden("the entry point a bot's own main calls; a second run() inside an activity body would nest one "
-            + "supervised run inside another")
+    @EntryPoint
+    @PaletteLabel("Run activity flow")
     @Untraced("holds the whole run")
-    public static void run(Runnable goHome, Class<?>... values) {
+    public static void runFlow(Class<?>... values) {
         observe();
         SdkValues.claim();
         ManagedValues.install(values);
-        lifecycle(() -> FlowWalker.run(Flows.installed(), goHome), goHome);
+        Runnable goHome = () -> {
+            Runnable home = Flows.installed().home();
+            if (home != null) home.run();
+        };
+        lifecycle(() -> FlowWalker.run(Flows.installed()), goHome);
     }
 
     /**
-     * Installs this bot's managed values as {@link #run} does, then runs {@code body} once and returns —
+     * Installs this bot's managed values as {@link #runFlow} does, then runs {@code body} once and returns —
      * what Studio's ▶ Try calls with one statement as the body, from a caller it writes outside the project's
      * sources.
      *
@@ -88,9 +96,9 @@ public class Bot {
      * exception from {@code body} is the try's failure and propagates; {@link #stop()} ends it quietly.
      *
      * @param body   the statement, and the locals it reads
-     * @param values each plugin's values class, as {@link #run} takes them
+     * @param values each plugin's values class, as {@link #runFlow} takes them
      */
-    @Hidden("the entry Studio's Try calls; a bot runs through run()")
+    @Hidden("the entry Studio's Try calls; a bot runs through runFlow()")
     @Untraced("holds the whole try")
     public static void trial(Runnable body, Class<?>... values) {
         observe();
@@ -178,7 +186,7 @@ public class Bot {
      * {@link Watchdog} so stuck states surface as {@link BotStuckException}. Does not return under normal
      * operation.
      *
-     * <p>Package-private: bots call {@link #run} — {@code supervise} is the internal loop.
+     * <p>Package-private: bots call {@link #runFlow} —{@code supervise} is the internal loop.
      *
      * @param body     the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param recovery run after a crash/stuck to restore a known-good state before the next attempt
