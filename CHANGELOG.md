@@ -17,6 +17,16 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+No source changes since v1.4.0, which never built on JitPack: it landed on a broken builder, and a tag that
+built `Error` stays broken. This is v1.4.0 as it was meant to resolve; read v1.4.0's notes below.
+
+### Build
+
+- The JitPack build deletes each downloaded archive once unpacked, skips the JDK's sources, and prints disk
+  space, Maven's launcher jar and the JDK version before building.
+
 ## [1.4.0] — 2026-10-10
 
 ### Build

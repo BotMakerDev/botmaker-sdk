@@ -8,9 +8,12 @@ before_install:
   # lost that way on 2026-10-10, and a tag that built Error stays broken.
   # The retries are a shell loop over plain curl flags: one builder's curl is too old for --retry-all-errors.
   - for i in 1 2 3 4 5; do curl -fsSL -o "$HOME/temurin25.tar.gz" https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jdk/hotspot/normal/eclipse && break; sleep 10; done
-  - mkdir -p "$HOME/temurin25" && tar -xzf "$HOME/temurin25.tar.gz" -C "$HOME/temurin25" --strip-components=1
+  # The bad builders look out of disk (SDKMan cannot save its download, our JDK starts but cannot read a jar),
+  # so each archive is deleted once unpacked and the JDK's sources are not unpacked at all. v1.4.0 was lost
+  # with neither.
+  - mkdir -p "$HOME/temurin25" && tar -xzf "$HOME/temurin25.tar.gz" -C "$HOME/temurin25" --strip-components=1 --exclude='*/lib/src.zip' && rm -f "$HOME/temurin25.tar.gz"
   - for i in 1 2 3 4 5; do curl -fsSL -o "$HOME/maven.tar.gz" https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.9/apache-maven-3.9.9-bin.tar.gz && break; sleep 10; done
-  - mkdir -p "$HOME/maven" && tar -xzf "$HOME/maven.tar.gz" -C "$HOME/maven" --strip-components=1
+  - mkdir -p "$HOME/maven" && tar -xzf "$HOME/maven.tar.gz" -C "$HOME/maven" --strip-components=1 && rm -f "$HOME/maven.tar.gz"
 install:
   # A tag's pom names its upstreams' released versions, written by the umbrella release in the release
   # commit (docs/refactor/43-real-versions.md), so the build needs nothing beside the checkout. JitPack
@@ -18,4 +21,6 @@ install:
   # chain back to back. flatten-maven-plugin writes the versions literally into the published pom. A tag
   # cut by hand from main names -SNAPSHOT upstreams, which JitPack cannot resolve: the build fails rather
   # than publishing.
+  # Disk, JDK and Maven first: before_install prints nothing to the log, and a lost tag should say why.
+  - df -h "$HOME" /tmp; ls "$HOME/maven/boot"; "$HOME/temurin25/bin/java" -version
   - JAVA_HOME="$HOME/temurin25" PATH="$HOME/temurin25/bin:$PATH" "$HOME/maven/bin/mvn" install -DskipTests -Dmaven.javadoc.skip=true -B
