@@ -38,7 +38,7 @@
              NOT optional, and this comment said it was until 2026-09-06, three days after the element
              below stopped being: `optional` means not transitive, so a host resolving botmaker-sdk got a
              jar whose SdkPlugin could not resolve its own superclass. See the dependency's own comment. -->
-        <botmaker.plugintoolkit.version>0.6.1-SNAPSHOT</botmaker.plugintoolkit.version>
+        <botmaker.plugintoolkit.version>0.6.2-SNAPSHOT</botmaker.plugintoolkit.version>
         <!-- botmaker-plugin-basics version: PLUGIN #2, which owns the JDK value types and their editors.
              Same contract as the four above and the same
              flatten reason — it is an ordinary <dependencies> entry, so the published pom must carry a
