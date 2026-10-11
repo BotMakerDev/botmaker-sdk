@@ -33,6 +33,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   when the game shows another size than `Sdk.screen()`. `.anchored(Anchor.BOTTOM_RIGHT)` keeps one with a
   corner or edge on a game of another shape; the centre otherwise. `save_point`/`save_region` write them, with
   an optional `anchor`.
+- **Numbers in a game's own font.** `Text.readDigits(source, Digits.GOLD)` reads a number with the font's
+  digit pictures rather than OCR, as an `OptionalLong`: empty when no digit is there, or when a character the
+  set lacks stands between two digits. `Digits.java` holds `new DigitSet("src/main/resources/digits/gold")`, a
+  folder of `0.png` to `9.png`, scaled as pictures are. The assistant's `save_digits` cuts the digits of a
+  number on screen into it, says which digits the set still lacks, and reads the number back.
 - **Another aspect ratio.** A picture on a frame of another shape is scaled by the smaller side's ratio, as a
   game fits its art, not by the mean; the run-start warning says when the shape differs.
 - **Smaller images for an assistant.** `sdk_screenshot` fits 1024 pixels unless a `scale` is given, and a

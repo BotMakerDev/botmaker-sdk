@@ -26,6 +26,11 @@ public final class ZoneSource implements CaptureSource, WindowBacked {
         this.zone = zone;
     }
 
+    /** The zone it narrows to, in the bot's pixels. */
+    Zone zone() {
+        return zone;
+    }
+
     @Override
     public BufferedImage capture() {
         CaptureSource whole = of.base();

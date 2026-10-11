@@ -15,6 +15,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.Flows;
@@ -26,13 +27,13 @@ import java.util.List;
 /**
  * The SDK's managed values, each declared once, and what a run does with each one.
  *
- * <p>Eleven declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
+ * <p>Twelve declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
  * plugin lists {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOW} is the activity
  * flow, {@code FLOW_LAYOUT} where the flow editor draws each card (a run ignores it), {@code CAPTURE} where
  * pixels are read from, {@code SETTINGS} how it clicks and looks, {@code SCREEN} the size its pictures were cut
- * at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS} and {@code ZONES} the classes of constants the
- * bot grows. {@code POINTS} and {@code REGIONS} are retired: read only for {@link SdkConversions}.
+ * at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS}, {@code ZONES} and {@code DIGITS} the classes of
+ * constants the bot grows. {@code POINTS} and {@code REGIONS} are retired: read only for {@link SdkConversions}.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract
  * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
@@ -135,6 +136,17 @@ public final class SdkValues {
                     + " name, to move it.");
 
     /**
+     * The game fonts' digits — {@code static final DigitSet GOLD = new DigitSet("src/main/resources/digits/gold")},
+     * a folder of {@code 0.png} to {@code 9.png} that {@code Text.readDigits} reads a number with. The assistant's
+     * {@code save_digits} cuts the digits of a number on screen into it and adds the constant.
+     */
+    public static final ManagedValue<DigitSet> DIGITS = ManagedValue.openSet(SdkValue.Id.DIGITS)
+            .of(DigitSet.class)
+            .in("Digits")
+            .because("Digits.java holds the game fonts' digit pictures. Ask Claude to save_digits on a number the"
+                    + " game shows to add or fix one.");
+
+    /**
      * The bot's screen size — {@code new Size(1280, 720)}: the frame its pictures were cut from, which a picture
      * names apart only when it was cut from another ({@code .in(Size)}). Written by the first picture cut while it
      * is {@code 0×0}, which is no size: pictures are matched as they are, and a private display is made at the
@@ -146,9 +158,9 @@ public final class SdkValues {
             .because("This is the size the bot's pictures were cut at. The first picture cut sets it; a private"
                     + " display is made at it and a game window is resized to it when the bot starts.");
 
-    /** All eleven, in the order the plugin declares them, the two retired ones included. */
+    /** All twelve, in the order the plugin declares them, the two retired ones included. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOW, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            ACTIVITIES, POINTS, REGIONS, SPOTS, ZONES, SCREEN);
+            ACTIVITIES, POINTS, REGIONS, SPOTS, ZONES, DIGITS, SCREEN);
 
     private static boolean claimed;
 

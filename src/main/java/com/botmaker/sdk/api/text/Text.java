@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.text;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.console.Debug;
 
 import com.botmaker.sdk.api.geometry.Point;
@@ -7,11 +8,13 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.internal.ocr.OcrEngine;
+import com.botmaker.sdk.internal.vision.DigitReader;
 
 import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalLong;
 import java.util.regex.Pattern;
 
 /**
@@ -163,6 +166,31 @@ public final class Text {
      */
     static OcrOptions orDefault(OcrOptions opts) {
         return opts == null ? DEFAULT_OPTIONS : opts;
+    }
+
+    // ---------------------------------------------------------------------
+    // readDigits — a number in the game's own font, by its digit pictures
+    // ---------------------------------------------------------------------
+
+    /**
+     * The number shown within {@code source}, read with {@code digits}' pictures rather than OCR — for a game font
+     * OCR misreads: {@code Text.readDigits(game.region(Zones.GOLD), Digits.GOLD).orElse(0)}. Empty when no digit is
+     * there, or when a gap as wide as a digit the set does not hold sits between two digits; a narrower separator
+     * ({@code ,} {@code .} {@code /}) is passed over, so {@code 350/500} reads {@code 350500}: narrow the area to
+     * one number (2026-10-11).
+     */
+    public static OptionalLong readDigits(CaptureSource source, DigitSet digits) {
+        try {
+            return DigitReader.read(source, digits, BotSettings.current().confidence());
+        } catch (RuntimeException | LinkageError e) {
+            Debug.error("readDigits failed: " + e.getMessage(), e);
+            return OptionalLong.empty();
+        }
+    }
+
+    /** {@link #readDigits(CaptureSource, DigitSet)} against the current source. */
+    public static OptionalLong readDigits(DigitSet digits) {
+        return readDigits(Source.current(), digits);
     }
 
     // ---------------------------------------------------------------------

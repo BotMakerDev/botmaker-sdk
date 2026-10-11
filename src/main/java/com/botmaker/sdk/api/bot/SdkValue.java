@@ -62,6 +62,8 @@ public @interface SdkValue {
         SPOTS,
         /** Named areas of the game, in the bot's pixels — a class of {@code Zone} constants. */
         ZONES,
+        /** A game font's digits as pictures, for {@code Text.readDigits} — a class of {@code DigitSet} constants. */
+        DIGITS,
         /**
          * The bot's screen size: the frame its pictures were cut from, which its private display is made and its
          * game window is sized to — a {@code Size} method.

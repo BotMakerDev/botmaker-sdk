@@ -15,10 +15,13 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.vision.DigitReader;
 import com.botmaker.sdk.internal.vision.Places;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.plugin.pictures.DigitCuts;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.PictureEdits;
@@ -33,11 +36,15 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * The assistant's pictures and places: each picture a {@code Pictures} constant, each named spot a
- * {@code Spots} constant and each named area a {@code Zones} constant, written through the host as the
+ * {@code Spots} constant, each named area a {@code Zones} constant and each game font's digits a {@code Digits}
+ * constant, written through the host as the
  * SDK's own windows write them. A box is in the pixels of the last screenshot, as {@code crop_picture}'s is; a
  * place is written in the bot's pixels, which the screenshot's are once the game shows the bot's screen size.
  */
@@ -45,6 +52,7 @@ final class PictureTools {
 
     private static final ManagedSet<Spot> SPOTS = ManagedSet.of(SdkValues.SPOTS);
     private static final ManagedSet<Zone> ZONES = ManagedSet.of(SdkValues.ZONES);
+    private static final ManagedSet<DigitSet> DIGITS = ManagedSet.of(SdkValues.DIGITS);
 
     record Crop(@Describe("the picture's name, lowercase with underscores: collect_button") String name,
                 @Describe("left edge, in the screenshot's pixels") int x,
@@ -86,6 +94,16 @@ final class PictureTools {
                        @Describe(value = ANCHOR, optional = true) Anchor anchor) {
     }
 
+    record NamedDigits(@Describe("the digit set's name, lowercase with underscores: gold") String name,
+                       @Describe("left edge of a box around one number the game shows, in the screenshot's pixels")
+                       int x,
+                       @Describe("top edge") int y,
+                       @Describe("width in pixels") int width,
+                       @Describe("height in pixels") int height,
+                       @Describe("the number exactly as the game shows it, separators included: 12,500")
+                       String shows) {
+    }
+
     private static final String ANCHOR = "the part of the screen it stays with when the game shows another shape: "
             + "a corner or edge for a HUD on it, center (the default) for the game's middle";
 
@@ -119,7 +137,13 @@ final class PictureTools {
             AssistantTool.named("save_region")
                     .describedAs("Names an area of the game as a Zones constant, in the bot's pixels, for a block to "
                             + "narrow a search to with .region(Zones.…), wherever the window sits and at any size")
-                    .takes(NamedRegion.class).handledBy(PictureTools::saveRegion));
+                    .takes(NamedRegion.class).handledBy(PictureTools::saveRegion),
+            AssistantTool.named("save_digits")
+                    .describedAs("Cuts the digits of a number the game shows, in a font OCR misreads, into a Digits "
+                            + "constant, for a block to read numbers with Text.readDigits(source, Digits.…). Box one "
+                            + "number with a little plain background around it; call again on numbers showing the "
+                            + "digits it lacks")
+                    .takes(NamedDigits.class).handledBy(PictureTools::saveDigits));
 
     private PictureTools() {}
 
@@ -242,6 +266,85 @@ final class PictureTools {
         return AgentReply.text(placed.saved().done() + " Zones." + constant + " = "
                 + Frames.box(new Rect(zone.x(), zone.y(), zone.width(), zone.height())) + placed.of()
                 + "; a block narrows a source to it with .region(Zones." + constant + ").");
+    }
+
+    static AgentReply saveDigits(NamedDigits digits, AgentContext context) {
+        Optional<Path> resources = Frames.resources(context);
+        if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
+        String name = TemplateLibrary.sanitizeName(digits.name());
+        String constant = FlowNames.constantFor(name);
+        if (name.isEmpty() || constant == null) {
+            return AgentReply.refused("\"" + digits.name() + "\" cannot be a constant's name.");
+        }
+        String shows = digits.shows() == null ? "" : digits.shows().replace(" ", "");
+        if (shows.chars().noneMatch(Character::isDigit)) {
+            return AgentReply.refused("Give the number the box shows, as the game writes it: 12,500.");
+        }
+        Optional<BufferedImage> frame = Frames.shown();
+        if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
+        Optional<Rect> area = Frames.within(frame.get(), digits.x(), digits.y(), digits.width(), digits.height());
+        if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));
+        BufferedImage number = Frames.cut(frame.get(), area.get());
+        List<Rect> boxes = DigitCuts.characters(number);
+        AgentReply seen = AgentReply.image(enlarged(number, boxes));
+        if (boxes.size() != shows.length()) {
+            return AgentReply.refused("That box holds " + boxes.size() + " characters apart, but \"" + shows + "\" has "
+                    + shows.length() + ": box the number alone, with a pixel or two of plain background around it.")
+                    .and(seen);
+        }
+        Size live = new Size(frame.get().getWidth(), frame.get().getHeight());
+        DigitSet set = new DigitSet(DigitCuts.pathFor(name));
+        // Every digit of a set is scaled by one frame: one cut from another is refused, not mixed in.
+        Optional<DigitSet> before = FxCall.call(() -> DIGITS.open(context.services().pluginValues(), constant)
+                .flatMap(DIGITS::read));
+        Size bot = FxCall.call(() -> ScreenSize.read(context.services())).orElse(live);
+        DigitSet wanted = bot.equals(live) ? set : set.in(live);
+        if (before.isPresent() && !before.get().equals(wanted) && !DigitCuts.held(resources.get(), name).isEmpty()) {
+            Size cut = before.get().frame() != null ? before.get().frame() : bot;
+            return AgentReply.refused("Digits." + constant + " was cut from a " + cut.width() + "×" + cut.height()
+                    + " frame and this screenshot is " + live.width() + "×" + live.height() + ": save_digits at that"
+                    + " size, or under another name.");
+        }
+        // The constant first: a refused one leaves the set's pictures as they were.
+        Placed<DigitSet> placed = FxCall.call(() -> place(context.services(), DIGITS, constant, live,
+                at -> at.equals(live) ? set : set.in(live)));
+        if (!placed.saved().ok()) return AgentReply.refused(placed.saved().done()).and(seen);
+        List<Integer> saved;
+        try {
+            saved = DigitCuts.save(resources.get(), name, number, boxes, shows);
+        } catch (IOException e) {
+            return AgentReply.refused("Could not save the digits: " + e.getMessage());
+        }
+        List<DigitReader.Glyph> held = DigitCuts.held(resources.get(), name);
+        Frames.mark(context, area.get(), Marks.Kind.NOTE, constant);
+        List<Integer> has = held.stream().map(DigitReader.Glyph::digit).toList();
+        List<Integer> lacks = IntStream.rangeClosed(0, 9).boxed().filter(d -> !has.contains(d)).toList();
+        String expected = shows.replaceAll("\\D", "").replaceFirst("^0+(?=.)", "");
+        OptionalLong read = DigitReader.read(number, 1, held, Frames.confidence(context.services()), name);
+        String check = read.isEmpty() ? "It cannot read this box back: box it again, with more plain background."
+                : String.valueOf(read.getAsLong()).equals(expected) ? "It reads this box as " + expected + "."
+                : "It reads this box as " + read.getAsLong() + ", not " + expected + ": box it again, with more plain"
+                + " background.";
+        return AgentReply.text("Saved digits " + digitList(saved) + " into Digits." + constant + " ("
+                        + set.folder() + ")" + placed.of() + ". It holds " + digitList(has)
+                        + (lacks.isEmpty() ? "" : "; it lacks " + digitList(lacks) + ": save_digits on numbers that"
+                        + " show them") + ". " + check + " A block reads one with Text.readDigits(source, Digits."
+                        + constant + ").")
+                .and(seen);
+    }
+
+    /** {@code 0 1 5}. */
+    private static String digitList(List<Integer> digits) {
+        return digits.stream().sorted().map(String::valueOf).collect(Collectors.joining(" "));
+    }
+
+    /** A number cut from the screen at a size the assistant can see it, each character it was cut into boxed. */
+    private static BufferedImage enlarged(BufferedImage number, List<Rect> boxes) {
+        double scale = Math.max(1, Math.min(8, 480.0 / number.getWidth()));
+        List<Rect> scaled = boxes.stream().map(r -> new Rect((int) Math.round(r.x() * scale),
+                (int) Math.round(r.y() * scale), (int) Math.round(r.width() * scale),
+                (int) Math.round(r.height() * scale))).toList();
+        return Frames.boxed(Frames.scaled(number, scale), scaled, Frames.FOUND);
     }
 
     /**

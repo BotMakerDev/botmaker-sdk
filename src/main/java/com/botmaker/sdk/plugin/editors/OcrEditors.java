@@ -4,8 +4,10 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.OcrLanguage;
 import com.botmaker.sdk.api.text.OcrOptions;
 import com.botmaker.sdk.api.text.OcrOptions.BinarizeMode;
@@ -24,6 +26,7 @@ import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -71,6 +74,19 @@ public final class OcrEditors {
             BinarizeMode.NONE, "None",
             BinarizeMode.OTSU, "Even lighting",
             BinarizeMode.ADAPTIVE, "Uneven lighting"));
+
+    /**
+     * A {@code DigitSet}: a pill naming its folder. Its digits are cut from the game by the assistant's
+     * {@code save_digits}, so there is nothing to pick here.
+     */
+    public static Node digits(ValueContext ctx) {
+        Label pill = Pills.value(ctx.value(DigitSet.class).map(set -> "🔢 " + set.name()).orElse(""),
+                Slots.sourceOr(ctx, "Not set"));
+        pill.setTooltip(new Tooltip(ctx.value(DigitSet.class).map(set -> set.folder() + ": ").orElse("")
+                + "a game font's digits as pictures. Ask Claude to save_digits on a number the game shows to add"
+                + " the ones it lacks."));
+        return pill;
+    }
 
     /** The editor: a pill saying the whole setting, opening the dialog. */
     public static Node options(ValueContext ctx) {

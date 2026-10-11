@@ -22,6 +22,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.plugin.flow.FlowNames;
@@ -316,6 +317,27 @@ class SdkAssistTest {
         assertEquals(new Spot(50, 30), host.set("spots").get("CLAIM").value());
     }
 
+    @Test
+    void aNumbersDigitsAreCutIntoADigitSetAndReadBack() {
+        host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(0, 0)));
+        BufferedImage frame = plain(new Color(0x10, 0x20, 0x50));
+        Graphics2D g = frame.createGraphics();
+        g.setColor(new Color(0xf0, 0xd0, 0x30));
+        g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 22));
+        g.drawString("4071", 100, 100);
+        g.dispose();
+        agent.frame = frame;
+        run("screenshot");
+        assertTrue(run("save_digits", "name", "gold", "x", 94, "y", 76, "width", 64, "height", 30, "shows", "407")
+                .isRefused(), "four characters in the box, three named");
+        AgentReply saved = run("save_digits", "name", "gold", "x", 94, "y", 76, "width", 64, "height", 30,
+                "shows", "4071");
+        assertTrue(text(saved).startsWith("Saved digits 0 1 4 7 into Digits.GOLD (src/main/resources/digits/gold) of"
+                + " the bot's 400×300 screen. It holds 0 1 4 7; it lacks 2 3 5 6 8 9"), text(saved));
+        assertTrue(text(saved).contains("It reads this box as 4071."), text(saved));
+        assertEquals(new DigitSet("src/main/resources/digits/gold"), host.set("digits").get("GOLD").value());
+    }
+
     // ── the flow ────────────────────────────────────────────────────────────────────────────────────────
 
     @Test
@@ -428,7 +450,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(32, names.size());
+        assertEquals(33, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 

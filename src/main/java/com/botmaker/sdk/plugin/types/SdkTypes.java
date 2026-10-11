@@ -17,6 +17,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.KeySequence;
 import com.botmaker.sdk.api.input.MouseButton;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.OcrOptions;
 import com.botmaker.sdk.api.text.Text;
 import com.botmaker.sdk.api.text.TextMatch;
@@ -156,6 +157,16 @@ public final class SdkTypes {
             .writtenAs(Zone::new, Zone::x, Zone::y, Zone::width, Zone::height)
             .with(Zone::anchored, Zone::anchor);
 
+    /**
+     * A game font's digits as pictures: {@code new DigitSet("src/main/resources/digits/gold")}, and {@code .in(…)}
+     * only when they were cut from a frame of another size than the bot's (2026-10-11).
+     */
+    public static final DeclaredCallType<DigitSet> DIGIT_SET = PluginType.value(DigitSet.class)
+            .fresh(() -> new DigitSet("src/main/resources/digits/digits"))
+            .editor(() -> OcrEditors::digits)
+            .writtenAs(DigitSet::new, DigitSet::folder)
+            .with(DigitSet::in, DigitSet::frame);
+
     /** A key on the keyboard. An enum's Java is its constant, so it needs no call. */
     public static final PluginType<Key> KEY = PluginType.value(Key.class)
             .firstConstant()
@@ -286,7 +297,7 @@ public final class SdkTypes {
      * the top of the list.
      */
     public static final List<PluginType<?>> ALL = List.of(
-            IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS,
+            IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET,
             POINT, RECT, SIZE, SPOT, ZONE,
             KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE,
             CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP,

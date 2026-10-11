@@ -11,7 +11,10 @@ activity, each name's label its words). Beside them the host writes **`Spots.jav
 **`Zones.java`** (`SPOTS`, `ZONES`, 2026-10-11): named `Spot`s and `Zone`s in the bot's pixels from the game's
 corner, which the assistant's `save_point` and `save_region` add and a run places on the live game
 (`internal/vision/Places`). `POINTS`/`REGIONS` (desktop `Point`s, source `Rect`s, 2026-10-06) are retired:
-`SdkConversions.PLACES` turns them into spots and zones when a bot upgrades. They are the user's: the host
+`SdkConversions.PLACES` turns them into spots and zones when a bot upgrades. **`Digits.java`** (`DIGITS`,
+2026-10-11) holds a `DigitSet` per game font, a folder of `0.png`–`9.png` under `src/main/resources/digits/`
+that the assistant's `save_digits` cuts (`plugin/pictures/DigitCuts`) and `Text.readDigits` reads with
+(`internal/vision/DigitReader`). They are the user's: the host
 rewrites the expression a marked method returns and the constants of a marked type, and nothing else,
 a body that is not exactly `return <expr>;` is read-only with a reason, and Studio locks the whole file on the
 canvas while this plugin is loaded (its values change in this plugin's windows). A project without them gets
