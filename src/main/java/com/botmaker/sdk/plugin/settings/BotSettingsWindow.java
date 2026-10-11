@@ -64,6 +64,9 @@ public final class BotSettingsWindow {
     /** Only Linux has a private display to offer. */
     private static final boolean LINUX = Os.current() == Os.LINUX;
 
+    /** A Mac has no private display or game VM yet: the game runs on the desktop. */
+    private static final boolean MAC = Os.current().isMac();
+
     private final StudioServices services;
     private final Window owner;
 
@@ -79,7 +82,7 @@ public final class BotSettingsWindow {
     /**
      * The bot's Java's choice, read on Windows: a private display is the desktop there and is kept when the
      * desktop is picked, for the bot on Linux. On Linux a VM bot shows as isolated, and is saved as what the
-     * window shows: a private display.
+     * window shows: a private display. On a Mac it is kept whatever it is, for the bot on the other two.
      */
     private BotSettings.Where windowsWhere = BotSettings.Where.PRIVATE_DISPLAY;
     private final CheckBox takeOver = new CheckBox("Take over the mouse and keyboard");
@@ -227,10 +230,15 @@ public final class BotSettingsWindow {
         Label takeOverHint = note("Off: events are sent to the game's window, and some games don't notice them. "
                 + "Turn this on if clicks are ignored — the pointer then moves to each click and returns.");
         if (!LINUX) {
-            // Windows watches a run's first background clicks and says so in the run's output when none of them
-            // changed the game's window (shared's IgnoredClickWatch).
+            // Windows and macOS watch a run's first background clicks and say so in the run's output when none of
+            // them changed the game's window (shared's IgnoredClickWatch).
             takeOverHint.setText(takeOverHint.getText() + " A run says so in its output when its first clicks "
                     + "change nothing in the game.");
+            if (MAC) {
+                return new VBox(8, title("Run the game in"), new Label("My desktop"), takeOver, takeOverHint,
+                        note("A Mac has no private display or game VM yet, so the game runs on your desktop "
+                                + "whatever the bot's settings say."));
+            }
             return windowsRunInPane(stage, takeOverHint);
         }
         privateDisplay.setToggleGroup(where);
@@ -434,6 +442,7 @@ public final class BotSettingsWindow {
     }
 
     private BotSettings.Where chosenWhere() {
+        if (MAC) return windowsWhere;
         if (!LINUX) {
             if (inVm.isSelected()) return BotSettings.Where.VM;
             // The desktop, which a private display also is on Windows: that one is kept for the bot on Linux.

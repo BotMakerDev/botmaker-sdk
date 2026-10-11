@@ -26,6 +26,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   Tesseract links and the one lept4j asks for. Untried on a Mac; Intel Macs get none.
 - The Remote Pilot finds `cloudflared` and `tailscale` where a Mac keeps them: Homebrew's and MacPorts' bin
   (a Mac app does not get the shell's `PATH`), and the Tailscale app's own CLI inside `Tailscale.app`.
+- Bot Settings on a Mac offers only the desktop, with the take-over tick, and no longer the Windows game-VM
+  setup. The bot's `where` is kept as written, for the bot on Linux or Windows.
 
 ### Changed (breaking)
 
