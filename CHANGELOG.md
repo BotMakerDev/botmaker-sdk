@@ -32,6 +32,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   run, ▶ Launch game and *Open VM screen* work as on Windows (`SessionBootstrap.hasGameVms`). An Intel Mac, or
   one older than macOS 14, keeps the desktop only, and Bot Settings says why. The bot's `where` is kept as
   written there, for the bot on Linux or Windows. Untried on a Mac.
+- **A Linux game VM on a Mac.** *Set up a game VM…* on a Mac offers macOS or Linux. Linux is Ubuntu for Apple
+  Silicon: several bots at once, each on its own screen, 2D only. It comes with Canonical's Steam snap, which
+  emulates Valve's x86 client and isn't supported by Valve. It has no Epic, as Legendary and Wine are x86. Its
+  VM screen has *Start Steam here*. It has no *Copy a game from this PC*: a Mac's Steam games are macOS builds,
+  which Steam in the VM would download again. Untried on a Mac.
 
 ### Changed (breaking)
 

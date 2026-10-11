@@ -91,7 +91,7 @@ final class VmPower {
         boolean tart = next.hypervisor() == Hypervisor.TART;
         whenIdle.setDisable(!counts);
         withStudio.setDisable(tart);
-        idleNote.setText(tart ? "On a Mac the VM runs until you shut it down here, or from macOS in it."
+        idleNote.setText(tart ? "On a Mac the VM runs until you shut it down here, or from its own system."
                 : counts ? "Used means a bot running in it, or its screen open in Studio."
                 : "VMware doesn't say whether anything uses the VM, so it isn't shut down when unused.");
         look(next);

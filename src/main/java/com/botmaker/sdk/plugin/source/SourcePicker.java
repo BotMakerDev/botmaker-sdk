@@ -21,6 +21,7 @@ import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorProbe;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
+import com.botmaker.shared.vm.GuestOs;
 import com.botmaker.shared.vm.GuestWindows;
 import com.botmaker.shared.vm.Hypervisor;
 import com.botmaker.shared.vm.VmCredentials;
@@ -522,8 +523,9 @@ public final class SourcePicker {
             try {
                 VmCredentials credentials = VmCredentials.load(vm.folder())
                         .orElseThrow(() -> new IOException("The VM has lost its passwords."));
-                if (vm.hypervisor() == Hypervisor.TART) {
-                    // Its VNC address is the running VM's, which a start reads back; it lists no windows yet.
+                if (vm.hypervisor() == Hypervisor.TART && vm.guestOs() == GuestOs.MACOS) {
+                    // Its VNC address is the running VM's, which a start reads back; it lists no windows yet. A
+                    // Linux guest's bots each have a display of their own, so it goes on to say none is listed.
                     try (VmSetup.Running running = VmSetup.start(vm, credentials)) {
                         show(screenTile, running.screen().captureScreen());
                     }

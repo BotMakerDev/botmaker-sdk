@@ -290,7 +290,7 @@ public final class BotSettingsWindow {
         myDesktop.setToggleGroup(where);
         inVm.setToggleGroup(where);
         Label vmHint = note("The game runs in a computer of its own, "
-                + (Os.current().isMac() ? "macOS" : "Windows or Linux") + ", which Studio sets up. You "
+                + (Os.current().isMac() ? "macOS or Linux" : "Windows or Linux") + ", which Studio sets up. You "
                 + "keep using yours; the bot's clicks reach the game as a real mouse's.");
         vms.setConverter(labels(vm -> vm.name() + " (" + vm.guestOs().displayName() + ")"
                 + (vm.stage() == VmRecord.Stage.READY ? "" : " — " + vm.stage().displayName())));

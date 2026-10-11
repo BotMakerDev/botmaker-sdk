@@ -240,6 +240,13 @@ final class VmScreen {
         if (vm.guestOs() == GuestOs.LINUX) {
             startSteam.setOnAction(e -> startSteam());
             show(startSteam, false);
+            if (onMac()) {
+                // Legendary and Wine are x86 programs, and a Mac's guest is arm64. No copy either: this Mac's Steam
+                // games are macOS builds, which Steam in the guest would download again.
+                bar.getChildren().addAll(new Label("Steam (Canonical's snap) is in this Linux VM: install games "
+                        + "through it. Epic games don't run here."), startSteam);
+                return bar;
+            }
             signInEpic.setOnAction(e -> signInEpic());
             signInEpic.setDisable(true);
             bar.getChildren().addAll(new Label("Steam and Legendary (Epic) are in this "
@@ -270,6 +277,11 @@ final class VmScreen {
         });
         bar.getChildren().add(copyGame);
         return bar;
+    }
+
+    /** Whether the VM runs on a Mac (Tart): its Linux guest is arm64, with Steam's snap, no Epic and no copy. */
+    private boolean onMac() {
+        return vm.hypervisor() == Hypervisor.TART;
     }
 
     /** A menu row that only says something. */

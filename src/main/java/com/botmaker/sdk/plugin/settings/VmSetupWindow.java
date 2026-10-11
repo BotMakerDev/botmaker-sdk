@@ -59,7 +59,8 @@ import java.util.function.Consumer;
  *   <li>its size, from this computer's;</li>
  *   <li>the setup itself: one sentence per step and the guest's screen as the system installs.</li>
  * </ol>
- * On a Mac there is no choice to make but the name and the size: macOS on Tart ({@link #macPane}).
+ * On a Mac the system is macOS or Linux, both on Tart, and there is no hypervisor or disc to choose
+ * ({@link #macPane}).
  * Closing the window or Cancel stops following the setup, and the VM stays as far as it got: Bot Settings
  * lists it, and this window resumes it ({@link #resume}).
  */
@@ -68,7 +69,7 @@ final class VmSetupWindow {
     /** Windows Setup's whole run with room to spare; {@code install} stops waiting after this. */
     private static final Duration INSTALL_TIMEOUT = Duration.ofHours(3);
 
-    /** A Mac's VM is macOS on Tart, cloned rather than installed: no system, hypervisor or disc to choose. */
+    /** A Mac's VM is macOS or Linux on Tart, cloned rather than installed: no hypervisor or disc to choose. */
     private static final boolean MAC = Os.current().isMac();
 
     private final StudioServices services;
@@ -80,6 +81,9 @@ final class VmSetupWindow {
     private final Label isoPath = note("No disc image chosen.");
     private final RadioButton windowsOs = new RadioButton("Windows: 3D and DirectX games, one game at a time");
     private final RadioButton linuxOs = new RadioButton("Linux: several games and bots at once, each on its own "
+            + "screen; 2D games");
+    private final RadioButton macOs = new RadioButton("macOS: 3D games, one game at a time");
+    private final RadioButton linuxOnMac = new RadioButton("Linux: several games and bots at once, each on its own "
             + "screen; 2D games");
     private final VBox windowsDisc = new VBox(8);
     private final Label linuxDisc = note("BotMaker downloads Ubuntu Server (about 4 GB) and installs it with Steam "
@@ -122,7 +126,7 @@ final class VmSetupWindow {
         Label heading = new Label(vm == null ? "Set up a game VM" : "Set up " + vm.name());
         Styles.on(heading, Styles.DIALOG_HEADING);
         Label intro = note("A computer of its own for the game: the bot plays there while you keep using yours. "
-                + (MAC ? "macOS comes ready-made: one download (about 25 GB), then it starts by itself"
+                + (MAC ? "Its system comes ready-made: one download, then it sets itself up"
                 : "Its system installs by itself, in 20–40 minutes") + "; the VM then stays on this computer.");
 
         VBox body = new VBox(14, heading, intro);
@@ -185,7 +189,7 @@ final class VmSetupWindow {
     }
 
     private GuestOs guestOs() {
-        if (MAC) return GuestOs.MACOS;
+        if (MAC) return linuxOnMac.isSelected() ? GuestOs.LINUX : GuestOs.MACOS;
         return linuxOs.isSelected() ? GuestOs.LINUX : GuestOs.WINDOWS;
     }
 
@@ -194,14 +198,22 @@ final class VmSetupWindow {
      * against its pinned checksum; the macOS image is Cirrus Labs' for this Mac's release.
      */
     private VBox macPane() {
-        Label system = note("macOS, from Cirrus Labs' ready-made image for this Mac's release. Its GPU is the Mac's "
-                + "own (Metal), so 3D games run; one game at a time, as on your desktop. A Linux VM on a Mac comes "
-                + "in a later update.");
+        ToggleGroup system = new ToggleGroup();
+        macOs.setToggleGroup(system);
+        linuxOnMac.setToggleGroup(system);
+        macOs.setSelected(true);
+        Label macNote = note("Cirrus Labs' ready-made image for this Mac's release (about 25 GB). Its GPU is the Mac's "
+                + "own (Metal), so 3D games run; one game at a time, as on your desktop.");
+        Label linuxNote = note("Ubuntu 24.04 for Apple Silicon, from Cirrus Labs (a few GB). Each bot gets a screen of "
+                + "its own; the guest draws in software, so no 3D. Steam is Canonical's snap, which runs Valve's x86 "
+                + "client through an emulator (FEX), unsupported by Valve. No Epic games: Legendary and Wine are x86 "
+                + "programs.");
         Label hypervisor = note((Tart.find().isPresent() ? "✓ Tart " + Tart.VERSION + " is here."
                 : "Set up downloads Tart " + Tart.VERSION + " (23 MB), checked against its published checksum.")
                 + " Tart runs the VM on Apple's Virtualization framework; it is free for any use but a competing "
                 + "product (FSL-1.1).");
-        return new VBox(8, title("1. System"), system, title("2. Hypervisor"), hypervisor);
+        return new VBox(8, title("1. System"), macOs, macNote, linuxOnMac, linuxNote, title("2. Hypervisor"),
+                hypervisor);
     }
 
     /** The disc and hypervisor panes for the system picked. */
