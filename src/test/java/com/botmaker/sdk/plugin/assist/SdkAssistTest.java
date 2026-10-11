@@ -423,6 +423,45 @@ class SdkAssistTest {
         assertTrue(run("add_activity", "name", "Collect").isRefused());
     }
 
+    /** This computer's flow, switches and setup are run properties, and only what the author allowed is taken. */
+    @Test
+    void theRunChoicesAreThisComputersRunProperties() {
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        assertFalse(run("add_activity", "name", "Collect", "body", "Collect::body").isRefused());
+        assertFalse(run("add_activity", "name", "Rest").isRefused());
+        Flow main = flow();
+        List<Flow.Step> steps = main.steps().stream()
+                .map(s -> s.label().equals("Rest") ? s.switchable() : s).toList();
+        host.set("flows").get("MAIN").withValue(new Flow(steps, main.edges(), main.start(), main.limits()));
+        host.set("flows").put("DAILY", TestContexts.row(Flow.class, "").withValue(main));
+
+        String read = text(run("get_run_choices"));
+        assertTrue(read.contains("Flows: MAIN, DAILY; Sdk.run() runs MAIN by default."), read);
+        assertTrue(read.contains("Activities the runner may switch: Rest on (as drawn)."), read);
+        assertTrue(read.contains("The bot has no setup."), read);
+
+        assertTrue(run("set_run_choices", "flow", "WEEKLY").isRefused());
+        assertTrue(run("set_run_choices", "off", List.of("Collect")).isRefused(), "not switchable");
+        assertTrue(host.properties.isEmpty(), "a refused choice writes nothing");
+
+        Run before = (Run) host.values.get("run").value();
+        host.values.get("run").withValue(before.setup(() -> { }));
+        assertTrue(text(run("get_run_choices")).contains("The setup runs at the next run."));
+        host.properties.put("botmaker.setup.params", "0123456789abcdef");
+        String set = text(run("set_run_choices", "off", List.of("rest"), "setup", false));
+        assertEquals("off", host.properties.get("botmaker.activity.Rest"));
+        assertEquals("off", host.properties.get("botmaker.setup"));
+        assertFalse(host.properties.containsKey("botmaker.setup.params"), "the next run reports what it is off for");
+        assertTrue(set.contains("Rest off.") && set.contains("The setup is off on this computer"), set);
+
+        // DAILY has no switchable activity, so Rest is no choice there.
+        assertFalse(run("set_run_choices", "flow", "daily").isRefused());
+        assertEquals("DAILY", host.properties.get("botmaker.flow"));
+        assertTrue(run("set_run_choices", "on", List.of("Rest")).isRefused());
+        assertFalse(run("set_run_choices", "flow", "default").isRefused());
+        assertFalse(host.properties.containsKey("botmaker.flow"));
+    }
+
     // ── source, settings, emulator, launch ──────────────────────────────────────────────────────────────
 
     @Test
@@ -498,7 +537,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(34, names.size());
+        assertEquals(36, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 

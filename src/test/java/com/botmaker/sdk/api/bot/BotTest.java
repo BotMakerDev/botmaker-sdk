@@ -97,7 +97,7 @@ class BotTest {
     }
 
     @Test
-    void theSetupRunsEachTimeTheGameStartsAndHomeFollowsIt() {
+    void theSetupRunsOnceAtTheFirstStartAndARestartSkipsIt() {
         com.botmaker.sdk.internal.launch.Target.set((String) null);
         StringBuilder order = new StringBuilder();
         AtomicInteger passes = new AtomicInteger();
@@ -106,8 +106,24 @@ class BotTest {
             if (passes.incrementAndGet() == 1) throw new IllegalStateException("crash");
             throw new StopLoop();
         }, () -> order.append("H"), () -> order.append("S")));
-        // Cold start: setup, home, body. The crash: home, restart, setup, home again, body.
-        assertEquals("SHBHSHB", order.toString());
+        // Cold start: setup, home, body. The crash: home, restart (the game kept its settings), home again, body.
+        assertEquals("SHBHHB", order.toString());
+    }
+
+    @Test
+    void aSetupThatThrewRunsAgainAfterTheRestartAndHomeFollowsIt() {
+        com.botmaker.sdk.internal.launch.Target.set((String) null);
+        StringBuilder order = new StringBuilder();
+        AtomicInteger setups = new AtomicInteger();
+        assertThrows(StopLoop.class, () -> Bot.lifecycle(() -> {
+            order.append("B");
+            throw new StopLoop();
+        }, () -> order.append("H"), () -> {
+            order.append("S");
+            if (setups.incrementAndGet() == 1) throw new IllegalStateException("settings did not open");
+        }));
+        // Cold start: setup throws. Recovery: home, restart, setup again, home again. Then the body.
+        assertEquals("SHSHB", order.toString());
     }
 
     @Test

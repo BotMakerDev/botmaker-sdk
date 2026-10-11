@@ -643,16 +643,17 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * The bot's setup — {@code Sdk.run()}'s {@code .setup(Gamebot::setup)}, run each time the bot has started the
-     * game, before home — picked as the home is. What it checks is the bot's own code: the game's settings, and the ones
-     * a user chose in the bot's parameters.
+     * The bot's setup — {@code Sdk.run()}'s {@code .setup(Gamebot::setup)}, run once per computer after the bot has
+     * started the game, before home — picked as the home is. What it checks is the bot's own code: the game's
+     * settings, and the ones a user chose in the bot's parameters.
      */
     private Node buildSetupSection() {
         VBox box = new VBox(6);
         box.getChildren().add(heading("Setup"));
-        Label explain = new Label("The method that makes the game ready for this bot, run when the bot starts "
-                + "and after it restarts the game: set the game's settings to what the bot needs, including those "
-                + "chosen in its parameters. Setup.fail(\"…\") stops the run and tells the user what to change.");
+        Label explain = new Label("The method that makes the game ready for this bot, run once on each computer "
+                + "the first time the bot starts the game: set the game's settings to what the bot needs, including "
+                + "those chosen in its parameters. It runs again when a parameter in the Setup category changes. "
+                + "Setup.fail(\"…\") stops the run and tells the user what to change.");
         explain.setWrapText(true);
         explain.getStyleClass().add("dialog-hint-text");
         box.getChildren().add(explain);

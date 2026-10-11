@@ -64,7 +64,7 @@ final class FlowTools {
     }
 
     record FlowMethod(@Describe("home: gets the game back to a known screen; setup: makes the game ready, "
-                              + "its settings included, each time the bot starts it") Hook which,
+                              + "its settings included, once per computer after the bot first starts it") Hook which,
                       @Describe(value = "one of the bot's public static void methods with no parameter, as "
                               + "Gamebot::setup; leave out for none", optional = true) String method) {
     }

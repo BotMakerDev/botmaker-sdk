@@ -23,7 +23,8 @@ package com.botmaker.sdk.api.flow;
  * @param home  what gets the game back to a known screen: before a step that {@link Flow.Step#goHome() goes
  *              home}, at start-up and after anything unexpected; {@code null} for nothing
  * @param setup what makes the game ready for this bot, once it is started: its settings, such as the ones a
- *              user chose in the bot's {@code @Param}s; {@code null} for nothing
+ *              user chose in the bot's {@code @Param}s. Run once per computer ({@code Setup}); {@code null} for
+ *              nothing
  */
 public record Run(Flow flow, Runnable home, Runnable setup) {
 
@@ -46,8 +47,9 @@ public record Run(Flow flow, Runnable home, Runnable setup) {
 
     /**
      * This run, making the game ready with {@code setup} — {@code Gamebot::setup} — once the bot has started the
-     * game, before {@link #home}. The bot writes it: open the game's settings, set what the bot needs, and call
-     * {@code Setup.fail("…")} when the user has to change something by hand.
+     * game, before {@link #home}; once per computer, and again when a {@code Setup.CATEGORY} parameter changes. The
+     * bot writes it: open the game's settings, set what the bot needs, and call {@code Setup.fail("…")} when the
+     * user has to change something by hand.
      */
     public Run setup(Runnable setup) {
         return new Run(flow, home, setup);

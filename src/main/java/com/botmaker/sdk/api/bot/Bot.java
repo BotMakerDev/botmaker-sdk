@@ -9,13 +9,16 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.bot.SetupOnce;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
+import com.botmaker.sdk.internal.flow.RunChoices;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.observe.IpcObserver;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -28,10 +31,11 @@ import java.util.function.Consumer;
  * bot needs; the body, the recovery hooks and the per-activity logic stay in editable user code.
  *
  * <p>{@link #runFlow} also runs a start-up sequence <em>once</em> before the first loop pass — launch the
- * project's configured target, then the flow's {@code setup}, then its {@code home} — so a fresh launch actually opens
- * the game, sets it as the bot needs and reaches a known screen instead of assuming it is already running. A first
- * launch leaves an already-open game alone; a recovery shuts a frozen one down first, and runs the setup again on
- * the restarted game.
+ * project's configured target, then the run's {@code setup} when this computer still owes it, then its
+ * {@code home} — so a fresh launch actually opens the game, sets it as the bot needs and reaches a known screen
+ * instead of assuming it is already running. A first launch leaves an already-open game alone; a recovery shuts a
+ * frozen one down first. The setup runs once per computer ({@code Setup}): a recovery runs it only when it has not
+ * yet returned.
  *
  * <p>The bot ends when {@link #stop()} is called — from an activity that is done, or automatically by the
  * generated loop once every activity is disabled. {@code stop()} unwinds the supervise loop cleanly and
@@ -66,7 +70,9 @@ public class Bot {
      * }</pre>
      *
      * <p>The bot names each plugin's values class, which is a fact only it has and one javac checks; what it
-     * does not write is what to do with them. The flow walked is the one {@code Sdk.run()} names; what gets the
+     * does not write is what to do with them. The flow walked is the one {@code Sdk.run()} names, unless this
+     * computer's {@code botmaker.flow} run property names another {@code Flows} constant, with the activities the
+     * runner may switch as its {@code botmaker.activity.<Name>} properties say; what gets the
      * game back to a known screen is its {@link com.botmaker.sdk.api.flow.Run#home}, run at start-up, after anything
      * unexpected and before each step that goes home; a run with none goes nowhere.
      *
@@ -83,11 +89,15 @@ public class Bot {
         observe();
         SdkValues.claim();
         ManagedValues.install(values);
+        InstalledRun.use(RunChoices.chosen(InstalledRun.installed(), values));
         Runnable goHome = () -> {
             Runnable home = InstalledRun.installed().home();
             if (home != null) home.run();
         };
-        lifecycle(() -> FlowWalker.run(InstalledRun.installed()), goHome, InstalledRun.installed().setup());
+        // The caller is the bot's own class, whose main this is: its package holds the bot's Setup parameters.
+        Class<?> bot = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
+        lifecycle(() -> FlowWalker.run(InstalledRun.installed()), goHome,
+                SetupOnce.owed(InstalledRun.installed().setup(), bot, values));
     }
 
     /**
@@ -143,20 +153,26 @@ public class Bot {
      * on every crash or stuck state. The launch target is this machine's {@code botmaker.launch.target}
      * property; a project with none configured launches nothing.
      *
-     * <p>Each time the game is (re)started, {@code setup} makes it ready: at the cold start before the
-     * {@code goHome} that follows it, and after a restart followed by a {@code goHome} of its own, since the
-     * recovery's ran before the game came back.
+     * <p>{@code setup} makes the game ready once, at the first start of the game: at the cold start before the
+     * {@code goHome} that follows it. A setup that throws is still owed, so it runs after the restart that recovers.
+     * A restart after the setup returned does not run it again: the game keeps its settings. Every restart is
+     * followed by a {@code goHome} of its own, since the recovery's ran before the game came back.
      *
      * @param body   the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param goHome navigate from wherever the bot is back to a safe/home screen
-     * @param setup  the run's setup, or null for none
+     * @param setup  the setup this run owes, or null for none
      */
     static void lifecycle(Runnable body, Runnable goHome, Runnable setup) {
+        AtomicReference<Runnable> owed = new AtomicReference<>(setup);
         supervise(body, goHome, mode -> {
             launchConfiguredTarget(mode);
-            if (setup == null) return;
-            Debug.log("setup");
-            setup.run();
+            Runnable due = owed.get();
+            if (due != null) {
+                Debug.log("setup");
+                due.run();
+                owed.set(null);
+            }
+            // The recovery's goHome ran before the game came back, so a restarted game is taken home again.
             if (mode == StartMode.RESTART) {
                 Debug.log("goHome");
                 goHome.run();
