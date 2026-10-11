@@ -21,6 +21,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Smaller images for an assistant.** `sdk_screenshot` fits 1024 pixels unless a `scale` is given, and a
+  find's boxed image fits 768. Coordinates stay the screenshot's own pixels.
 - **OCR on Apple Silicon Macs.** The jar carries Tesseract and Leptonica for `macosx-arm64` under
   `darwin-aarch64/`, beside the Linux ones (about 5 MB more). Leptonica is in it twice, under the name
   Tesseract links and the one lept4j asks for. Untried on a Mac; Intel Macs get none.

@@ -52,7 +52,8 @@ final class LookTools {
                 @Describe(value = "top edge of the part to show", optional = true) Integer y,
                 @Describe(value = "width of the part to show", optional = true) Integer width,
                 @Describe(value = "height of the part to show", optional = true) Integer height,
-                @Describe(value = "shrink the image, 0.1 to 1; coordinates stay the screenshot's", optional = true)
+                @Describe(value = "shrink the image, 0.1 to 1; coordinates stay the screenshot's. Left out, it "
+                        + "fits 1024 pixels: give 1, or a part, for detail", optional = true)
                 Double scale) {
     }
 
@@ -139,8 +140,10 @@ final class LookTools {
         Rect area = part.get();
         BufferedImage image = Frames.cut(full, area);
         if (shot.grid() != null) grid(image, area, shot.grid());
-        double scale = shot.scale() == null ? 1 : shot.scale();
-        if (scale < 1) image = scaled(image, scale);
+        // A grid is there to be read off, so a grid asked for without a scale is shown whole.
+        double scale = shot.scale() != null ? shot.scale()
+                : shot.grid() != null ? 1 : Frames.fit(area.width(), area.height(), Frames.LOOK_EDGE);
+        if (scale < 1) image = Frames.scaled(image, scale);
         StringBuilder said = new StringBuilder(full.getWidth() + "×" + full.getHeight());
         context.watchedArea().ifPresent(a -> said.append(" at ").append(a.x()).append(',').append(a.y())
                 .append(" on the desktop"));
@@ -148,7 +151,10 @@ final class LookTools {
         if (area.width() != full.getWidth() || area.height() != full.getHeight()) {
             said.append(" Showing ").append(Frames.box(area)).append(" of it.");
         }
-        if (scale < 1) said.append(" Shrunk ×").append(Frames.score(scale)).append(": divide what you see by it.");
+        if (scale < 1) {
+            said.append(" Shrunk to ").append(image.getWidth()).append('×').append(image.getHeight())
+                    .append(": multiply what you see by ").append(Frames.undo(scale)).append('.');
+        }
         return AgentReply.text(said.toString()).and(AgentReply.image(image));
     }
 
@@ -165,9 +171,9 @@ final class LookTools {
         boolean found = best.confidence() >= needs;
         Rect r = best.rect();
         if (found) Frames.mark(context, r, Marks.Kind.FOUND, base.get());
-        return AgentReply.text(base.get() + " best at " + Frames.box(r) + ", score " + Frames.score(best.confidence())
-                        + "; a run needs " + Frames.score(needs) + ", so it " + (found ? "finds it." : "would not."))
-                .and(AgentReply.image(Frames.boxed(frame.get(), List.of(r), found ? Frames.FOUND : Frames.NOTE)));
+        return Frames.found(base.get() + " best at " + Frames.box(r) + ", score " + Frames.score(best.confidence())
+                        + "; a run needs " + Frames.score(needs) + ", so it " + (found ? "finds it." : "would not."),
+                frame.get(), List.of(r), found ? Frames.FOUND : Frames.NOTE);
     }
 
     static AgentReply whichScreen(AssistantTool.None none, AgentContext context) {
@@ -201,8 +207,7 @@ final class LookTools {
         }
         String head = found.isEmpty() ? "None of the pictures is on screen (a run needs " + Frames.score(needs) + ")."
                 : found.size() + " on screen (✓, a run needs " + Frames.score(needs) + "):";
-        return AgentReply.text(head + "\n" + String.join("\n", lines))
-                .and(AgentReply.image(Frames.boxed(frame.get(), found, Frames.FOUND)));
+        return Frames.found(head + "\n" + String.join("\n", lines), frame.get(), found, Frames.FOUND);
     }
 
     static AgentReply waitForPicture(Wait wait, AgentContext context) {
@@ -226,9 +231,9 @@ final class LookTools {
                 if (match.isFound() && match.confidence() >= needs) {
                     long ms = (System.nanoTime() - start) / 1_000_000L;
                     Frames.mark(context, match.rect(), Marks.Kind.FOUND, base.get());
-                    return AgentReply.text(base.get() + " is there after " + ms + " ms, at " + Frames.box(match.rect())
-                                    + ", score " + Frames.score(match.confidence()) + ".")
-                            .and(AgentReply.image(Frames.boxed(frame.get(), List.of(match.rect()), Frames.FOUND)));
+                    return Frames.found(base.get() + " is there after " + ms + " ms, at " + Frames.box(match.rect())
+                                    + ", score " + Frames.score(match.confidence()) + ".",
+                            frame.get(), List.of(match.rect()), Frames.FOUND);
                 }
                 if (match.isFound()) best = Math.max(best, match.confidence());
                 if (System.nanoTime() >= deadline) break;
@@ -272,8 +277,7 @@ final class LookTools {
             Frames.mark(context, line.bounds(), Marks.Kind.FOUND, needle.text().trim());
         }
         if (hits.isEmpty()) return AgentReply.text("\"" + needle.text().trim() + "\" is not on the screen as text.");
-        return AgentReply.text(String.join("\n", said))
-                .and(AgentReply.image(Frames.boxed(frame.get(), hits, Frames.FOUND)));
+        return Frames.found(String.join("\n", said), frame.get(), hits, Frames.FOUND);
     }
 
     static AgentReply pixelColor(Spot spot, AgentContext context) {
@@ -318,9 +322,8 @@ final class LookTools {
             }
             Frames.mark(context, r, Marks.Kind.FOUND, hex(color.get()));
         }
-        return AgentReply.text(patches.size() + " patch" + (patches.size() == 1 ? "" : "es") + " of " + hex(color.get())
-                        + ", largest first:\n" + String.join("\n", said))
-                .and(AgentReply.image(Frames.boxed(frame.get(), boxes, Frames.FOUND)));
+        return Frames.found(patches.size() + " patch" + (patches.size() == 1 ? "" : "es") + " of " + hex(color.get())
+                + ", largest first:\n" + String.join("\n", said), frame.get(), boxes, Frames.FOUND);
     }
 
     /** The best match of the picture {@code name} on {@code frame}, in the frame's pixels. */
@@ -404,17 +407,4 @@ final class LookTools {
         g.drawString(text, x, y);
     }
 
-    private static BufferedImage scaled(BufferedImage image, double scale) {
-        int w = Math.max(1, (int) Math.round(image.getWidth() * scale));
-        int h = Math.max(1, (int) Math.round(image.getHeight() * scale));
-        BufferedImage small = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = small.createGraphics();
-        try {
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g.drawImage(image, 0, 0, w, h, null);
-        } finally {
-            g.dispose();
-        }
-        return small;
-    }
 }

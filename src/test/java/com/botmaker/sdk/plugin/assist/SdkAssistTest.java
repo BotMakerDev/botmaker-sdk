@@ -84,6 +84,22 @@ class SdkAssistTest {
     // ── seeing ──────────────────────────────────────────────────────────────────────────────────────────
 
     @Test
+    void aLargeFrameIsShrunkUnlessAScaleIsGiven() throws IOException {
+        agent.frame = new java.awt.image.BufferedImage(1920, 1080, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        AgentReply look = run("screenshot");
+        assertEquals(new java.awt.Dimension(1024, 576), size(look));
+        assertTrue(text(look).contains("Shrunk to 1024×576: multiply what you see by 1.8750"), text(look));
+        assertEquals(new java.awt.Dimension(1920, 1080), size(run("screenshot", "scale", 1.0)));
+        assertEquals(new java.awt.Dimension(1920, 1080), size(run("screenshot", "grid", 100)), "a grid is read whole");
+        assertEquals(new java.awt.Dimension(768, 432),
+                imageSize(Frames.boxed(agent.frame, java.util.List.of(), Frames.FOUND)), "a find's image is small");
+    }
+
+    private static java.awt.Dimension imageSize(java.awt.image.BufferedImage image) {
+        return new java.awt.Dimension(image.getWidth(), image.getHeight());
+    }
+
+    @Test
     void aScreenshotSaysItsSizeAndShowsAPartScaledWithAGrid() throws IOException {
         agent.frame = withPatchAt(120, 80);
         AgentReply whole = run("screenshot");

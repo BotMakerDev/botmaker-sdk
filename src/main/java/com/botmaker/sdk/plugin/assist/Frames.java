@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
+import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.overlay.Marks;
 import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.plugin.toolkit.ManagedHandle;
@@ -15,6 +16,7 @@ import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.List;
@@ -118,19 +120,73 @@ final class Frames {
         return copy;
     }
 
-    /** A copy of {@code frame} with each of {@code boxes} drawn on it in {@code color}. */
+    /**
+     * The longest side a screenshot is shown at when its call names no scale. An image costs the assistant
+     * tokens by its pixels, and a whole 1080p frame read at full size is seldom what a look needs; a part, or
+     * {@code scale} 1, shows the detail.
+     */
+    static final int LOOK_EDGE = 1024;
+    /**
+     * The longest side of the image a find answers with. Its text already gives the places in screenshot pixels,
+     * so the image only shows them — it never needs to be read off.
+     */
+    static final int BOXED_EDGE = 768;
+
+    /** The scale that fits {@code width}×{@code height} within {@code edge} pixels; 1 when it already fits. */
+    static double fit(int width, int height, int edge) {
+        return Math.min(1, edge / (double) Math.max(width, height));
+    }
+
+    /**
+     * A find's answer: {@code text}, then {@code frame} with {@code boxes} drawn on it, shrunk to fit
+     * {@link #BOXED_EDGE} — saying so, since the places in {@code text} are the frame's own pixels.
+     */
+    static AgentReply found(String text, BufferedImage frame, List<Rect> boxes, Color color) {
+        double scale = fit(frame.getWidth(), frame.getHeight(), BOXED_EDGE);
+        String note = scale < 1 ? "\n(The image is shrunk; the places above are the screenshot's pixels.)" : "";
+        return AgentReply.text(text + note).and(AgentReply.image(boxed(frame, boxes, color)));
+    }
+
+    /**
+     * {@code frame} shrunk to fit {@link #BOXED_EDGE}, with each of {@code boxes} drawn on it in {@code color}
+     * after the shrink, so a box stays 3 pixels wide and leaves a small target visible.
+     */
     static BufferedImage boxed(BufferedImage frame, List<Rect> boxes, Color color) {
-        BufferedImage copy = new BufferedImage(frame.getWidth(), frame.getHeight(), BufferedImage.TYPE_INT_RGB);
+        double scale = fit(frame.getWidth(), frame.getHeight(), BOXED_EDGE);
+        BufferedImage copy = scaled(frame, scale);
         Graphics2D g = copy.createGraphics();
         try {
-            g.drawImage(frame, 0, 0, null);
             g.setColor(color);
             g.setStroke(new BasicStroke(3));
-            for (Rect r : boxes) g.drawRect(r.x(), r.y(), r.width(), r.height());
+            for (Rect r : boxes) {
+                g.drawRect((int) Math.round(r.x() * scale), (int) Math.round(r.y() * scale),
+                        Math.max(1, (int) Math.round(r.width() * scale)),
+                        Math.max(1, (int) Math.round(r.height() * scale)));
+            }
         } finally {
             g.dispose();
         }
         return copy;
+    }
+
+    /** How to turn a pixel of an image shown at {@code scale} back into the screenshot's: exact to 4 places. */
+    static String undo(double scale) {
+        return String.format(Locale.ROOT, "%.4f", 1 / scale);
+    }
+
+    /** {@code image} resized by {@code scale}, smoothly. */
+    static BufferedImage scaled(BufferedImage image, double scale) {
+        int w = Math.max(1, (int) Math.round(image.getWidth() * scale));
+        int h = Math.max(1, (int) Math.round(image.getHeight() * scale));
+        BufferedImage small = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = small.createGraphics();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(image, 0, 0, w, h, null);
+        } finally {
+            g.dispose();
+        }
+        return small;
     }
 
     /** Shows {@code box}, in screenshot pixels, on the game where the watched screen sits. */
