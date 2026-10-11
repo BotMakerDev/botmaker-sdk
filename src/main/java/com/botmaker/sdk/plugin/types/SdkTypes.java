@@ -197,8 +197,8 @@ public final class SdkTypes {
             .writtenAs(Combo::held, combo -> combo.held(Duration.ZERO), Combo::hold);
 
     /** {@code KeySequence.step(combo, after)}: one step of a sequence, never declared or picked on its own. */
-    public static final DeclaredCall<KeySequence.Step> STEP = ComponentType.part(KeySequence.Step.class)
-            .writtenAs(KeySequence::step, KeySequence.Step::combo, KeySequence.Step::after);
+    public static final DeclaredCall<KeySequence.Press> STEP = ComponentType.part(KeySequence.Press.class)
+            .writtenAs(KeySequence::step, KeySequence.Press::combo, KeySequence.Press::after);
 
     /**
      * Combos one after another, written {@code KeySequence.of(step(…), step(…))}: a run of {@link #STEP}s. A

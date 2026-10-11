@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.editors;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.sdk.internal.emulator.EmulatorName;
 import com.botmaker.sdk.api.flow.ActivityClass;
+import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.emulator.EmulatorEditors;
 
 import java.awt.Color;
@@ -39,6 +40,10 @@ public final class SdkEditors {
             SlotEditor.onParameter(EmulatorName.class).draw(() -> EmulatorEditors::instanceName),
             // An activity is its enum's class literal, which no type of this plugin's can claim: a Class.
             SlotEditor.onParameter(ActivityClass.class).draw(() -> ActivityEditors::activity),
+            // The bot's run choices, @Params handed to Bot.runFlow: which flow, and the activities it skips. Only a
+            // value with no call site, a parameter's: a Flows constant's own Flow.of(…) is the flow editor's.
+            SlotEditor.when(ActivityEditors::isFlowChoice).draw(() -> ActivityEditors::flow),
+            SlotEditor.when(ActivityEditors::isSkippedActivity).draw(() -> ActivityEditors::switchable),
 
             // Several named pictures. Ahead of SdkTypes' single-picture editor because it claims a subset of
             // what that one would, and the host consults a plugin's slot editors before its types' editors:

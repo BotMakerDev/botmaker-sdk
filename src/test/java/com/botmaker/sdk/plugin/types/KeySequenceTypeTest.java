@@ -26,7 +26,7 @@ class KeySequenceTypeTest {
         Method factory = (Method) type.factory();
         assertEquals("of", factory.getName());
         assertTrue(factory.isVarArgs());
-        assertEquals(List.of(KeySequence.Step.class), type.componentTypes());
+        assertEquals(List.of(KeySequence.Press.class), type.componentTypes());
     }
 
     @Test
@@ -41,7 +41,7 @@ class KeySequenceTypeTest {
         Method factory = (Method) SdkTypes.STEP.factory();
         assertEquals("step", factory.getName());
         assertEquals(List.of(Combo.class, Duration.class), SdkTypes.STEP.componentTypes());
-        KeySequence.Step step = copyAll.steps().getFirst();
+        KeySequence.Press step = copyAll.steps().getFirst();
         assertEquals(step, SdkTypes.STEP.build(SdkTypes.STEP.components(step)));
         assertNull(SdkTypes.STEP.build(List.of(Key.A, Duration.ZERO)));
     }

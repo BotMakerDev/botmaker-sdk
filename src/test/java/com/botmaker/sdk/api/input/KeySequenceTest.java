@@ -19,8 +19,8 @@ class KeySequenceTest {
         KeySequence sequence = KeySequence.of(
                 KeySequence.step(SELECT_ALL, Duration.ofMillis(100)),
                 KeySequence.step(COPY, Duration.ZERO));
-        assertEquals(List.of(new KeySequence.Step(SELECT_ALL, Duration.ofMillis(100)),
-                new KeySequence.Step(COPY, Duration.ZERO)), sequence.steps());
+        assertEquals(List.of(new KeySequence.Press(SELECT_ALL, Duration.ofMillis(100)),
+                new KeySequence.Press(COPY, Duration.ZERO)), sequence.steps());
     }
 
     @Test
@@ -36,7 +36,7 @@ class KeySequenceTest {
     @Test
     void an_empty_sequence_or_a_bad_step_is_refused() {
         assertThrows(IllegalArgumentException.class, KeySequence::of);
-        assertThrows(NullPointerException.class, () -> KeySequence.of((KeySequence.Step[]) null));
+        assertThrows(NullPointerException.class, () -> KeySequence.of((KeySequence.Press[]) null));
         assertThrows(NullPointerException.class, () -> KeySequence.step(null, Duration.ZERO));
         assertThrows(NullPointerException.class, () -> KeySequence.step(COPY, null));
         assertThrows(IllegalArgumentException.class, () -> KeySequence.step(COPY, Duration.ofMillis(-1)));
@@ -44,7 +44,7 @@ class KeySequenceTest {
 
     @Test
     void the_list_is_a_copy() {
-        List<KeySequence.Step> steps = new ArrayList<>(List.of(KeySequence.step(COPY, Duration.ZERO)));
+        List<KeySequence.Press> steps = new ArrayList<>(List.of(KeySequence.step(COPY, Duration.ZERO)));
         KeySequence sequence = new KeySequence(steps);
         steps.add(KeySequence.step(SELECT_ALL, Duration.ZERO));
         assertEquals(1, sequence.steps().size());

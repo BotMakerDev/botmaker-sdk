@@ -3,13 +3,16 @@ package com.botmaker.sdk.plugin.editors;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
+import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.flow.Labels;
 import com.botmaker.sdk.plugin.flow.FlowConstants;
 import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.plugin.flow.FlowValue;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
@@ -57,6 +60,57 @@ public final class ActivityEditors {
         return labelBox(ctx, () -> activityLabels(FlowConstants.declared(ctx.services().pluginValues()).keySet()),
                 () -> false, "Activity",
                 ctx.value(Activity.class).map(Activity::label).orElse(""), FlowNames::activity, null);
+    }
+
+    /**
+     * An activity the person running the bot may switch off — one some flow draws {@code .switchable()}: an entry
+     * of the bot's {@code skip} parameter, {@code Activities.Rest.class}.
+     */
+    public static Node switchable(ValueContext ctx) {
+        return labelBox(ctx, () -> switchableLabels(ctx.services().pluginValues()), () -> false, "Activity",
+                ctx.value(Activity.class).map(Activity::label).orElse(""), FlowNames::activity, null);
+    }
+
+    /**
+     * Whether {@code ctx} is an entry of a parameter listing activities: a {@code Class} with no call site, new or
+     * holding an activity's enum. A class literal of anything else is left to the host.
+     */
+    public static boolean isSkippedActivity(ValueContext ctx) {
+        return ctx.slot().isEmpty() && ctx.type().is(Class.class)
+                && (ctx.source().isBlank() || ctx.value(Activity.class).filter(a -> !a.isNone()).isPresent());
+    }
+
+    /**
+     * Whether {@code ctx} is a flow parameter: a {@code Flow} with no call site, as a row of the Parameters window or
+     * the Runner is. A flow in code, a {@code Flows} constant's {@code Flow.of(…)} included, is left to its own editor.
+     */
+    public static boolean isFlowChoice(ValueContext ctx) {
+        return ctx.slot().isEmpty() && ctx.type().is(Flow.class);
+    }
+
+    /** The labels of the activities any of the bot's flows lets the runner switch off, in flow order. */
+    static List<String> switchableLabels(PluginValues values) {
+        return FlowValue.FLOWS.members(values).stream()
+                .flatMap(member -> FlowValue.FLOWS.read(values, member).stream())
+                .flatMap(flow -> flow.steps().stream())
+                .filter(Flow.Step::runnerSwitch)
+                .map(Flow.Step::label)
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * A flow — one of the bot's {@code Flows} constants, by name: the bot's {@code flow} parameter, and the flow
+     * {@code Bot.runFlow} walks. The host writes the picked flow as the constant holding it, {@code Flows.DAILY}.
+     */
+    public static Node flow(ValueContext ctx) {
+        PluginValues values = ctx.services().pluginValues();
+        Function<String, Object> flowNamed = name -> FlowValue.FLOWS.read(values, name).orElse(Flow.NONE);
+        String current = ctx.value(Flow.class)
+                .flatMap(flow -> FlowValue.FLOWS.members(values).stream()
+                        .filter(name -> flowNamed.apply(name).equals(flow)).findFirst())
+                .orElse("");
+        return labelBox(ctx, () -> FlowValue.FLOWS.members(values), () -> false, "Flow", current, flowNamed, null);
     }
 
     /**

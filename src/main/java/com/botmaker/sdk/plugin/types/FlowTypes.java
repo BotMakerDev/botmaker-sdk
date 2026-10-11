@@ -109,12 +109,11 @@ public final class FlowTypes {
     }
 
     /**
-     * {@code Run.of(Flow)} and its {@code .home(…)} and {@code .setup(…)} links, each written only when the run has
-     * one. The flow is a constant of the bot's {@code Flows}, and the host writes it as that constant's name
-     * because the value equals it — {@code Run.of(Flows.MAIN)}.
+     * {@code Run.of()} and its {@code .home(…)} and {@code .setup(…)} links, each written only when the run has
+     * one.
      */
     public static final DeclaredCall<Run> RUN_SHAPE = ComponentType.part(Run.class)
-            .writtenAs(Run::of, Run::flow)
+            .writtenAs(Run::of)
             .<Runnable>with(Run::home, run -> sourceOf(run.home()), FlowTypes::withHome)
             .<Runnable>with(Run::setup, run -> sourceOf(run.setup()), FlowTypes::withSetup)
             .constants(Run.NONE);

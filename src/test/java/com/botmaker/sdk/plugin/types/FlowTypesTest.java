@@ -54,7 +54,7 @@ class FlowTypesTest {
     }
 
     private static Run run() {
-        return Run.of(gamebot()).home(FlowTypes.method("Gamebot::goHome")).setup(FlowTypes.method("Gamebot::setup"));
+        return Run.of().home(FlowTypes.method("Gamebot::goHome")).setup(FlowTypes.method("Gamebot::setup"));
     }
 
     /** {@code build(components(v))} for one shape, which is the law every {@code ComponentType} owes. */
@@ -70,11 +70,11 @@ class FlowTypesTest {
     }
 
     /**
-     * The run names the default flow, and its {@code .home(…)} and {@code .setup(…)} are two links, each written
-     * only when the bot has one — one each for the whole bot, whichever flow runs.
+     * The run's {@code .home(…)} and {@code .setup(…)} are two links on {@code Run.of()}, each written only when the
+     * bot has one — one each for the whole bot, whichever flow runs.
      */
     @Test
-    void theRunHoldsTheFlowItsHomeAndItsSetup() {
+    void theRunHoldsItsHomeAndItsSetup() {
         assertEquals(run(), roundTrip(FlowTypes.RUN_SHAPE, run()));
         assertEquals("Gamebot::goHome", FlowTypes.sourceOf(roundTrip(FlowTypes.RUN_SHAPE, run()).home()));
         Run none = run().setup(null);
@@ -82,7 +82,7 @@ class FlowTypesTest {
         assertNull(run().home(null).home());
         assertEquals("Gamebot::setup", FlowTypes.sourceOf(run().home(null).setup()), "and the other way round");
         assertEquals(2, FlowTypes.RUN_SHAPE.withers().size());
-        assertEquals(List.of(Flow.class, Runnable.class, Runnable.class), FlowTypes.RUN_SHAPE.componentTypes());
+        assertEquals(List.of(Runnable.class, Runnable.class), FlowTypes.RUN_SHAPE.componentTypes());
         assertEquals(Run.NONE, roundTrip(FlowTypes.RUN_SHAPE, Run.NONE));
     }
 
@@ -135,7 +135,7 @@ class FlowTypesTest {
     void aFlowIsWrittenAsACallOnFlow() throws NoSuchMethodException {
         assertEquals(Flow.class.getMethod("of", List.class, List.class, Class.class, Flow.Limits.class),
                 FlowTypes.FLOW_SHAPE.factory());
-        assertEquals(Run.class.getMethod("of", Flow.class), FlowTypes.RUN_SHAPE.factory());
+        assertEquals(Run.class.getMethod("of"), FlowTypes.RUN_SHAPE.factory());
     }
 
     /** An activity and an outcome are written by their names, which the host spells as the bot's own. */

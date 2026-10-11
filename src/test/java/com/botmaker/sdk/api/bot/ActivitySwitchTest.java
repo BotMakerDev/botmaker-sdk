@@ -3,7 +3,6 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
@@ -37,7 +36,7 @@ class ActivitySwitchTest {
     }
 
     private static void install(Flow.Step... steps) {
-        InstalledRun.use(Run.of(Flow.of(List.of(steps), List.of(), null, Flow.Limits.DEFAULT)));
+        InstalledRun.walk(Flow.of(List.of(steps), List.of(), null, Flow.Limits.DEFAULT));
     }
 
     private static Flow.Step step(Class<? extends Outcome> activity, boolean enabled) {

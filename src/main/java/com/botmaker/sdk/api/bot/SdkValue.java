@@ -17,7 +17,7 @@ import java.lang.annotation.Target;
  *
  *     @SdkValue(SdkValue.Id.RUN)
  *     public static Run run() {
- *         return Run.of(Flows.MAIN).home(Gamebot::goHome);
+ *         return Run.of().home(Gamebot::goHome);
  *     }
  * }
  *
@@ -27,7 +27,7 @@ import java.lang.annotation.Target;
  * }
  * }</pre>
  *
- * <p>{@code Bot.runFlow(Sdk.class)} reads each marked method off the class it is given and applies the value
+ * <p>{@code Bot.runFlow(…, Sdk.class)} reads each marked method off the class it is given and applies the value
  * before the first click. Everywhere else a marked member is ordinary Java: a misspelt {@link Id} is a
  * compile error, and a developer with no BotMaker installed reads the whole bot by opening its files.
  */
@@ -48,8 +48,7 @@ public @interface SdkValue {
          */
         FLOWS,
         /**
-         * Which flow runs when nobody picks one, and the game's home and setup, which no flow owns — a {@code Run}
-         * method.
+         * The game's home and setup, which no flow owns — a {@code Run} method.
          */
         RUN,
         /** Where each flow's cards sit in the Activity Flow — a {@code FlowLayout} method a run ignores. */

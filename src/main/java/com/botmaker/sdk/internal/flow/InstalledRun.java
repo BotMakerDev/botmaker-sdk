@@ -5,11 +5,12 @@ import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.Run;
 
 /**
- * The run a bot does: the flow it walks, its home and its setup.
+ * The run a bot does: the flow it walks, and its home and setup.
  *
- * <p>{@code Bot.runFlow(Sdk.class)} installs the value your {@code @SdkValue(SdkValue.Id.RUN)} method returns and
- * walks its flow. {@link #use} is the same hand-off for a bot that builds its run some other way. Named apart
- * from the bot's own {@code Flows} class, which a bot's code names and this one would shadow.
+ * <p>{@code Bot.runFlow(Sdk.flow, …, Sdk.class)} installs the value your {@code @SdkValue(SdkValue.Id.RUN)} method
+ * returns ({@link #use}) and the flow its {@code @Param} names ({@link #walk}), then walks that flow: two hand-offs,
+ * since the run holds no flow. Named apart from the bot's own {@code Flows} class, which a bot's code names
+ * and this one would shadow.
  *
  * <p>Kept out of the insert menus: a dropped {@code use} would be written {@code InstalledRun.use(null)} and clear
  * the run, {@code installed} hands back a {@code Run} nothing in Studio takes, and {@code enabled} is
@@ -19,10 +20,12 @@ public final class InstalledRun {
 
     private static volatile Run current = Run.NONE;
 
+    private static volatile Flow flow = Flow.NONE;
+
     private InstalledRun() {}
 
     /**
-     * Uses {@code run} from now on. {@code null} clears it back to {@link Run#NONE}, which runs nothing.
+     * Uses {@code run} from now on. {@code null} clears it back to {@link Run#NONE}, which has no home and no setup.
      *
      * <p>Installing twice keeps the later run, which is what a reader would expect of a call named like this one.
      */
@@ -30,14 +33,19 @@ public final class InstalledRun {
         current = run == null ? Run.NONE : run;
     }
 
+    /** Walks {@code walked} from now on. {@code null} clears it back to {@link Flow#NONE}, which runs nothing. */
+    public static void walk(Flow walked) {
+        flow = walked == null ? Flow.NONE : walked;
+    }
+
     /** The installed run, or {@link Run#NONE} when nothing has been installed. Never {@code null}. */
     public static Run installed() {
         return current;
     }
 
-    /** The installed run's flow, or {@link Flow#NONE}. Never {@code null}. */
+    /** The flow being walked, or {@link Flow#NONE}. Never {@code null}. */
     public static Flow flow() {
-        return current.flow();
+        return flow;
     }
 
     /**

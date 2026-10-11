@@ -29,7 +29,7 @@ import java.util.Optional;
  * (2026-10-09), so the method says what this bot changed and nothing else. A setting that is on by default is
  * turned off by a link with a negative name ({@link #centredClicks()}, {@link #debugOff()}).
  *
- * <p>{@code Bot.runFlow(Sdk.class)} hands it to {@link #use} before anything runs, so a click never happens on
+ * <p>{@code Bot.runFlow(…, Sdk.class)} hands it to {@link #use} before anything runs, so a click never happens on
  * the defaults and then on the bot's own values. Studio's ⚙ Bot Settings window edits the expression; a bot
  * that wants another value for a while calls {@code BotSettings.use(BotSettings.current().confidence(0.9))}.
  *

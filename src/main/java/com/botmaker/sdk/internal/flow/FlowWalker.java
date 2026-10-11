@@ -47,14 +47,12 @@ public final class FlowWalker {
     }
 
     /**
-     * Walks {@code run}'s flow to its end. Does not return: it ends by calling {@link Bot#stop()}, which unwinds
-     * to the supervisor.
+     * Walks {@code flow} to its end. Does not return: it ends by calling {@link Bot#stop()}, which unwinds to the
+     * supervisor.
      *
-     * <p>The run's {@link Run#home()} runs before each step that goes home.
+     * <p>{@code goHome}, the run's {@link Run#home()} or {@code null}, runs before each step that goes home.
      */
-    public static void run(Run run) {
-        Flow flow = run.flow();
-        Runnable goHome = run.home();
+    public static void run(Flow flow, Runnable goHome) {
         int maxSteps = flow.limits().maxSteps();
         int stepDelayMs = flow.limits().stepDelayMs();
         Activity current = start(flow);

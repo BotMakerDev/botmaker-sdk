@@ -6,7 +6,6 @@ import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.flow.Run;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,16 +109,14 @@ class FlowWalkerTest {
 
     /** Installs and walks {@code flow} to its end, with no pause between activities. */
     private static void walk(Flow flow) {
-        walk(Run.of(flow));
+        walk(flow, null);
     }
 
-    /** The same, with {@code run}'s home. */
-    private static void walk(Run run) {
-        Flow flow = run.flow();
-        Run unpaused = new Run(new Flow(flow.steps(), flow.edges(), flow.start(),
-                Flow.limits(flow.limits().maxSteps(), 0)), run.home(), run.setup());
-        InstalledRun.use(unpaused);
-        assertThrows(RuntimeException.class, () -> FlowWalker.run(unpaused),
+    /** The same, with {@code home} before each step that goes home. */
+    private static void walk(Flow flow, Runnable home) {
+        Flow unpaused = new Flow(flow.steps(), flow.edges(), flow.start(), Flow.limits(flow.limits().maxSteps(), 0));
+        InstalledRun.walk(unpaused);
+        assertThrows(RuntimeException.class, () -> FlowWalker.run(unpaused, home),
                 "a run ends by stopping the bot, which throws");
     }
 
@@ -270,7 +267,7 @@ class FlowWalkerTest {
         Flow flow = flow(A.class, List.of(step(A.class, body(A.class), false, true, true).whenOff(B.class),
                         on(B.class), step(C.class, body(C.class), true, true, true)),
                 Flow.edge(B.NEXT, C.class));
-        walk(Run.of(flow).home(() -> log.add("goHome")));
+        walk(flow, () -> log.add("goHome"));
 
         assertEquals(List.of("B+popup", "goHome", "C+popup"), log,
                 "nothing to go home for when the activity won't run");

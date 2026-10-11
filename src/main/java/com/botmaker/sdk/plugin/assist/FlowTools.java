@@ -64,14 +64,15 @@ final class FlowTools {
     }
 
     record FlowMethod(@Describe("home: gets the game back to a known screen; setup: makes the game ready, "
-                              + "its settings included, once per computer after the bot first starts it") Hook which,
+                              + "its settings included, after the bot starts it when its doSetup parameter is "
+                              + "ticked") Hook which,
                       @Describe(value = "one of the bot's public static void methods with no parameter, as "
                               + "Gamebot::setup; leave out for none", optional = true) String method) {
     }
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("read_flow")
-                    .describedAs("The bot's activity flow (the one Sdk.run() runs by default): each activity with "
+                    .describedAs("The bot's activity flow (the first of its Flows): each activity with "
                             + "its body, switches and outcomes, every arrow, where a run starts, its limits, and "
                             + "the bot's home and setup")
                     .takesNothing().handledBy(FlowTools::readFlow),
@@ -199,7 +200,7 @@ final class FlowTools {
         return FxCall.call(() -> {
             FlowValue.Target target = FlowValue.target(services);
             Run run = set.which().set(target.run(), FlowTypes.method(method));
-            String refused = FlowValue.writeRun(services, target, target.flow(), run.home(), run.setup());
+            String refused = FlowValue.writeRun(services, target, run.home(), run.setup());
             if (refused != null) return AgentReply.refused(refused);
             return AgentReply.text(method.isEmpty() ? "The bot has no " + which + " now."
                     : "The bot's " + which + " is now " + method + ".");

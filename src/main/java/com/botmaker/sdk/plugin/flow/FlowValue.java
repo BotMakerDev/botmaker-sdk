@@ -11,19 +11,19 @@ import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The bot's flows, the {@link Run} that names the one running by default, and the card positions beside them,
- * read and written as values.
+ * The bot's flows, the {@link Run} holding the game's home and setup, and the card positions beside them, read
+ * and written as values.
  *
  * <p>Each is a handle on {@link SdkValues}' declarations, so no id is spelled here.
  *
- * <p><b>Which flow is edited.</b> Until the editor picks among flows (named flows, phase 4), the editor and the
- * assistant's tools edit the flow {@code Sdk.run()} names. A {@code Run} holds the flow's value, not its name,
- * so the name is the {@code Flows} constant holding that value ({@link #target}). A project with no flow yet
- * edits {@link #FIRST}, written on the first save together with the {@code Run} naming it.
+ * <p><b>Which flow is edited.</b> Which flow runs is the bot's {@code @Param}, which this plugin does not read.
+ * Until the editor picks among flows (named flows, phase 4), the editor and the assistant's tools edit the first
+ * {@code Flows} constant. A project with no flow yet edits {@link #FIRST}, written on the first save.
  *
  * <p><b>Reading may answer nothing, and that is ordinary.</b> A hand-written initialiser, a call to something
  * other than {@code Flow.of}, an activity whose body is a lambda rather than a method reference — each of them
@@ -35,7 +35,7 @@ public final class FlowValue {
     /** The flows, {@code Flows.MAIN} and its siblings. */
     public static final ManagedSet<Flow> FLOWS = ManagedSet.of(SdkValues.FLOWS);
 
-    /** Which flow runs by default, and the game's home and setup, {@code Sdk.run()}. */
+    /** The game's home and setup, {@code Sdk.run()}. */
     public static final ManagedHandle<Run> RUN = ManagedHandle.of(SdkValues.RUN);
 
     /** Where each flow's cards sit, {@code Sdk.flowLayout()}. */
@@ -54,11 +54,9 @@ public final class FlowValue {
      * @param value   that constant's initialiser, or empty when it is not written yet
      * @param flow    what the constant holds, {@link Flow#NONE} when it is not written yet
      * @param run     {@code Sdk.run()} as read, {@link Run#NONE} when it is not written yet
-     * @param named   whether {@code Sdk.run()} already names this flow; when not, the next write points it here
      * @param problem why nothing can be written, or {@code null}
      */
-    public record Target(String name, Optional<ValueContext> value, Flow flow, Run run, boolean named,
-                         String problem) {
+    public record Target(String name, Optional<ValueContext> value, Flow flow, Run run, String problem) {
 
         public Target {
             value = value == null ? Optional.empty() : value;
@@ -67,22 +65,18 @@ public final class FlowValue {
         }
 
         static Target refused(String problem) {
-            return new Target(FIRST, Optional.empty(), Flow.NONE, Run.NONE, false, problem);
+            return new Target(FIRST, Optional.empty(), Flow.NONE, Run.NONE, problem);
         }
 
         /** The sentence that says which flow this is, for a reader who cannot see the code. */
         public String said() {
-            if (named) return "Flows." + name + ", the flow Sdk.run() runs by default.";
-            if (value.isPresent()) {
-                return "Flows." + name + "; Sdk.run() names no flow yet, and the next change makes it run this one.";
-            }
-            return "No flow yet; the first change writes Flows." + name + " and makes Sdk.run() run it.";
+            if (value.isPresent()) return "Flows." + name + ".";
+            return "No flow yet; the first change writes Flows." + name + ".";
         }
     }
 
     /**
-     * The flow {@code Sdk.run()} names, opened for writing: the {@code Flows} constant equal to the run's flow,
-     * else — a run naming nothing yet — the first constant there is, else {@link #FIRST}, not written yet.
+     * The flow edited, opened for writing: the first {@code Flows} constant, else {@link #FIRST}, not written yet.
      */
     public static Target target(StudioServices services) {
         Optional<ValueContext> runValue = RUN.openOrCreate(services);
@@ -93,42 +87,28 @@ public final class FlowValue {
         }
         Optional<Run> run = RUN.read(runValue.get());
         if (run.isEmpty()) {
-            return Target.refused("Sdk.run() isn't written as Run.of(Flows.…) this editor reads, so the flow is shown"
-                    + " empty and left alone. Edit it in Sdk.java, or replace it with Run.of(Flows.MAIN) to draw it here.");
+            return Target.refused("Sdk.run() isn't written as Run.of() this editor reads, so the flow is shown empty "
+                    + "and left alone. Edit it in Sdk.java, or replace it with Run.of() to draw it here.");
         }
         PluginValues values = services.pluginValues();
-        boolean runsNothing = run.get().flow().equals(Flow.NONE);
-        String named = null;
-        String first = null;
-        for (String member : FLOWS.members(values)) {
-            if (first == null) first = member;
-            // A run of nothing names no constant, even an empty one: the first is edited, and the save points
-            // Sdk.run() at it.
-            if (named == null && !runsNothing
-                    && FLOWS.read(values, member).filter(run.get().flow()::equals).isPresent()) {
-                named = member;
-            }
-        }
-        String name = named != null ? named : runsNothing ? first : null;
-        if (name == null && !runsNothing) {
-            return new Target(FIRST, Optional.empty(), Flow.NONE, run.get(), false, "Sdk.run() names a flow that isn't "
-                    + "a constant of Flows this editor reads, so it is shown empty and left alone. Name one of Flows' "
-                    + "constants in Run.of(…) to draw it here.");
-        }
-        if (name == null) return new Target(FIRST, Optional.empty(), Flow.NONE, run.get(), false, null);
+        List<String> members = FLOWS.members(values);
+        if (members.isEmpty()) return new Target(FIRST, Optional.empty(), Flow.NONE, run.get(), null);
+        String name = members.getFirst();
         Optional<ValueContext> value = FLOWS.open(values, name);
         Optional<Flow> flow = value.flatMap(FLOWS::read);
         if (flow.isEmpty()) {
-            return new Target(name, Optional.empty(), Flow.NONE, run.get(), named != null, "Flows." + name + " isn't "
-                    + "one this editor wrote, so it is shown empty and left alone. Edit it in Flows.java, or replace it "
-                    + "with Flow.of(…) to draw it here.");
+            return new Target(name, Optional.empty(), Flow.NONE, run.get(), "Flows." + name + " isn't one this "
+                    + "editor wrote, so it is shown empty and left alone. Edit it in Flows.java, or replace it with "
+                    + "Flow.of(…) to draw it here.");
         }
-        return new Target(name, value, flow.get(), run.get(), named != null, null);
+        return new Target(name, value, flow.get(), run.get(), null);
     }
 
-    /** The flow {@code services}' project runs by default, or {@link Flow#NONE}. Read afresh every time. */
+    /** The flow the editor edits, or {@link Flow#NONE}. Read afresh every time. */
     public static Flow read(StudioServices services) {
-        return RUN.read(services).map(Run::flow).orElse(Flow.NONE);
+        PluginValues values = services.pluginValues();
+        return FLOWS.members(values).stream().findFirst().flatMap(name -> FLOWS.read(values, name))
+                .orElse(Flow.NONE);
     }
 
     /**
@@ -141,9 +121,8 @@ public final class FlowValue {
 
     /**
      * Writes {@code flow} as {@code target}'s constant, on the JavaFX application thread: into its initialiser when
-     * it is written, else as a new {@code Flows} constant; then, when {@code Sdk.run()} did not name it, points
-     * {@code Sdk.run()} at it. An activity whose body is not a method reference is refused where it is typed, so
-     * there is nothing else to report from here.
+     * it is written, else as a new {@code Flows} constant. An activity whose body is not a method reference is
+     * refused where it is typed, so there is nothing else to report from here.
      *
      * @return null when it was written, else why it could not be
      */
@@ -152,24 +131,21 @@ public final class FlowValue {
         Flow written = FlowTypes.written(flow);
         if (target.value().isPresent()) {
             target.value().get().set(written);
-        } else {
-            Optional<String> refused = FLOWS.add(services.pluginValues(), target.name(), written);
-            if (refused.isPresent()) return refused.get();
+            return null;
         }
-        if (target.named()) return null;
-        return RUN.write(services, new Run(written, target.run().home(), target.run().setup()));
+        return FLOWS.add(services.pluginValues(), target.name(), written).orElse(null);
     }
 
     /**
-     * Writes the run's home and setup, the flow it names kept: {@code Sdk.run()} is written only when one of them
-     * changed. On the JavaFX application thread, after the flow, so the flow it names is the one just written.
+     * Writes the run's home and setup: {@code Sdk.run()} is written only when one of them changed. On the JavaFX
+     * application thread.
      *
      * @return null when it was written or nothing changed, else why it could not be
      */
-    public static String writeRun(StudioServices services, Target target, Flow flow, Runnable home, Runnable setup) {
+    public static String writeRun(StudioServices services, Target target, Runnable home, Runnable setup) {
         if (target.problem() != null) return target.problem();
         Run run = target.run();
         if (Objects.equals(run.home(), home) && Objects.equals(run.setup(), setup)) return null;
-        return RUN.write(services, new Run(FlowTypes.written(flow), home, setup));
+        return RUN.write(services, new Run(home, setup));
     }
 }

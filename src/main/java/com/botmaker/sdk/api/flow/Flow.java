@@ -11,8 +11,8 @@ import java.util.List;
  * <p><b>A flow is Java, so a renamed activity method is a compile error</b> rather than a silently empty
  * value three screens into a run. A bot holds its flows as constants of its {@code Flows} class, one per way
  * of playing, and the editor rewrites one constant's expression, leaving everything around it exactly as you
- * wrote it. Which one runs when nobody picks is {@link Run}'s, in {@code Sdk.run()}, together with the game's
- * home and setup, which no flow owns.
+ * wrote it. Which one runs is the bot's {@code @Param}, handed to {@code Bot.runFlow}; the game's home and
+ * setup, which no flow owns, are {@link Run}'s, in {@code Sdk.run()}.
  *
  * <pre>{@code
  * @SdkValue(SdkValue.Id.FLOWS)

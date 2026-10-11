@@ -128,12 +128,13 @@ class BotTest {
 
     @Test
     void aStopDuringRecoveryEndsTheRunQuietly() {
-        // Setup.fail after a restart stops the bot from inside the recovery: supervise returns, nothing escapes.
+        // A setup's Bot.stop("…") after a restart stops the bot from inside the recovery: supervise returns, nothing
+        // escapes.
         AtomicInteger body = new AtomicInteger();
         Bot.supervise(() -> {
             body.incrementAndGet();
             throw new IllegalStateException("crash");
-        }, () -> Setup.fail("Set the game to windowed."));
+        }, () -> Bot.stop("Set the game to windowed."));
         assertEquals(1, body.get(), "the body is not run again after the recovery stopped the bot");
     }
 

@@ -8,16 +8,17 @@ import com.botmaker.plugin.api.palette.Untraced;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
+import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.bot.SdkValues;
-import com.botmaker.sdk.internal.bot.SetupOnce;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
-import com.botmaker.sdk.internal.flow.RunChoices;
+import com.botmaker.sdk.internal.flow.SkippedActivities;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.observe.IpcObserver;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -31,11 +32,10 @@ import java.util.function.Consumer;
  * bot needs; the body, the recovery hooks and the per-activity logic stay in editable user code.
  *
  * <p>{@link #runFlow} also runs a start-up sequence <em>once</em> before the first loop pass — launch the
- * project's configured target, then the run's {@code setup} when this computer still owes it, then its
- * {@code home} — so a fresh launch actually opens the game, sets it as the bot needs and reaches a known screen
- * instead of assuming it is already running. A first launch leaves an already-open game alone; a recovery shuts a
- * frozen one down first. The setup runs once per computer ({@code Setup}): a recovery runs it only when it has not
- * yet returned.
+ * project's configured target, then the run's {@code setup} when the bot's {@code doSetup} parameter is ticked,
+ * then its {@code home} — so a fresh launch actually opens the game, sets it as the bot needs and reaches a known
+ * screen instead of assuming it is already running. A first launch leaves an already-open game alone; a recovery
+ * shuts a frozen one down first. A recovery runs the setup only when it has not yet returned.
  *
  * <p>The bot ends when {@link #stop()} is called — from an activity that is done, or automatically by the
  * generated loop once every activity is disabled. {@code stop()} unwinds the supervise loop cleanly and
@@ -57,47 +57,50 @@ public class Bot {
     protected Bot() {}
 
     /**
-     * Installs this bot's managed values (the SDK's {@code @SdkValue} ones and any other plugin's) and runs its
-     * activity flow — the whole of a bot's {@code main}.
+     * Installs this bot's managed values (the SDK's {@code @SdkValue} ones and any other plugin's) and runs
+     * {@code flow} — the whole of a bot's {@code main}.
      *
      * <pre>{@code
      * public final class Gamebot extends Bot {
      *
      *     public static void main(String[] args) {
-     *         runFlow(Sdk.class);
+     *         runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class);
      *     }
      * }
      * }</pre>
      *
-     * <p>The bot names each plugin's values class, which is a fact only it has and one javac checks; what it
-     * does not write is what to do with them. The flow walked is the one {@code Sdk.run()} names, unless this
-     * computer's {@code botmaker.flow} run property names another {@code Flows} constant, with the activities the
-     * runner may switch as its {@code botmaker.activity.<Name>} properties say; what gets the
-     * game back to a known screen is its {@link com.botmaker.sdk.api.flow.Run#home}, run at start-up, after anything
-     * unexpected and before each step that goes home; a run with none goes nowhere.
+     * <p>What the person running the bot chooses is the bot's own {@code @Param}s, handed in here: which of the
+     * {@code Flows} runs, whether the game is set up first, and which activities the flow lets them switch off
+     * are skipped. What gets the game back to a known screen is {@code Sdk.run()}'s
+     * {@link com.botmaker.sdk.api.flow.Run#home}, run at start-up, after anything unexpected and before each step
+     * that goes home; a run with none goes nowhere.
      *
      * <p>Offered in the insert menu inside {@code main} only ({@link EntryPoint}): anywhere else it would start
      * a second supervised run inside the first.
      *
-     * @param values each plugin's values class in this bot — {@code Sdk.class}, the file that plugin shipped
-     *               and this project now owns. None is legal: the bot runs with whatever the SDK defaults to.
+     * @param flow    the flow to walk — a constant of the bot's {@code Flows}
+     * @param doSetup whether {@code Sdk.run()}'s {@link com.botmaker.sdk.api.flow.Run#setup} runs first, once the
+     *                game has started: tick it on a new computer, or after changing a game setting
+     * @param skip    the activities to switch off, each one the flow draws {@code .switchable()}; another is run
+     *                anyway, and the debug trace says so
+     * @param values  each plugin's values class in this bot — {@code Sdk.class}, the file that plugin shipped and
+     *                this project now owns
      */
     @EntryPoint
     @PaletteLabel("Run activity flow")
     @Untraced("holds the whole run")
-    public static void runFlow(Class<?>... values) {
+    public static void runFlow(Flow flow, boolean doSetup, Set<Class<? extends Outcome>> skip,
+                               Class<?>... values) {
         observe();
         SdkValues.claim();
         ManagedValues.install(values);
-        InstalledRun.use(RunChoices.chosen(InstalledRun.installed(), values));
+        InstalledRun.walk(SkippedActivities.applied(flow == null ? Flow.NONE : flow, skip));
         Runnable goHome = () -> {
             Runnable home = InstalledRun.installed().home();
             if (home != null) home.run();
         };
-        // The caller is the bot's own class, whose main this is: its package holds the bot's Setup parameters.
-        Class<?> bot = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
-        lifecycle(() -> FlowWalker.run(InstalledRun.installed()), goHome,
-                SetupOnce.owed(InstalledRun.installed().setup(), bot, values));
+        lifecycle(() -> FlowWalker.run(InstalledRun.flow(), InstalledRun.installed().home()), goHome,
+                doSetup ? InstalledRun.installed().setup() : null);
     }
 
     /**
@@ -145,6 +148,17 @@ public class Bot {
      */
     public static void stop() {
         throw new BotStoppedException();
+    }
+
+    /**
+     * Ends the bot, telling whoever runs it why: {@code whatToChange} is shown as the run's error. What a setup
+     * calls when the game is not as the bot needs it and the bot cannot change it itself —
+     * {@code Bot.stop("Set the game to windowed mode in Settings ▸ Display.")}.
+     */
+    @PaletteLabel("Stop, saying why")
+    public static void stop(String whatToChange) {
+        Debug.error(whatToChange);
+        stop();
     }
 
     /**
@@ -247,7 +261,7 @@ public class Bot {
     }
 
     /**
-     * Runs {@code recovery}; false when it stopped the bot, as a setup's {@code Setup.fail} does after a restart. A
+     * Runs {@code recovery}; false when it stopped the bot, as a setup's {@code Bot.stop("…")} does after a restart. A
      * recovery that crashes is said and the loop goes on: the next pass recovers again.
      */
     private static boolean recovered(Runnable recovery) {

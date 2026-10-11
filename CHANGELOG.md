@@ -41,21 +41,22 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   under 12 pixels tall are enlarged, up to three times, before they are matched.
 - **Several flows, and activities the runner may switch off.** A bot holds its flows as constants of
   `Flows.java` (`@SdkValue(SdkValue.Id.FLOWS)`, `public static final Flow MAIN = Flow.of(…)`), and
-  `Sdk.run()` (`@SdkValue(SdkValue.Id.RUN)`) says which one runs when nobody picks:
-  `Run.of(Flows.MAIN).home(Gamebot::goHome).setup(Gamebot::setup)`. Home and setup are the bot's, one each,
-  whichever flow runs. A card marked `.switchable()` ("Runner may switch this off" in the Activity Flow window)
-  is one the person running the bot may switch off for their computer. Card positions are kept per flow.
-- **Each computer chooses what it runs.** Run properties, never the bot's files: `botmaker.flow=DAILY` runs
-  `Flows.DAILY` instead of the default, and `botmaker.activity.Rest=off` (or `on`) switches a `.switchable()`
-  activity; a switch on any other activity is ignored and the trace says so. The assistant's `get_run_choices`
-  and `set_run_choices` read and set them.
-- **A setup for the game, once per computer.** `Run.setup(Gamebot::setup)` names the bot's own method that
-  makes the game ready: its settings, including the ones a user chose in the bot's parameters. It runs after the
-  bot first starts the game, before home; when it returns, Studio records `botmaker.setup=off` on this computer
-  and later runs skip it. It runs again when a `@Param(category = Setup.CATEGORY)` changes value, when
-  `botmaker.setup=on` is set again, and after a restart when it failed. `Setup.fail("Set the game to windowed
-  mode")` ends the run and tells the user what to change. The Activity Flow window picks the method as it picks
-  home, and the assistant's `set_flow_method` sets either one to a method the bot has.
+  `Sdk.run()` (`@SdkValue(SdkValue.Id.RUN)`) holds the game's home and setup, one each whichever flow runs:
+  `Run.of().home(Gamebot::goHome).setup(Gamebot::setup)`. A card marked `.switchable()` ("Runner may switch
+  this off" in the Activity Flow window) is one the person running the bot may switch off. Card positions are
+  kept per flow.
+- **What a run does is the bot's own `@Param`s.** `Bot.runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class)`
+  replaces `Bot.runFlow(Sdk.class)`: `flow` is the `Flows` constant to walk, drawn in the Runner and the
+  Parameters window as a pick among them; `doSetup` runs the setup first; `skip` is a
+  `Set<Class<? extends Outcome>>` of activities switched off, each picked among the switchable ones. An activity
+  in `skip` that this flow does not mark `.switchable()` runs anyway, and the trace says so.
+- **A setup for the game.** `Run.setup(Gamebot::setup)` names the bot's own method that makes the game ready:
+  its settings, including the ones a user chose in the bot's parameters. It runs after the bot starts the game,
+  before home, when `doSetup` is ticked, and again after a restart when it failed. `Bot.stop("Set the game to
+  windowed mode")` ends the run and tells the user what to change. The Activity Flow window picks the method as
+  it picks home, and the assistant's `set_flow_method` sets either one to a method the bot has.
+- **`KeySequence.Step` is `KeySequence.Press`**, so the palette has one `Step`, the flow's. A bot writes
+  `KeySequence.step(…)`, which is unchanged.
 - **An emulator shows the bot's screen size.** A run on an emulator sets its display to the bot's size with
   `wm size`, its density scaled with it, and resets both when the bot ends.
 - **Another aspect ratio.** A picture on a frame of another shape is scaled by the smaller side's ratio, as a

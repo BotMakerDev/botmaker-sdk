@@ -186,7 +186,7 @@ public class Keyboard {
 
     /** Press each step's combo on {@code source}'s window, waiting the step's {@code after} after each. */
     public static void sequence(CaptureSource source, KeySequence sequence) {
-        for (KeySequence.Step step : sequence.steps()) {
+        for (KeySequence.Press step : sequence.steps()) {
             combo(source, step.combo());
             if (!step.after().isZero()) pause.accept(step.after());
         }

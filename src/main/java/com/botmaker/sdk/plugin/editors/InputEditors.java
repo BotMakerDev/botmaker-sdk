@@ -295,7 +295,7 @@ public final class InputEditors {
     public static Node sequence(ValueContext ctx) {
         Button[] pill = new Button[1];
         pill[0] = Pills.button(sequencePill(ctx), () -> {
-            List<KeySequence.Step>[] steps = sequenceSteps(ctx);
+            List<KeySequence.Press>[] steps = sequenceSteps(ctx);
             VBox rows = new VBox(4);
             Runnable[] redraw = new Runnable[1];
             redraw[0] = () -> {
@@ -306,7 +306,7 @@ public final class InputEditors {
             redraw[0].run();
             Button add = new Button("Add step");
             add.setOnAction(e -> chooseCombo(ctx, null, combo -> {
-                List<KeySequence.Step> next = new ArrayList<>(steps[0]);
+                List<KeySequence.Press> next = new ArrayList<>(steps[0]);
                 next.add(KeySequence.step(combo, Duration.ZERO));
                 steps[0] = List.copyOf(next);
                 redraw[0].run();
@@ -328,13 +328,13 @@ public final class InputEditors {
     }
 
     @SuppressWarnings("unchecked")
-    private static List<KeySequence.Step>[] sequenceSteps(ValueContext ctx) {
+    private static List<KeySequence.Press>[] sequenceSteps(ValueContext ctx) {
         return new List[] {ctx.value(KeySequence.class).map(KeySequence::steps).orElse(List.of())};
     }
 
     /** One step's row; every change replaces {@code steps[0]} and, where the row count changes, redraws. */
-    private static Node stepRow(ValueContext ctx, List<KeySequence.Step>[] steps, int at, Runnable redraw) {
-        KeySequence.Step step = steps[0].get(at);
+    private static Node stepRow(ValueContext ctx, List<KeySequence.Press>[] steps, int at, Runnable redraw) {
+        KeySequence.Press step = steps[0].get(at);
         Button combo = new Button(step.combo().toString());
         combo.setOnAction(e -> chooseCombo(ctx, steps[0].get(at).combo(), chosen -> {
             steps[0] = replaced(steps[0], at, KeySequence.step(chosen, steps[0].get(at).after()));
@@ -349,7 +349,7 @@ public final class InputEditors {
         remove.getStyleClass().add("row-icon-button");
         remove.setTooltip(new Tooltip("Take this step out"));
         remove.setOnAction(e -> {
-            List<KeySequence.Step> next = new ArrayList<>(steps[0]);
+            List<KeySequence.Press> next = new ArrayList<>(steps[0]);
             next.remove(at);
             steps[0] = List.copyOf(next);
             redraw.run();

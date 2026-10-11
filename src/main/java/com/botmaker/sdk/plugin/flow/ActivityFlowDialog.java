@@ -56,8 +56,7 @@ import java.util.function.Consumer;
  *
  * <h2>What it writes</h2>
  *
- * <p>No file. The graph is one expression — the {@code Flows} constant {@code Sdk.run()} names
- * ({@link FlowValue#target}) — written through {@link com.botmaker.plugin.api.source.PluginValues}, so it lands
+ * <p>No file. The graph is one expression — a {@code Flows} constant ({@link FlowValue#target}) — written through {@link com.botmaker.plugin.api.source.PluginValues}, so it lands
  * in the bot's own Java, in the open buffer as well as on disk, as one entry in the project's history. The
  * game's home and setup are {@code Sdk.run()}'s, written after the flow and only when they changed. The card
  * positions are this flow's entry in the {@link FlowLayout} {@code Sdk.flowLayout()} returns, written after the
@@ -79,7 +78,7 @@ public final class ActivityFlowDialog {
     private final FlowCanvas canvas = new FlowCanvas();
 
     /**
-     * The flow this window edits — the {@code Flows} constant {@code Sdk.run()} names — read again after each save,
+     * The flow this window edits — a {@code Flows} constant, {@link FlowValue#target} — read again after each save,
      * since the first save of a project with no flow writes the constant.
      */
     private FlowValue.Target target = FlowValue.Target.refused(null);
@@ -635,7 +634,8 @@ public final class ActivityFlowDialog {
         box.getChildren().add(methodChoice("home", home, "Home::goHome", picked -> home = picked));
 
         Label start = new Label("To start the flow, insert Bot ▸ Run activity flow in your bot's main. It is "
-                + "offered there only, already naming your values classes: Bot.runFlow(Sdk.class).");
+                + "offered there only: Bot.runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class) walks the flow the "
+                + "bot's flow parameter names.");
         start.setWrapText(true);
         start.getStyleClass().add("dialog-hint-text");
         box.getChildren().add(start);
@@ -643,17 +643,17 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * The bot's setup — {@code Sdk.run()}'s {@code .setup(Gamebot::setup)}, run once per computer after the bot has
-     * started the game, before home — picked as the home is. What it checks is the bot's own code: the game's
-     * settings, and the ones a user chose in the bot's parameters.
+     * The bot's setup — {@code Sdk.run()}'s {@code .setup(Gamebot::setup)}, run after the bot has started the game,
+     * before home, when the bot's {@code doSetup} parameter is ticked — picked as the home is. What it checks is the
+     * bot's own code: the game's settings, and the ones a user chose in the bot's parameters.
      */
     private Node buildSetupSection() {
         VBox box = new VBox(6);
         box.getChildren().add(heading("Setup"));
-        Label explain = new Label("The method that makes the game ready for this bot, run once on each computer "
-                + "the first time the bot starts the game: set the game's settings to what the bot needs, including "
-                + "those chosen in its parameters. It runs again when a parameter in the Setup category changes. "
-                + "Setup.fail(\"…\") stops the run and tells the user what to change.");
+        Label explain = new Label("The method that makes the game ready for this bot, run once the bot has started "
+                + "the game when the bot's doSetup parameter is ticked: set the game's settings to what the bot "
+                + "needs, including those chosen in its parameters. Bot.stop(\"…\") stops the run and tells the user "
+                + "what to change.");
         explain.setWrapText(true);
         explain.getStyleClass().add("dialog-hint-text");
         box.getChildren().add(explain);
@@ -1038,11 +1038,10 @@ public final class ActivityFlowDialog {
                 notes);
         if (refused == null) {
             savedActivities = FlowEdits.labels(board.flow());
-            // Read again: the first save of a project with no flow wrote Flows.MAIN and pointed Sdk.run() at it,
-            // which the run written next keeps and the next save edits.
+            // Read again: the first save of a project with no flow wrote Flows.MAIN, which the next save edits.
             target = FlowValue.target(services);
             // After the flow, so the run names the flow as just written; nothing when home and setup are as read.
-            refused = FlowValue.writeRun(services, target, board.flow(), home, setup);
+            refused = FlowValue.writeRun(services, target, home, setup);
         }
         Throwable failure = null;
         FlowLayout layout = currentLayout(renamedTypes);

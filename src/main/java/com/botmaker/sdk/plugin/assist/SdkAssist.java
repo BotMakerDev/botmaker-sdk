@@ -7,8 +7,8 @@ import java.util.List;
 
 /**
  * The SDK's tools for the AI assistant that drives Studio: look at what the bot sees ({@link LookTools}), make
- * its pictures and places ({@link PictureTools}), shape its activity flow ({@link FlowTools}), choose what this
- * computer runs ({@link RunTools}), and set where it looks and how it runs ({@link SetupTools}).
+ * its pictures and places ({@link PictureTools}), shape its activity flow ({@link FlowTools}), and set where it
+ * looks and how it runs ({@link SetupTools}).
  *
  * <p>Coordinates are the <b>screenshot's</b> pixels: {@code (0, 0)} is the top-left of what {@code screenshot}
  * returned, so the assistant crops what it was shown. Every write goes through the same path as the SDK's own
@@ -21,7 +21,7 @@ public final class SdkAssist {
 
     /** Every tool, by group. */
     public static final List<AssistantTool<?>> ALL = join(LookTools.TOOLS, PictureTools.TOOLS, FlowTools.TOOLS,
-            RunTools.TOOLS, SetupTools.TOOLS);
+            SetupTools.TOOLS);
 
     private SdkAssist() {}
 

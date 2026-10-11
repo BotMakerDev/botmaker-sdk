@@ -6,7 +6,6 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import org.junit.jupiter.api.AfterEach;
@@ -81,9 +80,9 @@ class DebugTraceTest {
 
     /** Walks {@code flow} to its end, which is {@code Bot.stop()} throwing. */
     private static void run(Flow flow) {
-        InstalledRun.use(Run.of(flow));
+        InstalledRun.walk(flow);
         try {
-            FlowWalker.run(Run.of(flow));
+            FlowWalker.run(flow, null);
         } catch (RuntimeException ended) {
             // the run is over; only what it printed matters here
         }

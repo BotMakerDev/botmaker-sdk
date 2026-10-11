@@ -31,7 +31,7 @@ import java.util.List;
  * <p>Thirteen declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
  * plugin lists {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOWS} are the activity
- * flows, {@code RUN} the one that runs by default with the game's home and setup, {@code FLOW_LAYOUT} where the
+ * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
  * flow editor draws each card (a run ignores it), {@code CAPTURE} where
  * pixels are read from, {@code SETTINGS} how it clicks and looks, {@code SCREEN} the size its pictures were cut
  * at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS}, {@code ZONES} and {@code DIGITS} the classes of
@@ -56,12 +56,11 @@ public final class SdkValues {
             .because("These are the bot's activity flows. Draw them in 🔀 Activity Flow, which keeps the"
                     + " activities, the wires and the layout in step.");
 
-    /** Which flow runs when nobody picks, and the game's home and setup — {@code Run.of(Flows.MAIN).home(…)}. */
+    /** The game's home and setup — {@code Run.of().home(…)}. */
     public static final ManagedValue<Run> RUN = ManagedValue.method(SdkValue.Id.RUN)
             .in(HOLDER)
             .holds(Run.class, Run.NONE)
-            .because("This says which flow runs when nobody picks one, and the game's home and setup. Change"
-                    + " them in 🔀 Activity Flow.");
+            .because("This says how the bot gets the game home and sets it up. Change them in 🔀 Activity Flow.");
 
     public static final ManagedValue<FlowLayout> FLOW_LAYOUT = ManagedValue.method(SdkValue.Id.FLOW_LAYOUT)
             .in(HOLDER)
