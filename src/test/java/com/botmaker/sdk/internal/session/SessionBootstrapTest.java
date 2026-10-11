@@ -1,7 +1,9 @@
 package com.botmaker.sdk.internal.session;
 
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.internal.bot.Session;
+import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.RunState;
@@ -220,8 +222,20 @@ class SessionBootstrapTest {
     }
 
     @Test
-    void sizeFallsBackToTheDefaultWhenNoProjectResolution() {
-        // No botmaker-project.properties on the test classpath → no authored resolution → the fallback size.
+    void sizeIsTheBotsScreen() {
+        BotScreen.use(new Size(1920, 1080));
+        try {
+            SessionBackends.DisplaySize size = SessionBootstrap.size();
+            assertEquals(new Size(1920, 1080), new Size(size.width(), size.height()));
+            assertEquals(SessionBackends.SizeSource.BOT, size.source());
+        } finally {
+            BotScreen.use(null);
+        }
+    }
+
+    @Test
+    void sizeFallsBackToTheDefaultWhenTheBotNamesNone() {
+        BotScreen.use(new Size(0, 0));
         SessionBackends.DisplaySize size = SessionBootstrap.size();
         assertEquals(SessionBootstrap.DEFAULT_WIDTH, size.width());
         assertEquals(SessionBootstrap.DEFAULT_HEIGHT, size.height());

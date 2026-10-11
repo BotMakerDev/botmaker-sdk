@@ -1,7 +1,9 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.sdk.internal.vision.TemplateMetadata;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.sdk.internal.vision.TemplateSource;
 import com.botmaker.shared.opencv.OpenCvNative;
 import org.opencv.core.Mat;
@@ -12,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Public handle for a template image used by the vision API.
@@ -33,6 +36,10 @@ public class ImageTemplate implements AutoCloseable {
 
     private final String filePath;
     private final String id;
+    /** The frame it was cut from when that is not the bot's screen size; null when it is. */
+    private final Size frame;
+    /** Where in that frame it was cut; null when unknown. */
+    private final Rect place;
 
     // Lazily-loaded OpenCV image data. Null until getMat() is first called.
     private Mat mat;
@@ -42,10 +49,16 @@ public class ImageTemplate implements AutoCloseable {
      * @param filePath Path to the image (e.g. "images/accept_button.png")
      */
     public ImageTemplate(String filePath) {
+        this(filePath, null, null);
+    }
+
+    private ImageTemplate(String filePath, Size frame, Rect place) {
         if (filePath == null || filePath.isBlank()) {
             throw new IllegalArgumentException("File path cannot be empty");
         }
         this.filePath = filePath;
+        this.frame = frame == null || frame.empty() ? null : frame;
+        this.place = place == null || place.empty() ? null : place;
 
         // Extract ID from filename: "images/btn_ok.png" -> "btn_ok"
         Path path = Paths.get(filePath);
@@ -60,6 +73,32 @@ public class ImageTemplate implements AutoCloseable {
 
     public String filePath() {
         return filePath;
+    }
+
+    /**
+     * This picture, cut at {@code place} in its frame — {@code new ImageTemplate("…").at(new Rect(820, 610, 96,
+     * 40))}. Written by the windows that cut it, so where a picture belongs is in the bot's Java.
+     */
+    public ImageTemplate at(Rect place) {
+        return new ImageTemplate(filePath, frame, place);
+    }
+
+    /**
+     * This picture, cut from a frame of {@code frame} rather than the bot's screen size ({@code Sdk.screen()}):
+     * the matcher rescales it by the live frame against this size. Written only when the two differ.
+     */
+    public ImageTemplate in(Size frame) {
+        return new ImageTemplate(filePath, frame, place);
+    }
+
+    /** Where in its frame it was cut, or null when that is unknown. */
+    public Rect place() {
+        return place;
+    }
+
+    /** The frame it was cut from when that is not the bot's screen size, else null. */
+    public Size frame() {
+        return frame;
     }
 
     /**
@@ -107,17 +146,15 @@ public class ImageTemplate implements AutoCloseable {
     }
 
     /**
-     * The resolution the matcher rescales against: the size of the window or screen this template was captured
-     * from, or {@code null} when that is unknown. Read from the template's Studio-written sidecar by
-     * {@link TemplateMetadata}, which is where the sidecar's format and caching live — a template is a path and
-     * a threshold, not a reader of editor metadata.
+     * The resolution the matcher rescales against: the frame this template was cut from ({@link #in}), else the
+     * bot's screen size, else {@code null} when the bot names none and the template is matched as it is.
      *
      * <p>A {@link java.awt.Dimension} because that is the form shared's matcher takes ({@code shared.opencv}
      * cannot see the SDK's {@code Size}). This one method is the whole SDK↔shared mapping for authored
      * resolution; the matching call sites go through it rather than each converting.
      */
     java.awt.Dimension authoredSize() {
-        return TemplateMetadata.authoredSize(filePath);
+        return frame != null ? new java.awt.Dimension(frame.width(), frame.height()) : BotScreen.dimension();
     }
 
     public int width() {
@@ -147,8 +184,21 @@ public class ImageTemplate implements AutoCloseable {
         unload();
     }
 
+    /** The same file, cut at the same place from the same frame; the loaded pixels are not compared. */
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof ImageTemplate that && filePath.equals(that.filePath)
+                && Objects.equals(frame, that.frame) && Objects.equals(place, that.place);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(filePath, frame, place);
+    }
+
     @Override
     public String toString() {
-        return "ImageTemplate{id='" + id + "', path='" + filePath + "'}";
+        return "ImageTemplate{id='" + id + "', path='" + filePath + "'"
+                + (place == null ? "" : ", at=" + place) + (frame == null ? "" : ", in=" + frame) + "}";
     }
 }

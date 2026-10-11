@@ -29,10 +29,6 @@ import java.util.function.Supplier;
  */
 public final class NestedSessionLauncher implements AutoCloseable {
 
-    /** Nested display size used when the project has no reference resolution configured. */
-    public static final int DEFAULT_WIDTH = BackgroundLauncher.DEFAULT_WIDTH;
-    public static final int DEFAULT_HEIGHT = BackgroundLauncher.DEFAULT_HEIGHT;
-
     /** How a call site shows the outcome — its own status label, always invoked on the FX thread. */
     @FunctionalInterface
     public interface Report {

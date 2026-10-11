@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The bot's screen size is Java.** `@SdkValue(SdkValue.Id.SCREEN) Size screen()` in `Sdk.java` is the size
+  the bot's pictures were cut at; the first picture cut sets it. A private display is made at it, and a run
+  resizes a window source to it at start, or says in the trace why the game shows another size.
+- **A picture says where it was cut.** Its constant is written `new ImageTemplate("…").at(new Rect(…))`, plus
+  `.in(new Size(…))` when its frame is not the bot's screen size; the matcher rescales against that size, else
+  the bot's.
 - **Smaller images for an assistant.** `sdk_screenshot` fits 1024 pixels unless a `scale` is given, and a
   find's boxed image fits 768. Coordinates stay the screenshot's own pixels.
 - **OCR on Apple Silicon Macs.** The jar carries Tesseract and Leptonica for `macosx-arm64` under
@@ -42,6 +48,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed (breaking)
 
+- **No `<name>.json` beside a picture.** The resolution sidecar is neither written nor read: a picture with no
+  `.in(Size)` is taken to be cut at the bot's screen size, and one in a bot that names none is matched as it is.
+  `TemplateLibrary.saveTemplate`/`replaceImage` lost their size arguments; an exported picture set carries no
+  sidecars.
 - **An activity is its outcome enum.** `Activities.java` is a class of enums, one per activity, whose constants
   are its outcomes: `public enum Collect implements Outcome { NEXT, NOTHING_LEFT }`. `Outcomes.java`, the
   `Activity` interface you implemented, `Outcome.NEXT`, `Outcome.DISABLED` and `Step.reports(…)` are gone;

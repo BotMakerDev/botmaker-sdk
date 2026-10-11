@@ -38,8 +38,7 @@ import java.util.TreeSet;
  * migration. A manifest written before {@code customTags} existed is a bare {@code {"<name>": {…}}} map;
  * {@link #read} recognises both, so an older project loads with its tags intact and is rewritten into the
  * current shape on the next save. (A template <em>called</em> "templates" cannot make the two shapes
- * ambiguous: {@link TemplateLibrary#isReservedName} has always refused that name, because its
- * resolution sidecar would be this file.)
+ * ambiguous: {@link TemplateLibrary#isReservedName} has always refused that name.)
  *
  * <p><b>Assignments here, declarations elsewhere.</b> This file records which tags a template carries and
  * which <em>custom</em> tags the project has declared. It does not know about activity tags — those are

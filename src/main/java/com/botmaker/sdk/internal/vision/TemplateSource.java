@@ -8,8 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Where a template's bytes come from: the path as written, then the classpath — one lookup order for the
- * image and its sidecar.
+ * Where a template's bytes come from: the path as written, then the classpath.
  *
  * <p><b>The path alone resolved against the process's working directory and nothing else.</b> Studio runs a
  * bot with the project directory as its working directory, so {@code src/main/resources/images/collect.png}

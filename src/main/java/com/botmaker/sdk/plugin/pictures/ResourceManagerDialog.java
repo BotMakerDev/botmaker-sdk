@@ -478,15 +478,15 @@ public final class ResourceManagerDialog {
 
     /**
      * Recaptures a template's picture from the project's capture source — the surface the bot matches it on,
-     * whose size the sidecar records — keeping everything else about it. This window steps aside while the
+     * where it is cut its constant records — keeping everything else about it. This window steps aside while the
      * surface is up and comes back however the capture ends, a cancel included.
      */
     private void replaceByCapture(Path file) {
         if (file == null) return;
         stage.hide();
-        CaptureTemplates.recapture(services, owner, (picture, frameWidth, frameHeight, windowTitle) -> {
+        CaptureTemplates.recapture(services, owner, (picture, cut) -> {
             stage.show();
-            applyReplacement(file, picture, frameWidth, frameHeight, windowTitle);
+            applyReplacement(file, picture, cut);
         }, stage::show);
     }
 
@@ -505,17 +505,18 @@ public final class ResourceManagerDialog {
                 statusLabel.setText("Couldn't read " + picked.getName() + " as an image.");
                 return;
             }
-            // Unknown capture resolution: the file came from outside, so there is no window size to record.
-            applyReplacement(file, img, 0, 0, null);
+            // Unknown frame: the file came from outside, so its constant is written plain.
+            applyReplacement(file, img, FrameCut.unknown());
         } catch (IOException e) {
             statusLabel.setText("Failed to read the image: " + e.getMessage());
         }
     }
 
-    private void applyReplacement(Path file, BufferedImage img, int sourceW, int sourceH, String windowTitle) {
+    private void applyReplacement(Path file, BufferedImage img, FrameCut cut) {
         if (img == null) return;
         try {
-            TemplateLibrary.replaceImage(file, img, sourceW, sourceH, windowTitle);
+            TemplateLibrary.replaceImage(file, img);
+            TemplateUses.cut(services, TemplateLibrary.baseName(file), cut).ifPresent(services::status);
             published();
             reload();
             gallery.reveal(List.of(file));

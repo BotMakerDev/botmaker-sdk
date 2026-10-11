@@ -15,6 +15,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.PictureEdits;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
@@ -127,17 +128,17 @@ final class PictureTools {
     static AgentReply cropPicture(Crop crop, AgentContext context) {
         Optional<BufferedImage> frame = Frames.shown();
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
-        Optional<BufferedImage> picture = PictureCuts.crop(frame.get(), null,
+        Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), null,
                 new Area(crop.x(), crop.y(), crop.width(), crop.height()));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
         PictureCuts.Cut saved = FxCall.call(() -> PictureCuts.save(context.services(), picture.get(), crop.name(),
-                frame.get().getWidth(), frame.get().getHeight(), null));
+                frame.get()));
         Frames.mark(context, new Rect(crop.x(), crop.y(), crop.width(), crop.height()), Marks.Kind.NOTE, saved.name());
         String constant = TemplateNames.constantFor(saved.name());
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
                         + "." + constant) + saved.note().map(n -> " — " + n).orElse("") + ".")
-                .and(AgentReply.image(picture.get()));
+                .and(AgentReply.image(picture.get().image()));
     }
 
     static AgentReply showPicture(PictureName name, AgentContext context) {
@@ -183,13 +184,14 @@ final class PictureTools {
         if (base.isEmpty()) return AgentReply.refused(Frames.noPicture(replace.picture()));
         Optional<BufferedImage> frame = Frames.shown();
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
-        Optional<BufferedImage> picture = PictureCuts.crop(frame.get(), null,
+        Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), null,
                 new Area(replace.x(), replace.y(), replace.width(), replace.height()));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
-        PictureEdits.Done done = FxCall.call(() -> PictureEdits.replace(context.services(), base.get(), picture.get(),
-                frame.get().getWidth(), frame.get().getHeight()));
-        return done.ok() ? AgentReply.text(done.said()).and(AgentReply.image(picture.get()))
+        PictureEdits.Done done = FxCall.call(() -> PictureEdits.replace(context.services(), base.get(),
+                picture.get().image(), FrameCut.of(frame.get().getWidth(), frame.get().getHeight(),
+                        picture.get().place())));
+        return done.ok() ? AgentReply.text(done.said()).and(AgentReply.image(picture.get().image()))
                 : AgentReply.refused(done.said());
     }
 

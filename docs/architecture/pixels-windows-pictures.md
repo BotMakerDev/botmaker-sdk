@@ -3,7 +3,8 @@
 - **This plugin grabs its own pixels**, through `botmaker-shared`; the contract has no capture service.
   `plugin/screen/EditorFrame` has two `grabAsync` overloads and the second is not the first with a flag: an
   editor samples the target *as it is*, while a capture raises the window first so what it saves is what is
-  on screen (at whatever size it is — the matcher rescales against each picture's sidecar). A blank per-window
+  on screen (at whatever size it is — a picture records where it was cut on its constant, `.at(Rect)` and `.in(Size)` when the frame
+  is not the bot's screen size, and the matcher rescales against that). A blank per-window
   grab on Wayland falls through to a desktop capture cropped to the window. `EditorFrame.Failure` tells *no
   target* from *the grab came back blank*, because they send a user to two different places.
 - **The whole desktop is read through shared's `ScreenCapture`**, the grab a bot uses too (Robot, or under

@@ -94,8 +94,7 @@ class TemplateUsesTest {
 
     @Test
     void aConstantWhoseFileIsGoneIsMissingEvenWithNoTag(@TempDir Path resources) throws IOException {
-        TemplateLibrary.saveTemplate(resources, new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB), "ore", 0, 0,
-                null);
+        TemplateLibrary.saveTemplate(resources, new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB), "ore");
         Host host = new Host("ORE", "GOLD", "ELSEWHERE");
         host.paths.put("ORE", TemplateLibrary.pathForName("ore"));
         host.paths.put("GOLD", TemplateLibrary.pathForName("gold"));

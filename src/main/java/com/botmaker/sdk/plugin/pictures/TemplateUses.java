@@ -1,6 +1,8 @@
 package com.botmaker.sdk.plugin.pictures;
 
+import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
@@ -78,6 +80,34 @@ public final class TemplateUses {
     }
 
     /**
+     * Writes {@code Pictures.<NAME>} as cut at {@code cut} — {@code .at(Rect)}, and {@code .in(Size)} when its frame
+     * is not the bot's screen size — declaring it when it has no constant yet. What a capture and a replacement do,
+     * so where a picture came from is in the bot's Java. On the FX thread.
+     *
+     * @return empty when written or when the picture can have no constant; else the host's sentence
+     */
+    public static Optional<String> cut(StudioServices services, String baseName, FrameCut cut) {
+        PluginValues values = services.pluginValues();
+        String constant = TemplateNames.constantFor(baseName);
+        if (constant == null) return Optional.empty();
+        try {
+            if (!SET.contains(values, constant)) {
+                return SET.add(values, constant, ScreenSize.cut(services, picture(baseName), cut));
+            }
+            Optional<ValueContext> ctx = SET.open(values, constant);
+            Optional<ImageTemplate> held = ctx.flatMap(SET::read);
+            if (held.isEmpty()) {
+                return Optional.of("Pictures." + constant + " is written by hand; it was left as it is.");
+            }
+            // Its own path, which the user may have pointed elsewhere: only where it was cut changes.
+            ctx.get().set(ScreenSize.cut(services, new ImageTemplate(held.get().filePath()), cut));
+            return Optional.empty();
+        } catch (RuntimeException refused) {
+            return Optional.of("Pictures." + constant + " was not rewritten: " + refused.getMessage());
+        }
+    }
+
+    /**
      * Renames {@code oldName}'s constant and every use to {@code newName}'s, then points it at the new file.
      * Lossless — the same picture under a new name — so nothing is marked. A picture with no constant yet is
      * declared under the new name instead.
@@ -93,7 +123,10 @@ public final class TemplateUses {
         Optional<String> refused = SET.rename(values, from, to);
         if (refused.isPresent()) return refused;
         return SET.open(values, to).map(value -> {
-            value.set(picture(newName));
+            // Where it was cut stays: the same picture under a new name.
+            ImageTemplate held = SET.read(value).orElse(null);
+            ImageTemplate renamed = picture(newName);
+            value.set(held == null ? renamed : renamed.at(held.place()).in(held.frame()));
             return Optional.<String>empty();
         }).orElse(Optional.of(TemplateNames.CLASS_NAME + "." + to + " was renamed, but its path could not be "
                 + "rewritten."));

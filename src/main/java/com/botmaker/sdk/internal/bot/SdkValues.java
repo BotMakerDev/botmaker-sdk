@@ -12,9 +12,11 @@ import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.Flows;
+import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
 import java.util.List;
@@ -22,12 +24,13 @@ import java.util.List;
 /**
  * The SDK's managed values, each declared once, and what a run does with each one.
  *
- * <p>Eight declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
+ * <p>Nine declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
  * plugin lists {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOW} is the activity
  * flow, {@code FLOW_LAYOUT} where the flow editor draws each card (a run ignores it), {@code CAPTURE} where
- * pixels are read from, {@code SETTINGS} how it clicks and looks, and {@code PICTURES}, {@code ACTIVITIES},
- * {@code POINTS} and {@code REGIONS} the classes of constants the bot grows.
+ * pixels are read from, {@code SETTINGS} how it clicks and looks, {@code SCREEN} the size its pictures were cut
+ * at, and {@code PICTURES}, {@code ACTIVITIES}, {@code POINTS} and {@code REGIONS} the classes of constants the
+ * bot grows.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract
  * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
@@ -106,9 +109,21 @@ public final class SdkValues {
             .because("Regions.java holds the bot's named areas. Ask Claude to save_region an area again, under"
                     + " its name, to move it.");
 
-    /** All eight, in the order the plugin declares them. */
+    /**
+     * The bot's screen size — {@code new Size(1280, 720)}: the frame its pictures were cut from, which a picture
+     * names apart only when it was cut from another ({@code .in(Size)}). Written by the first picture cut while it
+     * is {@code 0×0}, which is no size: pictures are matched as they are, and a private display is made at the
+     * session default.
+     */
+    public static final ManagedValue<Size> SCREEN = ManagedValue.method(SdkValue.Id.SCREEN)
+            .in(HOLDER)
+            .holds(Size.class, new Size(0, 0))
+            .because("This is the size the bot's pictures were cut at. The first picture cut sets it; a private"
+                    + " display is made at it and a game window is resized to it when the bot starts.");
+
+    /** All nine, in the order the plugin declares them. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOW, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            ACTIVITIES, POINTS, REGIONS);
+            ACTIVITIES, POINTS, REGIONS, SCREEN);
 
     private static boolean claimed;
 
@@ -126,6 +141,7 @@ public final class SdkValues {
         ManagedValues.claim(FLOW, Flows::use);
         ManagedValues.claim(CAPTURE, Source::set);
         ManagedValues.claim(SETTINGS, BotSettings::use);
+        ManagedValues.claim(SCREEN, BotScreen::use);
         // Where the flow editor's cards sit: the editor's, and nothing at runtime reads it. Claimed so a run
         // does not report it as a value nobody takes.
         ManagedValues.claim(FLOW_LAYOUT, layout -> { });

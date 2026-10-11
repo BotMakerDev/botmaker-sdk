@@ -30,7 +30,7 @@ class PictureAtTest {
     @Test
     void aClickOnAPictureNamesItAndDeclaresItsConstant(@TempDir Path resources) throws IOException {
         BufferedImage button = noise(24, 24, 7);
-        TemplateLibrary.saveTemplate(resources, button, "collect", FRAME, FRAME, null);
+        TemplateLibrary.saveTemplate(resources, button, "collect");
         Services services = new Services(resources);
 
         Optional<ImageTemplate> found = PictureAt.find(services, new RecordedValue.Spot(60, 70, frameWith(button)));
@@ -42,7 +42,7 @@ class PictureAtTest {
     @Test
     void aClickBesideEveryPictureNamesNone(@TempDir Path resources) throws IOException {
         BufferedImage button = noise(24, 24, 7);
-        TemplateLibrary.saveTemplate(resources, button, "collect", FRAME, FRAME, null);
+        TemplateLibrary.saveTemplate(resources, button, "collect");
         Services services = new Services(resources);
 
         assertTrue(PictureAt.find(services, new RecordedValue.Spot(150, 150, frameWith(button))).isEmpty());

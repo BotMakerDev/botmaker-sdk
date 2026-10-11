@@ -19,6 +19,8 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
@@ -71,9 +73,9 @@ class SdkAssistTest {
         Frames.forget();
         host = new Host(resources);
         agent = new Agent(host);
-        TemplateLibrary.saveTemplate(resources, patch(), "ore", WATCHED.width(), WATCHED.height(), null);
+        TemplateLibrary.saveTemplate(resources, patch(), "ore");
         host.set("pictures").put("ORE", TestContexts.row(Object.class, "").withValue(
-                new com.botmaker.sdk.api.vision.ImageTemplate(TemplateLibrary.pathForName("ore"))));
+                new ImageTemplate(TemplateLibrary.pathForName("ore"))));
     }
 
     @AfterEach
@@ -132,7 +134,7 @@ class SdkAssistTest {
 
     @Test
     void whichScreenScoresEveryPictureOnOneFrame() throws IOException {
-        TemplateLibrary.saveTemplate(resources, noise(SIZE, SIZE, 3), "elsewhere", 0, 0, null);
+        TemplateLibrary.saveTemplate(resources, noise(SIZE, SIZE, 3), "elsewhere");
         agent.frame = withPatchAt(120, 80);
         String said = text(run("which_screen"));
         assertTrue(said.startsWith("1 on screen"), said);
@@ -200,6 +202,36 @@ class SdkAssistTest {
     }
 
     @Test
+    void theFirstCutSetsTheBotsScreenAndALaterOneFromAnotherFrameNamesItsOwn() {
+        host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(0, 0)));
+        agent.frame = withPatchAt(120, 80);
+        run("screenshot");
+        run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE);
+        assertEquals(new Size(WATCHED.width(), WATCHED.height()), host.values.get("screen").value(),
+                "the first picture's frame is the bot's size");
+        assertEquals(new ImageTemplate(TemplateLibrary.pathForName("gold")).at(new Rect(120, 80, SIZE, SIZE)),
+                host.set("pictures").get("GOLD").value(), "cut at the bot's size: no .in");
+
+        agent.frame = noise(800, 600, 5);
+        run("screenshot");
+        run("crop_picture", "name", "iron", "x", 0, "y", 0, "width", SIZE, "height", SIZE);
+        assertEquals(new ImageTemplate(TemplateLibrary.pathForName("iron")).at(new Rect(0, 0, SIZE, SIZE))
+                .in(new Size(800, 600)), host.set("pictures").get("IRON").value());
+        assertEquals(new Size(WATCHED.width(), WATCHED.height()), host.values.get("screen").value(), "kept");
+    }
+
+    @Test
+    void aReplacementRewritesWhereThePictureWasCut() {
+        host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(800, 600)));
+        agent.frame = withPatchAt(120, 80);
+        run("screenshot");
+        assertFalse(run("replace_picture", "picture", "ore", "x", 120, "y", 80, "width", SIZE, "height", SIZE)
+                .isRefused());
+        assertEquals(new ImageTemplate(TemplateLibrary.pathForName("ore")).at(new Rect(120, 80, SIZE, SIZE))
+                .in(new Size(WATCHED.width(), WATCHED.height())), host.set("pictures").get("ORE").value());
+    }
+
+    @Test
     void aPictureIsShownWithItsConstantAndUses() {
         assertEquals("ore: 48×48, Pictures.ORE, unused.", text(run("show_picture", "picture", "ore")));
         host.uses.put("ORE", List.of(new PluginValues.Use(Path.of("/bot/Collect.java"), 4, "click(Pictures.ORE);")));
@@ -208,7 +240,11 @@ class SdkAssistTest {
 
     @Test
     void aRenameMovesTheFileAndTheConstant() {
+        host.set("pictures").get("ORE").set(new ImageTemplate(TemplateLibrary.pathForName("ore"))
+                .at(new Rect(1, 2, 3, 4)).in(new Size(800, 600)));
         assertEquals("Renamed ore to iron.", text(run("rename_picture", "picture", "ore", "to", "iron")));
+        assertEquals(new ImageTemplate(TemplateLibrary.pathForName("iron")).at(new Rect(1, 2, 3, 4))
+                .in(new Size(800, 600)), host.set("pictures").get("IRON").value(), "where it was cut stays");
         assertTrue(TemplateLibrary.exists(resources, "iron"));
         assertFalse(TemplateLibrary.exists(resources, "ore"));
         assertEquals(List.of("rename pictures ORE IRON"), host.calls);
@@ -216,7 +252,7 @@ class SdkAssistTest {
 
     @Test
     void aPictureInUseIsDeletedOnlyAfterItsUsesMove() throws IOException {
-        TemplateLibrary.saveTemplate(resources, patch(), "gold", 0, 0, null);
+        TemplateLibrary.saveTemplate(resources, patch(), "gold");
         host.uses.put("ORE", List.of(new PluginValues.Use(Path.of("/bot/Collect.java"), 4, "click(Pictures.ORE);")));
 
         AgentReply refused = run("delete_picture", "picture", "ore");
@@ -234,6 +270,7 @@ class SdkAssistTest {
 
     @Test
     void aReplacementKeepsTheNameAndTakesTheNewImage() throws IOException {
+        host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(WATCHED.width(), WATCHED.height())));
         agent.frame = withPatchAt(120, 80);
         run("screenshot");
         AgentReply replaced = run("replace_picture", "picture", "ore", "x", 0, "y", 0, "width", 30, "height", 20);
@@ -241,7 +278,9 @@ class SdkAssistTest {
         BufferedImage now = ImageIO.read(TemplateLibrary.fileForName(resources, "ore").toFile());
         assertEquals(30, now.getWidth());
         assertEquals(20, now.getHeight());
-        assertTrue(host.calls.isEmpty(), "the Java is untouched: " + host.calls);
+        assertEquals(new ImageTemplate(TemplateLibrary.pathForName("ore")).at(new Rect(0, 0, 30, 20)),
+                host.set("pictures").get("ORE").value(), "its constant says where the new image was cut");
+        assertTrue(host.calls.stream().noneMatch(c -> c.contains("pictures")), "nothing renamed: " + host.calls);
     }
 
     @Test

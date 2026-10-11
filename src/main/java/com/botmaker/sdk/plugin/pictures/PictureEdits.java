@@ -91,19 +91,18 @@ public final class PictureEdits {
 
     /**
      * Gives the picture {@code name} a new image, keeping its name, its tags and every use: the blocks that look
-     * for it look for the new one.
-     *
-     * @param frameWidth the width of the frame it was cut from, for the resolution sidecar
+     * for it look for the new one. Its constant is rewritten as cut at {@code cut}.
      */
-    public static Done replace(StudioServices services, String name, BufferedImage picture, int frameWidth,
-                               int frameHeight) {
+    public static Done replace(StudioServices services, String name, BufferedImage picture, FrameCut cut) {
         Path file = TemplateLibrary.fileForName(services.resourcesDir(), name);
         if (TemplateLibrary.isDefaultTemplate(file)) return Done.refused("The default picture cannot be replaced.");
         try {
-            TemplateLibrary.replaceImage(file, picture, frameWidth, frameHeight, null);
+            TemplateLibrary.replaceImage(file, picture);
         } catch (IOException e) {
             return Done.refused("Failed to replace " + name + ": " + e.getMessage());
         }
-        return Done.ok("Replaced the image of " + name + "; every block that uses it now looks for the new one.");
+        String note = TemplateUses.cut(services, name, cut).map(n -> " " + n).orElse("");
+        return Done.ok("Replaced the image of " + name + "; every block that uses it now looks for the new one."
+                + note);
     }
 }

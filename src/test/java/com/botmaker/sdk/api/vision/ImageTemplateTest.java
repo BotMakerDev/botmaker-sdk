@@ -1,8 +1,12 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.internal.vision.BotScreen;
 import org.junit.jupiter.api.Test;
 import org.opencv.core.Mat;
 
+import java.awt.Dimension;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -26,6 +30,32 @@ class ImageTemplateTest {
     void derivesIdFromFileName() {
         assertEquals("default_template", new ImageTemplate("images/default_template.png").id());
         assertEquals("btn", new ImageTemplate("btn").id()); // no extension
+    }
+
+    @Test
+    void whereItWasCutIsPartOfTheValue() {
+        ImageTemplate plain = new ImageTemplate("images/ok.png");
+        ImageTemplate cut = plain.at(new Rect(10, 20, 30, 40)).in(new Size(1920, 1080));
+        assertEquals(new Rect(10, 20, 30, 40), cut.place());
+        assertEquals(new Size(1920, 1080), cut.frame());
+        assertEquals("ok", cut.id());
+        assertEquals(cut, new ImageTemplate("images/ok.png").in(new Size(1920, 1080)).at(new Rect(10, 20, 30, 40)));
+        assertNotEquals(plain, cut);
+        assertEquals(plain, plain.at(new Rect(0, 0, 0, 0)).in(new Size(0, 0)), "an empty place or frame is none");
+    }
+
+    @Test
+    void itsAuthoredSizeIsItsOwnFrameElseTheBotsScreenElseNone() {
+        try {
+            BotScreen.use(null);
+            assertNull(new ImageTemplate("images/ok.png").authoredSize());
+            BotScreen.use(new Size(1280, 720));
+            assertEquals(new Dimension(1280, 720), new ImageTemplate("images/ok.png").authoredSize());
+            assertEquals(new Dimension(1920, 1080),
+                    new ImageTemplate("images/ok.png").in(new Size(1920, 1080)).authoredSize());
+        } finally {
+            BotScreen.use(null);
+        }
     }
 
     @Test

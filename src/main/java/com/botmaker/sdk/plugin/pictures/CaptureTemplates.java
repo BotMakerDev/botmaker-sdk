@@ -4,9 +4,9 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.plugin.pictures.TemplateNaming.NamedCapture;
 import com.botmaker.sdk.plugin.pictures.TemplateNaming.NamedTemplate;
-import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureSurface;
 import com.botmaker.sdk.plugin.screen.CaptureSurface.Region;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
@@ -34,6 +34,7 @@ import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -196,10 +197,10 @@ public final class CaptureTemplates {
         new CaptureTemplates(services, owner, target, suggestedTag, done).start();
     }
 
-    /** What {@link #recapture} hands back: the new picture, the frame it was cut from, and that frame's window. */
+    /** What {@link #recapture} hands back: the new picture, and where in which frame it was cut. */
     @FunctionalInterface
     public interface Recaptured {
-        void accept(BufferedImage picture, int frameWidth, int frameHeight, String windowTitle);
+        void accept(BufferedImage picture, FrameCut cut);
     }
 
     /**
@@ -223,12 +224,12 @@ public final class CaptureTemplates {
             surface.hide();
             grabAfterHiding(fresh -> {
                 dropSurface();
-                BufferedImage cropped = crop(fresh.image(), region);
+                PictureCuts.Piece cropped = crop(fresh.image(), region);
                 if (cropped == null) {
                     onCancelled.run();
                     return;
                 }
-                onCaptured.accept(cropped, fresh.image().getWidth(), fresh.image().getHeight(), windowTitle());
+                onCaptured.accept(cropped.image(), cutIn(fresh.image(), cropped));
             }, failed);
         }, () -> {
             dropSurface();
@@ -320,8 +321,8 @@ public final class CaptureTemplates {
      * {@code "▧ 1600×900"} — the size, in the frame's own pixels, of what is being captured: the size a saved
      * picture records as authored.
      *
-     * <p>There is no project-wide reference size to compare it with: each picture records the size it was
-     * authored at in its own sidecar and the matcher rescales against that.
+     * <p>The first picture cut sets the bot's screen size ({@code Sdk.screen()}); a picture cut from a frame of
+     * another size is written with {@code .in(Size)} and the matcher rescales against that.
      */
     private void showSize(EditorFrame frame) {
         size.setText("▧ " + frame.image().getWidth() + "×" + frame.image().getHeight());
@@ -339,12 +340,12 @@ public final class CaptureTemplates {
         surface.hide();
         grabAfterHiding(frame -> {
             try {
-                BufferedImage cropped = crop(frame.image(), region);
+                PictureCuts.Piece cropped = crop(frame.image(), region);
                 if (cropped == null) return;
                 Optional<NamedCapture> named =
-                        TemplateNaming.promptNew(services, null, cropped, suggestedTag);
+                        TemplateNaming.promptNew(services, null, cropped.image(), suggestedTag);
                 if (named.isEmpty()) return;
-                save(cropped, named.get().name(), frame.image().getWidth(), frame.image().getHeight());
+                save(cropped.image(), named.get().name(), cutIn(frame.image(), cropped));
                 TemplateLibrary.applyTags(services, Map.of(named.get().name(), named.get().tags()));
             } catch (Exception failed) {
                 warn("Failed to save the picture: " + failed.getMessage());
@@ -371,16 +372,22 @@ public final class CaptureTemplates {
         grabAfterHiding(frame -> {
             try {
                 List<BufferedImage> crops = new ArrayList<>();
+                // By identity: the naming window hands each picture back as the same image it was given.
+                Map<BufferedImage, PictureCuts.Piece> pieces = new IdentityHashMap<>();
                 for (Region region : regions) {
-                    BufferedImage cropped = crop(frame.image(), region);
-                    if (cropped != null) crops.add(cropped);
+                    PictureCuts.Piece cropped = crop(frame.image(), region);
+                    if (cropped == null) continue;
+                    crops.add(cropped.image());
+                    pieces.put(cropped.image(), cropped);
                 }
                 if (crops.isEmpty()) return;
                 TemplateNaming.Batch batch = TemplateNaming.showBatch(services, null, crops, suggestedTag);
                 List<String> written = new ArrayList<>();
                 for (NamedTemplate template : batch.templates()) {
-                    save(template.image(), template.name(),
-                            frame.image().getWidth(), frame.image().getHeight());
+                    PictureCuts.Piece piece = pieces.get(template.image());
+                    save(template.image(), template.name(), piece == null
+                            ? FrameCut.of(frame.image().getWidth(), frame.image().getHeight(), null)
+                            : cutIn(frame.image(), piece));
                     written.add(template.name());
                 }
                 TemplateLibrary.applyTags(services, batch.tagsFor(written));
@@ -397,15 +404,15 @@ public final class CaptureTemplates {
     private void beginObject() {
         toolbarStage.hide();
         grab(frame -> {
-            // The sidecar's capture resolution is the whole frame the object was cut from — that is what the
-            // bot rescales against — and not the cut-out's own size.
+            // The picture's frame is the whole one the object was cut from — that is what the bot rescales
+            // against — and not the cut-out's own size.
             objectFrameWidth = frame.image().getWidth();
             objectFrameHeight = frame.image().getHeight();
             objectSurface = ObjectCaptureSurface.open(frame, this::onObjectExtracted, this::endSession);
         }, this::failSession);
     }
 
-    /** The full frame the in-progress object cut was taken from, for its resolution sidecar. */
+    /** The full frame the in-progress object cut was taken from, for its constant's frame. */
     private int objectFrameWidth;
     private int objectFrameHeight;
 
@@ -414,7 +421,7 @@ public final class CaptureTemplates {
         try {
             Optional<NamedCapture> named = TemplateNaming.promptNew(services, null, cut, suggestedTag);
             if (named.isEmpty()) return;
-            save(cut, named.get().name(), objectFrameWidth, objectFrameHeight);
+            save(cut, named.get().name(), FrameCut.of(objectFrameWidth, objectFrameHeight, null));
             TemplateLibrary.applyTags(services, Map.of(named.get().name(), named.get().tags()));
         } catch (Exception failed) {
             warn("Failed to save the object: " + failed.getMessage());
@@ -490,23 +497,23 @@ public final class CaptureTemplates {
     }
 
     /**
-     * Writes the picture and declares its {@code Pictures} constant when it has none, so a block that picks it
-     * reads {@code Pictures.ORE} rather than the path. A constant the host would not add is reported, never
-     * fatal: the picture is saved either way.
+     * Writes the picture and its {@code Pictures} constant, cut at {@code cut}, so a block that picks it reads
+     * {@code Pictures.ORE} rather than the path. A constant the host would not write is reported, never fatal:
+     * the picture is saved either way.
      */
-    private void save(BufferedImage picture, String name, int frameWidth, int frameHeight) throws Exception {
-        TemplateLibrary.saveTemplate(resources(), picture, name, frameWidth, frameHeight, windowTitle());
+    private void save(BufferedImage picture, String name, FrameCut cut) throws Exception {
+        TemplateLibrary.saveTemplate(resources(), picture, name);
         saved.add(name);
-        TemplateUses.declare(services.pluginValues(), name).ifPresent(services::status);
+        TemplateUses.cut(services, name, cut).ifPresent(services::status);
+    }
+
+    /** {@code piece}, cut out of {@code frame}. */
+    private static FrameCut cutIn(BufferedImage frame, PictureCuts.Piece piece) {
+        return FrameCut.of(frame.getWidth(), frame.getHeight(), piece.place());
     }
 
     private Path resources() {
         return services.resourcesDir();
-    }
-
-    /** The window title saved beside a picture, or {@code null} for a screen, desktop or emulator source. */
-    private String windowTitle() {
-        return CaptureLabels.windowTitle(target != null ? target : EditorFrame.defaultSource(services));
     }
 
     /**
@@ -514,7 +521,7 @@ public final class CaptureTemplates {
      * A rectangle region is a plain subimage; an ellipse region is cropped to its bounding box and masked to
      * the inscribed oval, transparent outside it.
      */
-    private static BufferedImage crop(BufferedImage full, Region r) {
+    private static PictureCuts.Piece crop(BufferedImage full, Region r) {
         if (r.paneW() <= 0 || r.paneH() <= 0) return null;
         double scaleX = full.getWidth() / r.paneW();
         double scaleY = full.getHeight() / r.paneH();
@@ -527,7 +534,7 @@ public final class CaptureTemplates {
         w = Math.max(1, Math.min(w, full.getWidth() - x));
         h = Math.max(1, Math.min(h, full.getHeight() - y));
         BufferedImage sub = full.getSubimage(x, y, w, h);
-        return r.shape() == CaptureSurface.Shape.ELLIPSE ? oval(sub) : sub;
+        return new PictureCuts.Piece(r.shape() == CaptureSurface.Shape.ELLIPSE ? oval(sub) : sub, new Rect(x, y, w, h));
     }
 
     /**

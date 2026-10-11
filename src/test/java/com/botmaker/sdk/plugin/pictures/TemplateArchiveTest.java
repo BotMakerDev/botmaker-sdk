@@ -6,7 +6,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +32,6 @@ class TemplateArchiveTest {
         assertEquals(Set.of("Loot"), Set.copyOf(manifest.customTags()), "declared, so it is not inert");
         assertEquals(List.of("ore"), manifest.byTag(List.of("ore"), TagCatalog.of(List.of(), manifest.customTags()))
                 .get("Loot"));
-        assertTrue(Files.isRegularFile(TemplateLibrary.sidecarFor(TemplateLibrary.fileForName(to, "ore"))),
-                "the resolution sidecar travels with its picture");
     }
 
     @Test
@@ -71,6 +68,6 @@ class TemplateArchiveTest {
     private static void save(Path resources, String name, Color colour) throws IOException {
         BufferedImage image = new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++) image.setRGB(x, y, colour.getRGB());
-        TemplateLibrary.saveTemplate(resources, image, name, 0, 0, null);
+        TemplateLibrary.saveTemplate(resources, image, name);
     }
 }

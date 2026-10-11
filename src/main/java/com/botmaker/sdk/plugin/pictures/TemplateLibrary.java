@@ -4,7 +4,6 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -16,7 +15,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -55,19 +53,6 @@ public final class TemplateLibrary {
     public static Path imagesDir(Path resourcesDir) {
         return resourcesDir.resolve("images");
     }
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    /**
-     * The resolution metadata written alongside every captured template as a {@code <name>.json} sidecar.
-     * {@code width}/{@code height} are the template's own pixel size; {@code captureWidth}/{@code
-     * captureHeight} are the resolution (physical pixels) of the capture source (window/screen) the template
-     * was authored against — the SDK reads these to rescale the template when the target runs at a different
-     * resolution (see {@code ImageTemplate.captureResolution()}). {@code captureWidth}/{@code captureHeight}
-     * of {@code 0} mean "unknown" (the SDK then falls back to the project-wide default resolution).
-     */
-    public record TemplateMetadata(int width, int height, int captureWidth, int captureHeight,
-                                   String target, String createdAt) {}
 
     /**
      * File name of the built-in default template.
@@ -180,9 +165,8 @@ public final class TemplateLibrary {
 
     /**
      * Whether {@code baseName} would collide with a file the library owns rather than a template — today the
-     * one name whose {@code <name>.json} sidecar <em>is</em> {@link TemplateManifest#FILE_NAME}. Checked by
-     * every naming path alongside {@link #exists}: saving a template called "templates" would otherwise
-     * overwrite the tag manifest with a resolution sidecar.
+     * one name whose {@code <name>.json} <em>is</em> {@link TemplateManifest#FILE_NAME}. Checked by every naming
+     * path alongside {@link #exists}, so a picture's name never reads as the tag manifest's.
      */
     public static boolean isReservedName(String baseName) {
         return baseName != null && TemplateManifest.FILE_NAME.equalsIgnoreCase(baseName + ".json");
@@ -239,11 +223,6 @@ public final class TemplateLibrary {
         return dot < 0 ? name : name.substring(0, dot);
     }
 
-    /** The metadata sidecar ({@code <name>.json}) that lives next to a template PNG. */
-    public static Path sidecarFor(Path templateFile) {
-        return templateFile.resolveSibling(baseName(templateFile) + ".json");
-    }
-
     /**
      * Whether a template PNG named {@code baseName} already exists (case-insensitive) — used to block
      * duplicate names so a new capture never silently overwrites an existing template.
@@ -261,41 +240,30 @@ public final class TemplateLibrary {
     }
 
     /**
-     * Saves {@code img} as {@code <imagesRoot>/<baseName>.png} plus a {@code <baseName>.json} resolution
-     * sidecar, and returns the template's project-root-relative path (the string for
-     * {@code new ImageTemplate("…")}). {@code captureWidth}/{@code captureHeight} are the capture source's
-     * physical resolution (pass {@code 0} when unknown); {@code targetTitle} may be {@code null}.
-     * {@code baseName} must already be sanitized. Does not check for an existing file — callers gate that
-     * via {@link #exists}.
+     * Saves {@code img} as {@code <imagesRoot>/<baseName>.png} and returns the template's project-root-relative
+     * path (the string for {@code new ImageTemplate("…")}). Where it was cut is written on its constant, not
+     * beside it ({@link TemplateUses#cut}). {@code baseName} must already be sanitized. Does not check for an
+     * existing file — callers gate that via {@link #exists}.
      */
-    public static String saveTemplate(Path resourcesDir, BufferedImage img, String baseName,
-                                      int captureWidth, int captureHeight, String targetTitle) throws IOException {
+    public static String saveTemplate(Path resourcesDir, BufferedImage img, String baseName) throws IOException {
         Path png = imagesDir(resourcesDir).resolve(baseName + ".png");
         Files.createDirectories(png.getParent());
         ImageIO.write(img, "png", png.toFile());
-        TemplateMetadata meta = new TemplateMetadata(img.getWidth(), img.getHeight(),
-                Math.max(0, captureWidth), Math.max(0, captureHeight), targetTitle, Instant.now().toString());
-        MAPPER.writerWithDefaultPrettyPrinter().writeValue(sidecarFor(png).toFile(), meta);
         return pathFor(png);
     }
 
     /**
      * Overwrites an existing template's picture, keeping its name, its tags and every block that references
-     * it. The resolution sidecar is rewritten too — a replacement is usually recaptured against a different
-     * window size, and a stale {@code captureWidth} would have the SDK rescale the new picture by the old
-     * picture's ratio.
+     * it. Its constant is rewritten by the caller ({@link TemplateUses#cut}): a replacement is usually cut from
+     * another frame, and a stale {@code .in(Size)} would have the SDK rescale the new picture by the old one's.
      *
      * <p>Separate from {@link #saveTemplate} even though the file write is the same, because the two answer
      * different questions: saving refuses an existing name (that would be a silent overwrite), replacing
      * requires one.
      */
-    public static void replaceImage(Path templateFile, BufferedImage img,
-                                    int captureWidth, int captureHeight, String targetTitle) throws IOException {
+    public static void replaceImage(Path templateFile, BufferedImage img) throws IOException {
         Files.createDirectories(templateFile.getParent());
         ImageIO.write(img, "png", templateFile.toFile());
-        TemplateMetadata meta = new TemplateMetadata(img.getWidth(), img.getHeight(),
-                Math.max(0, captureWidth), Math.max(0, captureHeight), targetTitle, Instant.now().toString());
-        MAPPER.writerWithDefaultPrettyPrinter().writeValue(sidecarFor(templateFile).toFile(), meta);
     }
 
     // ── Tags ────────────────────────────────────────────────────────────────────────────────────────────
@@ -406,24 +374,19 @@ public final class TemplateLibrary {
     }
 
     /**
-     * Renames a template: the PNG, its resolution sidecar and its tags, in that order. Single entry point
-     * because the three used to be moved by the caller and the tags weren't moved at all — the manifest is
-     * keyed by base name, so a rename that skips it silently untags the template.
+     * Renames a template: the PNG and its tags, in that order. Single entry point because the two used to be
+     * moved by the caller and the tags weren't moved at all — the manifest is keyed by base name, so a rename
+     * that skips it silently untags the template.
      */
     public static void renameTemplate(Path resourcesDir, Path file, String newBaseName) throws IOException {
         Path target = imagesDir(resourcesDir).resolve(newBaseName + ".png");
         Files.move(file, target, StandardCopyOption.REPLACE_EXISTING);
-        Path oldSidecar = sidecarFor(file);
-        if (Files.exists(oldSidecar)) {
-            Files.move(oldSidecar, sidecarFor(target), StandardCopyOption.REPLACE_EXISTING);
-        }
         saveManifest(resourcesDir, manifest(resourcesDir).renamed(baseName(file), newBaseName));
     }
 
-    /** Deletes a template: the PNG, its resolution sidecar and its manifest entry. */
+    /** Deletes a template: the PNG and its manifest entry. */
     public static void deleteTemplate(Path resourcesDir, Path file) throws IOException {
         Files.deleteIfExists(file);
-        Files.deleteIfExists(sidecarFor(file));
         saveManifest(resourcesDir, manifest(resourcesDir).without(baseName(file)));
     }
 

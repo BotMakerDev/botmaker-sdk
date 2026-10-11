@@ -86,7 +86,9 @@ public final class SdkTypes {
             .fresh(SdkTypes::placeholder)
             .editor(() -> TemplateEditors::template)
             .preview(() -> TemplateEditors::preview)
-            .writtenAs(ImageTemplate::new, ImageTemplate::filePath);
+            .writtenAs(ImageTemplate::new, ImageTemplate::filePath)
+            .with(ImageTemplate::at, ImageTemplate::place)
+            .with(ImageTemplate::in, ImageTemplate::frame);
 
     /**
      * How exact a pixel match has to be.

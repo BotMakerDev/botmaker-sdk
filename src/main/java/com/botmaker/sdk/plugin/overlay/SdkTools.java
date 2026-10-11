@@ -62,12 +62,11 @@ public final class SdkTools {
         Optional<BufferedImage> frame = context.frame();
         if (frame.isEmpty()) return "The watched screen cannot be captured.";
         Area at = context.watchedArea().orElse(null);
-        Optional<BufferedImage> picture = PictureCuts.crop(frame.get(), at, region);
+        Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), at, region);
         if (picture.isEmpty()) return "That box is outside the watched screen.";
         PictureCuts.Cut saved;
         try {
-            saved = PictureCuts.save(context.services(), picture.get(), typed, frame.get().getWidth(),
-                    frame.get().getHeight(), null);
+            saved = PictureCuts.save(context.services(), picture.get(), typed, frame.get());
         } catch (RuntimeException e) {
             return e.getMessage();
         }

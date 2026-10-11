@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteLabel;
 import com.botmaker.plugin.api.palette.Untraced;
+import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.bot.SdkValues;
@@ -13,6 +14,7 @@ import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.Flows;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.observe.IpcObserver;
+import com.botmaker.sdk.internal.vision.BotScreen;
 
 import java.util.function.Consumer;
 
@@ -165,6 +167,8 @@ public class Bot {
                 Target.waitForLaunch(BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
             }
         }
+        // The game is up: a window of another size than the pictures were cut at is resized, else the trace says.
+        BotScreen.fit(Source.current());
     }
 
     /**

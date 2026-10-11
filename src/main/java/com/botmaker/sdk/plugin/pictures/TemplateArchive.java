@@ -17,14 +17,13 @@ import java.util.zip.ZipOutputStream;
  * Import/export of image templates on their own — a {@code .bmtemplates} zip — so a set of templates can move
  * between projects without carrying a whole bot with it.
  *
- * <p>Smaller than a published project: the PNGs, their resolution sidecars (the SDK reads those to rescale a template at a different
- * resolution — an export without them would import templates that mis-scale) and a slice of the tag manifest
- * covering exactly the exported names.
+ * <p>Smaller than a published project: the PNGs and a slice of the tag manifest covering exactly the exported
+ * names. Where a picture was cut is its constant's ({@code .at}, {@code .in}), which stays in the bot it came
+ * from: an imported picture is declared plain, and is matched at the bot's screen size.
  *
  * <p>Layout inside the zip mirrors the images root, one level down, so the file is legible in any zip tool:
  * <pre>
  *   images/accept.png
- *   images/accept.json
  *   templates.json
  * </pre>
  *
@@ -94,7 +93,7 @@ public final class TemplateArchive {
     }
 
     /**
-     * Writes {@code templates} (PNG paths from the project's images root) plus their sidecars and tags to
+     * Writes {@code templates} (PNG paths from the project's images root) plus their tags to
      * {@code destination}.
      */
     public static void export(Path resourcesDir, Collection<Path> templates, Path destination)
@@ -105,10 +104,6 @@ public final class TemplateArchive {
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(destination))) {
             for (Path png : templates) {
                 writeEntry(zip, IMAGES_PREFIX + png.getFileName(), Files.readAllBytes(png));
-                Path sidecar = TemplateLibrary.sidecarFor(png);
-                if (Files.isRegularFile(sidecar)) {
-                    writeEntry(zip, IMAGES_PREFIX + sidecar.getFileName(), Files.readAllBytes(sidecar));
-                }
             }
             // The manifest is written through the same writer the project uses, via a scratch directory, so
             // an exported manifest and a project one can never be two different shapes.
@@ -154,7 +149,7 @@ public final class TemplateArchive {
 
         for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
             String fileName = entry.getKey();
-            if (!fileName.toLowerCase().endsWith(".png")) continue; // sidecars are pulled in with their PNG
+            if (!fileName.toLowerCase().endsWith(".png")) continue;
             String source = fileName.substring(0, fileName.length() - ".png".length());
             String sanitized = TemplateLibrary.sanitizeName(source);
             if (sanitized.isBlank() || TemplateLibrary.isReservedName(sanitized)) {
@@ -174,8 +169,6 @@ public final class TemplateArchive {
                 continue;
             }
             Files.write(imagesRoot.resolve(target + ".png"), entry.getValue());
-            byte[] sidecar = entries.get(source + ".json");
-            if (sidecar != null) Files.write(imagesRoot.resolve(target + ".json"), sidecar);
 
             merged = merged.withTags(target, incoming.tagsOf(source));
             imported.add(target);

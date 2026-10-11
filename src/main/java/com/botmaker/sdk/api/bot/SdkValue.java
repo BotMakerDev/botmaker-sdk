@@ -57,6 +57,11 @@ public @interface SdkValue {
         /** Named spots — a class of {@code Point} constants. */
         POINTS,
         /** Named areas — a class of {@code Rect} constants. */
-        REGIONS
+        REGIONS,
+        /**
+         * The bot's screen size: the frame its pictures were cut from, which its private display is made and its
+         * game window is sized to — a {@code Size} method.
+         */
+        SCREEN
     }
 }

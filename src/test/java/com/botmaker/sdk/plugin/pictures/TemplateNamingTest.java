@@ -34,7 +34,6 @@ class TemplateNamingTest {
     }
 
     private static void save(Path resources, String name) throws IOException {
-        TemplateLibrary.saveTemplate(resources, new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB), name, 0, 0,
-                null);
+        TemplateLibrary.saveTemplate(resources, new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB), name);
     }
 }

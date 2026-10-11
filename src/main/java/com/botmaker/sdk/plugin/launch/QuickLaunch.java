@@ -11,6 +11,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
+import com.botmaker.sdk.plugin.pictures.ScreenSize;
 import com.botmaker.sdk.plugin.settings.BackendInstallPrompt;
 import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
@@ -21,7 +22,6 @@ import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
 
-import java.awt.Dimension;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -203,16 +203,14 @@ public final class QuickLaunch {
             return;
         }
         Path resourcesDir = services.resourcesDir();
-        // The session is created at the project's standard resolution, not a fixed 1280x720: gamescope's -w/-h
-        // *is* the screen the game inside sees, so a hardcoded size caps the game's own resolution options at
-        // that size whatever the project is authored at — and makes the capture a scaled copy of what the
-        // pictures were made from.
-        // The authored size is gone and it was never there: capture.width / capture.height were read here
-        // and written by nothing in any module, so this took the launcher's own default on every call.
+        // The session is made at the bot's screen size, not a fixed 1280x720: gamescope's -w/-h *is* the screen
+        // the game inside sees, so another size caps the game's own resolution options at it — and makes the
+        // capture a scaled copy of what the pictures were cut from.
+        SessionBackends.DisplaySize size = ScreenSize.display(services);
         BackgroundLauncher.forProject(resourcesDir).start(
                 backend, spec,
-                BackgroundLauncher.DEFAULT_WIDTH,
-                BackgroundLauncher.DEFAULT_HEIGHT,
+                size.width(),
+                size.height(),
                 // The hop is the caller's: BackgroundLauncher lives in botmaker-session, which has no JavaFX,
                 // so the outcome arrives on whichever thread produced it and this one touches a button.
                 (ok, message) -> Platform.runLater(() -> {

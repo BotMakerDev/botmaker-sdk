@@ -137,8 +137,8 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
      * project at it is a separate, explicit action ({@link CaptureValue#point}). A button that takes a
      * picture must not silently re-point the bot.
      *
-     * <p>The window is captured at whatever size it is: the matcher rescales against each picture's own
-     * sidecar, so there is no canonical size to snap to.
+     * <p>The window is captured at whatever size it is: a picture cut from it records that size on its
+     * constant ({@code .in(Size)}) when it is not the bot's, and the matcher rescales against it.
      */
     public static void grabAsync(StudioServices services, CaptureSource source,
                                  Consumer<EditorFrame> onFrame, Consumer<Failure> onFailure) {

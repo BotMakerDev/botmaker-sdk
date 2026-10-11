@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.toolbar.ActionContext.Area;
+import com.botmaker.sdk.api.geometry.Rect;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -14,8 +15,8 @@ import java.util.Optional;
  * This is what the overlay's Picture tab and the assistant's {@code crop_picture} do, without ✂ Capture
  * Templates' window.
  *
- * <p>It is the same save the capture tool makes: the PNG, its resolution sidecar, then
- * {@code Pictures.<NAME>} through {@link TemplateUses#declare}. Links no JavaFX.
+ * <p>It is the same save the capture tool makes: the PNG, then {@code Pictures.<NAME>} written with where it was
+ * cut through {@link TemplateUses#cut}. Links no JavaFX.
  */
 public final class PictureCuts {
 
@@ -25,11 +26,16 @@ public final class PictureCuts {
     public record Cut(String name, String path, Optional<String> note) {
     }
 
+    /** A picture cut out of a frame, and where in that frame. */
+    public record Piece(BufferedImage image, Rect place) {
+    }
+
     /**
      * The part of {@code frame} under {@code region}, both in desktop pixels, with {@code frameArea} being where
-     * the frame sits. Empty when the region misses the frame or has no size.
+     * the frame sits, and the box it took in the frame's own pixels. Empty when the region misses the frame or has
+     * no size.
      */
-    public static Optional<BufferedImage> crop(BufferedImage frame, Area frameArea, Area region) {
+    public static Optional<Piece> crop(BufferedImage frame, Area frameArea, Area region) {
         if (frame == null || region == null || region.width() <= 0 || region.height() <= 0) return Optional.empty();
         int ox = frameArea == null ? 0 : frameArea.x();
         int oy = frameArea == null ? 0 : frameArea.y();
@@ -40,20 +46,16 @@ public final class PictureCuts {
         if (right <= x || bottom <= y) return Optional.empty();
         BufferedImage copy = new BufferedImage(right - x, bottom - y, BufferedImage.TYPE_INT_ARGB);
         copy.getGraphics().drawImage(frame.getSubimage(x, y, right - x, bottom - y), 0, 0, null);
-        return Optional.of(copy);
+        return Optional.of(new Piece(copy, new Rect(x, y, right - x, bottom - y)));
     }
 
     /**
-     * Saves {@code picture} as {@code typed} (sanitised the way every picture name is) and declares its
-     * constant. On the FX thread, since declaring writes the bot's Java.
+     * Saves {@code piece} as {@code typed} (sanitised the way every picture name is) and declares its constant,
+     * cut at its place in {@code frame}. On the FX thread, since declaring writes the bot's Java.
      *
-     * @param frameWidth  the width of the frame it was cut from, for the resolution sidecar; 0 when unknown
-     * @param frameHeight its height
-     * @param title       the window it was cut from, or null
      * @throws IllegalArgumentException with the sentence to show: no name, a name taken or reserved, no project
      */
-    public static Cut save(StudioServices services, BufferedImage picture, String typed, int frameWidth,
-                           int frameHeight, String title) {
+    public static Cut save(StudioServices services, Piece piece, String typed, BufferedImage frame) {
         Path resources = services == null ? null : services.resourcesDir();
         if (resources == null) throw new IllegalArgumentException("No project is open to save a picture into.");
         String name = TemplateLibrary.sanitizeName(typed);
@@ -63,8 +65,9 @@ public final class PictureCuts {
             throw new IllegalArgumentException("A picture called \"" + name + "\" already exists.");
         }
         try {
-            String path = TemplateLibrary.saveTemplate(resources, picture, name, frameWidth, frameHeight, title);
-            return new Cut(name, path, TemplateUses.declare(services.pluginValues(), name));
+            String path = TemplateLibrary.saveTemplate(resources, piece.image(), name);
+            return new Cut(name, path, TemplateUses.cut(services, name,
+                    FrameCut.of(frame.getWidth(), frame.getHeight(), piece.place())));
         } catch (IOException e) {
             throw new UncheckedIOException("Could not save " + name + ".png: " + e.getMessage(), e);
         }

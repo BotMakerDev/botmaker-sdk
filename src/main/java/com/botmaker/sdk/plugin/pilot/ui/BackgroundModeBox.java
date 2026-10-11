@@ -5,6 +5,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.pilot.NestedSessionLauncher;
 import com.botmaker.sdk.plugin.pilot.PilotProject;
+import com.botmaker.sdk.plugin.pictures.ScreenSize;
 import com.botmaker.sdk.plugin.settings.BackendInstallPrompt;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -252,17 +253,11 @@ final class BackgroundModeBox {
     }
 
     /**
-     * The project's reference resolution (what image templates were authored at), or the default when unset —
-     * the nested display is sized to match so captures line up with the templates.
-     *
-     * <p>The fallback itself is {@link SessionBackends#sizeFor}, not a local {@code int[]}, because the answer
-     * has to carry <em>which</em> of the two it is: this method used to resolve the default and hand down bare
-     * numbers, so nothing downstream could tell an authored 1280×720 from an unauthored one, and the status
-     * line could not say why the display is the size it is.
+     * The bot's screen size (what its pictures were cut at), or the default when it names none — the nested
+     * display is made at it so captures line up with the pictures. The answer carries <em>which</em> of the two
+     * it is, so the status line can say why the display is the size it is.
      */
     private static SessionBackends.DisplaySize referenceSize(PilotProject project) {
-        // A project authors no display size, so this is always the backend default; the status line still
-        // says which of the two sizes it is because sizeFor carries that.
-        return SessionBackends.sizeFor(0, 0);
+        return ScreenSize.display(project.services());
     }
 }

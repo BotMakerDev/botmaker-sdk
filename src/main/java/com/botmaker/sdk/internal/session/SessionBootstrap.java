@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.Session;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
+import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.session.launch.LaunchIsolation;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -183,21 +184,16 @@ public final class SessionBootstrap {
             .orElseGet(() -> SessionBackends.preferredBackend(spec));
     }
 
-    /** The nested-display options for {@code spec}: its selected backend at the project (or fallback) resolution. */
+    /** The nested-display options for {@code spec}: its selected backend at the bot's (or the fallback) size. */
     public static SessionOptions options(LaunchSpec spec) {
         SessionBackends.DisplaySize size = size();
         return SessionBackends.optionsFor(spec, backend(spec), size.width(), size.height());
     }
 
-    /**
-     * The nested display size, which is {@link SessionBackends}' own default.
-     *
-     * <p>The shape is kept rather than inlined at the call site, because a display size a bot did choose is
-     * a plausible thing to want — as an {@code @SdkValue} value beside the capture source, so it would have
-     * exactly one author.
-     */
+    /** The nested display size: the bot's screen size ({@code Sdk.screen()}), else {@link SessionBackends}' default. */
     static SessionBackends.DisplaySize size() {
-        return SessionBackends.sizeFor(0, 0);
+        return BotScreen.size().map(s -> SessionBackends.sizeFor(s.width(), s.height()))
+                .orElseGet(() -> SessionBackends.sizeFor(0, 0));
     }
 
     /**
