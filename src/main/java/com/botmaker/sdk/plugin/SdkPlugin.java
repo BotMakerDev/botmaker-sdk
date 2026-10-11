@@ -5,6 +5,8 @@ import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.api.bot.Bot;
+import com.botmaker.plugin.api.source.Conversion;
+import com.botmaker.sdk.internal.bot.SdkConversions;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
@@ -15,6 +17,8 @@ import com.botmaker.sdk.plugin.settings.VmKeeper;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.sdk.plugin.types.PictureAt;
 import com.botmaker.sdk.plugin.types.SdkTypes;
+
+import java.util.List;
 
 /**
  * The BotMaker SDK, as a Studio plugin.
@@ -76,6 +80,12 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .assistant(() -> SdkAssist.ALL)
                 .trial(Bot::trial)
                 .recorded(() -> PictureAt.ALL));
+    }
+
+    /** How a bot's values written by an older SDK reach this one's shapes (2026-10-11). */
+    @Override
+    public List<Conversion> conversions() {
+        return SdkConversions.ALL;
     }
 
     /**

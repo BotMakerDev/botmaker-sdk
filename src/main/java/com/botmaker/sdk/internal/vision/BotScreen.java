@@ -82,11 +82,14 @@ public final class BotScreen {
         }
         Diag.warn(SOURCE, "The game shows " + live.get() + " but the bot's pictures were cut at " + wanted
                 + " (Sdk.screen()): they are scaled, which can miss. Set the game to " + wanted
-                + (window == null ? "." : ", or let its window be resized."));
+                + (window == null ? "." : ", or let its window be resized.")
+                + (Places.otherShape(wanted, live.get()) ? " Its shape differs too: pictures scale by the smaller"
+                + " side, and spots and zones stay with their anchor." : ""));
         return live;
     }
 
-    private static Optional<Size> measure(CaptureSource source) {
+    /** The size {@code source} shows now, from one grab; empty when it could not be captured. */
+    static Optional<Size> measure(CaptureSource source) {
         try {
             BufferedImage frame = source.capture();
             return frame == null ? Optional.empty() : Optional.of(new Size(frame.getWidth(), frame.getHeight()));

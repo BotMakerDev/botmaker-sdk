@@ -10,14 +10,19 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.plugin.toolkit.ManagedSet;
-import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.geometry.Spot;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.vision.Places;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.PictureEdits;
+import com.botmaker.sdk.plugin.pictures.ScreenSize;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 
@@ -28,16 +33,18 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * The assistant's pictures and places: each picture a {@code Pictures} constant, each named spot a
- * {@code Points} constant and each named area a {@code Regions} constant, written through the host as the
- * SDK's own windows write them. A box is in the pixels of the last screenshot, as {@code crop_picture}'s is.
+ * {@code Spots} constant and each named area a {@code Zones} constant, written through the host as the
+ * SDK's own windows write them. A box is in the pixels of the last screenshot, as {@code crop_picture}'s is; a
+ * place is written in the bot's pixels, which the screenshot's are once the game shows the bot's screen size.
  */
 final class PictureTools {
 
-    private static final ManagedSet<Point> POINTS = ManagedSet.of(SdkValues.POINTS);
-    private static final ManagedSet<Rect> REGIONS = ManagedSet.of(SdkValues.REGIONS);
+    private static final ManagedSet<Spot> SPOTS = ManagedSet.of(SdkValues.SPOTS);
+    private static final ManagedSet<Zone> ZONES = ManagedSet.of(SdkValues.ZONES);
 
     record Crop(@Describe("the picture's name, lowercase with underscores: collect_button") String name,
                 @Describe("left edge, in the screenshot's pixels") int x,
@@ -67,15 +74,20 @@ final class PictureTools {
 
     record NamedPoint(@Describe("the spot's name: claim button") String name,
                       @Describe("x, in the screenshot's pixels") int x,
-                      @Describe("y, in the screenshot's pixels") int y) {
+                      @Describe("y, in the screenshot's pixels") int y,
+                      @Describe(value = ANCHOR, optional = true) Anchor anchor) {
     }
 
     record NamedRegion(@Describe("the area's name: bag") String name,
                        @Describe("left edge, in the screenshot's pixels") int x,
                        @Describe("top edge") int y,
                        @Describe("width in pixels") int width,
-                       @Describe("height in pixels") int height) {
+                       @Describe("height in pixels") int height,
+                       @Describe(value = ANCHOR, optional = true) Anchor anchor) {
     }
+
+    private static final String ANCHOR = "the part of the screen it stays with when the game shows another shape: "
+            + "a corner or edge for a HUD on it, center (the default) for the game's middle";
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("list_pictures")
@@ -101,12 +113,12 @@ final class PictureTools {
                             + "every use")
                     .takes(Replace.class).handledBy(PictureTools::replacePicture),
             AssistantTool.named("save_point")
-                    .describedAs("Names a spot of the screen as a Points constant, in the pixels Mouse.click "
-                            + "takes, for a block to click by name")
+                    .describedAs("Names a spot of the game as a Spots constant, in the bot's pixels, for a block to "
+                            + "click by name with Mouse.click(Spots.…), wherever the window sits and at any size")
                     .takes(NamedPoint.class).handledBy(PictureTools::savePoint),
             AssistantTool.named("save_region")
-                    .describedAs("Names an area of the screen as a Regions constant, in the capture source's own "
-                            + "pixels, for a block to narrow a search to with region(…)")
+                    .describedAs("Names an area of the game as a Zones constant, in the bot's pixels, for a block to "
+                            + "narrow a search to with .region(Zones.…), wherever the window sits and at any size")
                     .takes(NamedRegion.class).handledBy(PictureTools::saveRegion));
 
     private PictureTools() {}
@@ -203,14 +215,14 @@ final class PictureTools {
         if (Frames.within(frame.get(), point.x(), point.y(), 1, 1).isEmpty()) {
             return AgentReply.refused(Frames.outside(frame.get()));
         }
-        Optional<Area> at = context.watchedArea();
-        if (at.isEmpty()) return AgentReply.refused("Where the screen sits is not known, so the spot cannot be named.");
-        Point spot = new Point(at.get().x() + point.x(), at.get().y() + point.y());
-        Saved saved = FxCall.call(() -> save(context.services(), POINTS, constant, spot));
-        if (!saved.ok()) return AgentReply.refused(saved.done());
+        Size live = new Size(frame.get().getWidth(), frame.get().getHeight());
+        Placed<Spot> placed = FxCall.call(() -> place(context.services(), SPOTS, constant, live,
+                bot -> Places.inBot(point.x(), point.y(), point.anchor(), bot, live)));
+        if (!placed.saved().ok()) return AgentReply.refused(placed.saved().done());
         Frames.mark(context, new Rect(point.x() - 4, point.y() - 4, 9, 9), Marks.Kind.CLICK, constant);
-        return AgentReply.text(saved.done() + " Points." + constant + " = " + spot.x() + "," + spot.y()
-                + "; a block clicks it with Mouse.click(Points." + constant + ").");
+        Spot spot = placed.value();
+        return AgentReply.text(placed.saved().done() + " Spots." + constant + " = " + spot.x() + "," + spot.y()
+                + placed.of() + "; a block clicks it with Mouse.click(Spots." + constant + ").");
     }
 
     static AgentReply saveRegion(NamedRegion region, AgentContext context) {
@@ -221,11 +233,43 @@ final class PictureTools {
         Optional<Rect> area = Frames.within(frame.get(), region.x(), region.y(), region.width(), region.height());
         if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));
         Rect rect = area.get();
-        Saved saved = FxCall.call(() -> save(context.services(), REGIONS, constant, rect));
-        if (!saved.ok()) return AgentReply.refused(saved.done());
+        Size live = new Size(frame.get().getWidth(), frame.get().getHeight());
+        Placed<Zone> placed = FxCall.call(() -> place(context.services(), ZONES, constant, live,
+                bot -> Places.inBot(rect, region.anchor(), bot, live)));
+        if (!placed.saved().ok()) return AgentReply.refused(placed.saved().done());
         Frames.mark(context, rect, Marks.Kind.NOTE, constant);
-        return AgentReply.text(saved.done() + " Regions." + constant + " = " + Frames.box(rect)
-                + "; a block narrows a source to it with .region(Regions." + constant + ").");
+        Zone zone = placed.value();
+        return AgentReply.text(placed.saved().done() + " Zones." + constant + " = "
+                + Frames.box(new Rect(zone.x(), zone.y(), zone.width(), zone.height())) + placed.of()
+                + "; a block narrows a source to it with .region(Zones." + constant + ").");
+    }
+
+    /**
+     * A place cut from a screenshot of {@code live} size, written in the bot's pixels as the constant {@code name}.
+     * A bot naming no screen size takes the screenshot's, once the place is written: a refused save changes
+     * nothing. One whose {@code screen()} is written by hand is refused, since its pixels cannot be read. On the
+     * FX thread.
+     */
+    private static <T> Placed<T> place(StudioServices services, ManagedSet<T> set, String name, Size live,
+                                       Function<Size, T> inBot) {
+        Optional<Size> named = ScreenSize.read(services);
+        if (named.isEmpty() && ScreenSize.handWritten(services)) {
+            return new Placed<>(Saved.refused("Sdk.screen() is written by hand, so the bot's pixels are not known:"
+                    + " write it as new Size(width, height) first."), null, live);
+        }
+        Size bot = named.orElse(live);
+        T value = inBot.apply(bot);
+        Saved saved = save(services, set, name, value);
+        if (saved.ok() && named.isEmpty()) ScreenSize.adopt(services, live);
+        return new Placed<>(saved, value, bot);
+    }
+
+    /** What {@link #save} did with a place, and the bot's screen it was written against. */
+    private record Placed<T>(Saved saved, T value, Size bot) {
+        /** {@code " of the bot's 1280×720 screen"}. */
+        String of() {
+            return " of the bot's " + bot.width() + "×" + bot.height() + " screen";
+        }
     }
 
     /**

@@ -11,6 +11,8 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.geometry.Spot;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.KeySequence;
@@ -136,6 +138,23 @@ public final class SdkTypes {
             .fresh(() -> new Size(0, 0))
             .editor(() -> ctx -> GeometryEditors.size(ctx, SdkTypes.SIZE))
             .writtenAsRecord();
+
+    /**
+     * A named spot of the game, in the bot's pixels: {@code new Spot(412, 230)}, and {@code .anchored(Anchor.…)}
+     * only when it stays with another part of the screen than its centre (2026-10-11).
+     */
+    public static final DeclaredCallType<Spot> SPOT = PluginType.value(Spot.class)
+            .fresh(() -> new Spot(0, 0))
+            .editor(() -> GeometryEditors::spot)
+            .writtenAs(Spot::new, Spot::x, Spot::y)
+            .with(Spot::anchored, Spot::anchor);
+
+    /** A named area of the game, in the bot's pixels, written as {@link #SPOT} is. */
+    public static final DeclaredCallType<Zone> ZONE = PluginType.value(Zone.class)
+            .fresh(() -> new Zone(0, 0, 0, 0))
+            .editor(() -> GeometryEditors::zone)
+            .writtenAs(Zone::new, Zone::x, Zone::y, Zone::width, Zone::height)
+            .with(Zone::anchored, Zone::anchor);
 
     /** A key on the keyboard. An enum's Java is its constant, so it needs no call. */
     public static final PluginType<Key> KEY = PluginType.value(Key.class)
@@ -268,7 +287,7 @@ public final class SdkTypes {
      */
     public static final List<PluginType<?>> ALL = List.of(
             IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS,
-            POINT, RECT, SIZE,
+            POINT, RECT, SIZE, SPOT, ZONE,
             KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE,
             CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP,
             ACTIVITY, OUTCOME,

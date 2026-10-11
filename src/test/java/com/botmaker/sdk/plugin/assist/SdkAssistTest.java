@@ -17,9 +17,11 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.geometry.Spot;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.plugin.flow.FlowNames;
@@ -284,22 +286,34 @@ class SdkAssistTest {
     }
 
     @Test
-    void aPointIsSavedInTheBotsPixelsAndARegionInTheSources() {
+    void aPlaceIsSavedInTheBotsPixelsFromTheGamesCorner() {
+        host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(0, 0)));
         agent.frame = withPatchAt(120, 80);
         AgentReply point = run("save_point", "name", "claim button", "x", 10, "y", 20);
-        assertTrue(text(point).startsWith("Saved Points.CLAIM_BUTTON = 1010,520"), text(point));
-        assertEquals(new Point(1010, 520), host.set("points").get("CLAIM_BUTTON").value());
-        assertTrue(text(run("save_point", "name", "CLAIM_BUTTON", "x", 30, "y", 40))
-                .startsWith("Moved Points.CLAIM_BUTTON = 1030,540"), "the same name moves it");
-        assertEquals(new Point(1030, 540), host.set("points").get("CLAIM_BUTTON").value());
+        assertTrue(text(point).startsWith("Saved Spots.CLAIM_BUTTON = 10,20 of the bot's 400×300 screen"), text(point));
+        assertEquals(new Spot(10, 20), host.set("spots").get("CLAIM_BUTTON").value());
+        assertEquals(new Size(400, 300), host.values.get("screen").value(),
+                "a bot naming no size takes the screenshot's");
+        assertTrue(text(run("save_point", "name", "CLAIM_BUTTON", "x", 30, "y", 40, "anchor", "top_left"))
+                .startsWith("Moved Spots.CLAIM_BUTTON = 30,40"), "the same name moves it");
+        assertEquals(new Spot(30, 40).anchored(Anchor.TOP_LEFT), host.set("spots").get("CLAIM_BUTTON").value());
         assertTrue(run("save_point", "name", "2nd", "x", 10, "y", 20).isRefused(), "no constant starts with a digit");
         assertTrue(run("save_point", "name", "far", "x", 500, "y", 20).isRefused());
 
         AgentReply region = run("save_region", "name", "bag", "x", 300, "y", 200, "width", 200, "height", 200);
-        assertTrue(text(region).startsWith("Saved Regions.BAG = 300,200 (100×100)"), "clipped: " + text(region));
-        assertEquals(new Rect(300, 200, 100, 100), host.set("regions").get("BAG").value());
-        assertEquals(List.of("create points", "add points CLAIM_BUTTON", "create regions", "add regions BAG"),
+        assertTrue(text(region).startsWith("Saved Zones.BAG = 300,200 (100×100)"), "clipped: " + text(region));
+        assertEquals(new Zone(300, 200, 100, 100), host.set("zones").get("BAG").value());
+        assertEquals(List.of("create spots", "add spots CLAIM_BUTTON", "create zones", "add zones BAG"),
                 host.calls);
+    }
+
+    @Test
+    void aPlaceOnAGameShowingAnotherSizeIsWrittenAtTheBotsSize() {
+        host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(200, 150)));
+        agent.frame = withPatchAt(120, 80);
+        assertTrue(text(run("save_point", "name", "claim", "x", 100, "y", 60))
+                .startsWith("Saved Spots.CLAIM = 50,30 of the bot's 200×150 screen"), "the 400×300 game is twice it");
+        assertEquals(new Spot(50, 30), host.set("spots").get("CLAIM").value());
     }
 
     // ── the flow ────────────────────────────────────────────────────────────────────────────────────────

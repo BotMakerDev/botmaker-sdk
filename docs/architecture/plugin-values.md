@@ -7,9 +7,11 @@ template, in `src/main/java/<bot package>/plugins/sdk/`: **`Sdk.java`** — `FLO
 of named calls (`Flow.activity(Activities.Collect.class, Collect::body).described("…").goesHome()`) — then
 **`Pictures.java`**, `PICTURES` on the type, one `ImageTemplate` constant per picture, and
 **`Activities.java`** (`ACTIVITIES`: one nested `enum Collect implements Outcome { NEXT, NOTHING_LEFT }` per
-activity, each name's label its words). Beside them the host writes **`Points.java`** and
-**`Regions.java`** (`POINTS`, `REGIONS`, 2026-10-06): named `Point`s in the bot's pixels and `Rect`s in the
-capture source's, which the assistant's `save_point` and `save_region` add. They are the user's: the host
+activity, each name's label its words). Beside them the host writes **`Spots.java`** and
+**`Zones.java`** (`SPOTS`, `ZONES`, 2026-10-11): named `Spot`s and `Zone`s in the bot's pixels from the game's
+corner, which the assistant's `save_point` and `save_region` add and a run places on the live game
+(`internal/vision/Places`). `POINTS`/`REGIONS` (desktop `Point`s, source `Rect`s, 2026-10-06) are retired:
+`SdkConversions.PLACES` turns them into spots and zones when a bot upgrades. They are the user's: the host
 rewrites the expression a marked method returns and the constants of a marked type, and nothing else,
 a body that is not exactly `return <expr>;` is read-only with a reason, and Studio locks the whole file on the
 canvas while this plugin is loaded (its values change in this plugin's windows). A project without them gets

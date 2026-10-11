@@ -13,6 +13,8 @@ import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.geometry.Spot;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.Flows;
@@ -24,13 +26,13 @@ import java.util.List;
 /**
  * The SDK's managed values, each declared once, and what a run does with each one.
  *
- * <p>Nine declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
+ * <p>Eleven declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
  * plugin lists {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOW} is the activity
  * flow, {@code FLOW_LAYOUT} where the flow editor draws each card (a run ignores it), {@code CAPTURE} where
  * pixels are read from, {@code SETTINGS} how it clicks and looks, {@code SCREEN} the size its pictures were cut
- * at, and {@code PICTURES}, {@code ACTIVITIES}, {@code POINTS} and {@code REGIONS} the classes of constants the
- * bot grows.
+ * at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS} and {@code ZONES} the classes of constants the
+ * bot grows. {@code POINTS} and {@code REGIONS} are retired: read only for {@link SdkConversions}.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract
  * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
@@ -89,25 +91,48 @@ public final class SdkValues {
                     + " exit and every use of it together.");
 
     /**
-     * The named spots — {@code static final Point CLAIM = new Point(412, 230)}, in the bot's pixels, which is what
-     * {@code Mouse.click(Point)} takes. The assistant's {@code save_point} adds one, or moves one it names again.
+     * Retired 2026-10-11: the named spots as desktop pixels, {@code static final Point CLAIM = new Point(412, 230)}.
+     * Read only so {@link SdkConversions#PLACES} carries them into {@link #SPOTS}.
      */
     public static final ManagedValue<Point> POINTS = ManagedValue.openSet(SdkValue.Id.POINTS)
             .of(Point.class)
             .in("Points")
             .because("Points.java holds the bot's named spots. Ask Claude to save_point a spot again, under its"
-                    + " name, to move it.");
+                    + " name, to move it.")
+            .retired();
 
     /**
-     * The named areas — {@code static final Rect BAG = new Rect(10, 20, 200, 120)}, in the capture source's own
-     * pixels, which is what {@code captureSource().region(Rect)} narrows. The assistant's {@code save_region} adds
-     * one, or moves one it names again.
+     * Retired 2026-10-11: the named areas as source pixels, {@code static final Rect BAG = new Rect(10, 20, 200,
+     * 120)}. Read only so {@link SdkConversions#PLACES} carries them into {@link #ZONES}.
      */
     public static final ManagedValue<Rect> REGIONS = ManagedValue.openSet(SdkValue.Id.REGIONS)
             .of(Rect.class)
             .in("Regions")
             .because("Regions.java holds the bot's named areas. Ask Claude to save_region an area again, under"
-                    + " its name, to move it.");
+                    + " its name, to move it.")
+            .retired();
+
+    /**
+     * The named spots — {@code static final Spot CLAIM = new Spot(412, 230)}, in the bot's pixels, which
+     * {@code Mouse.click(Spot)} places on the game as it shows. The assistant's {@code save_point} adds one, or
+     * moves one it names again.
+     */
+    public static final ManagedValue<Spot> SPOTS = ManagedValue.openSet(SdkValue.Id.SPOTS)
+            .of(Spot.class)
+            .in("Spots")
+            .because("Spots.java holds the bot's named spots. Ask Claude to save_point a spot again, under its"
+                    + " name, to move it.");
+
+    /**
+     * The named areas — {@code static final Zone BAG = new Zone(10, 20, 200, 120)}, in the bot's pixels, which
+     * {@code source.region(Zone)} places on the game as it shows. The assistant's {@code save_region} adds one, or
+     * moves one it names again.
+     */
+    public static final ManagedValue<Zone> ZONES = ManagedValue.openSet(SdkValue.Id.ZONES)
+            .of(Zone.class)
+            .in("Zones")
+            .because("Zones.java holds the bot's named areas. Ask Claude to save_region an area again, under its"
+                    + " name, to move it.");
 
     /**
      * The bot's screen size — {@code new Size(1280, 720)}: the frame its pictures were cut from, which a picture
@@ -121,9 +146,9 @@ public final class SdkValues {
             .because("This is the size the bot's pictures were cut at. The first picture cut sets it; a private"
                     + " display is made at it and a game window is resized to it when the bot starts.");
 
-    /** All nine, in the order the plugin declares them. */
+    /** All eleven, in the order the plugin declares them, the two retired ones included. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOW, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            ACTIVITIES, POINTS, REGIONS, SCREEN);
+            ACTIVITIES, POINTS, REGIONS, SPOTS, ZONES, SCREEN);
 
     private static boolean claimed;
 

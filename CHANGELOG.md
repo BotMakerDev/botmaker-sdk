@@ -27,6 +27,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **A picture says where it was cut.** Its constant is written `new ImageTemplate("…").at(new Rect(…))`, plus
   `.in(new Size(…))` when its frame is not the bot's screen size; the matcher rescales against that size, else
   the bot's.
+- **Named places follow the game.** `Spots.java` holds `new Spot(x, y)` and `Zones.java` holds
+  `new Zone(x, y, w, h)`, in the bot's pixels from the game's top-left corner. `Mouse.click(Spots.CLAIM)` and
+  `source.region(Zones.BAG)` place them on the run's capture source wherever its window sits, and scale them
+  when the game shows another size than `Sdk.screen()`. `.anchored(Anchor.BOTTOM_RIGHT)` keeps one with a
+  corner or edge on a game of another shape; the centre otherwise. `save_point`/`save_region` write them, with
+  an optional `anchor`.
+- **Another aspect ratio.** A picture on a frame of another shape is scaled by the smaller side's ratio, as a
+  game fits its art, not by the mean; the run-start warning says when the shape differs.
 - **Smaller images for an assistant.** `sdk_screenshot` fits 1024 pixels unless a `scale` is given, and a
   find's boxed image fits 768. Coordinates stay the screenshot's own pixels.
 - **OCR on Apple Silicon Macs.** The jar carries Tesseract and Leptonica for `macosx-arm64` under
@@ -48,6 +56,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed (breaking)
 
+- **`Points` and `Regions` became `Spots` and `Zones`.** Studio converts them when a bot upgrades: each
+  `Point` becomes a `Spot` and each `Rect` a `Zone` with the same numbers. A spot saved on a window away from
+  the screen's corner is saved again.
 - **No `<name>.json` beside a picture.** The resolution sidecar is neither written nor read: a picture with no
   `.in(Size)` is taken to be cut at the bot's screen size, and one in a bot that names none is matched as it is.
   `TemplateLibrary.saveTemplate`/`replaceImage` lost their size arguments; an exported picture set carries no

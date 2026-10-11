@@ -25,6 +25,7 @@ import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Matches;
 import com.botmaker.sdk.api.vision.Precision;
+import com.botmaker.sdk.internal.bot.SdkConversions;
 import com.botmaker.sdk.internal.launch.Game;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
@@ -89,6 +90,7 @@ class SdkPluginSurfaceTest {
      */
     private static final List<Class<?>> DECLARED_TYPES = List.of(
             ImageTemplate.class, Precision.class, OcrOptions.class, Point.class, Rect.class, Size.class,
+            com.botmaker.sdk.api.geometry.Spot.class, com.botmaker.sdk.api.geometry.Zone.class,
             Key.class, MouseButton.class, Combo.class,
             KeySequence.class, CaptureSource.class, ImageTemplateGroup.class,
             com.botmaker.sdk.api.flow.Activity.class, com.botmaker.sdk.api.bot.Outcome.class,
@@ -145,6 +147,13 @@ class SdkPluginSurfaceTest {
         assertEquals(com.botmaker.sdk.api.geometry.Point.class, byId.get(SdkValue.Id.POINTS).type());
         assertEquals("Regions", byId.get(SdkValue.Id.REGIONS).holder());
         assertEquals(com.botmaker.sdk.api.geometry.Rect.class, byId.get(SdkValue.Id.REGIONS).type());
+        assertTrue(byId.get(SdkValue.Id.POINTS).isRetired() && byId.get(SdkValue.Id.REGIONS).isRetired(),
+                "kept as v1.4.2 wrote them, read only for the conversion");
+        assertEquals("Spots", byId.get(SdkValue.Id.SPOTS).holder());
+        assertEquals(com.botmaker.sdk.api.geometry.Spot.class, byId.get(SdkValue.Id.SPOTS).type());
+        assertEquals("Zones", byId.get(SdkValue.Id.ZONES).holder());
+        assertEquals(com.botmaker.sdk.api.geometry.Zone.class, byId.get(SdkValue.Id.ZONES).type());
+        assertEquals(List.of(SdkConversions.PLACES), plugin.conversions());
         // One declaration per constant, and nothing else.
         assertEquals(SdkValue.Id.values().length, byId.size());
         assertEquals(SdkValue.Id.values().length, plugin.managedValues().size());
@@ -314,7 +323,8 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(18, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02");
+        assertEquals(20, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
+                + " Spot and Zone 2026-10-11");
     }
 
     /**

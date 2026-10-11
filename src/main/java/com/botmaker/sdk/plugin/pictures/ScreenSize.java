@@ -40,15 +40,28 @@ public final class ScreenSize {
         ImageTemplate picture = cut.place() == null ? plain : plain.at(cut.place());
         Size frame = cut.frame();
         if (frame == null || frame.empty()) return picture;
+        return adopt(services, frame).filter(frame::equals).isPresent() ? picture : picture.in(frame);
+    }
+
+    /** Whether {@code screen()} is written by hand, so its size cannot be read and it is never written. */
+    public static boolean handWritten(StudioServices services) {
+        return services != null && SCREEN.open(services).filter(ctx -> !SCREEN.readable(ctx)).isPresent();
+    }
+
+    /**
+     * The bot's screen size, which becomes {@code frame} when the bot names none yet: what a picture, a spot or a
+     * zone cut from {@code frame} is written against. Empty when the bot names none and it could not be written. On
+     * the FX thread.
+     */
+    public static Optional<Size> adopt(StudioServices services, Size frame) {
         Optional<Size> screen = read(services);
-        if (screen.isPresent()) return screen.get().equals(frame) ? picture : picture.in(frame);
+        if (screen.isPresent() || frame == null || frame.empty()) return screen;
         // A screen() written by hand, which the grammar cannot read, is the user's: never overwritten.
-        boolean handWritten = services != null && SCREEN.open(services).filter(ctx -> !SCREEN.readable(ctx)).isPresent();
-        if (handWritten) return picture.in(frame);
+        if (handWritten(services)) return Optional.empty();
         try {
-            return SCREEN.write(services, frame) == null ? picture : picture.in(frame);
+            return SCREEN.write(services, frame) == null ? Optional.of(frame) : Optional.empty();
         } catch (RuntimeException refused) {
-            return picture.in(frame);
+            return Optional.empty();
         }
     }
 }

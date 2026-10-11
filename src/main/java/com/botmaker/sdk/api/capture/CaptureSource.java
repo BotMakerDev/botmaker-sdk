@@ -3,6 +3,8 @@ package com.botmaker.sdk.api.capture;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.internal.vision.ZoneSource;
 import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
@@ -26,8 +28,9 @@ import java.awt.image.BufferedImage;
  * matches within) that rectangle. Regions compose, so
  * {@code CaptureSource.window("Game").region(topBar)} is itself just another {@code CaptureSource}.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): seven of thirteen. What is offered is the whole of
- * how a bot <em>builds</em> a source — the four factories and the two {@link #region(Rect) region} narrowings,
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): eight of fourteen. What is offered is the whole of
+ * how a bot <em>builds</em> a source — the four factories and the three {@link #region(Rect) region} narrowings
+ * (a named {@link #region(Zone) zone} since 2026-10-11),
  * each of which hands back another {@code CaptureSource} the editor can hold — plus {@link #isPresent()}, the
  * one question a bot asks of a source it already has.
  *
@@ -138,6 +141,15 @@ public interface CaptureSource {
      */
     default CaptureSource region(Rect sub) {
         return new RegionSource(this, sub);
+    }
+
+    /**
+     * A named area of the game — {@code region(Zones.BAG)}: a place of the bot's screen, so it narrows the whole
+     * surface this source draws from ({@link #base()}), scaled when the game shows another size than the bot's
+     * (2026-10-11). Placed at each capture, so a source kept in a field follows the game's window and size.
+     */
+    default CaptureSource region(Zone zone) {
+        return new ZoneSource(this, zone);
     }
 
     /** {@link #region(Rect)} from raw coordinates within this source. */
