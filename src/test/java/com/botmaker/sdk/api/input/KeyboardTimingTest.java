@@ -62,6 +62,25 @@ class KeyboardTimingTest {
     }
 
     @Test
+    void a_hold_presses_waits_then_releases() {
+        Keyboard.hold(CaptureSource.desktop(), Key.W, Duration.ofMillis(300));
+        assertEquals(List.of(down(Key.W), "wait(300)", up(Key.W)), keyEvents());
+    }
+
+    @Test
+    void a_hold_releases_even_when_the_wait_is_cut_short() {
+        Keyboard.pause = wait -> {
+            throw new IllegalStateException("stopped");
+        };
+        try {
+            Keyboard.hold(CaptureSource.desktop(), Key.W, Duration.ofMillis(300));
+        } catch (IllegalStateException expected) {
+            // the stop; the key must still come up
+        }
+        assertEquals(List.of(down(Key.W), up(Key.W)), keyEvents());
+    }
+
+    @Test
     void a_sequence_presses_each_combo_then_waits_its_step() {
         KeySequence sequence = KeySequence.of(
                 KeySequence.step(Combo.of(Key.CTRL, Key.A), Duration.ofMillis(100)),

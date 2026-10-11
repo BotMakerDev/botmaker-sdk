@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.shared.opencv.ColorMatcher;
 import com.botmaker.shared.opencv.RawColorMatch;
 
@@ -205,7 +206,9 @@ public class Pixel {
 
     /** {@link #waitFor(Color, Precision, Duration)} in {@code source}. */
     public static boolean waitFor(Color target, CaptureSource source, Precision precision, Duration timeout) {
-        return poll(timeout, () -> find(target, source, precision));
+        if (poll(timeout, () -> find(target, source, precision))) return true;
+        MissFrames.missed("timed out waiting for colour " + hex(target), source, null);
+        return false;
     }
 
     /** Polls until {@code target} is gone from the current source, or {@code timeout} elapses. */
@@ -215,7 +218,13 @@ public class Pixel {
 
     /** {@link #waitForGone(Color, Precision, Duration)} in {@code source}. */
     public static boolean waitForGone(Color target, CaptureSource source, Precision precision, Duration timeout) {
-        return poll(timeout, () -> !find(target, source, precision));
+        if (poll(timeout, () -> !find(target, source, precision))) return true;
+        MissFrames.missed("timed out: colour " + hex(target) + " still showing", source, null);
+        return false;
+    }
+
+    private static String hex(Color c) {
+        return String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
     }
 
     /** Asks {@code done} every 100ms until it says yes or {@code timeout} elapses. */

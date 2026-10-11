@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.internal.ocr.OcrEngine;
+import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.vision.DigitReader;
 
 import java.awt.image.BufferedImage;
@@ -348,6 +349,7 @@ public final class Text {
             if (find(needle, source, opts)) return true;
             if (sleep()) return false;
         }
+        MissFrames.missed("timed out waiting for text \"" + needle + "\"", source, null);
         return false;
     }
 
@@ -363,6 +365,7 @@ public final class Text {
             if (!find(needle, source, opts)) return true;
             if (sleep()) return false;
         }
+        MissFrames.missed("timed out: text \"" + needle + "\" still showing", source, null);
         return false;
     }
 

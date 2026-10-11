@@ -39,9 +39,10 @@ import java.util.function.Consumer;
  * type</em>. Keys therefore reach the game, but the game is brought to the foreground first. There is no
  * mechanism on X11 that is both background and accepted by a game; that trade is the whole choice.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): all fourteen are offered. The shape is exactly the
- * one {@code ImageFinder}'s rule keeps — six operations, each in the plain form and the {@link CaptureSource}
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): all sixteen are offered. The shape is exactly the
+ * one {@code ImageFinder}'s rule keeps — eight methods, each in the plain form and the {@link CaptureSource}
  * form — with no third variant carrying a value a property already holds, so there is nothing here to trim.
+ * {@code hold} (2026-10-11) presses a key for a {@link Duration} and always releases it.
  * {@code sequence} (2026-09-27) presses a {@link KeySequence}: combos with a wait after each.
  * {@code combo} leads with its {@link Combo} shape (2026-09-26); the varargs one is in its submenu, and is what
  * a recording falls back to on a host that cannot fill a {@code Combo}.
@@ -86,6 +87,14 @@ public class Keyboard {
     public static void tap(Key key) {
         press(key);
         release(key);
+    }
+
+    /**
+     * Hold {@code key} down for {@code duration}, then release it — e.g. walking a character. The key is
+     * released even when the run stops during the hold.
+     */
+    public static void hold(Key key, Duration duration) {
+        hold(Source.current(), key, duration);
     }
 
     /**
@@ -157,6 +166,16 @@ public class Keyboard {
     public static void tap(CaptureSource source, Key key) {
         press(source, key);
         release(source, key);
+    }
+
+    /** {@link #hold(Key, Duration)} on {@code source}'s window. */
+    public static void hold(CaptureSource source, Key key, Duration duration) {
+        press(source, key);
+        try {
+            if (duration != null && duration.isPositive()) pause.accept(duration);
+        } finally {
+            release(source, key);
+        }
     }
 
     /** Press a chord on {@code source}'s window: hold each key in order, release in reverse. */

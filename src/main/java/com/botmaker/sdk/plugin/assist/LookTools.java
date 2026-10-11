@@ -17,14 +17,17 @@ import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Pixel;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.Vision;
+import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 
+import javax.imageio.ImageIO;
 import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,7 +38,7 @@ import java.util.Optional;
 /**
  * The assistant's eyes: what the bot sees, which pictures are on it, its text and its colours. Each reads a
  * fresh frame of the screen the bot watches, except {@code screenshot}, which also keeps it for
- * {@code crop_picture}. Nothing here writes or clicks.
+ * {@code crop_picture}; {@code missed_frames} reads what a run saved instead. Nothing here writes or clicks.
  */
 final class LookTools {
 
@@ -90,6 +93,10 @@ final class LookTools {
                      Double tolerance) {
     }
 
+    record Missed(@Describe(value = "a saved frame's file name, as the list gives it; the list when left out",
+            optional = true) String name) {
+    }
+
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("screenshot")
                     .describedAs("What the bot sees now: the screen its capture source names, as an image. "
@@ -121,9 +128,44 @@ final class LookTools {
             AssistantTool.named("find_color")
                     .describedAs("Where a colour is on the screen or in one area of it: each patch of it, "
                             + "largest first, boxed on the screenshot")
-                    .takes(ColorArea.class).handledBy(LookTools::findColor));
+                    .takes(ColorArea.class).handledBy(LookTools::findColor),
+            AssistantTool.named("missed_frames")
+                    .describedAs("What the latest run saw when a wait timed out: the frames it saved, "
+                            + "listed, or one of them as an image, its search area boxed. The trace names each.")
+                    .takes(Missed.class).handledBy(LookTools::missedFrames));
 
     private LookTools() {}
+
+    static AgentReply missedFrames(Missed missed, AgentContext context) {
+        Path folder = context.services().projectDir();
+        if (folder == null) return AgentReply.refused(Frames.noProject());
+        List<Path> frames = MissFrames.latest(folder);
+        if (frames.isEmpty()) return AgentReply.text("The latest run saved no frame: no wait timed out.");
+        if (missed.name() == null || missed.name().isBlank()) {
+            List<String> names = frames.stream().map(f -> f.getFileName().toString()).toList();
+            return AgentReply.text("Saved by the latest run, oldest first:\n" + String.join("\n", names));
+        }
+        // Only a name the list gives: a path the assistant typed never reaches the disk.
+        Optional<Path> file = frames.stream().filter(f -> f.getFileName().toString().equals(missed.name().trim()))
+                .findFirst();
+        if (file.isEmpty()) return AgentReply.refused("No saved frame called \"" + missed.name() + "\"; "
+                + "missed_frames without a name lists them.");
+        BufferedImage image;
+        try {
+            image = ImageIO.read(file.get().toFile());
+        } catch (IOException e) {
+            image = null;
+        }
+        if (image == null) return AgentReply.refused(missed.name() + " could not be read.");
+        double scale = Frames.fit(image.getWidth(), image.getHeight(), Frames.LOOK_EDGE);
+        StringBuilder said = new StringBuilder(missed.name() + ", " + image.getWidth() + "×" + image.getHeight());
+        if (scale < 1) {
+            image = Frames.scaled(image, scale);
+            said.append(", shrunk to ").append(image.getWidth()).append('×').append(image.getHeight())
+                    .append(": multiply what you see by ").append(Frames.undo(scale));
+        }
+        return AgentReply.text(said.append('.').toString()).and(AgentReply.image(image));
+    }
 
     static AgentReply screenshot(Shot shot, AgentContext context) {
         Optional<BufferedImage> frame = context.frame();

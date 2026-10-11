@@ -16,6 +16,7 @@ import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.flow.SkippedActivities;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.observe.IpcObserver;
+import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
 import java.util.Set;
@@ -92,6 +93,7 @@ public class Bot {
     public static void runFlow(Flow flow, boolean doSetup, Set<Class<? extends Outcome>> skip,
                                Class<?>... values) {
         observe();
+        MissFrames.start();
         SdkValues.claim();
         ManagedValues.install(values);
         InstalledRun.walk(SkippedActivities.applied(flow == null ? Flow.NONE : flow, skip));
@@ -118,6 +120,7 @@ public class Bot {
     @Untraced("holds the whole try")
     public static void trial(Runnable body, Class<?>... values) {
         observe();
+        MissFrames.start();
         SdkValues.claim();
         ManagedValues.install(values);
         try {

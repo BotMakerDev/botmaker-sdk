@@ -16,12 +16,15 @@ import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.sdk.internal.session.BotSession;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.PointerPolicy;
+import com.botmaker.sdk.api.time.Wait;
+
+import java.time.Duration;
 
 /**
  * Real pointer input — clicks, moves, drags and the wheel.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): nineteen of the twenty are offered, the four taking a
- * named {@link Spot} (2026-10-11) included. The one hidden is
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): twenty of the twenty-one are offered, the four taking
+ * a named {@link Spot} and {@code hold} (2026-10-11) included. The one hidden is
  * {@link #scroll(int)}, and the reason was already written down before this sweep existed — its own javadoc ends
  * <em>"Prefer the clearer {@link #scrollUp(int)} / {@link #scrollDown(int)}"</em>. Until now the menu offered all
  * three as equals and quietly contradicted that sentence; the annotation is what makes the author's preference
@@ -140,6 +143,19 @@ public class Mouse {
     /** Release a held mouse button. */
     public static void up(MouseButton button) {
         controller().mouseButton(button.code(), false);
+    }
+
+    /**
+     * Move to {@code p}, hold {@code button} down there for {@code duration}, then release it — e.g. charging
+     * an attack. The button is released even when the run stops during the hold.
+     */
+    public static void hold(MouseButton button, Point p, Duration duration) {
+        down(button, p);
+        try {
+            Wait.time(duration);
+        } finally {
+            up(button);
+        }
     }
 
     public static void rightClick(Point p) {

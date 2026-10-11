@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🖥 Wait for the screen.** `Screen.waitStable(quiet, timeout)` waits until the screen holds still (a loading
+  screen done, an animation over), `Screen.waitChange(timeout)` until it looks different (a click took effect).
+  Narrow either to a region; noise and a blinking caret never count.
+- **Hold a key or a button.** `Keyboard.hold(Key, Duration)` and `Mouse.hold(MouseButton, Point, Duration)`
+  press, wait, and always release, even when the run stops during the hold.
+- **A wait that times out saves what it saw.** In a run, a picture, colour, text or screen wait that times out
+  saves the frame under `target/botmaker-runs/` (the search area boxed) and says so in the trace, debugging on or
+  off. The assistant's `missed_frames` shows them. At most 20 per run, the last 5 runs kept.
+
 - **🔀 Activity Flow edits every flow.** A picker at the top shows one of the bot's `Flows` at a time, and
   **Flow ▾** adds, duplicates, renames (every use too, `Sdk.flow` included) and deletes them. A flow the bot's
   code still names isn't deleted. Activities belong to the bot: **Add from another flow** puts an activity another

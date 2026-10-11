@@ -2,7 +2,8 @@
 
 - `api.vision` — `ImageFinder` (find + `exists` + the lambda control flow `whileExists`/`ifExists`/
   `untilExists`), `ImageClicker`, `ImageWaiter`, `MatchResult`, `ImageTemplate`, `ImageTemplateGroup`,
-  `Pixel`, `Vision` (the last image and colour match). `api.text` is OCR: `Text` (with `Text.lastMatch()`),
+  `Pixel`, `Vision` (the last image and colour match), `Screen` (`waitStable`/`waitChange`, a fixed tolerance,
+  2026-10-11). `api.text` is OCR: `Text` (with `Text.lastMatch()`),
   `TextMatch`, `TextResult`, `OcrOptions`, `OcrLanguage`. `Precision` is `Pixel`'s knobs as one value (`EXACT`/`TIGHT`/`DEFAULT`/`LOOSE`, a validating
   `of(…)`, withers): a type because ΔE has no obvious scale and the pixel count is an *area* routinely misread
   as a width, and because an editor is claimed by **type**, never by a method and an argument index.

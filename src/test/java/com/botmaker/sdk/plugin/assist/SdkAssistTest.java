@@ -26,6 +26,7 @@ import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
+import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
@@ -42,6 +43,7 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -68,7 +70,8 @@ class SdkAssistTest {
     private static final Area WATCHED = new Area(1000, 500, 400, 300);
 
     @TempDir
-    Path resources;
+    Path bot;
+    private Path resources;
 
     private Host host;
     private Agent agent;
@@ -76,6 +79,7 @@ class SdkAssistTest {
     @BeforeEach
     void setUp() throws IOException {
         Frames.forget();
+        resources = Files.createDirectories(bot.resolve("src/main/resources"));
         host = new Host(resources);
         agent = new Agent(host);
         TemplateLibrary.saveTemplate(resources, patch(), "ore");
@@ -188,6 +192,20 @@ class SdkAssistTest {
         assertTrue(text(run("find_color", "color", "255,0,0", "x", 0, "y", 0, "width", 100, "height", 100))
                 .startsWith("#FF0000 is not on the screen there"));
         assertTrue(run("find_color", "color", "red").isRefused());
+    }
+
+    @Test
+    void theLatestRunsSavedFramesAreListedAndShownByNameOnly() throws IOException {
+        assertTrue(text(run("missed_frames")).startsWith("The latest run saved no frame"));
+        Path run = Files.createDirectories(bot.resolve(MissFrames.FOLDER).resolve("20261011-120000"));
+        ImageIO.write(new BufferedImage(1920, 1080, BufferedImage.TYPE_INT_RGB), "png",
+                run.resolve("01-ore-not-found.png").toFile());
+
+        String listed = text(run("missed_frames"));
+        assertTrue(listed.endsWith("01-ore-not-found.png"), listed);
+        AgentReply shown = run("missed_frames", "name", "01-ore-not-found.png");
+        assertEquals(new java.awt.Dimension(1024, 576), size(shown));
+        assertTrue(run("missed_frames", "name", "../../src/main/resources/ore.png").isRefused());
     }
 
     // ── pictures and places ─────────────────────────────────────────────────────────────────────────────
@@ -533,7 +551,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(37, names.size());
+        assertEquals(38, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
@@ -663,7 +681,7 @@ class SdkAssistTest {
             return id.substring(id.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
         }
 
-        @Override public Path projectDir() { return resources.getParent(); }
+        @Override public Path projectDir() { return resources.resolve("../../..").normalize(); }
         @Override public Path resourcesDir() { return resources; }
         @Override public Theme theme() { return null; }
         @Override public Dialogs dialogs() { return null; }

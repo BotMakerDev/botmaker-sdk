@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.input.Mouse;
 import com.botmaker.sdk.api.time.Wait;
+import com.botmaker.sdk.internal.trace.MissFrames;
 
 import java.time.Duration;
 
@@ -68,10 +69,11 @@ public class ImageWaiter {
                 return true;
             }
             Wait.milliseconds(100);
+            if (Thread.currentThread().isInterrupted()) break;   // the run is stopping: no more polls
         }
 
-        Debug.log("timeout waiting for " + template.id());
         Vision.setLastMatch(MatchResult.notFound());
+        MissFrames.missed("timed out waiting for " + template.id(), source, null);
         return false;
     }
 
@@ -108,11 +110,12 @@ public class ImageWaiter {
                 return true;
             }
             Wait.milliseconds(100);
+            if (Thread.currentThread().isInterrupted()) break;   // as in waitFor
         }
 
-        Debug.log("timeout: " + template.id() + " still visible");
         // Set last match to notFound since we timed out waiting for it to disappear
         Vision.setLastMatch(MatchResult.notFound());
+        MissFrames.missed("timed out: " + template.id() + " still showing", source, null);
         return false;
     }
 

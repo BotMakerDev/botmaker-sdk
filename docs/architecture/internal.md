@@ -24,4 +24,5 @@ launch, the emulator transport, OpenCV matching) lives in **shared**, where Stud
   writes one per call a bot makes into an offered class, so `Mouse`, `Wait` and `Keyboard` write none of their
   own; a line adds what the call's arguments and result cannot say (the match score, the window keys went to,
   a collapsed run). `Debug.error`/`Diag.error` print and trace whatever the debug switch says.
-  `../docs/refactor/40-run-trace.md`.
+  `../docs/refactor/40-run-trace.md`. `MissFrames` (2026-10-11) saves the frame a timed-out wait saw under
+  `target/botmaker-runs/` and warns with its name, in a bot's run only, bounded per run and across runs.
