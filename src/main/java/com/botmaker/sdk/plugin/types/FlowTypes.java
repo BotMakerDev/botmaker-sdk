@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
+import com.botmaker.sdk.api.flow.Run;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -14,19 +15,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The shapes an {@code @SdkValue} value of this plugin's takes: the flow's five records, as the components
- * that go inside the calls that write them.
+ * The shapes an {@code @SdkValue} value of this plugin's takes: a flow's four records, the run around the
+ * flows and the layout's, as the components that go inside the calls that write them.
  *
- * <h2>Why a flow is five declarations and not one type</h2>
+ * <h2>Why a flow is four declarations and not one type</h2>
  *
  * <p>A {@link ComponentType} is what lets the editor take an expression apart into typed parts, change one
  * of them and put the rest back exactly as written. One opaque {@code FLOW} leaf with a codec would give the
- * editor a string — which is where this whole design started, and what it exists to leave behind. Five
+ * editor a string — which is where this whole design started, and what it exists to leave behind. Four
  * declarations give it {@code Flow.of(List.of(Flow.activity(…), …), List.of(…), Activities.Collect.class,
  * Flow.limits(…))} as a tree it can walk, typed at every tip.
  *
  * <p><b>None of them implements {@code PluginType}</b>, and that is why the two interfaces are independent:
- * a {@code Step}, an {@code Edge}, a {@code Preset} and a {@code Limits} are parts of a flow and are
+ * a {@code Step}, an {@code Edge} and a {@code Limits} are parts of a flow and are
  * never picked on their own, so extending it would owe each a {@code fresh()} and an {@code editor()}
  * nothing would ever call.
  *
@@ -45,7 +46,7 @@ import java.util.Map;
  *
  * <h2>A body is a name, and it crosses as the source it is written as</h2>
  *
- * <p>An activity's body is written {@code Collect::body}, and the flow's {@code .home(…)} {@code Gamebot::goHome}.
+ * <p>An activity's body is written {@code Collect::body}, and the run's {@code .home(…)} {@code Gamebot::goHome}.
  * Neither is made into a live object — the editor never runs a bot's code — so each crosses as the
  * {@code String} the file writes, and is written back exactly so. The flow editor checks what a person types
  * ({@code FlowNames.isMethodReference}); this class checks nothing.
@@ -79,19 +80,16 @@ public final class FlowTypes {
         return none ? "" : written;
     }
 
-    // ---- the five containers ---------------------------------------------------------------------------
+    // ---- the containers --------------------------------------------------------------------------------
 
     /**
-     * {@code Flow.of(List<Step>, List<Edge>, List<Preset>, Class start, Limits)} and its {@code .home(…)} and
-     * {@code .setup(…)} links, each written only when the flow has one. A flow with nothing in it has no activity to start at, so no class
-     * literal to write: it is written {@code Flow.NONE} ({@link #written}).
+     * {@code Flow.of(List<Step>, List<Edge>, Class start, Limits)}. A flow with nothing in it has no activity to
+     * start at, so no class literal to write: it is written {@code Flow.NONE} ({@link #written}).
      */
     public static final DeclaredCall<Flow> FLOW_SHAPE = ComponentType.part(Flow.class)
-            .writtenAs(Flow::of, Flow::steps, Flow::edges, Flow::presets, flow -> null, Flow::limits)
-            .components(flow -> List.of(flow.steps(), flow.edges(), flow.presets(), flow.start(), flow.limits()))
+            .writtenAs(Flow::of, Flow::steps, Flow::edges, flow -> null, Flow::limits)
+            .components(flow -> List.of(flow.steps(), flow.edges(), flow.start(), flow.limits()))
             .build(FlowTypes::flow)
-            .<Runnable>with(Flow::home, flow -> sourceOf(flow.home()), FlowTypes::withHome)
-            .<Runnable>with(Flow::setup, flow -> sourceOf(flow.setup()), FlowTypes::withSetup)
             .constants(Flow.NONE);
 
     /** {@code flow} as it can be written: {@link Flow#NONE} once it has no activity left to start at. */
@@ -100,31 +98,42 @@ public final class FlowTypes {
     }
 
     private static Flow flow(List<Object> parts) {
-        if (parts.size() != 5 || !(parts.get(3) instanceof Activity start)
-                || !(parts.get(4) instanceof Flow.Limits limits)) {
+        if (parts.size() != 4 || !(parts.get(2) instanceof Activity start)
+                || !(parts.get(3) instanceof Flow.Limits limits)) {
             return null;
         }
         List<Flow.Step> steps = all(parts.get(0), Flow.Step.class);
         List<Flow.Edge> edges = all(parts.get(1), Flow.Edge.class);
-        List<Flow.Preset> presets = all(parts.get(2), Flow.Preset.class);
-        if (steps == null || edges == null || presets == null) return null;
-        return new Flow(steps, edges, presets, start, limits, null, null);
+        if (steps == null || edges == null) return null;
+        return new Flow(steps, edges, start, limits);
     }
 
-    private static Flow withHome(Flow flow, Object part) {
+    /**
+     * {@code Run.of(Flow)} and its {@code .home(…)} and {@code .setup(…)} links, each written only when the run has
+     * one. The flow is a constant of the bot's {@code Flows}, and the host writes it as that constant's name
+     * because the value equals it — {@code Run.of(Flows.MAIN)}.
+     */
+    public static final DeclaredCall<Run> RUN_SHAPE = ComponentType.part(Run.class)
+            .writtenAs(Run::of, Run::flow)
+            .<Runnable>with(Run::home, run -> sourceOf(run.home()), FlowTypes::withHome)
+            .<Runnable>with(Run::setup, run -> sourceOf(run.setup()), FlowTypes::withSetup)
+            .constants(Run.NONE);
+
+    private static Run withHome(Run run, Object part) {
         if (!(part instanceof String source)) return null;
-        return flow.home(method(source));
+        return run.home(method(source));
     }
 
-    private static Flow withSetup(Flow flow, Object part) {
+    private static Run withSetup(Run run, Object part) {
         if (!(part instanceof String source)) return null;
-        return flow.setup(method(source));
+        return run.setup(method(source));
     }
 
     /**
      * {@code Flow.activity(Class, ActivityBody)} and its links: {@code .described(String)}, {@code .off()},
-     * {@code .goesHome()}, {@code .checksPopups()}, {@code .whenOff(Class)}, each written only when the step is
-     * not as {@code Flow.activity} makes it. A new step is on, so its flag is the negative {@code off()}.
+     * {@code .goesHome()}, {@code .checksPopups()}, {@code .switchable()}, {@code .whenOff(Class)}, each written
+     * only when the step is not as {@code Flow.activity} makes it. A new step is on, so its flag is the negative
+     * {@code off()}.
      *
      * <p>A body crosses as the source it is written as, never as the functional object; a live one answers
      * empty, which reads as "written by hand" and is refused rather than guessed at. A card with no method yet is
@@ -138,6 +147,7 @@ public final class FlowTypes {
             .flag(Flow.Step::off, step -> !step.enabled())
             .flag(Flow.Step::goesHome, Flow.Step::goHome)
             .flag(Flow.Step::checksPopups, Flow.Step::popupCheck)
+            .flag(Flow.Step::switchable, Flow.Step::runnerSwitch)
             .<Class<? extends Outcome>>with(Flow.Step::whenOff, Flow.Step::whenOff, FlowTypes::withOff);
 
     private static Flow.Step step(List<Object> parts) {
@@ -150,20 +160,13 @@ public final class FlowTypes {
 
     private static Flow.Step withOff(Flow.Step step, Object part) {
         if (!(part instanceof Activity to)) return null;
-        return new Flow.Step(step.activity(), step.body(), step.description(), step.enabled(), step.goHome(),
-                step.popupCheck(), to);
+        return whenOff(step, to);
     }
 
-    /** {@code Flow.preset(String, List<Class>)}. */
-    public static final DeclaredCall<Flow.Preset> PRESET_SHAPE = ComponentType.part(Flow.Preset.class)
-            .writtenAs(Flow::preset, Flow.Preset::name, preset -> null)
-            .components(preset -> List.of(preset.name(), preset.activities()))
-            .build(FlowTypes::preset);
-
-    private static Flow.Preset preset(List<Object> parts) {
-        if (parts.size() != 2 || !(parts.get(0) instanceof String name)) return null;
-        List<Activity> activities = all(parts.get(1), Activity.class);
-        return activities == null ? null : new Flow.Preset(name, activities);
+    /** {@code step} going on to {@code to} when switched off: {@code .whenOff(…)} for an activity held by name. */
+    public static Flow.Step whenOff(Flow.Step step, Activity to) {
+        return new Flow.Step(step.activity(), step.body(), step.description(), step.enabled(), step.goHome(),
+                step.popupCheck(), step.runnerSwitch(), to);
     }
 
     /** {@code Flow.edge(Outcome, Class)}: the activity it leaves is the outcome's. */
@@ -184,34 +187,51 @@ public final class FlowTypes {
             .writtenAs(Flow::limits, Flow.Limits::maxSteps, Flow.Limits::stepDelayMs);
 
     /**
-     * {@code FlowLayout.of(Map<String, Spot>, boolean)}: the card positions, the {@code FLOW_LAYOUT}
-     * value beside the flow. The map is the host's to write ({@code Map.ofEntries}); its values
-     * are {@link #SPOT_SHAPE}s. A flow nobody has laid out is written {@code FlowLayout.NONE}.
+     * {@code FlowLayout.of(Map<String, Cards>, boolean)}: the card positions, the {@code FLOW_LAYOUT} value beside
+     * the run, keyed by flow. The map is the host's to write ({@code Map.ofEntries}); its values are
+     * {@link #CARDS_SHAPE}s. A bot nobody has laid out is written {@code FlowLayout.NONE}.
      */
     public static final DeclaredCall<FlowLayout> LAYOUT_SHAPE = ComponentType.part(FlowLayout.class)
-            .writtenAs(FlowLayout::of, FlowLayout::spots, FlowLayout::goHomeByDefault)
+            .writtenAs(FlowLayout::of, FlowLayout::flows, FlowLayout::goHomeByDefault)
             .build(FlowTypes::layout)
             .constants(FlowLayout.NONE);
 
-    /** The layout back, keeping every entry that is a name and a spot: a stray entry costs one card, not all. */
+    /** The layout back, keeping every entry that is a name and cards: a stray entry costs one flow, not all. */
     private static FlowLayout layout(List<Object> parts) {
         if (parts.size() != 2) return null;
-        Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
+        Map<String, FlowLayout.Cards> flows = new LinkedHashMap<>();
         if (parts.get(0) instanceof Map<?, ?> map) {
+            map.forEach((name, cards) -> {
+                if (name instanceof String n && cards instanceof FlowLayout.Cards c) flows.put(n, c);
+            });
+        }
+        return FlowLayout.of(flows, !(parts.get(1) instanceof Boolean b) || b);
+    }
+
+    /** {@code FlowLayout.cards(Map<String, Spot>)}: one flow's cards, each a {@link #SPOT_SHAPE}. */
+    public static final DeclaredCall<FlowLayout.Cards> CARDS_SHAPE = ComponentType.part(FlowLayout.Cards.class)
+            .writtenAs(FlowLayout::cards, FlowLayout.Cards::spots)
+            .build(FlowTypes::cards);
+
+    /** One flow's cards back, keeping every entry that is a name and a spot: a stray one costs one card. */
+    private static FlowLayout.Cards cards(List<Object> parts) {
+        if (parts.size() != 1) return null;
+        Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
+        if (parts.getFirst() instanceof Map<?, ?> map) {
             map.forEach((name, spot) -> {
                 if (name instanceof String n && spot instanceof FlowLayout.Spot s) spots.put(n, s);
             });
         }
-        return FlowLayout.of(spots, !(parts.get(1) instanceof Boolean b) || b);
+        return FlowLayout.cards(spots);
     }
 
     /** {@code FlowLayout.at(int, int)}. */
     public static final DeclaredCall<FlowLayout.Spot> SPOT_SHAPE = ComponentType.part(FlowLayout.Spot.class)
             .writtenAs(FlowLayout::at, FlowLayout.Spot::x, FlowLayout.Spot::y);
 
-    /** The flow's five and the layout's two, which is what {@code SdkPlugin.componentTypes()} hands the host. */
-    public static final List<ComponentType<?>> ALL = List.of(FLOW_SHAPE, STEP_SHAPE, PRESET_SHAPE,
-            EDGE_SHAPE, LIMITS_SHAPE, LAYOUT_SHAPE, SPOT_SHAPE);
+    /** The flow's four, the run and the layout's three, which is what {@code SdkPlugin.componentTypes()} hands the host. */
+    public static final List<ComponentType<?>> ALL = List.of(FLOW_SHAPE, STEP_SHAPE, EDGE_SHAPE, LIMITS_SHAPE,
+            RUN_SHAPE, LAYOUT_SHAPE, CARDS_SHAPE, SPOT_SHAPE);
 
     /** Every element of {@code list} as a {@code type}, or {@code null} when one is not. */
     private static <E> List<E> all(Object list, Class<E> type) {
@@ -231,7 +251,7 @@ public final class FlowTypes {
      * class, switched on and with no links.
      */
     public static Flow.Step step(Activity activity, ActivityBody<?> body) {
-        return new Flow.Step(activity, body, "", true, false, false, Activity.NONE);
+        return new Flow.Step(activity, body, "", true, false, false, false, Activity.NONE);
     }
 
     /**
@@ -243,7 +263,7 @@ public final class FlowTypes {
     }
 
     /**
-     * The flow's home or setup that only knows what it is written as — {@code Gamebot::goHome} — or {@code null}.
+     * The run's home or setup that only knows what it is written as — {@code Gamebot::goHome} — or {@code null}.
      */
     public static Runnable method(String source) {
         return source == null || source.isBlank() ? null : new NamedMethod(source);
@@ -259,7 +279,7 @@ public final class FlowTypes {
         return body instanceof Named(String source) ? source : "";
     }
 
-    /** How the flow's home or setup is written, or {@code ""} for none or a real one. */
+    /** How the run's home or setup is written, or {@code ""} for none or a real one. */
     public static String sourceOf(Runnable method) {
         return method instanceof NamedMethod(String source) ? source : "";
     }
@@ -280,7 +300,7 @@ public final class FlowTypes {
         }
     }
 
-    /** The flow's home or setup as a name, {@code Gamebot::goHome}: {@link Named}'s counterpart, and as honest. */
+    /** The run's home or setup as a name, {@code Gamebot::goHome}: {@link Named}'s counterpart, and as honest. */
     record NamedMethod(String source) implements Runnable {
 
         @Override

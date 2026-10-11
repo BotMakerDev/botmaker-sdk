@@ -28,7 +28,7 @@ import java.util.Set;
  * <ol>
  *   <li><b>Rename</b> each relabelled activity's enum, then each relabelled outcome inside its enum — the host
  *       renames it and every use (a body's {@code return Activities.Collect.WON;}, an
- *       {@code ActivitySwitch.disable(Activities.Battle.class)}, {@code Sdk.flow()} itself).</li>
+ *       {@code ActivitySwitch.disable(Activities.Battle.class)}, the {@code Flows} constants themselves).</li>
  *   <li><b>Add</b> an enum for every activity none holds, seeded with its outcomes, and a constant for every
  *       outcome its enum does not hold.</li>
  *   <li>The caller writes the flow; each activity is written as its class literal and each outcome as its

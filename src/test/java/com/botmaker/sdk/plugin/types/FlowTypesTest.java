@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
+import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
 
@@ -43,15 +44,17 @@ class FlowTypesTest {
         Flow.Step collect = FlowTypes.step(COLLECT, FlowTypes.body("Collect::body"))
                 .described("Click collect, then battle.").checksPopups();
         Flow.Step rest = FlowTypes.step(REST, FlowTypes.body("Rest::body"))
-                .described("Wait, then go round again.").off().goesHome();
+                .described("Wait, then go round again.").off().goesHome().switchable();
         rest = (Flow.Step) FlowTypes.STEP_SHAPE.withers().getLast().applyTo(rest, COLLECT);
         return new Flow(List.of(collect, rest),
                 List.of(new Flow.Edge(BotConstants.outcome("Collect", "NEXT"), COLLECT),
                         new Flow.Edge(NOTHING_LEFT, REST),
                         new Flow.Edge(BotConstants.outcome("Rest", "NEXT"), COLLECT)),
-                List.of(new Flow.Preset("Gathering only", List.of(COLLECT))),
-                COLLECT, Flow.limits(1000, 1000), FlowTypes.method("Gamebot::goHome"),
-                FlowTypes.method("Gamebot::setup"));
+                COLLECT, Flow.limits(1000, 1000));
+    }
+
+    private static Run run() {
+        return Run.of(gamebot()).home(FlowTypes.method("Gamebot::goHome")).setup(FlowTypes.method("Gamebot::setup"));
     }
 
     /** {@code build(components(v))} for one shape, which is the law every {@code ComponentType} owes. */
@@ -62,26 +65,32 @@ class FlowTypesTest {
     @Test
     void aFlowComesApartAndGoesBackTogetherWhole() {
         assertEquals(gamebot(), roundTrip(FlowTypes.FLOW_SHAPE, gamebot()));
-        assertEquals("Gamebot::goHome", FlowTypes.sourceOf(roundTrip(FlowTypes.FLOW_SHAPE, gamebot()).home()));
+        assertTrue(roundTrip(FlowTypes.FLOW_SHAPE, gamebot()).steps().getLast().runnerSwitch(),
+                "the runner's switch rides on its card");
     }
 
-    /** {@code .home(…)} and {@code .setup(…)} are two links, each written only when the flow has one. */
+    /**
+     * The run names the default flow, and its {@code .home(…)} and {@code .setup(…)} are two links, each written
+     * only when the bot has one — one each for the whole bot, whichever flow runs.
+     */
     @Test
-    void theSetupIsALinkOfItsOwn() {
-        Flow flow = gamebot();
-        assertEquals("Gamebot::setup", FlowTypes.sourceOf(flow.setup()));
-        Flow none = flow.setup(null);
+    void theRunHoldsTheFlowItsHomeAndItsSetup() {
+        assertEquals(run(), roundTrip(FlowTypes.RUN_SHAPE, run()));
+        assertEquals("Gamebot::goHome", FlowTypes.sourceOf(roundTrip(FlowTypes.RUN_SHAPE, run()).home()));
+        Run none = run().setup(null);
         assertEquals("Gamebot::goHome", FlowTypes.sourceOf(none.home()), "dropping the setup keeps the home");
-        assertNull(flow.home(null).home());
-        assertEquals("Gamebot::setup", FlowTypes.sourceOf(flow.home(null).setup()), "and the other way round");
-        assertEquals(2, FlowTypes.FLOW_SHAPE.withers().size());
+        assertNull(run().home(null).home());
+        assertEquals("Gamebot::setup", FlowTypes.sourceOf(run().home(null).setup()), "and the other way round");
+        assertEquals(2, FlowTypes.RUN_SHAPE.withers().size());
+        assertEquals(List.of(Flow.class, Runnable.class, Runnable.class), FlowTypes.RUN_SHAPE.componentTypes());
+        assertEquals(Run.NONE, roundTrip(FlowTypes.RUN_SHAPE, Run.NONE));
     }
 
     @Test
     void anEmptyFlowSurvives() {
         assertEquals(Flow.NONE, roundTrip(FlowTypes.FLOW_SHAPE, Flow.NONE));
         assertEquals(1, FlowTypes.FLOW_SHAPE.constants().size(), "written as Flow.NONE: no start to name");
-        Flow emptied = new Flow(List.of(), List.of(), List.of(), null, Flow.limits(5, 5), null, null);
+        Flow emptied = new Flow(List.of(), List.of(), null, Flow.limits(5, 5));
         assertEquals(Flow.NONE, FlowTypes.written(emptied), "a flow with no activity left has nothing to start at");
         assertEquals(gamebot(), FlowTypes.written(gamebot()));
     }
@@ -96,7 +105,6 @@ class FlowTypesTest {
         assertNull(FlowTypes.STEP_SHAPE.build(List.of(COLLECT, "Collect::body", "a description")),
                 "a part count that is neither the call's nor the call's and every link's is not this shape");
         assertEquals(flow.edges().get(1), roundTrip(FlowTypes.EDGE_SHAPE, flow.edges().get(1)));
-        assertEquals(flow.presets().getFirst(), roundTrip(FlowTypes.PRESET_SHAPE, flow.presets().getFirst()));
         assertEquals(flow.limits(), roundTrip(FlowTypes.LIMITS_SHAPE, flow.limits()));
     }
 
@@ -109,24 +117,25 @@ class FlowTypesTest {
     }
 
     /**
-     * A flow is five components, and which five is the fact the host writes the call from: the start is a
+     * A flow is four components, and which four is the fact the host writes the call from: the start is a
      * {@code Class}, which the host reads and writes as the class literal of a managed enum.
      */
     @Test
-    void aFlowIsFiveComponentsAHomeAndASetup() {
-        assertEquals(List.of(List.class, List.class, List.class, Class.class, Flow.Limits.class, Runnable.class,
-                Runnable.class), FlowTypes.FLOW_SHAPE.componentTypes());
-        assertEquals(7, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
+    void aFlowIsFourComponents() {
+        assertEquals(List.of(List.class, List.class, Class.class, Flow.Limits.class),
+                FlowTypes.FLOW_SHAPE.componentTypes());
+        assertEquals(4, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
         assertEquals(List.of(Class.class, ActivityBody.class, String.class, boolean.class, boolean.class,
-                boolean.class, Class.class), FlowTypes.STEP_SHAPE.componentTypes());
+                boolean.class, boolean.class, Class.class), FlowTypes.STEP_SHAPE.componentTypes());
         assertEquals(List.of(Outcome.class, Class.class), FlowTypes.EDGE_SHAPE.componentTypes());
     }
 
     /** A flow is one call on {@code Flow} itself, which is what the host identifies it by. */
     @Test
     void aFlowIsWrittenAsACallOnFlow() throws NoSuchMethodException {
-        assertEquals(Flow.class.getMethod("of", List.class, List.class, List.class, Class.class,
-                Flow.Limits.class), FlowTypes.FLOW_SHAPE.factory());
+        assertEquals(Flow.class.getMethod("of", List.class, List.class, Class.class, Flow.Limits.class),
+                FlowTypes.FLOW_SHAPE.factory());
+        assertEquals(Run.class.getMethod("of", Flow.class), FlowTypes.RUN_SHAPE.factory());
     }
 
     /** An activity and an outcome are written by their names, which the host spells as the bot's own. */
@@ -174,51 +183,66 @@ class FlowTypesTest {
     /** The enable flag is part of the flow, because a run reads it. */
     @Test
     void anActivitySwitchedOffIsStillPartOfTheFlow() {
-        Flow off = new Flow(List.of(FlowTypes.step(REST, FlowTypes.body("Rest::body")).off()), List.of(), List.of(),
-                REST, Flow.Limits.DEFAULT, null, null);
+        Flow off = new Flow(List.of(FlowTypes.step(REST, FlowTypes.body("Rest::body")).off()), List.of(), REST,
+                Flow.Limits.DEFAULT);
         Flow read = roundTrip(FlowTypes.FLOW_SHAPE, off);
         assertFalse(read.steps().getFirst().enabled());
         assertEquals(off, read);
     }
 
-    /** A saved preset is a named set of enable flags, and it travels in the value beside them. */
-    @Test
-    void aPresetRoundTripsWithTheFlow() {
-        Flow read = roundTrip(FlowTypes.FLOW_SHAPE, gamebot());
-        assertEquals(1, read.presets().size());
-        assertEquals("Gathering only", read.presets().getFirst().name());
-        assertTrue(read.presets().getFirst().enables(COLLECT));
-        assertFalse(read.presets().getFirst().enables(REST));
-    }
-
     /**
-     * The card positions come back as they were written, in the order the cards were given, so the Java the
-     * editor writes does not reshuffle on every save.
+     * The card positions come back as they were written, one arrangement per flow, each in the order its cards
+     * were given, so the Java the editor writes does not reshuffle on every save.
      */
     @Test
-    void aLayoutRoundTripsInItsOwnOrder() {
-        Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
-        spots.put("Rest", FlowLayout.at(320, 80));
-        spots.put("Collect", FlowLayout.at(40, 120));
-        FlowLayout layout = FlowLayout.of(spots, false);
+    void aLayoutRoundTripsPerFlowInItsOwnOrder() {
+        Map<String, FlowLayout.Spot> main = new LinkedHashMap<>();
+        main.put("Rest", FlowLayout.at(320, 80));
+        main.put("Collect", FlowLayout.at(40, 120));
+        Map<String, FlowLayout.Cards> flows = new LinkedHashMap<>();
+        flows.put("MAIN", FlowLayout.cards(main));
+        flows.put("DAILY", FlowLayout.cards(Map.of("Collect", FlowLayout.at(0, 0))));
+        FlowLayout layout = FlowLayout.of(flows, false);
 
         FlowLayout read = FlowTypes.LAYOUT_SHAPE.build(FlowTypes.LAYOUT_SHAPE.components(layout).stream()
-                .map(part -> part instanceof Map<?, ?> m ? rebuiltSpots(m) : part).toList());
+                .map(part -> part instanceof Map<?, ?> m ? rebuiltCards(m) : part).toList());
         assertEquals(layout, read);
-        assertEquals(List.of("Rest", "Collect"), List.copyOf(read.spots().keySet()));
+        assertEquals(List.of("MAIN", "DAILY"), List.copyOf(read.flows().keySet()));
+        assertEquals(List.of("Rest", "Collect"), List.copyOf(read.cardsOf("MAIN").spots().keySet()));
         assertFalse(read.goHomeByDefault());
-        assertEquals(FlowLayout.at(40, 120), read.spot("Collect"));
+        assertEquals(FlowLayout.at(40, 120), read.cardsOf("MAIN").spot("Collect"));
+        assertEquals(FlowLayout.at(0, 0), read.cardsOf("DAILY").spot("Collect"), "the same card, placed apart");
+        assertTrue(read.cardsOf("WEEKLY").spots().isEmpty(), "a flow nobody laid out has no cards placed");
+    }
+
+    /** Replacing one flow's cards keeps every other flow's where it was. */
+    @Test
+    void oneFlowsCardsChangeAlone() {
+        FlowLayout layout = FlowLayout.of(Map.of("DAILY", FlowLayout.cards(Map.of("Collect", FlowLayout.at(1, 2)))),
+                true);
+        FlowLayout moved = layout.with("MAIN", FlowLayout.cards(Map.of("Rest", FlowLayout.at(5, 6))));
+        assertEquals(FlowLayout.at(1, 2), moved.cardsOf("DAILY").spot("Collect"));
+        assertEquals(FlowLayout.at(5, 6), moved.cardsOf("MAIN").spot("Rest"));
+        assertFalse(moved.goingHomeByDefault(false).goHomeByDefault());
     }
 
     /** A layout nobody drew is written as the constant that says so. */
     @Test
     void anEmptyLayoutIsWrittenAsNone() throws ReflectiveOperationException {
         assertEquals(List.of(FlowLayout.class.getField("NONE")), FlowTypes.LAYOUT_SHAPE.constants());
-        assertTrue(FlowLayout.NONE.spots().isEmpty());
+        assertTrue(FlowLayout.NONE.flows().isEmpty());
         assertTrue(FlowLayout.NONE.goHomeByDefault());
     }
 
-    /** Each spot through its own declaration, as the host takes a map's values apart. */
+    /** Each flow's cards and each spot through their own declarations, as the host takes a map's values apart. */
+    private static Map<String, FlowLayout.Cards> rebuiltCards(Map<?, ?> written) {
+        Map<String, FlowLayout.Cards> out = new LinkedHashMap<>();
+        written.forEach((name, cards) -> out.put((String) name, FlowTypes.CARDS_SHAPE.build(
+                FlowTypes.CARDS_SHAPE.components((FlowLayout.Cards) cards).stream()
+                        .map(part -> part instanceof Map<?, ?> m ? rebuiltSpots(m) : part).toList())));
+        return out;
+    }
+
     private static Map<String, FlowLayout.Spot> rebuiltSpots(Map<?, ?> written) {
         Map<String, FlowLayout.Spot> out = new LinkedHashMap<>();
         written.forEach((name, spot) -> out.put((String) name,

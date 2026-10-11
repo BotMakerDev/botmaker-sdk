@@ -15,9 +15,9 @@ import java.lang.annotation.Target;
  * <pre>{@code
  * public final class Sdk {
  *
- *     @SdkValue(SdkValue.Id.FLOW)
- *     public static Flow flow() {
- *         return Flow.of(…);
+ *     @SdkValue(SdkValue.Id.RUN)
+ *     public static Run run() {
+ *         return Run.of(Flows.MAIN).home(Gamebot::goHome);
  *     }
  * }
  *
@@ -42,9 +42,17 @@ public @interface SdkValue {
 
     /** The SDK's values, one constant each. */
     enum Id {
-        /** The activity flow: what runs, in what order, and what stops it — a {@code Flow} method. */
-        FLOW,
-        /** Where the Activity Flow's cards sit — a {@code FlowLayout} method a run ignores. */
+        /**
+         * The bot's activity flows, one per way of playing: what runs, in what order, and what stops it — a class
+         * of {@code Flow} constants.
+         */
+        FLOWS,
+        /**
+         * Which flow runs when nobody picks one, and the game's home and setup, which no flow owns — a {@code Run}
+         * method.
+         */
+        RUN,
+        /** Where each flow's cards sit in the Activity Flow — a {@code FlowLayout} method a run ignores. */
         FLOW_LAYOUT,
         /** Where pixels are read from — a {@code CaptureSource} method. */
         CAPTURE,

@@ -39,7 +39,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   folder of `0.png` to `9.png`, scaled as pictures are. The assistant's `save_digits` cuts the digits of a
   number on screen into it, says which digits the set still lacks, and reads the number back. Digits shown
   under 12 pixels tall are enlarged, up to three times, before they are matched.
-- **A setup for the game.** `Flow.setup(Gamebot::setup)` names the bot's own method that makes the game ready:
+- **Several flows, and activities the runner may switch off.** A bot holds its flows as constants of
+  `Flows.java` (`@SdkValue(SdkValue.Id.FLOWS)`, `public static final Flow MAIN = Flow.of(…)`), and
+  `Sdk.run()` (`@SdkValue(SdkValue.Id.RUN)`) says which one runs when nobody picks:
+  `Run.of(Flows.MAIN).home(Gamebot::goHome).setup(Gamebot::setup)`. Home and setup are the bot's, one each,
+  whichever flow runs. A card marked `.switchable()` ("Runner may switch this off" in the Activity Flow window)
+  is one the person running the bot will be able to switch off for their computer. Card positions are kept per
+  flow.
+- **A setup for the game.** `Run.setup(Gamebot::setup)` names the bot's own method that makes the game ready:
   its settings, including the ones a user chose in the bot's parameters. It runs each time the bot has started
   the game, before home, and again after a restart. `Setup.fail("Set the game to windowed mode")` ends the run
   and tells the user what to change. The Activity Flow window picks the method as it picks home, and the
@@ -69,6 +76,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed (breaking)
 
+- **`Sdk.flow()` is gone, and so are presets.** The flow moved to `Flows.MAIN` and its `.home(…)` to
+  `Sdk.run()`; `Flow.of` takes four parts (no preset list), and `FlowLayout.of` keys its cards by flow
+  (`FlowLayout.cards(…)`). A preset is now a flow of its own. Studio does not yet convert a 1.4.2 bot: its upgrade
+  is refused until that conversion ships.
 - **`Points` and `Regions` became `Spots` and `Zones`.** Studio converts them when a bot upgrades: each
   `Point` becomes a `Spot` and each `Rect` a `Zone` with the same numbers. A spot saved on a window away from
   the screen's corner is saved again.

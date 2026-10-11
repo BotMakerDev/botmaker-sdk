@@ -15,10 +15,9 @@ import java.util.List;
 
 /**
  * One activity while it is being edited on the Activity Flow canvas: its name, description and outcomes,
- * whether it is enabled, and where its card sits. Mutable and observable — the node card, the side panel and
- * the preset bar all bind to the same draft, so a change in one is visible in the others immediately. On
- * save it splits in two: a {@link Flow.Step} for {@code Sdk.flow()}, and a position for
- * {@code Sdk.flowLayout()}.
+ * whether it is enabled, and where its card sits. Mutable and observable — the node card and the side panel
+ * both bind to the same draft, so a change in one is visible in the other immediately. On save it splits in
+ * two: a {@link Flow.Step} for its {@code Flows} constant, and a position for {@code Sdk.flowLayout()}.
  *
  * <p><b>It carries no parameters.</b> The Studio class this was ported from held an observable list of the
  * activity's variables, left over from the day values were edited in this dialog's side panel; nothing has
@@ -39,11 +38,14 @@ public final class ActivityDraft {
      */
     private final ObservableList<String> outcomes = FXCollections.observableArrayList();
 
-    /** Run the flow's home method ({@code Flow.home}) before this activity. On by default; see the card's tick. */
+    /** Run the bot's home method ({@code Run.home}) before this activity. On by default; see the card's tick. */
     private final BooleanProperty goHome = new SimpleBooleanProperty(true);
 
     /** Let the popup guard dismiss popups during this activity. On by default; see the card's tick. */
     private final BooleanProperty popupCheck = new SimpleBooleanProperty(true);
+
+    /** Let the person running the bot switch this activity off for their machine ({@code .switchable()}). Off by default. */
+    private final BooleanProperty runnerSwitch = new SimpleBooleanProperty(false);
 
     private double x;
     private double y;
@@ -86,8 +88,10 @@ public final class ActivityDraft {
      * {@code exits} are its enum's outcomes ({@link Board#exitsOf}).
      */
     public static ActivityDraft of(Flow.Step step, List<String> exits, double x, double y) {
-        return new ActivityDraft(step.label(), step.description(), step.enabled(), exits, step.goHome(),
-                step.popupCheck(), x, y, FlowTypes.sourceOf(step.body()));
+        ActivityDraft draft = new ActivityDraft(step.label(), step.description(), step.enabled(), exits,
+                step.goHome(), step.popupCheck(), x, y, FlowTypes.sourceOf(step.body()));
+        draft.runnerSwitch.set(step.runnerSwitch());
+        return draft;
     }
 
     /**
@@ -100,7 +104,7 @@ public final class ActivityDraft {
      */
     public Flow.Step toStep(Activity whenOff) {
         return new Flow.Step(FlowNames.activity(name.get()), FlowTypes.body(body), description.get(), enabled.get(),
-                goHome.get(), popupCheck.get(), whenOff);
+                goHome.get(), popupCheck.get(), runnerSwitch.get(), whenOff);
     }
 
     /** Every outcome this activity can report, in its enum's order, each once. */
@@ -132,6 +136,7 @@ public final class ActivityDraft {
     public BooleanProperty goHomeProperty() { return goHome; }
 
     public BooleanProperty popupCheckProperty() { return popupCheck; }
+    public BooleanProperty runnerSwitchProperty() { return runnerSwitch; }
     public ObservableList<String> outcomes() { return outcomes; }
 
     public String name() { return name.get(); }

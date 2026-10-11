@@ -118,11 +118,15 @@ class SdkPluginSurfaceTest {
             plugin.managedValues().stream().filter(v -> v.id().equals(ManagedValue.idOf(id))).findFirst()
                     .ifPresent(v -> byId.put(id, v));
         }
-        var flow = byId.get(SdkValue.Id.FLOW);
-        assertEquals(SdkValue.class.getName(), flow.marker());
-        assertEquals("Sdk", flow.holder());
-        assertEquals(com.botmaker.sdk.api.flow.Flow.class, flow.type());
-        assertEquals(com.botmaker.sdk.api.flow.Flow.NONE, flow.initial());
+        var flows = byId.get(SdkValue.Id.FLOWS);
+        assertEquals(SdkValue.class.getName(), flows.marker());
+        assertEquals("Flows", flows.holder());
+        assertTrue(flows.isOpenSet());
+        assertEquals(com.botmaker.sdk.api.flow.Flow.class, flows.type());
+        var run = byId.get(SdkValue.Id.RUN);
+        assertEquals("Sdk", run.holder());
+        assertEquals(com.botmaker.sdk.api.flow.Run.class, run.type());
+        assertEquals(com.botmaker.sdk.api.flow.Run.NONE, run.initial());
         var layout = byId.get(SdkValue.Id.FLOW_LAYOUT);
         assertEquals("Sdk", layout.holder());
         assertEquals(com.botmaker.sdk.api.flow.FlowLayout.class, layout.type());

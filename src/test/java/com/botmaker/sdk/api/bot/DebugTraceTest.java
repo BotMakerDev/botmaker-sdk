@@ -6,8 +6,9 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.internal.flow.FlowWalker;
-import com.botmaker.sdk.internal.flow.Flows;
+import com.botmaker.sdk.internal.flow.InstalledRun;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,7 +42,7 @@ class DebugTraceTest {
         Debug.enable();
         PopupGuard.uninstall();
         PopupGuard.enabled(true);
-        Flows.use(null);
+        InstalledRun.use(null);
     }
 
     /** Runs {@code body} with stdout and stderr captured, and returns everything it printed. */
@@ -75,14 +76,14 @@ class DebugTraceTest {
     /** Mining reporting {@code reported}; BAG_FULL leads to an activity the flow lacks, which ends the run quietly. */
     private static Flow mining(Mining reported) {
         return Flow.of(List.of(Flow.activity(Mining.class, () -> reported)),
-                List.of(Flow.edge(Mining.BAG_FULL, Gone.class)), List.of(), Mining.class, Flow.limits(10, 0));
+                List.of(Flow.edge(Mining.BAG_FULL, Gone.class)), Mining.class, Flow.limits(10, 0));
     }
 
     /** Walks {@code flow} to its end, which is {@code Bot.stop()} throwing. */
     private static void run(Flow flow) {
-        Flows.use(flow);
+        InstalledRun.use(Run.of(flow));
         try {
-            FlowWalker.run(flow);
+            FlowWalker.run(Run.of(flow));
         } catch (RuntimeException ended) {
             // the run is over; only what it printed matters here
         }

@@ -277,8 +277,7 @@ public final class FlowCanvas extends StackPane {
 
     /**
      * Runs {@code change} as a single undoable step. For a caller outside the canvas that changes several
-     * things at once — applying a preset flips a dozen switches, and taking that back should be one ↶, not
-     * twelve.
+     * things at once — flipping a dozen switches together, say — taking that back should be one ↶, not twelve.
      */
     public void mutate(String label, Runnable change) { history.mutate(label, change); }
 

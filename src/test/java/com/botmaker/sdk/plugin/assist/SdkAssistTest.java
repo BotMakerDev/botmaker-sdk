@@ -17,6 +17,7 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
@@ -342,15 +343,22 @@ class SdkAssistTest {
 
     @Test
     void theFlowIsBuiltReadAndRewired() {
-        host.values.put("flow", TestContexts.row(Flow.class, "").withValue(Flow.NONE));
-        assertEquals("The flow has no activities yet; add_activity adds one.", text(run("read_flow")));
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        String empty = text(run("read_flow"));
+        assertTrue(empty.startsWith("No flow yet; the first change writes Flows.MAIN"), empty);
+        assertTrue(empty.endsWith("The flow has no activities yet; add_activity adds one."), empty);
 
+        // A project with no flow gets Flows.MAIN on its first change, and Sdk.run() names it.
         assertFalse(run("add_activity", "name", "Collect", "body", "Collect::body").isRefused());
+        assertTrue(host.calls.contains("add flows MAIN"), host.calls.toString());
+        assertEquals(flow(), ((Run) host.values.get("run").value()).flow());
         assertFalse(run("add_activity", "name", "Battle").isRefused());
+        assertEquals(1, host.set("flows").size(), "the second change edits the flow the first one wrote");
         assertFalse(run("connect", "from", "Collect", "outcome", "bag full", "to", "Battle").isRefused());
         assertFalse(run("connect", "from", "Battle", "to", "Collect").isRefused());
         String read = text(run("read_flow"));
-        assertTrue(read.startsWith("Starts at Collect;"), read);
+        assertTrue(read.startsWith("Flows.MAIN, the flow Sdk.run() runs by default."), read);
+        assertTrue(read.contains("\nStarts at Collect;"), read);
         assertTrue(read.contains("• Collect — Collect::body; outcomes [Next, Bag full]"), read);
         assertTrue(read.contains("    on Bag full → Battle"), read);
         assertTrue(read.contains("• Battle — no body yet"), read);
@@ -370,7 +378,7 @@ class SdkAssistTest {
 
     @Test
     void theFlowsSetupNamesOnlyAMethodTheBotHas() {
-        host.values.put("flow", TestContexts.row(Flow.class, "").withValue(Flow.NONE));
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
         assertFalse(run("add_activity", "name", "Collect", "body", "Collect::body").isRefused());
         String read = text(run("read_flow"));
         assertTrue(read.contains("Home: none.") && read.contains("Setup: none."), read);
@@ -378,15 +386,41 @@ class SdkAssistTest {
         AgentReply missing = run("set_flow_method", "which", "setup", "method", "Gamebot::setup");
         assertTrue(missing.isRefused());
         assertTrue(text(missing).contains("It has: none."), text(missing));
-        assertEquals("The flow has no setup now. Activities: [Collect].",
-                text(run("set_flow_method", "which", "setup")));
+        assertEquals("The bot has no setup now.", text(run("set_flow_method", "which", "setup")));
+    }
+
+    /** A run naming nothing beside a flow already written: that flow is edited, and the change makes it the run's. */
+    @Test
+    void aRunNamingNothingIsPointedAtTheFlowEdited() {
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        assertFalse(run("add_activity", "name", "Collect", "body", "Collect::body").isRefused());
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        assertTrue(text(run("read_flow")).startsWith("Flows.MAIN; Sdk.run() names no flow yet"));
+
+        assertFalse(run("add_activity", "name", "Battle").isRefused());
+        assertEquals(flow(), ((Run) host.values.get("run").value()).flow());
+        assertEquals(1, host.set("flows").size());
     }
 
     @Test
-    void aFlowWrittenByHandIsLeftAlone() {
-        host.values.put("flow", TestContexts.row(Flow.class, "myFlow()"));
+    void aRunOrFlowWrittenByHandIsLeftAlone() {
+        host.values.put("run", TestContexts.row(Run.class, "myRun()"));
         assertTrue(run("read_flow").isRefused());
         assertTrue(run("set_start", "name", "Collect").isRefused());
+
+        // A flow written inside Run.of(…) rather than as a Flows constant: no constant to edit, so none is invented.
+        Flow inline = new Flow(List.of(com.botmaker.sdk.plugin.types.FlowTypes.step(FlowNames.activity("Collect"),
+                com.botmaker.sdk.api.flow.ActivityBody.none())), List.of(), FlowNames.activity("Collect"),
+                Flow.Limits.DEFAULT);
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.of(inline)));
+        assertTrue(run("read_flow").isRefused(), "a flow inline in Sdk.run()");
+        assertTrue(run("add_activity", "name", "Battle").isRefused());
+        assertTrue(host.set("flows").isEmpty());
+
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        host.set("flows").put("MAIN", TestContexts.row(Flow.class, "myFlow()"));
+        assertTrue(run("read_flow").isRefused(), "Flows.MAIN written by hand");
+        assertTrue(run("add_activity", "name", "Collect").isRefused());
     }
 
     // ── source, settings, emulator, launch ──────────────────────────────────────────────────────────────
@@ -478,7 +512,7 @@ class SdkAssistTest {
     }
 
     private Flow flow() {
-        return (Flow) host.values.get("flow").value();
+        return (Flow) host.set("flows").get("MAIN").value();
     }
 
     private static String text(AgentReply reply) {
@@ -629,7 +663,31 @@ class SdkAssistTest {
                     .map(name -> ManagedValue.idOf(SdkValue.Id.valueOf(name.toUpperCase(Locale.ROOT)))).toList();
         }
 
-        @Override public Optional<ValueContext> open(String id) { return Optional.ofNullable(values.get(name(id))); }
+        @Override
+        public Optional<ValueContext> open(String id) {
+            if (name(id).equals("run")) followTheNamedFlow();
+            return Optional.ofNullable(values.get(name(id)));
+        }
+
+        /** The Flows constant the run was written naming, once it was. */
+        private String runNames;
+
+        /**
+         * Studio reads {@code Run.of(Flows.MAIN)} through the constant, so the run's flow is always what
+         * {@code Flows.MAIN} holds now: a run written equal to a constant is taken to name it from then on.
+         */
+        private void followTheNamedFlow() {
+            if (!(values.get("run") instanceof TestContexts.Recording row) || !(row.value() instanceof Run run)) return;
+            Map<String, TestContexts.Recording> flows = set("flows");
+            flows.forEach((member, constant) -> {
+                if (runNames == null && run.flow().equals(constant.value())) runNames = member;
+            });
+            if (runNames == null || !flows.containsKey(runNames)
+                    || !(flows.get(runNames).value() instanceof Flow named) || named.equals(run.flow())) {
+                return;
+            }
+            values.put("run", TestContexts.row(Run.class, "").withValue(new Run(named, run.home(), run.setup())));
+        }
 
         @Override
         public Optional<String> create(String id) {

@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
+import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
@@ -18,7 +19,7 @@ import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
-import com.botmaker.sdk.internal.flow.Flows;
+import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
@@ -27,10 +28,11 @@ import java.util.List;
 /**
  * The SDK's managed values, each declared once, and what a run does with each one.
  *
- * <p>Twelve declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
+ * <p>Thirteen declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
  * plugin lists {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
- * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOW} is the activity
- * flow, {@code FLOW_LAYOUT} where the flow editor draws each card (a run ignores it), {@code CAPTURE} where
+ * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOWS} are the activity
+ * flows, {@code RUN} the one that runs by default with the game's home and setup, {@code FLOW_LAYOUT} where the
+ * flow editor draws each card (a run ignores it), {@code CAPTURE} where
  * pixels are read from, {@code SETTINGS} how it clicks and looks, {@code SCREEN} the size its pictures were cut
  * at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS}, {@code ZONES} and {@code DIGITS} the classes of
  * constants the bot grows. {@code POINTS} and {@code REGIONS} are retired: read only for {@link SdkConversions}.
@@ -44,11 +46,22 @@ public final class SdkValues {
     /** The class the method-shaped values live in: {@code plugins/sdk/Sdk.java}, named by the bot's {@code main}. */
     public static final String HOLDER = "Sdk";
 
-    public static final ManagedValue<Flow> FLOW = ManagedValue.method(SdkValue.Id.FLOW)
+    /**
+     * The flows — {@code static final Flow MAIN = Flow.of(…)}, one per way of playing. 🔀 Activity Flow draws one,
+     * keeping its activities, wires and layout in step.
+     */
+    public static final ManagedValue<Flow> FLOWS = ManagedValue.openSet(SdkValue.Id.FLOWS)
+            .of(Flow.class)
+            .in("Flows")
+            .because("These are the bot's activity flows. Draw them in 🔀 Activity Flow, which keeps the"
+                    + " activities, the wires and the layout in step.");
+
+    /** Which flow runs when nobody picks, and the game's home and setup — {@code Run.of(Flows.MAIN).home(…)}. */
+    public static final ManagedValue<Run> RUN = ManagedValue.method(SdkValue.Id.RUN)
             .in(HOLDER)
-            .holds(Flow.class, Flow.NONE)
-            .because("This is the bot's activity flow. Draw it in 🔀 Activity Flow, which keeps the activities,"
-                    + " the wires and the layout in step.");
+            .holds(Run.class, Run.NONE)
+            .because("This says which flow runs when nobody picks one, and the game's home and setup. Change"
+                    + " them in 🔀 Activity Flow.");
 
     public static final ManagedValue<FlowLayout> FLOW_LAYOUT = ManagedValue.method(SdkValue.Id.FLOW_LAYOUT)
             .in(HOLDER)
@@ -82,7 +95,7 @@ public final class SdkValues {
      * The activities, each an enum of its outcomes nested in one class —
      * {@code final class Activities { enum Collect implements Outcome { NEXT, NOTHING_LEFT } }} (2026-10-10).
      * 🔀 Activity Flow adds, renames and removes an enum with its card and a constant with its exit, together with
-     * every step, wire, preset, body and {@code ActivitySwitch} call naming them.
+     * every step, wire, body and {@code ActivitySwitch} call naming them.
      */
     public static final ManagedValue<Outcome> ACTIVITIES = ManagedValue.openSet(SdkValue.Id.ACTIVITIES)
             .ofEnums(Outcome.class, BotConstants::outcome)
@@ -158,8 +171,8 @@ public final class SdkValues {
             .because("This is the size the bot's pictures were cut at. The first picture cut sets it; a private"
                     + " display is made at it and a game window is resized to it when the bot starts.");
 
-    /** All twelve, in the order the plugin declares them, the two retired ones included. */
-    public static final List<ManagedValue<?>> ALL = List.of(FLOW, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
+    /** All thirteen, in the order the plugin declares them, the two retired ones included. */
+    public static final List<ManagedValue<?>> ALL = List.of(FLOWS, RUN, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
             ACTIVITIES, POINTS, REGIONS, SPOTS, ZONES, DIGITS, SCREEN);
 
     private static boolean claimed;
@@ -175,7 +188,7 @@ public final class SdkValues {
             return;
         }
         claimed = true;
-        ManagedValues.claim(FLOW, Flows::use);
+        ManagedValues.claim(RUN, InstalledRun::use);
         ManagedValues.claim(CAPTURE, Source::set);
         ManagedValues.claim(SETTINGS, BotSettings::use);
         ManagedValues.claim(SCREEN, BotScreen::use);

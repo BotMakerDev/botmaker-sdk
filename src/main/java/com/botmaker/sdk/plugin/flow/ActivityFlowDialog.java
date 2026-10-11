@@ -17,13 +17,11 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -46,9 +44,8 @@ import java.util.function.Consumer;
  * dropped on a canvas, wired into the order they should run, and ticked.
  *
  * <p>Three panes: the {@link FlowCanvas} in the middle, a side panel with the selected card's name, outcomes
- * and go-home/popup ticks, and a top bar of presets — named on/off selections that flip the enable ticks
- * without touching the wiring. Parameters themselves are <em>defined</em> in the editor's own Parameters
- * window, not here: this dialog is about the graph.
+ * and go-home/popup/runner ticks, and a top bar of canvas tools. Parameters themselves are <em>defined</em> in
+ * the editor's own Parameters window, not here: this dialog is about the graph.
  *
  * <h2>Why this window is the plugin's</h2>
  *
@@ -59,11 +56,12 @@ import java.util.function.Consumer;
  *
  * <h2>What it writes</h2>
  *
- * <p>No file. The graph is one expression — the one {@code Sdk.flow()} returns —
- * written through {@link com.botmaker.plugin.api.source.PluginValues}, so it lands in the bot's own Java, in the
- * open buffer as well as on disk, as one entry in the project's history. The card positions are the
- * {@link FlowLayout} {@code Sdk.flowLayout()} returns, written after the flow and only when they moved, so a
- * renamed card keeps its place.
+ * <p>No file. The graph is one expression — the {@code Flows} constant {@code Sdk.run()} names
+ * ({@link FlowValue#target}) — written through {@link com.botmaker.plugin.api.source.PluginValues}, so it lands
+ * in the bot's own Java, in the open buffer as well as on disk, as one entry in the project's history. The
+ * game's home and setup are {@code Sdk.run()}'s, written after the flow and only when they changed. The card
+ * positions are this flow's entry in the {@link FlowLayout} {@code Sdk.flowLayout()} returns, written after the
+ * flow and only when they moved, so a renamed card keeps its place.
  *
  * <p>Before the flow, the names in it: each activity is an enum nested in the bot's {@code Activities} class and
  * each of its outcomes a constant of that enum, renamed, added and removed by binding as the canvas changes
@@ -79,13 +77,12 @@ public final class ActivityFlowDialog {
     private final StudioServices services;
 
     private final FlowCanvas canvas = new FlowCanvas();
-    private final List<Selection> presets = new ArrayList<>();
 
     /**
-     * The {@code @SdkValue(SdkValue.Id.FLOW)} value this window edits, or empty when the project has none — no
-     * {@code Sdk.java}, or a {@code flow()} whose body somebody wrote by hand.
+     * The flow this window edits — the {@code Flows} constant {@code Sdk.run()} names — read again after each save,
+     * since the first save of a project with no flow writes the constant.
      */
-    private Optional<ValueContext> value = Optional.empty();
+    private FlowValue.Target target = FlowValue.Target.refused(null);
 
     /** Why the flow cannot be edited, or {@code null} when it can. Shown once, on the status line. */
     private String readOnlyReason;
@@ -96,7 +93,10 @@ public final class ActivityFlowDialog {
      */
     private Optional<ValueContext> layoutValue = Optional.empty();
 
-    /** The layout last read or written, so a save that moved no card leaves {@code flowLayout()} alone. */
+    /**
+     * The whole layout last read or written, every flow's cards, so a save that moved no card leaves
+     * {@code flowLayout()} alone and one that did keeps the other flows' entries.
+     */
     private FlowLayout written = FlowLayout.NONE;
 
     /**
@@ -106,10 +106,10 @@ public final class ActivityFlowDialog {
      */
     private Set<String> savedActivities = Set.of();
 
-    /** The flow's home as read, {@code Gamebot::goHome}: the canvas does not draw it, and a save keeps it. */
+    /** The run's home, {@code Gamebot::goHome}: the canvas does not draw it, and a save writes it when it changed. */
     private Runnable home;
 
-    /** The flow's setup as read, {@code Gamebot::setup}: kept by a save, like {@link #home}. */
+    /** The run's setup, {@code Gamebot::setup}: written like {@link #home}. */
     private Runnable setup;
 
     /**
@@ -143,7 +143,6 @@ public final class ActivityFlowDialog {
     private final Label orderLabel = new Label();
     private final ProgressIndicator progress = new ProgressIndicator();
     private final VBox sidePanel = new VBox(10);
-    private final ComboBox<Selection> presetCombo = new ComboBox<>();
 
     /**
      * Autosave, coalesced. Every edit on the canvas asks to be written, which is far too much work to do per
@@ -226,19 +225,19 @@ public final class ActivityFlowDialog {
 
     /** Seeds the canvas from the stored flow: a card per activity, at its stored spot or a fresh one. */
     private void loadCurrent() {
-        value = FlowValue.FLOW.open(services);
         Flow flow = readFlow();
         Board board = Board.read(services.pluginValues(), flow);
-        home = flow.home();
-        setup = flow.setup();
+        home = target.run().home();
+        setup = target.run().setup();
         FlowLayout layout = loadLayout();
+        FlowLayout.Cards cards = layout.cardsOf(target.name());
         boolean anyPlaced = false;
         List<Arrow> arrows = new ArrayList<>(flow.edges().stream().map(Arrow::of)
                 .filter(arrow -> !arrow.outcome().isBlank()).toList());
         for (Flow.Step step : flow.steps()) {
             // By the enum's name; a layout saved before 2026-10-10 keyed a card by its label.
-            FlowLayout.Spot placed = layout.spot(step.activity().name());
-            if (placed == null) placed = layout.spot(step.label());
+            FlowLayout.Spot placed = cards.spot(step.activity().name());
+            if (placed == null) placed = cards.spot(step.label());
             anyPlaced |= placed != null;
             Point2D at = placed == null ? canvas.nextFreeSpot() : new Point2D(placed.x(), placed.y());
             canvas.add(ActivityDraft.of(step, board.exitsOf(step.label()), at.getX(), at.getY()));
@@ -253,7 +252,6 @@ public final class ActivityFlowDialog {
         stepDelayMs = flow.limits().stepDelayMs();
         goHomeByDefault = layout.goHomeByDefault();
         canvas.select(null);
-        presets.addAll(flow.presets().stream().map(Selection::of).toList());
         savedActivities = FlowEdits.labels(flow);
         canvas.refresh();
     }
@@ -261,28 +259,23 @@ public final class ActivityFlowDialog {
     /**
      * Reads the stored flow, or says why it cannot be edited and opens empty.
      *
-     * <p>Three states, one shape of answer. <b>No value</b> means the project has no {@code Sdk.java} — the
-     * SDK was never added, or the file was deleted — and the window opens empty saying so. <b>An expression
-     * the plugin did not write</b> means somebody wrote the flow by hand, and the window opens empty,
+     * <p>Three states, one shape of answer. <b>No {@code Sdk.run()}</b> means the project has no {@code Sdk.java}
+     * — the SDK was never added, or the file was deleted — and the window opens empty saying so. <b>An expression
+     * the plugin did not write</b> means somebody wrote the run or the flow by hand, and the window opens empty,
      * refuses to save, and says which it is; overwriting it is exactly what this whole design exists to
-     * avoid. Otherwise there is a flow, and it may perfectly well be {@link Flow#NONE}.
+     * avoid. Otherwise there is a flow, and it may perfectly well be {@link Flow#NONE} — a project with none yet,
+     * whose first save writes {@code Flows.MAIN}.
      *
      * <p>The window still opens in every case, because closing it outright leaves the user no way to see
      * what the project has.
      */
     private Flow readFlow() {
-        if (value.isEmpty()) {
-            readOnly("This project has no Sdk.java with an @SdkValue(FLOW) method, so there is nothing to "
-                    + "save the flow into. BotMaker writes plugins/sdk/Sdk.java when the project opens and has "
-                    + "no Sdk class anywhere; reopen the project to get it.");
+        target = FlowValue.target(services);
+        if (target.problem() != null) {
+            readOnly(target.problem());
             return Flow.NONE;
         }
-        if (!FlowValue.FLOW.readable(value.get())) {
-            readOnly("The flow in Sdk.flow() isn't one this editor wrote, so it is shown empty and left "
-                    + "alone. Edit it in Sdk.java, or replace it with Flow.of(…) to draw it here.");
-            return Flow.NONE;
-        }
-        return FlowValue.read(value.get());
+        return target.flow();
     }
 
     /** Records why the flow cannot be written, and says it once. */
@@ -291,32 +284,9 @@ public final class ActivityFlowDialog {
         error(reason);
     }
 
-    // --- top bar: presets + add activity ---
+    // --- top bar: canvas tools + add activity ---
 
     private Node buildTopBar() {
-        presetCombo.setPromptText("Preset…");
-        presetCombo.setPrefWidth(180);
-        presetCombo.setConverter(new javafx.util.StringConverter<>() {
-            @Override public String toString(Selection preset) { return preset == null ? "" : preset.name(); }
-            @Override public Selection fromString(String s) { return null; } // display-only
-        });
-        refreshPresetCombo();
-
-        Button applyPreset = new Button("Apply");
-        applyPreset.setOnAction(e -> {
-            Selection preset = presetCombo.getValue();
-            if (preset == null) { error("Pick a preset first."); return; }
-            // One step, not one per activity: a preset flips every switch at once, and taking that back should
-            // be a single ↶ rather than a dozen.
-            canvas.mutate("apply preset " + preset.name(), () -> {
-                for (ActivityDraft d : canvas.drafts()) d.enabledProperty().set(preset.enables(d.name()));
-            });
-            error("");
-        });
-
-        Button savePreset = new Button("Save selection as preset…");
-        savePreset.setOnAction(e -> saveCurrentSelectionAsPreset());
-
         Button addActivity = new Button("Add activity");
         addActivity.setTooltip(new javafx.scene.control.Tooltip(
                 "Name it and declare its outcomes up front. Double-clicking empty canvas opens the same "
@@ -336,8 +306,7 @@ public final class ActivityFlowDialog {
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox bar = new HBox(8, new Label("Presets:"), presetCombo, applyPreset, savePreset,
-                new Separator(javafx.geometry.Orientation.VERTICAL), undoButton(), redoButton(),
+        HBox bar = new HBox(8, undoButton(), redoButton(),
                 new Separator(javafx.geometry.Orientation.VERTICAL), recenter, arrange,
                 spacer, addActivity);
         bar.setAlignment(Pos.CENTER_LEFT);
@@ -388,7 +357,6 @@ public final class ActivityFlowDialog {
                 .showAt(at.getX(), at.getY());
         if (made.isEmpty()) return;
         canvas.add(made.get());
-        refreshPresetCombo();   // the built-in "Everything" preset is derived from what's on the canvas
         error("");
     }
 
@@ -397,55 +365,6 @@ public final class ActivityFlowDialog {
         for (ActivityDraft d : canvas.drafts()) names.add(d.name());
         return names;
     }
-
-    private void saveCurrentSelectionAsPreset() {
-        TextInputDialog prompt = new TextInputDialog();
-        services.theme().apply(prompt);
-        prompt.initOwner(stage);
-        prompt.setTitle("Save preset");
-        prompt.setHeaderText("Name this selection of activities");
-        prompt.setContentText("Preset name:");
-        Optional<String> chosen = prompt.showAndWait();
-        if (chosen.isEmpty()) return;
-
-        String problem = FlowNames.presetNameProblem(chosen.get(), List.of(EVERYTHING, NOTHING));
-        if (problem != null) { error(problem); return; }
-        String name = chosen.get().trim();
-
-        List<String> on = new ArrayList<>();
-        for (ActivityDraft d : canvas.drafts()) {
-            if (d.enabled()) on.add(d.name());
-        }
-        presets.removeIf(p -> p.name().equals(name)); // re-saving a name overwrites it
-        presets.add(new Selection(name, on));
-        refreshPresetCombo();
-        // The last item of the list, which is the built-ins then these — not presets.size() - 1, which is the
-        // preset two before the one just saved.
-        presetCombo.getSelectionModel().select(presetCombo.getItems().size() - 1);
-        error("");
-        markDirty();
-    }
-
-    /**
-     * The built-in presets plus the user's saved ones — built-ins are derived from what's on the canvas.
-     *
-     * <p>The two built-ins are built here rather than stored, which is what keeps them true: "Everything"
-     * over a canvas that has gained a card means the new card too, and a stored copy of the list would mean
-     * every card except the new one.
-     */
-    private void refreshPresetCombo() {
-        List<String> all = new ArrayList<>();
-        for (ActivityDraft d : canvas.drafts()) all.add(d.name());
-        List<Selection> items = new ArrayList<>();
-        items.add(new Selection(EVERYTHING, all));
-        items.add(new Selection(NOTHING, List.of()));
-        items.addAll(presets);
-        presetCombo.getItems().setAll(items);
-    }
-
-    /** The two presets the editor offers over whatever is on the canvas; never saved into the flow. */
-    private static final String EVERYTHING = "Everything";
-    private static final String NOTHING = "Nothing";
 
     // --- side panel: the selected activity's graph properties, or the project globals ---
 
@@ -496,6 +415,13 @@ public final class ActivityFlowDialog {
         popupCheck.selectedProperty().addListener((o, was, is) -> markDirty());
         popupCheck.setTooltip(new javafx.scene.control.Tooltip(FlowNames.POPUP_TIP));
 
+        CheckBox runnerSwitch = new CheckBox("Runner may switch this off");
+        runnerSwitch.selectedProperty().bindBidirectional(draft.runnerSwitchProperty());
+        runnerSwitch.selectedProperty().addListener((o, was, is) -> markDirty());
+        runnerSwitch.setTooltip(new javafx.scene.control.Tooltip("Offer this activity to the person running the "
+                + "bot, who may switch it off (or back on) for their computer without opening the project. A "
+                + "switched-off activity takes its 'disabled' arrow, as when you untick it here."));
+
         // The methods returning this activity's enum, read as the list opens. A card whose enum is not written yet
         // has none, and nothing can be created for it until the flow's next save declares the enum.
         PluginValues values = services.pluginValues();
@@ -518,6 +444,7 @@ public final class ActivityFlowDialog {
         head.addRow(2, new Label("Description"), description);
         head.add(goHome, 1, 3);
         head.add(popupCheck, 1, 4);
+        head.add(runnerSwitch, 1, 5);
         GridPane.setHgrow(name, Priority.ALWAYS);
         GridPane.setHgrow(body, Priority.ALWAYS);
         GridPane.setHgrow(description, Priority.ALWAYS);
@@ -662,19 +589,6 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * {@code presets} with the activity {@code oldName} called {@code newName}. A preset names its activities,
-     * so a rename that left them alone would quietly take the renamed card out of every preset.
-     */
-    static List<Selection> renamedIn(List<Selection> presets, String oldName, String newName) {
-        List<Selection> out = new ArrayList<>(presets.size());
-        for (Selection p : presets) {
-            out.add(new Selection(p.name(), p.activities().stream()
-                    .map(a -> a.equals(oldName) ? newName : a).toList()));
-        }
-        return out;
-    }
-
-    /**
      * Removes {@code draft} from the flow for good — the card and its wires.
      *
      * <p>This replaced "Archive activity", which promised a reversible retirement and could not deliver one.
@@ -697,14 +611,13 @@ public final class ActivityFlowDialog {
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
 
         canvas.remove(draft); // also drops any wires into or out of it
-        refreshPresetCombo();
         error("");
     }
 
     /**
-     * The flow's way home — {@code .home(Gamebot::goHome)}, run at start-up, after anything unexpected and before
-     * each activity whose ⌂ is ticked — picked among the bot's {@code public static void} methods, and how a bot
-     * starts the flow at all ({@link #methodChoice}).
+     * The bot's way home — {@code Sdk.run()}'s {@code .home(Gamebot::goHome)}, run at start-up, after anything
+     * unexpected and before each activity whose ⌂ is ticked, whichever flow runs — picked among the bot's
+     * {@code public static void} methods, and how a bot starts the flow at all ({@link #methodChoice}).
      *
      * <p>Where the run starts is the bot's own {@code main}, which this window does not write: the sentence says
      * which block to insert there. Studio offers it in {@code main} only, filled with the bot's values classes.
@@ -713,7 +626,8 @@ public final class ActivityFlowDialog {
         VBox box = new VBox(6);
         box.getChildren().add(heading("Home"));
         Label explain = new Label("The method that gets the game back to a known screen: run when the bot "
-                + "starts, after anything unexpected, and before each activity whose ⌂ is ticked.");
+                + "starts, after anything unexpected, and before each activity whose ⌂ is ticked. One for the "
+                + "whole bot, whichever flow runs.");
         explain.setWrapText(true);
         explain.getStyleClass().add("dialog-hint-text");
         box.getChildren().add(explain);
@@ -729,8 +643,8 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * The flow's setup — {@code .setup(Gamebot::setup)}, run each time the bot has started the game, before home —
-     * picked as the home is. What it checks is the bot's own code: the game's settings, and the ones
+     * The bot's setup — {@code Sdk.run()}'s {@code .setup(Gamebot::setup)}, run each time the bot has started the
+     * game, before home — picked as the home is. What it checks is the bot's own code: the game's settings, and the ones
      * a user chose in the bot's parameters.
      */
     private Node buildSetupSection() {
@@ -748,14 +662,14 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * A pick of the bot's {@code public static void} methods for the flow's {@code .<link>(…)}, starting at
+     * A pick of the bot's {@code public static void} methods for the run's {@code .<link>(…)}, starting at
      * {@code current}. One written otherwise than as a method reference is not this window's to show or replace: it
      * says so and keeps it, rather than offering a list that would read "(none)" over it.
      */
     private Node methodChoice(String link, Runnable current, String example, Consumer<Runnable> picked) {
         String source = current == null ? "" : com.botmaker.sdk.plugin.types.FlowTypes.sourceOf(current);
         if (current != null && source.isBlank()) {
-            Label kept = new Label("Sdk.flow()'s ." + link + "(…) is written in code, not as a method reference, "
+            Label kept = new Label("Sdk.run()'s ." + link + "(…) is written in code, not as a method reference, "
                     + "and is kept as it is. Change it there.");
             kept.setWrapText(true);
             return kept;
@@ -904,15 +818,11 @@ public final class ActivityFlowDialog {
             return;
         }
         String was = draft.name();
-        List<Selection> renamed = renamedIn(presets, was, candidate);
-        presets.clear();
-        presets.addAll(renamed);
         renamed(activityRenames, was, candidate);
         // An outcome's pending renames are keyed by its activity's label now.
         Map<String, String> outcomes = outcomeRenames.remove(was);
         if (outcomes != null) outcomeRenames.put(candidate, outcomes);
         draft.nameProperty().set(candidate); // the card re-labels and its arrows follow the new name
-        refreshPresetCombo();
         error("");
     }
 
@@ -1007,17 +917,14 @@ public final class ActivityFlowDialog {
 
     /** The flow as it currently stands, with each card's outcomes, ready to be written into the bot's Java. */
     private Board currentBoard() {
-        Board drawn = board(canvas.drafts(), canvas.edges(), presets, canvas.start(),
-                Flow.limits(maxSteps, stepDelayMs), home);
-        return new Board(drawn.flow().setup(setup), drawn.exits());
+        return board(canvas.drafts(), canvas.edges(), canvas.start(), Flow.limits(maxSteps, stepDelayMs));
     }
 
     /**
      * The board {@code drafts} and {@code arrows} draw: a step per card, switched off to where its
      * {@link Arrow#DISABLED} arrow goes, an edge per other arrow, and each card's ports as its outcomes.
      */
-    static Board board(List<ActivityDraft> drafts, List<Arrow> arrows, List<Selection> presets, String start,
-                       Flow.Limits limits, Runnable home) {
+    static Board board(List<ActivityDraft> drafts, List<Arrow> arrows, String start, Flow.Limits limits) {
         List<Flow.Step> steps = new ArrayList<>();
         Map<String, List<String>> exits = new LinkedHashMap<>();
         for (ActivityDraft d : drafts) {
@@ -1032,9 +939,7 @@ public final class ActivityFlowDialog {
         // A start is a class literal, so a flow with cards always names one: the first card when none is set.
         Activity first = steps.isEmpty() ? Activity.NONE : steps.getFirst().activity();
         Activity begin = start == null || start.isBlank() ? first : FlowNames.activity(start);
-        Flow flow = new Flow(steps, edges, presets.stream().map(Selection::toPreset).toList(), begin, limits, home,
-                null);
-        return new Board(flow, exits);
+        return new Board(new Flow(steps, edges, begin, limits), exits);
     }
 
     /**
@@ -1047,23 +952,40 @@ public final class ActivityFlowDialog {
         if (read.isEmpty()) {
             layoutValue = Optional.empty();
             // The flow's own reason, when it has one, is the one worth reading.
-            if (readOnlyReason == null && value.isPresent()) error("Card positions aren't kept: Sdk.java has no flowLayout() BotMaker can write.");
+            if (readOnlyReason == null) error("Card positions aren't kept: Sdk.java has no flowLayout() BotMaker can write.");
         }
         written = read.orElse(FlowLayout.NONE);
         return written;
     }
 
     /**
-     * Where every card sits, keyed by its enum's name as the layout's javadoc says, plus the one editor preference
-     * that rides along with them.
+     * The layout with this flow's cards where they sit now, keyed by each one's enum name as the layout's javadoc
+     * says, every other flow's kept as read but for the enums {@code renamedTypes} renames, plus the one editor
+     * preference that rides along with them.
      */
-    private FlowLayout currentLayout() {
+    private FlowLayout currentLayout(Map<String, String> renamedTypes) {
         Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
         for (ActivityDraft d : canvas.drafts()) {
             String type = FlowNames.typeFor(d.name());
             spots.put(type == null ? d.name() : type, FlowLayout.at((int) Math.round(d.x()), (int) Math.round(d.y())));
         }
-        return FlowLayout.of(spots, goHomeByDefault);
+        return rekeyed(written, renamedTypes).with(target.name(), FlowLayout.cards(spots))
+                .goingHomeByDefault(goHomeByDefault);
+    }
+
+    /**
+     * {@code layout} with every flow's card of an enum {@code types} renames keyed by its new name: the rename is
+     * the enum's, so it reaches every flow that runs the activity, not only the one on the canvas.
+     */
+    static FlowLayout rekeyed(FlowLayout layout, Map<String, String> types) {
+        if (types.isEmpty()) return layout;
+        FlowLayout out = layout;
+        for (Map.Entry<String, FlowLayout.Cards> flow : layout.flows().entrySet()) {
+            Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
+            flow.getValue().spots().forEach((card, spot) -> spots.put(types.getOrDefault(card, card), spot));
+            out = out.with(flow.getKey(), FlowLayout.cards(spots));
+        }
+        return out;
     }
 
     /**
@@ -1102,13 +1024,27 @@ public final class ActivityFlowDialog {
         progress.setVisible(true);
         savedLabel.setText("Saving…");
 
+        // The enums this save renames, taken before the save consumes the renames: the other flows' cards follow.
+        Map<String, String> renamedTypes = new LinkedHashMap<>();
+        activityRenames.forEach((was, now) -> {
+            String from = FlowNames.typeFor(was);
+            String to = FlowNames.typeFor(now);
+            if (from != null && to != null) renamedTypes.put(from, to);
+        });
         // The constants first, so the flow written next names them (FlowConstants has the order and why).
         List<String> notes = new ArrayList<>();
-        String refused = FlowEdits.save(services.pluginValues(), value.orElse(null), board, savedActivities,
-                activityRenames, outcomeRenames, notes);
-        if (refused == null) savedActivities = FlowEdits.labels(board.flow());
+        String refused = FlowEdits.save(services, target, board, savedActivities, activityRenames, outcomeRenames,
+                notes);
+        if (refused == null) {
+            savedActivities = FlowEdits.labels(board.flow());
+            // Read again: the first save of a project with no flow wrote Flows.MAIN and pointed Sdk.run() at it,
+            // which the run written next keeps and the next save edits.
+            target = FlowValue.target(services);
+            // After the flow, so the run names the flow as just written; nothing when home and setup are as read.
+            refused = FlowValue.writeRun(services, target, board.flow(), home, setup);
+        }
         Throwable failure = null;
-        FlowLayout layout = currentLayout();
+        FlowLayout layout = currentLayout(renamedTypes);
         if (refused == null && layoutValue.isPresent() && !layout.equals(written)) {
             try {
                 // After the flow, never before: a layout for a card the saved flow does not have is the one

@@ -3,9 +3,10 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.FlowWalker;
-import com.botmaker.sdk.internal.flow.Flows;
+import com.botmaker.sdk.internal.flow.InstalledRun;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -32,11 +33,11 @@ class ActivitySwitchTest {
     @AfterEach
     void tearDown() {
         FlowWalker.clearOverrides();
-        Flows.use(null);
+        InstalledRun.use(null);
     }
 
     private static void install(Flow.Step... steps) {
-        Flows.use(Flow.of(List.of(steps), List.of(), List.of(), null, Flow.Limits.DEFAULT));
+        InstalledRun.use(Run.of(Flow.of(List.of(steps), List.of(), null, Flow.Limits.DEFAULT)));
     }
 
     private static Flow.Step step(Class<? extends Outcome> activity, boolean enabled) {

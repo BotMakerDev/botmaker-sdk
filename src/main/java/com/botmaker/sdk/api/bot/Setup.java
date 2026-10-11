@@ -4,7 +4,7 @@ import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.console.Debug;
 
 /**
- * What the flow's setup says when the game is not as the bot needs it and the bot cannot change it itself.
+ * What the bot's setup says when the game is not as the bot needs it and the bot cannot change it itself.
  *
  * <pre>{@code
  * public static void setup() {

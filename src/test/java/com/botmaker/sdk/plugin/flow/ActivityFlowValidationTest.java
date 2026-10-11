@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,7 +42,7 @@ class ActivityFlowValidationTest {
             steps.add(FlowTypes.step(FlowNames.activity(card.name()), ActivityBody.none()));
             exits.put(card.name(), card.outcomes());
         }
-        return new Board(new Flow(steps, List.of(), List.of(), null, Flow.Limits.DEFAULT, null, null), exits);
+        return new Board(new Flow(steps, List.of(), null, Flow.Limits.DEFAULT), exits);
     }
 
     @Test
@@ -155,13 +157,6 @@ class ActivityFlowValidationTest {
         assertTrue(renames.isEmpty());
     }
 
-    @Test
-    void a_saved_preset_may_not_take_a_built_in_name() {
-        assertNotNull(FlowNames.presetNameProblem("everything", List.of("Everything", "Nothing")));
-        assertNotNull(FlowNames.presetNameProblem("  ", List.of("Everything", "Nothing")));
-        assertNull(FlowNames.presetNameProblem("Night farm", List.of("Everything", "Nothing")));
-    }
-
     /** A renamed outcome keeps its arrow; another activity's arrow of the same outcome is not touched. */
     @Test
     void renaming_an_outcome_carries_its_arrow() {
@@ -171,25 +166,27 @@ class ActivityFlowValidationTest {
                 ActivityFlowDialog.rewiredOutcome(arrows, "Mining", "Full", "Bag full"));
     }
 
-    @Test
-    void renaming_an_activity_keeps_it_in_its_presets() {
-        List<Selection> presets = List.of(new Selection("Night", List.of("Mining", "Bank")));
-
-        assertEquals(List.of(new Selection("Night", List.of("Digging", "Bank"))),
-                ActivityFlowDialog.renamedIn(presets, "Mining", "Digging"));
-    }
-
     /** What the canvas draws by label is saved as the values the bot's names hold, and read back the same. */
     @Test
-    void an_arrow_and_a_selection_save_as_typed_values_and_back() {
+    void an_arrow_saves_as_a_typed_value_and_back() {
         Arrow plain = new Arrow("Mining", "Bank", "next");
         assertEquals(Arrow.NEXT, plain.outcome(), "kept as its constant's label");
         assertEquals(new Flow.Edge(FlowNames.outcome("Mining", "NEXT"), FlowNames.activity("Bank")), plain.toEdge());
         assertEquals(plain, Arrow.of(plain.toEdge()));
+    }
 
-        Selection night = new Selection("Night", List.of("Mining"));
-        assertTrue(night.toPreset().enables(FlowNames.activity("Mining")));
-        assertEquals(night, Selection.of(night.toPreset()));
+    /** A renamed enum is renamed in every flow, so every flow's card of it keeps its place under the new name. */
+    @Test
+    void a_rename_rekeys_the_card_in_every_flow() {
+        FlowLayout layout = FlowLayout.of(Map.of(
+                "MAIN", FlowLayout.cards(Map.of("Collect", FlowLayout.at(1, 2))),
+                "DAILY", FlowLayout.cards(Map.of("Collect", FlowLayout.at(3, 4), "Rest", FlowLayout.at(5, 6)))), true);
+        FlowLayout rekeyed = ActivityFlowDialog.rekeyed(layout, Map.of("Collect", "Gather"));
+        assertEquals(FlowLayout.at(3, 4), rekeyed.cardsOf("DAILY").spot("Gather"));
+        assertNull(rekeyed.cardsOf("DAILY").spot("Collect"));
+        assertEquals(FlowLayout.at(5, 6), rekeyed.cardsOf("DAILY").spot("Rest"));
+        assertEquals(FlowLayout.at(1, 2), rekeyed.cardsOf("MAIN").spot("Gather"));
+        assertEquals(layout, ActivityFlowDialog.rekeyed(layout, Map.of()));
     }
 
     /** The canvas's cards and arrows make the board a save writes: a DISABLED arrow is its card's off-wire. */
@@ -198,13 +195,15 @@ class ActivityFlowValidationTest {
         ActivityDraft mining = new ActivityDraft("Mining", "", true, List.of(Arrow.NEXT, "Bag full"), false, true, 0, 0,
                 "Mining::body");
         ActivityDraft bank = new ActivityDraft("Bank", "", false, List.of(Arrow.NEXT), false, true, 0, 0);
+        bank.runnerSwitchProperty().set(true);
         Board board = ActivityFlowDialog.board(List.of(mining, bank), List.of(new Arrow("Mining", "Bank", "Bag full"),
-                        new Arrow("Bank", "Mining", Arrow.DISABLED)), List.of(), "Mining", Flow.Limits.DEFAULT,
-                null);
+                        new Arrow("Bank", "Mining", Arrow.DISABLED)), "Mining", Flow.Limits.DEFAULT);
 
         assertEquals(List.of(new Flow.Edge(FlowNames.outcome("Mining", "Bag full"), FlowNames.activity("Bank"))),
                 board.flow().edges());
         assertEquals(FlowNames.activity("Mining"), board.flow().steps().get(1).whenOff());
+        assertTrue(board.flow().steps().get(1).runnerSwitch(), "the runner tick rides on the card");
+        assertFalse(board.flow().steps().getFirst().runnerSwitch());
         assertEquals(List.of(Arrow.NEXT, "Bag full"), board.exitsOf("Mining"));
         assertEquals(List.of(Arrow.NEXT), board.exitsOf("Bank"));
         assertEquals("Mining::body", FlowValue.bodySource(board.flow().steps().getFirst()));

@@ -11,7 +11,7 @@ import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.flow.FlowWalker;
-import com.botmaker.sdk.internal.flow.Flows;
+import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.observe.IpcObserver;
 import com.botmaker.sdk.internal.vision.BotScreen;
@@ -66,9 +66,9 @@ public class Bot {
      * }</pre>
      *
      * <p>The bot names each plugin's values class, which is a fact only it has and one javac checks; what it
-     * does not write is what to do with them. What gets the game back to a known screen is the flow's own
-     * {@link com.botmaker.sdk.api.flow.Flow#home}, run at start-up, after anything unexpected and before each
-     * step that goes home; a flow with none goes nowhere.
+     * does not write is what to do with them. The flow walked is the one {@code Sdk.run()} names; what gets the
+     * game back to a known screen is its {@link com.botmaker.sdk.api.flow.Run#home}, run at start-up, after anything
+     * unexpected and before each step that goes home; a run with none goes nowhere.
      *
      * <p>Offered in the insert menu inside {@code main} only ({@link EntryPoint}): anywhere else it would start
      * a second supervised run inside the first.
@@ -84,10 +84,10 @@ public class Bot {
         SdkValues.claim();
         ManagedValues.install(values);
         Runnable goHome = () -> {
-            Runnable home = Flows.installed().home();
+            Runnable home = InstalledRun.installed().home();
             if (home != null) home.run();
         };
-        lifecycle(() -> FlowWalker.run(Flows.installed()), goHome, Flows.installed().setup());
+        lifecycle(() -> FlowWalker.run(InstalledRun.installed()), goHome, InstalledRun.installed().setup());
     }
 
     /**
@@ -149,7 +149,7 @@ public class Bot {
      *
      * @param body   the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param goHome navigate from wherever the bot is back to a safe/home screen
-     * @param setup  the flow's setup, or null for none
+     * @param setup  the run's setup, or null for none
      */
     static void lifecycle(Runnable body, Runnable goHome, Runnable setup) {
         supervise(body, goHome, mode -> {

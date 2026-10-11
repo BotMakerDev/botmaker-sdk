@@ -5,8 +5,8 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
-import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.plugin.flow.Board;
 import com.botmaker.sdk.plugin.flow.FlowConstants;
 import com.botmaker.sdk.plugin.flow.FlowEdits;
@@ -19,7 +19,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
@@ -51,16 +50,16 @@ final class FlowTools {
                    @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome) {
     }
 
-    /** The flow's own methods: {@code .home(…)} and {@code .setup(…)}. */
+    /** The run's own methods, one each for the whole bot: {@code .home(…)} and {@code .setup(…)}. */
     enum Hook {
         HOME, SETUP;
 
-        Runnable of(Flow flow) {
-            return this == HOME ? flow.home() : flow.setup();
+        Runnable of(Run run) {
+            return this == HOME ? run.home() : run.setup();
         }
 
-        Flow set(Flow flow, Runnable method) {
-            return this == HOME ? flow.home(method) : flow.setup(method);
+        Run set(Run run, Runnable method) {
+            return this == HOME ? run.home(method) : run.setup(method);
         }
     }
 
@@ -72,14 +71,15 @@ final class FlowTools {
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("read_flow")
-                    .describedAs("The bot's activity flow: each activity with its body, switches and outcomes, "
-                            + "every arrow, where a run starts, and its limits")
+                    .describedAs("The bot's activity flow (the one Sdk.run() runs by default): each activity with "
+                            + "its body, switches and outcomes, every arrow, where a run starts, its limits, and "
+                            + "the bot's home and setup")
                     .takesNothing().handledBy(FlowTools::readFlow),
             AssistantTool.named("add_activity")
                     .describedAs("Adds an activity to the bot's flow, as the Activity Flow window does")
                     .takes(NewActivity.class).handledBy(FlowTools::addActivity),
             AssistantTool.named("rename_activity")
-                    .describedAs("Renames an activity everywhere: its card, arrows, presets and constant")
+                    .describedAs("Renames an activity everywhere: its card, arrows and constant")
                     .takes(Rename.class).handledBy(FlowTools::renameActivity),
             AssistantTool.named("remove_activity")
                     .describedAs("Removes an activity and its arrows from the flow")
@@ -96,8 +96,8 @@ final class FlowTools {
                     .describedAs("Makes an activity the one a run starts at")
                     .takes(ActivityName.class).handledBy(FlowTools::setStart),
             AssistantTool.named("set_flow_method")
-                    .describedAs("Sets the flow's home or setup to one of the bot's methods; create the method "
-                            + "with the code tools first")
+                    .describedAs("Sets the bot's home or setup (one each, whichever flow runs) to one of the bot's "
+                            + "methods; create the method with the code tools first")
                     .takes(FlowMethod.class).handledBy(FlowTools::setMethod));
 
     private FlowTools() {}
@@ -105,32 +105,37 @@ final class FlowTools {
     static AgentReply readFlow(AssistantTool.None none, AgentContext context) {
         StudioServices services = context.services();
         return FxCall.call(() -> {
-            Optional<ValueContext> value = FlowValue.FLOW.open(services);
-            if (value.isEmpty()) return AgentReply.refused("This project has no Sdk.flow().");
-            if (!FlowValue.FLOW.readable(value.get())) return AgentReply.refused(handWritten());
-            return AgentReply.text(describe(Board.read(services.pluginValues(), FlowValue.read(value.get()))));
+            FlowValue.Target target = FlowValue.target(services);
+            if (target.problem() != null) return AgentReply.refused(target.problem());
+            return AgentReply.text(describe(Board.read(services.pluginValues(), target.flow()), target));
         });
     }
 
-    /** {@code board} as the lines {@code read_flow} answers. */
-    static String describe(Board board) {
+    /** {@code board}, {@code target}'s flow, with its run's home and setup, as {@code read_flow} answers. */
+    static String describe(Board board, FlowValue.Target target) {
         Flow flow = board.flow();
-        if (flow.steps().isEmpty()) return "The flow has no activities yet; add_activity adds one.";
+        Run run = target.run();
         List<String> lines = new ArrayList<>();
-        lines.add("Starts at " + (flow.start().label().isEmpty() ? "nothing" : flow.start().label()) + "; at most "
-                + flow.limits().maxSteps() + " steps, " + flow.limits().stepDelayMs() + " ms apart.");
+        lines.add(target.said());
         for (Hook hook : Hook.values()) {
-            Runnable method = hook.of(flow);
+            Runnable method = hook.of(run);
             String source = FlowTypes.sourceOf(method);
             lines.add(hook.name().charAt(0) + hook.name().substring(1).toLowerCase(Locale.ROOT) + ": "
                     + (method == null ? "none" : source.isEmpty() ? "written by hand" : source) + ".");
         }
+        if (flow.steps().isEmpty()) {
+            lines.add("The flow has no activities yet; add_activity adds one.");
+            return String.join("\n", lines);
+        }
+        lines.add("Starts at " + (flow.start().label().isEmpty() ? "nothing" : flow.start().label()) + "; at most "
+                + flow.limits().maxSteps() + " steps, " + flow.limits().stepDelayMs() + " ms apart.");
         for (Flow.Step step : flow.steps()) {
             String body = FlowValue.bodySource(step);
             List<String> switches = new ArrayList<>();
             if (!step.enabled()) switches.add("off");
             if (step.goHome()) switches.add("goes home first");
             if (step.popupCheck()) switches.add("checks popups");
+            if (step.runnerSwitch()) switches.add("the runner may switch it off");
             lines.add("• " + step.label() + " — " + (body.isEmpty() ? "no body yet" : body)
                     + (switches.isEmpty() ? "" : ", " + String.join(", ", switches))
                     + "; outcomes " + board.exitsOf(step.label())
@@ -190,10 +195,15 @@ final class FlowTools {
                         + "parameter. It has: " + (held.isEmpty() ? "none" : String.join(", ", held)) + ".");
             }
         }
-        return editFlow(context, board -> new Board(set.which().set(board.flow(), FlowTypes.method(method)),
-                        board.exits()), flow -> Map.of(),
-                method.isEmpty() ? "The flow has no " + which + " now." : "The flow's " + which + " is now " + method
-                        + ".");
+        StudioServices services = context.services();
+        return FxCall.call(() -> {
+            FlowValue.Target target = FlowValue.target(services);
+            Run run = set.which().set(target.run(), FlowTypes.method(method));
+            String refused = FlowValue.writeRun(services, target, target.flow(), run.home(), run.setup());
+            if (refused != null) return AgentReply.refused(refused);
+            return AgentReply.text(method.isEmpty() ? "The bot has no " + which + " now."
+                    : "The bot's " + which + " is now " + method + ".");
+        });
     }
 
     /** Reads the flow, changes it, and saves it as 🔀 Activity Flow does — all on the FX thread. */
@@ -201,12 +211,11 @@ final class FlowTools {
                                        Function<Flow, Map<String, String>> activityRenames, String done) {
         StudioServices services = context.services();
         return FxCall.call(() -> {
-            Optional<ValueContext> value = FlowValue.FLOW.open(services);
-            if (value.isEmpty()) return AgentReply.refused("This project has no Sdk.flow() to write to.");
-            // A flow the user wrote by hand reads as none, and writing over it would lose it: 🔀 Activity Flow
-            // opens read-only for the same reason.
-            if (!FlowValue.FLOW.readable(value.get())) return AgentReply.refused(handWritten());
-            Board before = Board.read(services.pluginValues(), FlowValue.read(value.get()));
+            // A flow or run the user wrote by hand reads as none, and writing over it would lose it: 🔀 Activity
+            // Flow opens read-only for the same reason.
+            FlowValue.Target target = FlowValue.target(services);
+            if (target.problem() != null) return AgentReply.refused(target.problem());
+            Board before = Board.read(services.pluginValues(), target.flow());
             Board after;
             try {
                 after = change.apply(before);
@@ -214,9 +223,8 @@ final class FlowTools {
                 return AgentReply.refused(e.getMessage());
             }
             List<String> notes = new ArrayList<>();
-            String refused = FlowEdits.save(services.pluginValues(), value.get(), after,
-                    FlowEdits.labels(before.flow()), new LinkedHashMap<>(activityRenames.apply(before.flow())),
-                    new LinkedHashMap<>(), notes);
+            String refused = FlowEdits.save(services, target, after, FlowEdits.labels(before.flow()),
+                    new LinkedHashMap<>(activityRenames.apply(before.flow())), new LinkedHashMap<>(), notes);
             if (refused != null) return AgentReply.refused(refused);
             return AgentReply.text(done + (notes.isEmpty() ? "" : " " + String.join(" ", notes))
                     + " Activities: " + FlowEdits.labels(after.flow()) + ".");
@@ -226,10 +234,5 @@ final class FlowTools {
     /** The outcome as the canvas labels it: its constant's words, "Bag full" for "bag full". */
     private static String outcome(String typed) {
         return typed == null || typed.isBlank() ? "its first outcome" : FlowNames.label(typed);
-    }
-
-    private static String handWritten() {
-        return "Sdk.flow() was written by hand, so it is left as it is. Edit it in the code, or rewrite it as "
-                + "Flow.of(…) for the tools to edit.";
     }
 }

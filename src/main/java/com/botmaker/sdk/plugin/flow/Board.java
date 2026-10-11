@@ -18,7 +18,7 @@ import java.util.Map;
  * So the editor reads the exits off the project ({@link #read}), changes them beside the flow, and the save
  * brings the enum in step ({@link FlowConstants}) before it writes the flow that names its constants.
  *
- * @param flow  the value {@code Sdk.flow()} returns
+ * @param flow  one of the bot's {@code Flows} constants
  * @param exits each activity's label → its outcomes' labels, in the enum's order; every activity has one
  */
 public record Board(Flow flow, Map<String, List<String>> exits) {

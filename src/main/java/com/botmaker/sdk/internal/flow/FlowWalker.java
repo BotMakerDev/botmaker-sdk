@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.observe.Bots;
@@ -46,13 +47,14 @@ public final class FlowWalker {
     }
 
     /**
-     * Walks {@code flow} to its end. Does not return: it ends by calling {@link Bot#stop()}, which unwinds to
-     * the supervisor.
+     * Walks {@code run}'s flow to its end. Does not return: it ends by calling {@link Bot#stop()}, which unwinds
+     * to the supervisor.
      *
-     * <p>The flow's {@link Flow#home()} runs before each step that goes home.
+     * <p>The run's {@link Run#home()} runs before each step that goes home.
      */
-    public static void run(Flow flow) {
-        Runnable goHome = flow.home();
+    public static void run(Run run) {
+        Flow flow = run.flow();
+        Runnable goHome = run.home();
         int maxSteps = flow.limits().maxSteps();
         int stepDelayMs = flow.limits().stepDelayMs();
         Activity current = start(flow);
@@ -75,7 +77,7 @@ public final class FlowWalker {
     /** Whether the activity runs this pass: a runtime override if one was made, else the flow's flag. */
     public static boolean active(Activity activity) {
         Boolean override = activity == null ? null : OVERRIDES.get(activity);
-        return override != null ? override : Flows.enabled(activity);
+        return override != null ? override : InstalledRun.enabled(activity);
     }
 
     /**
@@ -83,7 +85,7 @@ public final class FlowWalker {
      * warning and a no-op, so a stale constant never stops a running bot.
      */
     public static void setEnabled(Activity activity, boolean enabled) {
-        if (activity == null || Flows.installed().step(activity) == null) {
+        if (activity == null || InstalledRun.flow().step(activity) == null) {
             Debug.error("[Activity] setEnabled: the flow has no activity '"
                     + (activity == null ? "null" : activity.label()) + "'. Ignoring.");
             return;

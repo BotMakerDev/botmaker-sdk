@@ -1,6 +1,6 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
@@ -48,10 +48,10 @@ public final class FlowEdits {
         Activity start = flow.start().isNone() ? step.activity() : flow.start();
         Map<String, List<String>> exits = new LinkedHashMap<>(board.exits());
         exits.put(step.label(), List.of(Arrow.NEXT));
-        return new Board(with(flow, steps, flow.edges(), flow.presets(), start), exits);
+        return new Board(with(flow, steps, flow.edges(), start), exits);
     }
 
-    /** {@code board} with the activity {@code from} called {@code typed}, in every step, wire, preset and the start. */
+    /** {@code board} with the activity {@code from} called {@code typed}, in every step, wire and the start. */
     public static Board renameActivity(Board board, String from, String typed) {
         Flow flow = board.flow();
         Flow.Step step = step(flow, from);
@@ -63,35 +63,31 @@ public final class FlowEdits {
         Activity was = step.activity();
         Activity now = FlowNames.activity(label);
         List<Flow.Step> steps = flow.steps().stream().map(s -> new Flow.Step(swap(s.activity(), was, now), s.body(),
-                s.description(), s.enabled(), s.goHome(), s.popupCheck(), swap(s.whenOff(), was, now))).toList();
+                s.description(), s.enabled(), s.goHome(), s.popupCheck(), s.runnerSwitch(),
+                swap(s.whenOff(), was, now))).toList();
         List<Flow.Edge> edges = flow.edges().stream().map(e -> new Flow.Edge(
                 e.from().equals(was) ? BotConstants.outcome(now.name(), e.on().name()) : e.on(),
                 swap(e.to(), was, now))).toList();
-        List<Flow.Preset> presets = flow.presets().stream().map(p -> new Flow.Preset(p.name(),
-                p.activities().stream().map(a -> swap(a, was, now)).toList())).toList();
         Map<String, List<String>> exits = new LinkedHashMap<>();
         board.exits().forEach((activity, outcomes) -> exits.put(activity.equals(step.label()) ? now.label() : activity,
                 outcomes));
-        return new Board(with(flow, steps, edges, presets, swap(flow.start(), was, now)), exits);
+        return new Board(with(flow, steps, edges, swap(flow.start(), was, now)), exits);
     }
 
-    /** {@code board} without the activity {@code name}, its wires, its place in presets, and the start if it was. */
+    /** {@code board} without the activity {@code name}, its wires, and the start if it was. */
     public static Board removeActivity(Board board, String name) {
         Flow flow = board.flow();
         Flow.Step removed = step(flow, name);
         Activity gone = removed.activity();
         List<Flow.Step> steps = flow.steps().stream().filter(s -> !s.activity().equals(gone))
-                .map(s -> s.whenOff().equals(gone) ? new Flow.Step(s.activity(), s.body(), s.description(),
-                        s.enabled(), s.goHome(), s.popupCheck(), Activity.NONE) : s).toList();
+                .map(s -> s.whenOff().equals(gone) ? FlowTypes.whenOff(s, Activity.NONE) : s).toList();
         List<Flow.Edge> edges = flow.edges().stream()
                 .filter(e -> !e.from().equals(gone) && !e.to().equals(gone)).toList();
-        List<Flow.Preset> presets = flow.presets().stream().map(p -> new Flow.Preset(p.name(),
-                p.activities().stream().filter(a -> !a.equals(gone)).toList())).toList();
         Activity start = flow.start().equals(gone) ? (steps.isEmpty() ? Activity.NONE : steps.getFirst().activity())
                 : flow.start();
         Map<String, List<String>> exits = new LinkedHashMap<>(board.exits());
         exits.remove(removed.label());
-        return new Board(with(flow, steps, edges, presets, start), exits);
+        return new Board(with(flow, steps, edges, start), exits);
     }
 
     /**
@@ -118,7 +114,7 @@ public final class FlowEdits {
         }
         List<Flow.Edge> edges = new ArrayList<>(flow.edges().stream().filter(e -> !e.on().equals(wired)).toList());
         edges.add(new Flow.Edge(wired, target));
-        Board next = new Board(with(flow, flow.steps(), edges, flow.presets(), flow.start()), exits);
+        Board next = new Board(with(flow, flow.steps(), edges, flow.start()), exits);
         String problem = validate(next);
         if (problem != null) throw new IllegalArgumentException(problem);
         return next;
@@ -146,7 +142,7 @@ public final class FlowEdits {
             else kept.add(edge);
         }
         if (gone == null) throw new IllegalArgumentException(source.label() + " has no wire on " + typed + ".");
-        return board.with(with(flow, flow.steps(), kept, flow.presets(), flow.start()));
+        return board.with(with(flow, flow.steps(), kept, flow.start()));
     }
 
     /** The outcome {@code outcome} names, trimmed: blank is {@code source}'s first, NEXT in a new activity. */
@@ -160,7 +156,7 @@ public final class FlowEdits {
     /** {@code board} starting at the activity {@code name}. */
     public static Board setStart(Board board, String name) {
         Flow flow = board.flow();
-        return board.with(with(flow, flow.steps(), flow.edges(), flow.presets(), step(flow, name).activity()));
+        return board.with(with(flow, flow.steps(), flow.edges(), step(flow, name).activity()));
     }
 
     /**
@@ -209,9 +205,9 @@ public final class FlowEdits {
     }
 
     /**
-     * Writes {@code board} into {@code value}: the {@code Activities} enums first, then the flow, then what it no
-     * longer names — the order 🔀 Activity Flow's save keeps (see {@link FlowConstants}). A rename that lands is
-     * taken out of its map. On the FX thread.
+     * Writes {@code board} as {@code target}'s flow: the {@code Activities} enums first, then the flow, then what
+     * it no longer names — the order 🔀 Activity Flow's save keeps (see {@link FlowConstants}). A rename that lands
+     * is taken out of its map. On the FX thread.
      *
      * @param saved           the activity labels the project held before
      * @param activityRenames activity label at last save → label now
@@ -219,14 +215,16 @@ public final class FlowEdits {
      * @param notes           collects what was left undone without stopping the save
      * @return null when written, else why not
      */
-    public static String save(PluginValues values, ValueContext value, Board board, Set<String> saved,
+    public static String save(StudioServices services, FlowValue.Target target, Board board, Set<String> saved,
                               Map<String, String> activityRenames, Map<String, Map<String, String>> outcomeRenames,
                               List<String> notes) {
         String problem = validate(board);
         if (problem != null) return problem;
+        if (target.problem() != null) return target.problem();
+        PluginValues values = services.pluginValues();
         String refused = FlowConstants.prepare(values, board, activityRenames, outcomeRenames);
         if (refused == null) refused = FlowConstants.unheld(values, board.flow());
-        if (refused == null) refused = FlowValue.write(value, board.flow());
+        if (refused == null) refused = FlowValue.write(services, target, board.flow());
         if (refused == null) FlowConstants.forget(values, board, saved, notes);
         return refused;
     }
@@ -247,16 +245,14 @@ public final class FlowEdits {
         throw new IllegalArgumentException("No activity called '" + name + "'; there are " + labels(flow));
     }
 
-    /** {@code flow} with these parts, its limits, home and setup kept. */
-    static Flow with(Flow flow, List<Flow.Step> steps, List<Flow.Edge> edges, List<Flow.Preset> presets,
-                     Activity start) {
-        return new Flow(steps, edges, presets, start, flow.limits(), flow.home(), flow.setup());
+    /** {@code flow} with these parts, its limits kept. */
+    static Flow with(Flow flow, List<Flow.Step> steps, List<Flow.Edge> edges, Activity start) {
+        return new Flow(steps, edges, start, flow.limits());
     }
 
     private static Flow withOff(Flow flow, Flow.Step source, Activity to) {
-        List<Flow.Step> steps = flow.steps().stream().map(s -> s == source ? new Flow.Step(s.activity(), s.body(),
-                s.description(), s.enabled(), s.goHome(), s.popupCheck(), to) : s).toList();
-        return with(flow, steps, flow.edges(), flow.presets(), flow.start());
+        List<Flow.Step> steps = flow.steps().stream().map(s -> s == source ? FlowTypes.whenOff(s, to) : s).toList();
+        return with(flow, steps, flow.edges(), flow.start());
     }
 
     private static Activity swap(Activity activity, Activity was, Activity now) {

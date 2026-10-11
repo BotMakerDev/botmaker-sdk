@@ -182,21 +182,6 @@ public final class FlowNames {
         return null;
     }
 
-    /**
-     * Why {@code candidate} can't name a saved preset, or null when it can. The two built-ins are derived
-     * from the canvas and never saved, so a saved preset of either name would sit beside them in the list,
-     * spelled the same and meaning something else.
-     */
-    public static String presetNameProblem(String candidate, Collection<String> builtIns) {
-        if (candidate == null || candidate.isBlank()) return "A preset needs a name.";
-        for (String builtIn : builtIns) {
-            if (builtIn.equalsIgnoreCase(candidate.trim())) {
-                return "'" + builtIn + "' is built in — pick another name.";
-            }
-        }
-        return null;
-    }
-
     private static String noConstant(String candidate, String holder) {
         return "'" + candidate + "' can't become a name in " + holder + " — start it with a letter.";
     }
@@ -216,7 +201,7 @@ public final class FlowNames {
             + "leave without an arrow ends the run.";
 
     /** The go-home tick's tooltip. */
-    public static final String GO_HOME_TIP = "Run the flow's home method (Flow.home(…)) immediately before "
+    public static final String GO_HOME_TIP = "Run the bot's home method (Run.home(…)) immediately before "
             + "this activity, so it starts from a known screen.";
 
     /** The popup tick's tooltip. */

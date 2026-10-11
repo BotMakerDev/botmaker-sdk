@@ -151,8 +151,8 @@ class FlowConstantsTest {
         for (String activity : exits.keySet()) {
             steps.add(FlowTypes.step(FlowNames.activity(activity), ActivityBody.none()));
         }
-        return new Board(new Flow(steps, List.of(), List.of(), steps.isEmpty() ? null : steps.getFirst().activity(),
-                Flow.Limits.DEFAULT, null, null), exits);
+        return new Board(new Flow(steps, List.of(), steps.isEmpty() ? null : steps.getFirst().activity(),
+                Flow.Limits.DEFAULT), exits);
     }
 
     private static <K, V> Map<K, V> ordered(K k1, V v1, K k2, V v2) {
@@ -250,8 +250,8 @@ class FlowConstantsTest {
     @Test
     void a_flow_naming_what_the_enums_lack_is_not_written() {
         Flow flow = new Flow(List.of(FlowTypes.step(FlowNames.activity("Collect"), ActivityBody.none())),
-                List.of(new Flow.Edge(FlowNames.outcome("Collect", "Won"), FlowNames.activity("Collect"))), List.of(),
-                FlowNames.activity("Collect"), Flow.Limits.DEFAULT, null, null);
+                List.of(new Flow.Edge(FlowNames.outcome("Collect", "Won"), FlowNames.activity("Collect"))),
+                FlowNames.activity("Collect"), Flow.Limits.DEFAULT);
 
         assertNull(FlowConstants.unheld(new Project(Set.of(), "Collect NEXT WON"), flow));
         String refused = FlowConstants.unheld(new Project(Set.of(), "Collect NEXT won"), flow);
