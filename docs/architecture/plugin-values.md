@@ -16,6 +16,8 @@ canvas while this plugin is loaded (its values change in this plugin's windows).
 them from the host on bind, from the `ManagedValue`s `SdkValues` declares.
 
 **Nothing is stored anywhere else.** There is no `activities.json`, `capture.json`, `capture.source`, `Wire`,
-`ProjectData`, parameters JSON or generated source, and **no migration, by rule**: a project written before
-the flow was Java reads as having no flow, and nothing deletes anyone's old file. What one computer launches
+`ProjectData`, parameters JSON or generated source, and **no reader of those files**: a project written before
+the flow was Java reads as having no flow, and nothing deletes anyone's old file. A later change to a managed
+value's shape is different: the SDK declares its conversion and Studio runs it on upgrade
+(`../docs/refactor/25-compatibility.md` §12, 2026-10-11). What one computer launches
 is a run property; what a bot was tested on is its gallery entry.
