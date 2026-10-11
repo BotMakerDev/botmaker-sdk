@@ -14,8 +14,8 @@ steps, arrows and start, `Flow.activity(Activities.Collect.class, Collect::body)
 activity, each name's label its words). Beside them the host writes **`Spots.java`** and
 **`Zones.java`** (`SPOTS`, `ZONES`, 2026-10-11): named `Spot`s and `Zone`s in the bot's pixels from the game's
 corner, which the assistant's `save_point` and `save_region` add and a run places on the live game
-(`internal/vision/Places`). `POINTS`/`REGIONS` (desktop `Point`s, source `Rect`s, 2026-10-06) are retired:
-`SdkConversions.PLACES` turns them into spots and zones when a bot upgrades. **`Digits.java`** (`DIGITS`,
+(`internal/vision/Places`); they replaced `POINTS`/`REGIONS` (desktop `Point`s, source `Rect`s, 2026-10-06),
+which nothing converts. **`Digits.java`** (`DIGITS`,
 2026-10-11) holds a `DigitSet` per game font, a folder of `0.png`–`9.png` under `src/main/resources/digits/`
 that the assistant's `save_digits` cuts (`plugin/pictures/DigitCuts`) and `Text.readDigits` reads with
 (`internal/vision/DigitReader`). They are the user's: the host
@@ -27,6 +27,7 @@ them from the host on bind, from the `ManagedValue`s `SdkValues` declares.
 **Nothing is stored anywhere else.** There is no `activities.json`, `capture.json`, `capture.source`, `Wire`,
 `ProjectData`, parameters JSON or generated source, and **no reader of those files**: a project written before
 the flow was Java reads as having no flow, and nothing deletes anyone's old file. A later change to a managed
-value's shape is different: the SDK declares its conversion and Studio runs it on upgrade
+value's shape converts nothing either: Studio's upgrade repairs the bot's values as it repairs its code, an id
+that is gone removed and a value that no longer compiles reset to its first value and marked `@Refactor`
 (`../docs/refactor/25-compatibility.md` §12, 2026-10-11). What one computer launches
 is a run property; what a bot was tested on is its gallery entry.

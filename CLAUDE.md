@@ -97,8 +97,8 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
 - **The palette is discovered, never listed**: `@Palette` marks what is offered, value types carry nothing.
 - **No class under `plugin/` reads or writes Java text**; an editor reads the value and hands one back.
 - **Nothing is stored outside the bot's Java (`Sdk.java`, `Pictures.java`) and run properties; no reader of
-  the old files** (`plugin-values.md`). A change to a managed value's shape ships a declared `Conversion`
-  (`../docs/refactor/25-compatibility.md` §12).
+  the old files** (`plugin-values.md`). A managed value's shape changes freely: nothing converts it, and
+  Studio's upgrade repairs what no longer reads (`../docs/refactor/25-compatibility.md` §12).
 - **A type is declared once, in `plugin/types/SdkTypes`**; the two string factories in `declaration.md` stay.
 - **All OpenCV loading goes through shared's `OpenCvNative.ensureLoaded()`** (`opencv.md`).
 - **The Tess4J / lept4j / bytedeco pins move together** (`internal.md`, `pom.xml`).

@@ -98,11 +98,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - **`Sdk.flow()` is gone, and so are presets.** The flow moved to `Flows.MAIN` and its `.home(…)` to
   `Sdk.run()`; `Flow.of` takes four parts (no preset list), and `FlowLayout.of` keys its cards by flow
-  (`FlowLayout.cards(…)`). A preset is now a flow of its own. No conversion from 1.4.2 ships: Studio refuses
-  that upgrade, and a 1.4.2 bot is moved by hand or recreated from the template.
-- **`Points` and `Regions` became `Spots` and `Zones`.** Studio converts them when a bot upgrades: each
-  `Point` becomes a `Spot` and each `Rect` a `Zone` with the same numbers. A spot saved on a window away from
-  the screen's corner is saved again.
+  (`FlowLayout.cards(…)`). A preset is now a flow of its own. Nothing converts a 1.4.2 bot's values: Studio's
+  upgrade repairs them like the rest of its code, so a value whose id is gone is removed (kept, unmarked, while
+  the bot still names it) and one that no longer compiles takes its first value, marked `@Refactor`. The flow
+  is drawn again.
+- **`Points` and `Regions` became `Spots` and `Zones`.** On upgrade the old classes are removed, or kept
+  unmarked while the bot names them; each spot and area is saved again (`save_point`, `save_region`).
 - **No `<name>.json` beside a picture.** The resolution sidecar is neither written nor read: a picture with no
   `.in(Size)` is taken to be cut at the bot's screen size, and one in a bot that names none is matched as it is.
   `TemplateLibrary.saveTemplate`/`replaceImage` lost their size arguments; an exported picture set carries no

@@ -18,8 +18,6 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   writes the original's name. Fix in the host (keep the picked name) or make a duplicate differ.
 - **Sub-flows** (idea, ask first): a card that walks another flow, `Flow.subflow(Flows.DAILY)`, and leaves on
   how it ended.
-- **1.4.2 bots do not upgrade** (no conversion, the user's call, 2026-10-11): a bot on SDK 1.4.2 is fixed by
-  hand or recreated after the next release.
 - **Launch targets**: `Target.set(String spec)` has no editor (a `@LaunchTargetSpec` could reuse the
   🎮 game dialog).
 - **Waydroid on the desktop**: a bot reads Android's frame through `adb screencap`, which writes nothing on a

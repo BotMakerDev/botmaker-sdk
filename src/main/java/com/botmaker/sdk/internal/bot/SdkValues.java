@@ -12,8 +12,6 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
-import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
@@ -39,7 +37,6 @@ import java.util.Set;
  * at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS}, {@code ZONES} and {@code DIGITS} the classes of
  * constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the run's {@code @Param} fields in
  * {@code Sdk.java}, which the bot's {@code main} hands to {@code Bot.runFlow} and nothing claims.
- * {@code POINTS} and {@code REGIONS} are retired: read only for {@link SdkConversions}.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract
  * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
@@ -106,28 +103,6 @@ public final class SdkValues {
             .in("Activities")
             .because("Activities and their outcomes are managed in 🔀 Activity Flow, which renames the card or the"
                     + " exit and every use of it together.");
-
-    /**
-     * Retired 2026-10-11: the named spots as desktop pixels, {@code static final Point CLAIM = new Point(412, 230)}.
-     * Read only so {@link SdkConversions#PLACES} carries them into {@link #SPOTS}.
-     */
-    public static final ManagedValue<Point> POINTS = ManagedValue.openSet(SdkValue.Id.POINTS)
-            .of(Point.class)
-            .in("Points")
-            .because("Points.java holds the bot's named spots. Ask Claude to save_point a spot again, under its"
-                    + " name, to move it.")
-            .retired();
-
-    /**
-     * Retired 2026-10-11: the named areas as source pixels, {@code static final Rect BAG = new Rect(10, 20, 200,
-     * 120)}. Read only so {@link SdkConversions#PLACES} carries them into {@link #ZONES}.
-     */
-    public static final ManagedValue<Rect> REGIONS = ManagedValue.openSet(SdkValue.Id.REGIONS)
-            .of(Rect.class)
-            .in("Regions")
-            .because("Regions.java holds the bot's named areas. Ask Claude to save_region an area again, under"
-                    + " its name, to move it.")
-            .retired();
 
     /**
      * The named spots — {@code static final Spot CLAIM = new Spot(412, 230)}, in the bot's pixels, which
@@ -202,9 +177,9 @@ public final class SdkValues {
             .shown(RUN_CATEGORY, "Activities this run skips", Param.PUBLIC)
             .because(RUN_PARAM);
 
-    /** All sixteen, in the order the plugin declares them, the two retired ones included. */
+    /** All fourteen, in the order the plugin declares them. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOWS, RUN, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            ACTIVITIES, POINTS, REGIONS, SPOTS, ZONES, DIGITS, SCREEN, FLOW, DO_SETUP, SKIP);
+            ACTIVITIES, SPOTS, ZONES, DIGITS, SCREEN, FLOW, DO_SETUP, SKIP);
 
     private static boolean claimed;
 

@@ -66,10 +66,6 @@ public @interface SdkValue {
         PICTURES,
         /** The cards of the Activity Flow — a class of enums, one per activity, whose {@link Outcome} constants are its exits. */
         ACTIVITIES,
-        /** Retired 2026-10-11: named spots as desktop {@code Point}s, which a bot's upgrade turns into {@link #SPOTS}. */
-        POINTS,
-        /** Retired 2026-10-11: named areas as source {@code Rect}s, which a bot's upgrade turns into {@link #ZONES}. */
-        REGIONS,
         /** Named spots of the game, in the bot's pixels — a class of {@code Spot} constants. */
         SPOTS,
         /** Named areas of the game, in the bot's pixels — a class of {@code Zone} constants. */

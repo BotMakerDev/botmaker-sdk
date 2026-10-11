@@ -25,7 +25,6 @@ import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Matches;
 import com.botmaker.sdk.api.vision.Precision;
-import com.botmaker.sdk.internal.bot.SdkConversions;
 import com.botmaker.sdk.internal.launch.Game;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
@@ -147,20 +146,12 @@ class SdkPluginSurfaceTest {
         assertTrue(byId.get(SdkValue.Id.ACTIVITIES).isGrouped(), "one enum of outcomes per activity");
         assertEquals("Collect", ((com.botmaker.sdk.api.flow.Activity) byId.get(SdkValue.Id.ACTIVITIES)
                 .byGroup("Collect")).name());
-        assertEquals("Points", byId.get(SdkValue.Id.POINTS).holder());
-        assertTrue(byId.get(SdkValue.Id.POINTS).isOpenSet());
-        assertEquals(com.botmaker.sdk.api.geometry.Point.class, byId.get(SdkValue.Id.POINTS).type());
-        assertEquals("Regions", byId.get(SdkValue.Id.REGIONS).holder());
-        assertEquals(com.botmaker.sdk.api.geometry.Rect.class, byId.get(SdkValue.Id.REGIONS).type());
-        assertTrue(byId.get(SdkValue.Id.POINTS).isRetired() && byId.get(SdkValue.Id.REGIONS).isRetired(),
-                "kept as v1.4.2 wrote them, read only for the conversion");
         assertEquals("Spots", byId.get(SdkValue.Id.SPOTS).holder());
         assertEquals(com.botmaker.sdk.api.geometry.Spot.class, byId.get(SdkValue.Id.SPOTS).type());
         assertEquals("Zones", byId.get(SdkValue.Id.ZONES).holder());
         assertEquals(com.botmaker.sdk.api.geometry.Zone.class, byId.get(SdkValue.Id.ZONES).type());
         assertEquals("Digits", byId.get(SdkValue.Id.DIGITS).holder());
         assertEquals(com.botmaker.sdk.api.text.DigitSet.class, byId.get(SdkValue.Id.DIGITS).type());
-        assertEquals(List.of(SdkConversions.PLACES), plugin.conversions());
         // One declaration per constant, and nothing else.
         assertEquals(SdkValue.Id.values().length, byId.size());
         assertEquals(SdkValue.Id.values().length, plugin.managedValues().size());
