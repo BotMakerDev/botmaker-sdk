@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.flow.Labels;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * The bot's {@code Activities} class — one enum per activity, its constants the activity's outcomes — kept in
@@ -49,6 +51,28 @@ public final class FlowConstants {
 
     private static String id() {
         return SET.value().id();
+    }
+
+    /**
+     * The outcome labels the enum of the activity {@code label} declares, in its order — what another flow running
+     * it already reports — or none when it has no enum yet.
+     */
+    public static List<String> outcomesOf(PluginValues values, String label) {
+        String type = FlowNames.typeFor(label);
+        if (type == null) return List.of();
+        return declared(values).getOrDefault(type, List.of()).stream().map(Labels::of).toList();
+    }
+
+    /**
+     * Why the activity {@code from} cannot be renamed {@code to} — another activity, which another flow may run,
+     * already has that enum — or null. The canvas checks its own cards; this is the bot's.
+     */
+    public static String renameProblem(PluginValues values, String from, String to) {
+        String was = FlowNames.typeFor(from);
+        String now = FlowNames.typeFor(to);
+        if (now == null || now.equals(was) || !declared(values).containsKey(now)) return null;
+        return FlowNames.ACTIVITIES + "." + now + " is already another activity of the bot's; pick another name, or "
+                + "add that activity to this flow instead.";
     }
 
     /** Each enum the project's {@code Activities} class holds, by its name, with its constants in file order. */
@@ -187,10 +211,12 @@ public final class FlowConstants {
 
     /**
      * Removes what the canvas dropped: each outcome an activity's enum holds that {@code board} no longer lists,
-     * and the enum of each of {@code saved} — the activities the last save had — that it no longer draws. A name
-     * code still uses stays, and the host's sentence listing where goes into {@code notes}.
+     * and the enum of each of {@code saved} — the activities the last save had — that it no longer draws, unless
+     * another flow draws it ({@code elsewhere}, labels, asked only when a card left: it reads every other flow). A
+     * name code still uses stays, and the host's sentence listing where goes into {@code notes}.
      */
-    public static void forget(PluginValues values, Board board, Collection<String> saved, List<String> notes) {
+    public static void forget(PluginValues values, Board board, Collection<String> saved,
+                              Supplier<? extends Collection<String>> elsewhere, List<String> notes) {
         Map<String, List<String>> declared = declared(values);
         Set<String> drawn = new LinkedHashSet<>();
         for (Map.Entry<String, List<String>> activity : board.exits().entrySet()) {
@@ -199,6 +225,7 @@ public final class FlowConstants {
             drawn.add(type);
             // An enum keeps a constant, for a body to return: prepare refuses an empty list.
             if (activity.getValue().isEmpty()) continue;
+            // Every flow running the activity reads its outcomes off the one enum, so the canvas's list is the enum's.
             Set<String> wanted = new LinkedHashSet<>();
             for (String label : activity.getValue()) wanted.add(FlowNames.constantFor(label));
             for (String constant : declared.getOrDefault(type, List.of())) {
@@ -207,9 +234,15 @@ public final class FlowConstants {
                         notes.add(FlowNames.ACTIVITIES + "." + type + "." + constant + " stays: " + refused));
             }
         }
+        Set<String> others = null;
         for (String label : saved) {
             String type = FlowNames.typeFor(label);
             if (type == null || drawn.contains(type) || !declared.containsKey(type)) continue;
+            if (others == null) {
+                others = new LinkedHashSet<>();
+                for (String other : elsewhere.get()) others.add(FlowNames.typeFor(other));
+            }
+            if (others.contains(type)) continue;
             values.removeGroup(id(), type).ifPresent(refused ->
                     notes.add(FlowNames.ACTIVITIES + "." + type + " stays: " + refused));
         }

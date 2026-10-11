@@ -11,9 +11,15 @@ import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.UnaryOperator;
 
 /**
  * The bot's flows, the {@link Run} holding the game's home and setup, and the card positions beside them, read
@@ -21,9 +27,11 @@ import java.util.Optional;
  *
  * <p>Each is a handle on {@link SdkValues}' declarations, so no id is spelled here.
  *
- * <p><b>Which flow is edited.</b> Which flow runs is the bot's {@code @Param}, which this plugin does not read.
- * Until the editor picks among flows (named flows, phase 4), the editor and the assistant's tools edit the first
- * {@code Flows} constant. A project with no flow yet edits {@link #FIRST}, written on the first save.
+ * <p><b>Which flow is edited.</b> A flow is found by its constant's name, never by its value: two constants may
+ * hold equal flows (a duplicate not yet changed). Which flow runs is the bot's {@code @Param}, which this plugin
+ * does not read, so when no name is given the editor and the assistant's tools edit {@link #defaultName}:
+ * {@code Flows.MAIN}, else the first constant. A project with no flow yet edits {@link #FIRST}, written on the first
+ * save.
  *
  * <p><b>Reading may answer nothing, and that is ordinary.</b> A hand-written initialiser, a call to something
  * other than {@code Flow.of}, an activity whose body is a lambda rather than a method reference — each of them
@@ -65,7 +73,11 @@ public final class FlowValue {
         }
 
         static Target refused(String problem) {
-            return new Target(FIRST, Optional.empty(), Flow.NONE, Run.NONE, problem);
+            return refused(FIRST, problem);
+        }
+
+        static Target refused(String name, String problem) {
+            return new Target(name, Optional.empty(), Flow.NONE, Run.NONE, problem);
         }
 
         /** The sentence that says which flow this is, for a reader who cannot see the code. */
@@ -75,10 +87,27 @@ public final class FlowValue {
         }
     }
 
-    /**
-     * The flow edited, opened for writing: the first {@code Flows} constant, else {@link #FIRST}, not written yet.
-     */
+    /** The bot's flows, the names of its {@code Flows} constants in file order. */
+    public static List<String> names(StudioServices services) {
+        return FLOWS.members(services.pluginValues());
+    }
+
+    /** The flow edited when none is named: {@link #FIRST} when there is one or none at all, else the first. */
+    public static String defaultName(List<String> names) {
+        return names.isEmpty() || names.contains(FIRST) ? FIRST : names.getFirst();
+    }
+
+    /** The flow edited when none is named ({@link #defaultName}), opened for writing. */
     public static Target target(StudioServices services) {
+        return target(services, null);
+    }
+
+    /**
+     * The flow {@code name} names — {@code DAILY}, or "daily" typed — opened for writing; {@link #defaultName} when
+     * {@code name} is blank. A name the bot has no constant for is refused, but for {@link #FIRST} on a project with
+     * no flow at all, which the first save writes.
+     */
+    public static Target target(StudioServices services, String name) {
         Optional<ValueContext> runValue = RUN.openOrCreate(services);
         if (runValue.isEmpty()) {
             return Target.refused("This project has no Sdk.java with an @SdkValue(RUN) method, so there is nothing "
@@ -92,23 +121,144 @@ public final class FlowValue {
         }
         PluginValues values = services.pluginValues();
         List<String> members = FLOWS.members(values);
-        if (members.isEmpty()) return new Target(FIRST, Optional.empty(), Flow.NONE, run.get(), null);
-        String name = members.getFirst();
-        Optional<ValueContext> value = FLOWS.open(values, name);
+        String picked = name == null || name.isBlank() ? defaultName(members) : named(name);
+        if (!members.contains(picked)) {
+            if (members.isEmpty() && picked.equals(FIRST)) {
+                return new Target(FIRST, Optional.empty(), Flow.NONE, run.get(), null);
+            }
+            return Target.refused(picked, "The bot has no flow Flows." + picked + "; it has " + listed(members) + ".");
+        }
+        Optional<ValueContext> value = FLOWS.open(values, picked);
         Optional<Flow> flow = value.flatMap(FLOWS::read);
         if (flow.isEmpty()) {
-            return new Target(name, Optional.empty(), Flow.NONE, run.get(), "Flows." + name + " isn't one this "
+            return new Target(picked, Optional.empty(), Flow.NONE, run.get(), "Flows." + picked + " isn't one this "
                     + "editor wrote, so it is shown empty and left alone. Edit it in Flows.java, or replace it with "
                     + "Flow.of(…) to draw it here.");
         }
-        return new Target(name, value, flow.get(), run.get(), null);
+        return new Target(picked, value, flow.get(), run.get(), null);
     }
 
-    /** The flow the editor edits, or {@link Flow#NONE}. Read afresh every time. */
-    public static Flow read(StudioServices services) {
+    /**
+     * The labels of the activities any of the bot's flows draws but {@code besides}, in flow order: an activity is
+     * one enum whichever flow runs it, so one flow dropping it leaves it to the others. {@code besides} may be null.
+     */
+    public static Set<String> labels(PluginValues values, String besides) {
+        Set<String> labels = new LinkedHashSet<>();
+        for (String member : FLOWS.members(values)) {
+            if (member.equals(besides)) continue;
+            FLOWS.read(values, member).ifPresent(flow -> labels.addAll(FlowEdits.labels(flow)));
+        }
+        return labels;
+    }
+
+    /**
+     * The step of the activity {@code label} as the first flow but {@code besides} running it has it — its body,
+     * description and switches — or empty when no other flow runs it. {@code besides} may be null.
+     */
+    public static Optional<Flow.Step> stepElsewhere(PluginValues values, String label, String besides) {
+        for (String member : FLOWS.members(values)) {
+            if (member.equals(besides)) continue;
+            for (Flow.Step step : FLOWS.read(values, member).orElse(Flow.NONE).steps()) {
+                if (step.label().equals(label)) return Optional.of(step);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Adds the flow {@code typed} names, holding {@code flow} — {@link Flow#NONE} for an empty one — on the JavaFX
+     * application thread.
+     *
+     * @return null when it was written, else why it could not be
+     */
+    public static String create(StudioServices services, String typed, Flow flow) {
         PluginValues values = services.pluginValues();
-        return FLOWS.members(values).stream().findFirst().flatMap(name -> FLOWS.read(values, name))
-                .orElse(Flow.NONE);
+        String name = FlowNames.constantFor(typed);
+        String problem = nameProblem(typed, name, FLOWS.members(values));
+        if (problem != null) return problem;
+        return FLOWS.add(values, name, FlowTypes.written(flow)).orElse(null);
+    }
+
+    /**
+     * Adds the flow {@code typed} names as a copy of {@code from}'s, its cards where {@code from}'s sit. The two hold
+     * equal flows until one changes, and a parameter picking either is written as the first of them.
+     *
+     * @return null when it was written, else why it could not be
+     */
+    public static String duplicate(StudioServices services, String from, String typed) {
+        Optional<Flow> flow = FLOWS.read(services.pluginValues(), from);
+        if (flow.isEmpty()) return "Flows." + from + " isn't one this editor reads, so it can't be copied.";
+        String refused = create(services, typed, flow.get());
+        if (refused == null) relayout(services, layout -> layout.with(FlowNames.constantFor(typed), layout.cardsOf(from)));
+        return refused;
+    }
+
+    /**
+     * Renames the flow {@code from} to the one {@code typed} names, and every use of it ({@code Sdk.flow} included),
+     * its cards following it. On the JavaFX application thread.
+     *
+     * @return null when it was renamed, else why it could not be
+     */
+    public static String rename(StudioServices services, String from, String typed) {
+        PluginValues values = services.pluginValues();
+        String name = FlowNames.constantFor(typed);
+        if (from.equals(name)) return null;
+        List<String> others = new ArrayList<>(FLOWS.members(values));
+        others.remove(from);
+        String problem = nameProblem(typed, name, others);
+        if (problem != null) return problem;
+        String refused = FLOWS.rename(values, from, name).orElse(null);
+        if (refused == null) relayout(services, layout -> moved(layout, from, name));
+        return refused;
+    }
+
+    /**
+     * Deletes the flow {@code name} and its cards' places; refused while code names it — the bot's {@code flow}
+     * parameter, most often. The activities stay: they are the bot's, whichever flow runs them.
+     *
+     * @return null when it was deleted, else why it could not be
+     */
+    public static String remove(StudioServices services, String name) {
+        String refused = FLOWS.remove(services.pluginValues(), name).orElse(null);
+        if (refused == null) relayout(services, layout -> moved(layout, name, null));
+        return refused;
+    }
+
+    /** Why {@code typed}, written {@code name}, cannot name a flow beside {@code taken}, or null. */
+    static String nameProblem(String typed, String name, List<String> taken) {
+        if (name == null) return "'" + (typed == null ? "" : typed.strip()) + "' makes no constant name: start it "
+                + "with a letter.";
+        if (taken.contains(name)) return "The bot already has a flow Flows." + name + ".";
+        return null;
+    }
+
+    /** {@code layout} with {@code from}'s cards under {@code to}, or dropped when {@code to} is null. */
+    static FlowLayout moved(FlowLayout layout, String from, String to) {
+        if (!layout.flows().containsKey(from)) return layout;
+        Map<String, FlowLayout.Cards> flows = new LinkedHashMap<>();
+        layout.flows().forEach((flow, cards) -> {
+            if (!flow.equals(from)) flows.put(flow, cards);
+            else if (to != null) flows.put(to, cards);
+        });
+        return FlowLayout.of(flows, layout.goHomeByDefault());
+    }
+
+    /** Rewrites {@code Sdk.flowLayout()} by {@code change}, when the project has one this plugin reads. */
+    private static void relayout(StudioServices services, UnaryOperator<FlowLayout> change) {
+        Optional<ValueContext> value = LAYOUT.open(services);
+        Optional<FlowLayout> read = value.flatMap(LAYOUT::read);
+        if (read.isEmpty()) return;
+        FlowLayout next = change.apply(read.get());
+        if (!next.equals(read.get())) value.get().set(next);
+    }
+
+    private static String named(String typed) {
+        String constant = FlowNames.constantFor(typed);
+        return constant == null ? typed.strip() : constant;
+    }
+
+    private static String listed(List<String> names) {
+        return names.isEmpty() ? "none" : String.join(", ", names);
     }
 
     /**

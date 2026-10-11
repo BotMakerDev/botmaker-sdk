@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🔀 Activity Flow edits every flow.** A picker at the top shows one of the bot's `Flows` at a time, and
+  **Flow ▾** adds, duplicates, renames (every use too, `Sdk.flow` included) and deletes them. A flow the bot's
+  code still names isn't deleted. Activities belong to the bot: **Add from another flow** puts an activity another
+  flow runs on this canvas with its body, outcomes and switches, a card named like one gets the same, a rename
+  reaches every flow and can't take another activity's name, and a flow dropping an activity leaves it to the
+  others. A body and switches stay each flow's own once added. The assistant's flow tools take `flow` (`MAIN`, else the
+  first, when left out); `read_flow` lists the flows; `add_flow`, `rename_flow` and `remove_flow` are new.
+  Duplicated flows hold equal values until one changes: a parameter picking either is written as the first.
+
 - **`flow`, `doSetup` and `skip` are the SDK's own parameters.** In `Sdk.java` each is marked with its id —
   `@SdkValue(SdkValue.Id.FLOW)`, `DO_SETUP`, `SKIP` — beside its `@Param`. Studio writes a missing one back, keeps
   its name, type and description, and lets the Runner and *Project ▸ Parameters* change its value only. A bot

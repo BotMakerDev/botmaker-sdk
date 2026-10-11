@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
+import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.plugin.flow.Board;
@@ -19,35 +20,61 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
- * The assistant's activity flow: read it, and change it as 🔀 Activity Flow does — each change through
- * {@link FlowEdits}, saved with the {@code Activities} enums it needs, on the FX thread.
+ * The assistant's activity flows: read one, change it as 🔀 Activity Flow does — each change through
+ * {@link FlowEdits}, saved with the {@code Activities} enums it needs, on the FX thread — and add, rename or remove
+ * a flow. Every flow tool takes the flow by its {@code Flows} constant's name, {@link FlowValue#defaultName} when
+ * left out.
  */
 final class FlowTools {
 
+    /** What every tool says of its {@code flow} argument. */
+    private static final String WHICH = "which of the bot's Flows: MAIN; leave out for MAIN, or the first when there is "
+            + "no MAIN";
+
+    record Which(@Describe(value = WHICH, optional = true) String flow) {
+    }
+
     record NewActivity(@Describe("the activity's name: Collect") String name,
-                       @Describe(value = "its body as a method reference, Collect::body; leave out for none yet",
-                               optional = true) String body) {
+                       @Describe(value = "its body as a method reference, Collect::body; leave out for none yet, or "
+                               + "for the body another flow running it has", optional = true) String body,
+                       @Describe(value = WHICH, optional = true) String flow) {
     }
 
     record Rename(@Describe("the activity's current name") String from,
-                  @Describe("its new name") String to) {
+                  @Describe("its new name") String to,
+                  @Describe(value = WHICH, optional = true) String flow) {
     }
 
-    record ActivityName(@Describe("the activity's name") String name) {
+    record ActivityName(@Describe("the activity's name") String name,
+                        @Describe(value = WHICH, optional = true) String flow) {
     }
 
     /** One arrow between two activities, on one outcome. */
     record Arrow(@Describe("the activity the arrow leaves") String from,
                  @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome,
-                 @Describe("the activity it goes to") String to) {
+                 @Describe("the activity it goes to") String to,
+                 @Describe(value = WHICH, optional = true) String flow) {
     }
 
     record Leaving(@Describe("the activity the arrow leaves") String from,
-                   @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome) {
+                   @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome,
+                   @Describe(value = WHICH, optional = true) String flow) {
+    }
+
+    record NewFlow(@Describe("the new flow's name: DAILY") String name,
+                   @Describe(value = "a flow to copy, MAIN; leave out for an empty one", optional = true) String copyOf) {
+    }
+
+    record RenameFlow(@Describe("the flow's current name") String from,
+                      @Describe("its new name") String to) {
+    }
+
+    record FlowName(@Describe("the flow's name") String name) {
     }
 
     /** The run's own methods, one each for the whole bot: {@code .home(…)} and {@code .setup(…)}. */
@@ -72,18 +99,18 @@ final class FlowTools {
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("read_flow")
-                    .describedAs("The bot's activity flow (the first of its Flows): each activity with "
-                            + "its body, switches and outcomes, every arrow, where a run starts, its limits, and "
-                            + "the bot's home and setup")
-                    .takesNothing().handledBy(FlowTools::readFlow),
+                    .describedAs("The bot's flows by name, then one flow: each activity with its body, switches and "
+                            + "outcomes, every arrow, where a run starts, its limits, and the bot's home and setup")
+                    .takes(Which.class).handledBy(FlowTools::readFlow),
             AssistantTool.named("add_activity")
-                    .describedAs("Adds an activity to the bot's flow, as the Activity Flow window does")
+                    .describedAs("Adds an activity to a flow, as the Activity Flow window does; one another flow "
+                            + "runs keeps its body and outcomes")
                     .takes(NewActivity.class).handledBy(FlowTools::addActivity),
             AssistantTool.named("rename_activity")
-                    .describedAs("Renames an activity everywhere: its card, arrows and constant")
+                    .describedAs("Renames an activity everywhere: its card in every flow, arrows and constant")
                     .takes(Rename.class).handledBy(FlowTools::renameActivity),
             AssistantTool.named("remove_activity")
-                    .describedAs("Removes an activity and its arrows from the flow")
+                    .describedAs("Removes an activity and its arrows from a flow; other flows keep it")
                     .takes(ActivityName.class).handledBy(FlowTools::removeActivity),
             AssistantTool.named("connect")
                     .describedAs("Draws an arrow from an activity's outcome to the activity that runs next, "
@@ -94,8 +121,18 @@ final class FlowTools {
                             + "stops there")
                     .takes(Leaving.class).handledBy(FlowTools::disconnect),
             AssistantTool.named("set_start")
-                    .describedAs("Makes an activity the one a run starts at")
+                    .describedAs("Makes an activity the one a run of the flow starts at")
                     .takes(ActivityName.class).handledBy(FlowTools::setStart),
+            AssistantTool.named("add_flow")
+                    .describedAs("Adds a flow, empty or a copy of another; the bot's flow parameter picks which "
+                            + "one runs")
+                    .takes(NewFlow.class).handledBy(FlowTools::addFlow),
+            AssistantTool.named("rename_flow")
+                    .describedAs("Renames a flow and every use of it, the bot's flow parameter included")
+                    .takes(RenameFlow.class).handledBy(FlowTools::renameFlow),
+            AssistantTool.named("remove_flow")
+                    .describedAs("Deletes a flow no code names; its activities stay for the other flows")
+                    .takes(FlowName.class).handledBy(FlowTools::removeFlow),
             AssistantTool.named("set_flow_method")
                     .describedAs("Sets the bot's home or setup (one each, whichever flow runs) to one of the bot's "
                             + "methods; create the method with the code tools first")
@@ -103,12 +140,14 @@ final class FlowTools {
 
     private FlowTools() {}
 
-    static AgentReply readFlow(AssistantTool.None none, AgentContext context) {
+    static AgentReply readFlow(Which which, AgentContext context) {
         StudioServices services = context.services();
         return FxCall.call(() -> {
-            FlowValue.Target target = FlowValue.target(services);
+            FlowValue.Target target = FlowValue.target(services, which.flow());
             if (target.problem() != null) return AgentReply.refused(target.problem());
-            return AgentReply.text(describe(Board.read(services.pluginValues(), target.flow()), target));
+            List<String> names = FlowValue.names(services);
+            String flows = "Flows: " + (names.isEmpty() ? "none yet" : String.join(", ", names)) + ".\n";
+            return AgentReply.text(flows + describe(Board.read(services.pluginValues(), target.flow()), target));
         });
     }
 
@@ -151,37 +190,100 @@ final class FlowTools {
     }
 
     static AgentReply addActivity(NewActivity activity, AgentContext context) {
-        return editFlow(context, flow -> FlowEdits.addActivity(flow, activity.name(), activity.body()),
-                flow -> Map.of(), "Added " + activity.name() + ".");
+        StudioServices services = context.services();
+        return editFlow(context, activity.flow(), board -> {
+            // An activity another flow runs is the same enum: its outcomes, and its step as there unless a body
+            // is given — as Add from another flow in 🔀 Activity Flow.
+            PluginValues values = services.pluginValues();
+            String label = FlowNames.activityLabel(activity.name());
+            List<String> outcomes = FlowConstants.outcomesOf(values, label);
+            boolean bodyGiven = activity.body() != null && !activity.body().isBlank();
+            Optional<Flow.Step> shared = bodyGiven ? Optional.empty() : FlowValue.stepElsewhere(values, label, null);
+            return shared.isPresent() ? FlowEdits.addShared(board, shared.get(), outcomes)
+                    : FlowEdits.addActivity(board, activity.name(), activity.body(), outcomes);
+        }, flow -> Map.of(), "Added " + activity.name() + ".");
     }
 
     static AgentReply renameActivity(Rename rename, AgentContext context) {
         // Keyed by the label the flow holds and the label the rename makes, which is what the constants'
         // plan looks up: "collect" typed for the activity "Collect" still renames Activities.COLLECT.
-        return editFlow(context, flow -> FlowEdits.renameActivity(flow, rename.from(), rename.to()),
+        StudioServices services = context.services();
+        return editFlow(context, rename.flow(), board -> {
+            String held = FlowEdits.labelOf(board.flow(), rename.from()).orElse(rename.from());
+            String problem = FlowConstants.renameProblem(services.pluginValues(), held, rename.to());
+            if (problem != null) throw new IllegalArgumentException(problem);
+            return FlowEdits.renameActivity(board, rename.from(), rename.to());
+        },
                 flow -> FlowEdits.labelOf(flow, rename.from()).<Map<String, String>>map(
                         held -> Map.of(held, FlowNames.activityLabel(rename.to()))).orElse(Map.of()),
                 "Renamed " + rename.from() + " to " + rename.to() + ".");
     }
 
     static AgentReply removeActivity(ActivityName name, AgentContext context) {
-        return editFlow(context, flow -> FlowEdits.removeActivity(flow, name.name()), flow -> Map.of(),
+        return editFlow(context, name.flow(), flow -> FlowEdits.removeActivity(flow, name.name()), flow -> Map.of(),
                 "Removed " + name.name() + ".");
     }
 
     static AgentReply connect(Arrow arrow, AgentContext context) {
-        return editFlow(context, flow -> FlowEdits.connect(flow, arrow.from(), arrow.outcome(), arrow.to()),
-                flow -> Map.of(), arrow.from() + " on " + outcome(arrow.outcome()) + " now goes to " + arrow.to() + ".");
+        return editFlow(context, arrow.flow(),
+                flow -> FlowEdits.connect(flow, arrow.from(), arrow.outcome(), arrow.to()), flow -> Map.of(),
+                arrow.from() + " on " + outcome(arrow.outcome()) + " now goes to " + arrow.to() + ".");
     }
 
     static AgentReply disconnect(Leaving leaving, AgentContext context) {
-        return editFlow(context, flow -> FlowEdits.disconnect(flow, leaving.from(), leaving.outcome()),
+        return editFlow(context, leaving.flow(), flow -> FlowEdits.disconnect(flow, leaving.from(), leaving.outcome()),
                 flow -> Map.of(), leaving.from() + " on " + outcome(leaving.outcome()) + " now goes nowhere.");
     }
 
     static AgentReply setStart(ActivityName name, AgentContext context) {
-        return editFlow(context, flow -> FlowEdits.setStart(flow, name.name()), flow -> Map.of(),
+        return editFlow(context, name.flow(), flow -> FlowEdits.setStart(flow, name.name()), flow -> Map.of(),
                 "A run now starts at " + name.name() + ".");
+    }
+
+    static AgentReply addFlow(NewFlow flow, AgentContext context) {
+        StudioServices services = context.services();
+        return FxCall.call(() -> {
+            boolean copy = flow.copyOf() != null && !flow.copyOf().isBlank();
+            String refused;
+            if (copy) {
+                FlowValue.Target from = FlowValue.target(services, flow.copyOf());
+                refused = from.problem() != null ? from.problem()
+                        : FlowValue.duplicate(services, from.name(), flow.name());
+            } else {
+                refused = FlowValue.create(services, flow.name(), Flow.NONE);
+            }
+            if (refused != null) return AgentReply.refused(refused);
+            return AgentReply.text("Added Flows." + FlowNames.constantFor(flow.name())
+                    + (copy ? ", a copy of " + flow.copyOf().strip() : ", empty") + ". Flows: "
+                    + String.join(", ", FlowValue.names(services)) + ".");
+        });
+    }
+
+    static AgentReply renameFlow(RenameFlow rename, AgentContext context) {
+        StudioServices services = context.services();
+        return FxCall.call(() -> {
+            FlowValue.Target from = FlowValue.target(services, rename.from());
+            if (from.value().isEmpty()) return AgentReply.refused(from.problem() != null ? from.problem()
+                    : "Flows." + from.name() + " is not written yet; add_activity writes it.");
+            String refused = FlowValue.rename(services, from.name(), rename.to());
+            if (refused != null) return AgentReply.refused(refused);
+            return AgentReply.text("Renamed Flows." + from.name() + " to Flows." + FlowNames.constantFor(rename.to())
+                    + ", and every use of it.");
+        });
+    }
+
+    static AgentReply removeFlow(FlowName name, AgentContext context) {
+        StudioServices services = context.services();
+        return FxCall.call(() -> {
+            FlowValue.Target target = FlowValue.target(services, name.name());
+            if (target.value().isEmpty()) return AgentReply.refused(target.problem() != null ? target.problem()
+                    : "There is no Flows." + target.name() + " to remove.");
+            String refused = FlowValue.remove(services, target.name());
+            if (refused != null) return AgentReply.refused(refused);
+            List<String> left = FlowValue.names(services);
+            return AgentReply.text("Removed Flows." + target.name() + ". Flows: "
+                    + (left.isEmpty() ? "none" : String.join(", ", left)) + ".");
+        });
     }
 
     /** Only a method the bot has: a name it lacks would not compile. */
@@ -207,14 +309,14 @@ final class FlowTools {
         });
     }
 
-    /** Reads the flow, changes it, and saves it as 🔀 Activity Flow does — all on the FX thread. */
-    private static AgentReply editFlow(AgentContext context, UnaryOperator<Board> change,
+    /** Reads the flow {@code name} names, changes it, and saves it as 🔀 Activity Flow does — all on the FX thread. */
+    private static AgentReply editFlow(AgentContext context, String name, UnaryOperator<Board> change,
                                        Function<Flow, Map<String, String>> activityRenames, String done) {
         StudioServices services = context.services();
         return FxCall.call(() -> {
             // A flow or run the user wrote by hand reads as none, and writing over it would lose it: 🔀 Activity
             // Flow opens read-only for the same reason.
-            FlowValue.Target target = FlowValue.target(services);
+            FlowValue.Target target = FlowValue.target(services, name);
             if (target.problem() != null) return AgentReply.refused(target.problem());
             Board before = Board.read(services.pluginValues(), target.flow());
             Board after;
@@ -227,7 +329,8 @@ final class FlowTools {
             String refused = FlowEdits.save(services, target, after, FlowEdits.labels(before.flow()),
                     new LinkedHashMap<>(activityRenames.apply(before.flow())), new LinkedHashMap<>(), notes);
             if (refused != null) return AgentReply.refused(refused);
-            return AgentReply.text(done + (notes.isEmpty() ? "" : " " + String.join(" ", notes))
+            return AgentReply.text("Flows." + target.name() + ": " + done
+                    + (notes.isEmpty() ? "" : " " + String.join(" ", notes))
                     + " Activities: " + FlowEdits.labels(after.flow()) + ".");
         });
     }

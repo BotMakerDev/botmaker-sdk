@@ -27,6 +27,7 @@ import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.plugin.flow.FlowValue;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -345,7 +346,7 @@ class SdkAssistTest {
     void theFlowIsBuiltReadAndRewired() {
         host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
         String empty = text(run("read_flow"));
-        assertTrue(empty.startsWith("No flow yet; the first change writes Flows.MAIN"), empty);
+        assertTrue(empty.startsWith("Flows: none yet.\nNo flow yet; the first change writes Flows.MAIN"), empty);
         assertTrue(empty.endsWith("The flow has no activities yet; add_activity adds one."), empty);
 
         // A project with no flow gets Flows.MAIN on its first change.
@@ -356,13 +357,13 @@ class SdkAssistTest {
         assertFalse(run("connect", "from", "Collect", "outcome", "bag full", "to", "Battle").isRefused());
         assertFalse(run("connect", "from", "Battle", "to", "Collect").isRefused());
         String read = text(run("read_flow"));
-        assertTrue(read.startsWith("Flows.MAIN.\n"), read);
+        assertTrue(read.startsWith("Flows: MAIN.\nFlows.MAIN.\n"), read);
         assertTrue(read.contains("\nStarts at Collect;"), read);
         assertTrue(read.contains("• Collect — Collect::body; outcomes [Next, Bag full]"), read);
         assertTrue(read.contains("    on Bag full → Battle"), read);
         assertTrue(read.contains("• Battle — no body yet"), read);
 
-        assertEquals("Collect on Bag full now goes nowhere. Activities: [Collect, Battle].",
+        assertEquals("Flows.MAIN: Collect on Bag full now goes nowhere. Activities: [Collect, Battle].",
                 text(run("disconnect", "from", "Collect", "outcome", "bag full")));
         assertTrue(run("disconnect", "from", "Collect", "outcome", "bag full").isRefused());
         assertFalse(run("set_start", "name", "Battle").isRefused());
@@ -388,18 +389,61 @@ class SdkAssistTest {
         assertEquals("The bot has no setup now.", text(run("set_flow_method", "which", "setup")));
     }
 
-    /** Of several flows, the first is edited, and the run is left as it was. */
+    /** Of several flows, MAIN is edited when none is named, and the run is left as it was. */
     @Test
-    void theFirstFlowIsEditedAndTheRunLeftAlone() {
+    void mainIsEditedWhenNoFlowIsNamedAndTheRunLeftAlone() {
         host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        host.set("flows").put("DAILY", TestContexts.row(Flow.class, "").withValue(Flow.NONE));
+        assertTrue(text(run("read_flow")).startsWith("Flows: DAILY.\nFlows.DAILY."), "the first, with no MAIN");
+        host.set("flows").remove("DAILY");
         assertFalse(run("add_activity", "name", "Collect", "body", "Collect::body").isRefused());
         host.set("flows").put("DAILY", TestContexts.row(Flow.class, "").withValue(Flow.NONE));
-        assertTrue(text(run("read_flow")).startsWith("Flows.MAIN."));
+        assertTrue(text(run("read_flow")).startsWith("Flows: MAIN, DAILY.\nFlows.MAIN."));
 
         assertFalse(run("add_activity", "name", "Battle").isRefused());
         assertEquals(2, flow().steps().size());
         assertEquals(Flow.NONE, host.set("flows").get("DAILY").value());
         assertEquals(Run.NONE, host.values.get("run").value(), "the flow is no part of the run");
+    }
+
+    /** A flow is picked by name; an activity is the bot's, shared by every flow running it. */
+    @Test
+    void flowsArePickedByNameAndShareTheirActivities() {
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        assertFalse(run("add_activity", "name", "Collect", "body", "Collect::body").isRefused());
+        assertFalse(run("connect", "from", "Collect", "outcome", "bag full", "to", "Collect").isRefused());
+
+        assertFalse(run("add_flow", "name", "daily", "copyOf", "MAIN").isRefused());
+        assertEquals(flow(), host.set("flows").get("DAILY").value(), "a copy holds the same flow");
+        assertFalse(run("add_flow", "name", "empty").isRefused());
+        assertEquals(Flow.NONE, host.set("flows").get("EMPTY").value());
+        assertTrue(run("add_flow", "name", "Daily").isRefused(), "DAILY is taken");
+        assertTrue(run("read_flow", "flow", "nightly").isRefused());
+
+        // Added to another flow, Collect keeps its body and its enum's outcomes.
+        assertFalse(run("add_activity", "name", "Collect", "flow", "EMPTY").isRefused());
+        Flow empty = (Flow) host.set("flows").get("EMPTY").value();
+        assertEquals("Collect::body", FlowValue.bodySource(empty.steps().getFirst()));
+        assertTrue(text(run("read_flow", "flow", "empty")).contains("outcomes [Next, Bag full]"));
+
+        // Dropped from one flow, it stays the others'.
+        assertFalse(run("remove_activity", "name", "Collect", "flow", "DAILY").isRefused());
+        assertFalse(host.calls.stream().anyMatch(call -> call.startsWith("removeGroup")), host.calls.toString());
+        assertTrue(host.set("activities").containsKey("Collect.BAG_FULL"));
+
+        // Another flow's activity has its enum: no activity here may take its name.
+        assertFalse(run("add_activity", "name", "Rest", "flow", "EMPTY").isRefused());
+        AgentReply taken = run("rename_activity", "from", "Collect", "to", "rest");
+        assertTrue(taken.isRefused(), "Activities.Rest is EMPTY's");
+        assertTrue(text(taken).contains("Activities.Rest is already another activity"), text(taken));
+
+        assertFalse(run("rename_flow", "from", "empty", "to", "farm").isRefused());
+        assertTrue(host.calls.contains("rename flows EMPTY FARM"), host.calls.toString());
+        host.uses.put("FARM", List.of(new PluginValues.Use(Path.of("Sdk.java"), 12,
+                "public static Flow flow = Flows.FARM;")));
+        assertTrue(run("remove_flow", "name", "farm").isRefused(), "the bot's flow parameter names it");
+        assertFalse(run("remove_flow", "name", "daily").isRefused());
+        assertEquals(List.of("MAIN", "FARM"), List.copyOf(host.set("flows").keySet()));
     }
 
     @Test
@@ -489,7 +533,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(34, names.size());
+        assertEquals(37, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 

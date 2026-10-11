@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
@@ -17,7 +18,11 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
@@ -56,6 +61,12 @@ import java.util.function.Consumer;
  *
  * <h2>What it writes</h2>
  *
+ * <p><b>One flow at a time.</b> The bot has several flows, its {@code Flows} constants; the top bar picks the one
+ * drawn, and adds, copies, renames and deletes them. Activities are the bot's, not a flow's: a card's enum and
+ * outcomes are the same in every flow running it, so a rename reaches them all and a flow dropping one leaves it
+ * to the others. Its body, description and switches are each flow's own step, copied from another flow when the
+ * card is added to this one.
+ *
  * <p>No file. The graph is one expression — a {@code Flows} constant ({@link FlowValue#target}) — written through {@link com.botmaker.plugin.api.source.PluginValues}, so it lands
  * in the bot's own Java, in the open buffer as well as on disk, as one entry in the project's history. The
  * game's home and setup are {@code Sdk.run()}'s, written after the flow and only when they changed. The card
@@ -75,11 +86,14 @@ public final class ActivityFlowDialog {
     private final Window owner;
     private final StudioServices services;
 
-    private final FlowCanvas canvas = new FlowCanvas();
+    private final BorderPane root = new BorderPane();
+
+    /** The canvas of the flow shown: a new one per flow picked, so undo never reaches into another flow. */
+    private FlowCanvas canvas;
 
     /**
-     * The flow this window edits — a {@code Flows} constant, {@link FlowValue#target} — read again after each save,
-     * since the first save of a project with no flow writes the constant.
+     * The flow this window edits — a {@code Flows} constant picked by name, {@link FlowValue#target} — read again
+     * after each save, since the first save of a project with no flow writes the constant.
      */
     private FlowValue.Target target = FlowValue.Target.refused(null);
 
@@ -182,25 +196,10 @@ public final class ActivityFlowDialog {
     }
 
     public void show() {
-        loadCurrent();
-
-        BorderPane root = new BorderPane();
-        root.setTop(buildTopBar());
-        root.setCenter(canvas);
         root.setRight(buildSidePanel());
         root.setBottom(buildBottomBar());
-
-        canvas.setOnMessage(this::error);
-        canvas.setOnChainChanged(this::refreshOrderLabel);
-        canvas.setOnCanvasDoubleClick(this::createActivityAt);
-        // Arrowd *after* loadCurrent, so seeding the canvas doesn't read as a dozen edits by the user; and the
-        // history is cleared for the same reason — the flow as it was loaded is the state undo bottoms out at.
-        canvas.setOnFlowMutated(this::markDirty);
-        canvas.history().clear();
         autosaveDelay.setOnFinished(e -> flush());
-        canvas.selectedProperty().addListener((o, was, is) -> showInSidePanel(is));
-        showInSidePanel(null);
-        refreshOrderLabel();
+        showFlow(null);
 
         // The window's own ✕ is the same door as the Close button, and it must not be the one that loses the
         // last edit: both go through closeRequested, which flushes anything outstanding first.
@@ -213,18 +212,60 @@ public final class ActivityFlowDialog {
         });
         FlowStyles.apply(stage.getScene());
         stage.show();
-        // Cards have real bounds only after the first layout pass; re-draw so the wires land on the ports —
-        // and auto-arrange there too, since it stacks cards by their real heights and would otherwise lay the
-        // first-ever open out against the fallback height.
+        layOut();
+    }
+
+    /**
+     * Shows the flow {@code name} names — {@link FlowValue#defaultName} when null — on a fresh canvas: its own
+     * cards, arrows and undo history. The caller has saved the flow it leaves.
+     */
+    private void showFlow(String name) {
+        canvas = new FlowCanvas();
+        activityRenames.clear();
+        outcomeRenames.clear();
+        readOnlyReason = null;
+        error("");
+        loadCurrent(name);
+        root.setTop(buildTopBar());
+        root.setCenter(canvas);
+
+        canvas.setOnMessage(this::error);
+        canvas.setOnChainChanged(this::refreshOrderLabel);
+        canvas.setOnCanvasDoubleClick(this::createActivityAt);
+        // Arrowd *after* loadCurrent, so seeding the canvas doesn't read as a dozen edits by the user; and the
+        // history is cleared for the same reason — the flow as it was loaded is the state undo bottoms out at.
+        canvas.setOnFlowMutated(this::markDirty);
+        canvas.history().clear();
+        canvas.selectedProperty().addListener((o, was, is) -> showInSidePanel(is));
+        showInSidePanel(null);
+        refreshOrderLabel();
+        if (stage != null) layOut();
+    }
+
+    /**
+     * Cards have real bounds only after the first layout pass; re-draw so the wires land on the ports — and
+     * auto-arrange there too, since it stacks cards by their real heights and would otherwise lay the first-ever
+     * open out against the fallback height.
+     */
+    private void layOut() {
+        FlowCanvas shown = canvas;
         Platform.runLater(() -> {
-            if (arrangeOnOpen) canvas.autoArrange();
-            else canvas.refresh();
+            if (arrangeOnOpen) shown.autoArrange();
+            else shown.refresh();
         });
     }
 
-    /** Seeds the canvas from the stored flow: a card per activity, at its stored spot or a fresh one. */
-    private void loadCurrent() {
-        Flow flow = readFlow();
+    /**
+     * Saves the flow on the canvas, then shows {@code name}'s. A save refused leaves the canvas where it is: what
+     * it holds would be lost.
+     */
+    private void switchTo(String name) {
+        afterSave(() -> null, name);
+    }
+
+    /** Seeds the canvas from the stored flow {@code name}: a card per activity, at its stored spot or a fresh one. */
+    private void loadCurrent(String name) {
+        Flow flow = readFlow(name);
         Board board = Board.read(services.pluginValues(), flow);
         home = target.run().home();
         setup = target.run().setup();
@@ -268,8 +309,8 @@ public final class ActivityFlowDialog {
      * <p>The window still opens in every case, because closing it outright leaves the user no way to see
      * what the project has.
      */
-    private Flow readFlow() {
-        target = FlowValue.target(services);
+    private Flow readFlow(String name) {
+        target = FlowValue.target(services, name);
         if (target.problem() != null) {
             readOnly(target.problem());
             return Flow.NONE;
@@ -305,12 +346,144 @@ public final class ActivityFlowDialog {
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox bar = new HBox(8, undoButton(), redoButton(),
+        HBox bar = new HBox(8, flowPicker(), flowMenu(),
+                new Separator(javafx.geometry.Orientation.VERTICAL), undoButton(), redoButton(),
                 new Separator(javafx.geometry.Orientation.VERTICAL), recenter, arrange,
-                spacer, addActivity);
+                spacer, fromOtherFlows(), addActivity);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(10));
         return bar;
+    }
+
+    /**
+     * The bot's flows, one picked: picking another saves this one and shows that one. A project with no flow lists
+     * {@link FlowValue#FIRST}, which the first save writes.
+     */
+    private Node flowPicker() {
+        List<String> names = new ArrayList<>(FlowValue.names(services));
+        if (!names.contains(target.name())) names.add(target.name());
+        ComboBox<String> picker = new ComboBox<>(FXCollections.observableArrayList(names));
+        picker.setValue(target.name());
+        picker.setTooltip(new javafx.scene.control.Tooltip("The flow drawn here, one of the bot's Flows. Which one "
+                + "runs is the bot's flow parameter, set in the Runner or Project ▸ Parameters…"));
+        picker.valueProperty().addListener((o, was, is) -> {
+            if (is != null && !is.equals(target.name())) switchTo(is);
+        });
+        return picker;
+    }
+
+    /** New, duplicate, rename and delete a flow. Each saves the flow shown first, as picking another does. */
+    private Node flowMenu() {
+        MenuItem create = new MenuItem("New flow…");
+        create.setOnAction(e -> askName("New flow", "Name the new flow", "").ifPresent(typed ->
+                afterSave(() -> FlowValue.create(services, typed, Flow.NONE), FlowNames.constantFor(typed))));
+        MenuItem duplicate = new MenuItem("Duplicate…");
+        duplicate.setOnAction(e -> askName("Duplicate flow", "Name the copy of Flows." + target.name(),
+                target.name() + "_COPY").ifPresent(typed -> afterSave(
+                () -> FlowValue.duplicate(services, target.name(), typed), FlowNames.constantFor(typed))));
+        MenuItem rename = new MenuItem("Rename…");
+        rename.setOnAction(e -> askName("Rename flow", "Rename Flows." + target.name() + " and every use of it",
+                target.name()).ifPresent(typed -> afterSave(
+                () -> FlowValue.rename(services, target.name(), typed), FlowNames.constantFor(typed))));
+        MenuItem delete = new MenuItem("Delete");
+        delete.setOnAction(e -> deleteFlow());
+        // Nothing to copy, rename or delete before the first save writes the constant.
+        boolean written = target.value().isPresent();
+        duplicate.setDisable(!written);
+        rename.setDisable(!written);
+        delete.setDisable(!written);
+        MenuButton menu = new MenuButton("Flow", null, create, duplicate, rename, delete);
+        menu.setTooltip(new javafx.scene.control.Tooltip("Add, copy, rename or delete one of the bot's flows. The "
+                + "activities are the bot's: every flow can run them."));
+        return menu;
+    }
+
+    /**
+     * Saves the flow shown, runs {@code change} — null when it landed, else why not — and shows {@code then}.
+     * A refusal is said and the canvas stays, its picker back on it. A flow written by hand is never saved from
+     * here, so its canvas edits have nothing to keep.
+     */
+    private void afterSave(java.util.function.Supplier<String> change, String then) {
+        autosaveDelay.stop();
+        if (readOnlyReason == null && dirty) flush();
+        String refused = readOnlyReason == null && (dirty || saving)
+                ? "Flows." + target.name() + " isn't saved, so nothing else changed: " + statusLabel.getText()
+                : change.get();
+        if (refused != null) {
+            error(refused);
+            root.setTop(buildTopBar());
+            return;
+        }
+        dirty = false;
+        showFlow(then);
+    }
+
+    private void deleteFlow() {
+        String name = target.name();
+        Alert confirm = services.theme().alert(Alert.AlertType.CONFIRMATION,
+                "Its arrows and card places go with it. Its activities stay: they are the bot's, and other flows "
+                        + "may run them. A flow the bot's code still names, as its flow parameter does, isn't deleted.",
+                ButtonType.CANCEL, ButtonType.OK);
+        confirm.initOwner(stage);
+        confirm.setTitle("Delete flow");
+        confirm.setHeaderText("Delete Flows." + name + "?");
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+        afterSave(() -> FlowValue.remove(services, name), null);
+    }
+
+    /** A flow name typed in a prompt, or empty when cancelled. */
+    private Optional<String> askName(String title, String header, String initial) {
+        TextInputDialog prompt = new TextInputDialog(initial);
+        services.theme().apply(prompt);
+        prompt.initOwner(stage);
+        prompt.setTitle(title);
+        prompt.setHeaderText(header);
+        prompt.setContentText("Name:");
+        return prompt.showAndWait().map(String::strip).filter(typed -> !typed.isEmpty());
+    }
+
+    /**
+     * The activities other flows run that this one does not, each added as a card with its body, outcomes and
+     * switches as the first flow running it has them. With none, the menu says so.
+     */
+    private Node fromOtherFlows() {
+        MenuButton menu = new MenuButton("Add from another flow");
+        // A flow written by hand is never saved from here: a card added to it would only be dropped.
+        menu.setDisable(readOnlyReason != null);
+        menu.setTooltip(new javafx.scene.control.Tooltip("An activity is the bot's, not one flow's: run one another "
+                + "flow already has here too, with the same code and outcomes."));
+        menu.setOnShowing(e -> {
+            menu.getItems().clear();
+            Set<String> placed = placedNames();
+            PluginValues values = services.pluginValues();
+            for (String flowName : FlowValue.names(services)) {
+                if (flowName.equals(target.name())) continue;
+                for (Flow.Step step : FlowValue.FLOWS.read(values, flowName).orElse(Flow.NONE).steps()) {
+                    if (placed.contains(step.label())) continue;
+                    placed.add(step.label());
+                    MenuItem item = new MenuItem(step.label() + "  (" + flowName + ")");
+                    item.setOnAction(a -> addShared(step));
+                    menu.getItems().add(item);
+                }
+            }
+            if (menu.getItems().isEmpty()) {
+                MenuItem none = new MenuItem("Every other flow's activities are already here");
+                none.setDisable(true);
+                menu.getItems().add(none);
+            }
+        });
+        return menu;
+    }
+
+    /** Puts {@code step}, run by another flow, on this canvas: same enum, same body, its outcomes as declared. */
+    private void addShared(Flow.Step step) {
+        Point2D at = canvas.nextFreeSpot();
+        List<String> outcomes = FlowConstants.outcomesOf(services.pluginValues(), step.label());
+        ActivityDraft draft = ActivityDraft.of(new Flow.Step(step.activity(), step.body(), step.description(), true,
+                step.goHome(), step.popupCheck(), step.runnerSwitch(), Activity.NONE),
+                outcomes.isEmpty() ? List.of(Arrow.NEXT) : outcomes, at.getX(), at.getY());
+        canvas.add(draft);
+        error("");
     }
 
     /**
@@ -355,7 +528,19 @@ public final class ActivityFlowDialog {
         Optional<ActivityDraft> made = new NewActivityDialog(stage, services, placedNames(), goHomeByDefault)
                 .showAt(at.getX(), at.getY());
         if (made.isEmpty()) return;
-        canvas.add(made.get());
+        // A name another flow already runs is that activity: its enum's outcomes come first, so saving this
+        // card does not drop the ones the other flow's arrows leave on, and its body is the one that flow runs.
+        ActivityDraft draft = made.get();
+        PluginValues values = services.pluginValues();
+        FlowValue.stepElsewhere(values, draft.name(), target.name())
+                .ifPresent(step -> draft.setBody(FlowValue.bodySource(step)));
+        List<String> declared = FlowConstants.outcomesOf(values, draft.name());
+        if (!declared.isEmpty()) {
+            List<String> outcomes = new ArrayList<>(declared);
+            for (String typed : draft.outcomes()) if (!outcomes.contains(typed)) outcomes.add(typed);
+            draft.outcomes().setAll(outcomes);
+        }
+        canvas.add(draft);
         error("");
     }
 
@@ -813,6 +998,11 @@ public final class ActivityFlowDialog {
         Set<String> others = new HashSet<>();
         for (ActivityDraft d : canvas.drafts()) if (d != draft) others.add(d.name());
         String problem = FlowNames.activityNameProblem(candidate, others);
+        // And the bot's: an enum another activity has, which another flow may run. Asked of the label the card had
+        // at the last save, since the enum keeps it until the next one.
+        String saved = activityRenames.entrySet().stream().filter(e -> e.getValue().equals(draft.name()))
+                .map(Map.Entry::getKey).findFirst().orElse(draft.name());
+        if (problem == null) problem = FlowConstants.renameProblem(services.pluginValues(), saved, candidate);
         if (problem != null) {
             error(problem + " Reverted.");
             field.setText(draft.name());
@@ -1039,7 +1229,7 @@ public final class ActivityFlowDialog {
         if (refused == null) {
             savedActivities = FlowEdits.labels(board.flow());
             // Read again: the first save of a project with no flow wrote Flows.MAIN, which the next save edits.
-            target = FlowValue.target(services);
+            target = FlowValue.target(services, target.name());
             // After the flow, so the run names the flow as just written; nothing when home and setup are as read.
             refused = FlowValue.writeRun(services, target, home, setup);
         }

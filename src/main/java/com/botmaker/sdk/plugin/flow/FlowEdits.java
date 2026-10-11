@@ -38,16 +38,39 @@ public final class FlowEdits {
      * an empty flow is its start.
      */
     public static Board addActivity(Board board, String typed, String bodySource) {
-        Flow flow = board.flow();
+        return addActivity(board, typed, bodySource, List.of());
+    }
+
+    /**
+     * {@code board} with a new activity as {@link #addActivity(Board, String, String)} adds one, its exits
+     * {@code outcomes} — the outcome labels its enum already declares when another flow runs it — or
+     * {@link Arrow#NEXT} when there are none.
+     */
+    public static Board addActivity(Board board, String typed, String bodySource, List<String> outcomes) {
         String label = FlowNames.activityLabel(typed);
-        String problem = FlowNames.activityNameProblem(label, labels(flow));
+        String problem = FlowNames.activityNameProblem(label, labels(board.flow()));
         if (problem != null) throw new IllegalArgumentException(problem);
-        Flow.Step step = FlowTypes.step(FlowNames.activity(label), body(bodySource));
+        return addStep(board, FlowTypes.step(FlowNames.activity(label), body(bodySource)), outcomes);
+    }
+
+    /**
+     * {@code board} with {@code shared} — the step another flow runs the activity as, its body, description and
+     * switches — switched on and with no off-wire, its exits {@code outcomes}. Refused when the flow already runs it.
+     */
+    public static Board addShared(Board board, Flow.Step shared, List<String> outcomes) {
+        String problem = FlowNames.activityNameProblem(shared.label(), labels(board.flow()));
+        if (problem != null) throw new IllegalArgumentException(problem);
+        return addStep(board, new Flow.Step(shared.activity(), shared.body(), shared.description(), true,
+                shared.goHome(), shared.popupCheck(), shared.runnerSwitch(), Activity.NONE), outcomes);
+    }
+
+    private static Board addStep(Board board, Flow.Step step, List<String> outcomes) {
+        Flow flow = board.flow();
         List<Flow.Step> steps = new ArrayList<>(flow.steps());
         steps.add(step);
         Activity start = flow.start().isNone() ? step.activity() : flow.start();
         Map<String, List<String>> exits = new LinkedHashMap<>(board.exits());
-        exits.put(step.label(), List.of(Arrow.NEXT));
+        exits.put(step.label(), outcomes == null || outcomes.isEmpty() ? List.of(Arrow.NEXT) : outcomes);
         return new Board(with(flow, steps, flow.edges(), start), exits);
     }
 
@@ -225,7 +248,9 @@ public final class FlowEdits {
         String refused = FlowConstants.prepare(values, board, activityRenames, outcomeRenames);
         if (refused == null) refused = FlowConstants.unheld(values, board.flow());
         if (refused == null) refused = FlowValue.write(services, target, board.flow());
-        if (refused == null) FlowConstants.forget(values, board, saved, notes);
+        if (refused == null) {
+            FlowConstants.forget(values, board, saved, () -> FlowValue.labels(values, target.name()), notes);
+        }
         return refused;
     }
 

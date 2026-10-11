@@ -1,7 +1,6 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
 
@@ -299,14 +298,13 @@ public final class TemplateLibrary {
     }
 
     /**
-     * The project's activity names in the order its flow lists them, or none.
+     * The project's activity names in the order its flows list them, each once, or none.
      *
      * <p>Degrading rather than throwing is the difference between a tag picklist that is short and one that
      * will not open — an unreadable flow is reported by the flow editor, not by a tag menu.
      */
     private static List<String> activityNames(StudioServices services) {
-        return FlowValue.read(services).steps().stream()
-                .map(Flow.Step::label)
+        return FlowValue.labels(services.pluginValues(), null).stream()
                 .filter(name -> !name.isBlank())
                 .toList();
     }

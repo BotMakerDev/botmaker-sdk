@@ -217,7 +217,7 @@ class FlowConstantsTest {
         Project project = new Project(Set.of("Collect.WON", "Rest"), "Collect NEXT WON LOST", "Rest NEXT", "Old NEXT");
         List<String> notes = new ArrayList<>();
         FlowConstants.forget(project, board(Map.of("Collect", List.of("Next"))), List.of("Collect", "Rest", "Old"),
-                notes);
+                Set::of, notes);
         assertEquals(List.of("remove Collect.WON", "remove Collect.LOST", "removeGroup Rest", "removeGroup Old"),
                 project.asked);
         assertEquals(Map.of("Collect", List.of("NEXT", "WON"), "Rest", List.of("NEXT")), project.enums);
@@ -229,8 +229,20 @@ class FlowConstantsTest {
     @Test
     void forgetting_leaves_an_enum_the_canvas_never_drew() {
         Project project = new Project(Set.of(), "Collect NEXT", "Mine NEXT");
-        FlowConstants.forget(project, board(Map.of("Collect", List.of("Next"))), Set.of("Collect"), new ArrayList<>());
+        FlowConstants.forget(project, board(Map.of("Collect", List.of("Next"))), Set.of("Collect"), Set::of,
+                new ArrayList<>());
         assertEquals(List.of(), project.asked);
+    }
+
+    /** An activity one flow drops is the bot's still while another flow draws it. */
+    @Test
+    void forgetting_keeps_an_enum_another_flow_draws() {
+        Project project = new Project(Set.of(), "Collect NEXT", "Rest NEXT");
+        FlowConstants.forget(project, board(Map.of("Collect", List.of("Next"))), Set.of("Collect", "Rest"),
+                () -> Set.of("Rest"), new ArrayList<>());
+        assertEquals(List.of(), project.asked);
+        assertEquals(List.of("Next"), FlowConstants.outcomesOf(project, "Rest"));
+        assertEquals(List.of(), FlowConstants.outcomesOf(project, "Battle"));
     }
 
     /** + New outcome… in a body's return slot declares it in that activity's enum, once. */
