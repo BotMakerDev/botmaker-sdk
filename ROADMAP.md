@@ -4,6 +4,9 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **macOS: OCR has never run on a Mac** (natives staged 2026-10-11 without one). Owed on Apple Silicon:
+  `OcrEngine.recognize` and `getWords` load the `darwin-aarch64/` natives and read text; whether dyld maps
+  Leptonica once or twice (`vmmap <pid> | grep lepton`), and that OCR works either way.
 - **Release owed**: `--sdk 2.0.0 --gamebot … --studio` (the umbrella `CLAUDE.md` › Templates). The gamebot
   template stays on its old pin until that run.
 - **Activity Flow**: a flow written from *+ New outcome…* while the Activity Flow window is open is

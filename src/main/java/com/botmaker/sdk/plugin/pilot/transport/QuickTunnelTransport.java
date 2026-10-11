@@ -1,15 +1,18 @@
 package com.botmaker.sdk.plugin.pilot.transport;
 
+import com.botmaker.shared.Executables;
+import com.botmaker.shared.platform.Os;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
@@ -32,7 +35,8 @@ public final class QuickTunnelTransport implements PilotTransport {
     /** The line cloudflared prints once an edge connection is up, after which the address answers. */
     private static final String REGISTERED = "Registered tunnel connection";
 
-    private final List<String> command;
+    /** The cloudflared argv, looked up at each use: one installed after this transport was made is found. */
+    private final Supplier<List<String>> command;
     private final long urlTimeoutMs;
     private final long readyTimeoutMs;
 
@@ -40,12 +44,16 @@ public final class QuickTunnelTransport implements PilotTransport {
     private Thread shutdownHook;
 
     public QuickTunnelTransport() {
-        this(List.of("cloudflared"), 30_000, 15_000);
+        this(() -> List.of(Executables.resolve("cloudflared")), 30_000, 15_000);
     }
 
     /** For tests: {@code command} stands in for {@code cloudflared}, and is given the same arguments. */
     QuickTunnelTransport(List<String> command, long urlTimeoutMs, long readyTimeoutMs) {
-        this.command = List.copyOf(command);
+        this(() -> command, urlTimeoutMs, readyTimeoutMs);
+    }
+
+    private QuickTunnelTransport(Supplier<List<String>> command, long urlTimeoutMs, long readyTimeoutMs) {
+        this.command = command;
         this.urlTimeoutMs = urlTimeoutMs;
         this.readyTimeoutMs = readyTimeoutMs;
     }
@@ -58,7 +66,7 @@ public final class QuickTunnelTransport implements PilotTransport {
     @Override
     public Availability available() {
         try {
-            List<String> version = new ArrayList<>(command);
+            List<String> version = new ArrayList<>(command.get());
             version.add("--version");
             Process p = new ProcessBuilder(version).redirectErrorStream(true).start();
             p.getOutputStream().close();
@@ -78,7 +86,7 @@ public final class QuickTunnelTransport implements PilotTransport {
     @Override
     public synchronized Opened open(int port) {
         close();
-        List<String> cmd = new ArrayList<>(command);
+        List<String> cmd = new ArrayList<>(command.get());
         cmd.addAll(List.of("tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:" + port));
         StringBuffer log = new StringBuffer();
         try {
@@ -139,9 +147,9 @@ public final class QuickTunnelTransport implements PilotTransport {
 
     /** How to install cloudflared on this operating system. */
     static String installHint() {
-        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-        if (os.contains("win")) return "Install it with: winget install --id Cloudflare.cloudflared";
-        if (os.contains("mac")) return "Install it with: brew install cloudflared";
+        Os os = Os.current();
+        if (os.isWindows()) return "Install it with: winget install --id Cloudflare.cloudflared";
+        if (os.isMac()) return "Install it with: brew install cloudflared";
         return "Install it from Cloudflare's package repository (pkg.cloudflare.com) or its GitHub releases "
                 + "(github.com/cloudflare/cloudflared), or with: brew install cloudflared";
     }

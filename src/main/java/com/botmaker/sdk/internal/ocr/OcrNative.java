@@ -22,9 +22,10 @@ import java.nio.file.StandardCopyOption;
  *
  * <p>The Tesseract native itself is loaded lazily by Tess4J on the first {@code doOCR}/{@code getWords}
  * call, and <b>no code here participates</b>: the build stages the natives into the jar under JNA's
- * {@code Platform.RESOURCE_PREFIX} ({@code win32-x86-64/} from Tess4J itself, {@code linux-x86-64/} from
- * {@code pom.xml}), and Tess4J's own {@code LoadLibs} extracts that prefix and prepends it to
- * {@code jna.library.path}. So OCR is self-contained on Windows <em>and</em> Linux — including in a
+ * {@code Platform.RESOURCE_PREFIX} ({@code win32-x86-64/} from Tess4J itself, {@code linux-x86-64/} and
+ * {@code darwin-aarch64/} from {@code pom.xml}), and Tess4J's own {@code LoadLibs} extracts that prefix and
+ * prepends it to {@code jna.library.path}. So OCR is self-contained on Windows, Linux and Apple Silicon
+ * macOS — including in a
  * generated bot, which cannot declare a package dependency. A genuine load failure still surfaces as an
  * {@link UnsatisfiedLinkError} — deliberately not swallowed here.
  *

@@ -16,8 +16,17 @@ class TailscaleFunnelServiceTest {
 
     @Test
     void off_names_only_the_https_port_the_pilot_serves() {
-        assertEquals(List.of("tailscale", "serve", "--https=443", "off"), TailscaleFunnelService.OFF);
+        assertEquals(List.of("serve", "--https=443", "off"), TailscaleFunnelService.OFF);
         assertFalse(TailscaleFunnelService.OFF.contains("reset"));
+    }
+
+    /** The CLI comes first, wherever it was found (on a Mac it may be inside Tailscale.app), then the arguments. */
+    @Test
+    void a_command_is_the_cli_then_its_arguments() {
+        List<String> argv = TailscaleFunnelService.command(TailscaleFunnelService.OFF);
+        assertEquals(TailscaleFunnelService.cli(), argv.get(0));
+        assertEquals(TailscaleFunnelService.OFF, argv.subList(1, argv.size()));
+        assertTrue(argv.get(0).endsWith("tailscale") || argv.get(0).equals(TailscaleFunnelService.MAC_APP_CLI));
     }
 
     /** Wording from tailscale 1.102 with nothing served on :443. */

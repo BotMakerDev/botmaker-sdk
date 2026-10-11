@@ -1,5 +1,7 @@
 package com.botmaker.sdk.plugin.pilot;
 
+import com.botmaker.shared.Executables;
+import com.botmaker.shared.platform.Os;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -7,6 +9,9 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -42,7 +47,13 @@ public final class TailscaleFunnelService {
 
     /** {@code true} if the {@code tailscale} CLI is present and responds to {@code version}. */
     public boolean isAvailable() {
-        return run(List.of("tailscale", "version"), 5).exit == 0;
+        return run(List.of("version"), 5).exit == 0;
+    }
+
+    /** What {@code tailscale status --json} prints, or empty when the CLI is missing, fails or says nothing. */
+    public static Optional<String> statusJson() {
+        Exec e = run(List.of("status", "--json"), 8);
+        return e.exit != 0 || e.out.isBlank() ? Optional.empty() : Optional.of(e.out);
     }
 
     /**
@@ -51,10 +62,10 @@ public final class TailscaleFunnelService {
      * all return {@code false}. This is the "installed &amp; logged in" gate in the setup wizard.
      */
     public boolean isLoggedIn() {
-        Exec e = run(List.of("tailscale", "status", "--json"), 8);
-        if (e.exit != 0 || e.out.isBlank()) return false;
+        Optional<String> status = statusJson();
+        if (status.isEmpty()) return false;
         try {
-            return "Running".equals(JSON.readTree(e.out).path("BackendState").asText(null));
+            return "Running".equals(JSON.readTree(status.get()).path("BackendState").asText(null));
         } catch (Exception ex) {
             return false;
         }
@@ -66,10 +77,10 @@ public final class TailscaleFunnelService {
      * unavailable / the node is logged out / the field is missing.
      */
     public Optional<String> dnsName() {
-        Exec e = run(List.of("tailscale", "status", "--json"), 8);
-        if (e.exit != 0 || e.out.isBlank()) return Optional.empty();
+        Optional<String> status = statusJson();
+        if (status.isEmpty()) return Optional.empty();
         try {
-            JsonNode name = JSON.readTree(e.out).path("Self").path("DNSName");
+            JsonNode name = JSON.readTree(status.get()).path("Self").path("DNSName");
             if (name.isMissingNode() || !name.isTextual()) return Optional.empty();
             String dns = name.asText().trim();
             if (dns.endsWith(".")) dns = dns.substring(0, dns.length() - 1);
@@ -92,7 +103,7 @@ public final class TailscaleFunnelService {
         // tailnet, `tailscale funnel` prints the reason and then blocks polling — so abort the moment a known
         // failure line appears (fail-fast markers) rather than waiting out the timeout, keeping the fallback
         // to a direct bind near-instant.
-        Exec e = run(List.of("tailscale", "funnel", "--bg", String.valueOf(localPort)), 12,
+        Exec e = run(List.of("funnel", "--bg", String.valueOf(localPort)), 12,
                 "is not enabled on your tailnet", "Access denied", "not logged in");
         if (e.exit != 0) {
             String msg = e.err.isBlank() ? e.out : e.err;
@@ -116,15 +127,15 @@ public final class TailscaleFunnelService {
         Exec e = run(OFF, 10);
         if (!turnedOff(e.exit, e.err + e.out)) {
             System.err.println("[Pilot] Could not turn the Remote Pilot's Funnel off: " + (e.err + e.out).trim()
-                    + " — run `tailscale serve --https=" + HTTPS_PORT + " off` to do it by hand.");
+                    + " — run `" + String.join(" ", command(OFF)) + "` to do it by hand.");
         }
     }
 
     /** The port {@code tailscale funnel --bg <port>} serves on when no {@code --https} is given. */
     static final int HTTPS_PORT = 443;
 
-    /** Turns off only the web handler {@link #enable} made, and the Funnel on it. */
-    static final List<String> OFF = List.of("tailscale", "serve", "--https=" + HTTPS_PORT, "off");
+    /** Turns off only the web handler {@link #enable} made, and the Funnel on it: the CLI's arguments. */
+    static final List<String> OFF = List.of("serve", "--https=" + HTTPS_PORT, "off");
 
     /** Whether {@link #OFF} left nothing of ours: it succeeded, or there was no handler to remove. */
     static boolean turnedOff(int exit, String output) {
@@ -133,18 +144,42 @@ public final class TailscaleFunnelService {
 
     // --- process plumbing ---
 
+    /**
+     * The Mac app's own CLI: the standalone and App Store Tailscale put no {@code tailscale} on {@code PATH},
+     * and the binary inside the bundle answers the same commands.
+     */
+    static final String MAC_APP_CLI = "/Applications/Tailscale.app/Contents/MacOS/Tailscale";
+
+    /**
+     * The {@code tailscale} to run. On macOS the app's bundled CLI when the app is installed, since it talks to
+     * the app's own daemon, where a Homebrew {@code tailscale} would ask a {@code tailscaled} that is not the
+     * one logged in. Otherwise {@link Executables#resolve} (Homebrew's bin included on macOS), else the name.
+     */
+    public static String cli() {
+        if (Os.current().isMac() && Files.isExecutable(Path.of(MAC_APP_CLI))) return MAC_APP_CLI;
+        return Executables.resolve("tailscale");
+    }
+
+    /** The full argv for the CLI's {@code args}. */
+    static List<String> command(List<String> args) {
+        List<String> argv = new ArrayList<>();
+        argv.add(cli());
+        argv.addAll(args);
+        return argv;
+    }
+
     private record Exec(int exit, String out, String err) {}
 
     /**
-     * Runs {@code cmd}, capturing stdout/stderr, bounded three ways: normal exit, any {@code failFast} marker
+     * Runs the CLI with {@code args}, capturing stdout/stderr, bounded three ways: normal exit, any {@code failFast} marker
      * appearing in the output (kill immediately — for commands that print a reason then block), or the
      * timeout. The timeout/kill is enforced by polling + {@code destroyForcibly}, never by reading a stream
      * (an inline read would itself hang on a blocking child).
      */
-    private static Exec run(List<String> cmd, int timeoutSeconds, String... failFast) {
+    private static Exec run(List<String> args, int timeoutSeconds, String... failFast) {
         Process p = null;
         try {
-            p = new ProcessBuilder(cmd).start();
+            p = new ProcessBuilder(command(args)).start();
             // Close the child's stdin so a command that would prompt gets EOF instead of blocking on input.
             p.getOutputStream().close();
             StringBuffer out = new StringBuffer();   // thread-safe: pumped by one thread, polled by this one

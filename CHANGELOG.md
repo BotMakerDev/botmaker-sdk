@@ -19,6 +19,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Added
+
+- **OCR on Apple Silicon Macs.** The jar carries Tesseract and Leptonica for `macosx-arm64` under
+  `darwin-aarch64/`, beside the Linux ones (about 5 MB more). Leptonica is in it twice, under the name
+  Tesseract links and the one lept4j asks for. Untried on a Mac; Intel Macs get none.
+- The Remote Pilot finds `cloudflared` and `tailscale` where a Mac keeps them: Homebrew's and MacPorts' bin
+  (a Mac app does not get the shell's `PATH`), and the Tailscale app's own CLI inside `Tailscale.app`.
+
 ### Changed (breaking)
 
 - **An activity is its outcome enum.** `Activities.java` is a class of enums, one per activity, whose constants

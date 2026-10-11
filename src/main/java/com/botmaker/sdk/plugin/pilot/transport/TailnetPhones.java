@@ -1,17 +1,15 @@
 package com.botmaker.sdk.plugin.pilot.transport;
 
+import com.botmaker.sdk.plugin.pilot.TailscaleFunnelService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The phones on this computer's tailnet, and whether Tailscale sees them online: the one fact that tells "the
@@ -33,22 +31,7 @@ public final class TailnetPhones {
 
     /** The phones {@code tailscale status --json} lists now; empty when the CLI is missing or says nothing. */
     public static List<Phone> probe() {
-        try {
-            Process p = new ProcessBuilder("tailscale", "status", "--json")
-                    .redirectError(ProcessBuilder.Redirect.DISCARD).start();
-            p.getOutputStream().close();
-            String out;
-            try (InputStream in = p.getInputStream()) {
-                out = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            }
-            if (!p.waitFor(8, TimeUnit.SECONDS)) {
-                p.destroyForcibly();
-                return List.of();
-            }
-            return p.exitValue() == 0 ? parse(out) : List.of();
-        } catch (Exception e) {
-            return List.of();
-        }
+        return TailscaleFunnelService.statusJson().map(TailnetPhones::parse).orElse(List.of());
     }
 
     /** The Android and iOS peers in a {@code tailscale status --json} document, online ones first. */

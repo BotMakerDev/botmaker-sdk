@@ -20,6 +20,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -89,6 +90,19 @@ class OcrEngineNativeTest {
             assertFalse(path.startsWith("/usr/") || path.startsWith("/lib"),
                     "a system OCR native was loaded instead of the bundled one: " + path
                             + " (all mapped: " + mapped + ")");
+        }
+    }
+
+    /**
+     * The Apple Silicon natives are staged on every build, whatever OS builds the jar, under the three names
+     * the pom's macOS note explains: the one macOS JNA asks for when Tess4J loads {@code tesseract}, the
+     * {@code @rpath} name libtesseract links, and the one lept4j asks for. None of them can be loaded here;
+     * a missing or misnamed file is what this catches before a Mac does.
+     */
+    @Test
+    void theAppleSiliconNativesAreStagedUnderTheNamesTheirLoadersUse() {
+        for (String name : new String[] {"libtesseract.dylib", "libleptonica.6.dylib", "libleptonica.dylib"}) {
+            assertNotNull(OcrEngineNativeTest.class.getResource("/darwin-aarch64/" + name), name);
         }
     }
 }

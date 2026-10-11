@@ -295,6 +295,18 @@
 
               The bytedeco jars also carry headers and .a files (~2 MB); the includes below drop them.
 
+              MACOS (Apple Silicon only, as Studio's .dmg): the same two libraries from the macosx-arm64
+              classifier, staged under darwin-aarch64/, JNA's prefix there. Three files, because macOS JNA
+              does no versioned-name matching (Linux's finds libleptonica.so.6 for "leptonica"; macOS's only
+              ever asks for the exact libleptonica.dylib):
+                - Tesseract is renamed to libtesseract.dylib, for the same reason as on Linux.
+                - Leptonica is staged as libleptonica.6.dylib, the literal @rpath name libtesseract links
+                  (its rpath is @loader_path/, so beside it), AND as libleptonica.dylib, the name lept4j asks
+                  for. dyld may map the two copies separately; they share malloc and the Pix layout, so a Pix
+                  made by one and read by the other is the same struct. Renaming a dylib's dependency instead
+                  would need install_name_tool and break its code signature on arm64.
+              Intel Macs get no OCR natives: Studio ships no Intel build either.
+
               This moved here from botmaker-shared/pom.xml in SDK 1.2.0, unchanged apart from living
               beside the code it serves. The staging half is the maven-antrun execution below.
             -->
@@ -324,6 +336,20 @@
                                     <version>${bytedeco.leptonica.version}</version>
                                     <classifier>linux-x86_64</classifier>
                                     <includes>**/libleptonica.so.*</includes>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.bytedeco</groupId>
+                                    <artifactId>tesseract</artifactId>
+                                    <version>${bytedeco.tesseract.version}</version>
+                                    <classifier>macosx-arm64</classifier>
+                                    <includes>**/libtesseract.*.dylib</includes>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.bytedeco</groupId>
+                                    <artifactId>leptonica</artifactId>
+                                    <version>${bytedeco.leptonica.version}</version>
+                                    <classifier>macosx-arm64</classifier>
+                                    <includes>**/libleptonica.*.dylib</includes>
                                 </artifactItem>
                             </artifactItems>
                             <outputDirectory>${project.build.directory}/native-stage</outputDirectory>
@@ -397,6 +423,24 @@
                                 <copy todir="${ocr.natives.dir}" flatten="true" failonerror="true">
                                     <fileset dir="${project.build.directory}/native-stage"
                                              includes="**/libleptonica.so.*"/>
+                                </copy>
+                                <!-- macOS: renamed and doubled, see the macOS note above. -->
+                                <property name="ocr.natives.mac.dir"
+                                          value="${project.build.outputDirectory}/darwin-aarch64"/>
+                                <mkdir dir="${ocr.natives.mac.dir}"/>
+                                <copy todir="${ocr.natives.mac.dir}" flatten="true" failonerror="true">
+                                    <fileset dir="${project.build.directory}/native-stage"
+                                             includes="**/macosx-arm64/libtesseract.*.dylib"/>
+                                    <mapper type="merge" to="libtesseract.dylib"/>
+                                </copy>
+                                <copy todir="${ocr.natives.mac.dir}" flatten="true" failonerror="true">
+                                    <fileset dir="${project.build.directory}/native-stage"
+                                             includes="**/macosx-arm64/libleptonica.*.dylib"/>
+                                </copy>
+                                <copy todir="${ocr.natives.mac.dir}" flatten="true" failonerror="true">
+                                    <fileset dir="${project.build.directory}/native-stage"
+                                             includes="**/macosx-arm64/libleptonica.*.dylib"/>
+                                    <mapper type="merge" to="libleptonica.dylib"/>
                                 </copy>
                             </target>
                         </configuration>
