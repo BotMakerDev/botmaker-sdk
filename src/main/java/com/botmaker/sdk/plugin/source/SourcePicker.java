@@ -22,9 +22,11 @@ import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorProbe;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
 import com.botmaker.shared.vm.GuestWindows;
+import com.botmaker.shared.vm.Hypervisor;
 import com.botmaker.shared.vm.VmCredentials;
 import com.botmaker.shared.vm.VmInventory;
 import com.botmaker.shared.vm.VmRecord;
+import com.botmaker.shared.vm.VmSetup;
 import com.botmaker.shared.vnc.GuestWindow;
 import com.botmaker.shared.vnc.Keysyms;
 import com.botmaker.shared.vnc.VncController;
@@ -520,6 +522,13 @@ public final class SourcePicker {
             try {
                 VmCredentials credentials = VmCredentials.load(vm.folder())
                         .orElseThrow(() -> new IOException("The VM has lost its passwords."));
+                if (vm.hypervisor() == Hypervisor.TART) {
+                    // Its VNC address is the running VM's, which a start reads back; it lists no windows yet.
+                    try (VmSetup.Running running = VmSetup.start(vm, credentials)) {
+                        show(screenTile, running.screen().captureScreen());
+                    }
+                    return;
+                }
                 GuestWindows.start(vm, credentials);
                 // Straight to its screen: a bot's session may be using the VM, and VmSetup.start would open QEMU's
                 // monitor beside it.

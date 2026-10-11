@@ -9,6 +9,7 @@ import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.SessionBackend;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.shared.tools.UserDirs;
+import com.botmaker.shared.vm.Tart;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -94,6 +95,24 @@ class SessionBootstrapTest {
         assertTrue(SessionBootstrap.isolatedOn(BotSettings.Where.VM, Os.WINDOWS));
         assertFalse(SessionBootstrap.isolatedOn(BotSettings.Where.VM, Os.LINUX));
         assertFalse(SessionBootstrap.isolatedOn(BotSettings.Where.MY_DESKTOP, Os.WINDOWS));
+        assertEquals(Tart.supported(), SessionBootstrap.isolatedOn(BotSettings.Where.VM, Os.MAC));
+        assertFalse(SessionBootstrap.isolatedOn(BotSettings.Where.PRIVATE_DISPLAY, Os.MAC));
+    }
+
+    @Test
+    void onlyAMacThatRunsTartHasGameVms() {
+        assertTrue(SessionBootstrap.hasGameVms(Os.MAC, true));
+        assertFalse(SessionBootstrap.hasGameVms(Os.MAC, false));
+        assertTrue(SessionBootstrap.hasGameVms(Os.WINDOWS, false));
+        assertFalse(SessionBootstrap.hasGameVms(Os.LINUX, true));
+    }
+
+    @Test
+    void aMacsGameVmStartsMacTargetsAndWindowsOnesWindowsTargets() {
+        LaunchSpec app = LaunchSpec.parse("desktop:/Applications/Chess.app");
+        assertTrue(SessionBootstrap.vmRefusal(app, Os.MAC).isEmpty());
+        assertTrue(SessionBootstrap.vmRefusal(app, Os.WINDOWS).isPresent());
+        assertTrue(SessionBootstrap.vmRefusal(LaunchSpec.parse("heroic:abc"), Os.MAC).isPresent());
     }
 
     @Test

@@ -88,8 +88,11 @@ final class VmPower {
         whenIdle.setSelected(settings.idleMinutes() > 0);
         minutes.getValueFactory().setValue(settings.idleMinutes() > 0 ? settings.idleMinutes() : DEFAULT_IDLE_MINUTES);
         boolean counts = next.hypervisor() == Hypervisor.QEMU;
+        boolean tart = next.hypervisor() == Hypervisor.TART;
         whenIdle.setDisable(!counts);
-        idleNote.setText(counts ? "Used means a bot running in it, or its screen open in Studio."
+        withStudio.setDisable(tart);
+        idleNote.setText(tart ? "On a Mac the VM runs until you shut it down here, or from macOS in it."
+                : counts ? "Used means a bot running in it, or its screen open in Studio."
                 : "VMware doesn't say whether anything uses the VM, so it isn't shut down when unused.");
         look(next);
     }

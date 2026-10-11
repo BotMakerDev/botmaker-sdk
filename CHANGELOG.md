@@ -26,8 +26,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   Tesseract links and the one lept4j asks for. Untried on a Mac; Intel Macs get none.
 - The Remote Pilot finds `cloudflared` and `tailscale` where a Mac keeps them: Homebrew's and MacPorts' bin
   (a Mac app does not get the shell's `PATH`), and the Tailscale app's own CLI inside `Tailscale.app`.
-- Bot Settings on a Mac offers only the desktop, with the take-over tick, and no longer the Windows game-VM
-  setup. The bot's `where` is kept as written, for the bot on Linux or Windows.
+- **A game VM on an Apple Silicon Mac** (shared's Tart). Bot Settings offers the desktop or a game VM, as on
+  Windows, and *Set up a game VM…* asks only a name and a size: BotMaker downloads Tart and Cirrus Labs' macOS
+  image for this Mac's release (about 25 GB), and boots it once. The game runs in macOS with a Metal GPU; the
+  run, ▶ Launch game and *Open VM screen* work as on Windows (`SessionBootstrap.hasGameVms`). An Intel Mac, or
+  one older than macOS 14, keeps the desktop only, and Bot Settings says why. The bot's `where` is kept as
+  written there, for the bot on Linux or Windows. Untried on a Mac.
 
 ### Changed (breaking)
 

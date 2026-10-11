@@ -13,6 +13,7 @@ import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.SessionBackend;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.shared.vm.GuestOs;
+import com.botmaker.shared.vm.Tart;
 import com.botmaker.shared.vm.VmInventory;
 import com.botmaker.shared.vm.VmRecord;
 import javafx.geometry.Insets;
@@ -64,8 +65,11 @@ public final class BotSettingsWindow {
     /** Only Linux has a private display to offer. */
     private static final boolean LINUX = Os.current() == Os.LINUX;
 
-    /** A Mac has no private display or game VM yet: the game runs on the desktop. */
-    private static final boolean MAC = Os.current().isMac();
+    /**
+     * A Mac that can't run Tart (Intel, or older than macOS 14) has no private display and no game VM: the game runs
+     * on the desktop. An Apple Silicon Mac gets Windows' choice, the desktop or a game VM.
+     */
+    private static final boolean DESKTOP_ONLY = Os.current().isMac() && !Tart.supported();
 
     private final StudioServices services;
     private final Window owner;
@@ -234,10 +238,10 @@ public final class BotSettingsWindow {
             // them changed the game's window (shared's IgnoredClickWatch).
             takeOverHint.setText(takeOverHint.getText() + " A run says so in its output when its first clicks "
                     + "change nothing in the game.");
-            if (MAC) {
+            if (DESKTOP_ONLY) {
                 return new VBox(8, title("Run the game in"), new Label("My desktop"), takeOver, takeOverHint,
-                        note("A Mac has no private display or game VM yet, so the game runs on your desktop "
-                                + "whatever the bot's settings say."));
+                        note("A game VM on a Mac needs Apple Silicon and macOS 14 or later, so the game runs on "
+                                + "your desktop whatever the bot's settings say."));
             }
             return windowsRunInPane(stage, takeOverHint);
         }
@@ -279,13 +283,14 @@ public final class BotSettingsWindow {
     }
 
     /**
-     * Windows: the desktop, or a game VM. The take-over tick is the desktop's alone: in a VM every click is the
-     * hypervisor's own mouse, which the guest takes as hardware.
+     * Windows and an Apple Silicon Mac: the desktop, or a game VM. The take-over tick is the desktop's alone: in a
+     * VM every click is the hypervisor's own mouse, which the guest takes as hardware.
      */
     private VBox windowsRunInPane(Stage stage, Label takeOverHint) {
         myDesktop.setToggleGroup(where);
         inVm.setToggleGroup(where);
-        Label vmHint = note("The game runs in a computer of its own, Windows or Linux, which Studio sets up. You "
+        Label vmHint = note("The game runs in a computer of its own, "
+                + (Os.current().isMac() ? "macOS" : "Windows or Linux") + ", which Studio sets up. You "
                 + "keep using yours; the bot's clicks reach the game as a real mouse's.");
         vms.setConverter(labels(vm -> vm.name() + " (" + vm.guestOs().displayName() + ")"
                 + (vm.stage() == VmRecord.Stage.READY ? "" : " — " + vm.stage().displayName())));
@@ -442,7 +447,7 @@ public final class BotSettingsWindow {
     }
 
     private BotSettings.Where chosenWhere() {
-        if (MAC) return windowsWhere;
+        if (DESKTOP_ONLY) return windowsWhere;
         if (!LINUX) {
             if (inVm.isSelected()) return BotSettings.Where.VM;
             // The desktop, which a private display also is on Windows: that one is kept for the bot on Linux.

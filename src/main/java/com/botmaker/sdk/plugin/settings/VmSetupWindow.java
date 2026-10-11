@@ -7,9 +7,11 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import com.botmaker.shared.Spawn;
 import com.botmaker.shared.launch.UriLauncher;
+import com.botmaker.shared.platform.Os;
 import com.botmaker.shared.vm.GuestOs;
 import com.botmaker.shared.vm.Hypervisor;
 import com.botmaker.shared.vm.Qemu;
+import com.botmaker.shared.vm.Tart;
 import com.botmaker.shared.vm.VmInventory;
 import com.botmaker.shared.vm.VmRecord;
 import com.botmaker.shared.vm.VmSetup;
@@ -57,6 +59,7 @@ import java.util.function.Consumer;
  *   <li>its size, from this computer's;</li>
  *   <li>the setup itself: one sentence per step and the guest's screen as the system installs.</li>
  * </ol>
+ * On a Mac there is no choice to make but the name and the size: macOS on Tart ({@link #macPane}).
  * Closing the window or Cancel stops following the setup, and the VM stays as far as it got: Bot Settings
  * lists it, and this window resumes it ({@link #resume}).
  */
@@ -64,6 +67,9 @@ final class VmSetupWindow {
 
     /** Windows Setup's whole run with room to spare; {@code install} stops waiting after this. */
     private static final Duration INSTALL_TIMEOUT = Duration.ofHours(3);
+
+    /** A Mac's VM is macOS on Tart, cloned rather than installed: no system, hypervisor or disc to choose. */
+    private static final boolean MAC = Os.current().isMac();
 
     private final StudioServices services;
     private final Consumer<VmRecord> onReady;
@@ -116,10 +122,13 @@ final class VmSetupWindow {
         Label heading = new Label(vm == null ? "Set up a game VM" : "Set up " + vm.name());
         Styles.on(heading, Styles.DIALOG_HEADING);
         Label intro = note("A computer of its own for the game: the bot plays there while you keep using yours. "
-                + "Its system installs by itself, in 20–40 minutes; the VM then stays on this computer.");
+                + (MAC ? "macOS comes ready-made: one download (about 25 GB), then it starts by itself"
+                : "Its system installs by itself, in 20–40 minutes") + "; the VM then stays on this computer.");
 
         VBox body = new VBox(14, heading, intro);
-        if (vm == null) {
+        if (vm == null && MAC) {
+            body.getChildren().addAll(new Separator(), nameRow(), macPane(), new Separator(), sizePane());
+        } else if (vm == null) {
             body.getChildren().addAll(new Separator(), nameRow(), systemPane(), new Separator(), hypervisorPane(),
                     new Separator(), isoPane(), new Separator(), sizePane());
         }
@@ -141,9 +150,9 @@ final class VmSetupWindow {
         stage.setOnHidden(e -> stopSetup());
         stage.show();
 
-        if (vm == null) {
+        if (vm == null && !MAC) {
             findHypervisor();
-        } else {
+        } else if (vm != null) {
             startSetup();
         }
     }
@@ -176,7 +185,23 @@ final class VmSetupWindow {
     }
 
     private GuestOs guestOs() {
+        if (MAC) return GuestOs.MACOS;
         return linuxOs.isSelected() ? GuestOs.LINUX : GuestOs.WINDOWS;
+    }
+
+    /**
+     * A Mac's system and hypervisor, which aren't choices: macOS on Tart. Tart is downloaded by Set up, checked
+     * against its pinned checksum; the macOS image is Cirrus Labs' for this Mac's release.
+     */
+    private VBox macPane() {
+        Label system = note("macOS, from Cirrus Labs' ready-made image for this Mac's release. Its GPU is the Mac's "
+                + "own (Metal), so 3D games run; one game at a time, as on your desktop. A Linux VM on a Mac comes "
+                + "in a later update.");
+        Label hypervisor = note((Tart.find().isPresent() ? "✓ Tart " + Tart.VERSION + " is here."
+                : "Set up downloads Tart " + Tart.VERSION + " (23 MB), checked against its published checksum.")
+                + " Tart runs the VM on Apple's Virtualization framework; it is free for any use but a competing "
+                + "product (FSL-1.1).");
+        return new VBox(8, title("1. System"), system, title("2. Hypervisor"), hypervisor);
     }
 
     /** The disc and hypervisor panes for the system picked. */
@@ -238,8 +263,9 @@ final class VmSetupWindow {
         grid.setVgap(8);
         grid.addRow(0, new Label("Memory (GB)"), memoryGb, note("This computer has " + hostGb + " GB."));
         grid.addRow(1, new Label("Cores"), cores, note("This computer has " + hostCores + "."));
-        grid.addRow(2, new Label("Disk (GB)"), diskGb, note("Windows 11's minimum. It takes only what is written."));
-        return new VBox(8, title("4. Size"), grid);
+        grid.addRow(2, new Label("Disk (GB)"), diskGb, note((MAC ? "The image's disk grows to this."
+                : "Windows 11's minimum.") + " It takes only what is written."));
+        return new VBox(8, title(MAC ? "3. Size" : "4. Size"), grid);
     }
 
     private static void setRange(Spinner<Integer> spinner, int min, int max, int value) {
@@ -271,7 +297,8 @@ final class VmSetupWindow {
         }
         Label done = note("Once it's ready, Open VM screen lets you use the VM by hand: install the game, sign in "
                 + "to Steam or Epic. The bot then starts the game there itself.");
-        return new VBox(8, title(vm == null ? "5. Set up" : "Setup"), new HBox(8, setUp, stop, openScreen, use),
+        return new VBox(8, title(vm != null ? "Setup" : MAC ? "4. Set up" : "5. Set up"),
+                new HBox(8, setUp, stop, openScreen, use),
                 progress, guest, done);
     }
 
@@ -294,6 +321,7 @@ final class VmSetupWindow {
 
     /** The hypervisor the system picked runs on, until it is found; {@link Hypervisor#UNKNOWN} before then. */
     private Hypervisor hypervisor() {
+        if (MAC) return Hypervisor.TART;
         if (found == null) return Hypervisor.UNKNOWN;
         if (guestOs() == GuestOs.LINUX) return found.qemu() ? Hypervisor.QEMU : Hypervisor.UNKNOWN;
         return found.detected();
@@ -308,6 +336,7 @@ final class VmSetupWindow {
         show(platformOn, hypervisor == Hypervisor.QEMU && !platform);
         hypervisorStatus.setText(switch (hypervisor) {
             case VMWARE -> "✓ VMware Workstation: its Windows gets a GPU, for 2D and 3D games.";
+            case TART -> "Tart, on a Mac."; // a Mac shows macPane instead
             case QEMU -> platform ? "✓ QEMU, on the Windows Hypervisor Platform."
                     : "QEMU is installed, but the Windows Hypervisor Platform it runs on is off. Turn it on, "
                     + "then restart Windows.";
@@ -418,7 +447,7 @@ final class VmSetupWindow {
         show(openScreen, true);
         show(use, true);
         progress.setText("✓ " + ready.name() + " is ready: " + ready.guestOs().displayName() + " is installed"
-                + (ready.guestOs() == GuestOs.WINDOWS ? " and signed in." : "."));
+                + (ready.guestOs() != GuestOs.LINUX ? " and signed in." : "."));
     }
 
     private void failed(String why) {

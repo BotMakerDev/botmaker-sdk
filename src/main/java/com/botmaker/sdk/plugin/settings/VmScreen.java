@@ -9,12 +9,14 @@ import com.botmaker.shared.launch.UriLauncher;
 import com.botmaker.shared.vm.GameCopy;
 import com.botmaker.shared.vm.GuestLauncher;
 import com.botmaker.shared.vm.GuestOs;
+import com.botmaker.shared.vm.Hypervisor;
 import com.botmaker.shared.vm.Legendary;
 import com.botmaker.shared.vm.LinuxDisplay;
 import com.botmaker.shared.vm.VmCredentials;
 import com.botmaker.shared.vm.VmInventory;
 import com.botmaker.shared.vm.VmRecord;
 import com.botmaker.shared.vm.VmSetup;
+import com.botmaker.shared.vnc.Keysyms;
 import com.botmaker.shared.vnc.VncController;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
@@ -27,6 +29,7 @@ import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.PasswordField;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
@@ -228,6 +231,12 @@ final class VmScreen {
         HBox bar = new HBox(8);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(6, 10, 6, 10));
+        if (vm.guestOs() == GuestOs.MACOS) {
+            // No installer runs unattended here, and a game copied from this Mac would be the same download.
+            bar.getChildren().add(new Label("Install the game here, or Steam or the Epic Games Launcher, from "
+                    + "Safari in the VM, and sign in. The bot then starts it itself."));
+            return bar;
+        }
         if (vm.guestOs() == GuestOs.LINUX) {
             startSteam.setOnAction(e -> startSteam());
             show(startSteam, false);
@@ -428,13 +437,13 @@ final class VmScreen {
         });
         view.setOnKeyPressed((KeyEvent e) -> {
             VncController s = screen;
-            int key = VmKeys.virtualKey(e.getCode().getCode());
+            int key = keyOf(e);
             if (s != null && held.add(key)) s.keyDown(key);
             e.consume();
         });
         view.setOnKeyReleased((KeyEvent e) -> {
             VncController s = screen;
-            int key = VmKeys.virtualKey(e.getCode().getCode());
+            int key = keyOf(e);
             if (s != null && held.remove(key)) s.keyUp(key);
             e.consume();
         });
@@ -442,6 +451,20 @@ final class VmScreen {
         view.focusedProperty().addListener((o, was, now) -> {
             if (!now) releaseKeys();
         });
+    }
+
+    /**
+     * The code {@code e}'s key goes to the screen as: a Windows virtual key, as a bot on Windows sends them, or for a
+     * Tart VM, whose screen takes X keysyms as a bot on a Mac sends them, that key's keysym.
+     */
+    private int keyOf(KeyEvent e) {
+        int virtualKey = VmKeys.virtualKey(e.getCode().getCode());
+        if (vm.hypervisor() != Hypervisor.TART) return virtualKey;
+        // Command is Super, as shared's MacKeyCodes reads it; it has no Windows virtual key of its own.
+        if (e.getCode() == KeyCode.COMMAND || e.getCode() == KeyCode.META) {
+            return 0xFFEB;
+        }
+        return Keysyms.of(virtualKey, Keysyms.NativeKeys.VIRTUAL_KEY);
     }
 
     /** Lets go, in the guest, of every key still held down there. */

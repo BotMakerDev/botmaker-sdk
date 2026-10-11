@@ -16,6 +16,7 @@ import com.botmaker.session.SessionStartException;
 import com.botmaker.session.Sessions;
 import com.botmaker.session.VmOptions;
 import com.botmaker.shared.vm.GuestLaunch;
+import com.botmaker.shared.vm.Tart;
 import com.botmaker.shared.vm.VmInventory;
 import com.botmaker.shared.vm.VmRecord;
 import com.botmaker.session.display.BackendInstall;
@@ -76,7 +77,7 @@ public final class SessionBootstrap {
     private SessionBootstrap() {}
 
     /**
-     * Whether this bot's game runs off the desktop: on a private display (Linux) or in a game VM (Windows), as
+     * Whether this bot's game runs off the desktop: on a private display (Linux) or in a game VM (Windows, Mac), as
      * {@link #where()} resolves it. <b>Default: its settings' {@code BotSettings.Where}, which itself defaults to
      * a private display</b>.
      */
@@ -86,19 +87,19 @@ public final class SessionBootstrap {
 
     /**
      * Whether {@code where} keeps the game off the desktop on {@code os}: a private display on Linux, a game VM on
-     * Windows. A place this computer doesn't have puts the game on the desktop.
+     * Windows and macOS. A place this computer doesn't have puts the game on the desktop.
      */
     static boolean isolatedOn(BotSettings.Where where, Os os) {
         return switch (where) {
             case PRIVATE_DISPLAY -> os == Os.LINUX;
-            case VM -> os == Os.WINDOWS;
+            case VM -> hasGameVms(os);
             case MY_DESKTOP -> false;
         };
     }
 
     /**
      * Where this bot's game runs, highest first: bot code ({@link Session#override()}: off is the desktop; on is a
-     * private display, or on Windows the settings' VM when they name one), the {@link #WHERE_PROPERTY} run
+     * private display, or on Windows and macOS the settings' VM when they name one), the {@link #WHERE_PROPERTY} run
      * property, {@link #WHERE_ENV}, the settings.
      */
     public static BotSettings.Where where() {
@@ -109,7 +110,7 @@ public final class SessionBootstrap {
         Boolean override = Session.override();
         if (override != null) {
             if (!override) return BotSettings.Where.MY_DESKTOP;
-            return os == Os.WINDOWS && settings == BotSettings.Where.VM
+            return hasGameVms(os) && settings == BotSettings.Where.VM
                 ? BotSettings.Where.VM : BotSettings.Where.PRIVATE_DISPLAY;
         }
         return BotSettings.Where.fromId(System.getProperty(WHERE_PROPERTY))
@@ -125,9 +126,12 @@ public final class SessionBootstrap {
         return Os.current() == Os.LINUX && settings.where() == BotSettings.Where.PRIVATE_DISPLAY;
     }
 
-    /** Whether Studio's launch surfaces put the game in a game VM for {@code settings}: Windows, and they say one. */
+    /**
+     * Whether Studio's launch surfaces put the game in a game VM for {@code settings}: Windows or a Mac, and they
+     * say one.
+     */
     public static boolean wantsVm(BotSettings settings) {
-        return Os.current() == Os.WINDOWS && settings.where() == BotSettings.Where.VM;
+        return hasGameVms(Os.current()) && settings.where() == BotSettings.Where.VM;
     }
 
     /**
@@ -135,6 +139,16 @@ public final class SessionBootstrap {
      * minutes, rather than after.
      */
     public static Optional<String> vmRefusal(LaunchSpec spec) {
+        return vmRefusal(spec, Os.current());
+    }
+
+    /** {@link #vmRefusal(LaunchSpec)} for a game VM on {@code os}: a Mac's runs macOS, Windows' runs Windows. */
+    static Optional<String> vmRefusal(LaunchSpec spec, Os os) {
+        if (os == Os.MAC) {
+            return GuestLaunch.macCommand(spec).isPresent() ? Optional.empty()
+                : Optional.of("A game VM can't start " + spec.describe()
+                    + ": it runs a macOS app, a program, a command, or a Steam or Epic game." + OR_THE_DESKTOP);
+        }
         return GuestLaunch.command(spec).isPresent() ? Optional.empty()
             : Optional.of("A game VM can't start " + spec.describe()
                 + ": it runs a Windows game by path, command, Steam or Epic." + OR_THE_DESKTOP);
@@ -296,9 +310,23 @@ public final class SessionBootstrap {
         return true;
     }
 
-    /** Whether this bot's game runs in a game VM: Windows, and {@link #where()} says one. */
+    /** Whether this bot's game runs in a game VM: Windows or a Mac, and {@link #where()} says one. */
     public static boolean inVm() {
-        return Os.current() == Os.WINDOWS && where() == BotSettings.Where.VM;
+        return hasGameVms(Os.current()) && where() == BotSettings.Where.VM;
+    }
+
+    /**
+     * Whether {@code os} runs game VMs here: Windows (VMware or QEMU), and a Mac that can run Tart (Apple Silicon,
+     * macOS 14 or later); another Mac runs the game on the desktop. Linux keeps the game off the desktop with a
+     * private display instead.
+     */
+    public static boolean hasGameVms(Os os) {
+        return hasGameVms(os, Tart.supported());
+    }
+
+    /** {@link #hasGameVms(Os)} with whether this Mac runs Tart given. Pure, for the tests. */
+    static boolean hasGameVms(Os os, boolean tartRuns) {
+        return os == Os.WINDOWS || os == Os.MAC && tartRuns;
     }
 
     /** Whether this bot's game VM is open and hasn't been given up on. */
