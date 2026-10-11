@@ -71,6 +71,8 @@ A bot's facts are Java in its own project:
   expression, so comments and helpers around it survive;
 - **pictures** are constants in `plugins/sdk/Pictures.java`, one per file under `src/main/resources/images`;
 - **parameters** are `@Param` static fields (the annotation is the plugin contract's, which the SDK brings).
+  The run's own three — `flow`, `doSetup`, `skip` in `Sdk.java` — also carry `@SdkValue(…)`: the SDK declared
+  them, so Studio writes one back if it goes missing and lets the runner change only its value.
 
 The canvas and the code are joined by method reference (`Collect::body`), so a renamed or deleted activity is
 a compile error, never a card that silently does nothing.

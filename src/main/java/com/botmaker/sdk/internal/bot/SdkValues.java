@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.bot;
 
 import com.botmaker.plugin.api.managed.ManagedValues;
+import com.botmaker.plugin.api.params.Param;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.Outcome;
@@ -24,18 +25,21 @@ import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * The SDK's managed values, each declared once, and what a run does with each one.
  *
- * <p>Thirteen declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
+ * <p>Sixteen declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
  * plugin lists {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOWS} are the activity
  * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
  * flow editor draws each card (a run ignores it), {@code CAPTURE} where
  * pixels are read from, {@code SETTINGS} how it clicks and looks, {@code SCREEN} the size its pictures were cut
  * at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS}, {@code ZONES} and {@code DIGITS} the classes of
- * constants the bot grows. {@code POINTS} and {@code REGIONS} are retired: read only for {@link SdkConversions}.
+ * constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the run's {@code @Param} fields in
+ * {@code Sdk.java}, which the bot's {@code main} hands to {@code Bot.runFlow} and nothing claims.
+ * {@code POINTS} and {@code REGIONS} are retired: read only for {@link SdkConversions}.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract
  * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
@@ -170,13 +174,56 @@ public final class SdkValues {
             .because("This is the size the bot's pictures were cut at. The first picture cut sets it; a private"
                     + " display is made at it and a game window is resized to it when the bot starts.");
 
-    /** All thirteen, in the order the plugin declares them, the two retired ones included. */
+    /** The run parameters' heading in the Runner and the Parameters window. */
+    private static final String RUN_CATEGORY = "Run";
+
+    private static final String RUN_PARAM = "The SDK reads this parameter in the bot's main. Change its value in the"
+            + " Runner or in Project ▸ Parameters.";
+
+    /** Which flow a run walks — {@code public static Flow flow}, passed to {@code Bot.runFlow}. */
+    public static final ManagedValue<Flow> FLOW = ManagedValue.param(SdkValue.Id.FLOW)
+            .in(HOLDER)
+            .startsAs(SdkValues::noFlow)
+            .shown(RUN_CATEGORY, "Which flow the bot runs", Param.PUBLIC)
+            .because(RUN_PARAM);
+
+    /** Whether a run sets the game up first — {@code public static boolean doSetup}. */
+    public static final ManagedValue<Boolean> DO_SETUP = ManagedValue.param(SdkValue.Id.DO_SETUP)
+            .in(HOLDER)
+            .startsAs(SdkValues::setUpFirst)
+            .shown(RUN_CATEGORY, "Set the game up first: tick it on a new computer or after changing a game"
+                    + " setting", Param.PUBLIC)
+            .because(RUN_PARAM);
+
+    /** The activities a run switches off — {@code public static Set<Class<? extends Outcome>> skip}. */
+    public static final ManagedValue<Set<Class<? extends Outcome>>> SKIP = ManagedValue.param(SdkValue.Id.SKIP)
+            .in(HOLDER)
+            .startsAs(SdkValues::skipNothing)
+            .shown(RUN_CATEGORY, "Activities this run skips", Param.PUBLIC)
+            .because(RUN_PARAM);
+
+    /** All sixteen, in the order the plugin declares them, the two retired ones included. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOWS, RUN, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            ACTIVITIES, POINTS, REGIONS, SPOTS, ZONES, DIGITS, SCREEN);
+            ACTIVITIES, POINTS, REGIONS, SPOTS, ZONES, DIGITS, SCREEN, FLOW, DO_SETUP, SKIP);
 
     private static boolean claimed;
 
     private SdkValues() {}
+
+    /** {@link #FLOW}'s type and first value: no flow until the runner picks one of {@code Flows}. */
+    private static Flow noFlow() {
+        return Flow.NONE;
+    }
+
+    /** {@link #DO_SETUP}'s: a new bot sets its game up on its first run. */
+    private static boolean setUpFirst() {
+        return true;
+    }
+
+    /** {@link #SKIP}'s: every activity runs. */
+    private static Set<Class<? extends Outcome>> skipNothing() {
+        return Set.of();
+    }
 
     /**
      * Registers this plugin's values with {@link ManagedValues}. Idempotent, and cheap enough to be called on

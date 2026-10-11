@@ -10,10 +10,15 @@ import java.lang.annotation.Target;
 
 /**
  * Marks one of the SDK's values in your bot: a method whose returned expression BotMaker Studio's windows
- * rewrite, or a class of constants they add to, rename in and remove from.
+ * rewrite, a class of constants they add to, rename in and remove from, or a {@code @Param} field the SDK
+ * declared, whose value the person running the bot sets.
  *
  * <pre>{@code
  * public final class Sdk {
+ *
+ *     @SdkValue(SdkValue.Id.DO_SETUP)
+ *     @Param(category = "Run", visibility = Param.PUBLIC, description = "Set the game up first")
+ *     public static boolean doSetup = true;
  *
  *     @SdkValue(SdkValue.Id.RUN)
  *     public static Run run() {
@@ -34,7 +39,7 @@ import java.lang.annotation.Target;
 @Documented
 @ManagedMarker
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD})
+@Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD})
 public @interface SdkValue {
 
     /** Which of the SDK's values this is. */
@@ -75,6 +80,12 @@ public @interface SdkValue {
          * The bot's screen size: the frame its pictures were cut from, which its private display is made and its
          * game window is sized to — a {@code Size} method.
          */
-        SCREEN
+        SCREEN,
+        /** Which flow a run walks — the {@code Flow} parameter {@code flow}, set in the Runner. */
+        FLOW,
+        /** Whether a run sets the game up first — the {@code boolean} parameter {@code doSetup}. */
+        DO_SETUP,
+        /** The activities a run switches off — the parameter {@code skip}, a set of activity classes. */
+        SKIP
     }
 }

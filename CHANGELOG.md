@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **`flow`, `doSetup` and `skip` are the SDK's own parameters.** In `Sdk.java` each is marked with its id —
+  `@SdkValue(SdkValue.Id.FLOW)`, `DO_SETUP`, `SKIP` — beside its `@Param`. Studio writes a missing one back, keeps
+  its name, type and description, and lets the Runner and *Project ▸ Parameters* change its value only. A bot
+  written before this keeps working: add the three marks, or Studio adds the three fields when they are missing.
+
 - **The bot's screen size is Java.** `@SdkValue(SdkValue.Id.SCREEN) Size screen()` in `Sdk.java` is the size
   the bot's pictures were cut at; the first picture cut sets it. A private display is made at it, and a run
   resizes a window source to it at start, or says in the trace why the game shows another size.
