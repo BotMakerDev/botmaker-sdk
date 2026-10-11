@@ -16,15 +16,17 @@
   **`BotSettings`**, the runtime tuning
   as an immutable value: `@SdkValue(SdkValue.Id.SETTINGS)` in `Sdk.java`, read as `BotSettings.current()`, changed for a
   while with `BotSettings.use(…)`, edited in ⚙ Bot Settings (`plugin/settings/BotSettingsWindow`).
-- `api.flow` — `Flow` (`steps`, `edges`, `presets`, `start`, `limits`, `home`),
-  `Flow.activity(Activities.Collect.class, Collect::body)` building a `Flow.Step`, each other part a named
-  link written only when not the default (`.described(…)`, `.off()`, `.goesHome()`, `.checksPopups()`,
-  `.whenOff(…)`; 2026-10-09, as `BotSettings.defaults().foundDelay(…)…` is), `Flow.edge(Activities.Collect.
-  NOTHING_LEFT, Activities.Battle.class)` (its source is the outcome's enum), the flow's `.home(Gamebot::goHome)`
-  (an activity's work and the way home are **method references**, so a rename is a compile error naming
-  `Sdk.java`), `Activity` (an activity by its enum's simple name, the key runtime and editor agree on),
-  `ActivityBody<O>` (a body returns its own activity's enum), `FlowLayout` (the editor's card positions, keyed
-  by activity name, which a run ignores); `internal.flow.Flows.enabled(activity)` reads an activity's switch.
+- `api.flow` — `Flow` (`steps`, `edges`, `start`, `limits`), one per way of playing, each a constant of the
+  bot's `Flows` (2026-10-11; presets are gone, a preset is a flow), `Flow.activity(Activities.Collect.class,
+  Collect::body)` building a `Flow.Step`, each other part a named link written only when not the default
+  (`.described(…)`, `.off()`, `.switchable()` — the runner may skip it through `Sdk.skip` — `.goesHome()`,
+  `.checksPopups()`, `.whenOff(…)`; 2026-10-09, as `BotSettings.defaults().foundDelay(…)…` is),
+  `Flow.edge(Activities.Collect.NOTHING_LEFT, Activities.Battle.class)` (its source is the outcome's enum),
+  `Run` (`Run.of().home(Gamebot::goHome).setup(Gamebot::setup)` in `Sdk.run()`, once for the bot; an activity's
+  work, the way home and setup are **method references**, so a rename is a compile error naming the holder),
+  `Activity` (an activity by its enum's simple name, the key runtime and editor agree on), `ActivityBody<O>` (a
+  body returns its own activity's enum), `FlowLayout` (the editor's card positions, keyed by flow then by
+  activity name, which a run ignores); `internal.flow.InstalledRun` holds what `Bot.runFlow` installed.
 - **An activity is its outcome enum (2026-10-10; constants since 2026-10-02, never strings).** The bot's
   `@SdkValue(ACTIVITIES) final class Activities` in `plugins/sdk/` nests one `enum Collect implements Outcome
   { NEXT, NOTHING_LEFT }` per activity (`SdkValues.ACTIVITIES`, an `ofEnums` grouped open set); its constants

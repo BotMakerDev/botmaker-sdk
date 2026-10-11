@@ -98,8 +98,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - **`Sdk.flow()` is gone, and so are presets.** The flow moved to `Flows.MAIN` and its `.home(…)` to
   `Sdk.run()`; `Flow.of` takes four parts (no preset list), and `FlowLayout.of` keys its cards by flow
-  (`FlowLayout.cards(…)`). A preset is now a flow of its own. Studio does not yet convert a 1.4.2 bot: its upgrade
-  is refused until that conversion ships.
+  (`FlowLayout.cards(…)`). A preset is now a flow of its own. No conversion from 1.4.2 ships: Studio refuses
+  that upgrade, and a 1.4.2 bot is moved by hand or recreated from the template.
 - **`Points` and `Regions` became `Spots` and `Zones`.** Studio converts them when a bot upgrades: each
   `Point` becomes a `Spot` and each `Rect` a `Zone` with the same numbers. A spot saved on a window away from
   the screen's corner is saved again.

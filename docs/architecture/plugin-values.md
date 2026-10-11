@@ -2,9 +2,13 @@
 
 `../docs/refactor/33-plugin-java.md`. Each value is marked `@SdkValue(SdkValue.Id.…)` (`api.bot.SdkValue`,
 meta-annotated `@ManagedMarker`), so a misspelt id is a compile error. A project gets its files from its
-template, in `src/main/java/<bot package>/plugins/sdk/`: **`Sdk.java`** — `FLOW` returning a `Flow`,
-`CAPTURE` a `CaptureSource`, `SETTINGS` a `BotSettings`, `FLOW_LAYOUT` a `FlowLayout`, each written as a chain
-of named calls (`Flow.activity(Activities.Collect.class, Collect::body).described("…").goesHome()`) — then
+template, in `src/main/java/<bot package>/plugins/sdk/`: **`Sdk.java`** — `RUN` returning a `Run` (the game's
+home and setup, which no flow owns), `CAPTURE` a `CaptureSource`, `SETTINGS` a `BotSettings`, `FLOW_LAYOUT` a
+`FlowLayout` keyed by flow, each written as a chain of named calls, and three marked `@Param` fields the SDK
+declares (`FLOW`, `DO_SETUP`, `SKIP`, 2026-10-11: which flow runs, whether setup runs first, which switchable
+activities this run skips) that the host writes back when missing and whose value alone is the user's — then
+**`Flows.java`** (`FLOWS`, an open set: one `Flow` constant per way of playing, `MAIN` by default, each its
+steps, arrows and start, `Flow.activity(Activities.Collect.class, Collect::body).described("…").goesHome()`),
 **`Pictures.java`**, `PICTURES` on the type, one `ImageTemplate` constant per picture, and
 **`Activities.java`** (`ACTIVITIES`: one nested `enum Collect implements Outcome { NEXT, NOTHING_LEFT }` per
 activity, each name's label its words). Beside them the host writes **`Spots.java`** and
