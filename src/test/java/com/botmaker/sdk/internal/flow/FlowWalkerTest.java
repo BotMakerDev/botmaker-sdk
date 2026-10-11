@@ -110,7 +110,7 @@ class FlowWalkerTest {
     /** Installs and walks {@code flow} to its end, with no pause between activities. */
     private static void walk(Flow flow) {
         Flow unpaused = new Flow(flow.steps(), flow.edges(), flow.presets(), flow.start(),
-                Flow.limits(flow.limits().maxSteps(), 0), flow.home());
+                Flow.limits(flow.limits().maxSteps(), 0), flow.home(), flow.setup());
         Flows.use(unpaused);
         assertThrows(RuntimeException.class, () -> FlowWalker.run(unpaused),
                 "a run ends by stopping the bot, which throws");

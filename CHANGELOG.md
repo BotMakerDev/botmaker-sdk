@@ -37,7 +37,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   digit pictures rather than OCR, as an `OptionalLong`: empty when no digit is there, or when a character the
   set lacks stands between two digits. `Digits.java` holds `new DigitSet("src/main/resources/digits/gold")`, a
   folder of `0.png` to `9.png`, scaled as pictures are. The assistant's `save_digits` cuts the digits of a
-  number on screen into it, says which digits the set still lacks, and reads the number back.
+  number on screen into it, says which digits the set still lacks, and reads the number back. Digits shown
+  under 12 pixels tall are enlarged, up to three times, before they are matched.
+- **A setup for the game.** `Flow.setup(Gamebot::setup)` names the bot's own method that makes the game ready:
+  its settings, including the ones a user chose in the bot's parameters. It runs each time the bot has started
+  the game, before home, and again after a restart. `Setup.fail("Set the game to windowed mode")` ends the run
+  and tells the user what to change. The Activity Flow window picks the method as it picks home, and the
+  assistant's `set_flow_method` sets either one to a method the bot has.
+- **An emulator shows the bot's screen size.** A run on an emulator sets its display to the bot's size with
+  `wm size`, its density scaled with it, and resets both when the bot ends.
 - **Another aspect ratio.** A picture on a frame of another shape is scaled by the smaller side's ratio, as a
   game fits its art, not by the mean; the run-start warning says when the shape differs.
 - **Smaller images for an assistant.** `sdk_screenshot` fits 1024 pixels unless a `scale` is given, and a

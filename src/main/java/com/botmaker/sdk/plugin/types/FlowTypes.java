@@ -82,8 +82,8 @@ public final class FlowTypes {
     // ---- the five containers ---------------------------------------------------------------------------
 
     /**
-     * {@code Flow.of(List<Step>, List<Edge>, List<Preset>, Class start, Limits)} and its {@code .home(…)} link,
-     * written only when the flow has a home. A flow with nothing in it has no activity to start at, so no class
+     * {@code Flow.of(List<Step>, List<Edge>, List<Preset>, Class start, Limits)} and its {@code .home(…)} and
+     * {@code .setup(…)} links, each written only when the flow has one. A flow with nothing in it has no activity to start at, so no class
      * literal to write: it is written {@code Flow.NONE} ({@link #written}).
      */
     public static final DeclaredCall<Flow> FLOW_SHAPE = ComponentType.part(Flow.class)
@@ -91,6 +91,7 @@ public final class FlowTypes {
             .components(flow -> List.of(flow.steps(), flow.edges(), flow.presets(), flow.start(), flow.limits()))
             .build(FlowTypes::flow)
             .<Runnable>with(Flow::home, flow -> sourceOf(flow.home()), FlowTypes::withHome)
+            .<Runnable>with(Flow::setup, flow -> sourceOf(flow.setup()), FlowTypes::withSetup)
             .constants(Flow.NONE);
 
     /** {@code flow} as it can be written: {@link Flow#NONE} once it has no activity left to start at. */
@@ -107,12 +108,17 @@ public final class FlowTypes {
         List<Flow.Edge> edges = all(parts.get(1), Flow.Edge.class);
         List<Flow.Preset> presets = all(parts.get(2), Flow.Preset.class);
         if (steps == null || edges == null || presets == null) return null;
-        return new Flow(steps, edges, presets, start, limits, null);
+        return new Flow(steps, edges, presets, start, limits, null, null);
     }
 
     private static Flow withHome(Flow flow, Object part) {
         if (!(part instanceof String source)) return null;
-        return flow.home(source.isBlank() ? null : new NamedHome(source));
+        return flow.home(method(source));
+    }
+
+    private static Flow withSetup(Flow flow, Object part) {
+        if (!(part instanceof String source)) return null;
+        return flow.setup(method(source));
     }
 
     /**
@@ -236,9 +242,11 @@ public final class FlowTypes {
         return new Named(source == null ? "" : source);
     }
 
-    /** The flow's home that only knows what it is written as — {@code Gamebot::goHome} — or {@code null}. */
-    public static Runnable home(String source) {
-        return source == null || source.isBlank() ? null : new NamedHome(source);
+    /**
+     * The flow's home or setup that only knows what it is written as — {@code Gamebot::goHome} — or {@code null}.
+     */
+    public static Runnable method(String source) {
+        return source == null || source.isBlank() ? null : new NamedMethod(source);
     }
 
     /**
@@ -251,9 +259,9 @@ public final class FlowTypes {
         return body instanceof Named(String source) ? source : "";
     }
 
-    /** How the flow's home is written, or {@code ""} for none or a real one. */
-    public static String sourceOf(Runnable home) {
-        return home instanceof NamedHome(String source) ? source : "";
+    /** How the flow's home or setup is written, or {@code ""} for none or a real one. */
+    public static String sourceOf(Runnable method) {
+        return method instanceof NamedMethod(String source) ? source : "";
     }
 
     /**
@@ -272,8 +280,8 @@ public final class FlowTypes {
         }
     }
 
-    /** The flow's home as a name, {@code Gamebot::goHome}: {@link Named}'s counterpart, and as honest. */
-    record NamedHome(String source) implements Runnable {
+    /** The flow's home or setup as a name, {@code Gamebot::goHome}: {@link Named}'s counterpart, and as honest. */
+    record NamedMethod(String source) implements Runnable {
 
         @Override
         public void run() {

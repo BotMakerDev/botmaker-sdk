@@ -369,6 +369,20 @@ class SdkAssistTest {
     }
 
     @Test
+    void theFlowsSetupNamesOnlyAMethodTheBotHas() {
+        host.values.put("flow", TestContexts.row(Flow.class, "").withValue(Flow.NONE));
+        assertFalse(run("add_activity", "name", "Collect", "body", "Collect::body").isRefused());
+        String read = text(run("read_flow"));
+        assertTrue(read.contains("Home: none.") && read.contains("Setup: none."), read);
+        // The fake bot has no public static void method: a name it lacks would not compile.
+        AgentReply missing = run("set_flow_method", "which", "setup", "method", "Gamebot::setup");
+        assertTrue(missing.isRefused());
+        assertTrue(text(missing).contains("It has: none."), text(missing));
+        assertEquals("The flow has no setup now. Activities: [Collect].",
+                text(run("set_flow_method", "which", "setup")));
+    }
+
+    @Test
     void aFlowWrittenByHandIsLeftAlone() {
         host.values.put("flow", TestContexts.row(Flow.class, "myFlow()"));
         assertTrue(run("read_flow").isRefused());
@@ -450,7 +464,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(33, names.size());
+        assertEquals(34, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 

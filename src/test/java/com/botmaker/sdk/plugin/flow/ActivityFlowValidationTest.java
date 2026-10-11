@@ -40,7 +40,7 @@ class ActivityFlowValidationTest {
             steps.add(FlowTypes.step(FlowNames.activity(card.name()), ActivityBody.none()));
             exits.put(card.name(), card.outcomes());
         }
-        return new Board(new Flow(steps, List.of(), List.of(), null, Flow.Limits.DEFAULT, null), exits);
+        return new Board(new Flow(steps, List.of(), List.of(), null, Flow.Limits.DEFAULT, null, null), exits);
     }
 
     @Test

@@ -27,7 +27,8 @@ import java.util.List;
  *             List.of(),
  *             Activities.Collect.class,
  *             Flow.limits(1000, 1000))
- *         .home(Gamebot::goHome);
+ *         .home(Gamebot::goHome)
+ *         .setup(Gamebot::setup);
  * }
  * }</pre>
  *
@@ -43,7 +44,8 @@ import java.util.List;
  *
  * <p>{@link #activity} takes the two things every step has, the activity and its work, and each other part is a
  * named link after it, written only when it is not the default: {@code .described("…")}, {@code .off()},
- * {@code .goesHome()}, {@code .checksPopups()}, {@code .whenOff(…)}. The flow's own {@link #home} is one too.
+ * {@code .goesHome()}, {@code .checksPopups()}, {@code .whenOff(…)}. The flow's own {@link #home} and
+ * {@link #setup} are links too.
  *
  * <h2>Five parts, fixed, and no varargs</h2>
  *
@@ -60,12 +62,15 @@ import java.util.List;
  * @param limits  what stops a run that never finishes
  * @param home    what gets the game back to a known screen: before a step that {@link Step#goHome() goes home},
  *                at start-up and after anything unexpected; {@code null} for nothing
+ * @param setup   what makes the game ready for this bot, at a run's start and after a restart: its settings, such
+ *                as the ones a user chose in the bot's {@code @Param}s; {@code null} for nothing
  */
 public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Activity start, Limits limits,
-                   Runnable home) {
+                   Runnable home, Runnable setup) {
 
     /** The empty flow: nothing to run, which is what a project with nothing drawn should do. */
-    public static final Flow NONE = new Flow(List.of(), List.of(), List.of(), Activity.NONE, Limits.DEFAULT, null);
+    public static final Flow NONE = new Flow(List.of(), List.of(), List.of(), Activity.NONE, Limits.DEFAULT, null,
+            null);
 
     public Flow {
         steps = steps == null ? List.of() : List.copyOf(steps);
@@ -75,15 +80,24 @@ public record Flow(List<Step> steps, List<Edge> edges, List<Preset> presets, Act
         limits = limits == null ? Limits.DEFAULT : limits;
     }
 
-    /** The flow, spelled the way the editor writes it, with no {@link #home} yet. */
+    /** The flow, spelled the way the editor writes it, with no {@link #home} or {@link #setup} yet. */
     public static Flow of(List<Step> steps, List<Edge> edges, List<Preset> presets,
                           Class<? extends Outcome> start, Limits limits) {
-        return new Flow(steps, edges, presets, Activity.of(start), limits, null);
+        return new Flow(steps, edges, presets, Activity.of(start), limits, null, null);
     }
 
     /** This flow, getting the game back to a known screen with {@code home} — {@code Gamebot::goHome}. */
     public Flow home(Runnable home) {
-        return new Flow(steps, edges, presets, start, limits, home);
+        return new Flow(steps, edges, presets, start, limits, home, setup);
+    }
+
+    /**
+     * This flow, making the game ready with {@code setup} — {@code Gamebot::setup} — each time the bot has started
+     * the game: at a run's start, before {@link #home}, and after a restart. The bot writes it: open the game's settings, set what the bot
+     * needs, and call {@code Setup.fail("…")} when the user has to change something by hand.
+     */
+    public Flow setup(Runnable setup) {
+        return new Flow(steps, edges, presets, start, limits, home, setup);
     }
 
     /**

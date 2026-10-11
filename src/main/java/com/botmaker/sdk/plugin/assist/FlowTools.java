@@ -8,13 +8,16 @@ import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.flow.Board;
+import com.botmaker.sdk.plugin.flow.FlowConstants;
 import com.botmaker.sdk.plugin.flow.FlowEdits;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
+import com.botmaker.sdk.plugin.types.FlowTypes;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -48,6 +51,25 @@ final class FlowTools {
                    @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome) {
     }
 
+    /** The flow's own methods: {@code .home(…)} and {@code .setup(…)}. */
+    enum Hook {
+        HOME, SETUP;
+
+        Runnable of(Flow flow) {
+            return this == HOME ? flow.home() : flow.setup();
+        }
+
+        Flow set(Flow flow, Runnable method) {
+            return this == HOME ? flow.home(method) : flow.setup(method);
+        }
+    }
+
+    record FlowMethod(@Describe("home: gets the game back to a known screen; setup: makes the game ready, "
+                              + "its settings included, each time the bot starts it") Hook which,
+                      @Describe(value = "one of the bot's public static void methods with no parameter, as "
+                              + "Gamebot::setup; leave out for none", optional = true) String method) {
+    }
+
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("read_flow")
                     .describedAs("The bot's activity flow: each activity with its body, switches and outcomes, "
@@ -72,7 +94,11 @@ final class FlowTools {
                     .takes(Leaving.class).handledBy(FlowTools::disconnect),
             AssistantTool.named("set_start")
                     .describedAs("Makes an activity the one a run starts at")
-                    .takes(ActivityName.class).handledBy(FlowTools::setStart));
+                    .takes(ActivityName.class).handledBy(FlowTools::setStart),
+            AssistantTool.named("set_flow_method")
+                    .describedAs("Sets the flow's home or setup to one of the bot's methods; create the method "
+                            + "with the code tools first")
+                    .takes(FlowMethod.class).handledBy(FlowTools::setMethod));
 
     private FlowTools() {}
 
@@ -93,6 +119,12 @@ final class FlowTools {
         List<String> lines = new ArrayList<>();
         lines.add("Starts at " + (flow.start().label().isEmpty() ? "nothing" : flow.start().label()) + "; at most "
                 + flow.limits().maxSteps() + " steps, " + flow.limits().stepDelayMs() + " ms apart.");
+        for (Hook hook : Hook.values()) {
+            Runnable method = hook.of(flow);
+            String source = FlowTypes.sourceOf(method);
+            lines.add(hook.name().charAt(0) + hook.name().substring(1).toLowerCase(Locale.ROOT) + ": "
+                    + (method == null ? "none" : source.isEmpty() ? "written by hand" : source) + ".");
+        }
         for (Flow.Step step : flow.steps()) {
             String body = FlowValue.bodySource(step);
             List<String> switches = new ArrayList<>();
@@ -144,6 +176,24 @@ final class FlowTools {
     static AgentReply setStart(ActivityName name, AgentContext context) {
         return editFlow(context, flow -> FlowEdits.setStart(flow, name.name()), flow -> Map.of(),
                 "A run now starts at " + name.name() + ".");
+    }
+
+    /** Only a method the bot has: a name it lacks would not compile. */
+    static AgentReply setMethod(FlowMethod set, AgentContext context) {
+        if (set.which() == null) return AgentReply.refused("Say which: home or setup.");
+        String which = set.which().name().toLowerCase(Locale.ROOT);
+        String method = set.method() == null ? "" : set.method().strip();
+        if (!method.isEmpty()) {
+            List<String> held = FxCall.call(() -> FlowConstants.homes(context.services().pluginValues()));
+            if (!held.contains(method)) {
+                return AgentReply.refused("The bot has no public static void method " + method + "() with no "
+                        + "parameter. It has: " + (held.isEmpty() ? "none" : String.join(", ", held)) + ".");
+            }
+        }
+        return editFlow(context, board -> new Board(set.which().set(board.flow(), FlowTypes.method(method)),
+                        board.exits()), flow -> Map.of(),
+                method.isEmpty() ? "The flow has no " + which + " now." : "The flow's " + which + " is now " + method
+                        + ".");
     }
 
     /** Reads the flow, changes it, and saves it as 🔀 Activity Flow does — all on the FX thread. */

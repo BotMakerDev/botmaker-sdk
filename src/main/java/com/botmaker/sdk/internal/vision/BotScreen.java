@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.vision;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.internal.capture.WindowBacked;
+import com.botmaker.sdk.internal.emulator.EmulatorSize;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -49,8 +50,8 @@ public final class BotScreen {
 
     /**
      * Brings {@code source} to the bot's size at a run's start, or says in the trace why it is not: a window is
-     * resized, keeping its border; anything else is reported, since the screen is the game's setting or the
-     * user's monitor. Its pictures are scaled either way, which costs exactness, not the run.
+     * resized, keeping its border; an emulator's display is set to it until the bot ends ({@link EmulatorSize});
+     * anything else is reported, since the screen is the game's setting or the user's monitor. Its pictures are scaled either way, which costs exactness, not the run.
      *
      * @return the size the source now shows, or empty when it could not be captured
      */
@@ -76,6 +77,15 @@ public final class BotScreen {
                 Thread.currentThread().interrupt();
             } catch (RuntimeException | LinkageError refused) {
                 Diag.warn(SOURCE, "Could not resize the game window: " + refused.getMessage());
+            }
+            live = measure(whole);
+            if (live.isEmpty() || live.get().equals(wanted)) return live;
+        }
+        if (EmulatorSize.showAt(whole, wanted)) {
+            try {
+                Thread.sleep(SETTLE_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
             live = measure(whole);
             if (live.isEmpty() || live.get().equals(wanted)) return live;

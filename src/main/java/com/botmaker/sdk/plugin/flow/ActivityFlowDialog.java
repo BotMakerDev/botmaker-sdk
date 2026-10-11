@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * The Activity Flow editor — the single place activities are defined, ordered and switched on. Cards are
@@ -107,6 +108,9 @@ public final class ActivityFlowDialog {
 
     /** The flow's home as read, {@code Gamebot::goHome}: the canvas does not draw it, and a save keeps it. */
     private Runnable home;
+
+    /** The flow's setup as read, {@code Gamebot::setup}: kept by a save, like {@link #home}. */
+    private Runnable setup;
 
     /**
      * Canvas renames not yet saved, label at last save → label now; an outcome's keyed first by its activity's
@@ -226,6 +230,7 @@ public final class ActivityFlowDialog {
         Flow flow = readFlow();
         Board board = Board.read(services.pluginValues(), flow);
         home = flow.home();
+        setup = flow.setup();
         FlowLayout layout = loadLayout();
         boolean anyPlaced = false;
         List<Arrow> arrows = new ArrayList<>(flow.edges().stream().map(Arrow::of)
@@ -461,6 +466,7 @@ public final class ActivityFlowDialog {
         if (draft == null) {
             sidePanel.getChildren().addAll(heading("Variables"), buildParametersNote());
             sidePanel.getChildren().addAll(new Separator(), buildHomeSection());
+            sidePanel.getChildren().addAll(new Separator(), buildSetupSection());
             sidePanel.getChildren().addAll(new Separator(), buildFlowLimitsSection());
             return;
         }
@@ -698,10 +704,7 @@ public final class ActivityFlowDialog {
     /**
      * The flow's way home — {@code .home(Gamebot::goHome)}, run at start-up, after anything unexpected and before
      * each activity whose ⌂ is ticked — picked among the bot's {@code public static void} methods, and how a bot
-     * starts the flow at all.
-     *
-     * <p>A home written otherwise than as a method reference is not this window's to show or replace: it says so
-     * and keeps it, rather than offering a list that would read "(none)" over it.
+     * starts the flow at all ({@link #methodChoice}).
      *
      * <p>Where the run starts is the bot's own {@code main}, which this window does not write: the sentence says
      * which block to insert there. Studio offers it in {@code main} only, filled with the bot's values classes.
@@ -715,21 +718,7 @@ public final class ActivityFlowDialog {
         explain.getStyleClass().add("dialog-hint-text");
         box.getChildren().add(explain);
 
-        String source = home == null ? "" : com.botmaker.sdk.plugin.types.FlowTypes.sourceOf(home);
-        if (home != null && source.isBlank()) {
-            Label kept = new Label("Sdk.flow()'s .home(…) is written in code, not as a method reference, and is "
-                    + "kept as it is. Change it there.");
-            kept.setWrapText(true);
-            box.getChildren().add(kept);
-        } else {
-            PluginValues values = services.pluginValues();
-            box.getChildren().add(MethodPicker.of(services, () -> FlowConstants.homes(values), source,
-                    "Home::goHome", (className, method) -> FlowConstants.createMethod(values, null, className, method),
-                    () -> null, reference -> {
-                        home = reference.isBlank() ? null : com.botmaker.sdk.plugin.types.FlowTypes.home(reference);
-                        markDirty();
-                    }));
-        }
+        box.getChildren().add(methodChoice("home", home, "Home::goHome", picked -> home = picked));
 
         Label start = new Label("To start the flow, insert Bot ▸ Run activity flow in your bot's main. It is "
                 + "offered there only, already naming your values classes: Bot.runFlow(Sdk.class).");
@@ -737,6 +726,47 @@ public final class ActivityFlowDialog {
         start.getStyleClass().add("dialog-hint-text");
         box.getChildren().add(start);
         return box;
+    }
+
+    /**
+     * The flow's setup — {@code .setup(Gamebot::setup)}, run each time the bot has started the game, before home —
+     * picked as the home is. What it checks is the bot's own code: the game's settings, and the ones
+     * a user chose in the bot's parameters.
+     */
+    private Node buildSetupSection() {
+        VBox box = new VBox(6);
+        box.getChildren().add(heading("Setup"));
+        Label explain = new Label("The method that makes the game ready for this bot, run when the bot starts "
+                + "and after it restarts the game: set the game's settings to what the bot needs, including those "
+                + "chosen in its parameters. Setup.fail(\"…\") stops the run and tells the user what to change.");
+        explain.setWrapText(true);
+        explain.getStyleClass().add("dialog-hint-text");
+        box.getChildren().add(explain);
+        box.getChildren().add(methodChoice("setup", setup, "GameSetup::prepare",
+                picked -> setup = picked));
+        return box;
+    }
+
+    /**
+     * A pick of the bot's {@code public static void} methods for the flow's {@code .<link>(…)}, starting at
+     * {@code current}. One written otherwise than as a method reference is not this window's to show or replace: it
+     * says so and keeps it, rather than offering a list that would read "(none)" over it.
+     */
+    private Node methodChoice(String link, Runnable current, String example, Consumer<Runnable> picked) {
+        String source = current == null ? "" : com.botmaker.sdk.plugin.types.FlowTypes.sourceOf(current);
+        if (current != null && source.isBlank()) {
+            Label kept = new Label("Sdk.flow()'s ." + link + "(…) is written in code, not as a method reference, "
+                    + "and is kept as it is. Change it there.");
+            kept.setWrapText(true);
+            return kept;
+        }
+        PluginValues values = services.pluginValues();
+        return MethodPicker.of(services, () -> FlowConstants.homes(values), source, example,
+                (className, method) -> FlowConstants.createMethod(values, null, className, method),
+                () -> null, reference -> {
+                    picked.accept(com.botmaker.sdk.plugin.types.FlowTypes.method(reference));
+                    markDirty();
+                });
     }
 
     /**
@@ -977,7 +1007,9 @@ public final class ActivityFlowDialog {
 
     /** The flow as it currently stands, with each card's outcomes, ready to be written into the bot's Java. */
     private Board currentBoard() {
-        return board(canvas.drafts(), canvas.edges(), presets, canvas.start(), Flow.limits(maxSteps, stepDelayMs), home);
+        Board drawn = board(canvas.drafts(), canvas.edges(), presets, canvas.start(),
+                Flow.limits(maxSteps, stepDelayMs), home);
+        return new Board(drawn.flow().setup(setup), drawn.exits());
     }
 
     /**
@@ -1000,7 +1032,8 @@ public final class ActivityFlowDialog {
         // A start is a class literal, so a flow with cards always names one: the first card when none is set.
         Activity first = steps.isEmpty() ? Activity.NONE : steps.getFirst().activity();
         Activity begin = start == null || start.isBlank() ? first : FlowNames.activity(start);
-        Flow flow = new Flow(steps, edges, presets.stream().map(Selection::toPreset).toList(), begin, limits, home);
+        Flow flow = new Flow(steps, edges, presets.stream().map(Selection::toPreset).toList(), begin, limits, home,
+                null);
         return new Board(flow, exits);
     }
 

@@ -46,6 +46,11 @@ public final class Emulator implements CaptureSource {
         this.instance = instance;
     }
 
+    /** The connection, for {@link EmulatorSize}'s {@code wm} commands. */
+    AdbDevice device() {
+        return device;
+    }
+
     // --- CaptureSource: makes the emulator a first-class vision target ---
 
     @Override

@@ -86,7 +86,10 @@ public final class FlowConstants {
         return values == null || type == null ? List.of() : values.methods(id(), type);
     }
 
-    /** The bot's methods that can be the flow's way home: each {@code public static void} one with no parameter. */
+    /**
+     * The bot's methods that can be the flow's way home or its setup: each {@code public static void} one with no
+     * parameter.
+     */
     public static List<String> homes(PluginValues values) {
         return values == null ? List.of() : values.methods(null, null);
     }

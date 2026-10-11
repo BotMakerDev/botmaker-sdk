@@ -91,9 +91,34 @@ class BotTest {
         StringBuilder order = new StringBuilder();
         assertThrows(StopLoop.class, () -> Bot.lifecycle(
                 () -> { order.append("B"); throw new StopLoop(); },
-                () -> order.append("H")));
+                () -> order.append("H"), null));
         assertEquals("HB", order.toString(),
                 "cold start runs the configured target then goHome, before the first body pass");
+    }
+
+    @Test
+    void theSetupRunsEachTimeTheGameStartsAndHomeFollowsIt() {
+        com.botmaker.sdk.internal.launch.Target.set((String) null);
+        StringBuilder order = new StringBuilder();
+        AtomicInteger passes = new AtomicInteger();
+        assertThrows(StopLoop.class, () -> Bot.lifecycle(() -> {
+            order.append("B");
+            if (passes.incrementAndGet() == 1) throw new IllegalStateException("crash");
+            throw new StopLoop();
+        }, () -> order.append("H"), () -> order.append("S")));
+        // Cold start: setup, home, body. The crash: home, restart, setup, home again, body.
+        assertEquals("SHBHSHB", order.toString());
+    }
+
+    @Test
+    void aStopDuringRecoveryEndsTheRunQuietly() {
+        // Setup.fail after a restart stops the bot from inside the recovery: supervise returns, nothing escapes.
+        AtomicInteger body = new AtomicInteger();
+        Bot.supervise(() -> {
+            body.incrementAndGet();
+            throw new IllegalStateException("crash");
+        }, () -> Setup.fail("Set the game to windowed."));
+        assertEquals(1, body.get(), "the body is not run again after the recovery stopped the bot");
     }
 
     @Test

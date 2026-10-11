@@ -50,7 +50,8 @@ class FlowTypesTest {
                         new Flow.Edge(NOTHING_LEFT, REST),
                         new Flow.Edge(BotConstants.outcome("Rest", "NEXT"), COLLECT)),
                 List.of(new Flow.Preset("Gathering only", List.of(COLLECT))),
-                COLLECT, Flow.limits(1000, 1000), FlowTypes.home("Gamebot::goHome"));
+                COLLECT, Flow.limits(1000, 1000), FlowTypes.method("Gamebot::goHome"),
+                FlowTypes.method("Gamebot::setup"));
     }
 
     /** {@code build(components(v))} for one shape, which is the law every {@code ComponentType} owes. */
@@ -64,11 +65,23 @@ class FlowTypesTest {
         assertEquals("Gamebot::goHome", FlowTypes.sourceOf(roundTrip(FlowTypes.FLOW_SHAPE, gamebot()).home()));
     }
 
+    /** {@code .home(…)} and {@code .setup(…)} are two links, each written only when the flow has one. */
+    @Test
+    void theSetupIsALinkOfItsOwn() {
+        Flow flow = gamebot();
+        assertEquals("Gamebot::setup", FlowTypes.sourceOf(flow.setup()));
+        Flow none = flow.setup(null);
+        assertEquals("Gamebot::goHome", FlowTypes.sourceOf(none.home()), "dropping the setup keeps the home");
+        assertNull(flow.home(null).home());
+        assertEquals("Gamebot::setup", FlowTypes.sourceOf(flow.home(null).setup()), "and the other way round");
+        assertEquals(2, FlowTypes.FLOW_SHAPE.withers().size());
+    }
+
     @Test
     void anEmptyFlowSurvives() {
         assertEquals(Flow.NONE, roundTrip(FlowTypes.FLOW_SHAPE, Flow.NONE));
         assertEquals(1, FlowTypes.FLOW_SHAPE.constants().size(), "written as Flow.NONE: no start to name");
-        Flow emptied = new Flow(List.of(), List.of(), List.of(), null, Flow.limits(5, 5), null);
+        Flow emptied = new Flow(List.of(), List.of(), List.of(), null, Flow.limits(5, 5), null, null);
         assertEquals(Flow.NONE, FlowTypes.written(emptied), "a flow with no activity left has nothing to start at");
         assertEquals(gamebot(), FlowTypes.written(gamebot()));
     }
@@ -100,10 +113,10 @@ class FlowTypesTest {
      * {@code Class}, which the host reads and writes as the class literal of a managed enum.
      */
     @Test
-    void aFlowIsFiveComponentsAndAHome() {
-        assertEquals(List.of(List.class, List.class, List.class, Class.class, Flow.Limits.class, Runnable.class),
-                FlowTypes.FLOW_SHAPE.componentTypes());
-        assertEquals(6, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
+    void aFlowIsFiveComponentsAHomeAndASetup() {
+        assertEquals(List.of(List.class, List.class, List.class, Class.class, Flow.Limits.class, Runnable.class,
+                Runnable.class), FlowTypes.FLOW_SHAPE.componentTypes());
+        assertEquals(7, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
         assertEquals(List.of(Class.class, ActivityBody.class, String.class, boolean.class, boolean.class,
                 boolean.class, Class.class), FlowTypes.STEP_SHAPE.componentTypes());
         assertEquals(List.of(Outcome.class, Class.class), FlowTypes.EDGE_SHAPE.componentTypes());
@@ -147,7 +160,7 @@ class FlowTypesTest {
         assertEquals("Collect::body", FlowTypes.sourceOf(named));
         org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class, named::run);
         org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class,
-                FlowTypes.home("Gamebot::goHome")::run);
+                FlowTypes.method("Gamebot::goHome")::run);
     }
 
     @Test
@@ -155,14 +168,14 @@ class FlowTypesTest {
         assertEquals("", FlowTypes.sourceOf(FlowTypes.body("")));
         assertEquals("", FlowTypes.sourceOf(FlowTypes.body(null)));
         assertEquals("", FlowTypes.sourceOf(ActivityBody.none()));
-        assertNull(FlowTypes.home(""), "no home is none, not a blank name");
+        assertNull(FlowTypes.method(""), "no home is none, not a blank name");
     }
 
     /** The enable flag is part of the flow, because a run reads it. */
     @Test
     void anActivitySwitchedOffIsStillPartOfTheFlow() {
         Flow off = new Flow(List.of(FlowTypes.step(REST, FlowTypes.body("Rest::body")).off()), List.of(), List.of(),
-                REST, Flow.Limits.DEFAULT, null);
+                REST, Flow.Limits.DEFAULT, null, null);
         Flow read = roundTrip(FlowTypes.FLOW_SHAPE, off);
         assertFalse(read.steps().getFirst().enabled());
         assertEquals(off, read);

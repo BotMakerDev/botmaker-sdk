@@ -38,6 +38,16 @@ class DigitReaderTest {
     }
 
     @Test
+    void tinyDigitsAreEnlargedUpToThreeTimes() {
+        assertEquals(1, DigitReader.enlargement(20));
+        assertEquals(1, DigitReader.enlargement(12));
+        assertEquals(2, DigitReader.enlargement(8));
+        assertEquals(3, DigitReader.enlargement(5));
+        assertEquals(3, DigitReader.enlargement(2), "never more than three times");
+        assertEquals(1, DigitReader.enlargement(0), "no digit, nothing to enlarge");
+    }
+
+    @Test
     void aGapWiderThanADigitIsACharacterTheSetLacks() {
         // 1 ? 5: the 7 between them is not in the set, so the number is not read as 15.
         assertEquals(OptionalLong.empty(), DigitReader.assemble(List.of(hit(1, 2, 0.95), hit(5, 26, 0.95)), "gold"));

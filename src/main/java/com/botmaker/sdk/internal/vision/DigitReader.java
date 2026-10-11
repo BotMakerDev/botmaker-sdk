@@ -41,6 +41,8 @@ public final class DigitReader {
     private static final double AS_SURE = 0.03;
     /** The most digits a {@code long} holds. */
     private static final int LONGEST = 18;
+    /** Digits shown shorter than this many pixels are enlarged before matching. */
+    private static final double SMALL = 12;
 
     private DigitReader() {}
 
@@ -97,12 +99,16 @@ public final class DigitReader {
     public static OptionalLong read(BufferedImage image, double scale, List<Glyph> glyphs, double confidence,
                                     String name) {
         OpenCvNative.ensureLoaded();
+        // A digit a few pixels tall is a handful of pixels to compare: both sides are enlarged first, so a
+        // pixel of antialiasing weighs less than a stroke.
+        int enlarge = enlargement(glyphs.stream().mapToInt(g -> g.image().getHeight()).max().orElse(0) * scale);
+        BufferedImage searched = enlarge == 1 ? image : resized(image, enlarge);
         List<Hit> hits = new ArrayList<>();
-        Mat background = OpencvManager.bufferedImageToMat(image);
+        Mat background = OpencvManager.bufferedImageToMat(searched);
         try {
             for (Glyph glyph : glyphs) {
-                BufferedImage sized = resized(glyph.image(), scale);
-                if (sized.getWidth() > image.getWidth() || sized.getHeight() > image.getHeight()) continue;
+                BufferedImage sized = resized(glyph.image(), scale * enlarge);
+                if (sized.getWidth() > searched.getWidth() || sized.getHeight() > searched.getHeight()) continue;
                 Mat template = OpencvManager.bufferedImageToMat(sized);
                 try {
                     for (RawMatch found : OpencvManager.findMultipleMatches(template, background, false,
@@ -182,6 +188,12 @@ public final class DigitReader {
         double sx = live.width() / (double) authored.width();
         double sy = live.height() / (double) authored.height();
         return Places.otherShape(authored, live) ? Math.min(sx, sy) : (sx + sy) / 2;
+    }
+
+    /** How many times a digit {@code shownHeight} pixels tall is enlarged before matching: up to 3, toward 12 px. */
+    static int enlargement(double shownHeight) {
+        if (shownHeight <= 0 || shownHeight >= SMALL) return 1;
+        return (int) Math.min(3, Math.ceil(SMALL / shownHeight));
     }
 
     /** Where {@code source} narrows its whole surface of {@code live} size to; all of it when it does not. */

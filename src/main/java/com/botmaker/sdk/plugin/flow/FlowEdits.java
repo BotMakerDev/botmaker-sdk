@@ -247,10 +247,10 @@ public final class FlowEdits {
         throw new IllegalArgumentException("No activity called '" + name + "'; there are " + labels(flow));
     }
 
-    /** {@code flow} with these parts, its limits and home kept. */
+    /** {@code flow} with these parts, its limits, home and setup kept. */
     static Flow with(Flow flow, List<Flow.Step> steps, List<Flow.Edge> edges, List<Flow.Preset> presets,
                      Activity start) {
-        return new Flow(steps, edges, presets, start, flow.limits(), flow.home());
+        return new Flow(steps, edges, presets, start, flow.limits(), flow.home(), flow.setup());
     }
 
     private static Flow withOff(Flow flow, Flow.Step source, Activity to) {

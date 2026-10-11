@@ -24,8 +24,14 @@ class DigitCutsTest {
 
     /** {@code text} in a game-like font: yellow on dark blue, not antialiased, with room around it. */
     private static BufferedImage shown(String text) {
-        Font font = new Font(Font.MONOSPACED, Font.BOLD, 22);
-        BufferedImage image = new BufferedImage(20 + text.length() * 16, 36, BufferedImage.TYPE_INT_RGB);
+        return shown(text, 22);
+    }
+
+    /** {@code text} at {@code points}, the image scaled to it. */
+    private static BufferedImage shown(String text, int points) {
+        Font font = new Font(Font.MONOSPACED, Font.BOLD, points);
+        BufferedImage image = new BufferedImage(20 + text.length() * points * 16 / 22, points * 36 / 22,
+                BufferedImage.TYPE_INT_RGB);
         Graphics2D g = image.createGraphics();
         try {
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
@@ -33,7 +39,7 @@ class DigitCutsTest {
             g.fillRect(0, 0, image.getWidth(), image.getHeight());
             g.setColor(new Color(0xf0, 0xd0, 0x30));
             g.setFont(font);
-            g.drawString(text, 8, 26);
+            g.drawString(text, 8, points * 26 / 22);
         } finally {
             g.dispose();
         }
@@ -61,6 +67,17 @@ class DigitCutsTest {
         assertEquals(OptionalLong.of(40718), DigitReader.read(shown("40718"), 1, glyphs, 0.9, "gold"));
         assertEquals(OptionalLong.of(1111), DigitReader.read(shown("1111"), 1, glyphs, 0.9, "gold"));
         assertEquals(OptionalLong.empty(), DigitReader.read(shown(""), 1, glyphs, 0.9, "gold"));
+    }
+
+    @Test
+    void digitsAFewPixelsTallAreReadToo(@TempDir Path resources) throws IOException {
+        BufferedImage all = shown("0123456789", 10);
+        List<Rect> boxes = DigitCuts.characters(all);
+        assertEquals(10, boxes.size());
+        assertTrue(boxes.getFirst().height() < 12, "small enough to be enlarged: " + boxes.getFirst());
+        DigitCuts.save(resources, "tiny", all, boxes, "0123456789");
+        assertEquals(OptionalLong.of(3857), DigitReader.read(shown("3857", 10), 1, DigitCuts.held(resources, "tiny"),
+                0.9, "tiny"));
     }
 
     @Test

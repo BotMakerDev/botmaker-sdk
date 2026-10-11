@@ -54,10 +54,11 @@ public final class FlowValue {
      */
     public static String write(ValueContext ctx, Flow flow) {
         if (ctx == null) return "This project has no Sdk.flow() to write to.";
-        // An empty flow is written Flow.NONE, which has no .home(…) to carry: refused rather than dropped.
-        if (flow.steps().isEmpty() && flow.home() != null) {
-            return "A flow with no activity can't keep its .home(…): add an activity first, or remove .home(…) "
-                    + "from Sdk.flow() by hand.";
+        // An empty flow is written Flow.NONE, which has no .home(…) or .setup(…) to carry: refused rather than
+        // dropped.
+        if (flow.steps().isEmpty() && (flow.home() != null || flow.setup() != null)) {
+            return "A flow with no activity can't keep its .home(…) or .setup(…): add an activity first, or remove "
+                    + "them from Sdk.flow() by hand.";
         }
         ctx.set(com.botmaker.sdk.plugin.types.FlowTypes.written(flow));
         return null;

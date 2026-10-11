@@ -43,6 +43,12 @@ public final class EmulatorSource implements CaptureSource {
     }
 
     /** An emulator's captured pixels <em>are</em> its coordinate space, so the origin is always {@code (0,0)}. */
+    /** The emulator a capture has already connected to, or null: never connects or launches one. */
+    Emulator connected() {
+        Emulator cached = connected;
+        return cached != null && cached.isPresent() ? cached : null;
+    }
+
     @Override
     public Point origin() {
         return new Point(0, 0);

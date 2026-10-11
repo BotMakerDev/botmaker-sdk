@@ -28,9 +28,10 @@ import java.util.function.Consumer;
  * bot needs; the body, the recovery hooks and the per-activity logic stay in editable user code.
  *
  * <p>{@link #runFlow} also runs a start-up sequence <em>once</em> before the first loop pass — launch the
- * project's configured target, then the flow's {@code home} — so a fresh launch actually opens the game and reaches a
- * known screen instead of assuming it is already running. A first launch leaves an already-open game alone; a
- * recovery shuts a frozen one down first.
+ * project's configured target, then the flow's {@code setup}, then its {@code home} — so a fresh launch actually opens
+ * the game, sets it as the bot needs and reaches a known screen instead of assuming it is already running. A first
+ * launch leaves an already-open game alone; a recovery shuts a frozen one down first, and runs the setup again on
+ * the restarted game.
  *
  * <p>The bot ends when {@link #stop()} is called — from an activity that is done, or automatically by the
  * generated loop once every activity is disabled. {@code stop()} unwinds the supervise loop cleanly and
@@ -86,7 +87,7 @@ public class Bot {
             Runnable home = Flows.installed().home();
             if (home != null) home.run();
         };
-        lifecycle(() -> FlowWalker.run(Flows.installed()), goHome);
+        lifecycle(() -> FlowWalker.run(Flows.installed()), goHome, Flows.installed().setup());
     }
 
     /**
@@ -142,11 +143,25 @@ public class Bot {
      * on every crash or stuck state. The launch target is this machine's {@code botmaker.launch.target}
      * property; a project with none configured launches nothing.
      *
+     * <p>Each time the game is (re)started, {@code setup} makes it ready: at the cold start before the
+     * {@code goHome} that follows it, and after a restart followed by a {@code goHome} of its own, since the
+     * recovery's ran before the game came back.
+     *
      * @param body   the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param goHome navigate from wherever the bot is back to a safe/home screen
+     * @param setup  the flow's setup, or null for none
      */
-    static void lifecycle(Runnable body, Runnable goHome) {
-        supervise(body, goHome, Bot::launchConfiguredTarget);
+    static void lifecycle(Runnable body, Runnable goHome, Runnable setup) {
+        supervise(body, goHome, mode -> {
+            launchConfiguredTarget(mode);
+            if (setup == null) return;
+            Debug.log("setup");
+            setup.run();
+            if (mode == StartMode.RESTART) {
+                Debug.log("goHome");
+                goHome.run();
+            }
+        });
     }
 
     /**
@@ -206,12 +221,30 @@ public class Bot {
             } catch (BotStuckException e) {
                 Debug.error("Stuck: " + e.getMessage() + " — recovering.");
                 Watchdog.reset();
-                recovery.run();
+                if (!recovered(recovery)) return;
             } catch (RuntimeException e) {
                 Debug.error("Crashed: " + e + " — recovering.");
                 Watchdog.reset();
-                recovery.run();
+                if (!recovered(recovery)) return;
             }
+        }
+    }
+
+    /**
+     * Runs {@code recovery}; false when it stopped the bot, as a setup's {@code Setup.fail} does after a restart. A
+     * recovery that crashes is said and the loop goes on: the next pass recovers again.
+     */
+    private static boolean recovered(Runnable recovery) {
+        try {
+            recovery.run();
+            return true;
+        } catch (BotStoppedException e) {
+            Debug.log("Stopped by request during recovery.");
+            return false;
+        } catch (RuntimeException e) {
+            Debug.error("Recovery failed: " + e);
+            Watchdog.reset();
+            return true;
         }
     }
 
@@ -258,11 +291,11 @@ public class Bot {
         } catch (BotStuckException e) {
             Debug.error("Stuck during start-up: " + e.getMessage() + " — recovering.");
             Watchdog.reset();
-            recovery.run();
+            if (!recovered(recovery)) return;
         } catch (RuntimeException e) {
             Debug.error("Crashed during start-up: " + e + " — recovering.");
             Watchdog.reset();
-            recovery.run();
+            if (!recovered(recovery)) return;
         }
         supervise(body, recovery);
     }
