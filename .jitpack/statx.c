@@ -1,4 +1,4 @@
-// Preloaded by jitpack.yml only on a JitPack builder whose java cannot load Maven's launcher.
+// Preloaded by .jitpack/build.sh only on a JitPack builder whose java cannot load Maven's launcher.
 //
 // Java 22 and later read file attributes with the statx syscall. Some JitPack builders run kernel 4.14 under a
 // container seccomp profile that predates statx and refuses it with EPERM rather than ENOSYS, so glibc does not
