@@ -626,7 +626,8 @@ public final class ActivityFlowDialog {
             PluginValues values = services.pluginValues();
             for (String flowName : FlowValue.names(services)) {
                 if (flowName.equals(target.name())) continue;
-                for (Flow.Step step : FlowValue.FLOWS.read(values, flowName).orElse(Flow.NONE).steps()) {
+                for (Flow.Step step : FlowValue.FLOWS.read(values, PluginValues.Member.of(flowName))
+                        .orElse(Flow.NONE).steps()) {
                     if (!(step.node() instanceof Activity) || placed.contains(step.label())) continue;
                     placed.add(step.label());
                     MenuItem item = new MenuItem(step.label() + "  (" + flowName + ")");

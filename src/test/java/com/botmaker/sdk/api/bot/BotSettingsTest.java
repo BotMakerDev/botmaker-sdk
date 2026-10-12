@@ -137,21 +137,21 @@ class BotSettingsTest {
 
     @Test
     void theRunsDebugPropertyWinsOverTheBotsSetting() {
-        assertEquals(Runs.DEBUG_PROPERTY, Diag.RUN_PROPERTY, "the SDK reads the property the host writes");
+        assertEquals(Runs.DEBUG.name(), Diag.RUN_PROPERTY, "the SDK reads the property the host writes");
         try {
-            System.setProperty(Runs.DEBUG_PROPERTY, "false");
+            System.setProperty(Diag.RUN_PROPERTY, "false");
             BotSettings.use(BotSettings.DEFAULTS.debug(true));
             assertFalse(Debug.isEnabled(), "Studio's toggle off silences a bot whose setting is on");
 
-            System.setProperty(Runs.DEBUG_PROPERTY, "true");
+            System.setProperty(Diag.RUN_PROPERTY, "true");
             BotSettings.use(BotSettings.DEFAULTS.debug(false));
             assertTrue(Debug.isEnabled(), "and turns on one whose setting is off");
 
-            System.clearProperty(Runs.DEBUG_PROPERTY);
+            System.clearProperty(Diag.RUN_PROPERTY);
             BotSettings.use(BotSettings.DEFAULTS.debug(false));
             assertFalse(Debug.isEnabled(), "with no toggle the bot decides");
         } finally {
-            System.clearProperty(Runs.DEBUG_PROPERTY);
+            System.clearProperty(Diag.RUN_PROPERTY);
             Debug.enable();
         }
     }

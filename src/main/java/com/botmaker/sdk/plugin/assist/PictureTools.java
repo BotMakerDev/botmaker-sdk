@@ -8,6 +8,7 @@ import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.plugin.api.overlay.Marks;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.geometry.Anchor;
@@ -295,7 +296,8 @@ final class PictureTools {
         Size live = new Size(frame.get().getWidth(), frame.get().getHeight());
         DigitSet set = new DigitSet(DigitCuts.pathFor(name));
         // Every digit of a set is scaled by one frame: one cut from another is refused, not mixed in.
-        Optional<DigitSet> before = FxCall.call(() -> DIGITS.open(context.services().pluginValues(), constant)
+        Optional<DigitSet> before = FxCall.call(() -> DIGITS.open(context.services().pluginValues(),
+                        Member.of(constant))
                 .flatMap(DIGITS::read));
         Size bot = FxCall.call(() -> ScreenSize.read(context.services())).orElse(live);
         DigitSet wanted = bot.equals(live) ? set : set.in(live);
@@ -383,16 +385,17 @@ final class PictureTools {
      */
     private static <T> Saved save(StudioServices services, ManagedSet<T> set, String name, T value) {
         PluginValues values = services.pluginValues();
-        if (set.contains(values, name)) {
-            Optional<ValueContext> held = set.open(values, name);
+        Member member = Member.of(name);
+        if (set.contains(values, member)) {
+            Optional<ValueContext> held = set.open(values, member);
             if (held.isEmpty() || set.read(held.get()).isEmpty()) {
                 return Saved.refused(set.value().holder() + "." + name + " is written by hand, so it is left as it is.");
             }
             return held.get().write(value).map(Saved::refused).orElse(new Saved(true, "Moved"));
         }
-        Optional<String> missing = values.create(set.value().id());
+        Optional<String> missing = values.create(set.value());
         if (missing.isPresent()) return Saved.refused(missing.get());
-        return set.add(values, name, value).map(Saved::refused).orElse(new Saved(true, "Saved"));
+        return set.add(values, member, value).map(Saved::refused).orElse(new Saved(true, "Saved"));
     }
 
     /** What {@link #save} did: {@code done} is the verb to report, or why nothing was. */

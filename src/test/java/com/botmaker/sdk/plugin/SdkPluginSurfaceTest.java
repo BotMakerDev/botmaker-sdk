@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -144,8 +145,8 @@ class SdkPluginSurfaceTest {
         assertEquals("Activities", byId.get(SdkValue.Id.ACTIVITIES).holder());
         assertEquals(com.botmaker.sdk.api.bot.Outcome.class, byId.get(SdkValue.Id.ACTIVITIES).type());
         assertTrue(byId.get(SdkValue.Id.ACTIVITIES).isGrouped(), "one enum of outcomes per activity");
-        assertEquals("Collect", ((com.botmaker.sdk.api.flow.Activity) byId.get(SdkValue.Id.ACTIVITIES)
-                .byGroup("Collect")).name());
+        assertEquals("Collect", byId.get(SdkValue.Id.ACTIVITIES)
+                .byGroup(com.botmaker.sdk.api.flow.Activity.class, "Collect").orElseThrow().name());
         assertEquals("Spots", byId.get(SdkValue.Id.SPOTS).holder());
         assertEquals(com.botmaker.sdk.api.geometry.Spot.class, byId.get(SdkValue.Id.SPOTS).type());
         assertEquals("Zones", byId.get(SdkValue.Id.ZONES).holder());
@@ -303,7 +304,7 @@ class SdkPluginSurfaceTest {
                     () -> editor.matches(TestContexts.typedSlot(String.class, "\"\"")), failures);
             ask(editor, "a call site",
                     () -> editor.matches(TestContexts.slot(
-                            TestContexts.method(Game.class, "launchSteam", String.class), 0, "\"\"")), failures);
+                            TestContexts.voidCall((Ref.Void1<String>) Game::launchSteam), 0, "\"\"")), failures);
             ask(editor, "an unresolved call",
                     () -> editor.matches(TestContexts.slot(null, 0, "\"\"")), failures);
         }

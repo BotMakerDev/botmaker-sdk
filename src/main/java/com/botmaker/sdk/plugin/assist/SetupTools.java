@@ -172,7 +172,7 @@ final class SetupTools {
     static AgentReply setCaptureSource(WindowTitle title, AgentContext context) {
         if (title.window() == null || title.window().isBlank()) return AgentReply.refused("Name a window.");
         String refused = FxCall.call(() -> CaptureValue.CAPTURE.write(context.services(),
-                CaptureSource.window(title.window().trim())));
+                CaptureSource.window(title.window().trim())).orElse(null));
         return refused == null ? AgentReply.text("The bot now looks at the window \"" + title.window().trim() + "\".")
                 : AgentReply.refused(refused);
     }
@@ -269,7 +269,8 @@ final class SetupTools {
             if (unsafe != null) return AgentReply.refused(unsafe);
         }
         String refused = FxCall.call(() -> {
-            String why = CaptureValue.CAPTURE.write(context.services(), CaptureSource.emulator(known.get()));
+            String why = CaptureValue.CAPTURE.write(context.services(), CaptureSource.emulator(known.get()))
+                    .orElse(null);
             if (why == null && target != null) LaunchTargetValue.set(context.services(), target);
             return why;
         });

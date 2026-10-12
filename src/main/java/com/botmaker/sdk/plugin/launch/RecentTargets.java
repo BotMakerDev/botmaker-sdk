@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.launch;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.run.RunProperty;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -18,7 +19,8 @@ import java.util.Optional;
 public final class RecentTargets {
 
     /** The run property holding the list. */
-    public static final String PROPERTY = "botmaker.launch.recent";
+    public static final RunProperty<List<Recent>> PROPERTY =
+            RunProperty.of("botmaker.launch.recent", RecentTargets::decode, RecentTargets::encode);
 
     /** How many are kept. */
     static final int LIMIT = 8;
@@ -44,8 +46,7 @@ public final class RecentTargets {
 
     /** The remembered targets, newest first. */
     public static List<Recent> list(StudioServices services) {
-        String value = services == null ? null : services.runs().property(PROPERTY);
-        return decode(value);
+        return services == null ? List.of() : services.runs().get(PROPERTY).orElse(List.of());
     }
 
     /** The remembered entry for {@code spec}, if it was picked from the dialog. */
@@ -57,7 +58,7 @@ public final class RecentTargets {
     /** Puts {@code recent} first, dropping its older copy and anything past {@link #LIMIT}. */
     public static void remember(StudioServices services, Recent recent) {
         if (services == null || recent == null) return;
-        services.runs().setProperty(PROPERTY, encode(pushed(list(services), recent)));
+        services.runs().set(PROPERTY, pushed(list(services), recent));
     }
 
     static List<Recent> pushed(List<Recent> before, Recent recent) {

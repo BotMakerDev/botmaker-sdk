@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.settings;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.run.RunProperty;
 import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.shared.launch.LaunchSpec;
 
@@ -18,13 +19,15 @@ import com.botmaker.shared.launch.LaunchSpec;
  */
 public final class LaunchTargetValue {
 
+    /** The run property, its text the spec. */
+    static final RunProperty<String> PROPERTY =
+            RunProperty.of(ProjectDefaults.LAUNCH_TARGET, String::trim, spec -> spec);
+
     private LaunchTargetValue() {}
 
     /** The raw spec, or {@code null} when this machine has none for the bot. */
     public static String current(StudioServices services) {
-        if (services == null) return null;
-        String spec = services.runs().property(ProjectDefaults.LAUNCH_TARGET);
-        return spec == null || spec.isBlank() ? null : spec.trim();
+        return services == null ? null : services.runs().get(PROPERTY).orElse(null);
     }
 
     /** The parsed spec, or {@code null} when there is none or it does not parse. */
@@ -35,6 +38,6 @@ public final class LaunchTargetValue {
 
     /** Makes {@code spec} what this machine launches for the bot; {@code null} clears it. */
     public static void set(StudioServices services, String spec) {
-        if (services != null) services.runs().setProperty(ProjectDefaults.LAUNCH_TARGET, spec);
+        if (services != null) services.runs().set(PROPERTY, spec);
     }
 }

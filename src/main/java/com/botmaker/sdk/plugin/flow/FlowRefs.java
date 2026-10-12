@@ -47,7 +47,8 @@ public final class FlowRefs {
 
     /** The open project's flows, as they stand now. */
     public static FlowRefs of(PluginValues values) {
-        return new FlowRefs(FlowValue.FLOWS.members(values), name -> FlowValue.FLOWS.read(values, name),
+        return new FlowRefs(FlowValue.flowNames(values),
+                name -> FlowValue.FLOWS.read(values, PluginValues.Member.of(name)),
                 FlowConstants.declared(values));
     }
 

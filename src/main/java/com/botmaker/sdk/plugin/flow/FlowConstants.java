@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Flow;
@@ -49,10 +50,6 @@ public final class FlowConstants {
     /** The activities' enums, as one grouped open set. */
     static final ManagedSet<Outcome> SET = ManagedSet.of(SdkValues.ACTIVITIES);
 
-    private static String id() {
-        return SET.value().id();
-    }
-
     /**
      * The outcome labels the enum of the activity {@code label} declares, in its order — what another flow running
      * it already reports — or none when it has no enum yet.
@@ -79,11 +76,9 @@ public final class FlowConstants {
     public static Map<String, List<String>> declared(PluginValues values) {
         Map<String, List<String>> declared = new LinkedHashMap<>();
         if (values == null) return declared;
-        for (String group : values.groups(id())) declared.put(group, new ArrayList<>());
-        for (String member : SET.members(values)) {
-            int dot = member.indexOf('.');
-            if (dot <= 0) continue;
-            declared.computeIfAbsent(member.substring(0, dot), group -> new ArrayList<>()).add(member.substring(dot + 1));
+        for (String group : SET.groups(values)) declared.put(group, new ArrayList<>());
+        for (Member member : SET.members(values)) {
+            if (member.grouped()) declared.computeIfAbsent(member.group(), group -> new ArrayList<>()).add(member.name());
         }
         return declared;
     }
@@ -95,8 +90,8 @@ public final class FlowConstants {
      */
     public static Optional<String> returnedBy(PluginValues values, String reference) {
         if (values == null || reference == null || reference.isBlank()) return Optional.empty();
-        for (String group : values.groups(id())) {
-            if (values.methods(id(), group).contains(reference)) return Optional.of(group);
+        for (String group : SET.groups(values)) {
+            if (SET.methods(values, group).contains(reference)) return Optional.of(group);
         }
         return Optional.empty();
     }
@@ -107,7 +102,7 @@ public final class FlowConstants {
      * is not declared yet.
      */
     public static List<String> bodies(PluginValues values, String type) {
-        return values == null || type == null ? List.of() : values.methods(id(), type);
+        return values == null || type == null ? List.of() : SET.methods(values, type);
     }
 
     /**
@@ -115,7 +110,7 @@ public final class FlowConstants {
      * parameter.
      */
     public static List<String> homes(PluginValues values) {
-        return values == null ? List.of() : values.methods((String) null, null);
+        return values == null ? List.of() : values.voidMethods();
     }
 
     /**
@@ -126,7 +121,8 @@ public final class FlowConstants {
     public static PluginValues.MethodWrite createMethod(PluginValues values, String type, String className,
                                                         String method) {
         if (values == null) return new PluginValues.MethodWrite(null, PluginValues.NO_SOURCE_TREE);
-        return values.createMethod(type == null ? null : id(), type, className, method);
+        return type == null ? values.createVoidMethod(className, method)
+                : SET.createMethod(values, type, className, method);
     }
 
     /**
@@ -145,7 +141,7 @@ public final class FlowConstants {
             String to = FlowNames.typeFor(rename.getValue());
             if (to == null) return refused(rename.getValue(), FlowNames.ACTIVITIES);
             if (from != null && !from.equals(to) && declared.containsKey(from) && !declared.containsKey(to)) {
-                Optional<String> refused = values.renameGroup(id(), from, to);
+                Optional<String> refused = SET.renameGroup(values, from, to);
                 if (refused.isPresent()) return refused.get();
                 declared.put(to, declared.remove(from));
             }
@@ -165,7 +161,7 @@ public final class FlowConstants {
             }
             List<String> held = declared.get(type);
             if (held == null) {
-                Optional<String> refused = values.addGroup(id(), type, wanted);
+                Optional<String> refused = SET.addGroup(values, type, wanted);
                 if (refused.isPresent()) return refused.get();
                 declared.put(type, new ArrayList<>(wanted));
                 continue;
@@ -176,7 +172,7 @@ public final class FlowConstants {
                 String to = FlowNames.constantFor(rename.getValue());
                 if (to == null) return refused(rename.getValue(), FlowNames.ACTIVITIES + "." + type);
                 if (from != null && !from.equals(to) && held.contains(from) && !held.contains(to)) {
-                    Optional<String> refused = SET.rename(values, type + "." + from, to);
+                    Optional<String> refused = SET.rename(values, Member.of(type, from), to);
                     if (refused.isPresent()) return refused.get();
                     held.set(held.indexOf(from), to);
                 }
@@ -184,7 +180,8 @@ public final class FlowConstants {
             }
             for (String constant : wanted) {
                 if (held.contains(constant)) continue;
-                Optional<String> refused = SET.add(values, type + "." + constant, BotConstants.outcome(type, constant));
+                Optional<String> refused = SET.add(values, Member.of(type, constant),
+                        BotConstants.outcome(type, constant));
                 if (refused.isPresent()) return refused.get();
                 held.add(constant);
             }
@@ -206,7 +203,7 @@ public final class FlowConstants {
         String constant = FlowNames.constantFor(label);
         if (constant == null) return Optional.of(refused(label, FlowNames.ACTIVITIES + "." + type));
         if (declared(values).getOrDefault(type, List.of()).contains(constant)) return Optional.empty();
-        return SET.add(values, type + "." + constant, BotConstants.outcome(type, constant));
+        return SET.add(values, Member.of(type, constant), BotConstants.outcome(type, constant));
     }
 
     /**
@@ -230,7 +227,7 @@ public final class FlowConstants {
             for (String label : activity.getValue()) wanted.add(FlowNames.constantFor(label));
             for (String constant : declared.getOrDefault(type, List.of())) {
                 if (wanted.contains(constant)) continue;
-                SET.remove(values, type + "." + constant).ifPresent(refused ->
+                SET.remove(values, Member.of(type, constant)).ifPresent(refused ->
                         notes.add(FlowNames.ACTIVITIES + "." + type + "." + constant + " stays: " + refused));
             }
         }
@@ -243,7 +240,7 @@ public final class FlowConstants {
                 for (String other : elsewhere.get()) others.add(FlowNames.typeFor(other));
             }
             if (others.contains(type)) continue;
-            values.removeGroup(id(), type).ifPresent(refused ->
+            SET.removeGroup(values, type).ifPresent(refused ->
                     notes.add(FlowNames.ACTIVITIES + "." + type + " stays: " + refused));
         }
     }

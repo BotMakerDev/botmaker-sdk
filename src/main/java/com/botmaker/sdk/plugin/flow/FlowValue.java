@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.flow;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.flow.Flow;
@@ -89,7 +90,15 @@ public final class FlowValue {
 
     /** The bot's flows, the names of its {@code Flows} constants in file order. */
     public static List<String> names(StudioServices services) {
-        return FLOWS.members(services.pluginValues());
+        return flowNames(services.pluginValues());
+    }
+
+    /** What a change naming no flow is refused with. */
+    private static final String NO_FLOW_NAMED = "No flow was named.";
+
+    /** The names of the bot's {@code Flows} constants, in file order. */
+    public static List<String> flowNames(PluginValues values) {
+        return FLOWS.members(values).stream().map(Member::name).toList();
     }
 
     /** The flow edited when none is named: {@link #FIRST} when there is one or none at all, else the first. */
@@ -122,7 +131,7 @@ public final class FlowValue {
                     + "and left alone. Edit it in Sdk.java, or replace it with Run.of() to draw it here.");
         }
         PluginValues values = services.pluginValues();
-        List<String> members = FLOWS.members(values);
+        List<String> members = flowNames(values);
         String picked = name == null || name.isBlank() ? defaultName(members) : named(name);
         if (!members.contains(picked)) {
             if (members.isEmpty() && picked.equals(FIRST)) {
@@ -130,7 +139,7 @@ public final class FlowValue {
             }
             return Target.refused(picked, "The bot has no flow Flows." + picked + "; it has " + listed(members) + ".");
         }
-        Optional<ValueContext> value = FLOWS.open(values, picked);
+        Optional<ValueContext> value = FLOWS.open(values, Member.of(picked));
         Optional<Flow> flow = value.flatMap(FLOWS::read);
         if (flow.isEmpty()) {
             return new Target(picked, Optional.empty(), Flow.NONE, run.get(), "Flows." + picked + " isn't one this "
@@ -146,9 +155,9 @@ public final class FlowValue {
      */
     public static Set<String> labels(PluginValues values, String besides) {
         Set<String> labels = new LinkedHashSet<>();
-        for (String member : FLOWS.members(values)) {
+        for (String member : flowNames(values)) {
             if (member.equals(besides)) continue;
-            FLOWS.read(values, member).ifPresent(flow -> labels.addAll(FlowEdits.labels(flow)));
+            FLOWS.read(values, Member.of(member)).ifPresent(flow -> labels.addAll(FlowEdits.labels(flow)));
         }
         return labels;
     }
@@ -158,9 +167,9 @@ public final class FlowValue {
      * description and switches — or empty when no other flow runs it. {@code besides} may be null.
      */
     public static Optional<Flow.Step> stepElsewhere(PluginValues values, String label, String besides) {
-        for (String member : FLOWS.members(values)) {
+        for (String member : flowNames(values)) {
             if (member.equals(besides)) continue;
-            for (Flow.Step step : FLOWS.read(values, member).orElse(Flow.NONE).steps()) {
+            for (Flow.Step step : FLOWS.read(values, Member.of(member)).orElse(Flow.NONE).steps()) {
                 if (step.label().equals(label)) return Optional.of(step);
             }
         }
@@ -176,9 +185,9 @@ public final class FlowValue {
     public static String create(StudioServices services, String typed, Flow flow) {
         PluginValues values = services.pluginValues();
         String name = FlowNames.constantFor(typed);
-        String problem = nameProblem(typed, name, FLOWS.members(values));
+        String problem = nameProblem(typed, name, flowNames(values));
         if (problem != null) return problem;
-        return FLOWS.add(values, name, FlowTypes.written(flow)).orElse(null);
+        return FLOWS.add(values, Member.of(name), FlowTypes.written(flow)).orElse(null);
     }
 
     /**
@@ -188,7 +197,8 @@ public final class FlowValue {
      * @return null when it was written, else why it could not be
      */
     public static String duplicate(StudioServices services, String from, String typed) {
-        Optional<Flow> flow = FLOWS.read(services.pluginValues(), from);
+        if (from == null || from.isBlank()) return NO_FLOW_NAMED;
+        Optional<Flow> flow = FLOWS.read(services.pluginValues(), Member.of(from));
         if (flow.isEmpty()) return "Flows." + from + " isn't one this editor reads, so it can't be copied.";
         String refused = create(services, typed, flow.get());
         if (refused == null) relayout(services, layout -> layout.with(FlowNames.constantFor(typed), layout.cardsOf(from)));
@@ -202,14 +212,15 @@ public final class FlowValue {
      * @return null when it was renamed, else why it could not be
      */
     public static String rename(StudioServices services, String from, String typed) {
+        if (from == null || from.isBlank()) return NO_FLOW_NAMED;
         PluginValues values = services.pluginValues();
         String name = FlowNames.constantFor(typed);
         if (from.equals(name)) return null;
-        List<String> others = new ArrayList<>(FLOWS.members(values));
+        List<String> others = new ArrayList<>(flowNames(values));
         others.remove(from);
         String problem = nameProblem(typed, name, others);
         if (problem != null) return problem;
-        String refused = FLOWS.rename(values, from, name).orElse(null);
+        String refused = FLOWS.rename(values, Member.of(from), name).orElse(null);
         if (refused == null) relayout(services, layout -> subflowMoved(moved(layout, from, name), from, name));
         return refused;
     }
@@ -222,13 +233,14 @@ public final class FlowValue {
      * @return null when it was deleted, else why it could not be
      */
     public static String remove(StudioServices services, String name) {
+        if (name == null || name.isBlank()) return NO_FLOW_NAMED;
         PluginValues values = services.pluginValues();
         List<String> users = FlowRefs.of(values).usersOf(name);
         if (!users.isEmpty()) {
             return "Flows." + name + " runs as a sub-flow card in " + listed(users) + ": remove "
                     + (users.size() == 1 ? "that card" : "those cards") + " first.";
         }
-        String refused = FLOWS.remove(values, name).orElse(null);
+        String refused = FLOWS.remove(values, Member.of(name)).orElse(null);
         if (refused == null) relayout(services, layout -> moved(layout, name, null));
         return refused;
     }
@@ -244,13 +256,13 @@ public final class FlowValue {
      */
     public static String placeAbove(StudioServices services, String inner, String host) {
         PluginValues values = services.pluginValues();
-        if (!FLOWS.members(values).contains(host)) return null;
+        if (!flowNames(values).contains(host)) return null;
         List<String> order = new ArrayList<>();
         innermostFirst(FlowRefs.of(values), inner, order);
         for (String flow : order) {
-            List<String> members = FLOWS.members(values);
+            List<String> members = flowNames(values);
             if (members.indexOf(flow) < members.indexOf(host)) continue;
-            String refused = FLOWS.moveBefore(values, flow, host).orElse(null);
+            String refused = FLOWS.moveBefore(values, Member.of(flow), Member.of(host)).orElse(null);
             if (refused != null) return refused;
         }
         return null;
@@ -338,7 +350,7 @@ public final class FlowValue {
             target.value().get().set(written);
             return null;
         }
-        return FLOWS.add(services.pluginValues(), target.name(), written).orElse(null);
+        return FLOWS.add(services.pluginValues(), Member.of(target.name()), written).orElse(null);
     }
 
     /**
@@ -351,6 +363,6 @@ public final class FlowValue {
         if (target.problem() != null) return target.problem();
         Run run = target.run();
         if (Objects.equals(run.home(), home) && Objects.equals(run.setup(), setup)) return null;
-        return RUN.write(services, new Run(home, setup));
+        return RUN.write(services, new Run(home, setup)).orElse(null);
     }
 }

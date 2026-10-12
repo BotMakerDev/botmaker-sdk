@@ -6,7 +6,7 @@ launch, the emulator transport, OpenCV matching) lives in **shared**, where Stud
 - `internal/observe` — the observation stack and `IpcObserver`, the adapter from observer callbacks onto
   shared's telemetry wire (`shared.ipc.TelemetryClient`).
 - `internal/config/ProjectDefaults` — what a running bot was told from outside its code: the
-  `botmaker.launch.target` run property (set per machine through `Runs.setProperty`,
+  `botmaker.launch.target` run property (set per machine through `Runs.set`,
   `plugin/settings/LaunchTargetValue`) and the session half of its `BotSettings`. No file is read.
 - `internal/ocr/{OcrEngine,OcrNative,OcrPreprocessor}` — the Tesseract stack behind `api.vision.Text`.
   `OcrNative` extracts the bundled `tessdata` and delegates the OpenCV load to shared's

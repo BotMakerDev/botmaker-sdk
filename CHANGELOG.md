@@ -111,6 +111,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed (breaking)
 
+- **Built on contract 0.9.0**: the SDK plugin addresses its values by declaration and `Member`
+  (`ManagedSet`, `voidMethods()`), declares its flow's calls with `Held` parts and `builtFrom` instead of
+  `List<Object>` builders, and keeps its run properties (the recent launch targets, the launch target, the game
+  VM) as typed `RunProperty` constants. It needs a Studio hosting contract 0.9.0. The plugin parameters are
+  `Param.Visibility.PUBLIC`.
+
 - **A flow can run another flow as one card.** `Flow.subflow(DAILY)` is a card that walks `DAILY` to its end,
   under `DAILY`'s own limits and switches; `Flow.edge(Activities.Collect.NOTHING_LEFT, DAILY)` wires into it and
   `Flow.edge(DAILY, Activities.Claim.DONE, Activities.Rest.class)` out of it, on the outcome `DAILY` ended on.

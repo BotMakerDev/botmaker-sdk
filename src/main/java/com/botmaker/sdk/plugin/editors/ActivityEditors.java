@@ -125,9 +125,9 @@ public final class ActivityEditors {
      */
     public static Node flow(ValueContext ctx) {
         PluginValues values = ctx.services().pluginValues();
-        String id = FlowValue.FLOWS.value().id();
-        List<String> flows = FlowValue.FLOWS.members(values);
-        String current = ctx.member(id).orElseGet(() -> shown(ctx, values, flows));
+        List<String> flows = FlowValue.flowNames(values);
+        String current = FlowValue.FLOWS.picked(ctx).map(PluginValues.Member::name)
+                .orElseGet(() -> shown(ctx, values, flows));
         String prompt = flows.size() == 1 ? "Run " + flows.getFirst() : "Pick a flow";
         if (NO_FLOW.equals(current) && flows.size() == 1) current = "";
         Button button = Styles.on(new Button(), Styles.INSET_FIELD_FLAT);
@@ -156,7 +156,7 @@ public final class ActivityEditors {
                 if (row == null || row.getParent() != tree.getRoot()) return;
                 popup.hide();
                 String flow = row.getValue().flow();
-                Optional<String> refused = ctx.writeMember(id, flow);
+                Optional<String> refused = FlowValue.FLOWS.pick(ctx, PluginValues.Member.of(flow));
                 refused.ifPresent(ctx.services()::status);
                 if (refused.isEmpty()) show.accept(flow);
             });
@@ -183,7 +183,8 @@ public final class ActivityEditors {
         String referred = BotConstants.flowName(value.get());
         if (referred != null) return flows.contains(referred) ? referred : "";
         return flows.stream()
-                .filter(name -> FlowValue.FLOWS.read(values, name).filter(value.get()::equals).isPresent())
+                .filter(name -> FlowValue.FLOWS.read(values, PluginValues.Member.of(name))
+                        .filter(value.get()::equals).isPresent())
                 .findFirst().orElse("");
     }
 

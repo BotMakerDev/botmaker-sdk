@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.emulator.EmulatorName;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,21 +34,21 @@ class SdkEditorsTest {
         return SdkEditors.ALL.stream().anyMatch(editor -> editor.matches(ctx));
     }
 
-    private static boolean carries(Method call, int argIndex, Class<? extends Annotation> annotation) {
+    private static boolean carries(Executable call, int argIndex, Class<? extends Annotation> annotation) {
         return TestContexts.slot(call, argIndex, "x").slot().flatMap(SlotContext::parameter)
                 .map(parameter -> parameter.isAnnotationPresent(annotation)).orElse(false);
     }
 
     @Test
     void every_bounded_setting_has_its_label_and_range_in_the_hints() {
-        Method confidence = TestContexts.method(BotSettings.class, "confidence", double.class);
+        Executable confidence = TestContexts.call((Ref.Of2<BotSettings, Double, BotSettings>) BotSettings::confidence);
         SettingHints.Hint setting = SettingHints.of(confidence.getParameters()[0]);
 
         assertEquals("Match confidence", setting.label());
         assertEquals(1, setting.max());
         assertTrue(claimed(TestContexts.slot(confidence, 0, "0.8")));
-        assertTrue(claimed(TestContexts.slot(TestContexts.method(BotSettings.class, "debug", boolean.class), 0,
-                "true")));
+        assertTrue(claimed(TestContexts.slot(
+                TestContexts.call((Ref.Of2<BotSettings, Boolean, BotSettings>) BotSettings::debug), 0, "true")));
         // Every wither that takes one number or flag is in the table: a new one without a hint is a free-typed
         // number. One taking an enum needs none, its constants say what it can be.
         for (Method wither : BotSettings.class.getDeclaredMethods()) {
@@ -59,7 +61,7 @@ class SdkEditorsTest {
 
     @Test
     void emulator_names_are_claimed() {
-        assertTrue(carries(TestContexts.method(Emulators.class, "use", String.class), 0, EmulatorName.class));
+        assertTrue(carries(TestContexts.call((Ref.Of1<String, ?>) Emulators::use), 0, EmulatorName.class));
     }
 
     /** No call, or one the host could not resolve: nothing is claimed, rather than guessed at. */

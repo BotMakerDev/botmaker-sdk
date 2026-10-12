@@ -36,7 +36,7 @@ public final class CaptureTypes {
      */
     public static final DeclaredCall<CurrentSource> CURRENT = ComponentType.part(CurrentSource.class)
             .writtenAs(Source::current)
-            .build(parts -> parts.isEmpty() ? new CurrentSource() : null);
+            .builtAs(CurrentSource::new);
 
     /** {@code CaptureSource.desktop()}. */
     public static final DeclaredCall<Desktop> DESKTOP = ComponentType.part(Desktop.class)

@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
+import com.botmaker.plugin.api.value.Held;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
@@ -10,8 +11,6 @@ import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.internal.flow.BotConstants;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +60,39 @@ public final class FlowTypes {
 
     private FlowTypes() {}
 
+    /**
+     * The parts the host holds as something the factory does not take — an activity's class literal as its
+     * {@link Activity}, a method reference as its text — and the maps whose stray entries are dropped. Each is a
+     * constant, named where its call is declared and again where {@code builtFrom} reads it.
+     */
+    private static final class Parts {
+        static final Held<Flow, List<Flow.Step>> STEPS = Held.list(Flow.Step.class, Flow::steps);
+        static final Held<Flow, List<Flow.Edge>> EDGES = Held.list(Flow.Edge.class, Flow::edges);
+        static final Held<Flow, Activity> START = Held.as(Activity.class,
+                flow -> flow.start() instanceof Activity activity ? activity : null);
+        static final Held<Flow, Flow.Limits> LIMITS = Held.as(Flow.Limits.class, Flow::limits);
+
+        static final Held<Run, String> HOME = Held.as(String.class, run -> sourceOf(run.home()));
+        static final Held<Run, String> SETUP = Held.as(String.class, run -> sourceOf(run.setup()));
+
+        static final Held<Flow.Step, Activity> CARD = Held.as(Activity.class, Flow.Step::activity);
+        static final Held<Flow.Step, String> BODY = Held.as(String.class,
+                step -> bodyLiteral(sourceOf(step.body())));
+        static final Held<Flow.Step, Activity> OFF = Held.as(Activity.class, FlowTypes::offActivity);
+
+        static final Held<Flow.Edge, Flow> VIA = Held.as(Flow.class, Flow.Edge::via);
+        static final Held<Flow.Edge, Outcome> ON = Held.as(Outcome.class, Flow.Edge::on);
+        static final Held<Flow.Edge, Activity> TO = Held.as(Activity.class,
+                edge -> edge.to() instanceof Activity activity ? activity : null);
+
+        static final Held<FlowLayout, Map<String, FlowLayout.Cards>> FLOWS =
+                Held.map(String.class, FlowLayout.Cards.class, FlowLayout::flows);
+        /** Whether a flow goes home by default; one the host reads as no value is the default, on. */
+        static final Held<FlowLayout, Boolean> GO_HOME = Held.as(Boolean.class, FlowLayout::goHomeByDefault);
+        static final Held<FlowLayout.Cards, Map<String, FlowLayout.Spot>> SPOTS =
+                Held.map(String.class, FlowLayout.Spot.class, FlowLayout.Cards::spots);
+    }
+
     // ---- the leaves' codecs ----------------------------------------------------------------------------
 
     /** How "drawn, not written yet" is spelled in a file — fully qualified, as all of these are. */
@@ -89,9 +121,9 @@ public final class FlowTypes {
      */
     public static final DeclaredCall<Flow> FLOW_SHAPE = ComponentType.part(Flow.class)
             .<List<Flow.Step>, List<Flow.Edge>, Class<? extends Outcome>, Flow.Limits, Flow>writtenAs(Flow::of,
-                    Flow::steps, Flow::edges, flow -> null, Flow::limits)
-            .components(flow -> List.of(flow.steps(), flow.edges(), flow.start(), flow.limits()))
-            .build(FlowTypes::flow)
+                    Parts.STEPS.part(), Parts.EDGES.part(), Parts.START.part(), Parts.LIMITS.part())
+            .builtFrom(parts -> flow(parts.get(Parts.STEPS), parts.get(Parts.EDGES), parts.get(Parts.START),
+                    parts.get(Parts.LIMITS)))
             .constants(Flow.NONE)
             // A reference to a flow (BotConstants.flow) is written only as that constant; one naming no constant
             // left is no flow to spell out.
@@ -116,36 +148,19 @@ public final class FlowTypes {
         return flow == null || flow.steps().isEmpty() ? Flow.NONE : flow;
     }
 
-    private static Flow flow(List<Object> parts) {
-        if (parts.size() != 4 || !(parts.get(2) instanceof Activity start)
-                || !(parts.get(3) instanceof Flow.Limits limits)) {
-            return null;
-        }
-        List<Flow.Step> steps = all(parts.get(0), Flow.Step.class);
-        List<Flow.Edge> edges = all(parts.get(1), Flow.Edge.class);
-        if (steps == null || edges == null) return null;
-        return new Flow(steps, edges, start, limits);
+    private static Flow flow(List<Flow.Step> steps, List<Flow.Edge> edges, Activity start, Flow.Limits limits) {
+        return start == null || limits == null ? null : new Flow(steps, edges, start, limits);
     }
 
     /**
      * {@code Run.of()} and its {@code .home(…)} and {@code .setup(…)} links, each written only when the run has
-     * one.
+     * one. Each method crosses as the text it is written as, {@code Gamebot::goHome}.
      */
     public static final DeclaredCall<Run> RUN_SHAPE = ComponentType.part(Run.class)
             .writtenAs(Run::of)
-            .<Runnable>with(Run::home, run -> sourceOf(run.home()), FlowTypes::withHome)
-            .<Runnable>with(Run::setup, run -> sourceOf(run.setup()), FlowTypes::withSetup)
+            .<Runnable>with(Run::home, Parts.HOME.part(FlowTypes::method))
+            .<Runnable>with(Run::setup, Parts.SETUP.part(FlowTypes::method))
             .constants(Run.NONE);
-
-    private static Run withHome(Run run, Object part) {
-        if (!(part instanceof String source)) return null;
-        return run.home(method(source));
-    }
-
-    private static Run withSetup(Run run, Object part) {
-        if (!(part instanceof String source)) return null;
-        return run.setup(method(source));
-    }
 
     /**
      * {@code Flow.activity(Class, ActivityBody)} and its links: {@code .described(String)}, {@code .off()},
@@ -158,9 +173,9 @@ public final class FlowTypes {
      * written as {@code ActivityBody.none()}.
      */
     public static final DeclaredCall<Flow.Step> STEP_SHAPE = cardLinks(ComponentType.part(Flow.Step.class)
-            .<Class<Outcome>, ActivityBody<Outcome>, Flow.Step>writtenAs(Flow::activity, step -> null, step -> null)
-            .components(value -> List.of(value.activity(), bodyLiteral(sourceOf(value.body()))))
-            .build(FlowTypes::step))
+            .<Class<Outcome>, ActivityBody<Outcome>, Flow.Step>writtenAs(Flow::activity, Parts.CARD.part(),
+                    Parts.BODY.part())
+            .builtFrom(parts -> card(parts.get(Parts.CARD), parts.get(Parts.BODY))))
             .when(step -> step.node() instanceof Activity);
 
     /**
@@ -182,7 +197,7 @@ public final class FlowTypes {
                 .flag(Flow.Step::goesHome, Flow.Step::goHome)
                 .flag(Flow.Step::checksPopups, Flow.Step::popupCheck)
                 .flag(Flow.Step::switchable, Flow.Step::runnerSwitch)
-                .<Class<? extends Outcome>>with(Flow.Step::whenOff, FlowTypes::offActivity, FlowTypes::withOff)
+                .<Class<? extends Outcome>, Activity>with(Flow.Step::whenOff, Parts.OFF, FlowTypes::whenOff)
                 .<Flow>with(Flow.Step::whenOff, step -> innerOf(step.whenOff()));
     }
 
@@ -191,17 +206,10 @@ public final class FlowTypes {
         return step.whenOff() instanceof Activity activity ? activity : Activity.NONE;
     }
 
-    private static Flow.Step step(List<Object> parts) {
-        if (parts.size() != 2 || !(parts.get(0) instanceof Activity activity) || activity.isNone()
-                || !(parts.get(1) instanceof String body)) {
-            return null;
-        }
+    /** The card for {@code activity} running {@code body} as written, or null for no activity or body. */
+    private static Flow.Step card(Activity activity, String body) {
+        if (activity == null || activity.isNone() || body == null) return null;
         return step(activity, new Named(bodyOf(body)));
-    }
-
-    private static Flow.Step withOff(Flow.Step step, Object part) {
-        if (!(part instanceof Activity to)) return null;
-        return whenOff(step, to);
     }
 
     /** {@code step} going on to {@code to} when switched off: {@code .whenOff(…)} for an activity held by name. */
@@ -212,16 +220,14 @@ public final class FlowTypes {
 
     /** {@code Flow.edge(Outcome, Class)}: the activity it leaves is the outcome's. */
     public static final DeclaredCall<Flow.Edge> EDGE_SHAPE = ComponentType.part(Flow.Edge.class)
-            .<Outcome, Class<? extends Outcome>, Flow.Edge>writtenAs(Flow::edge, Flow.Edge::on, edge -> null)
-            .components(edge -> List.of(edge.on(), edge.to()))
-            .build(FlowTypes::edge)
+            .<Outcome, Class<? extends Outcome>, Flow.Edge>writtenAs(Flow::edge, Parts.ON.part(), Parts.TO.part())
+            .builtFrom(parts -> edge(null, parts.get(Parts.ON), parts.get(Parts.TO)))
             .when(edge -> edge.via() == null && edge.to() instanceof Activity);
 
-    private static Flow.Edge edge(List<Object> parts) {
-        if (parts.size() != 2 || !(parts.get(0) instanceof Outcome on) || !(parts.get(1) instanceof Activity to)) {
-            return null;
-        }
-        return new Flow.Edge(on, to);
+    /** The wire from {@code via}'s card, or an activity's for null, on {@code on} to {@code to}; null for none. */
+    private static Flow.Edge edge(Flow via, Outcome on, Activity to) {
+        if (on == null || to == null) return null;
+        return via == null ? new Flow.Edge(on, to) : new Flow.Edge(via, on, to);
     }
 
     /** {@code Flow.edge(Outcome, Flow)}: a wire from an activity into a sub-flow card. */
@@ -234,19 +240,11 @@ public final class FlowTypes {
      * to an activity.
      */
     public static final DeclaredCall<Flow.Edge> EDGE_OUT_OF_SUBFLOW_SHAPE = ComponentType.part(Flow.Edge.class)
-            .<Flow, Outcome, Class<? extends Outcome>, Flow.Edge>writtenAs(Flow::edge, Flow.Edge::via,
-                    Flow.Edge::on, edge -> null)
-            .components(edge -> List.of(edge.via(), edge.on(), edge.to()))
-            .build(FlowTypes::edgeOut)
+            .<Flow, Outcome, Class<? extends Outcome>, Flow.Edge>writtenAs(Flow::edge, Parts.VIA.part(),
+                    Parts.ON.part(), Parts.TO.part())
+            .builtFrom(parts -> parts.get(Parts.VIA) == null ? null
+                    : edge(parts.get(Parts.VIA), parts.get(Parts.ON), parts.get(Parts.TO)))
             .when(edge -> edge.via() != null && edge.to() instanceof Activity);
-
-    private static Flow.Edge edgeOut(List<Object> parts) {
-        if (parts.size() != 3 || !(parts.get(0) instanceof Flow via) || !(parts.get(1) instanceof Outcome on)
-                || !(parts.get(2) instanceof Activity to)) {
-            return null;
-        }
-        return new Flow.Edge(via, on, to);
-    }
 
     /** {@code Flow.edge(Flow via, Outcome, Flow)}: a wire from one sub-flow card to another. */
     public static final DeclaredCall<Flow.Edge> EDGE_BETWEEN_SUBFLOWS_SHAPE = ComponentType.part(Flow.Edge.class)
@@ -264,38 +262,12 @@ public final class FlowTypes {
      * {@link #CARDS_SHAPE}s. A bot nobody has laid out is written {@code FlowLayout.NONE}.
      */
     public static final DeclaredCall<FlowLayout> LAYOUT_SHAPE = ComponentType.part(FlowLayout.class)
-            .writtenAs(FlowLayout::of, FlowLayout::flows, FlowLayout::goHomeByDefault)
-            .build(FlowTypes::layout)
+            .writtenAs(FlowLayout::of, Parts.FLOWS.part(), Parts.GO_HOME.part(on -> on == null || on))
             .constants(FlowLayout.NONE);
-
-    /** The layout back, keeping every entry that is a name and cards: a stray entry costs one flow, not all. */
-    private static FlowLayout layout(List<Object> parts) {
-        if (parts.size() != 2) return null;
-        Map<String, FlowLayout.Cards> flows = new LinkedHashMap<>();
-        if (parts.get(0) instanceof Map<?, ?> map) {
-            map.forEach((name, cards) -> {
-                if (name instanceof String n && cards instanceof FlowLayout.Cards c) flows.put(n, c);
-            });
-        }
-        return FlowLayout.of(flows, !(parts.get(1) instanceof Boolean b) || b);
-    }
 
     /** {@code FlowLayout.cards(Map<String, Spot>)}: one flow's cards, each a {@link #SPOT_SHAPE}. */
     public static final DeclaredCall<FlowLayout.Cards> CARDS_SHAPE = ComponentType.part(FlowLayout.Cards.class)
-            .writtenAs(FlowLayout::cards, FlowLayout.Cards::spots)
-            .build(FlowTypes::cards);
-
-    /** One flow's cards back, keeping every entry that is a name and a spot: a stray one costs one card. */
-    private static FlowLayout.Cards cards(List<Object> parts) {
-        if (parts.size() != 1) return null;
-        Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
-        if (parts.getFirst() instanceof Map<?, ?> map) {
-            map.forEach((name, spot) -> {
-                if (name instanceof String n && spot instanceof FlowLayout.Spot s) spots.put(n, s);
-            });
-        }
-        return FlowLayout.cards(spots);
-    }
+            .writtenAs(FlowLayout::cards, Parts.SPOTS.part());
 
     /** {@code FlowLayout.at(int, int)}. */
     public static final DeclaredCall<FlowLayout.Spot> SPOT_SHAPE = ComponentType.part(FlowLayout.Spot.class)
@@ -309,16 +281,6 @@ public final class FlowTypes {
             SUBFLOW_STEP_SHAPE, EDGE_SHAPE, EDGE_INTO_SUBFLOW_SHAPE, EDGE_OUT_OF_SUBFLOW_SHAPE,
             EDGE_BETWEEN_SUBFLOWS_SHAPE, LIMITS_SHAPE, RUN_SHAPE, LAYOUT_SHAPE, CARDS_SHAPE, SPOT_SHAPE);
 
-    /** Every element of {@code list} as a {@code type}, or {@code null} when one is not. */
-    private static <E> List<E> all(Object list, Class<E> type) {
-        if (!(list instanceof List<?> given)) return null;
-        List<E> out = new ArrayList<>(given.size());
-        for (Object element : given) {
-            if (!type.isInstance(element)) return null;
-            out.add(type.cast(element));
-        }
-        return out;
-    }
 
     // ---- what an editor builds a flow with -------------------------------------------------------------
 

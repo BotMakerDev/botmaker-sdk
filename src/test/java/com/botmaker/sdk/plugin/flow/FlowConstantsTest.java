@@ -1,7 +1,7 @@
 package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.sdk.plugin.SpelledValues;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.types.FlowTypes;
@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FlowConstantsTest {
 
     /** A project's {@code Activities} class, held as enum → constants, recording each change asked of it. */
-    private static final class Project implements PluginValues {
+    private static final class Project extends SpelledValues {
         final Map<String, List<String>> enums = new LinkedHashMap<>();
         final List<String> asked = new ArrayList<>();
         /** Members a remove is refused for: code still uses them. */

@@ -81,6 +81,8 @@ public final class CaptureValue {
                 ? CaptureSource.region(base, new Rect(region.x, region.y, region.width, region.height))
                 : base;
         // A pick is the user asking for a source to be kept, so a project with no Sdk.java gets one first.
-        CAPTURE.write(services, value);
+        CAPTURE.write(services, value).ifPresent(refused -> {
+            if (services != null) services.status(refused);
+        });
     }
 }

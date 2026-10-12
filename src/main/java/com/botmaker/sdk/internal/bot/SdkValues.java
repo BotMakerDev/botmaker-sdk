@@ -160,7 +160,7 @@ public final class SdkValues {
     public static final ManagedValue<Flow> FLOW = ManagedValue.param(SdkValue.Id.FLOW)
             .in(HOLDER)
             .startsAs(SdkValues::noFlow)
-            .shown(RUN_CATEGORY, "Which flow the bot runs", Param.PUBLIC)
+            .shown(RUN_CATEGORY, "Which flow the bot runs", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
 
     /** Whether a run sets the game up first — {@code public static boolean doSetup}. */
@@ -168,14 +168,14 @@ public final class SdkValues {
             .in(HOLDER)
             .startsAs(SdkValues::setUpFirst)
             .shown(RUN_CATEGORY, "Set the game up first: tick it on a new computer or after changing a game"
-                    + " setting", Param.PUBLIC)
+                    + " setting", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
 
     /** The activities a run switches off — {@code public static Set<Class<? extends Outcome>> skip}. */
     public static final ManagedValue<Set<Class<? extends Outcome>>> SKIP = ManagedValue.param(SdkValue.Id.SKIP)
             .in(HOLDER)
             .startsAs(SdkValues::skipNothing)
-            .shown(RUN_CATEGORY, "Activities this run skips", Param.PUBLIC)
+            .shown(RUN_CATEGORY, "Activities this run skips", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
 
     /** All fourteen, in the order the plugin declares them. */

@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.Theme;
 import com.botmaker.plugin.api.record.RecordedValue;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.sdk.plugin.SpelledValues;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import org.junit.jupiter.api.Test;
@@ -63,7 +64,7 @@ class PictureAtTest {
         return image;
     }
 
-    private static final class Values implements PluginValues {
+    private static final class Values extends SpelledValues {
         final List<String> added = new ArrayList<>();
 
         @Override public List<String> ids() { return List.of(); }

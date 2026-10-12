@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.sdk.plugin.SpelledValues;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.Test;
@@ -117,7 +118,7 @@ class TemplateUsesTest {
     }
 
     /** A host holding one open set, answering from maps and writing down what it was asked to do. */
-    private static final class Host implements PluginValues {
+    private static final class Host extends SpelledValues {
         final List<String> members = new ArrayList<>();
         final Map<String, List<Use>> uses = new LinkedHashMap<>();
         final List<String> calls = new ArrayList<>();

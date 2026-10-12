@@ -11,6 +11,8 @@ import com.botmaker.plugin.api.overlay.Marks;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.run.RunProperty;
+import com.botmaker.sdk.plugin.SpelledValues;
 import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.bot.BotSettings;
@@ -716,7 +718,7 @@ class SdkAssistTest {
      * A project: its resources folder, its run properties, and its values — each method-shaped value one
      * recording context, each open set a map of constants — writing down every change it was asked for.
      */
-    private static final class Host implements StudioServices, PluginValues {
+    private static final class Host extends SpelledValues implements StudioServices {
         final Path resources;
         final Map<String, TestContexts.Recording> values = new HashMap<>();
         final Map<String, Map<String, TestContexts.Recording>> sets = new HashMap<>();
@@ -755,14 +757,15 @@ class SdkAssistTest {
                 @Override public AutoCloseable onTelemetry(java.util.function.Consumer<byte[]> l) { return () -> { }; }
 
                 @Override
-                public String property(String name) {
-                    return properties.get(name);
+                public <T> Optional<T> get(RunProperty<T> property) {
+                    return property.read(properties.get(property.name()));
                 }
 
                 @Override
-                public void setProperty(String name, String value) {
-                    if (value == null || value.isBlank()) properties.remove(name);
-                    else properties.put(name, value);
+                public <T> void set(RunProperty<T> property, T value) {
+                    String text = property.write(value);
+                    if (text == null || text.isBlank()) properties.remove(property.name());
+                    else properties.put(property.name(), text);
                 }
             };
         }

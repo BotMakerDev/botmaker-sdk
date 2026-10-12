@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -63,7 +64,7 @@ public final class TemplateUses {
 
     /** Every use of the template called {@code baseName}'s constant; empty when it has none. */
     public static Scan find(PluginValues values, String baseName) {
-        String constant = declared(values, baseName);
+        Member constant = declared(values, baseName);
         return new Scan(baseName, constant == null ? List.of() : List.copyOf(SET.uses(values, constant)));
     }
 
@@ -74,7 +75,7 @@ public final class TemplateUses {
      * @return empty when it is declared now or cannot be; else the host's sentence
      */
     public static Optional<String> declare(PluginValues values, String baseName) {
-        String constant = TemplateNames.constantFor(baseName);
+        Member constant = constantFor(baseName);
         if (constant == null || SET.contains(values, constant)) return Optional.empty();
         return SET.add(values, constant, picture(baseName));
     }
@@ -88,7 +89,7 @@ public final class TemplateUses {
      */
     public static Optional<String> cut(StudioServices services, String baseName, FrameCut cut) {
         PluginValues values = services.pluginValues();
-        String constant = TemplateNames.constantFor(baseName);
+        Member constant = constantFor(baseName);
         if (constant == null) return Optional.empty();
         try {
             if (!SET.contains(values, constant)) {
@@ -115,12 +116,12 @@ public final class TemplateUses {
      * @return empty when done; else why nothing was renamed
      */
     public static Optional<String> rename(PluginValues values, String oldName, String newName) {
-        String from = declared(values, oldName);
+        Member from = declared(values, oldName);
         if (from == null) return declare(values, newName);
-        String to = TemplateNames.constantFor(newName);
+        Member to = constantFor(newName);
         if (to == null) return Optional.of("\"" + newName + "\" cannot be a constant's name, so "
                 + TemplateNames.CLASS_NAME + "." + from + " cannot follow it.");
-        Optional<String> refused = SET.rename(values, from, to);
+        Optional<String> refused = SET.rename(values, from, to.name());
         if (refused.isPresent()) return refused;
         return SET.open(values, to).map(value -> {
             // Where it was cut stays: the same picture under a new name.
@@ -138,11 +139,11 @@ public final class TemplateUses {
      * marked with {@link #repointNote}. Empty when there was nothing to point.
      */
     public static Optional<String> repoint(PluginValues values, String oldName, String replacement) {
-        String from = declared(values, oldName);
+        Member from = declared(values, oldName);
         if (from == null || SET.uses(values, from).isEmpty()) return Optional.empty();
         Optional<String> undeclared = declare(values, replacement);
         if (undeclared.isPresent()) return undeclared;
-        String to = TemplateNames.constantFor(replacement);
+        Member to = constantFor(replacement);
         if (to == null) return Optional.of("\"" + replacement + "\" has no constant to point "
                 + TemplateNames.CLASS_NAME + "." + from + "'s uses at.");
         return SET.repoint(values, from, to, repointNote(oldName, replacement));
@@ -153,7 +154,7 @@ public final class TemplateUses {
      * when it has none.
      */
     public static Optional<String> forget(PluginValues values, String baseName) {
-        String constant = declared(values, baseName);
+        Member constant = declared(values, baseName);
         return constant == null ? Optional.empty() : SET.remove(values, constant);
     }
 
@@ -167,8 +168,8 @@ public final class TemplateUses {
      */
     public static List<String> missing(PluginValues values, Path resourcesDir) {
         Set<String> gone = new TreeSet<>(TemplateLibrary.missingTemplates(resourcesDir));
-        for (String member : SET.members(values)) {
-            String baseName = TemplateNames.baseNameFor(member);
+        for (Member member : SET.members(values)) {
+            String baseName = TemplateNames.baseNameFor(member.name());
             if (baseName == null || TemplateLibrary.exists(resourcesDir, baseName)) continue;
             String path = SET.read(values, member)
                     .map(ImageTemplate::filePath)
@@ -191,9 +192,15 @@ public final class TemplateUses {
     }
 
     /** {@code baseName}'s constant when the open set declares it, else null. */
-    private static String declared(PluginValues values, String baseName) {
-        String constant = TemplateNames.constantFor(baseName);
+    private static Member declared(PluginValues values, String baseName) {
+        Member constant = constantFor(baseName);
         return constant != null && SET.contains(values, constant) ? constant : null;
+    }
+
+    /** The {@code Pictures} constant {@code baseName} is declared as, or null when it can have none. */
+    private static Member constantFor(String baseName) {
+        String constant = TemplateNames.constantFor(baseName);
+        return constant == null ? null : Member.of(constant);
     }
 
     private static ImageTemplate picture(String baseName) {

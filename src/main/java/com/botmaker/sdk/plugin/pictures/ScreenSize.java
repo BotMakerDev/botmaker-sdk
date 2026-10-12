@@ -59,7 +59,7 @@ public final class ScreenSize {
         // A screen() written by hand, which the grammar cannot read, is the user's: never overwritten.
         if (handWritten(services)) return Optional.empty();
         try {
-            return SCREEN.write(services, frame) == null ? Optional.of(frame) : Optional.empty();
+            return SCREEN.write(services, frame).isEmpty() ? Optional.of(frame) : Optional.empty();
         } catch (RuntimeException refused) {
             return Optional.empty();
         }
