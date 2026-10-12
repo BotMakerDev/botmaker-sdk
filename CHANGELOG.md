@@ -133,6 +133,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **Auto-arrange and Recenter show every card and wire.** A wire that skips columns passes between their cards,
+  a wire back to an earlier activity (or onto its own card) goes around the cards instead of through them, and
+  wires meeting at one card arrive a few pixels apart. Cards follow the order of the ports wired to them, so
+  fewer wires cross. The canvas grows to hold a long flow, and Recenter zooms out until everything fits; a flow
+  too big even then is centred on its start card.
 - **The flow parameter picks a flow by its name.** `Sdk.flow`'s list writes the flow picked (`Flows.EZF`), even
   when it is still empty or a fresh duplicate equal to another. `Flow.NONE` shows as *(no flow)*, and a bot with
   a single flow and none picked is prompted *Run EZF*.

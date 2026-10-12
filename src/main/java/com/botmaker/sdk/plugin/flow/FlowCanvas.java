@@ -13,8 +13,7 @@ import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.Node;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.WritableImage;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ContextMenu;
@@ -26,21 +25,26 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.ImagePattern;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.CubicCurve;
+import javafx.scene.shape.CubicCurveTo;
+import javafx.scene.shape.LineTo;
+import javafx.scene.shape.MoveTo;
+import javafx.scene.shape.Path;
 import javafx.scene.shape.Polygon;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.transform.Scale;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -80,8 +84,8 @@ public final class FlowCanvas extends StackPane {
     private static final double CARD_WIDTH = 180;
     private static final double PORT_RADIUS = 6;
     private static final double GRID_STEP = 24;
-    private static final double CANVAS_W = 3000;
-    private static final double CANVAS_H = 2000;
+    /** How much the canvas grows at a time when a card or wire passes its edge. */
+    private static final double GROW_STEP = 500;
     private static final double MIN_ZOOM = 0.4;
     private static final double MAX_ZOOM = 2.0;
     private static final double ARROW_LENGTH = 11;
@@ -93,13 +97,17 @@ public final class FlowCanvas extends StackPane {
     /** The grid dot colour used before CSS has been applied — the light theme's, and never seen for long. */
     private static final Color GRID_FALLBACK = Color.web("#d8d8d8");
 
-    /** Auto-arrange spacing: the pitch between layers, the gap between stacked cards, and the orphan row gap. */
-    private static final double ARRANGE_X = 300;
-    private static final double ARRANGE_GAP = 40;
     private static final double CARD_HEIGHT_FALLBACK = 80;
 
-    private static final double MINIMAP_W = 190;
-    private static final double MINIMAP_H = MINIMAP_W * CANVAS_H / CANVAS_W;
+    /** The minimap's longer side; the other follows the canvas's shape. */
+    private static final double MINIMAP_MAX = 190;
+
+    /**
+     * The canvas's size. It starts at {@link FlowArrange#MIN_W}×{@link FlowArrange#MIN_H}, Auto-arrange sets it to
+     * hold the arranged block, and a card dragged or loaded past its edge grows it.
+     */
+    private double canvasW = FlowArrange.MIN_W;
+    private double canvasH = FlowArrange.MIN_H;
 
     private final Pane content = new Pane();
     private final Group wires = new Group();
@@ -130,11 +138,13 @@ public final class FlowCanvas extends StackPane {
     private Consumer<Point2D> onCanvasDoubleClick = p -> {};
 
     /**
-     * The dot grid, and the one surface on this canvas CSS cannot paint: a {@link GraphicsContext} takes a
-     * {@link Color} and has never heard of a stylesheet. So {@code gridInk} — zero-sized, unmanaged, never
-     * drawn — carries the {@code .flow-grid-ink} class, and {@link #paintGrid()} reads the colour back off it.
+     * The dot grid, and the one surface on this canvas CSS cannot paint: a pattern tile takes a {@link Color} and
+     * has never heard of a stylesheet. So {@code gridInk} — zero-sized, unmanaged, never drawn — carries the
+     * {@code .flow-grid-ink} class, and {@link #paintGrid()} reads the colour back off it. The grid is one
+     * {@link #GRID_STEP}-sized tile repeated, so a canvas that grows costs no larger texture: a whole-canvas
+     * {@code Canvas} took 24 MB at 3000×2000, and would take hundreds once the canvas grew (2026-10-12).
      */
-    private final Canvas grid = new Canvas(CANVAS_W, CANVAS_H);
+    private final Region grid = new Region();
     private final Region gridInk = new Region();
 
     /**
@@ -165,14 +175,19 @@ public final class FlowCanvas extends StackPane {
     private double panStartH;
     private double panStartV;
 
+    /** True while a {@link #redrawSoon()} is queued. */
+    private boolean redrawPending;
+
     /** The activity the run begins at; blank until one is chosen (then the first placed card is used). */
     private String start = "";
 
     public FlowCanvas() {
-        content.setPrefSize(CANVAS_W, CANVAS_H);
+        content.setPrefSize(canvasW, canvasH);
         content.getStyleClass().add("flow-canvas-content");
         content.getTransforms().add(zoom);
         grid.setMouseTransparent(true);
+        grid.setManaged(false);
+        grid.resize(canvasW, canvasH);
         gridInk.getStyleClass().add("flow-grid-ink");
         gridInk.setManaged(false);
         gridInk.setMouseTransparent(true);
@@ -226,14 +241,35 @@ public final class FlowCanvas extends StackPane {
      * theme rather than once ever, in whatever colour {@code .flow-grid-ink} resolves to now.
      */
     private void paintGrid() {
-        GraphicsContext g = grid.getGraphicsContext2D();
-        g.clearRect(0, 0, CANVAS_W, CANVAS_H);
-        g.setFill(gridInk());
-        for (double x = 0; x < CANVAS_W; x += GRID_STEP) {
-            for (double y = 0; y < CANVAS_H; y += GRID_STEP) {
-                g.fillRect(x, y, 1, 1);
-            }
-        }
+        int step = (int) GRID_STEP;
+        WritableImage tile = new WritableImage(step, step);
+        tile.getPixelWriter().setColor(0, 0, gridInk());
+        grid.setBackground(new Background(new BackgroundFill(
+                new ImagePattern(tile, 0, 0, step, step, false), null, null)));
+    }
+
+    /** Makes the canvas {@code width}×{@code height}, never below the minimum. */
+    private void resizeCanvas(double width, double height) {
+        double w = Math.max(FlowArrange.MIN_W, Math.ceil(width));
+        double h = Math.max(FlowArrange.MIN_H, Math.ceil(height));
+        if (w == canvasW && h == canvasH) return;
+        canvasW = w;
+        canvasH = h;
+        content.setPrefSize(w, h);
+        grid.resize(w, h);
+    }
+
+    /**
+     * Grows the canvas so {@code box} has {@link FlowArrange#MARGIN} to spare right and below, in steps of
+     * {@link #GROW_STEP} so a drag past the edge does not resize on every pixel.
+     */
+    private void growToHold(FlowArrange.Rect box) {
+        if (box == null) return;
+        double needW = box.maxX() + FlowArrange.MARGIN;
+        double needH = box.maxY() + FlowArrange.MARGIN;
+        if (needW <= canvasW && needH <= canvasH) return;
+        resizeCanvas(Math.max(canvasW, Math.ceil(needW / GROW_STEP) * GROW_STEP),
+                Math.max(canvasH, Math.ceil(needH / GROW_STEP) * GROW_STEP));
     }
 
     /** What the stylesheet says a grid dot is, or {@link #GRID_FALLBACK} before there is a stylesheet to ask. */
@@ -395,9 +431,10 @@ public final class FlowCanvas extends StackPane {
     public Point2D nextFreeSpot() {
         double x = 60;
         double y = 40 + drafts.size() * 110.0;
-        if (y > CANVAS_H - 120) { // wrap into a new column rather than run off the bottom
-            x += 260 * (int) (y / (CANVAS_H - 120));
-            y = 40 + (y % (CANVAS_H - 120));
+        double height = FlowArrange.MIN_H;
+        if (y > height - 120) { // wrap into a new column rather than run off the bottom
+            x += 260 * (int) (y / (height - 120));
+            y = 40 + (y % (height - 120));
         }
         return new Point2D(x, y);
     }
@@ -498,33 +535,45 @@ public final class FlowCanvas extends StackPane {
     }
 
     /**
-     * Puts the cards back in the middle of the viewport at 1:1 zoom — the way out of "I panned into empty
-     * canvas and lost everything". The canvas is 3000×2000, so this is easy to do and impossible to undo by
-     * dragging.
+     * Shows every card and every wire: the zoom that fits them all into the viewport, never above 1:1, centred on
+     * them — the way out of "I panned into empty canvas and lost everything". A flow too big to fit at
+     * {@link #MIN_ZOOM} centres on the start card instead and says so. Until 2026-10-12 this reset the zoom to 1:1
+     * and framed the cards only, so a large flow was cut off and a loop's wire could sit outside the view.
      *
      * <p>A {@code ScrollPane}'s h/v value is a fraction of the <em>scrollable extent</em> (content minus
      * viewport), not of the content, and the content is scaled by the zoom. Getting either wrong lands the
      * view somewhere plausible-looking but never actually centred, which is what this used to do.
      */
     public void recenter() {
-        zoom.setX(1);
-        zoom.setY(1);
         // The viewport is only known after a layout pass; without this the first recenter divides by zero.
         Platform.runLater(() -> {
             Bounds view = scroller.getViewportBounds();
             if (cards.isEmpty() || view.getWidth() <= 0) {
+                setZoom(1);
                 scroller.setHvalue(0);
                 scroller.setVvalue(0);
                 drawMinimap();
                 return;
             }
-            Bounds box = cardsBoundingBox();
-            scroller.setHvalue(scrollFraction(box.getCenterX() * zoom.getX(), view.getWidth(),
-                    CANVAS_W * zoom.getX()));
-            scroller.setVvalue(scrollFraction(box.getCenterY() * zoom.getY(), view.getHeight(),
-                    CANVAS_H * zoom.getY()));
+            List<FlowArrange.Card> now = layoutCards();
+            FlowArrange.Rect box = FlowArrange.extent(now, FlowArrange.routes(now, edges));
+            double fit = FlowArrange.fitZoom(box, view.getWidth(), view.getHeight());
+            setZoom(Math.max(MIN_ZOOM, fit));
+            Point2D centre = new Point2D(box.centre().x(), box.centre().y());
+            NodeCard first = cards.get(resolvedStart());
+            if (fit < MIN_ZOOM && first != null) {
+                centre = new Point2D(first.getLayoutX() + widthOf(first) / 2, first.getLayoutY() + heightOf(first) / 2);
+                onMessage.accept("Too big to fit: use the minimap to move around.");
+            }
+            scroller.setHvalue(scrollFraction(centre.getX() * zoom.getX(), view.getWidth(), canvasW * zoom.getX()));
+            scroller.setVvalue(scrollFraction(centre.getY() * zoom.getY(), view.getHeight(), canvasH * zoom.getY()));
             drawMinimap();
         });
+    }
+
+    private void setZoom(double factor) {
+        zoom.setX(factor);
+        zoom.setY(factor);
     }
 
     /** The h/v value that centres {@code center} in a viewport of {@code viewLength} over {@code contentLength}. */
@@ -534,20 +583,17 @@ public final class FlowCanvas extends StackPane {
         return Math.clamp((center - viewLength / 2) / scrollable, 0, 1);
     }
 
-    /** The box the cards occupy, in unscaled canvas coordinates. Empty when there are none. */
-    private Bounds cardsBoundingBox() {
-        double minX = Double.MAX_VALUE;
-        double minY = Double.MAX_VALUE;
-        double maxX = 0;
-        double maxY = 0;
-        for (NodeCard c : cards.values()) {
-            minX = Math.min(minX, c.getLayoutX());
-            minY = Math.min(minY, c.getLayoutY());
-            maxX = Math.max(maxX, c.getLayoutX() + c.getWidth());
-            maxY = Math.max(maxY, c.getLayoutY() + heightOf(c));
+    /**
+     * Every card as {@link FlowArrange} sees it — where it is, its size, and where each outcome port sits — in the
+     * drafts' order, the one a blank start falls back on; the {@code cards} map reorders on a rename.
+     */
+    private List<FlowArrange.Card> layoutCards() {
+        List<FlowArrange.Card> out = new ArrayList<>(drafts.size());
+        for (ActivityDraft draft : drafts) {
+            NodeCard card = cards.get(draft.name());
+            if (card != null) out.add(card.asLayout());
         }
-        if (cards.isEmpty()) return new javafx.geometry.BoundingBox(0, 0, 0, 0);
-        return new javafx.geometry.BoundingBox(minX, minY, maxX - minX, maxY - minY);
+        return out;
     }
 
     private static double heightOf(NodeCard card) {
@@ -555,190 +601,37 @@ public final class FlowCanvas extends StackPane {
         return height > 0 ? height : CARD_HEIGHT_FALLBACK;
     }
 
+    private static double widthOf(NodeCard card) {
+        double width = Math.max(card.getWidth(), card.prefWidth(-1));
+        return width > 0 ? width : CARD_WIDTH;
+    }
+
     // --- auto-arrange ---
 
     /**
-     * Lays the cards out in layers, left to right: a card's column is the <em>longest</em> path from the
-     * start to it, cards sharing a column stack down it, and the whole block is centred on the canvas.
-     * Orphans go in a row of their own beneath everything.
-     *
-     * <p>Three things make the arrows readable, and all three were wrong before:
-     * <ul>
-     *   <li><b>Longest path, not breadth-first depth.</b> With shortest-path layers a card can land to the
-     *       left of one of its own predecessors, so a perfectly ordinary forward wire is drawn backwards.</li>
-     *   <li><b>Back-edges are excluded from the layering</b> (found by a depth-first walk). A loop back to an
-     *       earlier activity should be the <em>only</em> right-to-left arrow in the picture.</li>
-     *   <li><b>Cards are stacked by their real heights</b> and ordered within a column by the average
-     *       position of what points at them (the standard barycenter heuristic), so branches don't cross for
-     *       no reason and a card with six outcome ports doesn't overlap the one below it.</li>
-     * </ul>
+     * Lays the cards out in layers, left to right, with anything unreachable on a grid below, on a canvas sized to
+     * hold them, then shows them all ({@link #recenter()}). {@link FlowArrange} decides where each card goes; it
+     * reads only the cards' sizes and the wiring, so a second click moves nothing.
      */
     public void autoArrange() {
         history.mutate("auto-arrange", this::arrangeNow);
     }
 
     private void arrangeNow() {
-        // Nothing wired yet: there are no layers to compute, so lay every card out as a uniform grid. Doing
-        // this rather than the layer walk (which would place only the start card and leave the rest where they
-        // were) is what makes a repeated click idempotent — otherwise centreOnCanvas translates the un-placed
-        // cards by an ever-growing delta and they drift further apart on every click.
-        if (edges.isEmpty()) {
-            gridCards(placedNames(), 0);
-            centreOnCanvas();
-            refresh();
-            recenter();
-            return;
-        }
-
-        List<String> reachable = chain();
-        Map<String, Integer> layers = longestPathLayers(reachable);
-
-        Map<Integer, List<String>> byLayer = new LinkedHashMap<>();
-        for (String name : reachable) {
-            byLayer.computeIfAbsent(layers.getOrDefault(name, 0), k -> new ArrayList<>()).add(name);
-        }
-
-        Map<String, Integer> rowOf = new HashMap<>();
-        double bottom = 0;
-        for (int layer = 0; layer <= maxLayer(byLayer); layer++) {
-            List<String> column = byLayer.getOrDefault(layer, List.of());
-            column.sort((a, b) -> Double.compare(barycenter(a, rowOf), barycenter(b, rowOf)));
-            double y = 0;
-            for (int row = 0; row < column.size(); row++) {
-                NodeCard card = cards.get(column.get(row));
-                rowOf.put(column.get(row), row);
-                placeAt(card, layer * ARRANGE_X, y);
-                y += heightOf(card) + ARRANGE_GAP;
-            }
-            bottom = Math.max(bottom, y);
-        }
-
-        // Every placed card the layer walk didn't position — real orphans plus anything unreachable — is laid
-        // out on a fresh grid below the arranged block. Giving them fresh positions (rather than leaving them
-        // where they were) is what stops centreOnCanvas from feeding stale coordinates back in and drifting
-        // them on each click.
-        Set<String> arranged = new HashSet<>(reachable);
-        List<String> leftovers = new ArrayList<>();
-        for (String name : placedNames()) {
-            if (!arranged.contains(name)) leftovers.add(name);
-        }
-        gridCards(leftovers, bottom + ARRANGE_GAP);
-
-        centreOnCanvas();
+        FlowArrange.Layout layout = FlowArrange.arrange(layoutCards(), edges, start);
+        resizeCanvas(layout.width(), layout.height());
+        layout.at().forEach((name, at) -> {
+            NodeCard card = cards.get(name);
+            if (card != null) placeAt(card, at.x(), at.y());
+        });
         refresh();
         recenter();
     }
 
-    /** Lays {@code names} out as a squarish grid whose top edge sits at {@code top}, in placement order. */
-    private void gridCards(List<String> names, double top) {
-        if (names.isEmpty()) return;
-        int columns = (int) Math.ceil(Math.sqrt(names.size()));
-        double y = top;
-        double rowHeight = 0;
-        for (int i = 0; i < names.size(); i++) {
-            int col = i % columns;
-            if (col == 0 && i > 0) {
-                y += rowHeight + ARRANGE_GAP;
-                rowHeight = 0;
-            }
-            NodeCard card = cards.get(names.get(i));
-            if (card == null) continue;
-            placeAt(card, col * ARRANGE_X, y);
-            rowHeight = Math.max(rowHeight, heightOf(card));
-        }
-    }
-
-    private static int maxLayer(Map<Integer, List<String>> byLayer) {
-        int max = 0;
-        for (int layer : byLayer.keySet()) max = Math.max(max, layer);
-        return max;
-    }
-
-    /** The mean row of {@code name}'s already-placed predecessors — where it wants to sit to avoid crossings. */
-    private double barycenter(String name, Map<String, Integer> rowOf) {
-        double total = 0;
-        int count = 0;
-        for (Arrow e : edges) {
-            Integer row = e.to().equals(name) ? rowOf.get(e.from()) : null;
-            if (row != null) {
-                total += row;
-                count++;
-            }
-        }
-        return count == 0 ? Double.MAX_VALUE : total / count;   // no known predecessor: park it at the bottom
-    }
-
-    /**
-     * Each reachable activity's column: the longest path to it from the start, over the flow with its
-     * back-edges removed. Removing them is what keeps a cycle from making "longest path" unbounded.
-     */
-    private Map<String, Integer> longestPathLayers(List<String> reachable) {
-        Set<String> known = new LinkedHashSet<>(reachable);
-        Map<String, List<String>> forward = forwardEdges(known);
-
-        Map<String, Integer> layer = new LinkedHashMap<>();
-        for (String name : reachable) layer.put(name, 0);
-        // Relax |V| times: with the back-edges gone this is a DAG, so that is enough for the longest path.
-        for (int pass = 0; pass < reachable.size(); pass++) {
-            boolean moved = false;
-            for (String from : reachable) {
-                for (String to : forward.getOrDefault(from, List.of())) {
-                    if (layer.get(to) < layer.get(from) + 1) {
-                        layer.put(to, layer.get(from) + 1);
-                        moved = true;
-                    }
-                }
-            }
-            if (!moved) break;
-        }
-        return layer;
-    }
-
-    /** The wiring with cycles broken: every edge except the ones a depth-first walk finds leading backwards. */
-    private Map<String, List<String>> forwardEdges(Set<String> known) {
-        Map<String, List<String>> all = new LinkedHashMap<>();
-        for (Arrow e : edges) {
-            if (known.contains(e.from()) && known.contains(e.to()) && !e.from().equals(e.to())) {
-                all.computeIfAbsent(e.from(), k -> new ArrayList<>()).add(e.to());
-            }
-        }
-
-        Set<String> onStack = new LinkedHashSet<>();
-        Set<String> done = new HashSet<>();
-        Map<String, List<String>> forward = new LinkedHashMap<>();
-        for (String root : known) {
-            if (!done.contains(root)) dropBackEdges(root, all, forward, onStack, done);
-        }
-        return forward;
-    }
-
-    /** Depth-first from {@code node}, copying every edge except those pointing at the current stack. */
-    private static void dropBackEdges(String node, Map<String, List<String>> all,
-                                      Map<String, List<String>> forward, Set<String> onStack, Set<String> done) {
-        onStack.add(node);
-        for (String next : all.getOrDefault(node, List.of())) {
-            if (onStack.contains(next)) continue;   // a back-edge: this is the loop, not a layout constraint
-            forward.computeIfAbsent(node, k -> new ArrayList<>()).add(next);
-            if (!done.contains(next)) dropBackEdges(next, all, forward, onStack, done);
-        }
-        onStack.remove(node);
-        done.add(node);
-    }
-
-    /** Shifts every card so the block they form sits in the middle of the canvas. */
-    private void centreOnCanvas() {
-        if (cards.isEmpty()) return;
-        Bounds box = cardsBoundingBox();
-        double dx = (CANVAS_W - box.getWidth()) / 2 - box.getMinX();
-        double dy = (CANVAS_H - box.getHeight()) / 2 - box.getMinY();
-        for (NodeCard card : cards.values()) {
-            placeAt(card, card.getLayoutX() + dx, card.getLayoutY() + dy);
-        }
-    }
-
+    /** Moves a card, never closer to the canvas's top or left edge than a wire passing it needs. */
     private static void placeAt(NodeCard card, double x, double y) {
-        card.setLayoutX(Math.max(0, x));
-        card.setLayoutY(Math.max(0, y));
+        card.setLayoutX(Math.max(FlowArrange.CLEAR, x));
+        card.setLayoutY(Math.max(FlowArrange.CLEAR, y));
         card.draft().moveTo(card.getLayoutX(), card.getLayoutY());
     }
 
@@ -797,8 +690,8 @@ public final class FlowCanvas extends StackPane {
     /** Drags the view: a scene-space delta divided by the scrollable extent is the h/v change it represents. */
     private void pan(MouseEvent e) {
         Bounds view = scroller.getViewportBounds();
-        double scrollableX = CANVAS_W * zoom.getX() - view.getWidth();
-        double scrollableY = CANVAS_H * zoom.getY() - view.getHeight();
+        double scrollableX = canvasW * zoom.getX() - view.getWidth();
+        double scrollableY = canvasH * zoom.getY() - view.getHeight();
         if (scrollableX > 0) {
             scroller.setHvalue(Math.clamp(
                     panStartH - (e.getSceneX() - panOrigin.getX()) / scrollableX, 0, 1));
@@ -832,8 +725,7 @@ public final class FlowCanvas extends StackPane {
      * screen — the same problem {@link #recenter()} rescues you from, but continuously.
      */
     private Node buildMinimap() {
-        minimap.setPrefSize(MINIMAP_W, MINIMAP_H);
-        minimap.setMaxSize(MINIMAP_W, MINIMAP_H);
+        sizeMinimap();
         minimap.getStyleClass().add("flow-minimap");
         minimapViewport.getStyleClass().add("flow-minimap-viewport");
         minimap.setOnMousePressed(this::jumpFromMinimap);
@@ -843,23 +735,37 @@ public final class FlowCanvas extends StackPane {
         return minimap;
     }
 
+    /** Canvas pixels per minimap pixel: the canvas's longer side fills {@link #MINIMAP_MAX}. */
+    private double minimapScale() {
+        return MINIMAP_MAX / Math.max(canvasW, canvasH);
+    }
+
+    private void sizeMinimap() {
+        double width = canvasW * minimapScale();
+        double height = canvasH * minimapScale();
+        minimap.setPrefSize(width, height);
+        minimap.setMaxSize(width, height);
+    }
+
     private void jumpFromMinimap(MouseEvent e) {
         Bounds view = scroller.getViewportBounds();
-        double centerX = e.getX() / MINIMAP_W * CANVAS_W * zoom.getX();
-        double centerY = e.getY() / MINIMAP_H * CANVAS_H * zoom.getY();
-        scroller.setHvalue(scrollFraction(centerX, view.getWidth(), CANVAS_W * zoom.getX()));
-        scroller.setVvalue(scrollFraction(centerY, view.getHeight(), CANVAS_H * zoom.getY()));
+        double centerX = e.getX() / minimapScale() * zoom.getX();
+        double centerY = e.getY() / minimapScale() * zoom.getY();
+        scroller.setHvalue(scrollFraction(centerX, view.getWidth(), canvasW * zoom.getX()));
+        scroller.setVvalue(scrollFraction(centerY, view.getHeight(), canvasH * zoom.getY()));
         e.consume();
     }
 
     private void drawMinimap() {
+        sizeMinimap();
         minimap.getChildren().clear();
+        double scale = minimapScale();
         for (NodeCard card : cards.values()) {
             Rectangle dot = new Rectangle(
-                    card.getLayoutX() / CANVAS_W * MINIMAP_W,
-                    card.getLayoutY() / CANVAS_H * MINIMAP_H,
-                    Math.max(3, CARD_WIDTH / CANVAS_W * MINIMAP_W),
-                    Math.max(2, heightOf(card) / CANVAS_H * MINIMAP_H));
+                    card.getLayoutX() * scale,
+                    card.getLayoutY() * scale,
+                    Math.max(3, widthOf(card) * scale),
+                    Math.max(2, heightOf(card) * scale));
             dot.getStyleClass().add("flow-minimap-card");
             dot.pseudoClassStateChanged(OFF, !card.draft().enabled());
             minimap.getChildren().add(dot);
@@ -871,14 +777,16 @@ public final class FlowCanvas extends StackPane {
     private void drawMinimapViewport() {
         Bounds view = scroller.getViewportBounds();
         if (view.getWidth() <= 0) return;
-        double contentW = CANVAS_W * zoom.getX();
-        double contentH = CANVAS_H * zoom.getY();
+        double contentW = canvasW * zoom.getX();
+        double contentH = canvasH * zoom.getY();
+        double mapW = canvasW * minimapScale();
+        double mapH = canvasH * minimapScale();
         double x = scroller.getHvalue() * Math.max(0, contentW - view.getWidth()) / contentW;
         double y = scroller.getVvalue() * Math.max(0, contentH - view.getHeight()) / contentH;
-        minimapViewport.setX(x * MINIMAP_W);
-        minimapViewport.setY(y * MINIMAP_H);
-        minimapViewport.setWidth(Math.min(MINIMAP_W, view.getWidth() / contentW * MINIMAP_W));
-        minimapViewport.setHeight(Math.min(MINIMAP_H, view.getHeight() / contentH * MINIMAP_H));
+        minimapViewport.setX(x * mapW);
+        minimapViewport.setY(y * mapH);
+        minimapViewport.setWidth(Math.min(mapW, view.getWidth() / contentW * mapW));
+        minimapViewport.setHeight(Math.min(mapH, view.getHeight() / contentH * mapH));
     }
 
     // --- wiring ---
@@ -905,53 +813,46 @@ public final class FlowCanvas extends StackPane {
         });
     }
 
+    /**
+     * Draws every wire along the path {@link FlowArrange#routes} gives it from where the cards are now — clear of
+     * the cards between its ends, a wire back or onto its own card around them — and grows the canvas to hold it.
+     */
     private void redrawArrows() {
         wires.getChildren().clear();
-        for (Arrow e : edges) {
-            if (e.equals(pickedUp)) continue; // on the pointer while a drag moves it
-            NodeCard from = cards.get(e.from());
-            NodeCard to = cards.get(e.to());
-            if (from == null || to == null) continue; // stale wire; save() drops it
-            wires.getChildren().add(buildArrow(e, from, to));
-        }
+        List<Arrow> shown = new ArrayList<>(edges);
+        shown.remove(pickedUp); // on the pointer while a drag moves it; a stale wire has no card and no route
+        List<FlowArrange.Card> now = layoutCards();
+        List<FlowArrange.Route> routes = FlowArrange.routes(now, shown);
+        for (FlowArrange.Route route : routes) wires.getChildren().add(buildArrow(route));
+        growToHold(FlowArrange.extent(now, routes));
     }
 
-    private Node buildArrow(Arrow edge, NodeCard from, NodeCard to) {
-        Point2D start = from.outPortCenter(edge.outcome());
-        Point2D end = to.inPortCenter();
-        CubicCurve curve = styledCurve();
-        curve.setStartX(start.getX());
-        curve.setStartY(start.getY());
-        curve.setEndX(end.getX());
-        curve.setEndY(end.getY());
-        if (from == to) {
-            // A self-wire's two ends are on the same card, so an ordinary S-curve runs straight through it and
-            // is invisible. Loop it out to the right, over the top, and back into the input port.
-            double lift = heightOf(from) / 2 + 55;
-            curve.setControlX1(start.getX() + 70);
-            curve.setControlY1(start.getY() - lift);
-            curve.setControlX2(end.getX() - 70);
-            curve.setControlY2(end.getY() - lift);
-        } else {
-            // Horizontal control points give the flat S-curve that reads as "flows left to right".
-            double bend = Math.max(40, Math.abs(end.getX() - start.getX()) / 2);
-            curve.setControlX1(start.getX() + bend);
-            curve.setControlY1(start.getY());
-            curve.setControlX2(end.getX() - bend);
-            curve.setControlY2(end.getY());
-        }
+    /** Redraws the wires once, after the current pulse's layout — however many cards resize in it. */
+    private void redrawSoon() {
+        if (redrawPending) return;
+        redrawPending = true;
+        Platform.runLater(() -> {
+            redrawPending = false;
+            redrawArrows();
+        });
+    }
+
+    private Node buildArrow(FlowArrange.Route route) {
+        Arrow edge = route.arrow();
+        Path curve = path(route);
+        curve.getStyleClass().add("flow-wire");
 
         // A wire is symmetrical, so without a head you can't tell "A then B" from "B then A" — the direction
-        // is the entire meaning of the wire. The head is aimed along the curve's end tangent (control2 → end)
-        // rather than the straight start→end line, so it stays flush with the curve however the cards sit.
-        Polygon head = arrowHead(curve.getControlX2(), curve.getControlY2(), end.getX(), end.getY());
+        // is the entire meaning of the wire. The head is aimed along the path's last direction rather than the
+        // straight start→end line, so it stays flush with the path however the cards sit.
+        FlowArrange.Pt from = route.headFrom();
+        FlowArrange.Pt end = route.end();
+        Polygon head = arrowHead(from.x(), from.y(), end.x(), end.y());
 
-        // The hitbox: the same curve again, invisible and six times as wide, behind the visible one. Picking
+        // The hitbox: the same path again, invisible and six times as wide, behind the visible one. Picking
         // on a 2.5px stroke meant hunting for the pixel — and a wire you cannot hit is a wire you cannot
         // remove, which is what made a mis-drawn flow feel permanent.
-        CubicCurve hit = new CubicCurve(curve.getStartX(), curve.getStartY(),
-                curve.getControlX1(), curve.getControlY1(), curve.getControlX2(), curve.getControlY2(),
-                curve.getEndX(), curve.getEndY());
+        Path hit = path(route);
         hit.getStyleClass().add("flow-wire-hit");
 
         Group wire = new Group(hit, curve, head);
@@ -994,6 +895,19 @@ public final class FlowCanvas extends StackPane {
                 tipX - ARROW_LENGTH * Math.cos(angle + spread), tipY - ARROW_LENGTH * Math.sin(angle + spread));
         head.getStyleClass().add("flow-arrow");
         return head;
+    }
+
+    /** {@code route} as a JavaFX path: its lines and curves, in order. */
+    private static Path path(FlowArrange.Route route) {
+        Path path = new Path(new MoveTo(route.start().x(), route.start().y()));
+        for (FlowArrange.Segment segment : route.segments()) {
+            path.getElements().add(switch (segment) {
+                case FlowArrange.Line line -> new LineTo(line.to().x(), line.to().y());
+                case FlowArrange.Cubic c -> new CubicCurveTo(c.c1().x(), c.c1().y(), c.c2().x(), c.c2().y(),
+                        c.to().x(), c.to().y());
+            });
+        }
+        return path;
     }
 
     private static CubicCurve styledCurve() {
@@ -1086,7 +1000,8 @@ public final class FlowCanvas extends StackPane {
             setLayoutY(draft.y());
             // A card's size isn't known until it has been laid out, and the ports hang off its edges — so
             // re-draw the wires once the real bounds arrive (and again whenever the card resizes).
-            layoutBoundsProperty().addListener((o, was, is) -> redrawArrows());
+            // Once per pulse, not once per card: every redraw routes every wire around every card.
+            layoutBoundsProperty().addListener((o, was, is) -> redrawSoon());
 
             // The card is a fixed 180px wide and the title is the only part of the header with no natural
             // size, so it is the part that gets squeezed — and it was squeezed to nothing the moment a badge
@@ -1224,8 +1139,13 @@ public final class FlowCanvas extends StackPane {
             edges.removeIf(e -> e.from().equals(draft.name()) && !live.contains(e.outcome()));
         }
 
-        Point2D inPortCenter() {
-            return new Point2D(getLayoutX() + PORT_RADIUS, getLayoutY() + getHeight() / 2);
+        /** This card for {@link FlowArrange}: its place, its size, and each outcome port's height on it. */
+        FlowArrange.Card asLayout() {
+            Map<String, Double> portY = new LinkedHashMap<>();
+            if (getHeight() > 0) {   // before the first layout pass the ports have no place yet: the middle stands in
+                for (String outcome : outPorts.keySet()) portY.put(outcome, outPortCenter(outcome).getY() - getLayoutY());
+            }
+            return new FlowArrange.Card(draft.name(), getLayoutX(), getLayoutY(), widthOf(this), heightOf(this), portY);
         }
 
         Point2D outPortCenter(String outcome) {

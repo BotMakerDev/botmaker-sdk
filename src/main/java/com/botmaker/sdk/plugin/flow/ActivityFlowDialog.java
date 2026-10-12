@@ -334,13 +334,13 @@ public final class ActivityFlowDialog {
         addActivity.setOnAction(e -> createActivityAt(canvas.nextFreeSpot()));
 
         Button recenter = new Button("⌖ Recenter");
-        recenter.setTooltip(new javafx.scene.control.Tooltip("Reset the zoom and scroll back to the cards"));
+        recenter.setTooltip(new javafx.scene.control.Tooltip("Zoom and scroll to show every card and wire"));
         recenter.setOnAction(e -> canvas.recenter());
 
         Button arrange = new Button("⇄ Auto-arrange");
         arrange.setTooltip(new javafx.scene.control.Tooltip(
                 "Lay the cards out in layers, by how many steps they are from the start, with anything "
-                        + "unreachable below"));
+                        + "unreachable below, and show them all"));
         arrange.setOnAction(e -> canvas.autoArrange());
 
         HBox spacer = new HBox();
