@@ -68,7 +68,7 @@ public final class FlowEdits {
         Flow flow = board.flow();
         List<Flow.Step> steps = new ArrayList<>(flow.steps());
         steps.add(step);
-        Activity start = flow.start().isNone() ? step.activity() : flow.start();
+        Flow.Node start = flow.start().isNone() ? step.node() : flow.start();
         Map<String, List<String>> exits = new LinkedHashMap<>(board.exits());
         exits.put(step.label(), outcomes == null || outcomes.isEmpty() ? List.of(Arrow.NEXT) : outcomes);
         return new Board(with(flow, steps, flow.edges(), start), exits);
@@ -85,7 +85,7 @@ public final class FlowEdits {
         if (problem != null) throw new IllegalArgumentException(problem);
         Activity was = step.activity();
         Activity now = FlowNames.activity(label);
-        List<Flow.Step> steps = flow.steps().stream().map(s -> new Flow.Step(swap(s.activity(), was, now), s.body(),
+        List<Flow.Step> steps = flow.steps().stream().map(s -> new Flow.Step(swap(s.node(), was, now), s.body(),
                 s.description(), s.enabled(), s.goHome(), s.popupCheck(), s.runnerSwitch(),
                 swap(s.whenOff(), was, now))).toList();
         List<Flow.Edge> edges = flow.edges().stream().map(e -> new Flow.Edge(
@@ -106,7 +106,7 @@ public final class FlowEdits {
                 .map(s -> s.whenOff().equals(gone) ? FlowTypes.whenOff(s, Activity.NONE) : s).toList();
         List<Flow.Edge> edges = flow.edges().stream()
                 .filter(e -> !e.from().equals(gone) && !e.to().equals(gone)).toList();
-        Activity start = flow.start().equals(gone) ? (steps.isEmpty() ? Activity.NONE : steps.getFirst().activity())
+        Flow.Node start = flow.start().equals(gone) ? (steps.isEmpty() ? Activity.NONE : steps.getFirst().node())
                 : flow.start();
         Map<String, List<String>> exits = new LinkedHashMap<>(board.exits());
         exits.remove(removed.label());
@@ -271,17 +271,17 @@ public final class FlowEdits {
     }
 
     /** {@code flow} with these parts, its limits kept. */
-    static Flow with(Flow flow, List<Flow.Step> steps, List<Flow.Edge> edges, Activity start) {
+    static Flow with(Flow flow, List<Flow.Step> steps, List<Flow.Edge> edges, Flow.Node start) {
         return new Flow(steps, edges, start, flow.limits());
     }
 
-    private static Flow withOff(Flow flow, Flow.Step source, Activity to) {
+    private static Flow withOff(Flow flow, Flow.Step source, Flow.Node to) {
         List<Flow.Step> steps = flow.steps().stream().map(s -> s == source ? FlowTypes.whenOff(s, to) : s).toList();
         return with(flow, steps, flow.edges(), flow.start());
     }
 
-    private static Activity swap(Activity activity, Activity was, Activity now) {
-        return activity.equals(was) ? now : activity;
+    private static Flow.Node swap(Flow.Node node, Flow.Node was, Flow.Node now) {
+        return node.equals(was) ? now : node;
     }
 
     private static ActivityBody<?> body(String source) {

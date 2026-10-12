@@ -105,6 +105,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed (breaking)
 
+- **A flow can run another flow as one card.** `Flow.subflow(DAILY)` is a card that walks `DAILY` to its end,
+  under `DAILY`'s own limits and switches; `Flow.edge(Activities.Collect.NOTHING_LEFT, DAILY)` wires into it and
+  `Flow.edge(DAILY, Activities.Claim.DONE, Activities.Rest.class)` out of it, on the outcome `DAILY` ended on.
+  Declare the inner flow above the one that runs it: a run refuses one read before its declaration. The trace
+  says when a sub-flow starts and ends, and the runner's skip list reaches activities inside sub-flows. A
+  `Flow.Step` now holds a card (`node()`; `activity()` still answers for an activity) and a `Flow.Edge` the
+  sub-flow it leaves (`via()`). The Activity Flow window does not draw sub-flows yet.
 - **`Sdk.flow()` is gone, and so are presets.** The flow moved to `Flows.MAIN` and its `.home(…)` to
   `Sdk.run()`; `Flow.of` takes four parts (no preset list), and `FlowLayout.of` keys its cards by flow
   (`FlowLayout.cards(…)`). A preset is now a flow of its own. Nothing converts a 1.4.2 bot's values: Studio's

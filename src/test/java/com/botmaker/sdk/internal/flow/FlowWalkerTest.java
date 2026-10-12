@@ -273,6 +273,78 @@ class FlowWalkerTest {
                 "nothing to go home for when the activity won't run");
     }
 
+    // ---- sub-flows --------------------------------------------------------------------------------------
+
+    @Test
+    void aSubFlowsEndTakesTheOuterWireOnItsOutcome() {
+        Flow inner = flow(L.class, List.of(on(L.class), on(R.class)), Flow.edge(L.NEXT, R.class));
+        walk(Flow.of(List.of(on(A.class), Flow.subflow(inner), on(C.class)),
+                List.of(Flow.edge(A.NEXT, inner), Flow.edge(inner, R.NEXT, C.class)), A.class, Flow.limits(0, 0)));
+
+        assertEquals(List.of("A+popup", "L+popup", "R+popup", "C+popup"), log);
+    }
+
+    @Test
+    void aSubFlowsStepLimitStopsTheRun() {
+        Flow inner = flow(L.class, Flow.limits(3, 0), List.of(on(L.class)), Flow.edge(L.NEXT, L.class));
+        walk(Flow.of(List.of(on(A.class), Flow.subflow(inner), on(C.class)),
+                List.of(Flow.edge(A.NEXT, inner), Flow.edge(inner, L.NEXT, C.class)), A.class, Flow.limits(0, 0)));
+
+        assertEquals(List.of("A+popup", "L+popup", "L+popup", "L+popup"), log, "C never runs");
+    }
+
+    @Test
+    void aSwitchedOffSubFlowTakesItsOffWire() {
+        Flow inner = flow(L.class, List.of(on(L.class)));
+        walk(Flow.of(List.of(on(A.class), Flow.subflow(inner).off().whenOff(C.class), on(C.class)),
+                List.of(Flow.edge(A.NEXT, inner)), A.class, Flow.limits(0, 0)));
+
+        assertEquals(List.of("A+popup", "C+popup"), log);
+    }
+
+    @Test
+    void aSubFlowEndingOnAnOutcomeTheCardDoesNotWireEndsTheRun() {
+        Flow inner = flow(L.class, List.of(on(L.class)));
+        walk(Flow.of(List.of(on(A.class), Flow.subflow(inner), on(C.class)),
+                List.of(Flow.edge(A.NEXT, inner)), A.class, Flow.limits(0, 0)));
+
+        assertEquals(List.of("A+popup", "L+popup"), log);
+    }
+
+    @Test
+    void aSubFlowCanStartTheFlowAndLeadIntoAnother() {
+        Flow first = flow(L.class, List.of(on(L.class)));
+        Flow second = flow(R.class, List.of(on(R.class)));
+        walk(Flow.of(List.of(Flow.subflow(first), Flow.subflow(second)),
+                List.of(Flow.edge(first, L.NEXT, second)), first, Flow.limits(0, 0)));
+
+        assertEquals(List.of("L+popup", "R+popup"), log);
+    }
+
+    @Test
+    void aSubFlowsEndsAreItsUnwiredOutcomesOfCardsTheRunReaches() {
+        Flow inner = flow(A.class, List.of(on(A.class), on(B.class), on(C.class)),
+                Flow.edge(A.LEFT, B.class), Flow.edge(A.NEXT, A.class));
+        java.util.function.Function<Activity, List<? extends Outcome>> declared = activity -> switch (activity.name()) {
+            case "A" -> List.of(A.values());
+            case "B" -> List.of(B.values());
+            default -> List.of(C.values());
+        };
+        assertEquals(List.of(A.RIGHT, B.NEXT), FlowTree.endOutcomes(inner, declared),
+                "C is never reached, and A's NEXT and LEFT are wired");
+
+        Flow outer = Flow.of(List.of(Flow.subflow(inner)), List.of(Flow.edge(inner, A.RIGHT, L.class)), inner,
+                Flow.Limits.DEFAULT);
+        assertEquals(List.of(B.NEXT), FlowTree.endOutcomes(outer, declared), "a card's own wires take up its exits");
+    }
+
+    @Test
+    void aSubFlowReadBeforeItsDeclarationIsRefusedBeforeAnyStep() {
+        walk(Flow.of(List.of(on(A.class), Flow.subflow(null)), List.of(), A.class, Flow.limits(0, 0)));
+
+        assertTrue(log.isEmpty());
+    }
+
     // ---- the step budget --------------------------------------------------------------------------------
 
     @Test

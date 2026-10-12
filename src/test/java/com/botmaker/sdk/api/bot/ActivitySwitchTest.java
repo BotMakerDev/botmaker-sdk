@@ -36,7 +36,7 @@ class ActivitySwitchTest {
     }
 
     private static void install(Flow.Step... steps) {
-        InstalledRun.walk(Flow.of(List.of(steps), List.of(), null, Flow.Limits.DEFAULT));
+        InstalledRun.walk(new Flow(List.of(steps), List.of(), null, Flow.Limits.DEFAULT));
     }
 
     private static Flow.Step step(Class<? extends Outcome> activity, boolean enabled) {

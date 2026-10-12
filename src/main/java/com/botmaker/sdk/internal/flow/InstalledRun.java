@@ -4,8 +4,15 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.Run;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.IdentityHashMap;
+import java.util.Map;
+import java.util.Set;
+
 /**
- * The run a bot does: the flow it walks, and its home and setup.
+ * The run a bot does: the flow it walks, its home and setup, the activities its runner switched off, and the names
+ * of the bot's flows.
  *
  * <p>{@code Bot.runFlow(Sdk.flow, …, Sdk.class)} installs the value your {@code @SdkValue(SdkValue.Id.RUN)} method
  * returns ({@link #use}) and the flow its {@code @Param} names ({@link #walk}), then walks that flow: two hand-offs,
@@ -21,6 +28,11 @@ public final class InstalledRun {
     private static volatile Run current = Run.NONE;
 
     private static volatile Flow flow = Flow.NONE;
+
+    private static volatile Set<Activity> skipped = Set.of();
+
+    /** Each of the bot's flows by its constant's name, by identity: two flows may be equal and named apart. */
+    private static volatile Map<Flow, String> names = Map.of();
 
     private InstalledRun() {}
 
@@ -48,15 +60,65 @@ public final class InstalledRun {
         return flow;
     }
 
+    /** Switches {@code activities} off for this run, wherever a step drawn {@code .switchable()} runs them. */
+    public static void skip(Set<Activity> activities) {
+        skipped = activities == null ? Set.of() : Set.copyOf(activities);
+    }
+
+    /** Whether the runner switched {@code step} off: it is switchable, and its activity is listed to skip. */
+    public static boolean skipped(Flow.Step step) {
+        return step.runnerSwitch() && skipped.contains(step.node());
+    }
+
     /**
      * Whether the flow has the activity switched on — its configured default, before any
-     * {@code enable}/{@code disable} a running bot has made.
+     * {@code enable}/{@code disable} a running bot has made. The first step running it, in the flow or in one of its
+     * sub-flows, answers.
      *
      * <p><b>An activity the flow does not mention is on.</b> A bot may name an activity that is not on the
      * canvas at all, and reading an absent one as <em>off</em> would make it silently do nothing.
      */
     public static boolean enabled(Activity activity) {
-        Flow.Step found = flow().step(activity);
-        return found == null || found.enabled();
+        Flow.Step found = FlowTree.find(flow(), activity);
+        return found == null || (found.enabled() && !skipped(found));
+    }
+
+    /**
+     * Learns the names of the bot's flows: each {@code static final Flow} of the {@code Flows} class beside each of
+     * {@code holders} ({@code Sdk.class}), and of the holders themselves. A sub-flow's trace line and label name it.
+     */
+    public static void nameFlows(Class<?>... holders) {
+        Map<Flow, String> found = new IdentityHashMap<>();
+        for (Class<?> holder : holders == null ? new Class<?>[0] : holders) {
+            if (holder == null) continue;
+            try {
+                collect(Class.forName(holder.getPackageName() + ".Flows", true, holder.getClassLoader()), found);
+            } catch (ClassNotFoundException | LinkageError none) {
+                // A plugin's holder with no Flows beside it names no flow.
+            }
+            collect(holder, found);
+        }
+        names = found;
+    }
+
+    private static void collect(Class<?> holder, Map<Flow, String> into) {
+        for (Field field : holder.getDeclaredFields()) {
+            int modifiers = field.getModifiers();
+            // Final only: the bot's flow parameter, Sdk.flow, holds one of these and is not its name.
+            if (field.getType() != Flow.class || !Modifier.isStatic(modifiers) || !Modifier.isFinal(modifiers)) {
+                continue;
+            }
+            try {
+                if (field.get(null) instanceof Flow value) into.putIfAbsent(value, field.getName());
+            } catch (IllegalAccessException | LinkageError unreadable) {
+                // Not the bot's to read here: the flow keeps no name, and its trace says "a sub-flow".
+            }
+        }
+    }
+
+    /** The name the bot declares {@code flow} as, {@code DAILY}, or blank when it was never learned. */
+    public static String nameOf(Flow flow) {
+        String name = flow == null ? null : names.get(flow);
+        return name == null ? "" : name;
     }
 }

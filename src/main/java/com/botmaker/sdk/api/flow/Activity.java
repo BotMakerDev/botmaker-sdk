@@ -28,7 +28,7 @@ import com.botmaker.sdk.internal.flow.Labels;
  *
  * @param name the enum's simple name; blank for {@link #NONE}
  */
-public record Activity(String name) implements Labelled {
+public record Activity(String name) implements Flow.Node {
 
     /** No activity: the start of a flow with nothing in it, and a step with no off-wire. Labelled blank. */
     public static final Activity NONE = new Activity("");

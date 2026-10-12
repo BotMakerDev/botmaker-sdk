@@ -96,7 +96,9 @@ public class Bot {
         MissFrames.start();
         SdkValues.claim();
         ManagedValues.install(values);
-        InstalledRun.walk(SkippedActivities.applied(flow == null ? Flow.NONE : flow, skip));
+        InstalledRun.nameFlows(values);
+        InstalledRun.walk(flow);
+        InstalledRun.skip(SkippedActivities.of(InstalledRun.flow(), skip));
         Runnable goHome = () -> {
             Runnable home = InstalledRun.installed().home();
             if (home != null) home.run();

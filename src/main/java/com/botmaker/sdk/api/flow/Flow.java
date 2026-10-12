@@ -1,6 +1,8 @@
 package com.botmaker.sdk.api.flow;
 
 import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.internal.flow.InstalledRun;
+import com.botmaker.sdk.internal.flow.Labels;
 
 import java.util.List;
 
@@ -44,6 +46,28 @@ import java.util.List;
  * named link after it, written only when it is not the default: {@code .described("…")}, {@code .off()},
  * {@code .goesHome()}, {@code .checksPopups()}, {@code .switchable()}, {@code .whenOff(…)}.
  *
+ * <h2>A flow inside a flow</h2>
+ *
+ * <p>A card can be another flow, a sub-flow ({@link #subflow}): the run walks that flow to its end, under its own
+ * limits and switches, and the card counts as one step of the outer flow. Its exits are the inner flow's outcomes
+ * that nothing inside it wires; a wire out names the card and the outcome, a wire in names the flow:
+ *
+ * <pre>{@code
+ * public static final Flow DAILY = Flow.of(…);   // declared above MAIN, which reads it
+ * public static final Flow MAIN = Flow.of(
+ *         List.of(Flow.activity(Activities.Collect.class, Collect::body),
+ *                 Flow.subflow(DAILY).described("Claim the daily rewards."),
+ *                 Flow.activity(Activities.Rest.class, Rest::body)),
+ *         List.of(Flow.edge(Activities.Collect.NOTHING_LEFT, DAILY),
+ *                 Flow.edge(DAILY, Activities.Claim.DONE, Activities.Rest.class)),
+ *         Activities.Collect.class,
+ *         Flow.limits(1000, 1000));
+ * }</pre>
+ *
+ * <p>The inner flow is named as it is declared, {@code DAILY}, so it must be declared above the flow that runs it:
+ * javac refuses a flow inside itself, and a flow read before its declaration is null, which a run refuses at
+ * start-up. Hitting the inner flow's step limit stops the run.
+ *
  * <h2>Four parts, fixed, and no varargs</h2>
  *
  * <p>Each of the four has a type the editor knows, which is what lets it take the expression apart, change
@@ -53,11 +77,11 @@ import java.util.List;
  * own, the {@link FlowLayout} {@code Sdk.flowLayout()} returns, which nothing at runtime reads.
  *
  * @param steps  every activity in the flow with its work and its switches, in the order the editor lists them
- * @param edges  where each outcome leads; an edge naming an activity that is not here is ignored
- * @param start  the activity a run begins at; {@link Activity#NONE} for a flow that runs nothing
+ * @param edges  where each outcome leads; an edge naming a card that is not here is ignored
+ * @param start  the card a run begins at; {@link Activity#NONE} for a flow that runs nothing
  * @param limits what stops a run that never finishes
  */
-public record Flow(List<Step> steps, List<Edge> edges, Activity start, Limits limits) {
+public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits) {
 
     /** The empty flow: nothing to run, which is what a project with nothing drawn should do. */
     public static final Flow NONE = new Flow(List.of(), List.of(), Activity.NONE, Limits.DEFAULT);
@@ -72,6 +96,74 @@ public record Flow(List<Step> steps, List<Edge> edges, Activity start, Limits li
     /** The flow, spelled the way the editor writes it. */
     public static Flow of(List<Step> steps, List<Edge> edges, Class<? extends Outcome> start, Limits limits) {
         return new Flow(steps, edges, Activity.of(start), limits);
+    }
+
+    /** The flow, starting at its sub-flow card {@code start}. */
+    public static Flow of(List<Step> steps, List<Edge> edges, Flow start, Limits limits) {
+        return new Flow(steps, edges, new Sub(start), limits);
+    }
+
+    /**
+     * A card of a flow: an {@link Activity}, or another flow run as one step ({@link Sub}).
+     */
+    public sealed interface Node extends Labelled permits Activity, Sub {
+
+        /** Whether this is no card at all, {@link Activity#NONE}. */
+        default boolean isNone() {
+            return false;
+        }
+    }
+
+    /**
+     * A sub-flow card: {@code inner} walked to its end as one step of the flow that holds the card.
+     *
+     * <p>Its name is the constant the bot declares it as, {@code DAILY}, read off the bot's {@code Flows} class when
+     * the run starts; blank before then.
+     *
+     * @param inner the flow it runs; null only when it was read before its declaration, which a run refuses
+     */
+    public record Sub(Flow inner) implements Node {
+
+        @Override
+        public String name() {
+            return InstalledRun.nameOf(inner);
+        }
+
+        @Override
+        public String label() {
+            String name = name();
+            return name.isEmpty() ? "a sub-flow" : Labels.of(name);
+        }
+
+        /**
+         * The same card when it runs the same flow — the same constant, not an equal one: two flows declared alike
+         * are two cards, and comparing whole flow trees on every step would cost a walk of each.
+         */
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Sub sub && sub.inner == inner;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(inner);
+        }
+
+        @Override
+        public String toString() {
+            return name().isEmpty() ? "Sub[…]" : name();
+        }
+    }
+
+    /**
+     * A sub-flow card running {@code inner}, switched on, with nothing else set; {@link Step#described},
+     * {@link Step#off}, {@link Step#goesHome}, {@link Step#checksPopups} and {@link Step#whenOff} link after it as
+     * after an activity.
+     *
+     * @param inner the flow to run, declared above this one — {@code DAILY}
+     */
+    public static Step subflow(Flow inner) {
+        return new Step(new Sub(inner), null, "", true, false, false, false, Activity.NONE);
     }
 
     /**
@@ -93,90 +185,123 @@ public record Flow(List<Step> steps, List<Edge> edges, Activity start, Limits li
         return new Edge(on, Activity.of(to));
     }
 
+    /** One wire: leaving {@code on}'s activity when it reports {@code on}, arriving at the sub-flow card {@code to}. */
+    public static Edge edge(Outcome on, Flow to) {
+        return new Edge(on, new Sub(to));
+    }
+
+    /** One wire out of the sub-flow card {@code via}: when its flow ends on {@code on}, go on to {@code to}. */
+    public static Edge edge(Flow via, Outcome on, Class<? extends Outcome> to) {
+        return new Edge(via, on, Activity.of(to));
+    }
+
+    /** One wire out of the sub-flow card {@code via} into the sub-flow card {@code to}. */
+    public static Edge edge(Flow via, Outcome on, Flow to) {
+        return new Edge(via, on, new Sub(to));
+    }
+
     /** What stops a run that never finishes. */
     public static Limits limits(int maxSteps, int stepDelayMs) {
         return new Limits(maxSteps, stepDelayMs);
     }
 
-    /** The step of {@code activity}, or {@code null}. */
-    public Step step(Activity activity) {
+    /** The step of the card {@code node}, or {@code null}. */
+    public Step step(Node node) {
         for (Step step : steps) {
-            if (step.activity().equals(activity)) return step;
+            if (step.node().equals(node)) return step;
         }
         return null;
     }
 
     /**
-     * One activity of a flow: the work, and everything the canvas says about it.
+     * One card of a flow: an activity and its work, or a sub-flow, and everything the canvas says about it.
      *
-     * @param activity    which activity this is
-     * @param body        the work, as a method reference — {@code Collect::body}
+     * @param node        which card this is: an {@link Activity}, or a {@link Sub}
+     * @param body        the work, as a method reference — {@code Collect::body}; null for a sub-flow
      * @param description one line, shown on the canvas and nowhere else
-     * @param enabled     whether it runs; a disabled activity takes its off-wire rather than its work
-     * @param goHome      whether the bot's {@link Run#home} runs before this activity
+     * @param enabled     whether it runs; a disabled card takes its off-wire rather than its work
+     * @param goHome      whether the bot's {@link Run#home} runs before this card
      * @param popupCheck  whether the popup guard runs while it does
      * @param runnerSwitch whether the person running the bot may switch it off (or back on) for their machine,
      *                    without opening the project ({@link #switchable()})
-     * @param whenOff     where the run goes when this activity is switched off or has no body yet;
+     * @param whenOff     where the run goes when this card is switched off or has no body yet;
      *                    {@link Activity#NONE} ends the run there
      */
-    public record Step(Activity activity, ActivityBody<?> body, String description, boolean enabled,
-                       boolean goHome, boolean popupCheck, boolean runnerSwitch, Activity whenOff) {
+    public record Step(Node node, ActivityBody<?> body, String description, boolean enabled,
+                       boolean goHome, boolean popupCheck, boolean runnerSwitch, Node whenOff) {
 
         public Step {
-            activity = activity == null ? Activity.NONE : activity;
+            node = node == null ? Activity.NONE : node;
             description = description == null ? "" : description;
             whenOff = whenOff == null ? Activity.NONE : whenOff;
         }
 
+        /** The activity this card is, or {@link Activity#NONE} for a sub-flow card. */
+        public Activity activity() {
+            return node instanceof Activity activity ? activity : Activity.NONE;
+        }
+
         /** This step with {@code description}, the one line the canvas shows. */
         public Step described(String description) {
-            return new Step(activity, body, description, enabled, goHome, popupCheck, runnerSwitch, whenOff);
+            return new Step(node, body, description, enabled, goHome, popupCheck, runnerSwitch, whenOff);
         }
 
         /** This step switched off: the run takes its off-wire rather than its work. */
         public Step off() {
-            return new Step(activity, body, description, false, goHome, popupCheck, runnerSwitch, whenOff);
+            return new Step(node, body, description, false, goHome, popupCheck, runnerSwitch, whenOff);
         }
 
         /** This step with the bot's {@link Run#home} run before it. */
         public Step goesHome() {
-            return new Step(activity, body, description, enabled, true, popupCheck, runnerSwitch, whenOff);
+            return new Step(node, body, description, enabled, true, popupCheck, runnerSwitch, whenOff);
         }
 
         /** This step with the popup guard running while it does. */
         public Step checksPopups() {
-            return new Step(activity, body, description, enabled, goHome, true, runnerSwitch, whenOff);
+            return new Step(node, body, description, enabled, goHome, true, runnerSwitch, whenOff);
         }
 
         /** This step offered to the person running the bot, who may switch it off or back on for their machine. */
         public Step switchable() {
-            return new Step(activity, body, description, enabled, goHome, popupCheck, true, whenOff);
+            return new Step(node, body, description, enabled, goHome, popupCheck, true, whenOff);
         }
 
         /** This step going on to {@code to} when it is switched off or has no body yet. */
         public Step whenOff(Class<? extends Outcome> to) {
-            return new Step(activity, body, description, enabled, goHome, popupCheck, runnerSwitch, Activity.of(to));
+            return new Step(node, body, description, enabled, goHome, popupCheck, runnerSwitch, Activity.of(to));
         }
 
-        /** The activity's label, which is what the canvas and the trace show. */
+        /** This step going on to the sub-flow card {@code to} when it is switched off or has no body yet. */
+        public Step whenOff(Flow to) {
+            return new Step(node, body, description, enabled, goHome, popupCheck, runnerSwitch, new Sub(to));
+        }
+
+        /** The card's label, which is what the canvas and the trace show. */
         public String label() {
-            return activity.label();
+            return node.label();
         }
     }
 
     /**
-     * One wire: an activity reporting {@code on} goes on to {@code to}. The activity it leaves is
-     * {@code on}'s enum ({@link #from()}).
+     * One wire: a card reporting {@code on} goes on to {@code to}. The card it leaves is {@code on}'s activity, or
+     * the sub-flow card {@code via} whose flow ended on {@code on} ({@link #from()}).
+     *
+     * @param via the sub-flow this wire leaves, or null for an activity's own wire
      */
-    public record Edge(Outcome on, Activity to) {
+    public record Edge(Flow via, Outcome on, Node to) {
 
         public Edge {
             to = to == null ? Activity.NONE : to;
         }
 
-        /** The activity this wire leaves: the enum that declares {@link #on()}. */
-        public Activity from() {
+        /** An activity's own wire. */
+        public Edge(Outcome on, Node to) {
+            this(null, on, to);
+        }
+
+        /** The card this wire leaves: the sub-flow card {@link #via()}, else the enum that declares {@link #on()}. */
+        public Node from() {
+            if (via != null) return new Sub(via);
             return on == null ? Activity.NONE : on.activity();
         }
     }

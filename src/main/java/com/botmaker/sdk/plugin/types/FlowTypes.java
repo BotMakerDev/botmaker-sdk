@@ -87,7 +87,8 @@ public final class FlowTypes {
      * start at, so no class literal to write: it is written {@code Flow.NONE} ({@link #written}).
      */
     public static final DeclaredCall<Flow> FLOW_SHAPE = ComponentType.part(Flow.class)
-            .writtenAs(Flow::of, Flow::steps, Flow::edges, flow -> null, Flow::limits)
+            .<List<Flow.Step>, List<Flow.Edge>, Class<? extends Outcome>, Flow.Limits, Flow>writtenAs(Flow::of,
+                    Flow::steps, Flow::edges, flow -> null, Flow::limits)
             .components(flow -> List.of(flow.steps(), flow.edges(), flow.start(), flow.limits()))
             .build(FlowTypes::flow)
             .constants(Flow.NONE);
@@ -163,14 +164,14 @@ public final class FlowTypes {
     }
 
     /** {@code step} going on to {@code to} when switched off: {@code .whenOff(…)} for an activity held by name. */
-    public static Flow.Step whenOff(Flow.Step step, Activity to) {
-        return new Flow.Step(step.activity(), step.body(), step.description(), step.enabled(), step.goHome(),
+    public static Flow.Step whenOff(Flow.Step step, Flow.Node to) {
+        return new Flow.Step(step.node(), step.body(), step.description(), step.enabled(), step.goHome(),
                 step.popupCheck(), step.runnerSwitch(), to);
     }
 
     /** {@code Flow.edge(Outcome, Class)}: the activity it leaves is the outcome's. */
     public static final DeclaredCall<Flow.Edge> EDGE_SHAPE = ComponentType.part(Flow.Edge.class)
-            .writtenAs(Flow::edge, Flow.Edge::on, edge -> null)
+            .<Outcome, Class<? extends Outcome>, Flow.Edge>writtenAs(Flow::edge, Flow.Edge::on, edge -> null)
             .components(edge -> List.of(edge.on(), edge.to()))
             .build(FlowTypes::edge);
 
