@@ -17,6 +17,14 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Fixed
+
+- **1.4.3 never built.** Its pom pinned botmaker-shared v0.2.4, a tag JitPack never built (Maven Central's 429),
+  and it needs shared's `LaunchSpec.runsOn`, which no shared release had. This release pins shared 0.2.5 and is
+  1.4.3 otherwise: everything listed under 1.4.3 is in it.
+
 ## [1.4.3] — 2026-10-12
 
 ### Fixed
