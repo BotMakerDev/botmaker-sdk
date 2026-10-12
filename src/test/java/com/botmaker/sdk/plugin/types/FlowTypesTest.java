@@ -45,7 +45,7 @@ class FlowTypesTest {
                 .described("Click collect, then battle.").checksPopups();
         Flow.Step rest = FlowTypes.step(REST, FlowTypes.body("Rest::body"))
                 .described("Wait, then go round again.").off().goesHome().switchable();
-        rest = (Flow.Step) FlowTypes.STEP_SHAPE.withers().getLast().applyTo(rest, COLLECT);
+        rest = FlowTypes.whenOff(rest, COLLECT);
         return new Flow(List.of(collect, rest),
                 List.of(new Flow.Edge(BotConstants.outcome("Collect", "NEXT"), COLLECT),
                         new Flow.Edge(NOTHING_LEFT, REST),
@@ -108,6 +108,69 @@ class FlowTypesTest {
         assertEquals(flow.limits(), roundTrip(FlowTypes.LIMITS_SHAPE, flow.limits()));
     }
 
+    /** What the host hands over for {@code Flows.DAILY} and {@code Flows.WEEKLY} inside another flow. */
+    private static final Flow DAILY = BotConstants.flow("DAILY");
+    private static final Flow WEEKLY = BotConstants.flow("WEEKLY");
+
+    /**
+     * A flow running two others as cards, with every spelling a card, a wire and a start take when one end is a
+     * sub-flow: {@code Flow.subflow(Flows.DAILY)}, a wire into it, out of it and between two of them, an off-wire
+     * to one, and a flow starting at one.
+     */
+    private static Flow withSubflows() {
+        Flow.Step daily = Flow.subflow(DAILY).described("The daily round.").switchable();
+        Flow.Step weekly = FlowTypes.whenOff(Flow.subflow(WEEKLY).off(), new Flow.Sub(DAILY));
+        Flow.Step rest = FlowTypes.whenOff(FlowTypes.step(REST, FlowTypes.body("Rest::body")), new Flow.Sub(WEEKLY));
+        Outcome done = BotConstants.outcome("Claim", "DONE");
+        return new Flow(List.of(daily, weekly, rest),
+                List.of(new Flow.Edge(BotConstants.outcome("Rest", "NEXT"), new Flow.Sub(DAILY)),
+                        new Flow.Edge(DAILY, done, REST),
+                        new Flow.Edge(DAILY, BotConstants.outcome("Claim", "LATER"), new Flow.Sub(WEEKLY))),
+                new Flow.Sub(DAILY), Flow.limits(1000, 1000));
+    }
+
+    /**
+     * Each value is written by exactly one declaration of its class — the one whose {@code when} accepts it — and
+     * comes apart and back together through it.
+     */
+    @Test
+    void everySubflowSpellingIsOneDeclarationsAndRoundTrips() {
+        Flow flow = withSubflows();
+        assertEquals(flow, only(flow, FlowTypes.FLOW_SHAPE, FlowTypes.FLOW_FROM_SUBFLOW_SHAPE));
+        for (Flow.Step step : flow.steps()) {
+            assertEquals(step, only(step, FlowTypes.STEP_SHAPE, FlowTypes.SUBFLOW_STEP_SHAPE), step.toString());
+        }
+        for (Flow.Edge edge : flow.edges()) {
+            assertEquals(edge, only(edge, FlowTypes.EDGE_SHAPE, FlowTypes.EDGE_INTO_SUBFLOW_SHAPE,
+                    FlowTypes.EDGE_OUT_OF_SUBFLOW_SHAPE, FlowTypes.EDGE_BETWEEN_SUBFLOWS_SHAPE), edge.toString());
+        }
+        for (Flow.Edge edge : gamebot().edges()) {
+            assertEquals(edge, only(edge, FlowTypes.EDGE_SHAPE, FlowTypes.EDGE_INTO_SUBFLOW_SHAPE,
+                    FlowTypes.EDGE_OUT_OF_SUBFLOW_SHAPE, FlowTypes.EDGE_BETWEEN_SUBFLOWS_SHAPE), edge.toString());
+        }
+        assertEquals(gamebot(), only(gamebot(), FlowTypes.FLOW_SHAPE, FlowTypes.FLOW_FROM_SUBFLOW_SHAPE));
+    }
+
+    /** {@code value} through the one of {@code shapes} that writes it, failing when not exactly one does. */
+    @SafeVarargs
+    private static <T> T only(T value, ComponentType<T>... shapes) {
+        List<ComponentType<T>> writing = java.util.Arrays.stream(shapes).filter(shape -> shape.writes(value)).toList();
+        assertEquals(1, writing.size(), "declarations writing " + value);
+        return roundTrip(writing.getFirst(), value);
+    }
+
+    /** A reference to a flow is its name: two references to one flow are one card, whatever that flow holds. */
+    @Test
+    void aSubflowCardIsTheFlowItNames() {
+        assertEquals(new Flow.Sub(BotConstants.flow("DAILY")), new Flow.Sub(DAILY));
+        assertEquals(new Flow.Sub(BotConstants.flow("DAILY")).hashCode(), new Flow.Sub(DAILY).hashCode());
+        assertFalse(new Flow.Sub(DAILY).equals(new Flow.Sub(WEEKLY)));
+        assertEquals("DAILY", BotConstants.flowName(DAILY));
+        assertEquals("DAILY", new Flow.Sub(DAILY).name());
+        assertNull(BotConstants.flowName(Flow.NONE), "an empty flow is no reference");
+        assertNull(BotConstants.flowName(gamebot()));
+    }
+
     /** An activity is no part's {@code Class} the editor could hold: each shape refuses one that is not a name. */
     @Test
     void anActivityIsHeldAsItsName() {
@@ -126,7 +189,7 @@ class FlowTypesTest {
                 FlowTypes.FLOW_SHAPE.componentTypes());
         assertEquals(4, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
         assertEquals(List.of(Class.class, ActivityBody.class, String.class, boolean.class, boolean.class,
-                boolean.class, boolean.class, Class.class), FlowTypes.STEP_SHAPE.componentTypes());
+                boolean.class, boolean.class, Class.class, Flow.class), FlowTypes.STEP_SHAPE.componentTypes());
         assertEquals(List.of(Outcome.class, Class.class), FlowTypes.EDGE_SHAPE.componentTypes());
     }
 

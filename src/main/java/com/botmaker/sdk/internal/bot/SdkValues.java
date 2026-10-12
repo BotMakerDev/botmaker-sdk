@@ -53,6 +53,7 @@ public final class SdkValues {
      */
     public static final ManagedValue<Flow> FLOWS = ManagedValue.openSet(SdkValue.Id.FLOWS)
             .of(Flow.class)
+            .referredToAs(BotConstants::flow)
             .in("Flows")
             .because("These are the bot's activity flows. Draw them in 🔀 Activity Flow, which keeps the"
                     + " activities, the wires and the layout in step.");

@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
+import com.botmaker.sdk.internal.flow.BotConstants;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -91,7 +92,24 @@ public final class FlowTypes {
                     Flow::steps, Flow::edges, flow -> null, Flow::limits)
             .components(flow -> List.of(flow.steps(), flow.edges(), flow.start(), flow.limits()))
             .build(FlowTypes::flow)
-            .constants(Flow.NONE);
+            .constants(Flow.NONE)
+            // A reference to a flow (BotConstants.flow) is written only as that constant; one naming no constant
+            // left is no flow to spell out.
+            .when(flow -> flow.start() instanceof Activity && BotConstants.flowName(flow) == null);
+
+    /**
+     * {@code Flow.of(List<Step>, List<Edge>, Flow start, Limits)}: a flow starting at a sub-flow card. The start is
+     * a reference to another of the bot's flows, held by its name ({@code BotConstants.flow}).
+     */
+    public static final DeclaredCall<Flow> FLOW_FROM_SUBFLOW_SHAPE = ComponentType.part(Flow.class)
+            .<List<Flow.Step>, List<Flow.Edge>, Flow, Flow.Limits, Flow>writtenAs(Flow::of,
+                    Flow::steps, Flow::edges, flow -> innerOf(flow.start()), Flow::limits)
+            .when(flow -> flow.start() instanceof Flow.Sub);
+
+    /** The flow a sub-flow card runs, or null for any other card. */
+    private static Flow innerOf(Flow.Node node) {
+        return node instanceof Flow.Sub sub ? sub.inner() : null;
+    }
 
     /** {@code flow} as it can be written: {@link Flow#NONE} once it has no activity left to start at. */
     public static Flow written(Flow flow) {
@@ -139,16 +157,39 @@ public final class FlowTypes {
      * empty, which reads as "written by hand" and is refused rather than guessed at. A card with no method yet is
      * written as {@code ActivityBody.none()}.
      */
-    public static final DeclaredCall<Flow.Step> STEP_SHAPE = ComponentType.part(Flow.Step.class)
+    public static final DeclaredCall<Flow.Step> STEP_SHAPE = cardLinks(ComponentType.part(Flow.Step.class)
             .<Class<Outcome>, ActivityBody<Outcome>, Flow.Step>writtenAs(Flow::activity, step -> null, step -> null)
             .components(value -> List.of(value.activity(), bodyLiteral(sourceOf(value.body()))))
-            .build(FlowTypes::step)
-            .with(Flow.Step::described, Flow.Step::description)
-            .flag(Flow.Step::off, step -> !step.enabled())
-            .flag(Flow.Step::goesHome, Flow.Step::goHome)
-            .flag(Flow.Step::checksPopups, Flow.Step::popupCheck)
-            .flag(Flow.Step::switchable, Flow.Step::runnerSwitch)
-            .<Class<? extends Outcome>>with(Flow.Step::whenOff, Flow.Step::whenOff, FlowTypes::withOff);
+            .build(FlowTypes::step))
+            .when(step -> step.node() instanceof Activity);
+
+    /**
+     * {@code Flow.subflow(Flow)} and the same links as an activity's card: a card running another of the bot's
+     * flows, held by its name ({@code BotConstants.flow}). It has no body.
+     */
+    public static final DeclaredCall<Flow.Step> SUBFLOW_STEP_SHAPE = cardLinks(ComponentType.part(Flow.Step.class)
+            .<Flow, Flow.Step>writtenAs(Flow::subflow, step -> innerOf(step.node())))
+            .when(step -> step.node() instanceof Flow.Sub);
+
+    /**
+     * {@code call} with every card's links, in the order they are written: one list for both cards, so a link
+     * added to one is never missing from the other.
+     */
+    private static DeclaredCall<Flow.Step> cardLinks(DeclaredCall<Flow.Step> call) {
+        return call
+                .with(Flow.Step::described, Flow.Step::description)
+                .flag(Flow.Step::off, step -> !step.enabled())
+                .flag(Flow.Step::goesHome, Flow.Step::goHome)
+                .flag(Flow.Step::checksPopups, Flow.Step::popupCheck)
+                .flag(Flow.Step::switchable, Flow.Step::runnerSwitch)
+                .<Class<? extends Outcome>>with(Flow.Step::whenOff, FlowTypes::offActivity, FlowTypes::withOff)
+                .<Flow>with(Flow.Step::whenOff, step -> innerOf(step.whenOff()));
+    }
+
+    /** Where {@code step} goes switched off, when that is an activity: {@link Activity#NONE} for a sub-flow. */
+    private static Activity offActivity(Flow.Step step) {
+        return step.whenOff() instanceof Activity activity ? activity : Activity.NONE;
+    }
 
     private static Flow.Step step(List<Object> parts) {
         if (parts.size() != 2 || !(parts.get(0) instanceof Activity activity) || activity.isNone()
@@ -173,7 +214,8 @@ public final class FlowTypes {
     public static final DeclaredCall<Flow.Edge> EDGE_SHAPE = ComponentType.part(Flow.Edge.class)
             .<Outcome, Class<? extends Outcome>, Flow.Edge>writtenAs(Flow::edge, Flow.Edge::on, edge -> null)
             .components(edge -> List.of(edge.on(), edge.to()))
-            .build(FlowTypes::edge);
+            .build(FlowTypes::edge)
+            .when(edge -> edge.via() == null && edge.to() instanceof Activity);
 
     private static Flow.Edge edge(List<Object> parts) {
         if (parts.size() != 2 || !(parts.get(0) instanceof Outcome on) || !(parts.get(1) instanceof Activity to)) {
@@ -181,6 +223,36 @@ public final class FlowTypes {
         }
         return new Flow.Edge(on, to);
     }
+
+    /** {@code Flow.edge(Outcome, Flow)}: a wire from an activity into a sub-flow card. */
+    public static final DeclaredCall<Flow.Edge> EDGE_INTO_SUBFLOW_SHAPE = ComponentType.part(Flow.Edge.class)
+            .<Outcome, Flow, Flow.Edge>writtenAs(Flow::edge, Flow.Edge::on, edge -> innerOf(edge.to()))
+            .when(edge -> edge.via() == null && edge.to() instanceof Flow.Sub);
+
+    /**
+     * {@code Flow.edge(Flow via, Outcome, Class)}: a wire out of a sub-flow card, on the outcome its flow ended on,
+     * to an activity.
+     */
+    public static final DeclaredCall<Flow.Edge> EDGE_OUT_OF_SUBFLOW_SHAPE = ComponentType.part(Flow.Edge.class)
+            .<Flow, Outcome, Class<? extends Outcome>, Flow.Edge>writtenAs(Flow::edge, Flow.Edge::via,
+                    Flow.Edge::on, edge -> null)
+            .components(edge -> List.of(edge.via(), edge.on(), edge.to()))
+            .build(FlowTypes::edgeOut)
+            .when(edge -> edge.via() != null && edge.to() instanceof Activity);
+
+    private static Flow.Edge edgeOut(List<Object> parts) {
+        if (parts.size() != 3 || !(parts.get(0) instanceof Flow via) || !(parts.get(1) instanceof Outcome on)
+                || !(parts.get(2) instanceof Activity to)) {
+            return null;
+        }
+        return new Flow.Edge(via, on, to);
+    }
+
+    /** {@code Flow.edge(Flow via, Outcome, Flow)}: a wire from one sub-flow card to another. */
+    public static final DeclaredCall<Flow.Edge> EDGE_BETWEEN_SUBFLOWS_SHAPE = ComponentType.part(Flow.Edge.class)
+            .<Flow, Outcome, Flow, Flow.Edge>writtenAs(Flow::edge, Flow.Edge::via, Flow.Edge::on,
+                    edge -> innerOf(edge.to()))
+            .when(edge -> edge.via() != null && edge.to() instanceof Flow.Sub);
 
     /** {@code Flow.limits(int, int)}. */
     public static final DeclaredCall<Flow.Limits> LIMITS_SHAPE = ComponentType.part(Flow.Limits.class)
@@ -229,9 +301,13 @@ public final class FlowTypes {
     public static final DeclaredCall<FlowLayout.Spot> SPOT_SHAPE = ComponentType.part(FlowLayout.Spot.class)
             .writtenAs(FlowLayout::at, FlowLayout.Spot::x, FlowLayout.Spot::y);
 
-    /** The flow's four, the run and the layout's three, which is what {@code SdkPlugin.componentTypes()} hands the host. */
-    public static final List<ComponentType<?>> ALL = List.of(FLOW_SHAPE, STEP_SHAPE, EDGE_SHAPE, LIMITS_SHAPE,
-            RUN_SHAPE, LAYOUT_SHAPE, CARDS_SHAPE, SPOT_SHAPE);
+    /**
+     * The flow's four records — a flow, a card and a wire each spelled more than one way, the activity's spelling
+     * first — the run and the layout's three, which is what {@code SdkPlugin.componentTypes()} hands the host.
+     */
+    public static final List<ComponentType<?>> ALL = List.of(FLOW_SHAPE, FLOW_FROM_SUBFLOW_SHAPE, STEP_SHAPE,
+            SUBFLOW_STEP_SHAPE, EDGE_SHAPE, EDGE_INTO_SUBFLOW_SHAPE, EDGE_OUT_OF_SUBFLOW_SHAPE,
+            EDGE_BETWEEN_SUBFLOWS_SHAPE, LIMITS_SHAPE, RUN_SHAPE, LAYOUT_SHAPE, CARDS_SHAPE, SPOT_SHAPE);
 
     /** Every element of {@code list} as a {@code type}, or {@code null} when one is not. */
     private static <E> List<E> all(Object list, Class<E> type) {

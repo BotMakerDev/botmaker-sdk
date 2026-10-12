@@ -9,6 +9,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.Labels;
 import com.botmaker.sdk.plugin.flow.FlowConstants;
 import com.botmaker.sdk.plugin.flow.FlowNames;
@@ -135,6 +136,8 @@ public final class ActivityEditors {
         Optional<Flow> value = ctx.value(Flow.class);
         if (value.isEmpty()) return "";
         if (Flow.NONE.equals(value.get())) return NO_FLOW;
+        String referred = BotConstants.flowName(value.get());
+        if (referred != null) return flows.contains(referred) ? referred : "";
         return flows.stream()
                 .filter(name -> FlowValue.FLOWS.read(values, name).filter(value.get()::equals).isPresent())
                 .findFirst().orElse("");

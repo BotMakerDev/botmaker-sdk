@@ -116,8 +116,13 @@ public final class InstalledRun {
         }
     }
 
-    /** The name the bot declares {@code flow} as, {@code DAILY}, or blank when it was never learned. */
+    /**
+     * The name the bot declares {@code flow} as, {@code DAILY}, or blank when it was never learned. An editor's
+     * reference ({@link BotConstants#flow}) is its own name.
+     */
     public static String nameOf(Flow flow) {
+        String referred = BotConstants.flowName(flow);
+        if (referred != null) return referred;
         String name = flow == null ? null : names.get(flow);
         return name == null ? "" : name;
     }

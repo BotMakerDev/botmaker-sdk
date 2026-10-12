@@ -111,7 +111,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   Declare the inner flow above the one that runs it: a run refuses one read before its declaration. The trace
   says when a sub-flow starts and ends, and the runner's skip list reaches activities inside sub-flows. A
   `Flow.Step` now holds a card (`node()`; `activity()` still answers for an activity) and a `Flow.Edge` the
-  sub-flow it leaves (`via()`). The Activity Flow window does not draw sub-flows yet.
+  sub-flow it leaves (`via()`). Studio reads and writes every one of these spellings, a reference to a flow
+  (`Flows.DAILY`) kept by its name even while that flow is empty or equal to another; the Activity Flow window
+  does not draw sub-flows yet.
 - **`Sdk.flow()` is gone, and so are presets.** The flow moved to `Flows.MAIN` and its `.home(…)` to
   `Sdk.run()`; `Flow.of` takes four parts (no preset list), and `FlowLayout.of` keys its cards by flow
   (`FlowLayout.cards(…)`). A preset is now a flow of its own. Nothing converts a 1.4.2 bot's values: Studio's

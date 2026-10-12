@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.flow;
 
 import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.flow.Labels;
 
@@ -137,16 +138,19 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
 
         /**
          * The same card when it runs the same flow — the same constant, not an equal one: two flows declared alike
-         * are two cards, and comparing whole flow trees on every step would cost a walk of each.
+         * are two cards, and comparing whole flow trees on every step would cost a walk of each. An editor's
+         * reference to a flow by its name ({@code BotConstants.flow}) is the same card as another reference to
+         * the same name.
          */
         @Override
         public boolean equals(Object other) {
-            return other instanceof Sub sub && sub.inner == inner;
+            return other instanceof Sub sub && (sub.inner == inner
+                    || BotConstants.flowName(inner) != null && inner.equals(sub.inner));
         }
 
         @Override
         public int hashCode() {
-            return System.identityHashCode(inner);
+            return BotConstants.flowName(inner) != null ? inner.hashCode() : System.identityHashCode(inner);
         }
 
         @Override
