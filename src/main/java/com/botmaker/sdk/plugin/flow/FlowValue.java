@@ -110,9 +110,11 @@ public final class FlowValue {
     public static Target target(StudioServices services, String name) {
         Optional<ValueContext> runValue = RUN.openOrCreate(services);
         if (runValue.isEmpty()) {
-            return Target.refused("This project has no Sdk.java with an @SdkValue(RUN) method, so there is nothing "
-                    + "to save the flow into. BotMaker writes plugins/sdk/Sdk.java when the project opens and has no "
-                    + "Sdk class anywhere; reopen the project to get it.");
+            // The host writes a missing Sdk.java, and adds run() to one that lacks it (2026-10-12), so what is left
+            // is one of three, and the host's reason does not reach a plugin through openOrCreate.
+            return Target.refused("BotMaker has no @SdkValue(RUN) method it can write, so there is nothing to save "
+                    + "the flow into. Either the project is open read-only, Sdk.run() is hand-written in a form "
+                    + "this editor cannot read, or the Sdk class is outside plugins/sdk/.");
         }
         Optional<Run> run = RUN.read(runValue.get());
         if (run.isEmpty()) {

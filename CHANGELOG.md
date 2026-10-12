@@ -133,6 +133,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The Activity Flow window no longer says "reopen the project"** when it has nowhere to save. Studio now adds
+  the missing `run()` itself. What is left is said: the project is open read-only, or its `Sdk` class is
+  outside `plugins/sdk/`.
 - **"Runs" is a list, not a text field.** An activity's side panel lists the methods returning its enum, and
   *Create method…* writes one (`Collect::body`, returning the enum's first outcome) and picks it. With no card
   selected, **Home** picks the flow's way home the same way, among the bot's `public static void` methods.
