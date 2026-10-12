@@ -115,7 +115,7 @@ public final class FlowConstants {
      * parameter.
      */
     public static List<String> homes(PluginValues values) {
-        return values == null ? List.of() : values.methods(null, null);
+        return values == null ? List.of() : values.methods((String) null, null);
     }
 
     /**
