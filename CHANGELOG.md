@@ -19,7 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
-No source changes since v1.4.4; re-released for updated upstream pins.
+### Added
+
+- **Two assistant tools for the launch.** `list_games` lists the games this computer's launchers installed,
+  each with the target `set_launch_target` takes, so an assistant no longer has to know a Heroic app name.
+  `launch_game` starts the bot's launch target on this desktop without running the bot. Given `seconds`, it
+  answers once the window the bot looks at is open. With the game in a private display or a VM it refuses: a
+  run starts the game there.
 
 ### Fixed
 

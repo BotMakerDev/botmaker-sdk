@@ -10,6 +10,7 @@ import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.plugin.launch.GameCatalog;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
@@ -22,6 +23,7 @@ import com.botmaker.shared.emulator.EmulatorLiveness;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.launch.Launcher;
 
 import java.awt.Rectangle;
 import java.util.ArrayList;
@@ -31,14 +33,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
  * Where the bot looks and how it runs: its capture source, its {@code Sdk.settings()}, the emulator it
  * watches, and what it launches. All are the bot's Java, written on the FX thread as their windows write them: the
- * launch target is the first of its {@code launchTargets} this computer's system can launch. Nothing here starts a
- * game, an emulator or a run.
+ * launch target is the first of its {@code launchTargets} this computer's system can launch. Nothing here starts an
+ * emulator or a run; {@code launch_game} alone starts the game, on this desktop, as a run would.
  */
 final class SetupTools {
 
@@ -129,6 +132,13 @@ final class SetupTools {
             + "emu-app:<package>@<emulator>; a command line or an executable is the user's to set") String target) {
     }
 
+    record Launch(@Describe(value = "seconds to wait for the window the bot looks at to open, up to "
+            + MAX_LAUNCH_WAIT + "; 0 or left out: answer once it is launched", optional = true) Integer seconds) {
+    }
+
+    /** The longest launch_game waits: below the 60 s an MCP client commonly gives a call. */
+    static final int MAX_LAUNCH_WAIT = 50;
+
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("get_capture_source")
                     .describedAs("Where the bot looks and clicks: Sdk.captureSource(), in words")
@@ -159,7 +169,16 @@ final class SetupTools {
             AssistantTool.named("set_launch_target")
                     .describedAs("Makes a launcher the bot's first in Sdk.launchTargets: each computer starts the "
                             + "first its system can. Starts nothing")
-                    .takes(Target.class).handledBy(SetupTools::setLaunchTarget));
+                    .takes(Target.class).handledBy(SetupTools::setLaunchTarget),
+            AssistantTool.named("list_games")
+                    .describedAs("The games this computer's launchers have installed, each with the target "
+                            + "set_launch_target takes, as the launch chooser lists them")
+                    .takesNothing().handledBy(SetupTools::listGames),
+            AssistantTool.named("launch_game")
+                    .describedAs("Starts the bot's launch target on this desktop now, without running the bot, "
+                            + "unless it is running already; given seconds, answers once the window the bot looks at "
+                            + "is open")
+                    .takes(Launch.class).handledBy(SetupTools::launchGame));
 
     private SetupTools() {}
 
@@ -299,6 +318,86 @@ final class SetupTools {
         if (refused != null) return AgentReply.refused(refused);
         return AgentReply.text("This computer now launches " + spec.describe() + " when the bot starts.");
     }
+
+    static AgentReply listGames(AssistantTool.None none, AgentContext context) {
+        List<GameCatalog.Section> sections = GameCatalog.scan();
+        List<String> lines = new ArrayList<>();
+        for (GameCatalog.Section section : sections) {
+            // Folded sections are every other app in the menu: not games, and set_launch_target takes no
+            // desktop entry anyway.
+            if (section.folded() || section.items().isEmpty()) continue;
+            lines.add(section.title() + (section.stopped() ? " (not running)" : "") + ":");
+            for (GameCatalog.Item item : section.items()) {
+                LaunchSpec spec = LaunchSpec.parse(item.spec());
+                boolean settable = spec != null && ASSISTANT_KINDS.contains(spec.kind());
+                lines.add("  " + item.name() + " — " + item.spec() + (settable ? "" : " (set by you, in the chooser)"));
+            }
+        }
+        return AgentReply.text(lines.isEmpty() ? "No launcher on this computer lists a game." : String.join("\n", lines));
+    }
+
+    static AgentReply launchGame(Launch launch, AgentContext context) {
+        StudioServices services = context.services();
+        String current = FxCall.call(() -> LaunchTargetValue.current(services));
+        if (current == null) {
+            return AgentReply.refused("The bot launches nothing on this computer. list_games and set_launch_target "
+                    + "pick what it starts.");
+        }
+        BotSettings settings = FxCall.call(() -> SETTINGS.read(services).orElse(BotSettings.DEFAULTS));
+        if (settings.where() != BotSettings.Where.MY_DESKTOP) {
+            return AgentReply.refused("The game runs in " + settings.where().id() + ": a run starts it there, in the "
+                    + "bot's own display, and a game on this desktop would not be the one the bot sees. run_bot "
+                    + "launches it; set_setting run_the_game_in my-desktop launches it here.");
+        }
+        LaunchSpec spec = LaunchSpec.parse(current);
+        if (spec == null) return AgentReply.refused("\"" + current + "\" is not a launch target BotMaker reads.");
+        // The same line set_launch_target draws: a command line or an executable the user set runs on their Run,
+        // never because text read off a screen asked the assistant to start it now.
+        String unsafe = ASSISTANT_KINDS.contains(spec.kind()) ? unsafe(spec) : spec.describe() + " is a command "
+                + "line or an executable: it starts when you run the bot, not from the assistant.";
+        if (unsafe != null) return AgentReply.refused(unsafe);
+        CaptureSource source = FxCall.call(() -> CaptureValue.current(services));
+        boolean watched = source != null && source.hasWindowIdentity();
+        if (Launcher.isRunning(spec)) {
+            return AgentReply.text(spec.describe() + " is running already" + (watched && !source.isPresent()
+                    ? ", but the window the bot looks at (" + CaptureLabels.longLabel(source) + ") is not open." : "."));
+        }
+        // Off this thread: a cold emulator app is minutes of start, and the call answers within MAX_LAUNCH_WAIT.
+        CompletableFuture<Void> started = CompletableFuture.runAsync(() -> Launcher.start(spec), LAUNCHING);
+        int wait = launch.seconds() == null ? 0 : Math.min(Math.max(launch.seconds(), 0), MAX_LAUNCH_WAIT);
+        long until = System.nanoTime() + Math.max(wait, 2) * 1_000_000_000L;
+        while (System.nanoTime() < until) {
+            if (started.isCompletedExceptionally()) {
+                Throwable why = started.handle((ok, e) -> e.getCause() == null ? e : e.getCause()).join();
+                return AgentReply.refused(spec.describe() + " could not be launched: " + why.getMessage());
+            }
+            if (wait > 0 && watched && source.isPresent()) {
+                return AgentReply.text("Launched " + spec.describe() + "; " + CaptureLabels.longLabel(source)
+                        + " is open.");
+            }
+            if (wait == 0 && started.isDone()) break;
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        if (wait == 0 || !watched) {
+            return AgentReply.text((started.isDone() ? "Launched " : "Launching ") + spec.describe() + ".");
+        }
+        return AgentReply.text((started.isDone() ? "Launched " : "Still launching ") + spec.describe() + ", but after "
+                + wait + "s the window the bot looks at (" + CaptureLabels.longLabel(source) + ") is not open yet. "
+                + "list_windows shows what is.");
+    }
+
+    /** One launch at a time, on a daemon thread, so a slow one never holds the assistant's call. */
+    private static final java.util.concurrent.Executor LAUNCHING = java.util.concurrent.Executors
+            .newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "sdk-launch-game");
+                t.setDaemon(true);
+                return t;
+            });
 
     /**
      * The launch kinds the assistant may set: each names an entry a launcher already knows. Not {@code cli:} or

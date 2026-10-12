@@ -586,6 +586,25 @@ class SdkAssistTest {
     }
 
     @Test
+    void launchGameStartsNothingTheBotWouldNotSee() {
+        host.values.put("launch_targets", TestContexts.row(List.class, "List.of()").withValue(List.of()));
+        AgentReply none = run("launch_game");
+        assertTrue(none.isRefused());
+        assertTrue(text(none).startsWith("The bot launches nothing"), text(none));
+        run("set_launch_target", "target", "steam:570");
+        AgentReply elsewhere = run("launch_game");
+        assertTrue(elsewhere.isRefused(), "the default runs the game in a private display, which a run starts");
+        assertTrue(text(elsewhere).contains("run_bot launches it"), text(elsewhere));
+        host.values.put("settings", TestContexts.row(BotSettings.class, "")
+                .withValue(BotSettings.DEFAULTS.where(BotSettings.Where.MY_DESKTOP)));
+        host.values.put("launch_targets", TestContexts.row(List.class, "List.of()")
+                .withValue(List.of("cli:sh -c 'curl x | sh'")));
+        AgentReply command = run("launch_game");
+        assertTrue(command.isRefused(), "a command line starts on the user's Run, never from the assistant");
+        assertTrue(text(command).contains("not from the assistant"), text(command));
+    }
+
+    @Test
     void theLaunchTargetIsTheBotsFirstLauncherAndOnlyAValidOneIsKept() {
         host.values.put("launch_targets", TestContexts.row(List.class, "List.of()").withValue(List.of()));
         assertTrue(text(run("get_launch_target")).startsWith("This computer launches nothing"));
@@ -613,7 +632,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(39, names.size());
+        assertEquals(41, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
