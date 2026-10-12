@@ -178,15 +178,21 @@ public final class FlowValue {
 
     /**
      * Adds the flow {@code typed} names, holding {@code flow} — {@link Flow#NONE} for an empty one — on the JavaFX
-     * application thread.
+     * application thread. A bot with no flow yet gets {@link #FIRST} first: the editor shows it before it is
+     * written, and a second flow would otherwise make it vanish.
      *
      * @return null when it was written, else why it could not be
      */
     public static String create(StudioServices services, String typed, Flow flow) {
         PluginValues values = services.pluginValues();
         String name = FlowNames.constantFor(typed);
-        String problem = nameProblem(typed, name, flowNames(values));
+        List<String> names = flowNames(values);
+        String problem = nameProblem(typed, name, names);
         if (problem != null) return problem;
+        if (names.isEmpty() && !FIRST.equals(name)) {
+            String refused = FLOWS.add(values, Member.of(FIRST), Flow.NONE).orElse(null);
+            if (refused != null) return refused;
+        }
         return FLOWS.add(values, Member.of(name), FlowTypes.written(flow)).orElse(null);
     }
 
@@ -347,8 +353,8 @@ public final class FlowValue {
         if (target.problem() != null) return target.problem();
         Flow written = FlowTypes.written(flow);
         if (target.value().isPresent()) {
-            target.value().get().set(written);
-            return null;
+            // write, not set: set only puts a refusal on the status line, and the editor then said "Saved".
+            return target.value().get().write(written).orElse(null);
         }
         return FLOWS.add(services.pluginValues(), Member.of(target.name()), written).orElse(null);
     }

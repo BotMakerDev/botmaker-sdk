@@ -19,6 +19,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Fixed
+
+- **A flow with an activity is saved.** Activity Flow said "Saved" while Studio refused the flow, so `Flows.X` stayed
+  `Flow.NONE` and only the card's place and the activity's enum were written. A refused write now shows as *Not
+  saved* with Studio's reason (the flow and its card places alike).
+- **A new flow keeps `MAIN`.** In a bot with no flow yet, Activity Flow shows `MAIN` before writing it; creating
+  another flow then made it vanish. `MAIN` is now written first.
+- **Create method asks for a class and a name, not `Class::method` text.** Pick one of the bot's classes, or type
+  a new name to create that class, then name the method: an activity's body, the way home and the setup alike.
+
 ### Build
 
 - **JitPack builds with `.jitpack/build.sh`**, the umbrella's `tools/jitpack/build.sh`: Maven 3.9.9 and every

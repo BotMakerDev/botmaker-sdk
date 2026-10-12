@@ -8,8 +8,11 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 
@@ -70,12 +73,10 @@ final class MethodPicker {
                 refused(services, "No method", why);
                 return;
             }
-            prompt(services, proposal).ifPresent(reference -> {
-                int at = reference.indexOf("::");
-                PluginValues.MethodWrite written = create.apply(reference.substring(0, at),
-                        reference.substring(at + 2));
+            prompt(services, proposal).ifPresent(named -> {
+                PluginValues.MethodWrite written = create.apply(named.className(), named.method());
                 if (!written.written()) {
-                    refused(services, reference, written.refusal());
+                    refused(services, named.className() + "::" + named.method(), written.refusal());
                     return;
                 }
                 box.getItems().setAll(items(methods.get(), written.reference()));
@@ -98,20 +99,62 @@ final class MethodPicker {
         return items;
     }
 
-    /** Asks for {@code Class::method}, proposing {@code proposal}; empty when cancelled or not a reference. */
-    private static Optional<String> prompt(StudioServices services, String proposal) {
-        TextInputDialog dialog = new TextInputDialog(proposal);
+    /** The class a new method goes in and the method's name, as the create prompt took them. */
+    record Named(String className, String method) {}
+
+    /**
+     * Asks for the class — one of the bot's, picked, or a new name typed — and the method's name, proposing
+     * {@code proposal}'s two halves; empty when cancelled or either is not a Java name.
+     */
+    private static Optional<Named> prompt(StudioServices services, String proposal) {
+        Named proposed = split(proposal);
+        List<String> classes = services.pluginValues().classes();
+
+        ComboBox<String> owner = new ComboBox<>();
+        owner.setEditable(true);
+        owner.getItems().setAll(classes);
+        owner.setValue(proposed.className());   // a class of its own, Collect for Collect's body, until one is picked
+        owner.setMaxWidth(Double.MAX_VALUE);
+        TextField method = new TextField(proposed.method());
+
+        GridPane form = new GridPane();
+        form.setHgap(8);
+        form.setVgap(8);
+        form.addRow(0, new Label("Class"), owner);
+        form.addRow(1, new Label("Method"), method);
+        Label hint = new Label("Pick one of the bot's classes, or type a new name to create that class.");
+        hint.setWrapText(true);
+        form.add(hint, 0, 2, 2, 1);
+        GridPane.setHgrow(owner, Priority.ALWAYS);
+
+        Dialog<Named> dialog = new Dialog<>();
         services.theme().apply(dialog);
         dialog.initOwner(Modals.owner(services));
         dialog.setTitle("Create method");
-        dialog.setHeaderText("Which class, and what is the method called?");
-        dialog.setContentText("Class::method");
-        Optional<String> typed = dialog.showAndWait().map(String::strip).filter(s -> !s.isEmpty());
-        if (typed.isPresent() && !FlowNames.isMethodReference(typed.get())) {
-            refused(services, typed.get(), "Write it as Class::method, like " + proposal + ".");
+        dialog.setHeaderText("Which class does the method go in, and what is it called?");
+        dialog.getDialogPane().setContent(form);
+        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.CANCEL, ButtonType.OK);
+        dialog.setResultConverter(button -> button == ButtonType.OK
+                ? new Named(text(owner.getEditor().getText()), text(method.getText())) : null);
+        javafx.application.Platform.runLater(method::requestFocus);
+        Optional<Named> named = dialog.showAndWait().filter(n -> !n.className().isEmpty() || !n.method().isEmpty());
+        if (named.isPresent() && !FlowNames.isMethodReference(named.get().className() + "::" + named.get().method())) {
+            refused(services, "", "Both need a Java name, a letter first: a class like "
+                    + proposed.className() + " and a method like " + proposed.method() + ".");
             return Optional.empty();
         }
-        return typed;
+        return named;
+    }
+
+    /** {@code Collect::body} as its class and method; a reference without {@code ::} is all method. */
+    static Named split(String reference) {
+        String whole = reference == null ? "" : reference.strip();
+        int at = whole.indexOf("::");
+        return at < 0 ? new Named("", whole) : new Named(whole.substring(0, at), whole.substring(at + 2));
+    }
+
+    private static String text(String typed) {
+        return typed == null ? "" : typed.strip();
     }
 
     private static void refused(StudioServices services, String reference, String why) {

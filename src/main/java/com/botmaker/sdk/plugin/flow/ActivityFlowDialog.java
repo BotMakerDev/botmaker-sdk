@@ -1469,8 +1469,9 @@ public final class ActivityFlowDialog {
             try {
                 // After the flow, never before: a layout for a card the saved flow does not have is the one
                 // way round that is merely untidy.
-                layoutValue.get().set(layout);
-                written = layout;
+                Optional<String> layoutRefused = layoutValue.get().write(layout);
+                if (layoutRefused.isPresent()) failure = new IllegalStateException(layoutRefused.get());
+                else written = layout;
             } catch (Exception | LinkageError e) {
                 failure = e;
             }
