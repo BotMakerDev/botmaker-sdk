@@ -19,7 +19,8 @@ import java.util.Map;
  * brings the enum in step ({@link FlowConstants}) before it writes the flow that names its constants.
  *
  * @param flow  one of the bot's {@code Flows} constants
- * @param exits each activity's label → its outcomes' labels, in the enum's order; every activity has one
+ * @param exits each activity's label → its outcomes' labels, in the enum's order; every activity has one, and
+ *              no sub-flow card does: its exits are its flow's ({@link FlowRefs#exits})
  */
 public record Board(Flow flow, Map<String, List<String>> exits) {
 
@@ -38,6 +39,8 @@ public record Board(Flow flow, Map<String, List<String>> exits) {
         Map<String, List<String>> declared = FlowConstants.declared(values);
         Map<String, List<String>> exits = new LinkedHashMap<>();
         for (Flow.Step step : flow.steps()) {
+            // A sub-flow card's exits are its flow's (FlowRefs), never an enum the save writes.
+            if (step.node() instanceof Flow.Sub) continue;
             List<String> own = new ArrayList<>();
             for (String constant : declared.getOrDefault(step.activity().name(), List.of())) {
                 own.add(Labels.of(constant));

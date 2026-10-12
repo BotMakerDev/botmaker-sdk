@@ -44,4 +44,15 @@ class FlowValueTest {
         assertEquals(List.of("MAIN"), List.copyOf(FlowValue.moved(layout, "DAILY", null).flows().keySet()));
         assertSame(layout, FlowValue.moved(layout, "NIGHTLY", "X"), "a flow with no cards moves nothing");
     }
+
+    @Test
+    void aSubflowCardKeepsItsPlaceWhenItsFlowIsRenamed() {
+        Map<String, FlowLayout.Cards> flows = new LinkedHashMap<>();
+        flows.put("MAIN", FlowLayout.cards(Map.of("Collect", FlowLayout.at(1, 2), "▸ DAILY", FlowLayout.at(5, 6))));
+        flows.put("DAILY", FlowLayout.cards(Map.of("Rest", FlowLayout.at(3, 4))));
+        FlowLayout renamed = FlowValue.subflowMoved(FlowLayout.of(flows, true), "DAILY", "FARM");
+        assertEquals(FlowLayout.at(5, 6), renamed.cardsOf("MAIN").spot("▸ FARM"));
+        assertNull(renamed.cardsOf("MAIN").spot("▸ DAILY"));
+        assertEquals(FlowLayout.at(1, 2), renamed.cardsOf("MAIN").spot("Collect"));
+    }
 }

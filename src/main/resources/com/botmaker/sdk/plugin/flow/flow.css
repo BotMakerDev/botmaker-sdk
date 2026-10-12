@@ -72,6 +72,44 @@
     -fx-font-weight: bold;
 }
 
+/*
+ * A sub-flow card (2026-10-12): another flow run as one step. A double border tells it from an activity at a
+ * glance in every theme, since it is drawn in the card's own tokens rather than a colour of its own.
+ */
+.flow-card-subflow {
+    -fx-border-color: -bm-flow-wire, -bm-flow-border;
+    -fx-border-width: 2, 1;
+    -fx-border-insets: 0, 3;
+    -fx-border-radius: 6, 4;
+}
+
+/* An exit the sub-flow no longer ends on, and the wire still leaving it: never taken, so said in warning ink. */
+.flow-port-broken {
+    -fx-text-fill: -bm-severity-warning-text;
+}
+
+.flow-wire-broken {
+    -fx-stroke: -bm-severity-warning-text;
+    -fx-stroke-dash-array: 6 4;
+}
+
+/* The flow tree and the breadcrumb above the canvas. */
+.flow-tree-flow {
+    -fx-font-weight: bold;
+}
+
+.flow-tree-subflow {
+    -fx-text-fill: -bm-primary;
+}
+
+.flow-tree .tree-cell:selected.flow-tree-subflow {
+    -fx-text-fill: -fx-selection-bar-text;
+}
+
+.flow-breadcrumb-here {
+    -fx-font-weight: bold;
+}
+
 /* The two card toggles, told apart by shape as well as caption: a tick for "run this", a small pressed
    button for the go-home pre-step. */
 .flow-toggle-run {

@@ -1,5 +1,7 @@
 package com.botmaker.sdk.internal.flow;
 
+import com.botmaker.sdk.api.bot.Outcome;
+
 import java.util.Locale;
 
 /**
@@ -16,6 +18,23 @@ import java.util.Locale;
 public final class Labels {
 
     private Labels() {}
+
+    /**
+     * What starts a sub-flow card's label, {@code ▸ DAILY}: no activity's words start with it, so a card's label
+     * names one card (2026-10-12).
+     */
+    public static final String SUBFLOW = "▸ ";
+
+    /**
+     * An exit of a sub-flow card as the canvas labels its port: the inner activity and its outcome,
+     * {@code Claim · Done}, since two inner activities may each end on an outcome of one name.
+     */
+    public static String ofExit(Outcome exit) {
+        return exit.activity().label() + EXIT + exit.label();
+    }
+
+    /** What joins the activity and the outcome in {@link #ofExit}. */
+    public static final String EXIT = " · ";
 
     /** {@code constant} as words: {@code BAG_FULL} is "Bag full", {@code HP_BELOW_50} "Hp below 50". */
     public static String of(String constant) {

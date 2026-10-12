@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.Labels;
 
 /**
@@ -30,12 +31,13 @@ public record Arrow(String from, String to, String outcome) {
         from = from == null ? "" : from;
         to = to == null ? "" : to;
         // "Next", "NEXT" and "next" are one constant, so one port.
-        outcome = outcome == null ? "" : DISABLED.equals(outcome) ? outcome : FlowNames.label(outcome);
+        outcome = FlowNames.port(outcome);
     }
 
-    /** The arrow a stored edge is drawn as. */
+    /** The arrow a stored edge is drawn as: out of a sub-flow card, on its exit's port ({@code Claim · Done}). */
     public static Arrow of(Flow.Edge edge) {
-        return new Arrow(edge.from().label(), edge.to().label(), edge.on() == null ? "" : edge.on().label());
+        String on = edge.on() == null ? "" : edge.via() != null ? Labels.ofExit(edge.on()) : edge.on().label();
+        return new Arrow(edge.from().label(), edge.to().label(), on);
     }
 
     /** The switched-off arrow a stored step is drawn with, or {@code null} when it has none. */
@@ -48,8 +50,13 @@ public record Arrow(String from, String to, String outcome) {
         return DISABLED.equals(outcome);
     }
 
-    /** The edge this arrow is saved as: its outcome as {@code from}'s constant. Not for {@link #isDisabled}. */
+    /**
+     * The edge this arrow is saved as: its outcome as {@code from}'s constant, or, out of a sub-flow card, as the
+     * inner activity's constant its exit names. Not for {@link #isDisabled}.
+     */
     public Flow.Edge toEdge() {
-        return new Flow.Edge(FlowNames.outcome(from, outcome), FlowNames.activity(to));
+        String via = FlowNames.subflowOf(from);
+        if (via != null) return new Flow.Edge(BotConstants.flow(via), FlowNames.exitOutcome(outcome), FlowNames.node(to));
+        return new Flow.Edge(FlowNames.outcome(from, outcome), FlowNames.node(to));
     }
 }

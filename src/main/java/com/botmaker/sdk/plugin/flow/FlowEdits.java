@@ -78,6 +78,10 @@ public final class FlowEdits {
     public static Board renameActivity(Board board, String from, String typed) {
         Flow flow = board.flow();
         Flow.Step step = step(flow, from);
+        if (step.node() instanceof Flow.Sub) {
+            throw new IllegalArgumentException(step.label() + " is a sub-flow card: it is named by its flow, so rename "
+                    + "the flow instead.");
+        }
         String label = FlowNames.activityLabel(typed);
         Set<String> others = labels(flow);
         others.remove(step.label());
@@ -88,8 +92,10 @@ public final class FlowEdits {
         List<Flow.Step> steps = flow.steps().stream().map(s -> new Flow.Step(swap(s.node(), was, now), s.body(),
                 s.description(), s.enabled(), s.goHome(), s.popupCheck(), s.runnerSwitch(),
                 swap(s.whenOff(), was, now))).toList();
-        List<Flow.Edge> edges = flow.edges().stream().map(e -> new Flow.Edge(
-                e.from().equals(was) ? BotConstants.outcome(now.name(), e.on().name()) : e.on(),
+        // An outcome names its enum, so a wire on one of was's renames with it, a sub-flow card's exit included.
+        List<Flow.Edge> edges = flow.edges().stream().map(e -> new Flow.Edge(e.via(),
+                e.on() != null && e.on().activity().equals(was) ? BotConstants.outcome(now.name(), e.on().name())
+                        : e.on(),
                 swap(e.to(), was, now))).toList();
         Map<String, List<String>> exits = new LinkedHashMap<>();
         board.exits().forEach((activity, outcomes) -> exits.put(activity.equals(step.label()) ? now.label() : activity,
@@ -97,12 +103,12 @@ public final class FlowEdits {
         return new Board(with(flow, steps, edges, swap(flow.start(), was, now)), exits);
     }
 
-    /** {@code board} without the activity {@code name}, its wires, and the start if it was. */
+    /** {@code board} without the card {@code name} — an activity or a sub-flow card — its wires, and the start if it was. */
     public static Board removeActivity(Board board, String name) {
         Flow flow = board.flow();
         Flow.Step removed = step(flow, name);
-        Activity gone = removed.activity();
-        List<Flow.Step> steps = flow.steps().stream().filter(s -> !s.activity().equals(gone))
+        Flow.Node gone = removed.node();
+        List<Flow.Step> steps = flow.steps().stream().filter(s -> !s.node().equals(gone))
                 .map(s -> s.whenOff().equals(gone) ? FlowTypes.whenOff(s, Activity.NONE) : s).toList();
         List<Flow.Edge> edges = flow.edges().stream()
                 .filter(e -> !e.from().equals(gone) && !e.to().equals(gone)).toList();
@@ -121,7 +127,7 @@ public final class FlowEdits {
     public static Board connect(Board board, String from, String outcome, String to) {
         Flow flow = board.flow();
         Flow.Step source = step(flow, from);
-        Activity target = step(flow, to).activity();
+        Flow.Node target = step(flow, to).node();
         String typed = typed(board, source, outcome);
         String constant = FlowNames.constantFor(typed);
         if (constant == null) throw new IllegalArgumentException("'" + typed + "' is not an outcome's name.");
@@ -135,7 +141,8 @@ public final class FlowEdits {
             own.add(wired.label());
             exits.put(source.label(), own);
         }
-        List<Flow.Edge> edges = new ArrayList<>(flow.edges().stream().filter(e -> !e.on().equals(wired)).toList());
+        List<Flow.Edge> edges = new ArrayList<>(flow.edges().stream()
+                .filter(e -> e.via() != null || !wired.equals(e.on())).toList());
         edges.add(new Flow.Edge(wired, target));
         Board next = new Board(with(flow, flow.steps(), edges, flow.start()), exits);
         String problem = validate(next);
@@ -176,10 +183,10 @@ public final class FlowEdits {
         return own.getFirst();
     }
 
-    /** {@code board} starting at the activity {@code name}. */
+    /** {@code board} starting at the card {@code name}. */
     public static Board setStart(Board board, String name) {
         Flow flow = board.flow();
-        return board.with(with(flow, flow.steps(), flow.edges(), step(flow, name).activity()));
+        return board.with(with(flow, flow.steps(), flow.edges(), step(flow, name).node()));
     }
 
     /**
@@ -189,6 +196,7 @@ public final class FlowEdits {
     public static String validate(Board board) {
         Map<String, String> activityTypes = new HashMap<>();
         for (Flow.Step step : board.flow().steps()) {
+            if (step.node() instanceof Flow.Sub) continue;   // named by its flow; its exits are that flow's
             String name = step.label();
             String type = FlowNames.typeFor(name);
             if (type == null) {
@@ -220,10 +228,12 @@ public final class FlowEdits {
         return null;
     }
 
-    /** The labels of {@code flow}'s activities, in order. */
+    /** The labels of {@code flow}'s activities, in order; its sub-flow cards are not activities. */
     public static Set<String> labels(Flow flow) {
         Set<String> labels = new LinkedHashSet<>();
-        for (Flow.Step step : flow.steps()) labels.add(step.label());
+        for (Flow.Step step : flow.steps()) {
+            if (step.node() instanceof Activity) labels.add(step.label());
+        }
         return labels;
     }
 

@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
+import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.Labels;
 
@@ -116,6 +117,51 @@ public final class FlowNames {
         return BotConstants.outcome(typeFor(activity), constantFor(label));
     }
 
+    /** The label of the sub-flow card running the flow {@code flow}, {@code ▸ DAILY}. */
+    public static String subflowLabel(String flow) {
+        return Labels.SUBFLOW + flow;
+    }
+
+    /** The flow a sub-flow card's label names — {@code DAILY} for {@code ▸ DAILY} — or null for an activity's. */
+    public static String subflowOf(String label) {
+        if (label == null || !label.startsWith(Labels.SUBFLOW)) return null;
+        String flow = label.substring(Labels.SUBFLOW.length()).strip();
+        return flow.isEmpty() ? null : flow;
+    }
+
+    /** The card a label names: a sub-flow card for {@code ▸ DAILY}, else the activity {@link #activity} names. */
+    public static Flow.Node node(String label) {
+        String flow = subflowOf(label);
+        return flow == null ? activity(label) : new Flow.Sub(BotConstants.flow(flow));
+    }
+
+    /**
+     * The key a card's place is kept under in {@code Sdk.flowLayout()}: an activity's enum name, a sub-flow card's
+     * label ({@code ▸ DAILY}), which no enum name can be.
+     */
+    public static String layoutKey(String label) {
+        if (subflowOf(label) != null) return label;
+        String type = typeFor(label);
+        return type == null ? label : type;
+    }
+
+    /** The exit a sub-flow card's port label names, {@code Claim · Done}: the inner activity's outcome. */
+    public static Outcome exitOutcome(String exit) {
+        int at = exit == null ? -1 : exit.indexOf(Labels.EXIT);
+        if (at < 0) return BotConstants.outcome("", constantFor(exit));
+        return outcome(exit.substring(0, at), exit.substring(at + Labels.EXIT.length()));
+    }
+
+    /**
+     * A port's label as it is kept: {@link Arrow#DISABLED} and a sub-flow card's exit ({@code Claim · Done}) as
+     * they are, any other outcome as {@link #label} keeps it.
+     */
+    public static String port(String outcome) {
+        if (outcome == null) return "";
+        if (Arrow.DISABLED.equals(outcome) || outcome.contains(Labels.EXIT)) return outcome;
+        return label(outcome);
+    }
+
     /**
      * Whether {@code s} is a method reference — {@code Collect::body}, or {@code com.mybot.Collect::body}.
      *
@@ -169,6 +215,9 @@ public final class FlowNames {
      */
     public static String activityNameProblem(String candidate, Collection<String> taken) {
         if (candidate == null || candidate.isEmpty()) return "Give the activity a name.";
+        if (candidate.startsWith(Labels.SUBFLOW.strip())) {
+            return "'" + candidate + "' starts like a sub-flow card (▸ DAILY); start an activity's name with a letter.";
+        }
         String type = typeFor(candidate);
         if (type == null) return noConstant(candidate, ACTIVITIES);
         if (RESERVED.contains(type)) {

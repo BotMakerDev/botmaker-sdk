@@ -38,7 +38,7 @@ public final class FlowRules {
      * port.
      */
     public static Optional<Arrow> held(List<Arrow> edges, String from, String outcome) {
-        String label = Arrow.DISABLED.equals(outcome) ? outcome : FlowNames.label(outcome);
+        String label = FlowNames.port(outcome);
         for (Arrow e : edges) {
             if (e.from().equals(from) && e.outcome().equals(label)) return Optional.of(e);
         }
@@ -56,6 +56,19 @@ public final class FlowRules {
         List<Arrow> out = new ArrayList<>(edges);
         if (old.isPresent()) out.set(out.indexOf(old.get()), wire);
         else out.add(wire);
+        return out;
+    }
+
+    /**
+     * The ports of the card {@code card}, among {@code ports}, that no wire in {@code edges} leaves: on an activity
+     * each ends the run, which is how a flow stops; on a sub-flow card each is an end of its flow that this one does
+     * not go on from, and the canvas warns about those.
+     */
+    public static List<String> unwired(String card, List<String> ports, List<Arrow> edges) {
+        List<String> out = new ArrayList<>();
+        for (String port : ports) {
+            if (held(edges, card, port).isEmpty()) out.add(port);
+        }
         return out;
     }
 

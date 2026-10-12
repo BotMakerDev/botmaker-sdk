@@ -130,10 +130,14 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
             return InstalledRun.nameOf(inner);
         }
 
+        /**
+         * {@code ▸ DAILY}: the flow's constant as the bot names it, marked so that no activity's label is ever one
+         * (2026-10-12, the canvas keys a card by its label).
+         */
         @Override
         public String label() {
             String name = name();
-            return name.isEmpty() ? "a sub-flow" : Labels.of(name);
+            return name.isEmpty() ? "a sub-flow" : Labels.SUBFLOW + name;
         }
 
         /**

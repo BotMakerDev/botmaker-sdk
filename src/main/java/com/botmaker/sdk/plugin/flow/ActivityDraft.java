@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin.flow;
 
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 import javafx.beans.property.BooleanProperty;
@@ -18,6 +17,9 @@ import java.util.List;
  * whether it is enabled, and where its card sits. Mutable and observable — the node card and the side panel
  * both bind to the same draft, so a change in one is visible in the other immediately. On save it splits in
  * two: a {@link Flow.Step} for its {@code Flows} constant, and a position for {@code Sdk.flowLayout()}.
+ *
+ * <p>A sub-flow card is a draft too, named by its label ({@code ▸ DAILY}, {@link #isSubflow}): its outcomes are
+ * the exits of the flow it runs, read when the canvas opens, and it has no body (2026-10-12).
  *
  * <p><b>It carries no parameters.</b> The Studio class this was ported from held an observable list of the
  * activity's variables, left over from the day values were edited in this dialog's side panel; nothing has
@@ -65,6 +67,8 @@ public final class ActivityDraft {
      */
     private String body;
 
+    private List<String> brokenExits = List.of();
+
     public ActivityDraft(String name, String description, boolean enabled, List<String> outcomes,
                          boolean goHome, boolean popupCheck, double x, double y) {
         this(name, description, enabled, outcomes, goHome, popupCheck, x, y, "");
@@ -95,16 +99,40 @@ public final class ActivityDraft {
     }
 
     /**
-     * The value this draft currently describes, <b>with the body reference it came in with</b>, and going
-     * nowhere when switched off: the canvas's {@link Arrow#DISABLED} arrow is the caller's to set.
+     * The value this draft currently describes, <b>with the body reference it came in with</b>, going to
+     * {@code whenOff} when switched off: the canvas's {@link Arrow#DISABLED} arrow is the caller's to read. A
+     * sub-flow card has no body.
      *
      * <p>Carrying the body through is the whole reason {@link #body} is a field. Rebuilding the activity
      * from the draft's visible fields alone would hand back one whose work was blank, which is how a rename
      * on the canvas would come to unwire a card from the code behind it.
      */
-    public Flow.Step toStep(Activity whenOff) {
-        return new Flow.Step(FlowNames.activity(name.get()), FlowTypes.body(body), description.get(), enabled.get(),
-                goHome.get(), popupCheck.get(), runnerSwitch.get(), whenOff);
+    public Flow.Step toStep(Flow.Node whenOff) {
+        return new Flow.Step(FlowNames.node(name.get()), isSubflow() ? null : FlowTypes.body(body), description.get(),
+                enabled.get(), goHome.get(), popupCheck.get(), runnerSwitch.get(), whenOff);
+    }
+
+    /** The flow this card runs, {@code DAILY}, when it is a sub-flow card ({@code ▸ DAILY}); else null. */
+    public String subflow() {
+        return FlowNames.subflowOf(name.get());
+    }
+
+    /** Whether this is a sub-flow card: its ports are its flow's exits, read off that flow, never typed. */
+    public boolean isSubflow() {
+        return subflow() != null;
+    }
+
+    /**
+     * The ports of a sub-flow card that its flow no longer ends on, each still left by a wire — drawn broken
+     * until the wire is moved or removed. Empty for an activity.
+     */
+    public List<String> brokenExits() {
+        return brokenExits;
+    }
+
+    /** Marks {@code exits} as {@link #brokenExits}; they stay among the card's outcomes, so their wires do. */
+    public void setBrokenExits(List<String> exits) {
+        this.brokenExits = exits == null ? List.of() : List.copyOf(exits);
     }
 
     /** Every outcome this activity can report, in its enum's order, each once. */

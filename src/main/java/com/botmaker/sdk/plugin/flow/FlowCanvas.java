@@ -136,6 +136,8 @@ public final class FlowCanvas extends StackPane {
     private Runnable onChainChanged = () -> {};
     /** Fired on a double-click on empty canvas, with the point in unscaled canvas coordinates. */
     private Consumer<Point2D> onCanvasDoubleClick = p -> {};
+    /** Fired to open the flow a sub-flow card runs, {@code DAILY}: a double-click on the card, or its menu. */
+    private Consumer<String> onOpenSubflow = flow -> {};
 
     /**
      * The dot grid, and the one surface on this canvas CSS cannot paint: a pattern tile takes a {@link Color} and
@@ -374,6 +376,28 @@ public final class FlowCanvas extends StackPane {
         this.onCanvasDoubleClick = onCanvasDoubleClick;
     }
 
+    /** What opens the flow a sub-flow card runs — the dialog shows it, one breadcrumb deeper. */
+    public void setOnOpenSubflow(Consumer<String> onOpenSubflow) {
+        this.onOpenSubflow = onOpenSubflow;
+    }
+
+    /** Selects the card labelled {@code name} and scrolls it to the middle of the view; nothing when it is not here. */
+    public void reveal(String name) {
+        ActivityDraft draft = draftNamed(name);
+        if (draft == null) return;
+        select(draft);
+        Platform.runLater(() -> {
+            NodeCard card = cards.get(name);
+            Bounds view = scroller.getViewportBounds();
+            if (card == null || view.getWidth() <= 0) return;
+            double x = (card.getLayoutX() + widthOf(card) / 2) * zoom.getX();
+            double y = (card.getLayoutY() + heightOf(card) / 2) * zoom.getY();
+            scroller.setHvalue(scrollFraction(x, view.getWidth(), canvasW * zoom.getX()));
+            scroller.setVvalue(scrollFraction(y, view.getHeight(), canvasH * zoom.getY()));
+            drawMinimap();
+        });
+    }
+
     /** Adds a card for {@code draft} at its stored position and selects it. */
     public void add(ActivityDraft draft) {
         history.mutate("add " + draft.name(), () -> {
@@ -457,11 +481,22 @@ public final class FlowCanvas extends StackPane {
         List<String> unwired = new ArrayList<>();
         for (String name : chain()) {
             ActivityDraft draft = cards.get(name).draft();
-            for (String outcome : draft.allOutcomes()) {
-                boolean wired = edges.stream()
-                        .anyMatch(e -> e.from().equals(name) && e.outcome().equals(outcome));
-                if (!wired) unwired.add(name + "." + outcome);
-            }
+            if (draft.isSubflow()) continue;
+            for (String outcome : FlowRules.unwired(name, draft.allOutcomes(), edges)) unwired.add(name + "." + outcome);
+        }
+        return unwired;
+    }
+
+    /**
+     * The exits of reachable sub-flow cards that nothing wires, {@code ▸ DAILY: Claim · Done}: the outer run ends
+     * where the inner flow ended, which a drawing showing the card in the middle of a flow rarely means.
+     */
+    public List<String> unwiredExits() {
+        List<String> unwired = new ArrayList<>();
+        for (String name : chain()) {
+            ActivityDraft draft = cards.get(name).draft();
+            if (!draft.isSubflow()) continue;
+            for (String exit : FlowRules.unwired(name, draft.allOutcomes(), edges)) unwired.add(name + ": " + exit);
         }
         return unwired;
     }
@@ -841,6 +876,8 @@ public final class FlowCanvas extends StackPane {
         Arrow edge = route.arrow();
         Path curve = path(route);
         curve.getStyleClass().add("flow-wire");
+        boolean broken = isBroken(edge);
+        if (broken) curve.getStyleClass().add("flow-wire-broken");
 
         // A wire is symmetrical, so without a head you can't tell "A then B" from "B then A" — the direction
         // is the entire meaning of the wire. The head is aimed along the path's last direction rather than the
@@ -858,7 +895,8 @@ public final class FlowCanvas extends StackPane {
         Group wire = new Group(hit, curve, head);
         wire.getStyleClass().add("flow-wire-group");
         Tooltip.install(wire, new Tooltip(edge.from() + " — " + edge.outcome() + " → " + edge.to()
-                + "  (click to remove it)"));
+                + (broken ? "\nBroken: " + FlowNames.subflowOf(edge.from()) + " no longer ends on " + edge.outcome()
+                + ", so the run never takes this wire." : "") + "  (click to remove it)"));
         // One click, gone. This was a two-step select-then-Delete for a while, because a click used to remove
         // the wire outright and brushing one while reaching for a card silently unwired the flow with nothing
         // to undo it. There is an undo now, so the reason for the second step is gone, and what is left is a
@@ -874,6 +912,12 @@ public final class FlowCanvas extends StackPane {
             e.consume();
         });
         return wire;
+    }
+
+    /** Whether {@code edge} leaves a sub-flow card on an exit its flow no longer ends on. */
+    private boolean isBroken(Arrow edge) {
+        ActivityDraft from = draftNamed(edge.from());
+        return from != null && from.brokenExits().contains(edge.outcome());
     }
 
     private void removeEdge(Arrow edge) {
@@ -1056,6 +1100,19 @@ public final class FlowCanvas extends StackPane {
             orphanNote.setVisible(false);
 
             body.getStyleClass().add("flow-card");
+            if (draft.isSubflow()) {
+                // Another flow run as one step: drawn apart, opened on a double-click, its ports that flow's ends.
+                body.getStyleClass().add("flow-card-subflow");
+                title.tooltipProperty().unbind();
+                title.setTooltip(new Tooltip("Runs Flows." + draft.subflow() + " to its end, then follows the wire "
+                        + "of the outcome it ended on. Double-click to open it."));
+                body.setOnMouseClicked(e -> {
+                    if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2) {
+                        onOpenSubflow.accept(draft.subflow());
+                        e.consume();
+                    }
+                });
+            }
             body.setPrefWidth(CARD_WIDTH);
             body.setMinWidth(CARD_WIDTH);
             body.getChildren().addAll(header, badges, orphanNote);
@@ -1104,7 +1161,10 @@ public final class FlowCanvas extends StackPane {
         private ContextMenu cardMenu() {
             MenuItem startHere = new MenuItem("Start the flow here");
             startHere.setOnAction(e -> setStartTo(draft.name()));
-            return new ContextMenu(startHere);
+            if (!draft.isSubflow()) return new ContextMenu(startHere);
+            MenuItem open = new MenuItem("Open " + draft.subflow());
+            open.setOnAction(e -> onOpenSubflow.accept(draft.subflow()));
+            return new ContextMenu(open, startHere);
         }
 
         /**
@@ -1123,8 +1183,10 @@ public final class FlowCanvas extends StackPane {
                 }
                 installPortHandlers(circle, outcome);
                 outPorts.put(outcome, circle);
-                Label label = new Label(outcome);
+                boolean broken = draft.brokenExits().contains(outcome);
+                Label label = new Label(broken ? "⚠ " + outcome : outcome);
                 label.getStyleClass().add("flow-port-label");
+                if (broken) label.getStyleClass().add("flow-port-broken");
                 HBox row = new HBox(3, label, circle);
                 row.setAlignment(Pos.CENTER_RIGHT);
                 ports.getChildren().add(row);
@@ -1219,6 +1281,14 @@ public final class FlowCanvas extends StackPane {
             if (Arrow.DISABLED.equals(outcome)) {
                 return "Drag to the activity that runs next when " + draft.name() + " is switched off. "
                         + "Leave it unwired and the run stops there.";
+            }
+            if (draft.brokenExits().contains(outcome)) {
+                return draft.subflow() + " no longer ends on " + outcome + ": its wire is never taken. Move it to "
+                        + "another exit, or click it to remove it.";
+            }
+            if (draft.isSubflow()) {
+                return "Drag to the card that runs next when " + draft.subflow() + " ends on " + outcome
+                        + ". Leave it unwired and the run stops there.";
             }
             return "Drag to the activity that runs next when " + draft.name() + " reports " + outcome;
         }

@@ -13,6 +13,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 /**
  * A flow with its sub-flows, read as one tree: the walker, the runner's switches, the canvas and Claude's tools
@@ -82,7 +83,17 @@ public final class FlowTree {
      * @param outcomesOf every outcome an activity declares, its enum's constants
      */
     public static List<Outcome> endOutcomes(Flow flow, Function<Activity, List<? extends Outcome>> outcomesOf) {
-        return endOutcomes(flow, outcomesOf, flows());
+        return endOutcomes(flow, outcomesOf, UnaryOperator.identity());
+    }
+
+    /**
+     * The same, each sub-flow card's flow read through {@code inner} first: an editor holds a card's flow as a
+     * reference by name ({@link BotConstants#flow}), and {@code inner} answers the flow that name holds — the same
+     * object for the same name, which is how a cycle stops.
+     */
+    public static List<Outcome> endOutcomes(Flow flow, Function<Activity, List<? extends Outcome>> outcomesOf,
+                                            UnaryOperator<Flow> inner) {
+        return endOutcomes(flow, outcomesOf, inner, flows());
     }
 
     /** A set of flows by identity, as sub-flow cards compare them: hashing a whole flow tree costs a walk of it. */
@@ -91,13 +102,13 @@ public final class FlowTree {
     }
 
     private static List<Outcome> endOutcomes(Flow flow, Function<Activity, List<? extends Outcome>> outcomesOf,
-                                             Set<Flow> open) {
+                                             UnaryOperator<Flow> inner, Set<Flow> open) {
         if (flow == null || !open.add(flow)) return List.of();
         List<Outcome> ends = new ArrayList<>();
         for (Flow.Node node : reachable(flow)) {
             List<? extends Outcome> exits = switch (node) {
                 case Activity activity -> outcomesOf.apply(activity);
-                case Flow.Sub sub -> endOutcomes(sub.inner(), outcomesOf, open);
+                case Flow.Sub sub -> endOutcomes(inner.apply(sub.inner()), outcomesOf, inner, open);
             };
             for (Outcome exit : exits) {
                 if (wired(flow, node, exit) == null && !ends.contains(exit)) ends.add(exit);

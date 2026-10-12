@@ -13,13 +13,23 @@ import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.Labels;
 import com.botmaker.sdk.plugin.flow.FlowConstants;
 import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.plugin.flow.FlowRefs;
+import com.botmaker.sdk.plugin.flow.FlowTreeView;
 import com.botmaker.sdk.plugin.flow.FlowValue;
 import javafx.application.Platform;
+import javafx.geometry.Bounds;
+import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
+import javafx.scene.layout.VBox;
+import javafx.stage.Popup;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -105,27 +116,60 @@ public final class ActivityEditors {
 
     /**
      * A flow — one of the bot's {@code Flows} constants, by name: the bot's {@code flow} parameter, and the flow
-     * {@code Bot.runFlow} walks. The picked name is written ({@code Flows.DAILY}), never the first flow equal to it:
-     * a fresh flow equals {@link Flow#NONE} and a duplicate its source. {@value #NO_FLOW} writes {@code Flow.NONE};
-     * while it is the value, a bot with one flow is prompted to pick it. The prompt is decided as the row is drawn.
+     * {@code Bot.runFlow} walks. A button showing the flow picked opens the flow tree read-only
+     * ({@link FlowTreeView}, 2026-10-12): each flow with its cards, a sub-flow card with the cards of the flow it
+     * runs, and a click on a flow picks it. The picked name is written ({@code Flows.DAILY}), never the first flow
+     * equal to it: a fresh flow equals {@link Flow#NONE} and a duplicate its source. {@value #NO_FLOW} writes
+     * {@code Flow.NONE}; while it is the value, a bot with one flow is prompted to pick it. The prompt is decided as
+     * the row is drawn.
      */
     public static Node flow(ValueContext ctx) {
         PluginValues values = ctx.services().pluginValues();
         String id = FlowValue.FLOWS.value().id();
-        Supplier<List<String>> options = () -> {
-            List<String> names = new ArrayList<>(FlowValue.FLOWS.members(values));
-            names.add(NO_FLOW);
-            return names;
-        };
         List<String> flows = FlowValue.FLOWS.members(values);
         String current = ctx.member(id).orElseGet(() -> shown(ctx, values, flows));
-        String prompt = flows.size() == 1 ? "Run " + flows.getFirst() : "Flow";
+        String prompt = flows.size() == 1 ? "Run " + flows.getFirst() : "Pick a flow";
         if (NO_FLOW.equals(current) && flows.size() == 1) current = "";
-        // A typed "daily" is the DAILY option; "(no flow)" only as listed.
-        Function<String, Object> named = name -> NO_FLOW.equals(name) ? name
-                : Optional.ofNullable(FlowNames.constantFor(name)).orElse(name);
-        return labelBox(ctx, options, () -> false, prompt, current, named, null,
-                name -> NO_FLOW.equals(name) ? ctx.write(Flow.NONE) : ctx.writeMember(id, name));
+        Button button = Styles.on(new Button(), Styles.INSET_FIELD_FLAT);
+        String[] picked = {current};
+        // What the button says: the flow picked, or the prompt; a pick the host refused leaves it as it was.
+        Consumer<String> show = name -> {
+            picked[0] = name;
+            button.setText(name.isBlank() ? prompt : name + "  ▾");
+        };
+        show.accept(current);
+        button.setOnAction(e -> {
+            Popup popup = new Popup();
+            popup.setAutoHide(true);
+            TreeView<FlowTreeView.Item> tree = FlowTreeView.of(FlowRefs.of(values), picked[0]);
+            tree.setPrefSize(260, 320);
+            Hyperlink none = new Hyperlink(NO_FLOW);
+            none.setOnAction(a -> {
+                popup.hide();
+                Optional<String> refused = ctx.write(Flow.NONE);
+                refused.ifPresent(ctx.services()::status);
+                if (refused.isEmpty()) show.accept(NO_FLOW);
+            });
+            tree.setOnMouseClicked(click -> {
+                TreeItem<FlowTreeView.Item> row = tree.getSelectionModel().getSelectedItem();
+                // Read-only: only a flow at the top is a choice; its cards are there to tell flows apart.
+                if (row == null || row.getParent() != tree.getRoot()) return;
+                popup.hide();
+                String flow = row.getValue().flow();
+                Optional<String> refused = ctx.writeMember(id, flow);
+                refused.ifPresent(ctx.services()::status);
+                if (refused.isEmpty()) show.accept(flow);
+            });
+            VBox box = new VBox(4, none, tree);
+            box.setPadding(new Insets(6));
+            // A popup is a scene of its own: the theme's sheets, and the root's colours, follow the row it opens from.
+            box.setStyle("-fx-background-color: -fx-background; -fx-border-color: -fx-box-border;");
+            popup.getContent().add(box);
+            if (button.getScene() != null) popup.getScene().getStylesheets().setAll(button.getScene().getStylesheets());
+            Bounds at = button.localToScreen(button.getBoundsInLocal());
+            popup.show(button, at.getMinX(), at.getMaxY());
+        });
+        return button;
     }
 
     /**

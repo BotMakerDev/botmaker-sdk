@@ -256,12 +256,13 @@ public final class FlowConstants {
     public static String unheld(PluginValues values, Flow flow) {
         Map<String, List<String>> declared = declared(values);
         for (Flow.Step step : flow.steps()) {
-            if (declared.containsKey(step.activity().name())) continue;
+            if (step.node() instanceof Flow.Sub || declared.containsKey(step.activity().name())) continue;
             return "The flow names " + FlowNames.ACTIVITIES + "." + step.activity().name() + ", which "
                     + FlowNames.ACTIVITIES + ".java does not declare.";
         }
         for (Flow.Edge edge : flow.edges()) {
-            String type = edge.from().name();
+            // The enum declaring the outcome: the card's own, or, out of a sub-flow card, the inner activity's.
+            String type = edge.on() == null ? "" : edge.on().activity().name();
             if (declared.getOrDefault(type, List.of()).contains(edge.on().name())) continue;
             return "The flow names " + FlowNames.ACTIVITIES + "." + type + "." + edge.on().name() + ", which "
                     + FlowNames.ACTIVITIES + ".java does not declare. The Activity Flow names outcomes in upper "

@@ -210,20 +210,56 @@ public final class FlowValue {
         String problem = nameProblem(typed, name, others);
         if (problem != null) return problem;
         String refused = FLOWS.rename(values, from, name).orElse(null);
-        if (refused == null) relayout(services, layout -> moved(layout, from, name));
+        if (refused == null) relayout(services, layout -> subflowMoved(moved(layout, from, name), from, name));
         return refused;
     }
 
     /**
-     * Deletes the flow {@code name} and its cards' places; refused while code names it — the bot's {@code flow}
-     * parameter, most often. The activities stay: they are the bot's, whichever flow runs them.
+     * Deletes the flow {@code name} and its cards' places; refused while another flow runs it as a sub-flow card,
+     * or code names it — the bot's {@code flow} parameter, most often. The activities stay: they are the bot's,
+     * whichever flow runs them.
      *
      * @return null when it was deleted, else why it could not be
      */
     public static String remove(StudioServices services, String name) {
-        String refused = FLOWS.remove(services.pluginValues(), name).orElse(null);
+        PluginValues values = services.pluginValues();
+        List<String> users = FlowRefs.of(values).usersOf(name);
+        if (!users.isEmpty()) {
+            return "Flows." + name + " runs as a sub-flow card in " + listed(users) + ": remove "
+                    + (users.size() == 1 ? "that card" : "those cards") + " first.";
+        }
+        String refused = FLOWS.remove(values, name).orElse(null);
         if (refused == null) relayout(services, layout -> moved(layout, name, null));
         return refused;
+    }
+
+    /**
+     * Declares the flow {@code inner} above {@code host}, when it is below: a card of {@code host} running
+     * {@code Flows.DAILY} reads a constant not yet set when {@code DAILY} is declared below it, and a run refuses
+     * that. Nothing moves when it is already above, or when {@code host} is not written yet — its first save
+     * declares it last. On the JavaFX application thread.
+     *
+     * @return null when it is above now, else why not
+     */
+    public static String placeAbove(StudioServices services, String inner, String host) {
+        PluginValues values = services.pluginValues();
+        List<String> members = FLOWS.members(values);
+        if (!members.contains(host) || members.indexOf(inner) < members.indexOf(host)) return null;
+        return FLOWS.moveBefore(values, inner, host).orElse(null);
+    }
+
+    /** {@code layout} with every flow's sub-flow card running {@code from} kept under {@code to}'s card. */
+    static FlowLayout subflowMoved(FlowLayout layout, String from, String to) {
+        String was = FlowNames.subflowLabel(from);
+        String now = FlowNames.subflowLabel(to);
+        FlowLayout out = layout;
+        for (Map.Entry<String, FlowLayout.Cards> flow : layout.flows().entrySet()) {
+            if (!flow.getValue().spots().containsKey(was)) continue;
+            Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
+            flow.getValue().spots().forEach((card, spot) -> spots.put(card.equals(was) ? now : card, spot));
+            out = out.with(flow.getKey(), FlowLayout.cards(spots));
+        }
+        return out;
     }
 
     /** Why {@code typed}, written {@code name}, cannot name a flow beside {@code taken}, or null. */

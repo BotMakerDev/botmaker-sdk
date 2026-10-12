@@ -112,8 +112,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   says when a sub-flow starts and ends, and the runner's skip list reaches activities inside sub-flows. A
   `Flow.Step` now holds a card (`node()`; `activity()` still answers for an activity) and a `Flow.Edge` the
   sub-flow it leaves (`via()`). Studio reads and writes every one of these spellings, a reference to a flow
-  (`Flows.DAILY`) kept by its name even while that flow is empty or equal to another; the Activity Flow window
-  does not draw sub-flows yet.
+  (`Flows.DAILY`) kept by its name even while that flow is empty or equal to another. In 🔀 Activity Flow,
+  *Add sub-flow* puts a card `▸ DAILY` on the canvas, offering only flows that don't run the one drawn, and moves
+  `DAILY`'s declaration above it when it is below. The card's ports are the outcomes `DAILY` can end on
+  (`Claim · Done`), read as the canvas opens; a wire on one `DAILY` no longer ends on is drawn broken, and an
+  exit nothing wires is warned about. Double-click the card to open `DAILY`; the breadcrumb (`MAIN ▸ DAILY`)
+  goes back. The flow picker and Flow menu became a flow tree on the left, each flow with its cards and a
+  sub-flow card with its flow's, its menu adding, copying, renaming and deleting flows; a flow another one runs
+  isn't deleted. The bot's `flow` parameter is picked from the same tree, read-only. A sub-flow card's label
+  is `▸ DAILY` in the trace too.
 - **`Sdk.flow()` is gone, and so are presets.** The flow moved to `Flows.MAIN` and its `.home(…)` to
   `Sdk.run()`; `Flow.of` takes four parts (no preset list), and `FlowLayout.of` keys its cards by flow
   (`FlowLayout.cards(…)`). A preset is now a flow of its own. Nothing converts a 1.4.2 bot's values: Studio's

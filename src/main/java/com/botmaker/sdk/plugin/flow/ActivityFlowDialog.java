@@ -9,7 +9,6 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
@@ -17,8 +16,9 @@ import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Button;
+import javafx.beans.property.BooleanProperty;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBox;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
@@ -27,6 +27,11 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -61,8 +66,10 @@ import java.util.function.Consumer;
  *
  * <h2>What it writes</h2>
  *
- * <p><b>One flow at a time.</b> The bot has several flows, its {@code Flows} constants; the top bar picks the one
- * drawn, and adds, copies, renames and deletes them. Activities are the bot's, not a flow's: a card's enum and
+ * <p><b>One flow at a time.</b> The bot has several flows, its {@code Flows} constants; the flow tree on the left
+ * ({@link FlowTreeView}) picks the one drawn, and its menu adds, copies, renames and deletes them. A flow may run
+ * another as one card, a sub-flow card ({@code ▸ DAILY}): opening it shows that flow one breadcrumb deeper, and its
+ * ports are the outcomes that flow ends on, read as the canvas opens (2026-10-12). Activities are the bot's, not a flow's: a card's enum and
  * outcomes are the same in every flow running it, so a rename reaches them all and a flow dropping one leaves it
  * to the others. Its body, description and switches are each flow's own step, copied from another flow when the
  * card is added to this one.
@@ -177,6 +184,16 @@ public final class ActivityFlowDialog {
     private Button closeButton;
     private Stage stage;
 
+    /**
+     * The flows open on the way to the one shown, outermost first, its own last — {@code MAIN ▸ DAILY}: a sub-flow
+     * card opened adds its flow, a breadcrumb clicked cuts back to it, a flow picked in the tree starts over.
+     */
+    private List<String> trail = List.of();
+
+    /** The flow tree on the left, rebuilt each time a flow is shown; hidden by the top bar's ☰ Flows. */
+    private final VBox treePane = new VBox(6);
+    private boolean treeShown = true;
+
     public ActivityFlowDialog(StudioServices services, Window owner) {
         this.services = services;
         this.owner = owner;
@@ -226,12 +243,16 @@ public final class ActivityFlowDialog {
         readOnlyReason = null;
         error("");
         loadCurrent(name);
+        if (trail.isEmpty() || !trail.getLast().equals(target.name())) trail = List.of(target.name());
         root.setTop(buildTopBar());
         root.setCenter(canvas);
+        buildTreePane();
+        root.setLeft(treeShown ? treePane : null);
 
         canvas.setOnMessage(this::error);
         canvas.setOnChainChanged(this::refreshOrderLabel);
         canvas.setOnCanvasDoubleClick(this::createActivityAt);
+        canvas.setOnOpenSubflow(this::openSubflow);
         // Arrowd *after* loadCurrent, so seeding the canvas doesn't read as a dozen edits by the user; and the
         // history is cleared for the same reason — the flow as it was loaded is the state undo bottoms out at.
         canvas.setOnFlowMutated(this::markDirty);
@@ -256,17 +277,32 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * Saves the flow on the canvas, then shows {@code name}'s. A save refused leaves the canvas where it is: what
-     * it holds would be lost.
+     * Saves the flow on the canvas, then shows the last of {@code path}, the breadcrumb leading to it. A save refused
+     * leaves the canvas where it is: what it holds would be lost.
      */
-    private void switchTo(String name) {
-        afterSave(() -> null, name);
+    private void switchTo(List<String> path) {
+        afterSave(() -> null, path.getLast(), path);
     }
 
-    /** Seeds the canvas from the stored flow {@code name}: a card per activity, at its stored spot or a fresh one. */
+    /** Opens the flow the sub-flow card running {@code inner} runs, one breadcrumb deeper. */
+    private void openSubflow(String inner) {
+        List<String> path = new ArrayList<>();
+        for (String flow : trail) {
+            if (flow.equals(inner)) break;
+            path.add(flow);
+        }
+        path.add(inner);
+        switchTo(path);
+    }
+
+    /**
+     * Seeds the canvas from the stored flow {@code name}: a card per activity and per sub-flow card, at its stored
+     * spot or a fresh one.
+     */
     private void loadCurrent(String name) {
         Flow flow = readFlow(name);
         Board board = Board.read(services.pluginValues(), flow);
+        FlowRefs refs = FlowRefs.of(services.pluginValues());
         home = target.run().home();
         setup = target.run().setup();
         FlowLayout layout = loadLayout();
@@ -275,12 +311,18 @@ public final class ActivityFlowDialog {
         List<Arrow> arrows = new ArrayList<>(flow.edges().stream().map(Arrow::of)
                 .filter(arrow -> !arrow.outcome().isBlank()).toList());
         for (Flow.Step step : flow.steps()) {
-            // By the enum's name; a layout saved before 2026-10-10 keyed a card by its label.
-            FlowLayout.Spot placed = cards.spot(step.activity().name());
+            // By the enum's name, a sub-flow card's by its label; a layout saved before 2026-10-10 keyed a card by its
+            // label.
+            FlowLayout.Spot placed = cards.spot(FlowNames.layoutKey(step.label()));
             if (placed == null) placed = cards.spot(step.label());
             anyPlaced |= placed != null;
             Point2D at = placed == null ? canvas.nextFreeSpot() : new Point2D(placed.x(), placed.y());
-            canvas.add(ActivityDraft.of(step, board.exitsOf(step.label()), at.getX(), at.getY()));
+            String inner = FlowRefs.flowOf(step.node());
+            FlowRefs.Exits exits = inner == null ? null : refs.exitsIn(flow, inner);
+            ActivityDraft draft = ActivityDraft.of(step, exits == null ? board.exitsOf(step.label()) : exits.all(),
+                    at.getX(), at.getY());
+            if (exits != null) draft.setBrokenExits(exits.broken());
+            canvas.add(draft);
             Arrow off = Arrow.off(step);
             if (off != null) arrows.add(off);
         }
@@ -346,56 +388,120 @@ public final class ActivityFlowDialog {
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox bar = new HBox(8, flowPicker(), flowMenu(),
+        HBox bar = new HBox(8, treeToggle(), breadcrumb(),
                 new Separator(javafx.geometry.Orientation.VERTICAL), undoButton(), redoButton(),
                 new Separator(javafx.geometry.Orientation.VERTICAL), recenter, arrange,
-                spacer, fromOtherFlows(), addActivity);
+                spacer, addSubflowMenu(), fromOtherFlows(), addActivity);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(10));
         return bar;
     }
 
-    /**
-     * The bot's flows, one picked: picking another saves this one and shows that one. A project with no flow lists
-     * {@link FlowValue#FIRST}, which the first save writes.
-     */
-    private Node flowPicker() {
-        List<String> names = new ArrayList<>(FlowValue.names(services));
-        if (!names.contains(target.name())) names.add(target.name());
-        ComboBox<String> picker = new ComboBox<>(FXCollections.observableArrayList(names));
-        picker.setValue(target.name());
-        picker.setTooltip(new javafx.scene.control.Tooltip("The flow drawn here, one of the bot's Flows. Which one "
-                + "runs is the bot's flow parameter, set in the Runner or Project ▸ Parameters…"));
-        picker.valueProperty().addListener((o, was, is) -> {
-            if (is != null && !is.equals(target.name())) switchTo(is);
+    /** Shows or hides the flow tree, giving its width to the canvas. */
+    private Node treeToggle() {
+        ToggleButton toggle = new ToggleButton("☰ Flows");
+        toggle.setSelected(treeShown);
+        toggle.setTooltip(new javafx.scene.control.Tooltip("Show or hide the bot's flows, each with its cards"));
+        toggle.selectedProperty().addListener((o, was, is) -> {
+            treeShown = is;
+            root.setLeft(is ? treePane : null);
         });
-        return picker;
+        return toggle;
     }
 
-    /** New, duplicate, rename and delete a flow. Each saves the flow shown first, as picking another does. */
-    private Node flowMenu() {
+    /**
+     * {@code MAIN ▸ DAILY}: the flows open on the way to the one shown, each a link back to it but the last. Which
+     * flow runs is the bot's flow parameter, set in the Runner or Project ▸ Parameters…
+     */
+    private Node breadcrumb() {
+        HBox crumbs = new HBox(4);
+        crumbs.setAlignment(Pos.CENTER_LEFT);
+        crumbs.getStyleClass().add("flow-breadcrumb");
+        for (int i = 0; i < trail.size(); i++) {
+            String flow = trail.get(i);
+            if (i > 0) crumbs.getChildren().add(new Label("▸"));
+            if (i == trail.size() - 1) {
+                Label here = new Label(flow);
+                here.getStyleClass().add("flow-breadcrumb-here");
+                here.setTooltip(new javafx.scene.control.Tooltip("The flow drawn here, Flows." + flow + ". Which flow "
+                        + "runs is the bot's flow parameter, set in the Runner or Project ▸ Parameters…"));
+                crumbs.getChildren().add(here);
+            } else {
+                List<String> back = List.copyOf(trail.subList(0, i + 1));
+                Hyperlink link = new Hyperlink(flow);
+                link.setOnAction(e -> switchTo(back));
+                crumbs.getChildren().add(link);
+            }
+        }
+        return crumbs;
+    }
+
+    /**
+     * The flow tree ({@link FlowTreeView}): a click on a flow shows it, on a card shows its flow with the card
+     * centred, on a sub-flow card opens the flow it runs. Its menu adds, copies, renames and deletes a flow; each
+     * saves the flow shown first.
+     */
+    private void buildTreePane() {
+        TreeView<FlowTreeView.Item> tree = FlowTreeView.of(FlowRefs.of(services.pluginValues()), null);
+        // The flow shown, expanded and selected; a project with none lists the one its first save writes.
+        TreeItem<FlowTreeView.Item> here = FlowTreeView.flowRow(tree, target.name());
+        if (here == null) {
+            here = new TreeItem<>(new FlowTreeView.Item(target.name(), null));
+            tree.getRoot().getChildren().add(here);
+        }
+        here.setExpanded(true);
+        tree.getSelectionModel().select(here);
+        tree.setOnMouseClicked(e -> {
+            TreeItem<FlowTreeView.Item> picked = tree.getSelectionModel().getSelectedItem();
+            if (e.getButton() != MouseButton.PRIMARY || picked == null) return;
+            FlowTreeView.Item item = picked.getValue();
+            List<String> path = FlowTreeView.trail(picked);
+            if (path.isEmpty()) return;
+            String card = item.isFlow() || item.subflow() != null ? null : item.card();
+            if (!path.getLast().equals(target.name())) switchTo(path);
+            if (card != null) canvas.reveal(card);
+        });
+        tree.setContextMenu(new ContextMenu());
+        tree.getContextMenu().setOnShowing(e -> {
+            TreeItem<FlowTreeView.Item> picked = tree.getSelectionModel().getSelectedItem();
+            String flow = picked == null || !picked.getValue().isFlow() ? null : picked.getValue().flow();
+            tree.getContextMenu().getItems().setAll(flowMenuItems(flow));
+        });
+        VBox.setVgrow(tree, Priority.ALWAYS);
+
+        Button create = new Button("+ New flow");
+        create.setMaxWidth(Double.MAX_VALUE);
+        create.setOnAction(e -> newFlow());
+        treePane.getChildren().setAll(tree, create);
+        treePane.setPadding(new Insets(10, 0, 10, 10));
+        treePane.setPrefWidth(200);
+        treePane.setMinWidth(160);
+    }
+
+    /**
+     * New, and for the flow {@code flow} — null when no flow row is picked — duplicate, rename and delete. Nothing
+     * to copy, rename or delete before the first save writes the constant.
+     */
+    private List<MenuItem> flowMenuItems(String flow) {
         MenuItem create = new MenuItem("New flow…");
-        create.setOnAction(e -> askName("New flow", "Name the new flow", "").ifPresent(typed ->
-                afterSave(() -> FlowValue.create(services, typed, Flow.NONE), FlowNames.constantFor(typed))));
-        MenuItem duplicate = new MenuItem("Duplicate…");
-        duplicate.setOnAction(e -> askName("Duplicate flow", "Name the copy of Flows." + target.name(),
-                target.name() + "_COPY").ifPresent(typed -> afterSave(
-                () -> FlowValue.duplicate(services, target.name(), typed), FlowNames.constantFor(typed))));
-        MenuItem rename = new MenuItem("Rename…");
-        rename.setOnAction(e -> askName("Rename flow", "Rename Flows." + target.name() + " and every use of it",
-                target.name()).ifPresent(typed -> afterSave(
-                () -> FlowValue.rename(services, target.name(), typed), FlowNames.constantFor(typed))));
-        MenuItem delete = new MenuItem("Delete");
-        delete.setOnAction(e -> deleteFlow());
-        // Nothing to copy, rename or delete before the first save writes the constant.
-        boolean written = target.value().isPresent();
-        duplicate.setDisable(!written);
-        rename.setDisable(!written);
-        delete.setDisable(!written);
-        MenuButton menu = new MenuButton("Flow", null, create, duplicate, rename, delete);
-        menu.setTooltip(new javafx.scene.control.Tooltip("Add, copy, rename or delete one of the bot's flows. The "
-                + "activities are the bot's: every flow can run them."));
-        return menu;
+        create.setOnAction(e -> newFlow());
+        if (flow == null || !FlowValue.names(services).contains(flow)) return List.of(create);
+        MenuItem duplicate = new MenuItem("Duplicate " + flow + "…");
+        duplicate.setOnAction(e -> askName("Duplicate flow", "Name the copy of Flows." + flow, flow + "_COPY")
+                .ifPresent(typed -> afterSave(() -> FlowValue.duplicate(services, flow, typed),
+                        FlowNames.constantFor(typed))));
+        MenuItem rename = new MenuItem("Rename " + flow + "…");
+        rename.setOnAction(e -> askName("Rename flow", "Rename Flows." + flow + " and every use of it", flow)
+                .ifPresent(typed -> afterSave(() -> FlowValue.rename(services, flow, typed),
+                        flow.equals(target.name()) ? FlowNames.constantFor(typed) : target.name())));
+        MenuItem delete = new MenuItem("Delete " + flow);
+        delete.setOnAction(e -> deleteFlow(flow));
+        return List.of(create, duplicate, rename, delete);
+    }
+
+    private void newFlow() {
+        askName("New flow", "Name the new flow", "").ifPresent(typed ->
+                afterSave(() -> FlowValue.create(services, typed, Flow.NONE), FlowNames.constantFor(typed)));
     }
 
     /**
@@ -404,6 +510,11 @@ public final class ActivityFlowDialog {
      * here, so its canvas edits have nothing to keep.
      */
     private void afterSave(java.util.function.Supplier<String> change, String then) {
+        afterSave(change, then, then == null ? List.of() : List.of(then));
+    }
+
+    /** {@link #afterSave(java.util.function.Supplier, String)}, the breadcrumb then {@code path}. */
+    private void afterSave(java.util.function.Supplier<String> change, String then, List<String> path) {
         autosaveDelay.stop();
         if (readOnlyReason == null && dirty) flush();
         String refused = readOnlyReason == null && (dirty || saving)
@@ -412,14 +523,25 @@ public final class ActivityFlowDialog {
         if (refused != null) {
             error(refused);
             root.setTop(buildTopBar());
+            buildTreePane();
             return;
         }
         dirty = false;
+        trail = List.copyOf(path);
         showFlow(then);
     }
 
-    private void deleteFlow() {
-        String name = target.name();
+    /**
+     * Deletes the flow {@code name} after asking; refused, before asking, while another flow runs it as a sub-flow
+     * card. Shows the flow drawn before, or the default when that was the one deleted.
+     */
+    private void deleteFlow(String name) {
+        List<String> users = FlowRefs.of(services.pluginValues()).usersOf(name);
+        if (!users.isEmpty()) {
+            error("Flows." + name + " runs as a sub-flow card in " + String.join(", ", users) + ": remove "
+                    + (users.size() == 1 ? "that card" : "those cards") + " first.");
+            return;
+        }
         Alert confirm = services.theme().alert(Alert.AlertType.CONFIRMATION,
                 "Its arrows and card places go with it. Its activities stay: they are the bot's, and other flows "
                         + "may run them. A flow the bot's code still names, as its flow parameter does, isn't deleted.",
@@ -428,7 +550,53 @@ public final class ActivityFlowDialog {
         confirm.setTitle("Delete flow");
         confirm.setHeaderText("Delete Flows." + name + "?");
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
-        afterSave(() -> FlowValue.remove(services, name), null);
+        afterSave(() -> FlowValue.remove(services, name), name.equals(target.name()) ? null : target.name());
+    }
+
+    /**
+     * The flows a card of this one may run: each other flow that does not run this one, which would walk it
+     * forever. Picking one declared below this flow moves its declaration above it first ({@link FlowValue#placeAbove}).
+     */
+    private Node addSubflowMenu() {
+        MenuButton menu = new MenuButton("Add sub-flow");
+        menu.setDisable(readOnlyReason != null);
+        menu.setTooltip(new javafx.scene.control.Tooltip("Run another flow as one card: it runs to its end, and the "
+                + "outcome it ends on leaves on that port. A flow that runs this one isn't offered."));
+        menu.setOnShowing(e -> {
+            menu.getItems().clear();
+            Set<String> placed = placedNames();
+            for (String flow : FlowRefs.of(services.pluginValues()).offerable(target.name())) {
+                if (placed.contains(FlowNames.subflowLabel(flow))) continue;
+                MenuItem item = new MenuItem(flow);
+                item.setOnAction(a -> addSubflow(flow));
+                menu.getItems().add(item);
+            }
+            if (menu.getItems().isEmpty()) {
+                MenuItem none = new MenuItem("No other flow can run here: add one with + New flow");
+                none.setDisable(true);
+                menu.getItems().add(none);
+            }
+        });
+        return menu;
+    }
+
+    /** Puts a card running {@code inner} on the canvas, its ports {@code inner}'s exits, once it is declared above. */
+    private void addSubflow(String inner) {
+        String refused = FlowValue.placeAbove(services, inner, target.name());
+        if (refused != null) {
+            error("Flows." + inner + " is declared below Flows." + target.name() + " and couldn't be moved above it, "
+                    + "so a card running it would read nothing: " + refused);
+            return;
+        }
+        // The move rewrote Flows.java: open this flow's constant again before the next save writes it.
+        FlowValue.Target again = FlowValue.target(services, target.name());
+        if (again.problem() == null) target = again;
+        Point2D at = canvas.nextFreeSpot();
+        List<String> exits = FlowRefs.of(services.pluginValues()).exits(inner);
+        canvas.add(new ActivityDraft(FlowNames.subflowLabel(inner), "", true, exits, false, false, at.getX(),
+                at.getY()));
+        error("");
+        buildTreePane();
     }
 
     /** A flow name typed in a prompt, or empty when cancelled. */
@@ -459,7 +627,7 @@ public final class ActivityFlowDialog {
             for (String flowName : FlowValue.names(services)) {
                 if (flowName.equals(target.name())) continue;
                 for (Flow.Step step : FlowValue.FLOWS.read(values, flowName).orElse(Flow.NONE).steps()) {
-                    if (placed.contains(step.label())) continue;
+                    if (!(step.node() instanceof Activity) || placed.contains(step.label())) continue;
                     placed.add(step.label());
                     MenuItem item = new MenuItem(step.label() + "  (" + flowName + ")");
                     item.setOnAction(a -> addShared(step));
@@ -574,37 +742,24 @@ public final class ActivityFlowDialog {
             return;
         }
 
+        if (draft.isSubflow()) {
+            showSubflowInSidePanel(draft);
+            return;
+        }
+
         TextField name = new TextField(draft.name());
         name.focusedProperty().addListener((o, was, is) -> {
             if (is) return;
             renameDraft(draft, FlowNames.activityLabel(name.getText()), name);
         });
-        TextField description = new TextField(draft.description());
-        description.textProperty().addListener((o, was, is) -> {
-            draft.descriptionProperty().set(is);
-            markDirty();
-        });
-
-        CheckBox goHome = new CheckBox("Go home first");
-        goHome.selectedProperty().bindBidirectional(draft.goHomeProperty());
-        // The canvas records what it owns — position, wiring, the enable switch. These three live on the draft
-        // and nowhere else, so they ask for the save themselves. They are not undoable, which is the honest
-        // answer for a text field and a tick you can simply set back.
-        goHome.selectedProperty().addListener((o, was, is) -> markDirty());
-        goHome.setTooltip(new javafx.scene.control.Tooltip(
-                FlowNames.GO_HOME_TIP + " Same tick as the ⌂ on the card."));
-
-        CheckBox popupCheck = new CheckBox("Check for popups");
-        popupCheck.selectedProperty().bindBidirectional(draft.popupCheckProperty());
-        popupCheck.selectedProperty().addListener((o, was, is) -> markDirty());
-        popupCheck.setTooltip(new javafx.scene.control.Tooltip(FlowNames.POPUP_TIP));
-
-        CheckBox runnerSwitch = new CheckBox("Runner may switch this off");
-        runnerSwitch.selectedProperty().bindBidirectional(draft.runnerSwitchProperty());
-        runnerSwitch.selectedProperty().addListener((o, was, is) -> markDirty());
-        runnerSwitch.setTooltip(new javafx.scene.control.Tooltip("Offer this activity to the person running the "
-                + "bot, who may switch it off (or back on) for their computer without opening the project. A "
-                + "switched-off activity takes its 'disabled' arrow, as when you untick it here."));
+        TextField description = descriptionField(draft);
+        CheckBox goHome = tick("Go home first", draft.goHomeProperty(),
+                FlowNames.GO_HOME_TIP + " Same tick as the ⌂ on the card.");
+        CheckBox popupCheck = tick("Check for popups", draft.popupCheckProperty(), FlowNames.POPUP_TIP);
+        CheckBox runnerSwitch = tick("Runner may switch this off", draft.runnerSwitchProperty(), "Offer this "
+                + "activity to the person running the bot, who may switch it off (or back on) for their computer "
+                + "without opening the project. A switched-off activity takes its 'disabled' arrow, as when you "
+                + "untick it here.");
 
         // The methods returning this activity's enum, read as the list opens. A card whose enum is not written yet
         // has none, and nothing can be created for it until the flow's next save declares the enum.
@@ -642,6 +797,74 @@ public final class ActivityFlowDialog {
                 heading("Outcomes"), buildOutcomeEditor(draft), new Separator(),
                 heading("Variables"), buildParametersNote(),
                 new Separator(), delete);
+    }
+
+    /**
+     * A sub-flow card's panel: the flow it runs, a way into it, its description and switches, and its exits — the
+     * outcomes that flow ends on, read off it, so nothing here renames them.
+     */
+    private void showSubflowInSidePanel(ActivityDraft draft) {
+        String inner = draft.subflow();
+        Label runs = new Label("Runs Flows." + inner + " to its end, then follows the wire of the outcome it ended "
+                + "on. Its own limits and switches hold while it runs.");
+        runs.setWrapText(true);
+        runs.getStyleClass().add("dialog-hint-text");
+        Button open = new Button("Open " + inner);
+        open.setOnAction(e -> openSubflow(inner));
+
+        GridPane head = new GridPane();
+        head.setHgap(8);
+        head.setVgap(6);
+        TextField description = descriptionField(draft);
+        head.addRow(0, new Label("Description"), description);
+        head.add(tick("Go home first", draft.goHomeProperty(), FlowNames.GO_HOME_TIP), 1, 1);
+        head.add(tick("Check for popups", draft.popupCheckProperty(), FlowNames.POPUP_TIP), 1, 2);
+        head.add(tick("Runner may switch this off", draft.runnerSwitchProperty(), "Offer this sub-flow to the "
+                + "person running the bot, who may switch it off for their computer: it then takes its 'disabled' "
+                + "arrow."), 1, 3);
+        GridPane.setHgrow(description, Priority.ALWAYS);
+
+        VBox exits = new VBox(4);
+        if (draft.allOutcomes().isEmpty()) {
+            exits.getChildren().add(new Label(inner + " has no end yet: it has no card, or every outcome is wired."));
+        }
+        for (String exit : draft.allOutcomes()) {
+            boolean broken = draft.brokenExits().contains(exit);
+            Label row = new Label((broken ? "⚠ " : "• ") + exit + (broken ? " — no longer an end of " + inner : ""));
+            if (broken) row.getStyleClass().add("flow-port-broken");
+            exits.getChildren().add(row);
+        }
+
+        Button delete = new Button("Remove card");
+        delete.setTooltip(new javafx.scene.control.Tooltip("Removes the card and its wires. Flows." + inner
+                + " stays."));
+        delete.setOnAction(e -> deleteActivity(draft));
+
+        sidePanel.getChildren().addAll(heading("Sub-flow " + inner), runs, open, head, new Separator(),
+                heading("Exits"), exits, new Separator(), delete);
+    }
+
+    /** The draft's description, saved as it is typed. */
+    private TextField descriptionField(ActivityDraft draft) {
+        TextField description = new TextField(draft.description());
+        description.textProperty().addListener((o, was, is) -> {
+            draft.descriptionProperty().set(is);
+            markDirty();
+        });
+        return description;
+    }
+
+    /**
+     * A tick bound to one of the draft's switches. The canvas records what it owns — position, wiring, the enable
+     * switch. These live on the draft and nowhere else, so they ask for the save themselves. They are not undoable,
+     * which is the honest answer for a text field and a tick you can simply set back.
+     */
+    private CheckBox tick(String caption, BooleanProperty value, String tip) {
+        CheckBox box = new CheckBox(caption);
+        box.selectedProperty().bindBidirectional(value);
+        box.selectedProperty().addListener((o, was, is) -> markDirty());
+        box.setTooltip(new javafx.scene.control.Tooltip(tip));
+        return box;
     }
 
     /**
@@ -785,12 +1008,13 @@ public final class ActivityFlowDialog {
      */
     private void deleteActivity(ActivityDraft draft) {
         Alert confirm = services.theme().alert(Alert.AlertType.CONFIRMATION,
-                "Its card and every wire into or out of it are removed; ↶ brings them back. The method it "
-                        + "runs is left exactly as it is.\n\n"
+                "Its card and every wire into or out of it are removed; ↶ brings them back. "
+                        + (draft.isSubflow() ? "Flows." + draft.subflow() + " stays as it is."
+                        : "The method it runs is left exactly as it is.") + "\n\n"
                         + "To stop it running without losing it, turn its switch off instead.",
                 ButtonType.CANCEL, ButtonType.OK);
         confirm.initOwner(stage);
-        confirm.setTitle("Delete activity");
+        confirm.setTitle(draft.isSubflow() ? "Remove sub-flow card" : "Delete activity");
         confirm.setHeaderText("Delete “" + draft.name() + "”?");
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
 
@@ -1090,6 +1314,11 @@ public final class ActivityFlowDialog {
         if (!orphans.isEmpty()) {
             summary.append("    ⚠ not in the flow (won't run): ").append(String.join(", ", orphans));
         }
+        // A warning: a sub-flow card sits mid-flow, so an end of its flow wired nowhere stops the whole run.
+        List<String> exits = canvas.unwiredExits();
+        if (!exits.isEmpty()) {
+            summary.append("    ⚠ stops the run when the sub-flow ends on: ").append(String.join(", ", exits));
+        }
         // Also not a warning, but worth saying out loud: an unwired DISABLED port is a silent stop, and it is
         // silent precisely where the drawing shows the flow carrying on.
         List<String> stopsWhenOff = canvas.unwiredWhenDisabled();
@@ -1119,17 +1348,18 @@ public final class ActivityFlowDialog {
         List<Flow.Step> steps = new ArrayList<>();
         Map<String, List<String>> exits = new LinkedHashMap<>();
         for (ActivityDraft d : drafts) {
-            Activity off = arrows.stream().filter(a -> a.isDisabled() && a.from().equals(d.name())).findFirst()
-                    .map(a -> FlowNames.activity(a.to())).orElse(Activity.NONE);
+            Flow.Node off = arrows.stream().filter(a -> a.isDisabled() && a.from().equals(d.name())).findFirst()
+                    .map(a -> FlowNames.node(a.to())).orElse(Activity.NONE);
             steps.add(d.toStep(off));
-            exits.put(d.name(), d.allOutcomes());
+            // A sub-flow card's ports are its flow's exits, which no enum of this bot declares for it.
+            if (!d.isSubflow()) exits.put(d.name(), d.allOutcomes());
         }
         // A blank arrow leaves on no outcome, so it names no constant to be written as.
         List<Flow.Edge> edges = arrows.stream().filter(a -> !a.isDisabled() && !a.outcome().isBlank())
                 .map(Arrow::toEdge).toList();
-        // A start is a class literal, so a flow with cards always names one: the first card when none is set.
-        Activity first = steps.isEmpty() ? Activity.NONE : steps.getFirst().activity();
-        Activity begin = start == null || start.isBlank() ? first : FlowNames.activity(start);
+        // A start is a class literal or a flow, so a flow with cards always names one: the first card when none is set.
+        Flow.Node first = steps.isEmpty() ? Activity.NONE : steps.getFirst().node();
+        Flow.Node begin = start == null || start.isBlank() ? first : FlowNames.node(start);
         return new Board(new Flow(steps, edges, begin, limits), exits);
     }
 
@@ -1157,8 +1387,7 @@ public final class ActivityFlowDialog {
     private FlowLayout currentLayout(Map<String, String> renamedTypes) {
         Map<String, FlowLayout.Spot> spots = new LinkedHashMap<>();
         for (ActivityDraft d : canvas.drafts()) {
-            String type = FlowNames.typeFor(d.name());
-            spots.put(type == null ? d.name() : type, FlowLayout.at((int) Math.round(d.x()), (int) Math.round(d.y())));
+            spots.put(FlowNames.layoutKey(d.name()), FlowLayout.at((int) Math.round(d.x()), (int) Math.round(d.y())));
         }
         return rekeyed(written, renamedTypes).with(target.name(), FlowLayout.cards(spots))
                 .goingHomeByDefault(goHomeByDefault);
