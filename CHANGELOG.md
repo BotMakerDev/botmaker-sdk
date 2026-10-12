@@ -133,6 +133,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The flow parameter picks a flow by its name.** `Sdk.flow`'s list writes the flow picked (`Flows.EZF`), even
+  when it is still empty or a fresh duplicate equal to another. `Flow.NONE` shows as *(no flow)*, and a bot with
+  a single flow and none picked is prompted *Run EZF*.
 - **The Activity Flow window no longer says "reopen the project"** when it has nowhere to save. Studio now adds
   the missing `run()` itself. What is left is said: the project is open read-only, or its `Sdk` class is
   outside `plugins/sdk/`.

@@ -13,9 +13,6 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   overwritten by that window's next save (it holds its own drafts). Dragging from a wired port refuses
   ("remove that wire first") instead of moving the arrow — a gesture change, waiting for a decision. A
   hand-chained flow is shown read-only.
-- **Equal flows**: a fresh *Duplicate…* equals its source until edited, and the host writes the `flow`
-  `@Param` by value (`ManagedConstants.Lookup.spell` takes the first equal constant), so picking the copy
-  writes the original's name. Fix in the host (keep the picked name) or make a duplicate differ.
 - **Sub-flows** (idea, ask first): a card that walks another flow, `Flow.subflow(Flows.DAILY)`, and leaves on
   how it ended.
 - **Launch targets**: `Target.set(String spec)` has no editor (a `@LaunchTargetSpec` could reuse the

@@ -99,18 +99,45 @@ public final class ActivityEditors {
                 .toList();
     }
 
+    /** The flow list's entry for {@link Flow#NONE}: the bot runs nothing until a flow is picked. */
+    static final String NO_FLOW = "(no flow)";
+
     /**
      * A flow — one of the bot's {@code Flows} constants, by name: the bot's {@code flow} parameter, and the flow
-     * {@code Bot.runFlow} walks. The host writes the picked flow as the constant holding it, {@code Flows.DAILY}.
+     * {@code Bot.runFlow} walks. The picked name is written ({@code Flows.DAILY}), never the first flow equal to it:
+     * a fresh flow equals {@link Flow#NONE} and a duplicate its source. {@value #NO_FLOW} writes {@code Flow.NONE};
+     * while it is the value, a bot with one flow is prompted to pick it. The prompt is decided as the row is drawn.
      */
     public static Node flow(ValueContext ctx) {
         PluginValues values = ctx.services().pluginValues();
-        Function<String, Object> flowNamed = name -> FlowValue.FLOWS.read(values, name).orElse(Flow.NONE);
-        String current = ctx.value(Flow.class)
-                .flatMap(flow -> FlowValue.FLOWS.members(values).stream()
-                        .filter(name -> flowNamed.apply(name).equals(flow)).findFirst())
-                .orElse("");
-        return labelBox(ctx, () -> FlowValue.FLOWS.members(values), () -> false, "Flow", current, flowNamed, null);
+        String id = FlowValue.FLOWS.value().id();
+        Supplier<List<String>> options = () -> {
+            List<String> names = new ArrayList<>(FlowValue.FLOWS.members(values));
+            names.add(NO_FLOW);
+            return names;
+        };
+        List<String> flows = FlowValue.FLOWS.members(values);
+        String current = ctx.member(id).orElseGet(() -> shown(ctx, values, flows));
+        String prompt = flows.size() == 1 ? "Run " + flows.getFirst() : "Flow";
+        if (NO_FLOW.equals(current) && flows.size() == 1) current = "";
+        // A typed "daily" is the DAILY option; "(no flow)" only as listed.
+        Function<String, Object> named = name -> NO_FLOW.equals(name) ? name
+                : Optional.ofNullable(FlowNames.constantFor(name)).orElse(name);
+        return labelBox(ctx, options, () -> false, prompt, current, named, null,
+                name -> NO_FLOW.equals(name) ? ctx.write(Flow.NONE) : ctx.writeMember(id, name));
+    }
+
+    /**
+     * What the box shows when the host names no member — the value is spelled out, or written in a way it does
+     * not resolve: {@value #NO_FLOW} for {@link Flow#NONE}, else the first flow equal to the value, else nothing.
+     */
+    private static String shown(ValueContext ctx, PluginValues values, List<String> flows) {
+        Optional<Flow> value = ctx.value(Flow.class);
+        if (value.isEmpty()) return "";
+        if (Flow.NONE.equals(value.get())) return NO_FLOW;
+        return flows.stream()
+                .filter(name -> FlowValue.FLOWS.read(values, name).filter(value.get()::equals).isPresent())
+                .findFirst().orElse("");
     }
 
     /**
@@ -144,6 +171,19 @@ public final class ActivityEditors {
     private static Node labelBox(ValueContext ctx, Supplier<List<String>> options, BooleanSupplier opening,
                                  String prompt, String current, Function<String, Object> value,
                                  Supplier<Optional<String>> create) {
+        return labelBox(ctx, options, opening, prompt, current, value, create, label -> {
+            ctx.set(value.apply(label));
+            return Optional.empty();
+        });
+    }
+
+    /**
+     * The same, writing the chosen option through {@code write}, which answers why not when it wrote nothing — and
+     * the box then goes back to what it held.
+     */
+    private static Node labelBox(ValueContext ctx, Supplier<List<String>> options, BooleanSupplier opening,
+                                 String prompt, String current, Function<String, Object> value,
+                                 Supplier<Optional<String>> create, Function<String, Optional<String>> write) {
         ComboBox<String> box = Styles.on(new ComboBox<>(), Styles.INSET_FIELD_FLAT);
         box.setEditable(true);
         box.setPromptText(prompt);
@@ -176,16 +216,16 @@ public final class ActivityEditors {
             Object typed = known.contains(now) || FlowNames.constantFor(now) != null ? value.apply(now) : null;
             String chosen = typed == null ? null : known.stream()
                     .filter(option -> value.apply(option).equals(typed)).findFirst().orElse(null);
-            if (chosen == null) {
+            Optional<String> refused = chosen == null ? Optional.of("") : write.apply(chosen);
+            if (refused.isPresent()) {
                 // No constant holds it, so there is nothing to write it as: the box goes back, writing nothing.
+                if (!refused.get().isBlank()) ctx.services().status(refused.get());
                 Platform.runLater(() -> {
                     reverting[0] = true;
                     box.setValue(was);
                     reverting[0] = false;
                 });
-                return;
             }
-            ctx.set(value.apply(chosen));
         });
         // An editable ComboBox commits its editor on Enter only; clicking away would lose a typed label.
         box.focusedProperty().addListener((obs, was, focused) -> {
