@@ -120,7 +120,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   goes back. The flow picker and Flow menu became a flow tree on the left, each flow with its cards and a
   sub-flow card with its flow's, its menu adding, copying, renaming and deleting flows; a flow another one runs
   isn't deleted. The bot's `flow` parameter is picked from the same tree, read-only. A sub-flow card's label
-  is `▸ DAILY` in the trace too.
+  is `▸ DAILY` in the trace too. Claude does the same through the assistant: `add_subflow` adds a card (moving
+  the inner flow above, refusing one that would loop), `connect` and `disconnect` take `fromFlow` to wire a
+  card's exit, a card is named by its flow wherever a tool takes one, and `read_flow` lists each card with its
+  exits, the broken ones apart, and which flows run each flow.
 - **`Sdk.flow()` is gone, and so are presets.** The flow moved to `Flows.MAIN` and its `.home(…)` to
   `Sdk.run()`; `Flow.of` takes four parts (no preset list), and `FlowLayout.of` keys its cards by flow
   (`FlowLayout.cards(…)`). A preset is now a flow of its own. Nothing converts a 1.4.2 bot's values: Studio's

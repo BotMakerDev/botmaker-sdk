@@ -464,6 +464,63 @@ class SdkAssistTest {
         assertEquals(List.of("MAIN", "FARM"), List.copyOf(host.set("flows").keySet()));
     }
 
+    /** A card running another flow: it moves that flow above, shows its exits, and is wired by them. */
+    @Test
+    void aSubflowCardIsAddedReadAndWiredByItsExits() {
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        assertFalse(run("add_activity", "name", "Collect", "body", "Collect::body").isRefused());
+        assertFalse(run("add_flow", "name", "daily").isRefused());
+        assertFalse(run("add_activity", "name", "Claim", "flow", "DAILY").isRefused());
+
+        String added = text(run("add_subflow", "name", "daily"));
+        assertTrue(added.contains("Added ▸ DAILY, which runs Flows.DAILY; its exits, each wired with connect and "
+                + "fromFlow DAILY: [Claim · Next]."), added);
+        assertTrue(host.calls.contains("moveBefore flows DAILY MAIN"), host.calls.toString());
+        assertEquals(List.of("DAILY", "MAIN"), List.copyOf(host.set("flows").keySet()));
+        assertTrue(run("add_subflow", "name", "daily").isRefused(), "MAIN already runs it");
+        AgentReply cycle = run("add_subflow", "name", "main", "flow", "daily");
+        assertTrue(cycle.isRefused());
+        assertTrue(text(cycle).contains("Flows.MAIN runs Flows.DAILY"), text(cycle));
+        assertTrue(run("add_subflow", "name", "nightly").isRefused());
+
+        assertFalse(run("connect", "from", "Collect", "outcome", "bag full", "to", "daily").isRefused());
+        assertFalse(run("connect", "fromFlow", "daily", "from", "claim", "to", "Collect").isRefused());
+        AgentReply noExit = run("connect", "fromFlow", "daily", "from", "Claim", "outcome", "done", "to", "Collect");
+        assertTrue(noExit.isRefused());
+        assertTrue(text(noExit).contains("its exits are [Claim · Next]"), text(noExit));
+        assertTrue(text(run("connect", "from", "daily", "to", "Collect")).contains("is a sub-flow card"));
+        String read = text(run("read_flow"));
+        assertTrue(read.startsWith("Flows: DAILY (a card in MAIN), MAIN.\nFlows.MAIN.\n"), read);
+        assertTrue(read.contains("• ▸ DAILY — runs Flows.DAILY; exits [Claim · Next]"), read);
+        assertTrue(read.contains("    on Bag full → ▸ DAILY"), read);
+        assertTrue(read.contains("    on Claim · Next → Collect"), read);
+        assertEquals(1, flow().edges().stream().filter(e -> e.via() != null).count());
+
+        assertTrue(run("remove_flow", "name", "daily").isRefused(), "MAIN runs it");
+        assertFalse(run("disconnect", "fromFlow", "daily", "from", "Claim").isRefused());
+        assertTrue(flow().edges().stream().noneMatch(e -> e.via() != null));
+        assertFalse(run("set_start", "name", "daily").isRefused());
+        assertEquals("▸ DAILY", flow().start().label());
+        assertFalse(run("remove_activity", "name", "▸ DAILY").isRefused());
+        assertEquals(List.of("Collect"), flow().steps().stream().map(Flow.Step::label).toList());
+    }
+
+    /** A flow moved above its user takes the flows its own cards run with it, each above the card reading it. */
+    @Test
+    void aSubflowMovesAboveItsUserWithTheFlowsItRuns() {
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        assertFalse(run("add_activity", "name", "Collect").isRefused());
+        assertFalse(run("add_flow", "name", "x").isRefused());
+        assertFalse(run("add_activity", "name", "Rest", "flow", "X").isRefused());
+        assertFalse(run("add_flow", "name", "daily").isRefused());
+        assertFalse(run("add_subflow", "name", "x", "flow", "daily").isRefused());
+        assertEquals(List.of("MAIN", "X", "DAILY"), List.copyOf(host.set("flows").keySet()), "X is above already");
+
+        assertFalse(run("add_subflow", "name", "daily").isRefused());
+        assertEquals(List.of("X", "DAILY", "MAIN"), List.copyOf(host.set("flows").keySet()));
+        assertTrue(text(run("read_flow")).contains("X (a card in DAILY), DAILY (a card in MAIN), MAIN."));
+    }
+
     @Test
     void aRunOrFlowWrittenByHandIsLeftAlone() {
         host.values.put("run", TestContexts.row(Run.class, "myRun()"));
@@ -551,7 +608,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(38, names.size());
+        assertEquals(39, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
@@ -793,6 +850,20 @@ class SdkAssistTest {
         public Optional<String> repoint(String id, String member, String replacement, String note) {
             calls.add("repoint " + name(id) + " " + member + " " + replacement);
             uses.put(replacement, uses.remove(member));
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> moveBefore(String id, String member, String before) {
+            calls.add("moveBefore " + name(id) + " " + member + " " + before);
+            Map<String, TestContexts.Recording> moved = new LinkedHashMap<>();
+            TestContexts.Recording row = set(name(id)).remove(member);
+            set(name(id)).forEach((name, value) -> {
+                if (name.equals(before)) moved.put(member, row);
+                moved.put(name, value);
+            });
+            set(name(id)).clear();
+            set(name(id)).putAll(moved);
             return Optional.empty();
         }
 

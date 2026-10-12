@@ -64,6 +64,52 @@ public final class FlowEdits {
                 shared.goHome(), shared.popupCheck(), shared.runnerSwitch(), Activity.NONE), outcomes);
     }
 
+    /**
+     * {@code board} with a card running the flow {@code inner}, {@code ▸ DAILY}: no body, its exits the ends of
+     * {@code inner}, read off that flow and so never held here. Refused when the flow already has one. Whether
+     * {@code inner} may run here at all is the caller's to check ({@link FlowRefs#offerable}).
+     */
+    public static Board addSubflow(Board board, String inner) {
+        String label = FlowNames.subflowLabel(inner);
+        Flow flow = board.flow();
+        if (flow.steps().stream().anyMatch(s -> s.label().equals(label))) {
+            throw new IllegalArgumentException("The flow already has a card running Flows." + inner + ".");
+        }
+        List<Flow.Step> steps = new ArrayList<>(flow.steps());
+        Flow.Step step = Flow.subflow(BotConstants.flow(inner));
+        steps.add(step);
+        Flow.Node start = flow.start().isNone() ? step.node() : flow.start();
+        return board.with(with(flow, steps, flow.edges(), start));
+    }
+
+    /**
+     * {@code board} with the wire from the card running {@code inner} on its exit {@code exit}
+     * ({@code Claim · Done}: the inner activity's outcome) going to {@code to}, replacing the one that exit had.
+     */
+    public static Board connectExit(Board board, String inner, String exit, String to) {
+        Flow flow = board.flow();
+        Flow.Node card = step(flow, FlowNames.subflowLabel(inner)).node();
+        Flow.Node target = step(flow, to).node();
+        Outcome on = FlowNames.exitOutcome(exit);
+        List<Flow.Edge> edges = new ArrayList<>(flow.edges().stream()
+                .filter(e -> !(card.equals(e.from()) && on.equals(e.on()))).toList());
+        edges.add(new Flow.Edge(BotConstants.flow(inner), on, target));
+        return board.with(with(flow, flow.steps(), edges, flow.start()));
+    }
+
+    /** {@code board} without the wire from the card running {@code inner} on its exit {@code exit}. */
+    public static Board disconnectExit(Board board, String inner, String exit) {
+        Flow flow = board.flow();
+        Flow.Step card = step(flow, FlowNames.subflowLabel(inner));
+        Outcome on = FlowNames.exitOutcome(exit);
+        List<Flow.Edge> kept = flow.edges().stream()
+                .filter(e -> !(card.node().equals(e.from()) && on.equals(e.on()))).toList();
+        if (kept.size() == flow.edges().size()) {
+            throw new IllegalArgumentException(card.label() + " has no wire on " + exit + ".");
+        }
+        return board.with(with(flow, flow.steps(), kept, flow.start()));
+    }
+
     private static Board addStep(Board board, Flow.Step step, List<String> outcomes) {
         Flow flow = board.flow();
         List<Flow.Step> steps = new ArrayList<>(flow.steps());
@@ -126,7 +172,7 @@ public final class FlowEdits {
      */
     public static Board connect(Board board, String from, String outcome, String to) {
         Flow flow = board.flow();
-        Flow.Step source = step(flow, from);
+        Flow.Step source = wireSource(flow, from);
         Flow.Node target = step(flow, to).node();
         String typed = typed(board, source, outcome);
         String constant = FlowNames.constantFor(typed);
@@ -156,7 +202,7 @@ public final class FlowEdits {
      */
     public static Board disconnect(Board board, String from, String outcome) {
         Flow flow = board.flow();
-        Flow.Step source = step(flow, from);
+        Flow.Step source = wireSource(flow, from);
         String typed = typed(board, source, outcome);
         String constant = FlowNames.constantFor(FlowNames.label(typed));
         if (constant == null) throw new IllegalArgumentException("'" + typed + "' is not an outcome's name.");
@@ -277,7 +323,18 @@ public final class FlowEdits {
         for (Flow.Step step : flow.steps()) {
             if (step.label().equalsIgnoreCase(name == null ? "" : name.trim())) return step;
         }
-        throw new IllegalArgumentException("No activity called '" + name + "'; there are " + labels(flow));
+        throw new IllegalArgumentException("No activity called '" + name + "'; there are "
+                + flow.steps().stream().map(Flow.Step::label).toList());
+    }
+
+    /** The activity a wire on one of its own outcomes leaves; a sub-flow card leaves on an exit instead. */
+    private static Flow.Step wireSource(Flow flow, String name) {
+        Flow.Step source = step(flow, name);
+        if (source.node() instanceof Flow.Sub) {
+            throw new IllegalArgumentException(source.label() + " is a sub-flow card: a wire leaves it on an exit, an "
+                    + "activity of " + FlowRefs.flowOf(source.node()) + " and the outcome that activity ended on.");
+        }
+        return source;
     }
 
     /** {@code flow} with these parts, its limits kept. */

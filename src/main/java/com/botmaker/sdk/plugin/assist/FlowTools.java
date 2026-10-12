@@ -8,10 +8,12 @@ import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.Run;
+import com.botmaker.sdk.internal.flow.Labels;
 import com.botmaker.sdk.plugin.flow.Board;
 import com.botmaker.sdk.plugin.flow.FlowConstants;
 import com.botmaker.sdk.plugin.flow.FlowEdits;
 import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.plugin.flow.FlowRefs;
 import com.botmaker.sdk.plugin.flow.FlowValue;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 
@@ -28,7 +30,8 @@ import java.util.function.UnaryOperator;
  * The assistant's activity flows: read one, change it as 🔀 Activity Flow does — each change through
  * {@link FlowEdits}, saved with the {@code Activities} enums it needs, on the FX thread — and add, rename or remove
  * a flow. Every flow tool takes the flow by its {@code Flows} constant's name, {@link FlowValue#defaultName} when
- * left out.
+ * left out. A sub-flow card is taken by the flow it runs; a wire leaving one names that flow ({@code fromFlow}) and
+ * the inner activity's outcome it ended on, one of the card's exits ({@link FlowRefs#exits}).
  */
 final class FlowTools {
 
@@ -50,20 +53,33 @@ final class FlowTools {
                   @Describe(value = WHICH, optional = true) String flow) {
     }
 
-    record ActivityName(@Describe("the activity's name") String name,
+    /** What a tool says of a card it takes by name. */
+    private static final String CARD = "an activity, or a sub-flow card by the flow it runs: DAILY";
+
+    /** What a wire's {@code fromFlow} says. */
+    private static final String FROM_FLOW = "when the arrow leaves a sub-flow card: the flow it runs, DAILY; from and "
+            + "outcome are then the activity in that flow it ended at and the outcome it ended on";
+
+    record ActivityName(@Describe("the card's name: " + CARD) String name,
                         @Describe(value = WHICH, optional = true) String flow) {
     }
 
-    /** One arrow between two activities, on one outcome. */
+    /** One arrow between two cards, on one outcome. */
     record Arrow(@Describe("the activity the arrow leaves") String from,
                  @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome,
-                 @Describe("the activity it goes to") String to,
+                 @Describe("the card it goes to: " + CARD) String to,
+                 @Describe(value = FROM_FLOW, optional = true) String fromFlow,
                  @Describe(value = WHICH, optional = true) String flow) {
     }
 
     record Leaving(@Describe("the activity the arrow leaves") String from,
                    @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome,
+                   @Describe(value = FROM_FLOW, optional = true) String fromFlow,
                    @Describe(value = WHICH, optional = true) String flow) {
+    }
+
+    record NewSubflow(@Describe("the flow the card runs: DAILY") String name,
+                      @Describe(value = WHICH + "; the flow the card goes in", optional = true) String flow) {
     }
 
     record NewFlow(@Describe("the new flow's name: DAILY") String name,
@@ -100,8 +116,14 @@ final class FlowTools {
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("read_flow")
                     .describedAs("The bot's flows by name, then one flow: each activity with its body, switches and "
-                            + "outcomes, every arrow, where a run starts, its limits, and the bot's home and setup")
+                            + "outcomes, each sub-flow card with its exits, every arrow, where a run starts, its "
+                            + "limits, and the bot's home and setup")
                     .takes(Which.class).handledBy(FlowTools::readFlow),
+            AssistantTool.named("add_subflow")
+                    .describedAs("Adds a card running another of the bot's flows: the run walks that flow to its "
+                            + "end, then leaves the card on the outcome it ended on (its exits; wire them with "
+                            + "connect and fromFlow). A flow that runs this one can't be added")
+                    .takes(NewSubflow.class).handledBy(FlowTools::addSubflow),
             AssistantTool.named("add_activity")
                     .describedAs("Adds an activity to a flow, as the Activity Flow window does; one another flow "
                             + "runs keeps its body and outcomes")
@@ -145,14 +167,18 @@ final class FlowTools {
         return FxCall.call(() -> {
             FlowValue.Target target = FlowValue.target(services, which.flow());
             if (target.problem() != null) return AgentReply.refused(target.problem());
-            List<String> names = FlowValue.names(services);
+            FlowRefs refs = FlowRefs.of(services.pluginValues());
+            List<String> names = refs.names().stream().map(name -> {
+                List<String> users = refs.usersOf(name);
+                return users.isEmpty() ? name : name + " (a card in " + String.join(", ", users) + ")";
+            }).toList();
             String flows = "Flows: " + (names.isEmpty() ? "none yet" : String.join(", ", names)) + ".\n";
-            return AgentReply.text(flows + describe(Board.read(services.pluginValues(), target.flow()), target));
+            return AgentReply.text(flows + describe(Board.read(services.pluginValues(), target.flow()), target, refs));
         });
     }
 
     /** {@code board}, {@code target}'s flow, with its run's home and setup, as {@code read_flow} answers. */
-    static String describe(Board board, FlowValue.Target target) {
+    static String describe(Board board, FlowValue.Target target, FlowRefs refs) {
         Flow flow = board.flow();
         Run run = target.run();
         List<String> lines = new ArrayList<>();
@@ -170,23 +196,79 @@ final class FlowTools {
         lines.add("Starts at " + (flow.start().label().isEmpty() ? "nothing" : flow.start().label()) + "; at most "
                 + flow.limits().maxSteps() + " steps, " + flow.limits().stepDelayMs() + " ms apart.");
         for (Flow.Step step : flow.steps()) {
-            String body = FlowValue.bodySource(step);
             List<String> switches = new ArrayList<>();
             if (!step.enabled()) switches.add("off");
             if (step.goHome()) switches.add("goes home first");
             if (step.popupCheck()) switches.add("checks popups");
             if (step.runnerSwitch()) switches.add("the runner may switch it off");
-            lines.add("• " + step.label() + " — " + (body.isEmpty() ? "no body yet" : body)
-                    + (switches.isEmpty() ? "" : ", " + String.join(", ", switches))
-                    + "; outcomes " + board.exitsOf(step.label())
-                    + (step.description().isBlank() ? "" : ". " + step.description()));
+            String switched = switches.isEmpty() ? "" : ", " + String.join(", ", switches);
+            String described = step.description().isBlank() ? "" : ". " + step.description();
+            String inner = FlowRefs.flowOf(step.node());
+            if (inner != null) {
+                // A card's exits are its flow's ends, read off that flow; a wire on one it no longer ends on stays.
+                FlowRefs.Exits exits = refs.exitsIn(flow, inner);
+                lines.add("• " + step.label() + " — runs Flows." + inner + switched + "; exits "
+                        + (exits.live().isEmpty() ? "none (Flows." + inner + " has no card yet)" : exits.live())
+                        + (exits.broken().isEmpty() ? "" : "; wired but no longer an end of Flows." + inner + ": "
+                        + exits.broken())
+                        + described);
+            } else {
+                String body = FlowValue.bodySource(step);
+                lines.add("• " + step.label() + " — " + (body.isEmpty() ? "no body yet" : body) + switched
+                        + "; outcomes " + board.exitsOf(step.label()) + described);
+            }
             for (Flow.Edge edge : flow.edges()) {
-                if (!edge.from().equals(step.activity())) continue;
-                lines.add("    on " + edge.on().label() + " → " + edge.to().label());
+                if (!edge.from().equals(step.node()) || edge.on() == null) continue;
+                String on = edge.via() == null ? edge.on().label() : Labels.ofExit(edge.on());
+                lines.add("    on " + on + " → " + edge.to().label());
             }
             if (!step.whenOff().isNone()) lines.add("    when off → " + step.whenOff().label());
         }
         return String.join("\n", lines);
+    }
+
+    static AgentReply addSubflow(NewSubflow sub, AgentContext context) {
+        StudioServices services = context.services();
+        String typed = sub.name() == null ? "" : sub.name().strip();
+        // First the inner flow goes above this one, as Add sub-flow in 🔀 Activity Flow moves it; then the card.
+        Placed placed = FxCall.call(() -> {
+            FlowValue.Target target = FlowValue.target(services, sub.flow());
+            if (target.problem() != null) return Placed.refused(target.problem());
+            FlowRefs refs = FlowRefs.of(services.pluginValues());
+            String inner = FlowNames.constantFor(typed);
+            if (inner == null || !refs.names().contains(inner)) {
+                return Placed.refused("There is no Flows." + typed + "; the bot's flows are " + refs.names()
+                        + ". add_flow adds one.");
+            }
+            if (!refs.offerable(target.name()).contains(inner)) {
+                return Placed.refused(inner.equals(target.name()) ? "A flow can't run itself as a card."
+                        : "Flows." + inner + " runs Flows." + target.name() + ", so a card running it there would "
+                        + "walk forever.");
+            }
+            // Checked before anything moves, so a refusal leaves Flows.java as it was.
+            if (target.flow().steps().stream().anyMatch(s -> inner.equals(FlowRefs.flowOf(s.node())))) {
+                return Placed.refused("Flows." + target.name() + " already has a card running Flows." + inner + ".");
+            }
+            String refused = FlowValue.placeAbove(services, inner, target.name());
+            if (refused != null) {
+                return Placed.refused("Flows." + inner + " is declared below Flows." + target.name() + " and couldn't "
+                        + "be moved above it, so a card running it would read nothing: " + refused);
+            }
+            return new Placed(inner, refs.exits(inner), null);
+        });
+        if (placed.refused() != null) return AgentReply.refused(placed.refused());
+        String inner = placed.inner();
+        return editFlow(context, sub.flow(), board -> FlowEdits.addSubflow(board, inner), flow -> Map.of(),
+                "Added " + FlowNames.subflowLabel(inner) + ", which runs Flows." + inner + "; "
+                        + (placed.exits().isEmpty() ? "it has no exit until Flows." + inner + " has a card."
+                        : "its exits, each wired with connect and fromFlow " + inner + ": " + placed.exits() + "."));
+    }
+
+    /** Where {@link #addSubflow} stands once the inner flow is checked and above: its name and exits, or why not. */
+    private record Placed(String inner, List<String> exits, String refused) {
+        static Placed refused(String why) {
+            return new Placed(null, List.of(), why);
+        }
     }
 
     static AgentReply addActivity(NewActivity activity, AgentContext context) {
@@ -220,24 +302,101 @@ final class FlowTools {
     }
 
     static AgentReply removeActivity(ActivityName name, AgentContext context) {
-        return editFlow(context, name.flow(), flow -> FlowEdits.removeActivity(flow, name.name()), flow -> Map.of(),
-                "Removed " + name.name() + ".");
+        return editFlow(context, name.flow(), board -> FlowEdits.removeActivity(board, card(board, name.name())),
+                flow -> Map.of(), "Removed " + name.name() + ".");
     }
 
     static AgentReply connect(Arrow arrow, AgentContext context) {
-        return editFlow(context, arrow.flow(),
-                flow -> FlowEdits.connect(flow, arrow.from(), arrow.outcome(), arrow.to()), flow -> Map.of(),
-                arrow.from() + " on " + outcome(arrow.outcome()) + " now goes to " + arrow.to() + ".");
+        StudioServices services = context.services();
+        if (blank(arrow.fromFlow())) {
+            return editFlow(context, arrow.flow(),
+                    board -> FlowEdits.connect(board, card(board, arrow.from()), arrow.outcome(),
+                            card(board, arrow.to())),
+                    flow -> Map.of(), arrow.from() + " on " + outcome(arrow.outcome()) + " now goes to " + arrow.to()
+                            + ".");
+        }
+        return editFlow(context, arrow.flow(), board -> {
+            // A broken exit — wired, but no longer an end of the inner flow — may be moved as well as removed.
+            String inner = innerOf(board, arrow.fromFlow());
+            List<String> exits = FlowRefs.of(services.pluginValues()).exitsIn(board.flow(), inner).all();
+            String exit = exit(exits, inner, arrow.from(), arrow.outcome());
+            return FlowEdits.connectExit(board, inner, exit, card(board, arrow.to()));
+        }, flow -> Map.of(), arrow.fromFlow() + "'s card on " + arrow.from() + " ending on "
+                + outcome(arrow.outcome()) + " now goes to " + arrow.to() + ".");
     }
 
     static AgentReply disconnect(Leaving leaving, AgentContext context) {
-        return editFlow(context, leaving.flow(), flow -> FlowEdits.disconnect(flow, leaving.from(), leaving.outcome()),
-                flow -> Map.of(), leaving.from() + " on " + outcome(leaving.outcome()) + " now goes nowhere.");
+        StudioServices services = context.services();
+        if (blank(leaving.fromFlow())) {
+            return editFlow(context, leaving.flow(),
+                    board -> FlowEdits.disconnect(board, card(board, leaving.from()), leaving.outcome()),
+                    flow -> Map.of(),
+                    leaving.from() + " on " + outcome(leaving.outcome()) + " now goes nowhere.");
+        }
+        return editFlow(context, leaving.flow(), board -> {
+            // A broken exit — wired, but no longer an end of the inner flow — is unwired like any other.
+            String inner = innerOf(board, leaving.fromFlow());
+            List<String> exits = FlowRefs.of(services.pluginValues()).exitsIn(board.flow(), inner).all();
+            return FlowEdits.disconnectExit(board, inner, exit(exits, inner, leaving.from(), leaving.outcome()));
+        }, flow -> Map.of(), leaving.fromFlow() + "'s card on " + leaving.from() + " ending on "
+                + outcome(leaving.outcome()) + " now goes nowhere.");
     }
 
     static AgentReply setStart(ActivityName name, AgentContext context) {
-        return editFlow(context, name.flow(), flow -> FlowEdits.setStart(flow, name.name()), flow -> Map.of(),
-                "A run now starts at " + name.name() + ".");
+        return editFlow(context, name.flow(), board -> FlowEdits.setStart(board, card(board, name.name())),
+                flow -> Map.of(), "A run now starts at " + name.name() + ".");
+    }
+
+    /**
+     * The label of the card {@code typed} names on {@code board}: an activity's as typed, a sub-flow card's for its
+     * label ({@code ▸ DAILY}) or for the flow it runs ({@code daily}). Anything else as typed, for the edit to refuse.
+     */
+    private static String card(Board board, String typed) {
+        if (typed == null || FlowEdits.labelOf(board.flow(), typed).isPresent()) return typed;
+        String flow = FlowNames.subflowOf(typed.strip());
+        String inner = FlowNames.constantFor(flow == null ? typed : flow);
+        if (inner == null) return typed;
+        return FlowEdits.labelOf(board.flow(), FlowNames.subflowLabel(inner)).orElse(typed);
+    }
+
+    /** The flow a card on {@code board} runs that {@code typed} names — {@code daily} or {@code ▸ DAILY} — or refused. */
+    private static String innerOf(Board board, String typed) {
+        // A card, never an activity: "daily" is ▸ DAILY here even beside an activity called Daily.
+        String flow = FlowNames.subflowOf(typed.strip());
+        String constant = FlowNames.constantFor(flow == null ? typed.strip() : flow);
+        String label = constant == null ? typed : FlowNames.subflowLabel(constant);
+        String inner = FlowNames.subflowOf(label);
+        if (inner == null || FlowEdits.labelOf(board.flow(), label).isEmpty()) {
+            throw new IllegalArgumentException("This flow has no card running Flows." + typed.strip()
+                    + "; add_subflow adds one.");
+        }
+        return inner;
+    }
+
+    /**
+     * The exit among {@code exits} ({@code Claim · Done}) of the card running {@code inner} that {@code activity}
+     * ending on {@code outcome} names; a blank outcome is that activity's first exit.
+     */
+    private static String exit(List<String> exits, String inner, String activity, String outcome) {
+        String prefix = FlowNames.activityLabel(activity == null ? "" : activity) + Labels.EXIT;
+        List<String> own = exits.stream().filter(e -> e.regionMatches(true, 0, prefix, 0, prefix.length())).toList();
+        String wanted = blank(outcome) ? null : prefix + FlowNames.label(outcome);
+        for (String exit : own) {
+            if (wanted == null || exit.equalsIgnoreCase(wanted)) return exit;
+        }
+        throw new IllegalArgumentException("The card running Flows." + inner + " has no exit "
+                + (wanted == null ? "from " + activity : wanted) + "; its exits are " + exits + ".");
+    }
+
+    /** " Sub-flow cards: [▸ DAILY]." when {@code flow} has any, else nothing. */
+    private static String cards(Flow flow) {
+        List<String> cards = flow.steps().stream().filter(s -> FlowRefs.flowOf(s.node()) != null)
+                .map(Flow.Step::label).toList();
+        return cards.isEmpty() ? "" : " Sub-flow cards: " + cards + ".";
+    }
+
+    private static boolean blank(String s) {
+        return s == null || s.isBlank();
     }
 
     static AgentReply addFlow(NewFlow flow, AgentContext context) {
@@ -331,7 +490,8 @@ final class FlowTools {
             if (refused != null) return AgentReply.refused(refused);
             return AgentReply.text("Flows." + target.name() + ": " + done
                     + (notes.isEmpty() ? "" : " " + String.join(" ", notes))
-                    + " Activities: " + FlowEdits.labels(after.flow()) + ".");
+                    + " Activities: " + FlowEdits.labels(after.flow()) + "."
+                    + cards(after.flow()));
         });
     }
 

@@ -13,8 +13,6 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   overwritten by that window's next save (it holds its own drafts). Dragging from a wired port refuses
   ("remove that wire first") instead of moving the arrow — a gesture change, waiting for a decision. A
   hand-chained flow is shown read-only.
-- **Sub-flows** (idea, ask first): a card that walks another flow, `Flow.subflow(Flows.DAILY)`, and leaves on
-  how it ended.
 - **Launch targets**: `Target.set(String spec)` has no editor (a `@LaunchTargetSpec` could reuse the
   🎮 game dialog).
 - **Waydroid on the desktop**: a bot reads Android's frame through `adb screencap`, which writes nothing on a

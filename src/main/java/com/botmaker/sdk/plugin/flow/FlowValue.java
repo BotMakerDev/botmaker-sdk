@@ -236,16 +236,33 @@ public final class FlowValue {
     /**
      * Declares the flow {@code inner} above {@code host}, when it is below: a card of {@code host} running
      * {@code Flows.DAILY} reads a constant not yet set when {@code DAILY} is declared below it, and a run refuses
-     * that. Nothing moves when it is already above, or when {@code host} is not written yet — its first save
-     * declares it last. On the JavaFX application thread.
+     * that. The flows {@code inner}'s own cards run, at any depth, go above it first, each one's before its user,
+     * so none is left below a card reading it. Nothing moves when it is already above, or when {@code host} is not
+     * written yet — its first save declares it last. On the JavaFX application thread.
      *
      * @return null when it is above now, else why not
      */
     public static String placeAbove(StudioServices services, String inner, String host) {
         PluginValues values = services.pluginValues();
-        List<String> members = FLOWS.members(values);
-        if (!members.contains(host) || members.indexOf(inner) < members.indexOf(host)) return null;
-        return FLOWS.moveBefore(values, inner, host).orElse(null);
+        if (!FLOWS.members(values).contains(host)) return null;
+        List<String> order = new ArrayList<>();
+        innermostFirst(FlowRefs.of(values), inner, order);
+        for (String flow : order) {
+            List<String> members = FLOWS.members(values);
+            if (members.indexOf(flow) < members.indexOf(host)) continue;
+            String refused = FLOWS.moveBefore(values, flow, host).orElse(null);
+            if (refused != null) return refused;
+        }
+        return null;
+    }
+
+    /** {@code name} and every flow its cards run, each after the ones it runs; each once. */
+    private static void innermostFirst(FlowRefs refs, String name, List<String> order) {
+        if (order.contains(name)) return;
+        order.add(name);   // marks it seen, so a hand-written loop ends; put back at its place below
+        for (String inner : refs.subflows(name)) innermostFirst(refs, inner, order);
+        order.remove(name);
+        order.add(name);
     }
 
     /** {@code layout} with every flow's sub-flow card running {@code from} kept under {@code to}'s card. */

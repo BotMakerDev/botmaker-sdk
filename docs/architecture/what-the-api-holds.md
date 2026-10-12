@@ -28,6 +28,16 @@
   `Activity` (an activity by its enum's simple name, the key runtime and editor agree on), `ActivityBody<O>` (a
   body returns its own activity's enum), `FlowLayout` (the editor's card positions, keyed by flow then by
   activity name, which a run ignores); `internal.flow.InstalledRun` holds what `Bot.runFlow` installed.
+- **A card may run another flow (2026-10-12).** `Flow.Step.node()` is a sealed `Flow.Node`: an `Activity` or a
+  `Flow.Sub` (`Flow.subflow(DAILY)`). `FlowWalker.walk` runs the inner flow under its own limits and switches and
+  returns the outcome it ended on; the outer wire is the `Flow.Edge` whose `via()` is that flow and whose `on()`
+  is that outcome. A card's exits are the inner flow's unwired end outcomes, never held anywhere
+  (`internal.flow.FlowTree.endOutcomes`). The editor holds `Flows.DAILY` by name (`BotConstants.flow`, so an
+  empty flow or two equal ones stay apart) and labels the card `▸ DAILY` and an exit `Claim · Done`
+  (`internal.flow.Labels`). The inner flow is declared above its user; the editor moves it there
+  (`PluginValues.moveBefore`) and offers no flow that would loop, and a run refuses one read before its
+  declaration. `plugin/flow/FlowRefs` answers what the canvas, the flow tree and the assistant's `FlowTools` ask
+  across flows: exits, broken exits, which flows run which.
 - **An activity is its outcome enum (2026-10-10; constants since 2026-10-02, never strings).** The bot's
   `@SdkValue(ACTIVITIES) final class Activities` in `plugins/sdk/` nests one `enum Collect implements Outcome
   { NEXT, NOTHING_LEFT }` per activity (`SdkValues.ACTIVITIES`, an `ofEnums` grouped open set); its constants
