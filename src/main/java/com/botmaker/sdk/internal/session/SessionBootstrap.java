@@ -3,7 +3,7 @@ package com.botmaker.sdk.internal.session;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.Session;
-import com.botmaker.sdk.internal.config.ProjectDefaults;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.session.launch.LaunchIsolation;
 import com.botmaker.shared.platform.Os;
@@ -57,7 +57,7 @@ public final class SessionBootstrap {
     public static final String WHERE_PROPERTY = "botmaker.session.where";
     /** The environment form of {@link #WHERE_PROPERTY}, for a bot started from a shell or a service unit. */
     public static final String WHERE_ENV = "BOTMAKER_SESSION_WHERE";
-    /** The run property naming the game VM, for {@code BotSettings.Where.VM}: a fact about this computer. */
+    /** The system property naming the game VM for a bot started by hand; else the bot's {@code vm} parameter. */
     public static final String VM_PROPERTY = "botmaker.session.vm";
     /** The environment form of {@link #VM_PROPERTY}. */
     public static final String VM_ENV = "BOTMAKER_SESSION_VM";
@@ -161,7 +161,7 @@ public final class SessionBootstrap {
      * from its Java rather than from a running bot.
      */
     public static SessionBackend backendFor(LaunchSpec spec, BotSettings.DisplayBackend pinned) {
-        return SessionBackend.fromId(ProjectDefaults.backendId(pinned))
+        return SessionBackend.fromId(backendId(pinned))
             .orElseGet(() -> SessionBackends.preferredBackend(spec));
     }
 
@@ -180,8 +180,13 @@ public final class SessionBootstrap {
     public static SessionBackend backend(LaunchSpec spec) {
         return SessionBackend.fromId(Session.pinnedBackend())
             .or(() -> SessionBackend.fromId(System.getProperty(BACKEND_PROPERTY)))
-            .or(() -> SessionBackend.fromId(ProjectDefaults.sessionBackend()))
+            .or(() -> SessionBackend.fromId(backendId(BotSettings.current().runIn().displayBackend())))
             .orElseGet(() -> SessionBackends.preferredBackend(spec));
+    }
+
+    /** {@code backend}'s session id, or {@code null} for {@link BotSettings.DisplayBackend#AUTO}. */
+    static String backendId(BotSettings.DisplayBackend backend) {
+        return backend == null || backend == BotSettings.DisplayBackend.AUTO ? null : backend.id();
     }
 
     /** The nested-display options for {@code spec}: its selected backend at the bot's (or the fallback) size. */
@@ -370,14 +375,16 @@ public final class SessionBootstrap {
     }
 
     /**
-     * The game VM to run in: the {@link #VM_PROPERTY} run property, then {@link #VM_ENV}, else the one VM set up on
-     * this computer.
+     * The game VM to run in: {@code -D}{@link #VM_PROPERTY} or {@link #VM_ENV} given by hand, then the bot's
+     * {@code vm} parameter ({@link InstalledGame#vm()}), else the one VM set up on this computer.
      *
      * @throws IllegalStateException when none is named and there isn't exactly one
      */
     static String vmName() {
         String named = System.getProperty(VM_PROPERTY);
-        return vmName(named != null && !named.isBlank() ? named : System.getenv(VM_ENV));
+        if (named == null || named.isBlank()) named = System.getenv(VM_ENV);
+        if (named == null || named.isBlank()) named = InstalledGame.vm();
+        return vmName(named);
     }
 
     /**
@@ -393,7 +400,7 @@ public final class SessionBootstrap {
         if (ready.size() == 1) return ready.get(0).name();
         throw new IllegalStateException(ready.isEmpty()
             ? "There's no game VM on this computer. Set one up in ⚙ Bot Settings." + OR_THE_DESKTOP
-            : "There are " + ready.size() + " game VMs on this computer: name one with -D" + VM_PROPERTY + "=<name>.");
+            : "There are " + ready.size() + " game VMs on this computer: pick one in ⚙ Bot Settings.");
     }
 
     private static final String OR_THE_DESKTOP = " Or set ⚙ Bot Settings ▸ Run the game in ▸ My desktop.";

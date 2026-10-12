@@ -586,11 +586,13 @@ class SdkAssistTest {
     }
 
     @Test
-    void theLaunchTargetIsThisMachinesAndOnlyAValidOneIsKept() {
+    void theLaunchTargetIsTheBotsFirstLauncherAndOnlyAValidOneIsKept() {
+        host.values.put("launch_targets", TestContexts.row(List.class, "List.of()").withValue(List.of()));
         assertTrue(text(run("get_launch_target")).startsWith("This computer launches nothing"));
         assertEquals("This computer now launches Steam game 570 when the bot starts.",
                 text(run("set_launch_target", "target", " steam:570 ")));
-        assertEquals("steam:570", host.properties.get("botmaker.launch.target"));
+        assertEquals(List.of("steam:570"), host.values.get("launch_targets").value(), "the bot's Java, not a run property");
+        assertTrue(host.properties.isEmpty());
         assertEquals("steam:570 — Steam game 570.", text(run("get_launch_target")));
         assertTrue(run("set_launch_target", "target", "nonsense").isRefused());
         assertTrue(run("set_launch_target", "target", "floppy:disk").isRefused(), "a kind nothing launches");
@@ -603,7 +605,8 @@ class SdkAssistTest {
         assertTrue(text(run("set_launch_target", "target", "emu-app:com.example.game@no-such-emulator-here"))
                 .contains("not an emulator set up here"));
         assertFalse(run("set_launch_target", "target", "steam:570").isRefused());
-        assertEquals("steam:570", host.properties.get("botmaker.launch.target"));
+        assertEquals("steam:570", ((List<?>) host.values.get("launch_targets").value()).getFirst(),
+                "the launcher set last is the bot's first");
     }
 
     @Test

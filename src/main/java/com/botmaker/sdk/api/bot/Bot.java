@@ -11,6 +11,7 @@ import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.Watchdog;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.flow.SkippedActivities;
@@ -96,6 +97,7 @@ public class Bot {
         MissFrames.start();
         SdkValues.claim();
         ManagedValues.install(values);
+        InstalledGame.install(values);
         InstalledRun.nameFlows(values);
         InstalledRun.walk(flow);
         InstalledRun.skip(SkippedActivities.of(InstalledRun.flow(), skip));
@@ -125,6 +127,7 @@ public class Bot {
         MissFrames.start();
         SdkValues.claim();
         ManagedValues.install(values);
+        InstalledGame.install(values);
         try {
             body.run();
         } catch (BotStoppedException e) {

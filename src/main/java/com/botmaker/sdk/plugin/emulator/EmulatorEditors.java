@@ -8,8 +8,11 @@ import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.shared.emulator.EmulatorInstances;
+
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+
+import java.util.Optional;
 
 /**
  * The editor for an {@code @EmulatorName} argument — {@code Emulators.use("…")}, {@code named}, {@code launch}
@@ -70,14 +73,16 @@ public final class EmulatorEditors {
      * <p>Best effort — the inline call the user just wrote stands either way, and an editor that threw here
      * would lose the edit as well as the wiring.
      *
-     * <p><b>The two halves are written to two different places, and that is the split, not an
-     * inconsistency.</b> What the bot <em>launches</em> is a fact about running this bot on this machine, so
-     * it is this machine's run property ({@link LaunchTargetValue}). Where the bot <em>looks</em> is a fact about the
-     * bot, so it is the expression {@code Sdk.captureSource()} returns — Java the user can read, and the
-     * only copy of that answer.
+     * <p><b>Both halves are the bot's Java.</b> What the bot <em>launches</em> becomes the first of its
+     * {@code launchTargets} ({@link LaunchTargetValue}); where it <em>looks</em> is the expression
+     * {@code Sdk.captureSource()} returns.
      */
     private static void pointProjectAtApp(ValueContext ctx, String instanceName, String appPackage) {
-        LaunchTargetValue.set(ctx.services(), "emu-app:" + appPackage + "@" + instanceName);
+        Optional<String> refused = LaunchTargetValue.set(ctx.services(), "emu-app:" + appPackage + "@" + instanceName);
+        if (refused.isPresent()) {
+            ctx.services().status(refused.get());
+            return;
+        }
         CaptureValue.point(ctx.services(), new EmulatorSource(instanceName));
         ctx.services().status("This computer now launches " + appPackage + " on " + instanceName
                 + ", and the bot captures from " + instanceName + ".");

@@ -78,7 +78,7 @@ public final class BotSettingsWindow {
     private final RadioButton privateDisplay = new RadioButton(BotSettings.Where.PRIVATE_DISPLAY.displayName());
     private final RadioButton myDesktop = new RadioButton(BotSettings.Where.MY_DESKTOP.displayName());
     private final RadioButton inVm = new RadioButton(BotSettings.Where.VM.displayName());
-    /** Windows: this computer's game VMs; the one picked is the {@link VmChoice} run property. */
+    /** Windows: this computer's game VMs; the one picked is the bot's {@code vm} parameter ({@link VmChoice}). */
     private final ComboBox<VmRecord> vms = new ComboBox<>();
     private final Label vmStatus = note("");
     /** Windows: the picked VM's power; {@code null} on Linux. */
@@ -152,8 +152,8 @@ public final class BotSettingsWindow {
         save.setDefaultButton(true);
         save.setOnAction(e -> {
             BotSettings chosen = collect();
-            // Which VM is this computer's fact, kept beside the project rather than in the bot's Java.
-            // Only a VM that is set up: one still installing would boot its installer disc for the bot.
+            // Which VM is the bot's vm parameter, in Sdk.java. Only a VM that is set up: one still installing
+            // would boot its installer disc for the bot.
             VmRecord picked = vms.getValue();
             if (!LINUX && inVm.isSelected() && picked != null && picked.stage() == VmRecord.Stage.READY) {
                 VmChoice.set(services, picked.name());
@@ -341,7 +341,7 @@ public final class BotSettingsWindow {
 
     /**
      * Runs the bot's game in {@code vm}: {@code Where.VM} in its Java, unless it says so already or isn't a
-     * value this window can rewrite, and {@code vm} as this computer's {@link VmChoice}.
+     * value this window can rewrite, and {@code vm} as the bot's {@link VmChoice}.
      */
     static void useVm(StudioServices services, VmRecord vm) {
         VmChoice.set(services, vm.name());

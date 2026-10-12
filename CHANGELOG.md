@@ -113,9 +113,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - **Built on contract 0.9.0**: the SDK plugin addresses its values by declaration and `Member`
   (`ManagedSet`, `voidMethods()`), declares its flow's calls with `Held` parts and `builtFrom` instead of
-  `List<Object>` builders, and keeps its run properties (the recent launch targets, the launch target, the game
-  VM) as typed `RunProperty` constants. It needs a Studio hosting contract 0.9.0. The plugin parameters are
-  `Param.Visibility.PUBLIC`.
+  `List<Object>` builders, and keeps the launcher picker's history as a typed `RunProperty`. It needs a Studio
+  hosting contract 0.9.0. The plugin parameters are `Param.Visibility.PUBLIC`.
+
+- **What the bot launches and its game VM are the bot's Java, not this computer's.** `Sdk.launchTargets`, a
+  `List<String>` parameter, lists the launchers the bot's author supports, preferred first (`steam:570`,
+  `heroic:…`, an emulator app); each computer starts the first its system can launch, with no platform written
+  anywhere. 🎮 Game puts a pick first, and *Clear* takes this computer's launcher out of the list. `Sdk.vm` names
+  the game VM, declared only while the settings run the game in a VM on Windows or a Mac (a conditional
+  parameter). The run properties `botmaker.launch.target` and `botmaker.session.vm` are no longer written;
+  `-D` still wins for a bot started by hand. A machine's old run property, still in Studio's settings, wins too
+  until the first pick in 🎮 Game or ⚙ Bot Settings, which clears it.
 
 - **A flow can run another flow as one card.** `Flow.subflow(DAILY)` is a card that walks `DAILY` to its end,
   under `DAILY`'s own limits and switches; `Flow.edge(Activities.Collect.NOTHING_LEFT, DAILY)` wires into it and

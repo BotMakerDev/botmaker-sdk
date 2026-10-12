@@ -11,7 +11,7 @@ import java.util.Optional;
  * A {@link CaptureSource} that targets an emulator <em>by instance name</em>, connecting lazily on first use —
  * and dispatching a launch if the instance isn't running yet. This is what makes every configured emulator
  * selectable as a capture target without pre-launching it: a project whose {@code capture.source} is
- * {@code emulator:<name>} resolves to one of these (see {@code ProjectDefaults}).
+ * {@code emulator:<name>} resolves to one of these.
  *
  * <p>Resolution is non-blocking and idempotent. While the named instance is down, the first
  * {@link #capture()} dispatches a launch (once) and returns {@code null}; the matcher treats that as "not

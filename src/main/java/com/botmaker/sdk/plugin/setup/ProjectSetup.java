@@ -38,7 +38,7 @@ import java.nio.file.Path;
  *
  * <p>Every row reads a fact that belongs to this module. The capture source is {@code Sdk.captureSource()} in
  * the bot's own Java; the pictures are the images folder, read through {@link TemplateLibrary}; the launch
- * target is this machine's {@code botmaker.launch.target} run property ({@link LaunchTargetValue}). The host
+ * target is the first of the bot's {@code launchTargets} this computer's system can launch ({@link LaunchTargetValue}). The host
  * holds none of it. What the host supplies is the three things nobody else can: which project is open, the
  * current look, and the window this one is owned by.
  *
@@ -224,8 +224,12 @@ public final class ProjectSetup {
     private Button clearLaunchButton() {
         Button clear = new Button("Clear");
         clear.setOnAction(e -> {
-            LaunchTargetValue.set(services, null);
-            launchStatus.setText("Launch target cleared on this computer.");
+            String next = LaunchTargetValue.set(services, null)
+                    .orElseGet(() -> LaunchTargetValue.current(services) == null
+                            ? "That launcher is no longer one of the bot's; this computer launches nothing now."
+                            : "That launcher is no longer one of the bot's; this computer now launches "
+                                    + LaunchTargetValue.current(services) + ".");
+            launchStatus.setText(next);
             refresh();
         });
         return clear;

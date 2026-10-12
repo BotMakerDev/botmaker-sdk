@@ -5,7 +5,7 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.capture.Source;
 
-import com.botmaker.sdk.internal.config.ProjectDefaults;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 
 /**
@@ -15,8 +15,8 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
  * Runnable)} calls them for you — so the supervisor (re)launches whatever the project is configured to run
  * without the user hand-editing any launch code.
  *
- * <p>On first use the current target initialises from <strong>this machine's</strong> — the
- * {@code botmaker.launch.target} system property Studio starts the bot with (see {@link ProjectDefaults}).
+ * <p>On first use the current target initialises from the first of the bot's {@code launchTargets} this computer's
+ * system can launch, or a {@code -Dbotmaker.launch.target} given by hand (see {@link InstalledGame#launchTarget}).
  * When none is configured the target is {@code null} and {@link #start()} is a no-op: an empty game-bot scaffold
  * that hasn't picked a game yet simply doesn't launch anything. Override at runtime with
  * {@link #set(LaunchTarget)}.
@@ -41,7 +41,7 @@ public final class Target {
         if (!initialised) {
             synchronized (Target.class) {
                 if (!initialised) {
-                    current = LaunchTarget.parse(ProjectDefaults.launchTarget());
+                    current = LaunchTarget.parse(InstalledGame.launchTarget());
                     initialised = true;
                 }
             }

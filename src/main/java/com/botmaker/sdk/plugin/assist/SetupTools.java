@@ -36,8 +36,8 @@ import java.util.function.Function;
 
 /**
  * Where the bot looks and how it runs: its capture source, its {@code Sdk.settings()}, the emulator it
- * watches, and what this machine launches for it. The source and settings are the bot's Java, written on the FX
- * thread as their windows write them; the launch target is this machine's run property. Nothing here starts a
+ * watches, and what it launches. All are the bot's Java, written on the FX thread as their windows write them: the
+ * launch target is the first of its {@code launchTargets} this computer's system can launch. Nothing here starts a
  * game, an emulator or a run.
  */
 final class SetupTools {
@@ -157,8 +157,8 @@ final class SetupTools {
                     .describedAs("What this computer launches when the bot starts, if anything")
                     .takesNothing().handledBy(SetupTools::getLaunchTarget),
             AssistantTool.named("set_launch_target")
-                    .describedAs("Sets what this computer launches when the bot starts. Kept on this computer, "
-                            + "not in the bot's files. Starts nothing")
+                    .describedAs("Makes a launcher the bot's first in Sdk.launchTargets: each computer starts the "
+                            + "first its system can. Starts nothing")
                     .takes(Target.class).handledBy(SetupTools::setLaunchTarget));
 
     private SetupTools() {}
@@ -271,7 +271,7 @@ final class SetupTools {
         String refused = FxCall.call(() -> {
             String why = CaptureValue.CAPTURE.write(context.services(), CaptureSource.emulator(known.get()))
                     .orElse(null);
-            if (why == null && target != null) LaunchTargetValue.set(context.services(), target);
+            if (why == null && target != null) why = LaunchTargetValue.set(context.services(), target).orElse(null);
             return why;
         });
         if (refused != null) return AgentReply.refused(refused);
@@ -295,7 +295,8 @@ final class SetupTools {
         }
         String unsafe = unsafe(spec);
         if (unsafe != null) return AgentReply.refused(unsafe);
-        LaunchTargetValue.set(context.services(), spec.spec());
+        String refused = FxCall.call(() -> LaunchTargetValue.set(context.services(), spec.spec()).orElse(null));
+        if (refused != null) return AgentReply.refused(refused);
         return AgentReply.text("This computer now launches " + spec.describe() + " when the bot starts.");
     }
 

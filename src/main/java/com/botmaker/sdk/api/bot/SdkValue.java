@@ -82,6 +82,14 @@ public @interface SdkValue {
         /** Whether a run sets the game up first — the {@code boolean} parameter {@code doSetup}. */
         DO_SETUP,
         /** The activities a run switches off — the parameter {@code skip}, a set of activity classes. */
-        SKIP
+        SKIP,
+        /**
+         * The launchers the bot can start its game from, preferred first — the {@code List<String>} parameter
+         * {@code launchTargets}, each a launch spec ({@code steam:1145350}). A run takes the first one its
+         * computer's system can launch.
+         */
+        LAUNCH_TARGETS,
+        /** The game VM the game runs in, by name — the {@code String} parameter {@code vm}; blank for the one there is. */
+        VM
     }
 }

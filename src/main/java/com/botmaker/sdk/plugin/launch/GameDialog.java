@@ -50,6 +50,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The game dialog: what this computer starts for the open bot, picked from what the launchers and the app menu
@@ -59,7 +60,7 @@ import java.util.Map;
  * what the grid of covers shows: <b>All</b> (every game, each once), <b>Recent</b> picks, one per launcher
  * (Steam, Epic, Heroic, Faugus, Lutris, …), one per emulator instance (its apps by name, dimmed while it is
  * stopped), Waydroid's Android apps, the menu's games, and every other app,
- * which All leaves out. A pick sets this machine's {@code botmaker.launch.target}
+ * which All leaves out. A pick becomes the first of the bot's {@code launchTargets} in {@code Sdk.java}
  * ({@link LaunchTargetValue}) and is remembered in {@link RecentTargets}.
  *
  * <p>It builds no launch settings of its own (the maintainer's call): a target is which launcher and which of
@@ -145,15 +146,24 @@ public final class GameDialog {
 
     private void show(Window owner) {
         Label heading = Styles.on(new Label("Which game does this bot play?"), Styles.DIALOG_HEADING);
-        Label hint = Styles.on(new Label("Pick it from what this computer's launchers already have — the pick is "
-                + "kept on this computer only. ▶ Launch game starts it without running the bot."), Styles.DIALOG_HINT);
+        Label hint = Styles.on(new Label("Pick it from what this computer's launchers already have — the pick becomes "
+                + "the bot's first launcher in Sdk.java, and each computer starts the first one its system can. "
+                + "▶ Launch game starts it without running the bot."), Styles.DIALOG_HINT);
         hint.setWrapText(true);
 
         clear.setOnAction(e -> {
-            LaunchTargetValue.set(services, null);
+            Optional<String> refused = LaunchTargetValue.set(services, null);
+            if (refused.isPresent()) {
+                report(false, refused.get());
+                return;
+            }
             picks.selectToggle(null);
             refreshCurrent();
-            report(true, "This computer launches nothing for the bot now.");
+            markCurrent();
+            String next = LaunchTargetValue.current(services);
+            report(true, "That launcher is no longer one of the bot's"
+                    + (next == null ? "; this computer launches nothing now." : "; this computer now launches "
+                    + GameButton.nameOf(services, next) + "."));
             onChanged.run();
         });
         Region spacer = new Region();
@@ -434,7 +444,11 @@ public final class GameDialog {
     private void choose(GameCatalog.Item item) {
         // Remembered first: setting the target refreshes the toolbar, whose label reads the name from here.
         RecentTargets.remember(services, new RecentTargets.Recent(item.spec(), item.name(), item.artwork()));
-        LaunchTargetValue.set(services, item.spec());
+        Optional<String> refused = LaunchTargetValue.set(services, item.spec());
+        if (refused.isPresent()) {
+            report(false, refused.get());
+            return;
+        }
         refreshCurrent();
         markCurrent();
         report(true, "This computer now launches " + item.name() + ".");

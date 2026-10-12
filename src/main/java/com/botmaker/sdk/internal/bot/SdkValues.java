@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.bot;
 import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.plugin.api.params.Param;
 import com.botmaker.plugin.api.source.ManagedValue;
+import com.botmaker.plugin.api.source.ParamScope;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.bot.SdkValue;
@@ -21,6 +22,7 @@ import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.sdk.internal.vision.TemplateNames;
+import com.botmaker.shared.platform.Os;
 
 import java.util.List;
 import java.util.Set;
@@ -38,8 +40,8 @@ import java.util.Set;
  * constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the run's {@code @Param} fields in
  * {@code Sdk.java}, which the bot's {@code main} hands to {@code Bot.runFlow} and nothing claims.
  *
- * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract
- * and {@code api} types only, so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
+ * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract,
+ * {@code api} and shared types only — no toolkit — so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
  * {@link #claim()} before installing, which is the only ordering anyone has to get right.
  */
 public final class SdkValues {
@@ -178,9 +180,42 @@ public final class SdkValues {
             .shown(RUN_CATEGORY, "Activities this run skips", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
 
-    /** All fourteen, in the order the plugin declares them. */
+    /** The game parameters' heading in the Parameters window. */
+    private static final String GAME_CATEGORY = "Game";
+
+    private static final String GAME_PARAM = "The SDK reads this parameter when the bot starts its game. Pick the"
+            + " game in 🎮 Game, or change it in Project ▸ Parameters.";
+
+    /**
+     * The launchers the bot can start its game from, preferred first — {@code public static List<String>
+     * launchTargets}, each a launch spec ({@code steam:1145350}, {@code heroic:Fortnite}). The bot's author lists
+     * them; a run takes the first its computer's system can launch ({@code LaunchKind.runsOn}), so nothing about
+     * a platform is written. Empty: the bot starts no game, and is run against one already open.
+     */
+    public static final ManagedValue<List<String>> LAUNCH_TARGETS = ManagedValue.param(SdkValue.Id.LAUNCH_TARGETS)
+            .in(HOLDER)
+            .startsAs(SdkValues::noLaunchTargets)
+            .shown(GAME_CATEGORY, "The launchers this bot can start its game from, preferred first",
+                    Param.Visibility.EDITOR)
+            .because(GAME_PARAM);
+
+    /**
+     * The game VM the game runs in when ⚙ Bot Settings runs it in one — {@code public static String vm}, by name;
+     * blank for the one VM there is. Declared only while it means something ({@link #vmApplies}): the settings run
+     * the game in a VM, on a system that has game VMs. So the bot's {@code main} never names it; the session reads
+     * it by its mark.
+     */
+    public static final ManagedValue<String> VM = ManagedValue.param(SdkValue.Id.VM)
+            .in(HOLDER)
+            .startsAs(SdkValues::theOneVm)
+            .shown(GAME_CATEGORY, "The game VM the game runs in; blank for the one VM there is",
+                    Param.Visibility.EDITOR)
+            .when(SdkValues::vmApplies)
+            .because(GAME_PARAM);
+
+    /** All sixteen, in the order the plugin declares them. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOWS, RUN, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            ACTIVITIES, SPOTS, ZONES, DIGITS, SCREEN, FLOW, DO_SETUP, SKIP);
+            ACTIVITIES, SPOTS, ZONES, DIGITS, SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, VM);
 
     private static boolean claimed;
 
@@ -199,6 +234,26 @@ public final class SdkValues {
     /** {@link #SKIP}'s: every activity runs. */
     private static Set<Class<? extends Outcome>> skipNothing() {
         return Set.of();
+    }
+
+    /** {@link #LAUNCH_TARGETS}'s: no launcher until the game is picked. */
+    private static List<String> noLaunchTargets() {
+        return List.of();
+    }
+
+    /** {@link #VM}'s: the one game VM there is. */
+    private static String theOneVm() {
+        return "";
+    }
+
+    /**
+     * Whether {@link #VM} applies: the bot's settings run the game in a VM, and this computer's system has game VMs —
+     * Windows and a Mac; Linux runs a game on a private display instead.
+     */
+    static boolean vmApplies(ParamScope scope) {
+        Os os = Os.current();
+        if (os != Os.WINDOWS && os != Os.MAC) return false;
+        return scope.value(SETTINGS).map(settings -> settings.where() == BotSettings.Where.VM).orElse(false);
     }
 
     /**

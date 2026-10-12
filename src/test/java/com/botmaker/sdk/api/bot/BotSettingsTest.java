@@ -4,7 +4,6 @@ import com.botmaker.plugin.api.Runs;
 import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
-import com.botmaker.sdk.internal.config.ProjectDefaults;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -17,7 +16,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -82,7 +80,7 @@ class BotSettingsTest {
         assertEquals(0.11, current.compareMargin());
         assertEquals(7, current.maxRetryAttempts());
         assertEquals(BotSettings.Where.MY_DESKTOP, current.where());
-        assertEquals("xephyr", ProjectDefaults.sessionBackend());
+        assertEquals("xephyr", current.runIn().displayBackend().id());
     }
 
     @Test
@@ -153,20 +151,6 @@ class BotSettingsTest {
         } finally {
             System.clearProperty(Diag.RUN_PROPERTY);
             Debug.enable();
-        }
-    }
-
-    @Test
-    void theLaunchTargetIsTheMachinesRunProperty() {
-        String was = System.getProperty(ProjectDefaults.LAUNCH_TARGET);
-        try {
-            System.clearProperty(ProjectDefaults.LAUNCH_TARGET);
-            assertNull(ProjectDefaults.launchTarget());
-            System.setProperty(ProjectDefaults.LAUNCH_TARGET, " steam:570 ");
-            assertEquals("steam:570", ProjectDefaults.launchTarget());
-        } finally {
-            if (was == null) System.clearProperty(ProjectDefaults.LAUNCH_TARGET);
-            else System.setProperty(ProjectDefaults.LAUNCH_TARGET, was);
         }
     }
 }
