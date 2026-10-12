@@ -5,6 +5,8 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.launch.Launcher;
 import com.botmaker.shared.launch.RunningProbe;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -35,11 +37,17 @@ class LaunchTargetProbeTest {
     @Test
     void aDesktopCaptureSourceNoLongerBlindsTheProbe() {
         // The exact reported setup: capture the whole desktop, so the source cannot answer — but the game is up.
-        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Firestone Online Idle RPG"))));
+        // A name no real process carries, so a game running on this computer cannot answer for the fake windows.
+        String game = "ProbeGame" + UUID.randomUUID().toString().substring(0, 8);
+        NativeControllerFactory.setForTesting(new FakeController(List.of(window(game + " Online Idle RPG"),
+                new GenericWindow(new Object(), game, new Rectangle(0, 0, 100, 100), GenericWindow.NO_PID,
+                        "probegame.exe"))));
         Source.set(CaptureSource.desktop());
 
-        assertTrue(LaunchTarget.parse("heroic:Firestone").isRunning(),
-                "the window is open; enumerating the OS's windows must see it even with no window source");
+        assertFalse(LaunchTarget.parse("heroic:" + game).isRunning(),
+                "a title alone proves nothing (2026-10-13): Studio's own window is named after the game too");
+        assertTrue(Launcher.isRunning(LaunchSpec.parse("heroic:" + game), "probegame.exe"),
+                "a window of the bot's class is the game's, with no window source");
         assertFalse(LaunchTarget.parse("heroic:SomethingElseEntirely").isRunning());
     }
 
