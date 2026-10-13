@@ -74,8 +74,8 @@ public final class EmulatorEditors {
      * would lose the edit as well as the wiring.
      *
      * <p><b>Both halves are the bot's Java.</b> What the bot <em>launches</em> becomes the first of its
-     * {@code launchTargets} ({@link LaunchTargetValue}); where it <em>looks</em> is the expression
-     * {@code Sdk.captureSource()} returns.
+     * {@code launchTargets} ({@link LaunchTargetValue}); where it <em>looks</em> is its
+     * {@code Sdk.captureSource} parameter.
      */
     private static void pointProjectAtApp(ValueContext ctx, String instanceName, String appPackage) {
         Optional<String> refused = LaunchTargetValue.set(ctx.services(), "emu-app:" + appPackage + "@" + instanceName);

@@ -26,6 +26,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `launch_game` starts the bot's launch target on this desktop without running the bot. Given `seconds`, it
   answers once the window the bot looks at is open. With the game in a private display or a VM it refuses: a
   run starts the game there.
+- **The Runner shows the game's launchers and window.** `launchTargets` is a public parameter of the new type
+  `Launcher` (`List.of(Launcher.of("heroic:43d4…"))`), and each one opens 🎮 Game to pick another. The capture source
+  is a public parameter too, `Sdk.captureSource` (was the method `captureSource()`), picked with the 🎯 source
+  tiles. Both sit under *Game*. A bot whose `Sdk.java` still has the method: pick the window again, which writes
+  the field, then delete the method. The window tiles list the most recently opened window first.
 
 ### Changed
 

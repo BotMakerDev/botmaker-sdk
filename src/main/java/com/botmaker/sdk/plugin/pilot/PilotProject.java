@@ -20,7 +20,7 @@ import java.nio.file.Path;
  *
  * <h2>It reads the bot's own Java</h2>
  *
- * <p>The project's capture source is the expression {@code Sdk.captureSource()} returns — the
+ * <p>The project's capture source is the parameter {@code Sdk.captureSource} — the
  * {@code @SdkValue(SdkValue.Id.CAPTURE)} value — so this asks
  * {@link com.botmaker.plugin.api.source.PluginValues} for it, as a value the host read. One author, and it is
  * the one the user can see in their own editor.

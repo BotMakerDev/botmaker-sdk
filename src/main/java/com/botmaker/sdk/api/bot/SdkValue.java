@@ -58,7 +58,7 @@ public @interface SdkValue {
         RUN,
         /** Where each flow's cards sit in the Activity Flow — a {@code FlowLayout} method a run ignores. */
         FLOW_LAYOUT,
-        /** Where pixels are read from — a {@code CaptureSource} method. */
+        /** Where pixels are read from: the game's window — the {@code CaptureSource} parameter {@code captureSource}. */
         CAPTURE,
         /** How the bot clicks and looks — a {@link BotSettings} method. */
         SETTINGS,
@@ -84,8 +84,8 @@ public @interface SdkValue {
         /** The activities a run switches off — the parameter {@code skip}, a set of activity classes. */
         SKIP,
         /**
-         * The launchers the bot can start its game from, preferred first — the {@code List<String>} parameter
-         * {@code launchTargets}, each a launch spec ({@code steam:1145350}). A run takes the first one its
+         * The launchers the bot can start its game from, preferred first — the {@code List<Launcher>} parameter
+         * {@code launchTargets} ({@code Launcher.of("steam:1145350")}). A run takes the first one its
          * computer's system can launch.
          */
         LAUNCH_TARGETS,

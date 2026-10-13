@@ -23,6 +23,7 @@ import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorProbe;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
+import com.botmaker.shared.launch.GameWindows;
 import com.botmaker.shared.launch.WindowIdentity;
 import com.botmaker.shared.vm.GuestOs;
 import com.botmaker.shared.vm.GuestWindows;
@@ -136,7 +137,7 @@ public final class SourcePicker {
 
     /**
      * The 🎯 Capture Source press: chooses what the bot reads pixels from, and writes it into the bot's own
-     * Java — the one expression {@code Sdk.captureSource()} returns.
+     * Java — its {@code Sdk.captureSource} parameter.
      *
      * <p><b>The item's label is constant.</b> A plugin's toolbar list is built with no {@link StudioServices},
      * so a label supplier has no project to read the current source out of.
@@ -592,9 +593,11 @@ public final class SourcePicker {
                 String title = window.getTitle();
                 WindowIdentity identity = WindowIdentity.of(window);
                 if (identity == null || !seen.add(identity)) continue;
+                // The window a run finds by this identity, which is what the thumbnail must show when several share it.
+                GenericWindow shown = GameWindows.named(identity, found).orElse(window);
                 BufferedImage shot;
                 try {
-                    shot = NativeControllerFactory.get().captureWindow(window);
+                    shot = NativeControllerFactory.get().captureWindow(shown);
                 } catch (Throwable notCaptured) {
                     shot = null;
                 }

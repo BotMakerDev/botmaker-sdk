@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.DeclaredCallType;
 import com.botmaker.plugin.api.value.DeclaredType;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Activity;
@@ -35,6 +36,7 @@ import com.botmaker.sdk.plugin.editors.ActivityEditors;
 import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 import com.botmaker.sdk.plugin.editors.GeometryEditors;
 import com.botmaker.sdk.plugin.editors.InputEditors;
+import com.botmaker.sdk.plugin.editors.LauncherEditors;
 import com.botmaker.sdk.plugin.editors.OcrEditors;
 import com.botmaker.sdk.plugin.editors.PrecisionEditors;
 import com.botmaker.sdk.plugin.editors.ResultEditors;
@@ -236,6 +238,16 @@ public final class SdkTypes {
             .writtenAsParts();
 
     /**
+     * One launcher the bot starts its game from, {@code Launcher.of("heroic:43d4…")}: drawn as a pill naming the
+     * game that opens 🎮 Game ({@link LauncherEditors}). A fresh one names no game.
+     */
+    public static final DeclaredCallType<Launcher> LAUNCHER = PluginType.value(Launcher.class)
+            .fresh(() -> Launcher.of(""))
+            .editor(() -> LauncherEditors::launcher)
+            .preview(() -> LauncherEditors::preview)
+            .writtenAs(Launcher::of, Launcher::spec);
+
+    /**
      * One activity of the flow: the bot's {@code Activities.Collect} enum, which an editor holds by name
      * ({@link BotConstants#activity}) and the host writes as its class literal. A fresh one is no activity; the
      * picker offers the flow's.
@@ -300,7 +312,7 @@ public final class SdkTypes {
             IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET,
             POINT, RECT, SIZE, SPOT, ZONE,
             KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE,
-            CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP,
+            CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER,
             ACTIVITY, OUTCOME,
             MATCH_RESULT, MATCHES, COLOR_MATCH, TEXT_MATCH);
 

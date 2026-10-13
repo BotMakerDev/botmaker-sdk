@@ -141,7 +141,7 @@ final class SetupTools {
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("get_capture_source")
-                    .describedAs("Where the bot looks and clicks: Sdk.captureSource(), in words")
+                    .describedAs("Where the bot looks and clicks: Sdk.captureSource, in words")
                     .takesNothing().handledBy(SetupTools::getCaptureSource),
             AssistantTool.named("set_capture_source")
                     .describedAs("Points the bot at an open window, so it looks at and clicks in that window; the bot "
@@ -186,7 +186,7 @@ final class SetupTools {
 
     static AgentReply getCaptureSource(AssistantTool.None none, AgentContext context) {
         CaptureSource source = FxCall.call(() -> CaptureValue.current(context.services()));
-        return AgentReply.text(source == null ? "Sdk.captureSource() names nothing BotMaker can read: the bot looks "
+        return AgentReply.text(source == null ? "Sdk.captureSource names nothing BotMaker can read: the bot looks "
                 + "at the whole desktop, or at what the code says." : CaptureLabels.longLabel(source) + ".");
     }
 
@@ -197,7 +197,7 @@ final class SetupTools {
             return AgentReply.refused("No open window \"" + title.window().trim() + "\" has a window class to find it "
                     + "by: list_windows lists the ones that do.");
         }
-        String refused = FxCall.call(() -> CaptureValue.CAPTURE.write(context.services(), window.get()).orElse(null));
+        String refused = FxCall.call(() -> CaptureValue.write(context.services(), window.get()).orElse(null));
         return refused == null ? AgentReply.text("The bot now looks at " + CaptureLabels.longLabel(window.get()) + ".")
                 : AgentReply.refused(refused);
     }
@@ -296,7 +296,7 @@ final class SetupTools {
             if (unsafe != null) return AgentReply.refused(unsafe);
         }
         String refused = FxCall.call(() -> {
-            String why = CaptureValue.CAPTURE.write(context.services(), CaptureSource.emulator(known.get()))
+            String why = CaptureValue.write(context.services(), CaptureSource.emulator(known.get()))
                     .orElse(null);
             if (why == null && target != null) why = LaunchTargetValue.set(context.services(), target).orElse(null);
             return why;

@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * The game dialog: what this computer starts for the open bot, picked from what the launchers and the app menu
@@ -90,6 +91,8 @@ public final class GameDialog {
 
     private final StudioServices services;
     private final Runnable onChanged;
+    /** Set when a launcher editor asked: a pick goes to it and closes the dialog, and nothing is written. */
+    private final Consumer<String> picked;
     private final ToggleGroup picks = new ToggleGroup();
     private final ToggleGroup groupPicks = new ToggleGroup();
     /** One tile per target, so a game listed under All, Recent and its launcher is one selection. */
@@ -114,9 +117,10 @@ public final class GameDialog {
     /** One radio button's worth of tiles; {@code extra} is the emulator picker's tile, or {@code null}. */
     private record Group(String title, List<Tile> tiles, Node extra) {}
 
-    private GameDialog(StudioServices services, Runnable onChanged) {
+    private GameDialog(StudioServices services, Runnable onChanged, Consumer<String> picked) {
         this.services = services;
         this.onChanged = onChanged == null ? () -> { } : onChanged;
+        this.picked = picked;
         this.launch = Styles.on(QuickLaunch.button(services, this::report), Styles.PRIMARY_BUTTON);
         launch.setText("▶ Launch game");
     }
@@ -132,6 +136,7 @@ public final class GameDialog {
      */
     public static void open(StudioServices services, Window owner, Runnable onChanged) {
         if (active != null && active.stage != null && active.stage.isShowing()) {
+            // A pick an editor is waiting for is brought forward too, never dropped.
             if (active.services == services) {
                 active.stage.toFront();
                 active.stage.requestFocus();
@@ -140,15 +145,29 @@ public final class GameDialog {
             // Left open from the project before: a pick there would land in that project's settings.
             active.stage.close();
         }
-        active = new GameDialog(services, onChanged);
+        active = new GameDialog(services, onChanged, null);
+        active.show(owner);
+    }
+
+    /**
+     * Opens the dialog to pick one game for a launcher editor (the Runner's, the Parameters window's): {@code picked}
+     * gets its launch spec, on the JavaFX thread, and the dialog closes. Nothing is written to the bot; the editor
+     * hands the value back.
+     */
+    public static void pick(StudioServices services, Window owner, Consumer<String> picked) {
+        if (active != null && active.stage != null && active.stage.isShowing()) active.stage.close();
+        active = new GameDialog(services, null, picked);
         active.show(owner);
     }
 
     private void show(Window owner) {
         Label heading = Styles.on(new Label("Which game does this bot play?"), Styles.DIALOG_HEADING);
-        Label hint = Styles.on(new Label("Pick it from what this computer's launchers already have — the pick becomes "
-                + "the bot's first launcher in Sdk.java, and each computer starts the first one its system can. "
-                + "▶ Launch game starts it without running the bot."), Styles.DIALOG_HINT);
+        Label hint = Styles.on(new Label(picked != null
+                ? "Pick it from what this computer's launchers already have — the pick goes into the launcher you "
+                        + "are editing."
+                : "Pick it from what this computer's launchers already have — the pick becomes the bot's first "
+                        + "launcher in Sdk.java, and each computer starts the first one its system can. ▶ Launch game "
+                        + "starts it without running the bot."), Styles.DIALOG_HINT);
         hint.setWrapText(true);
 
         clear.setOnAction(e -> {
@@ -170,6 +189,9 @@ public final class GameDialog {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox currentRow = new HBox(8, current, spacer, clear, launch);
         currentRow.setAlignment(Pos.CENTER_LEFT);
+        // Picking for an editor: the bot's current launcher is not what is being chosen, and Clear would write it.
+        currentRow.setVisible(picked == null);
+        currentRow.setManaged(picked == null);
 
         TextField search = new TextField();
         search.setPromptText("Search…");
@@ -444,6 +466,11 @@ public final class GameDialog {
     private void choose(GameCatalog.Item item) {
         // Remembered first: setting the target refreshes the toolbar, whose label reads the name from here.
         RecentTargets.remember(services, new RecentTargets.Recent(item.spec(), item.name(), item.artwork()));
+        if (picked != null) {
+            stage.close();
+            picked.accept(item.spec());
+            return;
+        }
         Optional<String> refused = LaunchTargetValue.set(services, item.spec());
         if (refused.isPresent()) {
             report(false, refused.get());
@@ -465,6 +492,8 @@ public final class GameDialog {
 
     /** Selects the current target's tile, so reopening shows what is picked. */
     private void markCurrent() {
+        // Picking for an editor: the bot's first launcher is not the one being edited.
+        if (picked != null) return;
         Tile tile = tiles.get(LaunchTargetValue.current(services));
         picks.selectToggle(tile == null ? null : tile.button());
     }

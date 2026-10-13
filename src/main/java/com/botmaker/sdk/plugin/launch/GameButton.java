@@ -50,7 +50,7 @@ public final class GameButton {
     }
 
     /** What {@code spec} is called: the name it was picked under, else the spec's short label. */
-    static String nameOf(StudioServices services, String spec) {
+    public static String nameOf(StudioServices services, String spec) {
         return RecentTargets.find(services, spec).map(RecentTargets.Recent::name)
                 .orElseGet(() -> LaunchSpec.shortLabel(spec, null));
     }

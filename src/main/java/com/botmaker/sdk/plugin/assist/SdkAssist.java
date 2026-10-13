@@ -14,7 +14,7 @@ import java.util.List;
  * returned, so the assistant crops what it was shown. Every write goes through the same path as the SDK's own
  * windows, on the FX thread ({@link FxCall}): the picture files and their {@code Pictures} constants, the
  * {@code Points} and {@code Regions} constants, the flow and its {@code Activities}/{@code Outcomes} constants,
- * {@code Sdk.captureSource()} and {@code Sdk.settings()}, and this machine's launch target. Nothing clicks,
+ * {@code Sdk.captureSource} and {@code Sdk.settings()}, and this machine's launch target. Nothing clicks,
  * types or starts anything; the assistant acts on the game only by running the bot.
  */
 public final class SdkAssist {

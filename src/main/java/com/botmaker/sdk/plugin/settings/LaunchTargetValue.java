@@ -3,8 +3,10 @@ package com.botmaker.sdk.plugin.settings;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.run.RunProperty;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.config.InstalledGame;
+import com.botmaker.sdk.plugin.params.ParamSlot;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
 
@@ -34,7 +36,7 @@ public final class LaunchTargetValue {
 
     /** The bot's launchers, preferred first; empty when it lists none or the parameter does not read. */
     public static List<String> all(StudioServices services) {
-        return open(services).flatMap(ctx -> ctx.value(List.class)).map(InstalledGame::specs).orElse(List.of());
+        return ParamSlot.open(services, SdkValues.LAUNCH_TARGETS).flatMap(ctx -> ctx.value(List.class)).map(InstalledGame::specs).orElse(List.of());
     }
 
     /**
@@ -62,14 +64,9 @@ public final class LaunchTargetValue {
      * @return empty when written, else why nothing was
      */
     public static Optional<String> set(StudioServices services, String spec) {
-        if (services == null) return Optional.of("No project is open.");
-        Optional<ValueContext> ctx = open(services);
-        if (ctx.isEmpty()) {
-            Optional<String> refused = services.pluginValues().create(SdkValues.LAUNCH_TARGETS);
-            if (refused.isPresent()) return refused;
-            ctx = open(services);
-            if (ctx.isEmpty()) return Optional.of("Sdk.launchTargets is written by hand, so BotMaker leaves it alone.");
-        }
+        ParamSlot.Opened opened = ParamSlot.openOrCreate(services, SdkValues.LAUNCH_TARGETS, "Sdk.launchTargets");
+        if (opened.ctx().isEmpty()) return Optional.of(opened.refused());
+        ValueContext ctx = opened.ctx().get();
         String clearing = spec == null || spec.isBlank() ? current(services) : null;
         services.runs().set(OLD_RUN_PROPERTY, null);
         List<String> next = new ArrayList<>(all(services));
@@ -80,14 +77,6 @@ public final class LaunchTargetValue {
             next.addFirst(spec.trim());
         }
         if (next.equals(all(services))) return Optional.empty();
-        return ctx.get().write(List.copyOf(next));
-    }
-
-    private static Optional<ValueContext> open(StudioServices services) {
-        try {
-            return services == null ? Optional.empty() : services.pluginValues().open(SdkValues.LAUNCH_TARGETS);
-        } catch (RuntimeException unreadable) {
-            return Optional.empty();
-        }
+        return ctx.write(next.stream().map(Launcher::of).toList());
     }
 }

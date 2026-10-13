@@ -93,7 +93,7 @@ class SdkPluginSurfaceTest {
             Point.class, Rect.class, Size.class,
             com.botmaker.sdk.api.geometry.Spot.class, com.botmaker.sdk.api.geometry.Zone.class,
             Key.class, MouseButton.class, Combo.class,
-            KeySequence.class, CaptureSource.class, ImageTemplateGroup.class,
+            KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, com.botmaker.sdk.api.bot.Launcher.class,
             com.botmaker.sdk.api.flow.Activity.class, com.botmaker.sdk.api.bot.Outcome.class,
             MatchResult.class, Matches.class, ColorMatch.class, TextMatch.class);
 
@@ -322,8 +322,8 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(21, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
-                + " Spot, Zone and DigitSet 2026-10-11");
+        assertEquals(22, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
+                + " Spot, Zone and DigitSet 2026-10-11; Launcher 2026-10-13");
     }
 
     /**

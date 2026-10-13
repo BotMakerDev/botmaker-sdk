@@ -36,7 +36,7 @@ import java.nio.file.Path;
  *
  * <h2>Why this is the plugin's</h2>
  *
- * <p>Every row reads a fact that belongs to this module. The capture source is {@code Sdk.captureSource()} in
+ * <p>Every row reads a fact that belongs to this module. The capture source is {@code Sdk.captureSource} in
  * the bot's own Java; the pictures are the images folder, read through {@link TemplateLibrary}; the launch
  * target is the first of the bot's {@code launchTargets} this computer's system can launch ({@link LaunchTargetValue}). The host
  * holds none of it. What the host supplies is the three things nobody else can: which project is open, the

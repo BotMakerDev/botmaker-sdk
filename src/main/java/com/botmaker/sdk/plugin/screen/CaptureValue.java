@@ -2,12 +2,12 @@ package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.toolbar.ActionContext;
-import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.sdk.plugin.params.ParamSlot;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.launch.WindowIdentity;
@@ -17,22 +17,19 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The {@code @SdkValue(SdkValue.Id.CAPTURE)} value — where a bot reads pixels from, written as the one expression
- * {@code Sdk.captureSource()} returns.
+ * The {@code @SdkValue(SdkValue.Id.CAPTURE)} value — where a bot reads pixels from, the parameter
+ * {@code Sdk.captureSource}, which the Runner shows too.
  *
- * <p>This is the only copy of the answer. {@code Sdk.captureSource()} is Java the bot compiles, so a
+ * <p>This is the only copy of the answer. {@code Sdk.captureSource} is Java the bot compiles, so a
  * developer with no BotMaker installed can read it, change it and see the change take effect.
  *
  * <h2>It is allowed to fail quietly</h2>
  *
- * <p>A project may have no {@code Sdk.java}, and a user may have written {@code captureSource()} by hand in a
+ * <p>A project may have no {@code Sdk.java}, and a user may have written {@code captureSource} by hand in a
  * shape the host does not read. In both cases there is nothing to write and nothing has gone wrong: the Java
  * the user wrote is still theirs.
  */
 public final class CaptureValue {
-
-    /** The value, declared once in {@link SdkValues}. */
-    public static final ManagedHandle<CaptureSource> CAPTURE = ManagedHandle.of(SdkValues.CAPTURE);
 
     private CaptureValue() {}
 
@@ -44,7 +41,24 @@ public final class CaptureValue {
      * Read on every call rather than held: a source changed in another window has to take effect at once.
      */
     public static CaptureSource current(StudioServices services) {
-        return CAPTURE.read(services).filter(source -> !(source instanceof CurrentSource)).orElse(null);
+        return ParamSlot.open(services, SdkValues.CAPTURE).flatMap(ctx -> {
+            try {
+                return ctx.value(CaptureSource.class);
+            } catch (RuntimeException unreadable) {
+                return Optional.empty();
+            }
+        }).filter(source -> !(source instanceof CurrentSource)).orElse(null);
+    }
+
+    /**
+     * Writes {@code source} into {@code Sdk.captureSource}, asking the host to write the parameter first when the
+     * project lacks it ({@link ParamSlot}: a parameter since 2026-10-13).
+     *
+     * @return empty when written, else the sentence to show
+     */
+    public static Optional<String> write(StudioServices services, CaptureSource source) {
+        ParamSlot.Opened opened = ParamSlot.openOrCreate(services, SdkValues.CAPTURE, "Sdk.captureSource");
+        return opened.ctx().map(ctx -> ctx.write(source)).orElseGet(() -> Optional.of(opened.refused()));
     }
 
     /**
@@ -93,8 +107,8 @@ public final class CaptureValue {
     }
 
     /**
-     * Points {@code Sdk.captureSource()} at {@code source}, asking the host to create {@code Sdk.java} first
-     * when the project has none; does nothing when there is still no such method to write to. Call it on the
+     * Points {@code Sdk.captureSource} at {@code source}, asking the host to write the parameter first when the
+     * project lacks it; does nothing when there is still no such parameter to write to. Call it on the
      * JavaFX application thread.
      *
      * @param source the project's capture source, or null for the whole desktop
@@ -114,7 +128,7 @@ public final class CaptureValue {
                 ? CaptureSource.region(base, new Rect(region.x, region.y, region.width, region.height))
                 : base;
         // A pick is the user asking for a source to be kept, so a project with no Sdk.java gets one first.
-        CAPTURE.write(services, value).ifPresent(refused -> {
+        write(services, value).ifPresent(refused -> {
             if (services != null) services.status(refused);
         });
     }

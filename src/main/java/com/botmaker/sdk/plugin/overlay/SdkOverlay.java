@@ -30,7 +30,7 @@ import java.util.Optional;
  * <ul>
  *   <li><b>Targets:</b> every activity body, by type. A bot passes each one to {@code Flow.activity} as an
  *       {@link ActivityBody} method reference, so Studio offers {@code Collect.body()} as a chip.</li>
- *   <li><b>Watched:</b> the screen {@code Sdk.captureSource()} names. ⇄ Change opens the 🎯 Capture Source
+ *   <li><b>Watched:</b> the screen {@code Sdk.captureSource} names. ⇄ Change opens the 🎯 Capture Source
  *       picker.</li>
  *   <li><b>Frames:</b> that source's own capture, at its origin — what the bot's matchers read.</li>
  *   <li><b>Tools:</b> {@link SdkTools}.</li>
@@ -59,13 +59,13 @@ public final class SdkOverlay {
 
     private SdkOverlay() {}
 
-    /** The screen {@code Sdk.captureSource()} names, when it is one the overlay can open over. */
+    /** The screen {@code Sdk.captureSource} names, when it is one the overlay can open over. */
     public static Optional<Watched> watched(OverlayContext context) {
         return of(CaptureValue.current(context.services()));
     }
 
     /**
-     * Where the bot's frames come from: {@code Sdk.captureSource()} itself, grabbed as the bot's matchers grab
+     * Where the bot's frames come from: {@code Sdk.captureSource} itself, grabbed as the bot's matchers grab
      * it — so a region is the region. Whatever it answers is in desktop pixels, which Studio draws on as they are.
      * Nothing for a project that names no source, and nothing for two Studio grabs itself:
      * <ul>

@@ -5,10 +5,10 @@ import com.botmaker.plugin.api.params.Param;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.ParamScope;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
@@ -34,11 +34,12 @@ import java.util.Set;
  * plugin lists {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOWS} are the activity
  * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
- * flow editor draws each card (a run ignores it), {@code CAPTURE} where
- * pixels are read from, {@code SETTINGS} how it clicks and looks, {@code SCREEN} the size its pictures were cut
- * at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS}, {@code ZONES} and {@code DIGITS} the classes of
- * constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the run's {@code @Param} fields in
- * {@code Sdk.java}, which the bot's {@code main} hands to {@code Bot.runFlow} and nothing claims.
+ * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
+ * size its pictures were cut at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS}, {@code ZONES} and
+ * {@code DIGITS} the classes of constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the
+ * run's {@code @Param} fields in {@code Sdk.java}, which the bot's {@code main} hands to {@code Bot.runFlow} and
+ * nothing claims; {@code LAUNCH_TARGETS}, {@code CAPTURE} (where pixels are read from) and {@code VM} the game's,
+ * which {@code Bot.runFlow} reads by their marks.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract,
  * {@code api} and shared types only — no toolkit — so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
@@ -71,11 +72,6 @@ public final class SdkValues {
             .holds(FlowLayout.class, FlowLayout.NONE)
             .because("These are where the Activity Flow's cards sit. Drag them in 🔀 Activity Flow, which keeps"
                     + " them in step with the activities' names.");
-
-    public static final ManagedValue<CaptureSource> CAPTURE = ManagedValue.method(SdkValue.Id.CAPTURE)
-            .in(HOLDER)
-            .holds(CaptureSource.class, CaptureSource.desktop())
-            .because("This is where the bot reads pixels from. Choose it in 🎯 Capture Source.");
 
     public static final ManagedValue<BotSettings> SETTINGS = ManagedValue.method(SdkValue.Id.SETTINGS)
             .in(HOLDER)
@@ -180,24 +176,36 @@ public final class SdkValues {
             .shown(RUN_CATEGORY, "Activities this run skips", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
 
-    /** The game parameters' heading in the Parameters window. */
+    /** The game parameters' heading in the Runner and the Parameters window. */
     private static final String GAME_CATEGORY = "Game";
 
     private static final String GAME_PARAM = "The SDK reads this parameter when the bot starts its game. Pick the"
-            + " game in 🎮 Game, or change it in Project ▸ Parameters.";
+            + " game in 🎮 Game, in the Runner or in Project ▸ Parameters.";
 
     /**
-     * The launchers the bot can start its game from, preferred first — {@code public static List<String>
-     * launchTargets}, each a launch spec ({@code steam:1145350}, {@code heroic:Fortnite}). The bot's author lists
+     * The launchers the bot can start its game from, preferred first — {@code public static List<Launcher>
+     * launchTargets}, each a launch spec ({@code Launcher.of("steam:1145350")}). The bot's author lists
      * them; a run takes the first its computer's system can launch ({@code LaunchKind.runsOn}), so nothing about
      * a platform is written. Empty: the bot starts no game, and is run against one already open.
      */
-    public static final ManagedValue<List<String>> LAUNCH_TARGETS = ManagedValue.param(SdkValue.Id.LAUNCH_TARGETS)
+    public static final ManagedValue<List<Launcher>> LAUNCH_TARGETS = ManagedValue.param(SdkValue.Id.LAUNCH_TARGETS)
             .in(HOLDER)
             .startsAs(SdkValues::noLaunchTargets)
             .shown(GAME_CATEGORY, "The launchers this bot can start its game from, preferred first",
-                    Param.Visibility.EDITOR)
+                    Param.Visibility.PUBLIC)
             .because(GAME_PARAM);
+
+    /**
+     * Where the bot reads pixels from — {@code public static CaptureSource captureSource}, the game's window as the
+     * person running the bot picked it (2026-10-13: a parameter, so the Runner shows it). {@code Bot.runFlow} reads
+     * it by its mark ({@code InstalledGame}).
+     */
+    public static final ManagedValue<CaptureSource> CAPTURE = ManagedValue.param(SdkValue.Id.CAPTURE)
+            .in(HOLDER)
+            .startsAs(SdkValues::wholeDesktop)
+            .shown(GAME_CATEGORY, "The game's window: where the bot reads pixels from", Param.Visibility.PUBLIC)
+            .because("This is where the bot reads pixels from. Choose it in 🎯 Capture Source, in the Runner or in"
+                    + " Project ▸ Parameters.");
 
     /**
      * The game VM the game runs in when ⚙ Bot Settings runs it in one — {@code public static String vm}, by name;
@@ -237,8 +245,13 @@ public final class SdkValues {
     }
 
     /** {@link #LAUNCH_TARGETS}'s: no launcher until the game is picked. */
-    private static List<String> noLaunchTargets() {
+    private static List<Launcher> noLaunchTargets() {
         return List.of();
+    }
+
+    /** {@link #CAPTURE}'s: the whole desktop until the game's window is picked. */
+    private static CaptureSource wholeDesktop() {
+        return CaptureSource.desktop();
     }
 
     /** {@link #VM}'s: the one game VM there is. */
@@ -266,7 +279,6 @@ public final class SdkValues {
         }
         claimed = true;
         ManagedValues.claim(RUN, InstalledRun::use);
-        ManagedValues.claim(CAPTURE, Source::set);
         ManagedValues.claim(SETTINGS, BotSettings::use);
         ManagedValues.claim(SCREEN, BotScreen::use);
         // Where the flow editor's cards sit: the editor's, and nothing at runtime reads it. Claimed so a run

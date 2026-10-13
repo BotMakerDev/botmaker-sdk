@@ -1,6 +1,9 @@
 package com.botmaker.sdk.internal.config;
 
+import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.shared.platform.Os;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -17,10 +20,14 @@ class InstalledGameTest {
     /** A bot's {@code Sdk}: the fields are found by mark, whatever they are called. */
     public static final class Sdk {
         @SdkValue(SdkValue.Id.LAUNCH_TARGETS)
-        public static List<String> launchers = List.of("faugus:abc", " steam:570 ", "");
+        public static List<Launcher> launchers = List.of(Launcher.of("faugus:abc"), Launcher.of(" steam:570 "),
+                Launcher.of(""));
 
         @SdkValue(SdkValue.Id.VM)
         public static String gameVm = " win11 ";
+
+        @SdkValue(SdkValue.Id.CAPTURE)
+        public static CaptureSource game = CaptureSource.window("firestone.exe", "");
     }
 
     @AfterEach
@@ -33,10 +40,13 @@ class InstalledGameTest {
         InstalledGame.install(Sdk.class);
         assertEquals(List.of("faugus:abc", "steam:570"), InstalledGame.launchTargets());
         assertEquals("win11", InstalledGame.vm());
+        assertEquals("Window[firestone.exe]", Source.current().toString(), "the bot reads the window picked");
 
         InstalledGame.install(String.class);
         assertTrue(InstalledGame.launchTargets().isEmpty(), "a bot with no such field launches nothing");
         assertEquals("", InstalledGame.vm());
+        assertEquals(CaptureSource.desktop().toString(), Source.current().toString(),
+                "a bot with no capture source reads the whole desktop again");
     }
 
     @Test

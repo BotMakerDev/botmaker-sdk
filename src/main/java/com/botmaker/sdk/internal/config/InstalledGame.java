@@ -1,6 +1,10 @@
 package com.botmaker.sdk.internal.config;
 
+import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
 
@@ -11,8 +15,8 @@ import java.util.List;
 
 /**
  * The game half of the bot's {@code Sdk} parameters, read off the classes {@code Bot.runFlow} is handed: the
- * launchers the bot can start its game from, and the game VM it runs in — and the launch target a run starts
- * ({@link #launchTarget}). A {@code -D} given to a bot started by hand wins over both.
+ * launchers the bot can start its game from, the game VM it runs in and the capture source it reads — and the launch
+ * target a run starts ({@link #launchTarget}). A {@code -D} given to a bot started by hand wins over the first two.
  *
  * <p>Read by mark, not by name: the field carrying {@code @SdkValue(SdkValue.Id.LAUNCH_TARGETS)} is the list,
  * whatever the bot calls it. A field of another type, or one that cannot be read, is no value: nothing is launched
@@ -28,19 +32,29 @@ public final class InstalledGame {
 
     private InstalledGame() {}
 
-    /** Takes the game parameters from the first of {@code values} that marks each. */
+    /**
+     * Takes the game parameters from the first of {@code values} that marks each, and points the bot at the capture
+     * source one names ({@link Source#set}); with none, the source goes back to its default. A capture source of
+     * {@code Source.current()} names none: it is what this sets.
+     */
     public static void install(Class<?>... values) {
         List<String> targets = null;
         String named = null;
+        CaptureSource capture = null;
         if (values != null) {
             for (Class<?> type : values) {
                 if (type == null) continue;
                 if (targets == null) targets = specs(field(type, SdkValue.Id.LAUNCH_TARGETS));
                 if (named == null && field(type, SdkValue.Id.VM) instanceof String text) named = text;
+                if (capture == null && field(type, SdkValue.Id.CAPTURE) instanceof CaptureSource source
+                        && !(source instanceof CurrentSource)) {
+                    capture = source;
+                }
             }
         }
         launchTargets = targets == null ? List.of() : targets;
         vm = named == null ? "" : named.trim();
+        Source.set(capture);
     }
 
     /** The launch specs the bot lists, preferred first; empty when it lists none. */
@@ -97,14 +111,14 @@ public final class InstalledGame {
     }
 
     /**
-     * A {@code launchTargets} value as specs: its non-blank strings, trimmed, or null when it is not a list. The one
+     * A {@code launchTargets} value as specs: its launchers' non-blank specs, or null when it is not a list. The one
      * reading the run and Studio's game dialog share, so both agree on which launcher is first.
      */
     public static List<String> specs(Object value) {
         if (!(value instanceof List<?> list)) return null;
         List<String> out = new ArrayList<>(list.size());
         for (Object each : list) {
-            if (each instanceof String spec && !spec.isBlank()) out.add(spec.trim());
+            if (each instanceof Launcher launcher && !launcher.spec().isEmpty()) out.add(launcher.spec());
         }
         return List.copyOf(out);
     }
