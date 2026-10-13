@@ -42,6 +42,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A game window's lookup is traced when its answer changes.** Every capture resolves the window, so the trace
+  said `window … -> Firestone` once per look; it now says it once, and again only when the window opens, closes
+  or changes.
 - **A window is found by its class, never by its title alone.** `CaptureSource.window(windowClass, title)`
   replaces `window(titleSubstring)`: the class is X11's `WM_CLASS` (a Windows program's file name, a Mac app),
   and the title is written only when that class is one many programs share — Heroic's Firestone is

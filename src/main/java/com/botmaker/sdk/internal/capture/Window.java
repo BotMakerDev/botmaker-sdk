@@ -17,7 +17,9 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A specific application window the bot can target — capture it, click inside it, and manage it
@@ -82,9 +84,17 @@ public class Window implements CaptureSource {
      */
     public static Optional<Window> named(WindowIdentity game) {
         Optional<Window> hit = GameWindows.named(game, controller().getAllWindows()).map(Window::new);
-        Debug.log("window " + game + " -> " + hit.map(Window::title).orElse("not open"));
+        String found = hit.map(Window::title).orElse("not open");
+        // Resolved on every capture: said when the answer changes, not once per look. Remembered only while it is
+        // said, so turning debug output on says the current answer.
+        if (Debug.isEnabled() && (game == null || !found.equals(LAST_RESOLVED.put(game, found)))) {
+            Debug.log("window " + game + " -> " + found);
+        }
         return hit;
     }
+
+    /** What {@link #named} last found for each game window, so a resolve that changes nothing says nothing. */
+    private static final Map<WindowIdentity, String> LAST_RESOLVED = new ConcurrentHashMap<>();
 
     // --- CaptureSource ---
 
