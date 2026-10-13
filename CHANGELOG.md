@@ -23,9 +23,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - **Two assistant tools for the launch.** `list_games` lists the games this computer's launchers installed,
   each with the target `set_launch_target` takes, so an assistant no longer has to know a Heroic app name.
-  `launch_game` starts the bot's launch target on this desktop without running the bot. Given `seconds`, it
-  answers once the window the bot looks at is open. With the game in a private display or a VM it refuses: a
-  run starts the game there.
+  `launch_game` starts the bot's launch target without running the bot: on this desktop, or in a private display
+  when the settings say one, as ▶ Launch does. Given `seconds`, it answers once the window the bot looks at is
+  open. With the game in a VM it refuses: a run starts the game there.
+- **The assistant sees a game in a private display or an emulator.** `screenshot`, `which_screen`, `find_picture`,
+  `crop_picture` and the other look tools read the private display this project's launch brought up (the game's
+  window, as a run reads it), else a running emulator the capture source names, else the screen Studio watches.
+  Before, they read only this desktop: with Firestone in gamescope they showed Studio's own window.
 - **The Runner shows the game's launchers and window.** `launchTargets` is a public parameter of the new type
   `Launcher` (`List.of(Launcher.of("heroic:43d4…"))`), and each one opens 🎮 Game to pick another. The capture source
   is a public parameter too, `Sdk.captureSource` (was the method `captureSource()`), picked with the 🎯 source
@@ -48,6 +52,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   the launch was skipped and the bot clicked in Studio.
 
 ### Fixed
+
+- **A run joins the private display ▶ Launch brought up.** Since ▶ Launch moved into the SDK plugin, Studio's
+  hand-off offered the run nothing (the plugin's session is on its own class loader), so the run started a second
+  display and the single-instance launcher refused it (Heroic) or sent the game to the first. The launch now offers
+  its display to every later run as run properties (`botmaker.session.display`, `.window`, `.owner.backend`); a
+  run joins it while it answers.
 
 - **1.4.3 never built.** Its pom pinned botmaker-shared v0.2.4, a tag JitPack never built (Maven Central's 429),
   and it needs shared's `LaunchSpec.runsOn`, which no shared release had. This release pins shared 0.2.5 and is

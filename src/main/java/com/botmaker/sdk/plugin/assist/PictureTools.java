@@ -235,7 +235,7 @@ final class PictureTools {
     static AgentReply savePoint(NamedPoint point, AgentContext context) {
         String constant = FlowNames.constantFor(point.name());
         if (constant == null) return AgentReply.refused("\"" + point.name() + "\" cannot be a constant's name.");
-        Optional<BufferedImage> frame = context.frame();
+        Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         if (Frames.within(frame.get(), point.x(), point.y(), 1, 1).isEmpty()) {
             return AgentReply.refused(Frames.outside(frame.get()));
@@ -253,7 +253,7 @@ final class PictureTools {
     static AgentReply saveRegion(NamedRegion region, AgentContext context) {
         String constant = FlowNames.constantFor(region.name());
         if (constant == null) return AgentReply.refused("\"" + region.name() + "\" cannot be a constant's name.");
-        Optional<BufferedImage> frame = context.frame();
+        Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         Optional<Rect> area = Frames.within(frame.get(), region.x(), region.y(), region.width(), region.height());
         if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));

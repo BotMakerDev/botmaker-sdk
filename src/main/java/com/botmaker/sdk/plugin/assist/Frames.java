@@ -11,7 +11,11 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.session.PrivateSession;
+import com.botmaker.session.launch.BackgroundLauncher;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -64,6 +68,57 @@ final class Frames {
 
     static String noProject() {
         return "No project is open.";
+    }
+
+    /**
+     * What the look tools read now, in the bot's pixels: the private display this project's launch brought up
+     * (launch_game, ▶ Launch), else the emulator the capture source names while it runs, else the screen Studio
+     * watches. Studio grabs only this desktop, and a game in a private display or an emulator is on neither: the
+     * assistant was shown Studio's own window while Firestone ran in gamescope (2026-10-13). Blocking.
+     */
+    static Optional<BufferedImage> look(AgentContext context) {
+        PrivateSession session = session(context);
+        if (session != null) {
+            try {
+                // The game's window, as a run's SessionSource grabs it: gamescope never paints its root, so the
+                // whole screen is black there; the screen only until a window is attached.
+                BufferedImage window = session.capture();
+                return Optional.ofNullable(window != null ? window : session.captureScreen());
+            } catch (RuntimeException closing) {
+                return Optional.empty();
+            }
+        }
+        CaptureSource emulator = emulator(context);
+        if (emulator != null) return emulator.isPresent() ? Optional.ofNullable(emulator.capture()) : Optional.empty();
+        return context.frame();
+    }
+
+    /**
+     * Where {@link #look}'s frame sits on this desktop; empty when it is a display of its own — the private
+     * display, an emulator — which no box on the desktop lands on.
+     */
+    static Optional<Area> lookArea(AgentContext context) {
+        return session(context) != null || emulator(context) != null ? Optional.empty() : context.watchedArea();
+    }
+
+    /** Where {@link #look} reads, said after a frame's size: " at 0,28 on the desktop", " in the private display :1". */
+    static String place(AgentContext context) {
+        PrivateSession session = session(context);
+        if (session != null) return " in the private display " + session.displayName();
+        if (emulator(context) != null) return " on the emulator";
+        return context.watchedArea().map(a -> " at " + a.x() + ',' + a.y() + " on the desktop").orElse("");
+    }
+
+    /** The live private display this project's launch brought up, or null. */
+    private static PrivateSession session(AgentContext context) {
+        Path resources = context.services().resourcesDir();
+        return resources == null ? null : BackgroundLauncher.forProject(resources).session();
+    }
+
+    /** The capture source when it names an emulator, or null. */
+    private static CaptureSource emulator(AgentContext context) {
+        CaptureSource source = FxCall.call(() -> CaptureValue.current(context.services()));
+        return source != null && source.base() instanceof EmulatorSource ? source : null;
     }
 
     /** The confidence a run holds a match to: the project's {@code Sdk.settings()}, else the SDK's default. */
@@ -191,7 +246,7 @@ final class Frames {
 
     /** Shows {@code box}, in screenshot pixels, on the game where the watched screen sits. */
     static void mark(AgentContext context, Rect box, Marks.Kind kind, String label) {
-        context.watchedArea().ifPresent(at -> context.marks().show(new Area(at.x() + box.x(), at.y() + box.y(),
+        lookArea(context).ifPresent(at -> context.marks().show(new Area(at.x() + box.x(), at.y() + box.y(),
                 box.width(), box.height()), kind, label));
     }
 

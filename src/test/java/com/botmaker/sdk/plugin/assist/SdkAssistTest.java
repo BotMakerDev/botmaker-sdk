@@ -605,8 +605,11 @@ class SdkAssistTest {
         assertTrue(none.isRefused());
         assertTrue(text(none).startsWith("The bot launches nothing"), text(none));
         run("set_launch_target", "target", "steam:570");
+        // A private display is brought up as ▶ Launch does: not tried here, where it would start a real one.
+        host.values.put("settings", TestContexts.row(BotSettings.class, "")
+                .withValue(BotSettings.DEFAULTS.where(BotSettings.Where.VM)));
         AgentReply elsewhere = run("launch_game");
-        assertTrue(elsewhere.isRefused(), "the default runs the game in a private display, which a run starts");
+        assertTrue(elsewhere.isRefused(), "a game VM is started by a run");
         assertTrue(text(elsewhere).contains("run_bot launches it"), text(elsewhere));
         host.values.put("settings", TestContexts.row(BotSettings.class, "")
                 .withValue(BotSettings.DEFAULTS.where(BotSettings.Where.MY_DESKTOP)));

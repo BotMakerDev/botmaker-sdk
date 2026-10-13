@@ -11,6 +11,8 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.launch.GameCatalog;
+import com.botmaker.sdk.plugin.launch.QuickLaunch;
+import com.botmaker.sdk.plugin.launch.SessionHandoff;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.OpenWindows;
@@ -24,6 +26,8 @@ import com.botmaker.shared.emulator.Platforms.PlatformStatus;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
+import com.botmaker.session.PrivateSession;
+import com.botmaker.session.launch.BackgroundLauncher;
 
 import java.awt.Rectangle;
 import java.util.ArrayList;
@@ -34,6 +38,10 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -41,7 +49,8 @@ import java.util.function.Function;
  * Where the bot looks and how it runs: its capture source, its {@code Sdk.settings()}, the emulator it
  * watches, and what it launches. All are the bot's Java, written on the FX thread as their windows write them: the
  * launch target is the first of its {@code launchTargets} this computer's system can launch. Nothing here starts an
- * emulator or a run; {@code launch_game} alone starts the game, on this desktop, as a run would.
+ * emulator or a run; {@code launch_game} alone starts the game, on this desktop or in the private display, as a run
+ * would.
  */
 final class SetupTools {
 
@@ -177,9 +186,10 @@ final class SetupTools {
                             + "set_launch_target takes, as the launch chooser lists them")
                     .takesNothing().handledBy(SetupTools::listGames),
             AssistantTool.named("launch_game")
-                    .describedAs("Starts the bot's launch target on this desktop now, without running the bot, "
-                            + "unless it is running already; given seconds, answers once the window the bot looks at "
-                            + "is open")
+                    .describedAs("Starts the bot's launch target now, without running the bot, unless it is running "
+                            + "already: on this desktop, or in a private display when the settings say one, which the "
+                            + "look tools then read and the next run joins; given seconds, answers once the window the "
+                            + "bot looks at is open")
                     .takes(Launch.class).handledBy(SetupTools::launchGame));
 
     private SetupTools() {}
@@ -352,10 +362,10 @@ final class SetupTools {
                     + "pick what it starts.");
         }
         BotSettings settings = FxCall.call(() -> SETTINGS.read(services).orElse(BotSettings.DEFAULTS));
-        if (settings.where() != BotSettings.Where.MY_DESKTOP) {
-            return AgentReply.refused("The game runs in " + settings.where().id() + ": a run starts it there, in the "
-                    + "bot's own display, and a game on this desktop would not be the one the bot sees. run_bot "
-                    + "launches it; set_setting run_the_game_in my-desktop launches it here.");
+        if (settings.where() == BotSettings.Where.VM) {
+            return AgentReply.refused("The game runs in a game VM: a run starts it there, and a game on this desktop "
+                    + "would not be the one the bot sees. run_bot launches it; set_setting run_the_game_in "
+                    + "my-desktop launches it here.");
         }
         LaunchSpec spec = LaunchSpec.parse(current);
         if (spec == null) return AgentReply.refused("\"" + current + "\" is not a launch target BotMaker reads.");
@@ -364,12 +374,20 @@ final class SetupTools {
         String unsafe = ASSISTANT_KINDS.contains(spec.kind()) ? unsafe(spec) : spec.describe() + " is a command "
                 + "line or an executable: it starts when you run the bot, not from the assistant.";
         if (unsafe != null) return AgentReply.refused(unsafe);
+        if (QuickLaunch.usesBackgroundSession(spec, settings.where() == BotSettings.Where.PRIVATE_DISPLAY)) {
+            return launchPrivately(spec, launch, services);
+        }
         CaptureSource source = FxCall.call(() -> CaptureValue.current(services));
         boolean watched = source != null && source.hasWindowIdentity();
         if (Launcher.isRunning(spec)) {
             return AgentReply.text(spec.describe() + " is running already" + (watched && !source.isPresent()
                     ? ", but the window the bot looks at (" + CaptureLabels.longLabel(source) + ") is not open." : "."));
         }
+        // On this desktop: a run must not join a private display an earlier launch offered.
+        FxCall.call(() -> {
+            SessionHandoff.offer(services, null);
+            return null;
+        });
         // Off this thread: a cold emulator app is minutes of start, and the call answers within MAX_LAUNCH_WAIT.
         CompletableFuture<Void> started = CompletableFuture.runAsync(() -> Launcher.start(spec), LAUNCHING);
         int wait = launch.seconds() == null ? 0 : Math.min(Math.max(launch.seconds(), 0), MAX_LAUNCH_WAIT);
@@ -398,6 +416,50 @@ final class SetupTools {
                 + wait + "s the window the bot looks at (" + CaptureLabels.longLabel(source) + ") is not open yet. "
                 + "list_windows shows what is.");
     }
+
+    /**
+     * launch_game when the game runs in a private display: brought up there as ▶ Launch does, so the look tools
+     * read it and the next run joins it rather than launching a second copy (2026-10-13). A display already up
+     * answers that it is.
+     */
+    private static AgentReply launchPrivately(LaunchSpec spec, Launch launch, StudioServices services) {
+        if (services.resourcesDir() == null) return AgentReply.refused(Frames.noProject());
+        PrivateSession live = BackgroundLauncher.forProject(services.resourcesDir()).session();
+        if (live != null) {
+            return AgentReply.text(spec.describe() + " is running already in the private display "
+                    + live.displayName() + ".");
+        }
+        CompletableFuture<String> done = new CompletableFuture<>();
+        // The session is held only once the game's window is up: until then a second call would start a second one.
+        if (!STARTING.compareAndSet(null, done)) {
+            return AgentReply.text("A private display is still coming up for " + spec.describe()
+                    + ": screenshot shows it once it is.");
+        }
+        done.whenComplete((message, why) -> STARTING.compareAndSet(done, null));
+        FxCall.call(() -> {
+            QuickLaunch.launchPrivately(spec, services, (ok, message) -> {
+                if (ok) done.complete(message);
+                else done.completeExceptionally(new IllegalStateException(message));
+            });
+            return null;
+        });
+        int wait = launch.seconds() == null ? 0 : Math.min(Math.max(launch.seconds(), 0), MAX_LAUNCH_WAIT);
+        try {
+            return AgentReply.text(done.get(Math.max(wait, 2), TimeUnit.SECONDS));
+        } catch (ExecutionException refused) {
+            return AgentReply.refused(spec.describe() + " could not be launched: " + refused.getCause().getMessage());
+        } catch (TimeoutException starting) {
+            return AgentReply.text("Bringing up a private display and launching " + spec.describe() + " in it. "
+                    + (wait > 0 ? "It is not up after " + wait + "s; " : "")
+                    + "screenshot shows it once it is.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return AgentReply.text("Launching " + spec.describe() + " in a private display.");
+        }
+    }
+
+    /** The private display launch_game is bringing up, until it is held or refused; null when none. */
+    private static final AtomicReference<CompletableFuture<String>> STARTING = new AtomicReference<>();
 
     /** One launch at a time, on a daemon thread, so a slow one never holds the assistant's call. */
     private static final java.util.concurrent.Executor LAUNCHING = java.util.concurrent.Executors

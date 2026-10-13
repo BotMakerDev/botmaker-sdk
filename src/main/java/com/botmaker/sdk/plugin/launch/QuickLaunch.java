@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.launch;
 
 import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.DesktopSession;
+import com.botmaker.session.PrivateSession;
 import com.botmaker.session.SessionBackend;
 import com.botmaker.session.SessionStartException;
 import com.botmaker.session.Sessions;
@@ -24,6 +25,7 @@ import javafx.scene.control.Tooltip;
 
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 /**
  * The "▶ Launch now" button: brings the project's configured {@code launch.target} up <em>without</em>
@@ -145,6 +147,8 @@ public final class QuickLaunch {
             return;
         }
         report.accept(true, "Launching " + spec.describe() + "…");
+        // On this desktop: a run must not join a private display an earlier launch offered.
+        SessionHandoff.offer(services, null);
         // The answer is the last thing the launcher said about its own progress. An emulator app narrates
         // ("starting Waydroid…", "waiting for Android…"); every other kind says nothing (null) and falls back to
         // the generic line. Launcher.start throws the underlying failure (Steam not installed, no protocol
@@ -215,7 +219,8 @@ public final class QuickLaunch {
         // the game inside sees, so another size caps the game's own resolution options at it — and makes the
         // capture a scaled copy of what the pictures were cut from.
         SessionBackends.DisplaySize size = ScreenSize.display(services);
-        BackgroundLauncher.forProject(resourcesDir).start(
+        BackgroundLauncher launcher = BackgroundLauncher.forProject(resourcesDir);
+        launcher.start(
                 backend, spec,
                 size.width(),
                 size.height(),
@@ -224,6 +229,36 @@ public final class QuickLaunch {
                 (ok, message) -> Platform.runLater(() -> {
                     button.setDisable(false);
                     report.accept(ok, message);
+                    if (ok && launcher.session() != null) SessionHandoff.offer(services, launcher.session());
                 }));
+    }
+
+    /**
+     * Brings {@code spec} up in a private display for the assistant's launch_game, as ▶ Launch does with the
+     * settings saying one, and offers it to the runs ({@link SessionHandoff}). {@code done} hears the outcome: true
+     * once the game's window is up there, false and why otherwise. FX thread, and {@code done} runs on it.
+     */
+    public static void launchPrivately(LaunchSpec spec, StudioServices services, BiConsumer<Boolean, String> done) {
+        BotSettings settings = BotSettingsWindow.current(services);
+        SessionBackend backend = SessionBootstrap.backendFor(spec, settings.runIn().displayBackend());
+        if (!SessionBackends.isAvailable(backend)) {
+            Platform.runLater(() -> done.accept(false, SessionBootstrap.missingBackend(backend)));
+            return;
+        }
+        SessionBackends.DisplaySize size = ScreenSize.display(services);
+        BackgroundLauncher launcher = BackgroundLauncher.forProject(services.resourcesDir());
+        // start reports "Bringing up…" first, at once, on success: only a refusal ends the launch then. Counted
+        // here, as it is reported, since the session may be held by the time the FX thread reads it.
+        boolean[] first = {true};
+        launcher.start(backend, spec, size.width(), size.height(), (ok, message) -> {
+            boolean progress = ok && first[0];
+            first[0] = false;
+            if (progress) return;
+            Platform.runLater(() -> {
+                PrivateSession session = launcher.session();
+                if (ok && session != null) SessionHandoff.offer(services, session);
+                done.accept(ok && session != null, message);
+            });
+        });
     }
 }

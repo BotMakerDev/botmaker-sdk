@@ -168,7 +168,7 @@ final class LookTools {
     }
 
     static AgentReply screenshot(Shot shot, AgentContext context) {
-        Optional<BufferedImage> frame = context.frame();
+        Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         BufferedImage full = frame.get();
         Optional<Rect> part = Frames.within(full, shot.x(), shot.y(), shot.width(), shot.height());
@@ -186,10 +186,8 @@ final class LookTools {
         double scale = shot.scale() != null ? shot.scale()
                 : shot.grid() != null ? 1 : Frames.fit(area.width(), area.height(), Frames.LOOK_EDGE);
         if (scale < 1) image = Frames.scaled(image, scale);
-        StringBuilder said = new StringBuilder(full.getWidth() + "×" + full.getHeight());
-        context.watchedArea().ifPresent(a -> said.append(" at ").append(a.x()).append(',').append(a.y())
-                .append(" on the desktop"));
-        said.append('.');
+        StringBuilder said = new StringBuilder(full.getWidth() + "×" + full.getHeight()).append(Frames.place(context))
+                .append('.');
         if (area.width() != full.getWidth() || area.height() != full.getHeight()) {
             said.append(" Showing ").append(Frames.box(area)).append(" of it.");
         }
@@ -205,7 +203,7 @@ final class LookTools {
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         Optional<String> base = Frames.picture(resources.get(), name.picture());
         if (base.isEmpty()) return AgentReply.refused(Frames.noPicture(name.picture()));
-        Optional<BufferedImage> frame = context.frame();
+        Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         MatchResult best = best(resources.get(), base.get(), frame.get());
         if (!best.isFound()) return AgentReply.text(base.get() + " could not be matched on this screen at all.");
@@ -221,7 +219,7 @@ final class LookTools {
     static AgentReply whichScreen(AssistantTool.None none, AgentContext context) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
-        Optional<BufferedImage> frame = context.frame();
+        Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         record Scored(String name, MatchResult match) {}
         List<Scored> scored = new ArrayList<>();
@@ -267,7 +265,7 @@ final class LookTools {
         try (ImageTemplate template = new ImageTemplate(TemplateLibrary.fileForName(resources.get(), base.get())
                 .toString())) {
             while (true) {
-                Optional<BufferedImage> frame = context.frame();
+                Optional<BufferedImage> frame = Frames.look(context);
                 if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
                 MatchResult match = ImageFinder.bestMatch(template, new Frames.Still(frame.get()));
                 if (match.isFound() && match.confidence() >= needs) {
@@ -290,7 +288,7 @@ final class LookTools {
     }
 
     static AgentReply readText(ReadArea read, AgentContext context) {
-        Optional<BufferedImage> frame = context.frame();
+        Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         Optional<Rect> area = Frames.within(frame.get(), read.x(), read.y(), read.width(), read.height());
         if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));
@@ -307,7 +305,7 @@ final class LookTools {
 
     static AgentReply findText(Needle needle, AgentContext context) {
         if (needle.text() == null || needle.text().isBlank()) return AgentReply.refused("Name the text to look for.");
-        Optional<BufferedImage> frame = context.frame();
+        Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         String wanted = needle.text().trim().toLowerCase(Locale.ROOT);
         List<Rect> hits = new ArrayList<>();
@@ -323,7 +321,7 @@ final class LookTools {
     }
 
     static AgentReply pixelColor(Spot spot, AgentContext context) {
-        Optional<BufferedImage> frame = context.frame();
+        Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         BufferedImage image = frame.get();
         if (spot.x() < 0 || spot.y() < 0 || spot.x() >= image.getWidth() || spot.y() >= image.getHeight()) {
@@ -340,7 +338,7 @@ final class LookTools {
         if (color.isEmpty()) return AgentReply.refused("\"" + search.color() + "\" is not a colour: #RRGGBB, or r,g,b.");
         double tolerance = search.tolerance() == null ? Precision.DEFAULT.deltaE() : search.tolerance();
         if (!(tolerance >= 0 && tolerance <= 100)) return AgentReply.refused("The tolerance is between 0 and 100.");
-        Optional<BufferedImage> frame = context.frame();
+        Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         Optional<Rect> area = Frames.within(frame.get(), search.x(), search.y(), search.width(), search.height());
         if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));
