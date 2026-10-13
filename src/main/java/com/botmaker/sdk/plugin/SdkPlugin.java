@@ -74,6 +74,7 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .runOverlay(() -> SdkRunOverlay.ALL)
                 .overlay(() -> SdkOverlay.PART)
                 .assistant(() -> SdkAssist.ALL)
+                .assistantGuide(SdkAssist.GUIDE)
                 .trial(Bot::trial)
                 .recorded(() -> PictureAt.ALL));
     }

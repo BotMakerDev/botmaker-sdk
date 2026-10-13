@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The SDK tells the assistant how its bot is laid out.** Its guide (`SdkAssist.GUIDE`, given through the
+  contract's `assistantGuide`) says a bot is activities and a flow: one activity per chore returning its own
+  outcome enum, the order of chores in the flow, navigation in the home method, and pictures named per idea and
+  place. Studio gives it to the assistant at connect.
+
 - **The assistant acts on the game and reads it as text.** `click` (a point or a picture), `key` and `scroll` act
   where the look tools look, wait `settle_ms` (800 by default), and answer in text: the box that changed, the
   pictures a run would find after, and the text that appeared or went there — an image of the changed part only

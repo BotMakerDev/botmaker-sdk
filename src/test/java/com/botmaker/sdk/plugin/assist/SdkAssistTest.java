@@ -728,6 +728,24 @@ class SdkAssistTest {
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
+    /** Studio's own tools the guide names beside the SDK's. */
+    private static final java.util.Set<String> STUDIOS = java.util.Set.of("add_method", "run_activity");
+
+    @Test
+    void theGuideNamesOnlyToolsThereAreAndThePluginGivesIt() {
+        for (String word : List.of("describe", "click", "key", "scroll", "connect")) {
+            assertTrue(SdkAssist.ALL.stream().anyMatch(t -> t.name().equals(word)), word + " is no tool");
+        }
+        java.util.Set<String> names = SdkAssist.ALL.stream().map(AssistantTool::name)
+                .collect(java.util.stream.Collectors.toSet());
+        java.util.regex.Matcher named = java.util.regex.Pattern.compile("\\b[a-z]+_[a-z_]+\\b").matcher(SdkAssist.GUIDE);
+        while (named.find()) {
+            assertTrue(names.contains(named.group()) || STUDIOS.contains(named.group()),
+                    "the guide names " + named.group() + ", which is no tool");
+        }
+        assertEquals(SdkAssist.GUIDE.strip(), new com.botmaker.sdk.plugin.SdkPlugin().assistantGuide());
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────
 
     private AgentReply run(String tool, Object... arguments) {
