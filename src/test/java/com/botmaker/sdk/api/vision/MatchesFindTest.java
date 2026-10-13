@@ -175,14 +175,18 @@ class MatchesFindTest {
         assertTrue(Vision.lastMatches().isEmpty(), "the context must reflect the final, clear frame");
     }
 
-    /** {@code lit} greyed out, as a game draws a disabled button: its shape kept, its colour gone. */
+    /**
+     * {@code lit} greyed out, as a game draws a disabled button: its shape kept, its colour half gone, so that a
+     * plain match takes it for {@code lit} at the default confidence as Firestone's grey Claim (0.81) is.
+     */
     private static BufferedImage greyed(BufferedImage lit) {
         BufferedImage grey = new BufferedImage(lit.getWidth(), lit.getHeight(), BufferedImage.TYPE_3BYTE_BGR);
         for (int y = 0; y < lit.getHeight(); y++) {
             for (int x = 0; x < lit.getWidth(); x++) {
                 int rgb = lit.getRGB(x, y);
-                int v = (((rgb >> 16) & 0xFF) + ((rgb >> 8) & 0xFF) + (rgb & 0xFF)) / 3;
-                grey.setRGB(x, y, (v << 16) | (v << 8) | v);
+                int r = (rgb >> 16) & 0xFF, g = (rgb >> 8) & 0xFF, b = rgb & 0xFF;
+                int v = (r + g + b) / 3;
+                grey.setRGB(x, y, ((r + v) / 2 << 16) | ((g + v) / 2 << 8) | (b + v) / 2);
             }
         }
         return grey;
@@ -196,17 +200,31 @@ class MatchesFindTest {
 
         // A lit button beside its grey twin, then the grey twin alone once the lit one was claimed.
         CountingSource source = new CountingSource(List.of(frameWith(litPatch, greyPatch), frameWith(greyPatch)));
-        assertTrue(ImageFinder.bestMatch(lit, new CountingSource(List.of(frameWith(greyPatch)))).isFound(),
+        assertTrue(ImageFinder.find(lit, new CountingSource(List.of(frameWith(greyPatch)))),
                 "the twin must fool a plain match, or this test proves nothing");
 
         int[] iterations = {0};
         ImageFinder.whileFindCompare(ImageTemplateGroup.of(lit), ImageTemplateGroup.of(grey), source, found -> {
             iterations[0]++;
-            assertTrue(found.rect().x() < 150, "only the lit button is acted on, got " + found.rect());
+            assertTrue(found.has(lit));
+            assertTrue(found.get(lit).rect().x() < 150, "only the lit button is acted on, got " + found.get(lit).rect());
         });
 
         assertEquals(1, iterations[0]);
-        assertFalse(Vision.lastMatch().isFound());
+        assertTrue(Vision.lastMatches().isEmpty());
+    }
+
+    @Test
+    void reMatchingACompareFrameDropsTheLookAlike(@TempDir Path tmp) throws Exception {
+        BufferedImage litPatch = patch(1), greyPatch = greyed(litPatch);
+        ImageTemplate lit = write(tmp, "lit", litPatch);
+        ImageTemplate grey = write(tmp, "grey", greyPatch);
+        BufferedImage pixels = frameWith(litPatch, greyPatch);
+        CountingSource source = new CountingSource(List.of(pixels));
+
+        // What clickAllLast re-matches: the grey twin counts on its own, never beside its bad picture.
+        assertEquals(2, ImageFinder.findAllIn(pixels, lit, source, 0.8).size());
+        assertEquals(1, ImageFinder.findAllIn(pixels, lit, ImageTemplateGroup.of(grey), source, 0.8).size());
     }
 
     @Test

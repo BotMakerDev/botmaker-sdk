@@ -177,6 +177,54 @@ public class ImageFinder {
     }
 
     /**
+     * Internal: {@link #findFrame} with look-alikes — every {@code good} template whose best match clears
+     * {@code confidence} and out-scores every {@code bad} one at that place by {@code margin}, all from one
+     * capture. Does not update Vision — the caller is responsible for that.
+     */
+    static Vision.Frame compareFrame(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
+                                     double confidence, double margin) {
+        if (good.isEmpty()) {
+            return new Vision.Frame(Matches.none(), source, null, good, bad);
+        }
+        Mat background = null;
+        try {
+            BufferedImage screenshot = source.capture();
+            if (screenshot == null) {
+                return new Vision.Frame(Matches.none(), source, null, good, bad);
+            }
+            background = OpencvManager.bufferedImageToMat(screenshot);
+            Point origin = source.origin();
+
+            List<MatchResult> results = new ArrayList<>();
+            for (ImageTemplate template : good.templates()) {
+                RawMatch gm = OpencvManager.findBest(template.getMat(), background, false, template.authoredSize());
+                if (gm != null && gm.score() >= confidence && beatsAllBads(gm, bad.templates(), background, margin)) {
+                    MatchResult result = new MatchResult(new Point(gm.x() + origin.x(), gm.y() + origin.y()),
+                            gm.width(), gm.height(), gm.score(), template.id());
+                    emitMatch(source, result);
+                    traceHit(template, result);
+                    results.add(result);
+                } else {
+                    // Seen but out-scored by a look-alike is a miss here too: the frame's matches hold winners only.
+                    emitMatch(source, MatchResult.miss(gm != null ? gm.score() : 0.0));
+                    traceMiss(template);
+                }
+            }
+            return new Vision.Frame(Matches.of(results), source, screenshot, good, bad);
+
+        } catch (Exception e) {
+            if (Debug.isEnabled()) {
+                Debug.error("Error comparing template group: " + e.getMessage(), e);
+            }
+            return new Vision.Frame(Matches.none(), source, null, good, bad);
+        } finally {
+            if (background != null) {
+                background.release();
+            }
+        }
+    }
+
+    /**
      * Internal method that performs the actual find operation and returns the MatchResult.
      * Does not update Vision - caller is responsible for that.
      */
@@ -596,9 +644,19 @@ public class ImageFinder {
      */
     static List<MatchResult> findAllIn(BufferedImage screenshot, ImageTemplate template, CaptureSource source,
                                        double confidence) {
+        return findAllIn(screenshot, template, ImageTemplateGroup.of(), source, confidence);
+    }
+
+    /**
+     * Internal: {@link #findAllIn(BufferedImage, ImageTemplate, CaptureSource, double)} keeping only the
+     * locations that out-score every {@code bad} look-alike by the compare margin.
+     */
+    static List<MatchResult> findAllIn(BufferedImage screenshot, ImageTemplate template, ImageTemplateGroup bad,
+                                       CaptureSource source, double confidence) {
         Mat background = null;
         try {
             background = OpencvManager.bufferedImageToMat(screenshot);
+            Mat pixels = background;
 
             List<RawMatch> matches =
                     OpencvManager.findMultipleMatches(template.getMat(), background, false, confidence,
@@ -609,6 +667,7 @@ public class ImageFinder {
             int offsetY = origin.y();
 
             List<MatchResult> results = matches.stream()
+                    .filter(r -> bad.isEmpty() || beatsAllBads(r, bad.templates(), pixels, margin()))
                     .map(r -> {
                         Point location = new Point(r.x() + offsetX, r.y() + offsetY);
                         return new MatchResult(location, r.width(), r.height(), r.score(), template.id());
@@ -782,16 +841,17 @@ public class ImageFinder {
     }
 
     /**
-     * Keep running {@code action} (with the fresh match each time) as long as a {@code good} template is
-     * visible where it beats every {@code bad} one by the compare margin — {@link #whileFind} for a picture
-     * with a look-alike, such as a lit button and its greyed-out twin, which a match alone cannot tell apart.
+     * Keep running {@code action} (with a fresh frame's matches each time) as long as a {@code good} template
+     * is visible where it beats every {@code bad} one by the compare margin — {@link #whileFindAny} for
+     * pictures with look-alikes, such as a lit button and its greyed-out twin, which a match alone cannot tell
+     * apart. The matches hold only the good templates that won.
      *
      * @param good   the templates to act on
      * @param bad    their look-alikes, never acted on
-     * @param action the action to run with each winning match
+     * @param action the action to run with each frame's matches
      */
     public static void whileFindCompare(ImageTemplateGroup good, ImageTemplateGroup bad,
-                                        Consumer<MatchResult> action) {
+                                        Consumer<Matches> action) {
         whileFindCompare(good, bad, Source.current(), action);
     }
 
@@ -801,17 +861,16 @@ public class ImageFinder {
      * @param good   the templates to act on
      * @param bad    their look-alikes, never acted on
      * @param source the capture source to search within
-     * @param action the action to run with each winning match
+     * @param action the action to run with each frame's matches
      */
     public static void whileFindCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
-                                        Consumer<MatchResult> action) {
+                                        Consumer<Matches> action) {
         PopupGuard.check();
-        MatchResult result;
-        while ((result = compare(good.templates(), bad.templates(), source, confidence(), margin())).isFound()) {
-            Vision.setLastMatch(result);
-            action.accept(result);
+        Vision.Frame frame;
+        while (!(frame = compareFrame(good, bad, source, confidence(), margin())).matches().isEmpty()) {
+            Vision.runInFrame(frame, action);
         }
-        Vision.setLastMatch(MatchResult.notFound());
+        Vision.setLastMatches(Matches.none());
     }
 
     /**

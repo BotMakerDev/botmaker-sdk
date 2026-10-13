@@ -61,7 +61,8 @@ public final class SdkAssist {
               body's to handle: the run's watchdog sees the same screen over and over and recovers through
               the home method.
             - Write a body foolproof, out of the loop methods that take a lambda: ImageFinder.whileFindAny,
-              whileFindAll, ifFindAny (group, found -> …), untilFind(picture, action), whileFindCompare.
+              whileFindAll, ifFindAny (group, found -> …), whileFindCompare (good, bad, found -> …),
+              untilFind(picture, action).
               Each pass looks at the screen again, so a missed click or a slow screen is retried, not
               trusted. Build the logic from what the lambda is handed (its parameter by var:<its name>):
               found.has(X) and found.get(X) say which pictures this frame shows, ImageClicker.click(

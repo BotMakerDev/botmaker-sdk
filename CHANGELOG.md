@@ -21,9 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
-- **`ImageFinder.whileFindCompare(good, bad, action)`.** `whileFind` for a picture with a look-alike: it runs
-  the action on each match a good picture wins over every bad one there, so a loop over lit Claim buttons stops
-  at the greyed-out ones. Matching ignores colour, and a grey twin scores just over the confidence a run needs.
+- **`ImageFinder.whileFindCompare(good, bad, found -> …)`.** `whileFindAny` for pictures with look-alikes: each
+  pass hands the action the frame's `Matches` of the good pictures that win over every bad one there (so
+  `found.get(X)`, `ImageClicker.clickLast()` and `clickAllLast()` work, the last skipping every grey twin), and a
+  loop over lit Claim buttons stops at the greyed-out ones. Matching ignores colour, and a grey twin scores just over the confidence a run needs.
 - **`crop_picture` names the look-alikes.** A cut that a run would also find elsewhere on the screenshot says
   where and how well, and points at the compare forms.
 - **The guide asks for foolproof bodies.** The assistant writes a body out of the loop methods that take a

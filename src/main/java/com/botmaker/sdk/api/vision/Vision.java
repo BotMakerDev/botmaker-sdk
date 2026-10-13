@@ -120,9 +120,17 @@ public final class Vision {
      * the pixels lets that second question be answered by re-matching the same instant rather than by capturing
      * a new one, which is both cheaper and the only way the two answers can agree. It is never converted to an
      * OpenCV {@code Mat} unless someone asks.
+     *
+     * <p>{@code bad} is a compare's look-alikes ({@link ImageFinder#whileFindCompare}), empty for a plain group
+     * find: re-matching the pixels must drop an occurrence a look-alike wins, as the compare did.
      */
     record Frame(Matches matches, CaptureSource source, java.awt.image.BufferedImage pixels,
-                 ImageTemplateGroup group) {}
+                 ImageTemplateGroup group, ImageTemplateGroup bad) {
+
+        Frame(Matches matches, CaptureSource source, java.awt.image.BufferedImage pixels, ImageTemplateGroup group) {
+            this(matches, source, pixels, group, ImageTemplateGroup.of());
+        }
+    }
 
     /**
      * Internal: runs {@code action} as the callback of a group find, with {@code current} as the current frame.

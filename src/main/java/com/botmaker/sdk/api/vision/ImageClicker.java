@@ -250,7 +250,7 @@ public class ImageClicker {
         List<MatchResult> occurrences = new ArrayList<>();
         for (ImageTemplate template : templates) {
             occurrences.addAll(ImageFinder.findAllIn(
-                    frame.pixels(), template, frame.source(), BotSettings.current().confidence()));
+                    frame.pixels(), template, frame.bad(), frame.source(), BotSettings.current().confidence()));
         }
         return clickEach(frame, occurrences);
     }
