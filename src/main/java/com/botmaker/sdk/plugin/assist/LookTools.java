@@ -48,6 +48,7 @@ final class LookTools {
 
     private static final int POLL_MS = 250;
     private static final int MOST_LISTED = 20;
+    private static final String SHOW = "true adds the screenshot with the places boxed; the text already gives them";
 
     record Shot(@Describe(value = "draw a labelled grid every this many pixels, 25 or more", optional = true)
                 Integer grid,
@@ -57,15 +58,20 @@ final class LookTools {
                 @Describe(value = "width of the part to show", optional = true) Integer width,
                 @Describe(value = "height of the part to show", optional = true) Integer height,
                 @Describe(value = "shrink the image, 0.1 to 1; coordinates stay the screenshot's. Left out, it "
-                        + "fits 1024 pixels: give 1, or a part, for detail", optional = true)
+                        + "fits 768 pixels: give 1, or a part, for detail", optional = true)
                 Double scale) {
     }
 
-    record PictureName(@Describe("a picture's name, as list_pictures gives it") String picture) {
+    record PictureName(@Describe("a picture's name, as list_pictures gives it") String picture,
+                       @Describe(value = SHOW, optional = true) Boolean show) {
+    }
+
+    record Shown(@Describe(value = SHOW, optional = true) Boolean show) {
     }
 
     record Wait(@Describe("a picture's name, as list_pictures gives it") String picture,
-                @Describe("how long to wait, in milliseconds, at most 30000") int timeoutMs) {
+                @Describe("how long to wait, in milliseconds, at most 30000") int timeoutMs,
+                @Describe(value = SHOW, optional = true) Boolean show) {
     }
 
     record ReadArea(@Describe(value = "left edge of the area to read; with y, width and height", optional = true)
@@ -77,7 +83,8 @@ final class LookTools {
                     OcrLanguage language) {
     }
 
-    record Needle(@Describe("the text to look for, matched in any case inside a line") String text) {
+    record Needle(@Describe("the text to look for, matched in any case inside a line") String text,
+                  @Describe(value = SHOW, optional = true) Boolean show) {
     }
 
     record Spot(@Describe("x, in the screenshot's pixels") int x,
@@ -91,7 +98,8 @@ final class LookTools {
                      @Describe(value = "width of the area", optional = true) Integer width,
                      @Describe(value = "height of the area", optional = true) Integer height,
                      @Describe(value = "how far a colour may be from it, as ΔE; 12 when left out", optional = true)
-                     Double tolerance) {
+                     Double tolerance,
+                     @Describe(value = SHOW, optional = true) Boolean show) {
     }
 
     record Missed(@Describe(value = "a saved frame's file name, as the list gives it; the list when left out",
@@ -105,13 +113,12 @@ final class LookTools {
                             + "scale is shown. A grid labels them.")
                     .takes(Shot.class).handledBy(LookTools::screenshot),
             AssistantTool.named("find_picture")
-                    .describedAs("Where a picture is on the screen now and how sure the match is, with the "
-                            + "screenshot boxed where it matched best")
+                    .describedAs("Where a picture is on the screen now and how sure the match is")
                     .takes(PictureName.class).handledBy(LookTools::findPicture),
             AssistantTool.named("which_screen")
-                    .describedAs("Every picture scored on one frame, best first, with the ones a run would find "
-                            + "boxed: which screen of the game this is")
-                    .takesNothing().handledBy(LookTools::whichScreen),
+                    .describedAs("Every picture scored on one frame, best first, the ones a run would find "
+                            + "ticked: which screen of the game this is")
+                    .takes(Shown.class).handledBy(LookTools::whichScreen),
             AssistantTool.named("wait_for_picture")
                     .describedAs("Waits until a picture is on the screen, as ImageFinder.waitFor would, and says "
                             + "where and after how long; or that it did not come")
@@ -121,14 +128,14 @@ final class LookTools {
                             + "is and how sure the reading is")
                     .takes(ReadArea.class).handledBy(LookTools::readText),
             AssistantTool.named("find_text")
-                    .describedAs("Where a piece of text is on the screen now, with the screenshot boxed there")
+                    .describedAs("Where a piece of text is on the screen now")
                     .takes(Needle.class).handledBy(LookTools::findText),
             AssistantTool.named("pixel_color")
                     .describedAs("The colour of one pixel of the screen now")
                     .takes(Spot.class).handledBy(LookTools::pixelColor),
             AssistantTool.named("find_color")
                     .describedAs("Where a colour is on the screen or in one area of it: each patch of it, "
-                            + "largest first, boxed on the screenshot")
+                            + "largest first")
                     .takes(ColorArea.class).handledBy(LookTools::findColor),
             AssistantTool.named("missed_frames")
                     .describedAs("What the latest run saw when a wait timed out: the frames it saved, "
@@ -214,10 +221,10 @@ final class LookTools {
         if (found) Frames.mark(context, r, Marks.Kind.FOUND, base.get());
         return Frames.found(base.get() + " best at " + Frames.box(r) + ", score " + Frames.score(best.confidence())
                         + "; a run needs " + Frames.score(needs) + ", so it " + (found ? "finds it." : "would not."),
-                frame.get(), List.of(r), found ? Frames.FOUND : Frames.NOTE);
+                frame.get(), List.of(r), found ? Frames.FOUND : Frames.NOTE, name.show());
     }
 
-    static AgentReply whichScreen(AssistantTool.None none, AgentContext context) {
+    static AgentReply whichScreen(Shown shown, AgentContext context) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         Optional<BufferedImage> frame = Frames.look(context);
@@ -240,7 +247,7 @@ final class LookTools {
         }
         String head = found.isEmpty() ? "None of the pictures is on screen (a run needs " + Frames.score(needs) + ")."
                 : found.size() + " on screen (✓, a run needs " + Frames.score(needs) + "):";
-        return Frames.found(head + "\n" + String.join("\n", lines), frame.get(), found, Frames.FOUND);
+        return Frames.found(head + "\n" + String.join("\n", lines), frame.get(), found, Frames.FOUND, shown.show());
     }
 
     static AgentReply waitForPicture(Wait wait, AgentContext context) {
@@ -266,7 +273,7 @@ final class LookTools {
                     Frames.mark(context, match.rect(), Marks.Kind.FOUND, base.get());
                     return Frames.found(base.get() + " is there after " + ms + " ms, at " + Frames.box(match.rect())
                                     + ", score " + Frames.score(match.confidence()) + ".",
-                            frame.get(), List.of(match.rect()), Frames.FOUND);
+                            frame.get(), List.of(match.rect()), Frames.FOUND, wait.show());
                 }
                 if (match.isFound()) best = Math.max(best, match.confidence());
                 if (System.nanoTime() >= deadline) break;
@@ -310,7 +317,7 @@ final class LookTools {
             Frames.mark(context, line.bounds(), Marks.Kind.FOUND, needle.text().trim());
         }
         if (hits.isEmpty()) return AgentReply.text("\"" + needle.text().trim() + "\" is not on the screen as text.");
-        return Frames.found(String.join("\n", said), frame.get(), hits, Frames.FOUND);
+        return Frames.found(String.join("\n", said), frame.get(), hits, Frames.FOUND, needle.show());
     }
 
     static AgentReply pixelColor(Spot spot, AgentContext context) {
@@ -356,7 +363,7 @@ final class LookTools {
             Frames.mark(context, r, Marks.Kind.FOUND, hex(color.get()));
         }
         return Frames.found(patches.size() + " patch" + (patches.size() == 1 ? "" : "es") + " of " + hex(color.get())
-                + ", largest first:\n" + String.join("\n", said), frame.get(), boxes, Frames.FOUND);
+                + ", largest first:\n" + String.join("\n", said), frame.get(), boxes, Frames.FOUND, search.show());
     }
 
     /** A picture's best match on one frame. */

@@ -77,6 +77,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The assistant's finds answer in text.** `find_picture`, `which_screen`, `wait_for_picture`, `find_text` and
+  `find_color` give the places and scores as text and add the boxed screenshot only with `show: true`; a whole
+  `screenshot` fits 768 pixels instead of 1024. Images were most of what a session with the assistant cost.
 - **A game window's lookup is traced when its answer changes.** Every capture resolves the window, so the trace
   said `window … -> Firestone` once per look; it now says it once, and again only when the window opens, closes
   or changes.

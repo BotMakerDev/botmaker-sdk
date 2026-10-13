@@ -180,7 +180,7 @@ final class Frames {
      * tokens by its pixels, and a whole 1080p frame read at full size is seldom what a look needs; a part, or
      * {@code scale} 1, shows the detail.
      */
-    static final int LOOK_EDGE = 1024;
+    static final int LOOK_EDGE = 768;
     /**
      * The longest side of the image a find answers with. Its text already gives the places in screenshot pixels,
      * so the image only shows them — it never needs to be read off.
@@ -193,10 +193,12 @@ final class Frames {
     }
 
     /**
-     * A find's answer: {@code text}, then {@code frame} with {@code boxes} drawn on it, shrunk to fit
-     * {@link #BOXED_EDGE} — saying so, since the places in {@code text} are the frame's own pixels.
+     * A find's answer: {@code text}, then, when {@code show} is true, {@code frame} with {@code boxes} drawn on it,
+     * shrunk to fit {@link #BOXED_EDGE} — saying so, since the places in {@code text} are the frame's own pixels.
+     * The text alone is the default: an image costs the assistant more than the places it only repeats.
      */
-    static AgentReply found(String text, BufferedImage frame, List<Rect> boxes, Color color) {
+    static AgentReply found(String text, BufferedImage frame, List<Rect> boxes, Color color, Boolean show) {
+        if (!Boolean.TRUE.equals(show)) return AgentReply.text(text);
         double scale = fit(frame.getWidth(), frame.getHeight(), BOXED_EDGE);
         String note = scale < 1 ? "\n(The image is shrunk; the places above are the screenshot's pixels.)" : "";
         return AgentReply.text(text + note).and(AgentReply.image(boxed(frame, boxes, color)));

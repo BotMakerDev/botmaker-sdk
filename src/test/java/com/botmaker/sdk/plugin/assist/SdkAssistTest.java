@@ -108,8 +108,8 @@ class SdkAssistTest {
     void aLargeFrameIsShrunkUnlessAScaleIsGiven() throws IOException {
         agent.frame = new java.awt.image.BufferedImage(1920, 1080, java.awt.image.BufferedImage.TYPE_INT_RGB);
         AgentReply look = run("screenshot");
-        assertEquals(new java.awt.Dimension(1024, 576), size(look));
-        assertTrue(text(look).contains("Shrunk to 1024×576: multiply what you see by 1.8750"), text(look));
+        assertEquals(new java.awt.Dimension(768, 432), size(look));
+        assertTrue(text(look).contains("Shrunk to 768×432: multiply what you see by 2.5000"), text(look));
         assertEquals(new java.awt.Dimension(1920, 1080), size(run("screenshot", "scale", 1.0)));
         assertEquals(new java.awt.Dimension(1920, 1080), size(run("screenshot", "grid", 100)), "a grid is read whole");
         assertEquals(new java.awt.Dimension(768, 432),
@@ -149,6 +149,27 @@ class SdkAssistTest {
                 text(found));
         assertEquals(List.of("FOUND 1120,580 48×48 ore"), agent.marks);
         assertTrue(run("find_picture", "picture", "gold").isRefused());
+    }
+
+    @Test
+    void aFindAnswersInTextAndShowsItsBoxesOnlyWhenAsked() throws IOException {
+        agent.frame = withPatchAt(120, 80);
+        AgentReply waited = run("wait_for_picture", "picture", "ore", "timeoutMs", 0);
+        assertTrue(text(waited).startsWith("ore is there"), text(waited));
+        for (AgentReply plain : List.of(run("find_picture", "picture", "ore"), run("which_screen"), waited,
+                run("find_color", "color", "#000000"))) {
+            assertTrue(plain.parts().stream().noneMatch(p -> p.kind() == AgentReply.Kind.IMAGE),
+                    "the text already gives the places: " + text(plain));
+        }
+        assertEquals(new java.awt.Dimension(400, 300), size(run("find_picture", "picture", "ore", "show", true)));
+        assertEquals(new java.awt.Dimension(400, 300), size(run("which_screen", "show", true)));
+        assertEquals(new java.awt.Dimension(400, 300),
+                size(run("wait_for_picture", "picture", "ore", "timeoutMs", 0, "show", true)));
+
+        agent.frame = withText("BotMaker 42", 30, 100);
+        AgentReply text = run("find_text", "text", "botmaker");
+        assertTrue(text.parts().stream().noneMatch(p -> p.kind() == AgentReply.Kind.IMAGE), text(text));
+        assertEquals(new java.awt.Dimension(400, 300), size(run("find_text", "text", "botmaker", "show", true)));
     }
 
     @Test
@@ -214,7 +235,7 @@ class SdkAssistTest {
         String listed = text(run("missed_frames"));
         assertTrue(listed.endsWith("01-ore-not-found.png"), listed);
         AgentReply shown = run("missed_frames", "name", "01-ore-not-found.png");
-        assertEquals(new java.awt.Dimension(1024, 576), size(shown));
+        assertEquals(new java.awt.Dimension(768, 432), size(shown));
         assertTrue(run("missed_frames", "name", "../../src/main/resources/ore.png").isRefused());
     }
 
