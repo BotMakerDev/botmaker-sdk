@@ -17,6 +17,9 @@ import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.text.DigitSet;
+import com.botmaker.sdk.api.vision.ImageFinder;
+import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.vision.DigitReader;
 import com.botmaker.sdk.internal.vision.Places;
@@ -27,15 +30,19 @@ import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.PictureEdits;
 import com.botmaker.sdk.plugin.pictures.ScreenSize;
+import com.botmaker.sdk.plugin.pictures.TagCatalog;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.pictures.TemplateManifest;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Function;
@@ -59,7 +66,9 @@ final class PictureTools {
                 @Describe("left edge, in the screenshot's pixels") int x,
                 @Describe("top edge, in the screenshot's pixels") int y,
                 @Describe("width in pixels") int width,
-                @Describe("height in pixels") int height) {
+                @Describe("height in pixels") int height,
+                @Describe(value = "tags to file it under, each declared (list_tags)", optional = true)
+                List<String> tags) {
     }
 
     record PictureName(@Describe("a picture's name, as list_pictures gives it") String picture) {
@@ -152,12 +161,16 @@ final class PictureTools {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         List<String> lines = new ArrayList<>();
+        TemplateManifest manifest = TemplateLibrary.manifest(resources.get());
+        TagCatalog catalog = FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
         for (Path file : TemplateLibrary.list(resources.get())) {
             if (TemplateLibrary.isUnmodifiedDefaultTemplate(file)) continue;
             String name = TemplateLibrary.baseName(file);
             String constant = TemplateNames.constantFor(name);
+            List<String> tags = catalog.declaredOnly(manifest.tagsOf(name));
             lines.add(name + (constant == null ? " (no constant: rename it lowercase)" : " → "
-                    + TemplateNames.CLASS_NAME + "." + constant));
+                    + TemplateNames.CLASS_NAME + "." + constant) + (tags.isEmpty() ? "" : " [" + String.join(", ", tags)
+                    + "]"));
         }
         return AgentReply.text(lines.isEmpty() ? "No pictures yet; crop_picture makes one." : String.join("\n", lines));
     }
@@ -169,12 +182,27 @@ final class PictureTools {
                 new Area(crop.x(), crop.y(), crop.width(), crop.height()));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
-        PictureCuts.Cut saved = FxCall.call(() -> PictureCuts.save(context.services(), picture.get(), crop.name(),
-                frame.get()));
+        List<String> typed = crop.tags() == null ? List.of() : crop.tags();
+        TagCatalog catalog = typed.isEmpty() ? null : FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
+        Optional<String> undeclared = typed.stream().filter(t -> !catalog.isDeclared(t)).findFirst();
+        if (undeclared.isPresent()) {
+            return AgentReply.refused("No tag called \"" + undeclared.get() + "\"; list_tags names them and "
+                    + "declare_tag makes one. Nothing was saved.");
+        }
+        List<String> tags = catalog == null ? List.of() : catalog.declaredOnly(typed);
+        Optional<String> moving = moving(context, frame.get(), new Rect(crop.x(), crop.y(), crop.width(),
+                crop.height()));
+        if (moving.isPresent()) return AgentReply.refused(moving.get());
+        PictureCuts.Cut saved = FxCall.call(() -> {
+            PictureCuts.Cut cut = PictureCuts.save(context.services(), picture.get(), crop.name(), frame.get());
+            if (!tags.isEmpty()) TemplateLibrary.applyTags(context.services(), Map.of(cut.name(), tags));
+            return cut;
+        });
         Frames.mark(context, new Rect(crop.x(), crop.y(), crop.width(), crop.height()), Marks.Kind.NOTE, saved.name());
         String constant = TemplateNames.constantFor(saved.name());
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
-                        + "." + constant) + saved.note().map(n -> " — " + n).orElse("") + ".")
+                        + "." + constant) + (tags.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
+                        + saved.note().map(n -> " — " + n).orElse("") + ".")
                 .and(AgentReply.image(picture.get().image()));
     }
 
@@ -225,6 +253,9 @@ final class PictureTools {
                 new Area(replace.x(), replace.y(), replace.width(), replace.height()));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
+        Optional<String> moving = moving(context, frame.get(), new Rect(replace.x(), replace.y(), replace.width(),
+                replace.height()));
+        if (moving.isPresent()) return AgentReply.refused(moving.get());
         PictureEdits.Done done = FxCall.call(() -> PictureEdits.replace(context.services(), base.get(),
                 picture.get().image(), FrameCut.of(frame.get().getWidth(), frame.get().getHeight(),
                         picture.get().place())));
@@ -333,6 +364,66 @@ final class PictureTools {
                         + " show them") + ". " + check + " A block reads one with Text.readDigits(source, Digits."
                         + constant + ").")
                 .and(seen);
+    }
+
+    /** How long a box is watched before it is saved, and how many live frames that takes. */
+    static final long STILL_MS = 1000;
+    private static final int STILL_LOOKS = 3;
+    /** How far around its box a cut is looked for on a live frame: a few pixels of the game's own jitter. */
+    private static final int STILL_SLACK = 8;
+
+    /**
+     * Why {@code asked} is no picture to cut, or empty when a run would find it: the cut is matched, as a run
+     * matches a picture ({@link ImageFinder#bestMatch}), around its own place on {@value #STILL_LOOKS} live frames
+     * over {@value #STILL_MS} ms, and a score under the bot's confidence on any of them means an animation, a
+     * counter, a sparkle passing, or the screen moved since the screenshot. Such a picture matches only the
+     * moment it was cut at. With no live frame of the screenshot's size the check is skipped. Blocking.
+     */
+    private static Optional<String> moving(AgentContext context, BufferedImage shown, Rect asked) {
+        Optional<Rect> inside = Frames.within(shown, asked.x(), asked.y(), asked.width(), asked.height());
+        if (inside.isEmpty()) return Optional.empty();
+        Rect box = inside.get();
+        Optional<Rect> around = Frames.within(shown, Math.max(0, box.x() - STILL_SLACK),
+                Math.max(0, box.y() - STILL_SLACK),
+                Math.min(shown.getWidth() - Math.max(0, box.x() - STILL_SLACK), box.width() + 2 * STILL_SLACK),
+                Math.min(shown.getHeight() - Math.max(0, box.y() - STILL_SLACK), box.height() + 2 * STILL_SLACK));
+        if (around.isEmpty()) return Optional.empty();
+        double needs = Frames.confidence(context.services());
+        Path file;
+        try {
+            file = Files.createTempFile("botmaker-still-", ".png");
+            ImageIO.write(Frames.cut(shown, box), "png", file.toFile());
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+        try (ImageTemplate cut = new ImageTemplate(file.toString())) {
+            for (int look = 0; look < STILL_LOOKS; look++) {
+                if (look > 0) Thread.sleep(STILL_MS / (STILL_LOOKS - 1));
+                Optional<BufferedImage> live = Frames.look(context);
+                if (live.isEmpty() || live.get().getWidth() != shown.getWidth()
+                        || live.get().getHeight() != shown.getHeight()) {
+                    return Optional.empty();
+                }
+                MatchResult best = ImageFinder.bestMatch(cut, new Frames.Still(Frames.cut(live.get(), around.get())));
+                double score = best.isFound() ? best.confidence() : 0;
+                if (score < needs) {
+                    return Optional.of("That box changes: " + (look * STILL_MS / (STILL_LOOKS - 1)) + " ms later "
+                            + "a run would score it " + Frames.score(score) + " where it was cut, under the "
+                            + Frames.score(needs) + " it needs. It is animated, or the screen moved since the "
+                            + "screenshot: take a new one and cut a part that holds still. Nothing was saved.");
+                }
+            }
+            return Optional.empty();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } finally {
+            try {
+                Files.deleteIfExists(file);
+            } catch (IOException ignored) {
+                // a temp file left behind is the system's to clear
+            }
+        }
     }
 
     /** {@code 0 1 5}. */

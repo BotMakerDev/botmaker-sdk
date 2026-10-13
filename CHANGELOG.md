@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The assistant tags pictures.** New tools `list_tags`, `tag_pictures`, `untag_pictures`, `set_tags`,
+  `declare_tag`, `rename_tag` and `delete_tag` make every edit 🖼 Manage Pictures and its tag manager make;
+  `crop_picture` takes `tags` and `list_pictures` shows them. Only a declared tag is accepted (a refusal
+  names the ones there are), and an activity's own tag is neither renamed nor deleted. The guide says to cut
+  every picture a screen offers in one visit, the button's image rather than its label, and tag each.
+- **`crop_picture` and `replace_picture` refuse a box that moves.** The cut is matched as a run matches it
+  (`ImageFinder.bestMatch`) around its own place on three live frames over a second; a score under the bot's
+  confidence (an animation, a counter, or the screen moved since the screenshot) refuses it, so no picture is
+  saved that matches only the moment it was cut.
 - **The SDK tells the assistant how its bot is laid out.** Its guide (`SdkAssist.GUIDE`, given through the
   contract's `assistantGuide`) says a bot is activities and a flow: one activity per chore returning its own
   outcome enum, the order of chores in the flow, navigation in the home method, and pictures named per idea and

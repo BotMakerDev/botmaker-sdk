@@ -34,6 +34,7 @@ import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.pictures.TemplateManifest;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -227,6 +228,61 @@ class SdkAssistTest {
         assertTrue(TemplateLibrary.exists(resources, "gold"));
         assertTrue(host.set("pictures").containsKey("GOLD"));
         assertTrue(text(run("list_pictures")).contains("gold → Pictures.GOLD"));
+    }
+
+    @Test
+    void aBoxThatChangesOverTimeIsNotCut() {
+        agent.frame = withPatchAt(120, 80);
+        run("screenshot");
+        agent.frame = noise(WATCHED.width(), WATCHED.height(), 9);
+        AgentReply refused = run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE);
+        assertTrue(refused.isRefused() && text(refused).startsWith("That box changes"), text(refused));
+        assertFalse(TemplateLibrary.exists(resources, "gold"));
+        assertTrue(run("replace_picture", "picture", "ore", "x", 120, "y", 80, "width", SIZE, "height", SIZE)
+                .isRefused());
+
+        agent.frame = withPatchAt(120, 80);
+        assertFalse(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE)
+                .isRefused(), "the same frame again is still");
+    }
+
+    @Test
+    void aPictureIsTaggedOnlyWithDeclaredTagsAndEveryTagEditIsATool() {
+        agent.frame = withPatchAt(120, 80);
+        run("screenshot");
+        agent.frame = null;
+        assertTrue(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
+                "tags", List.of("Home")).isRefused(), "Home is not declared");
+        assertFalse(TemplateLibrary.exists(resources, "gold"), "a refused tag saves nothing");
+
+        assertEquals("Declared Home; tag_pictures puts it on pictures.", text(run("declare_tag", "tag", " Home ")));
+        assertTrue(run("declare_tag", "tag", "home").isRefused(), "already there, in another case");
+        assertTrue(run("declare_tag", "tag", TemplateManifest.UNTAGGED).isRefused(), "a built-in group");
+        assertEquals("Saved gold as Pictures.GOLD, tagged Home.", text(run("crop_picture", "name", "gold",
+                "x", 120, "y", 80, "width", SIZE, "height", SIZE, "tags", List.of("home", "HOME"))),
+                "spelled as declared, once");
+        assertTrue(text(run("list_pictures")).contains("gold → Pictures.GOLD [Home]"));
+
+        run("declare_tag", "tag", "Popups");
+        assertTrue(run("tag_pictures", "tag", "Nope", "pictures", List.of("gold")).isRefused());
+        assertTrue(run("tag_pictures", "tag", "Popups", "pictures", List.of("gold", "nothing")).isRefused());
+        assertFalse(run("tag_pictures", "tag", "popups", "pictures", List.of("gold", "ore")).isRefused());
+        assertEquals(java.util.Set.of("Home", "Popups"), TemplateLibrary.manifest(resources).tagsOf("gold"));
+        String listed = text(run("list_tags"));
+        assertTrue(listed.contains("Popups: gold, ore"), listed);
+
+        assertEquals("Took Popups off ore.", text(run("untag_pictures", "tag", "Popups", "pictures", List.of("ore"))));
+        assertTrue(TemplateLibrary.manifest(resources).tagsOf("ore").isEmpty());
+        assertTrue(run("untag_pictures", "tag", "Popups", "pictures", List.of("ore")).isRefused(), "ore has none");
+        assertEquals("gold carries Popups.", text(run("set_tags", "picture", "gold", "tags", List.of("Popups"))));
+
+        assertTrue(run("rename_tag", "tag", "Popups", "to", "Home").isRefused(), "taken");
+        assertEquals("Renamed Popups to Dialogs.", text(run("rename_tag", "tag", "Popups", "to", "Dialogs")));
+        assertEquals(java.util.Set.of("Dialogs"), TemplateLibrary.manifest(resources).tagsOf("gold"));
+        assertEquals("Deleted Dialogs; its pictures stay.", text(run("delete_tag", "tag", "Dialogs")));
+        assertTrue(TemplateLibrary.manifest(resources).tagsOf("gold").isEmpty());
+        assertTrue(TemplateLibrary.exists(resources, "gold"));
+        assertTrue(run("delete_tag", "tag", "Dialogs").isRefused());
     }
 
     @Test
@@ -724,7 +780,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(45, names.size());
+        assertEquals(52, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 

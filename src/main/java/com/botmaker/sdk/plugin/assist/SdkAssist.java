@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * The SDK's tools for the AI assistant that drives Studio: look at what the bot sees ({@link LookTools}), make
- * its pictures and places ({@link PictureTools}), shape its activity flow ({@link FlowTools}), and set where it
+ * its pictures and places ({@link PictureTools}) and tag the pictures ({@link TagTools}), shape its activity flow ({@link FlowTools}), and set where it
  * looks and how it runs ({@link SetupTools}).
  *
  * <p>Coordinates are the <b>screenshot's</b> pixels: {@code (0, 0)} is the top-left of what {@code screenshot}
@@ -22,7 +22,7 @@ public final class SdkAssist {
 
     /** Every tool, by group. */
     public static final List<AssistantTool<?>> ALL = join(LookTools.TOOLS, ActTools.TOOLS, PictureTools.TOOLS,
-            FlowTools.TOOLS, SetupTools.TOOLS);
+            TagTools.TOOLS, FlowTools.TOOLS, SetupTools.TOOLS);
 
     /**
      * How a bot on the SDK is laid out, said to the assistant beside these tools: a bot is its activities, and a
@@ -40,7 +40,14 @@ public final class SdkAssist {
               activity starts from, safe to call at any moment. Make it with add_method, then name it with
               set_flow_method. An activity that needs another screen opens it from there in its own body.
             - Pictures, points and regions are the bot's constants (Pictures.CLAIM_RESEARCH): one per idea and
-              place, named <idea>_<where>; the same idea on another screen is another picture.
+              place, named <idea>_<where>; the same idea on another screen is another picture. On a screen
+              reached for the first time, cut every button and marker a chore will need from one screenshot,
+              not one per trip. Cut a button's image, not its label: a label's text changes with the game's
+              language and shows through to a moving background; leave out the corner a badge (a red count
+              or bell) comes and goes on, and any part that moves (crop_picture refuses a box that changes
+              within a second: cut a still part). Tag each picture with the
+              activity that uses it, or a custom tag (declare_tag) for home and popups: crop_picture takes
+              tags, list_tags shows them.
             - Before writing a step, find it: describe looks, click, key and scroll act, and all four answer
               in text. Then write it in the activity's body and run_activity it.
             - A click can be missed and a screen can be slow (lag, a dropped connection), so a step repeats
