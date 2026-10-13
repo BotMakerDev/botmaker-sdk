@@ -87,6 +87,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `settleMs` (5000 when left out, at most 10000). The guide also
   says how a home method finds home: by a picture no other screen shows, Escape until it shows, then clearing
   the popups.
+- **What moves on its own is not the game's answer.** On a screen that animates by itself (Firestone's swaying
+  home), click, key and scroll took that motion for the answer and returned the screen from before the click.
+  They now read the screen twice more before acting and ignore what moved in between, about 0.4 s per action.
 - **▶ Try joins the private display too.** A try, and the assistant's run_activity and try_statement, looked for the
   game's window on the desktop while the game ran in the private display, and found none. A try now joins the
   display it is offered, as a run does, and still launches nothing.

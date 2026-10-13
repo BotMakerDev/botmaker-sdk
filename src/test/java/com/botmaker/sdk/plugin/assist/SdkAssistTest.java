@@ -825,31 +825,100 @@ class SdkAssistTest {
                 "the frames differ, or this test proves nothing");
 
         Iterator<BufferedImage> late = List.of(before, before, before, opening, open, open, open).iterator();
-        assertSame(open, ActTools.answered(before, () -> Optional.of(late.next()), 5_000, clock).orElseThrow(),
+        ActTools.Motion none = ActTools.Motion.NONE;
+        assertSame(open, ActTools.answered(before, none, () -> Optional.of(late.next()), 5_000, clock).orElseThrow(),
                 "the frame once it holds still, not the first that differs");
         assertEquals(5 * ActTools.POLL_MS, waited[0]);
 
         waited[0] = 0;
-        assertSame(before, ActTools.answered(before, () -> Optional.of(before), 1_000, clock).orElseThrow());
+        assertSame(before, ActTools.answered(before, none, () -> Optional.of(before), 1_000, clock).orElseThrow());
         assertEquals(1_000, waited[0], "nothing changed: read until the cap");
 
         waited[0] = 0;
         int[] frame = {0};
-        ActTools.answered(before, () -> Optional.of(noise(40, 20, 10 + frame[0]++)), 10_000, clock);
+        ActTools.answered(before, none, () -> Optional.of(noise(40, 20, 10 + frame[0]++)), 10_000, clock);
         assertTrue(waited[0] >= ActTools.SETTLING_MS && waited[0] < ActTools.SETTLING_MS + ActTools.POLL_MS,
                 "a screen that never holds still is given SETTLING_MS, not the cap: " + waited[0]);
 
         waited[0] = 0;
-        assertSame(before, ActTools.answered(before, () -> Optional.of(before), 0, clock).orElseThrow());
+        assertSame(before, ActTools.answered(before, none, () -> Optional.of(before), 0, clock).orElseThrow());
         assertEquals(0, waited[0], "0 reads it at once");
 
         waited[0] = 0;
-        assertEquals(Optional.empty(), ActTools.answered(before, Optional::empty, 10_000, clock));
+        assertEquals(Optional.empty(), ActTools.answered(before, none, Optional::empty, 10_000, clock));
         assertTrue(waited[0] < ActTools.SETTLING_MS + ActTools.POLL_MS, "a capture that is gone is not waited for");
 
         Thread.currentThread().interrupt();
-        assertThrows(InterruptedException.class, () -> ActTools.answered(before, () -> Optional.of(before), 0, clock));
+        assertThrows(InterruptedException.class,
+                () -> ActTools.answered(before, none, () -> Optional.of(before), 0, clock));
         assertFalse(Thread.currentThread().isInterrupted());
+    }
+
+    /**
+     * A screen that moves on its own is not the game's answer: Firestone's home sways, and a click on the Tavern
+     * was answered with the home screen before the Tavern drew (2026-10-13).
+     */
+    @Test
+    void motionBeforeTheActIsNotItsAnswer() throws InterruptedException {
+        BufferedImage still = noise(60, 40, 1);
+        BufferedImage swayed = copy(still);
+        BufferedImage swayedBack = copy(still);
+        for (int y = 0; y < 6; y++) {
+            for (int x = 0; x < 6; x++) {
+                swayed.setRGB(x, y, swayed.getRGB(x, y) ^ 0x808080);
+                swayedBack.setRGB(x + 2, y, swayedBack.getRGB(x + 2, y) ^ 0x808080);
+            }
+        }
+        ActTools.Motion motion = ActTools.Motion.of(List.of(still, swayed));
+        assertTrue(ActTools.changed(still, swayedBack).isPresent(), "unmasked, the sway is a change");
+        assertEquals(Optional.empty(), ActTools.changed(still, swayedBack, motion), "masked, a sway a little "
+                + "further is not");
+        BufferedImage opened = copy(swayedBack);
+        opened.setRGB(40, 30, opened.getRGB(40, 30) ^ 0x808080);
+        assertEquals(Optional.of(new Rect(40, 30, 2, 2)), ActTools.changed(still, opened, motion));
+
+        long[] waited = {0};
+        ActTools.Clock clock = new ActTools.Clock() {
+            @Override
+            public long nowMs() {
+                return waited[0];
+            }
+
+            @Override
+            public void sleep(long ms) {
+                waited[0] += ms;
+            }
+        };
+        Iterator<BufferedImage> late = List.of(swayedBack, swayed, opened, opened).iterator();
+        assertSame(opened, ActTools.answered(still, motion, () -> Optional.of(late.next()), 5_000, clock)
+                .orElseThrow(), "the sway is waited past, not taken for the answer");
+
+        waited[0] = 0;
+        Iterator<BufferedImage> reads = List.of(swayed, swayedBack).iterator();
+        assertEquals(List.of(swayed, swayedBack), ActTools.ambient(() -> Optional.of(reads.next()), clock));
+        assertEquals(ActTools.AMBIENT_READS * ActTools.POLL_MS, waited[0]);
+        assertSame(ActTools.Motion.NONE, ActTools.Motion.of(List.of(still, still)));
+        assertSame(ActTools.Motion.NONE, ActTools.Motion.of(List.of(still)));
+
+        Iterator<Optional<BufferedImage>> failing = List.of(Optional.<BufferedImage>empty(), Optional.of(swayed))
+                .iterator();
+        assertEquals(List.of(swayed), ActTools.ambient(failing::next, clock), "a failed read is left out");
+    }
+
+    @Test
+    void motionReachesOnlyItsGrowAndNeverAnotherSize() {
+        BufferedImage still = noise(60, 40, 1);
+        BufferedImage swayed = copy(still);
+        swayed.setRGB(20, 20, swayed.getRGB(20, 20) ^ 0x808080);
+        ActTools.Motion motion = ActTools.Motion.of(List.of(still, swayed));
+        int reach = ActTools.AMBIENT_GROW;
+        assertTrue(motion.ignores(20 + reach, 20 - reach, 60, 40));
+        assertFalse(motion.ignores(20 + reach + 2, 20, 60, 40), "past the grow it is the game's answer");
+        assertFalse(motion.ignores(20, 20, 61, 40), "a frame of another size is compared whole");
+        assertSame(ActTools.Motion.NONE, ActTools.Motion.of(List.of(still, noise(30, 20, 2))));
+
+        assertSame(ActTools.Motion.NONE, ActTools.Motion.of(List.of(still, noise(60, 40, 2))),
+                "a screen moving all over is compared whole, or no answer would show");
     }
 
     @Test
