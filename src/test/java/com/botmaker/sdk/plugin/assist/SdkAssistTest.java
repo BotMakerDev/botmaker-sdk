@@ -35,6 +35,7 @@ import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateManifest;
+import com.botmaker.sdk.plugin.types.FlowTypes;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -458,6 +459,44 @@ class SdkAssistTest {
         assertTrue(host.calls.contains("renameGroup activities Battle Fight"), host.calls.toString());
     }
 
+    /** A card drawn with no body gets one later, and its switches, as the card editor sets them. */
+    @Test
+    void aCardGetsItsBodyAndSwitchesLater() {
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        assertFalse(run("add_activity", "name", "Research").isRefused());
+        host.set("flows").put("DAILY", TestContexts.row(Flow.class, "").withValue(Flow.NONE));
+        assertFalse(run("add_subflow", "name", "DAILY").isRefused());
+
+        AgentReply missing = run("set_activity", "name", "research", "body", "Research::body");
+        assertTrue(missing.isRefused());
+        assertTrue(text(missing).contains("It has: none; add_method writes one."), text(missing));
+        host.bodies.put("Research", List.of("Research::body"));
+        AgentReply other = run("set_activity", "name", "Research", "body", "Collect::body");
+        assertTrue(other.isRefused());
+        assertTrue(text(other).contains("It has: Research::body."), text(other));
+        assertFalse(run("set_activity", "name", "research", "body", "Research::body", "goesHome", true,
+                "description", "Start research.").isRefused());
+        assertTrue(run("set_activity", "name", "daily", "body", "Research::body").isRefused(), "a sub-flow card");
+
+        Flow.Step step = flow().steps().getFirst();
+        assertEquals("Research::body", FlowTypes.sourceOf(step.body()));
+        assertTrue(step.goHome());
+        assertEquals("Start research.", step.description());
+        assertFalse(step.popupCheck());
+
+        // What is left out stays as it was.
+        assertFalse(run("set_activity", "name", "Research", "checksPopups", true).isRefused());
+        step = flow().steps().getFirst();
+        assertEquals("Research::body", FlowTypes.sourceOf(step.body()));
+        assertTrue(step.goHome() && step.popupCheck());
+        assertEquals("Start research.", step.description());
+        assertTrue(text(run("read_flow")).contains("• Research — Research::body, goes home first, checks popups"));
+        assertFalse(run("set_activity", "name", "Research", "description", "", "goesHome", false).isRefused());
+        step = flow().steps().getFirst();
+        assertEquals("", step.description(), "an empty line is none");
+        assertFalse(step.goHome());
+    }
+
     @Test
     void theFlowsSetupNamesOnlyAMethodTheBotHas() {
         host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
@@ -835,7 +874,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(52, names.size());
+        assertEquals(53, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
@@ -1111,6 +1150,14 @@ class SdkAssistTest {
             set(name(id)).clear();
             set(name(id)).putAll(moved);
             return Optional.empty();
+        }
+
+        /** The bot's methods returning each activity's enum, by the enum's name. */
+        final Map<String, List<String>> bodies = new HashMap<>();
+
+        @Override
+        public List<String> methods(String id, String group) {
+            return group == null ? List.of() : bodies.getOrDefault(group, List.of());
         }
 
         @Override

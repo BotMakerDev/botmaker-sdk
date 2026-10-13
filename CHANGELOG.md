@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The assistant changes a card.** New tool `set_activity` sets an activity's body (`Research::body`, refused
+  unless the bot has that method returning the activity's enum), its line, and whether it goes home first,
+  checks popups or may be switched off by the runner; what it leaves out stays. Before, a card added without a
+  body could never get one over MCP (`FlowEdits.setCard`).
 - **The assistant tags pictures.** New tools `list_tags`, `tag_pictures`, `untag_pictures`, `set_tags`,
   `declare_tag`, `rename_tag` and `delete_tag` make every edit 🖼 Manage Pictures and its tag manager make;
   `crop_picture` takes `tags` and `list_pictures` shows them. Only a declared tag is accepted (a refusal

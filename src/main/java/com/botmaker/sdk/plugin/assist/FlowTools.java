@@ -64,6 +64,20 @@ final class FlowTools {
                         @Describe(value = WHICH, optional = true) String flow) {
     }
 
+    /** What {@code set_activity} says of a switch it takes. */
+    private static final String KEPT = "; leave out to keep it as it is";
+
+    record Card(@Describe("the card's name: " + CARD) String name,
+                @Describe(value = "its body as a method reference, Collect::body: one of the bot's public static "
+                        + "methods with no parameter returning the activity's enum" + KEPT, optional = true) String body,
+                @Describe(value = "the one line the canvas shows under it, empty for none" + KEPT, optional = true) String description,
+                @Describe(value = "true runs the bot's home before it" + KEPT, optional = true) Boolean goesHome,
+                @Describe(value = "true runs the popup guard while it does" + KEPT, optional = true) Boolean checksPopups,
+                @Describe(value = "true lets the person running the bot switch it off for their machine" + KEPT,
+                        optional = true) Boolean switchable,
+                @Describe(value = WHICH, optional = true) String flow) {
+    }
+
     /** One arrow between two cards, on one outcome. */
     record Arrow(@Describe("the activity the arrow leaves") String from,
                  @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome,
@@ -128,6 +142,10 @@ final class FlowTools {
                     .describedAs("Adds an activity to a flow, as the Activity Flow window does; one another flow "
                             + "runs keeps its body and outcomes")
                     .takes(NewActivity.class).handledBy(FlowTools::addActivity),
+            AssistantTool.named("set_activity")
+                    .describedAs("Changes a card in one flow as the Activity Flow window does: its body, its line, "
+                            + "and whether it goes home first, checks popups or may be switched off by the runner")
+                    .takes(Card.class).handledBy(FlowTools::setActivity),
             AssistantTool.named("rename_activity")
                     .describedAs("Renames an activity everywhere: its card in every flow, arrows and constant")
                     .takes(Rename.class).handledBy(FlowTools::renameActivity),
@@ -284,6 +302,27 @@ final class FlowTools {
             return shared.isPresent() ? FlowEdits.addShared(board, shared.get(), outcomes)
                     : FlowEdits.addActivity(board, activity.name(), activity.body(), outcomes);
         }, flow -> Map.of(), "Added " + activity.name() + ".");
+    }
+
+    /** Only a body the bot has: one returning another enum, or no method at all, would not compile. */
+    static AgentReply setActivity(Card card, AgentContext context) {
+        StudioServices services = context.services();
+        return editFlow(context, card.flow(), board -> {
+            String label = card(board, card.name());
+            String type = FlowNames.typeFor(label);
+            // A card that is no activity of this flow is the edit's to refuse, with its own sentence.
+            if (!blank(card.body()) && type != null && FlowEdits.labelOf(board.flow(), label).isPresent()
+                    && FlowNames.subflowOf(label) == null) {
+                List<String> bodies = FlowConstants.bodies(services.pluginValues(), type);
+                if (!bodies.contains(card.body().strip())) {
+                    throw new IllegalArgumentException("The bot has no public static method " + card.body().strip()
+                            + "() with no parameter returning Activities." + type + ". It has: "
+                            + (bodies.isEmpty() ? "none; add_method writes one" : String.join(", ", bodies)) + ".");
+                }
+            }
+            return FlowEdits.setCard(board, label, card.body(), card.description(), card.goesHome(),
+                    card.checksPopups(), card.switchable());
+        }, flow -> Map.of(), "Changed " + card.name() + ".");
     }
 
     static AgentReply renameActivity(Rename rename, AgentContext context) {

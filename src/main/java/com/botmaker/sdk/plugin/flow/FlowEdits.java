@@ -229,6 +229,27 @@ public final class FlowEdits {
         return own.getFirst();
     }
 
+    /**
+     * {@code board} with the card {@code name} as 🔀 Activity Flow's card leaves it: its body the method
+     * {@code bodySource} names ({@code Collect::body}), its line {@code description} and its switches — each kept
+     * as it is when null, the body also when blank; a blank line is none. A sub-flow card runs its flow and has no body to give.
+     */
+    public static Board setCard(Board board, String name, String bodySource, String description, Boolean goHome,
+                                Boolean popupCheck, Boolean runnerSwitch) {
+        Flow flow = board.flow();
+        Flow.Step was = step(flow, name);
+        boolean newBody = bodySource != null && !bodySource.isBlank();
+        if (newBody && was.node() instanceof Flow.Sub) {
+            throw new IllegalArgumentException(was.label() + " is a sub-flow card: it runs its flow and has no body.");
+        }
+        Flow.Step now = new Flow.Step(was.node(), newBody ? body(bodySource) : was.body(),
+                description == null ? was.description() : description.strip(), was.enabled(),
+                goHome == null ? was.goHome() : goHome, popupCheck == null ? was.popupCheck() : popupCheck,
+                runnerSwitch == null ? was.runnerSwitch() : runnerSwitch, was.whenOff());
+        List<Flow.Step> steps = flow.steps().stream().map(s -> s == was ? now : s).toList();
+        return board.with(with(flow, steps, flow.edges(), flow.start()));
+    }
+
     /** {@code board} starting at the card {@code name}. */
     public static Board setStart(Board board, String name) {
         Flow flow = board.flow();
