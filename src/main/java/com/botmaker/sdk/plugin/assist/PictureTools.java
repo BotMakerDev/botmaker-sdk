@@ -20,6 +20,7 @@ import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.vision.DigitReader;
 import com.botmaker.sdk.internal.vision.Places;
@@ -193,6 +194,8 @@ final class PictureTools {
         Optional<String> moving = moving(context, frame.get(), new Rect(crop.x(), crop.y(), crop.width(),
                 crop.height()));
         if (moving.isPresent()) return AgentReply.refused(moving.get());
+        String alike = lookAlikes(context, frame.get(), picture.get().image(),
+                new Rect(crop.x(), crop.y(), crop.width(), crop.height())).map(a -> " " + a).orElse("");
         PictureCuts.Cut saved = FxCall.call(() -> {
             PictureCuts.Cut cut = PictureCuts.save(context.services(), picture.get(), crop.name(), frame.get());
             if (!tags.isEmpty()) TemplateLibrary.applyTags(context.services(), Map.of(cut.name(), tags));
@@ -202,8 +205,52 @@ final class PictureTools {
         String constant = TemplateNames.constantFor(saved.name());
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
                         + "." + constant) + (tags.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
-                        + saved.note().map(n -> " — " + n).orElse("") + ".")
+                        + saved.note().map(n -> " — " + n).orElse("") + "." + alike)
                 .and(AgentReply.image(picture.get().image()));
+    }
+
+    /** How far from its own box a match still counts as the cut itself, in pixels. */
+    private static final int SELF_SLACK = 8;
+
+    /**
+     * Where else on {@code shown} a run would find {@code cut}, saved from {@code asked}, said as a warning; empty
+     * when nowhere. Matching ignores colour, so a lit button's greyed-out twin scores just over the bot's
+     * confidence and a run clicks it forever: cutting the twin as a compare's bad picture is the cure. A twin
+     * scoring between the run's default confidence and a lower one the project sets goes unsaid.
+     */
+    private static Optional<String> lookAlikes(AgentContext context, BufferedImage shown, BufferedImage cut,
+                                               Rect asked) {
+        Optional<Rect> inside = Frames.within(shown, asked.x(), asked.y(), asked.width(), asked.height());
+        if (inside.isEmpty()) return Optional.empty();
+        Rect box = inside.get();
+        double needs = Frames.confidence(context.services());
+        Path file;
+        try {
+            file = Files.createTempFile("botmaker-alike-", ".png");
+            ImageIO.write(cut, "png", file.toFile());
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+        try (ImageTemplate template = new ImageTemplate(file.toString())) {
+            ImageFinder.findAll(template, new Frames.Still(shown));
+            List<String> elsewhere = Vision.lastMatchList().stream()
+                    .filter(m -> m.confidence() >= needs)
+                    .filter(m -> Math.abs(m.rect().x() - box.x()) > SELF_SLACK
+                            || Math.abs(m.rect().y() - box.y()) > SELF_SLACK)
+                    .map(m -> m.rect().x() + "," + m.rect().y() + " (" + Frames.score(m.confidence()) + ")")
+                    .toList();
+            if (elsewhere.isEmpty()) return Optional.empty();
+            return Optional.of("A run also finds it at " + String.join(", ", elsewhere) + ", over the "
+                    + Frames.score(needs) + " it needs: matching ignores colour, so a greyed-out twin counts. "
+                    + "If those are not the same thing, cut one as its look-alike and act with "
+                    + "ImageFinder.whileFindCompare or ImageClicker.clickCompare, this as good and it as bad.");
+        } finally {
+            try {
+                Files.deleteIfExists(file);
+            } catch (IOException ignored) {
+                // a temp file left behind is the system's to clear
+            }
+        }
     }
 
     static AgentReply showPicture(PictureName name, AgentContext context) {

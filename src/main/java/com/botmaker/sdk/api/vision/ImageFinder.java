@@ -782,6 +782,39 @@ public class ImageFinder {
     }
 
     /**
+     * Keep running {@code action} (with the fresh match each time) as long as a {@code good} template is
+     * visible where it beats every {@code bad} one by the compare margin — {@link #whileFind} for a picture
+     * with a look-alike, such as a lit button and its greyed-out twin, which a match alone cannot tell apart.
+     *
+     * @param good   the templates to act on
+     * @param bad    their look-alikes, never acted on
+     * @param action the action to run with each winning match
+     */
+    public static void whileFindCompare(ImageTemplateGroup good, ImageTemplateGroup bad,
+                                        Consumer<MatchResult> action) {
+        whileFindCompare(good, bad, Source.current(), action);
+    }
+
+    /**
+     * {@link #whileFindCompare(ImageTemplateGroup, ImageTemplateGroup, Consumer)} on a specific source.
+     *
+     * @param good   the templates to act on
+     * @param bad    their look-alikes, never acted on
+     * @param source the capture source to search within
+     * @param action the action to run with each winning match
+     */
+    public static void whileFindCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
+                                        Consumer<MatchResult> action) {
+        PopupGuard.check();
+        MatchResult result;
+        while ((result = compare(good.templates(), bad.templates(), source, confidence(), margin())).isFound()) {
+            Vision.setLastMatch(result);
+            action.accept(result);
+        }
+        Vision.setLastMatch(MatchResult.notFound());
+    }
+
+    /**
      * Keep running {@code action} until {@code template} appears (no match found while it's absent).
      *
      * @param template the image template to search for

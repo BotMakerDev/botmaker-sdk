@@ -60,10 +60,22 @@ public final class SdkAssist {
               game's exit dialog; its close button belongs in that group. A game that froze is not the
               body's to handle: the run's watchdog sees the same screen over and over and recovers through
               the home method.
-            - A step that repeats until the screen changes is one call, not a loop block:
-              ImageClicker.clickAll(group) claims every match, ImageFinder.whileFindAny(group, action) and
-              untilFind(picture, action) repeat their action (a lambda; its parameter by var:<its name>),
-              ImageWaiter.waitAndClick waits for a button. A group is ImageTemplateGroup.of(…, …).
+            - Write a body foolproof, out of the loop methods that take a lambda: ImageFinder.whileFindAny,
+              whileFindAll, ifFindAny (group, found -> …), untilFind(picture, action), whileFindCompare.
+              Each pass looks at the screen again, so a missed click or a slow screen is retried, not
+              trusted. Build the logic from what the lambda is handed (its parameter by var:<its name>):
+              found.has(X) and found.get(X) say which pictures this frame shows, ImageClicker.click(
+              found.get(X)) or clickLast() act on them without looking again. A group is
+              ImageTemplateGroup.of(…, …). No loop blocks, no chain of separate find-then-click calls.
+            - Click pictures, never places: no Mouse.click on a Spot or on x, y, which cannot tell whether
+              they landed. A tab or button gets a picture.
+            - Prove each step by a picture of its result, never by time: the loop's own picture coming or
+              going, or ImageWaiter.waitFor / waitUntilGone of a picture only that screen or state shows
+              (a close button is on every screen: not a marker). Screen.waitStable and Wait guess, they prove
+              nothing.
+            - Matching ignores colour: a lit button and its greyed-out twin both match (crop_picture says
+              where else a cut is found). Cut the twin too and act with the compare forms, the lit one as
+              good and the twin as bad: ImageFinder.whileFindCompare(good, bad, action), clickCompare.
             - A run's choices (which flow, which activity is on) are @Param fields, never run properties.
             """;
 

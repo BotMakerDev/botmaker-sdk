@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **`ImageFinder.whileFindCompare(good, bad, action)`.** `whileFind` for a picture with a look-alike: it runs
+  the action on each match a good picture wins over every bad one there, so a loop over lit Claim buttons stops
+  at the greyed-out ones. Matching ignores colour, and a grey twin scores just over the confidence a run needs.
+- **`crop_picture` names the look-alikes.** A cut that a run would also find elsewhere on the screenshot says
+  where and how well, and points at the compare forms.
+- **The guide asks for foolproof bodies.** The assistant writes a body out of the loop methods that take a
+  lambda (`whileFindAny`, `whileFindAll`, `ifFindAny`, `untilFind`, `whileFindCompare`), with its logic built
+  from the `Matches` each pass hands over. It clicks pictures, never a `Spot` or x, y. It proves each step with
+  a picture of its result, never `Screen.waitStable` or `Wait`.
 - **The assistant changes a card.** New tool `set_activity` sets an activity's body (`Research::body`, refused
   unless the bot has that method returning the activity's enum), its line, and whether it goes home first,
   checks popups or may be switched off by the runner; what it leaves out stays. Before, a card added without a

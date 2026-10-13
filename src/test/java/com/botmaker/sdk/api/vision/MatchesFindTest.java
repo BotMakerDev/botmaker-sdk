@@ -175,6 +175,40 @@ class MatchesFindTest {
         assertTrue(Vision.lastMatches().isEmpty(), "the context must reflect the final, clear frame");
     }
 
+    /** {@code lit} greyed out, as a game draws a disabled button: its shape kept, its colour gone. */
+    private static BufferedImage greyed(BufferedImage lit) {
+        BufferedImage grey = new BufferedImage(lit.getWidth(), lit.getHeight(), BufferedImage.TYPE_3BYTE_BGR);
+        for (int y = 0; y < lit.getHeight(); y++) {
+            for (int x = 0; x < lit.getWidth(); x++) {
+                int rgb = lit.getRGB(x, y);
+                int v = (((rgb >> 16) & 0xFF) + ((rgb >> 8) & 0xFF) + (rgb & 0xFF)) / 3;
+                grey.setRGB(x, y, (v << 16) | (v << 8) | v);
+            }
+        }
+        return grey;
+    }
+
+    @Test
+    void whileFindCompareStopsAtTheLookAlike(@TempDir Path tmp) throws Exception {
+        BufferedImage litPatch = patch(1), greyPatch = greyed(litPatch);
+        ImageTemplate lit = write(tmp, "lit", litPatch);
+        ImageTemplate grey = write(tmp, "grey", greyPatch);
+
+        // A lit button beside its grey twin, then the grey twin alone once the lit one was claimed.
+        CountingSource source = new CountingSource(List.of(frameWith(litPatch, greyPatch), frameWith(greyPatch)));
+        assertTrue(ImageFinder.bestMatch(lit, new CountingSource(List.of(frameWith(greyPatch)))).isFound(),
+                "the twin must fool a plain match, or this test proves nothing");
+
+        int[] iterations = {0};
+        ImageFinder.whileFindCompare(ImageTemplateGroup.of(lit), ImageTemplateGroup.of(grey), source, found -> {
+            iterations[0]++;
+            assertTrue(found.rect().x() < 150, "only the lit button is acted on, got " + found.rect());
+        });
+
+        assertEquals(1, iterations[0]);
+        assertFalse(Vision.lastMatch().isFound());
+    }
+
     @Test
     void clickTakesAnAlreadyLocatedMatchWithoutCapturingAgain(@TempDir Path tmp) throws Exception {
         BufferedImage mailPatch = patch(1);
