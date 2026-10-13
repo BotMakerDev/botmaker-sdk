@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * The assistant's hands: a click, a key or a scroll on the game the look tools see, each answered in text — the
@@ -40,8 +41,15 @@ import java.util.Optional;
  */
 final class ActTools {
 
-    static final int SETTLE_MS = 800;
-    static final int LONGEST_SETTLE_MS = 5_000;
+    static final int SETTLE_MS = 5_000;
+    static final int LONGEST_SETTLE_MS = 10_000;
+    /** How often the screen is read while the game answers. */
+    static final int POLL_MS = 200;
+    /**
+     * How long a screen that started changing is given to finish: one that animates on its own never holds still.
+     * A game can take seconds to start answering (Firestone's Library, 2026-10-13), so no fixed wait fits.
+     */
+    static final int SETTLING_MS = 1_500;
     /** A channel moving less than this is the same pixel: compression, a blended edge. */
     private static final int SAME = 24;
     /** Every this many pixels is compared; a change smaller than this is not a step's answer. */
@@ -51,13 +59,14 @@ final class ActTools {
     private static final int MOST_LINES = 15;
     private static final int MOST_DESCRIBED = 60;
     private static final long KEY_HOLD_MS = 40;
+    private static final String SETTLE = "the longest the game is given to answer, in milliseconds: the screen is "
+            + "read until it changes and holds still; 5000 when left out, at most 10000, 0 reads it at once";
 
     record Click(@Describe(value = "x, in the screenshot's pixels; with y", optional = true) Integer x,
                  @Describe(value = "y, in the screenshot's pixels", optional = true) Integer y,
                  @Describe(value = "a picture's name instead of x and y: its best match's centre, when a run "
                          + "would find it", optional = true) String picture,
-                 @Describe(value = "how long the game is given to answer before the screen is read again, in "
-                         + "milliseconds; 800 when left out, at most 5000", optional = true) Integer settleMs,
+                 @Describe(value = SETTLE, optional = true) Integer settleMs,
                  @Describe(value = "true adds a small image of the part that changed", optional = true)
                  Boolean show,
                  @Describe(value = "true to act on the user's own desktop, taking their mouse; refused there "
@@ -65,8 +74,7 @@ final class ActTools {
     }
 
     record Press(@Describe("the key, as printed on it or as Key names it: Escape, Q, F5, Page Up, 5") String key,
-                 @Describe(value = "milliseconds before the screen is read again; 800 when left out, at most 5000",
-                         optional = true) Integer settleMs,
+                 @Describe(value = SETTLE, optional = true) Integer settleMs,
                  @Describe(value = "true adds a small image of the part that changed", optional = true)
                  Boolean show,
                  @Describe(value = "true to act on the user's own desktop, where the key goes to whatever has "
@@ -76,8 +84,7 @@ final class ActTools {
     record Wheel(@Describe("x to scroll at, in the screenshot's pixels") int x,
                  @Describe("y to scroll at") int y,
                  @Describe("notches: positive scrolls up or away, negative down or toward you") int amount,
-                 @Describe(value = "milliseconds before the screen is read again; 800 when left out, at most 5000",
-                         optional = true) Integer settleMs,
+                 @Describe(value = SETTLE, optional = true) Integer settleMs,
                  @Describe(value = "true adds a small image of the part that changed", optional = true)
                  Boolean show,
                  @Describe(value = "true to act on the user's own desktop, taking their mouse; refused there "
@@ -209,15 +216,65 @@ final class ActTools {
             return AgentReply.refused("The input failed: " + failed.getMessage());
         }
         // From here the action happened: an answer that is not a refusal, so it is not tried again.
+        Optional<BufferedImage> after;
         try {
-            Thread.sleep(settle);
+            after = answered(before.get(), () -> Frames.look(context), settle, Clock.REAL);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return AgentReply.text(done + "; stopped before the screen was read again.");
         }
-        Optional<BufferedImage> after = Frames.look(context);
         if (after.isEmpty()) return AgentReply.text(done + "; the screen could not be captured after it.");
         return answer(context, done, before.get(), after.get(), Boolean.TRUE.equals(show));
+    }
+
+    /** Time as {@link #answered} counts it: the wall clock in a run, a counter in a test. */
+    interface Clock {
+        Clock REAL = new Clock() {
+            @Override
+            public long nowMs() {
+                return System.nanoTime() / 1_000_000;
+            }
+
+            @Override
+            public void sleep(long ms) throws InterruptedException {
+                Thread.sleep(ms);
+            }
+        };
+
+        long nowMs();
+
+        void sleep(long ms) throws InterruptedException;
+    }
+
+    /**
+     * The frame the game answered with: the screen read every {@link #POLL_MS} until it differs from
+     * {@code before}, then until two reads in a row are the same or {@link #SETTLING_MS} went by, never past
+     * {@code capMs} (reading a frame takes time too). When nothing changed by then, the last frame read; empty when
+     * none could be read for {@link #SETTLING_MS}: a capture that is gone does not hold the answer for the whole cap.
+     */
+    static Optional<BufferedImage> answered(BufferedImage before, Supplier<Optional<BufferedImage>> look, int capMs,
+                                            Clock clock) throws InterruptedException {
+        if (Thread.interrupted()) throw new InterruptedException();
+        long start = clock.nowMs();
+        long changedAt = -1;
+        Optional<BufferedImage> last = Optional.empty();
+        while (true) {
+            Optional<BufferedImage> now = look.get();
+            long waited = clock.nowMs() - start;
+            if (now.isPresent()) {
+                if (changedAt < 0) {
+                    if (changed(before, now.get()).isPresent()) changedAt = waited;
+                } else if (last.isPresent() && changed(last.get(), now.get()).isEmpty()) {
+                    return now;
+                }
+                last = now;
+            }
+            if (waited >= capMs || changedAt >= 0 && waited - changedAt >= SETTLING_MS
+                    || last.isEmpty() && waited >= SETTLING_MS) {
+                return last;
+            }
+            clock.sleep(Math.min(POLL_MS, capMs - waited));
+        }
     }
 
     /** What changed from {@code before} to {@code after}, in text, with the changed part's image when asked. */

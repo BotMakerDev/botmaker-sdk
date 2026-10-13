@@ -52,9 +52,14 @@ public final class SdkAssist {
               in text. Then write it in the activity's body and run_activity it.
             - A click can be missed and a screen can be slow (lag, a dropped connection), so a step repeats
               until the screen shows it worked, never clicks once and trusts it. The home method, for one:
-              until the home screen shows, click whatever blocks it (a group of its close and claim
-              buttons, clickAny) or press Escape. A game that froze is not the body's to handle: the run's
-              watchdog sees the same screen over and over and recovers through the home method.
+              its marker is a picture no other screen shows (a sidebar icon shown everywhere is not one), and
+              it stays visible under a popup. untilFind(marker, action) runs its action again at once, so
+              the action presses Escape and then waits for the marker (ImageWaiter.waitFor, under a second):
+              without that wait it presses again while the game answers. Then whileFindAny(the group of close
+              and claim buttons) clears what still covers home. An Escape too many on home may open the
+              game's exit dialog; its close button belongs in that group. A game that froze is not the
+              body's to handle: the run's watchdog sees the same screen over and over and recovers through
+              the home method.
             - A step that repeats until the screen changes is one call, not a loop block:
               ImageClicker.clickAll(group) claims every match, ImageFinder.whileFindAny(group, action) and
               untilFind(picture, action) repeat their action (a lambda; its parameter by var:<its name>),

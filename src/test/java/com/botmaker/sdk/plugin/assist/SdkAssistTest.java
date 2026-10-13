@@ -53,6 +53,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -63,6 +64,8 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -725,7 +728,7 @@ class SdkAssistTest {
         run("key", "key", "esc", "desktop", true, "settleMs", 0);
         assertEquals(List.of("keyDown(65307)", "keyUp(65307)"), controller.events);
         assertTrue(run("key", "key", "Hyper", "desktop", true).isRefused());
-        assertTrue(run("click", "x", 1, "y", 1, "desktop", true, "settleMs", 9000).isRefused());
+        assertTrue(run("click", "x", 1, "y", 1, "desktop", true, "settleMs", 11000).isRefused());
         controller.events.clear();
         assertTrue(run("click", "x", 400, "y", 10, "desktop", true, "settleMs", 0).isRefused(), "off the frame");
         assertTrue(run("scroll", "x", -1, "y", 10, "amount", 1, "desktop", true, "settleMs", 0).isRefused());
@@ -756,6 +759,58 @@ class SdkAssistTest {
         assertEquals(Optional.of(new Rect(40, 30, 82, 32)), ActTools.changed(before, after));
         assertEquals(Optional.of(new Rect(0, 0, 50, 50)), ActTools.changed(before, noise(50, 50, 5)),
                 "another size is all changed");
+    }
+
+    /**
+     * A game that answers late is waited for: Firestone's Library tab switched after three seconds, and a fixed
+     * 800 ms wait said "nothing changed" (2026-10-13).
+     */
+    @Test
+    void anActIsAnsweredWhenTheScreenChangedAndHeldStill() throws InterruptedException {
+        BufferedImage before = noise(40, 20, 1);
+        BufferedImage opening = noise(40, 20, 2);
+        BufferedImage open = noise(40, 20, 3);
+        long[] waited = {0};
+        ActTools.Clock clock = new ActTools.Clock() {
+            @Override
+            public long nowMs() {
+                return waited[0];
+            }
+
+            @Override
+            public void sleep(long ms) {
+                waited[0] += ms;
+            }
+        };
+        assertTrue(ActTools.changed(before, opening).isPresent() && ActTools.changed(opening, open).isPresent(),
+                "the frames differ, or this test proves nothing");
+
+        Iterator<BufferedImage> late = List.of(before, before, before, opening, open, open, open).iterator();
+        assertSame(open, ActTools.answered(before, () -> Optional.of(late.next()), 5_000, clock).orElseThrow(),
+                "the frame once it holds still, not the first that differs");
+        assertEquals(5 * ActTools.POLL_MS, waited[0]);
+
+        waited[0] = 0;
+        assertSame(before, ActTools.answered(before, () -> Optional.of(before), 1_000, clock).orElseThrow());
+        assertEquals(1_000, waited[0], "nothing changed: read until the cap");
+
+        waited[0] = 0;
+        int[] frame = {0};
+        ActTools.answered(before, () -> Optional.of(noise(40, 20, 10 + frame[0]++)), 10_000, clock);
+        assertTrue(waited[0] >= ActTools.SETTLING_MS && waited[0] < ActTools.SETTLING_MS + ActTools.POLL_MS,
+                "a screen that never holds still is given SETTLING_MS, not the cap: " + waited[0]);
+
+        waited[0] = 0;
+        assertSame(before, ActTools.answered(before, () -> Optional.of(before), 0, clock).orElseThrow());
+        assertEquals(0, waited[0], "0 reads it at once");
+
+        waited[0] = 0;
+        assertEquals(Optional.empty(), ActTools.answered(before, Optional::empty, 10_000, clock));
+        assertTrue(waited[0] < ActTools.SETTLING_MS + ActTools.POLL_MS, "a capture that is gone is not waited for");
+
+        Thread.currentThread().interrupt();
+        assertThrows(InterruptedException.class, () -> ActTools.answered(before, () -> Optional.of(before), 0, clock));
+        assertFalse(Thread.currentThread().isInterrupted());
     }
 
     @Test

@@ -77,6 +77,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **The assistant's click, key and scroll wait for the game to answer.** They waited a fixed 800 ms and said
+  "nothing changed" when a game took longer, as Firestone takes seconds to open a screen. Now they read the screen
+  until it changes and holds still, or 1.5 s after it first changed for a screen that never holds still, up to
+  `settleMs` (5000 when left out, at most 10000). The guide also
+  says how a home method finds home: by a picture no other screen shows, Escape until it shows, then clearing
+  the popups.
 - **▶ Try joins the private display too.** A try, and the assistant's run_activity and try_statement, looked for the
   game's window on the desktop while the game ran in the private display, and found none. A try now joins the
   display it is offered, as a run does, and still launches nothing.
