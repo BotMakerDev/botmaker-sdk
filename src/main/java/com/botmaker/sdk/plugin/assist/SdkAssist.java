@@ -14,14 +14,15 @@ import java.util.List;
  * returned, so the assistant crops what it was shown. Every write goes through the same path as the SDK's own
  * windows, on the FX thread ({@link FxCall}): the picture files and their {@code Pictures} constants, the
  * {@code Points} and {@code Regions} constants, the flow and its {@code Activities}/{@code Outcomes} constants,
- * {@code Sdk.captureSource} and {@code Sdk.settings()}, and this machine's launch target. Nothing clicks,
- * types or starts anything; the assistant acts on the game only by running the bot.
+ * {@code Sdk.captureSource} and {@code Sdk.settings()}, and this machine's launch target. {@link ActTools}
+ * clicks, taps a key or scrolls on the game the look tools see, and says in text what changed; on the user's own
+ * desktop only when asked.
  */
 public final class SdkAssist {
 
     /** Every tool, by group. */
-    public static final List<AssistantTool<?>> ALL = join(LookTools.TOOLS, PictureTools.TOOLS, FlowTools.TOOLS,
-            SetupTools.TOOLS);
+    public static final List<AssistantTool<?>> ALL = join(LookTools.TOOLS, ActTools.TOOLS, PictureTools.TOOLS,
+            FlowTools.TOOLS, SetupTools.TOOLS);
 
     private SdkAssist() {}
 

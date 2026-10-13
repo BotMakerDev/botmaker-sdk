@@ -26,6 +26,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
@@ -645,11 +646,81 @@ class SdkAssistTest {
                 "the launcher set last is the bot's first");
     }
 
+    // ── acting ──────────────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void anActionOnTheUsersDesktopIsRefusedUnlessTheCallSaysSo() {
+        RecordingNativeController controller = new RecordingNativeController();
+        NativeControllerFactory.setForTesting(controller);
+        agent.frame = withPatchAt(120, 80);
+        AgentReply refused = run("click", "x", 10, "y", 20);
+        assertTrue(refused.isRefused() && text(refused).contains("desktop: true"), text(refused));
+        assertTrue(run("key", "key", "Escape").isRefused());
+        assertTrue(controller.events.isEmpty(), "nothing was pressed: " + controller.events);
+
+        assertEquals("Clicked 10,20; nothing changed.",
+                text(run("click", "x", 10, "y", 20, "desktop", true, "settleMs", 0)));
+        assertTrue(controller.events.contains("mouseMove(1010,520)"), controller.events.toString());
+        assertEquals("Clicked ore at 144,104; nothing changed.",
+                text(run("click", "picture", "ore", "desktop", true, "settleMs", 0)), "a picture is clicked at its centre");
+        assertTrue(controller.events.contains("mouseMove(1144,604)"), controller.events.toString());
+
+        controller.events.clear();
+        run("key", "key", "esc", "desktop", true, "settleMs", 0);
+        assertEquals(List.of("keyDown(65307)", "keyUp(65307)"), controller.events);
+        assertTrue(run("key", "key", "Hyper", "desktop", true).isRefused());
+        assertTrue(run("click", "x", 1, "y", 1, "desktop", true, "settleMs", 9000).isRefused());
+    }
+
+    @Test
+    void aKeyIsNamedAsPrintedOrAsKeyNamesIt() {
+        assertEquals(Optional.of(Key.ESCAPE), ActTools.key("Escape"));
+        assertEquals(Optional.of(Key.ESCAPE), ActTools.key("esc"));
+        assertEquals(Optional.of(Key.Q), ActTools.key("q"));
+        assertEquals(Optional.of(Key.NUM5), ActTools.key("5"));
+        assertEquals(Optional.of(Key.PAGE_UP), ActTools.key("Page Up"));
+        assertEquals(Optional.of(Key.PAGE_UP), ActTools.key("PAGE_UP"));
+        assertEquals(Optional.of(Key.F5), ActTools.key("f5"));
+        assertEquals(Optional.of(Key.LEFT_BRACKET), ActTools.key("["));
+        assertEquals(Optional.empty(), ActTools.key("Hyper"));
+        assertEquals(Optional.empty(), ActTools.key(" "));
+    }
+
+    @Test
+    void theChangedBoxHoldsEveryMovedPixelAndNothingElse() {
+        BufferedImage before = noise(200, 100, 5);
+        BufferedImage after = copy(before);
+        assertEquals(Optional.empty(), ActTools.changed(before, after));
+        after.setRGB(40, 30, after.getRGB(40, 30) ^ 0x808080);
+        after.setRGB(120, 60, after.getRGB(120, 60) ^ 0x808080);
+        assertEquals(Optional.of(new Rect(40, 30, 82, 32)), ActTools.changed(before, after));
+        assertEquals(Optional.of(new Rect(0, 0, 50, 50)), ActTools.changed(before, noise(50, 50, 5)),
+                "another size is all changed");
+    }
+
+    @Test
+    void textThatAppearedOrWentIsCountedByItsWordsNotItsPlace() {
+        Rect at = new Rect(0, 0, 10, 10);
+        Rect moved = new Rect(50, 50, 10, 10);
+        ActTools.TextDiff diff = ActTools.TextDiff.of(
+                List.of(new ActTools.Line("Fight", at), new ActTools.Line("Claim  all", at)),
+                List.of(new ActTools.Line("Claim", moved), new ActTools.Line("claim all", at),
+                        new ActTools.Line("Quests", at)));
+        assertEquals(List.of("Claim", "Quests"), diff.appeared().stream().map(ActTools.Line::text).toList());
+        assertEquals(List.of("Fight"), diff.went().stream().map(ActTools.Line::text).toList());
+    }
+
+    private static BufferedImage copy(BufferedImage image) {
+        BufferedImage copy = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+        copy.getGraphics().drawImage(image, 0, 0, null);
+        return copy;
+    }
+
     @Test
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(41, names.size());
+        assertEquals(45, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 

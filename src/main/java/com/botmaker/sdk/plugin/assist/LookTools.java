@@ -38,7 +38,8 @@ import java.util.Optional;
 /**
  * The assistant's eyes: what the bot sees, which pictures are on it, its text and its colours. Each reads a
  * fresh frame of the screen the bot watches, except {@code screenshot}, which also keeps it for
- * {@code crop_picture}; {@code missed_frames} reads what a run saved instead. Nothing here writes or clicks.
+ * {@code crop_picture}; {@code missed_frames} reads what a run saved instead. Nothing here writes or clicks;
+ * {@link ActTools} acts and says what changed.
  */
 final class LookTools {
 
@@ -221,16 +222,8 @@ final class LookTools {
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
-        record Scored(String name, MatchResult match) {}
-        List<Scored> scored = new ArrayList<>();
-        for (Path file : TemplateLibrary.list(resources.get())) {
-            if (TemplateLibrary.isUnmodifiedDefaultTemplate(file)) continue;
-            String name = TemplateLibrary.baseName(file);
-            MatchResult best = best(resources.get(), name, frame.get());
-            if (best.isFound()) scored.add(new Scored(name, best));
-        }
+        List<Scored> scored = scores(resources.get(), frame.get());
         if (scored.isEmpty()) return AgentReply.text("No picture matched at all; crop_picture makes one.");
-        scored.sort(Comparator.comparingDouble((Scored s) -> s.match().confidence()).reversed());
         double needs = Frames.confidence(context.services());
         List<String> lines = new ArrayList<>();
         List<Rect> found = new ArrayList<>();
@@ -366,8 +359,25 @@ final class LookTools {
                 + ", largest first:\n" + String.join("\n", said), frame.get(), boxes, Frames.FOUND);
     }
 
+    /** A picture's best match on one frame. */
+    record Scored(String name, MatchResult match) {
+    }
+
+    /** Every picture's best match on {@code frame}, best first; a picture that matched nowhere is left out. */
+    static List<Scored> scores(Path resources, BufferedImage frame) {
+        List<Scored> scored = new ArrayList<>();
+        for (Path file : TemplateLibrary.list(resources)) {
+            if (TemplateLibrary.isUnmodifiedDefaultTemplate(file)) continue;
+            String name = TemplateLibrary.baseName(file);
+            MatchResult best = best(resources, name, frame);
+            if (best.isFound()) scored.add(new Scored(name, best));
+        }
+        scored.sort(Comparator.comparingDouble((Scored s) -> s.match().confidence()).reversed());
+        return scored;
+    }
+
     /** The best match of the picture {@code name} on {@code frame}, in the frame's pixels. */
-    private static MatchResult best(Path resources, String name, BufferedImage frame) {
+    static MatchResult best(Path resources, String name, BufferedImage frame) {
         // Released after each match: an unreleased template is native memory.
         try (ImageTemplate template = new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString())) {
             return ImageFinder.bestMatch(template, new Frames.Still(frame));
@@ -375,7 +385,7 @@ final class LookTools {
     }
 
     /** Every line the SDK's OCR reads on {@code image}, in its pixels; the thread's last match is left clear. */
-    private static List<TextMatch> recognise(BufferedImage image, OcrLanguage language) {
+    static List<TextMatch> recognise(BufferedImage image, OcrLanguage language) {
         try {
             Text.readAll(new Frames.Still(image), Text.DEFAULT_OPTIONS.withLanguages(language));
             return List.copyOf(Text.lastMatchList());

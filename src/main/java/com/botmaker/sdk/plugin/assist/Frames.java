@@ -110,13 +110,13 @@ final class Frames {
     }
 
     /** The live private display this project's launch brought up, or null. */
-    private static PrivateSession session(AgentContext context) {
+    static PrivateSession session(AgentContext context) {
         Path resources = context.services().resourcesDir();
         return resources == null ? null : BackgroundLauncher.forProject(resources).session();
     }
 
     /** The capture source when it names an emulator, or null. */
-    private static CaptureSource emulator(AgentContext context) {
+    static CaptureSource emulator(AgentContext context) {
         CaptureSource source = FxCall.call(() -> CaptureValue.current(context.services()));
         return source != null && source.base() instanceof EmulatorSource ? source : null;
     }

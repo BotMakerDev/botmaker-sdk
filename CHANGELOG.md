@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The assistant acts on the game and reads it as text.** `click` (a point or a picture), `key` and `scroll` act
+  where the look tools look, wait `settle_ms` (800 by default), and answer in text: the box that changed, the
+  pictures a run would find after, and the text that appeared or went there — an image of the changed part only
+  with `show`. `describe` is the same look without an action: the pictures on screen and every line of text with
+  its place. On the user's own desktop they refuse unless the call says `desktop: true`; an emulator takes a click
+  only. Before, every step the assistant wanted to see cost an edit, a try and a screenshot.
 - **Two assistant tools for the launch.** `list_games` lists the games this computer's launchers installed,
   each with the target `set_launch_target` takes, so an assistant no longer has to know a Heroic app name.
   `launch_game` starts the bot's launch target without running the bot: on this desktop, or in a private display
