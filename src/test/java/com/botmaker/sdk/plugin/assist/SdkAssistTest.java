@@ -729,7 +729,7 @@ class SdkAssistTest {
     }
 
     /** Studio's own tools the guide names beside the SDK's. */
-    private static final java.util.Set<String> STUDIOS = java.util.Set.of("add_method", "run_activity");
+    private static final java.util.Set<String> STUDIOS = java.util.Set.of("add_method", "run_activity", "set_slot");
 
     @Test
     void theGuideNamesOnlyToolsThereAreAndThePluginGivesIt() {

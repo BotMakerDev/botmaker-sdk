@@ -43,6 +43,15 @@ public final class SdkAssist {
               place, named <idea>_<where>; the same idea on another screen is another picture.
             - Before writing a step, find it: describe looks, click, key and scroll act, and all four answer
               in text. Then write it in the activity's body and run_activity it.
+            - A click can be missed and a screen can be slow (lag, a dropped connection), so a step repeats
+              until the screen shows it worked, never clicks once and trusts it. The home method, for one:
+              until the home screen shows, click whatever blocks it (a group of its close and claim
+              buttons, clickAny) or press Escape. A game that froze is not the body's to handle: the run's
+              watchdog sees the same screen over and over and recovers through the home method.
+            - A step that repeats until the screen changes is one call, not a loop block:
+              ImageClicker.clickAll(group) claims every match, ImageFinder.whileFindAny(group, action) and
+              untilFind(picture, action) repeat their action (a lambda; its parameter by var:<its name>),
+              ImageWaiter.waitAndClick waits for a button. A group is ImageTemplateGroup.of(…, …).
             - A run's choices (which flow, which activity is on) are @Param fields, never run properties.
             """;
 

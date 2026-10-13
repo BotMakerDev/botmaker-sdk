@@ -24,7 +24,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **The SDK tells the assistant how its bot is laid out.** Its guide (`SdkAssist.GUIDE`, given through the
   contract's `assistantGuide`) says a bot is activities and a flow: one activity per chore returning its own
   outcome enum, the order of chores in the flow, navigation in the home method, and pictures named per idea and
-  place. Studio gives it to the assistant at connect.
+  place. Studio gives it to the assistant at connect. It also says a step that repeats is one call
+  (`ImageClicker.clickAll`, `ImageFinder.whileFindAny`, `untilFind`, `ImageWaiter.waitAndClick`), not a loop block.
 
 - **The assistant acts on the game and reads it as text.** `click` (a point or a picture), `key` and `scroll` act
   where the look tools look, wait `settle_ms` (800 by default), and answer in text: the box that changed, the
