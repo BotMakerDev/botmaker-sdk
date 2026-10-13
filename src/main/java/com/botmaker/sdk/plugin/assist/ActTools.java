@@ -142,13 +142,13 @@ final class ActTools {
             }
             Point at = match.rect().center();
             // The frame the picture was found on is the one the change is measured from: the click lands on it.
-            return act(context, frame.get(), click.desktop(), click.settleMs(), click.show(),
+            return act(context, frame.get(), at, click.desktop(), click.settleMs(), click.show(),
                     "Clicked " + base.get() + " at " + at.x() + "," + at.y(), hands -> hands.click(at.x(), at.y()));
         }
         if (click.x() == null || click.y() == null) return AgentReply.refused("Give x and y, or a picture.");
         int x = click.x();
         int y = click.y();
-        return act(context, null, click.desktop(), click.settleMs(), click.show(), "Clicked " + x + "," + y,
+        return act(context, null, new Point(x, y), click.desktop(), click.settleMs(), click.show(), "Clicked " + x + "," + y,
                 hands -> hands.click(x, y));
     }
 
@@ -158,22 +158,23 @@ final class ActTools {
             return AgentReply.refused("\"" + press.key() + "\" is no key; name it as printed on it (Escape, Q, F5, "
                     + "Page Up) or as Key names it (PAGE_UP).");
         }
-        return act(context, null, press.desktop(), press.settleMs(), press.show(), "Pressed " + key.get().label(),
+        return act(context, null, null, press.desktop(), press.settleMs(), press.show(), "Pressed " + key.get().label(),
                 hands -> hands.key(key.get()));
     }
 
     static AgentReply scroll(Wheel wheel, AgentContext context) {
         if (wheel.amount() == 0) return AgentReply.refused("Scroll by at least one notch.");
-        return act(context, null, wheel.desktop(), wheel.settleMs(), wheel.show(),
+        return act(context, null, new Point(wheel.x(), wheel.y()), wheel.desktop(), wheel.settleMs(), wheel.show(),
                 "Scrolled " + wheel.amount() + " at " + wheel.x() + "," + wheel.y(),
                 hands -> hands.scroll(wheel.x(), wheel.y(), wheel.amount()));
     }
 
     /**
      * Does {@code action} with the hands the look tools' screen takes, waits {@code settleMs}, and says what changed
-     * from {@code seen} (a frame already taken, or null to take one now).
+     * from {@code seen} (a frame already taken, or null to take one now). {@code at}, the point acted on, must be
+     * on the frame; null for a key.
      */
-    private static AgentReply act(AgentContext context, BufferedImage seen, Boolean desktop, Integer settleMs,
+    private static AgentReply act(AgentContext context, BufferedImage seen, Point at, Boolean desktop, Integer settleMs,
                                   Boolean show, String done, Action action) {
         int settle = settleMs == null ? SETTLE_MS : settleMs;
         if (settle < 0 || settle > LONGEST_SETTLE_MS) {
@@ -189,6 +190,12 @@ final class ActTools {
         }
         Optional<BufferedImage> before = seen != null ? Optional.of(seen) : Frames.look(context);
         if (before.isEmpty()) return AgentReply.refused(Frames.noScreen());
+        // A point off the frame is off the game: on the desktop it would land on another window.
+        if (at != null && (at.x() < 0 || at.y() < 0 || at.x() >= before.get().getWidth()
+                || at.y() >= before.get().getHeight())) {
+            return AgentReply.refused(at.x() + "," + at.y() + " is outside the " + before.get().getWidth() + "×"
+                    + before.get().getHeight() + " screenshot; nothing was done.");
+        }
         // The frame and the hands each ask where the game is: a display closing or opening between them would act
         // on another surface than the one read, or than the one the desktop check approved.
         if (hands(context).getClass() != hands.getClass()) {

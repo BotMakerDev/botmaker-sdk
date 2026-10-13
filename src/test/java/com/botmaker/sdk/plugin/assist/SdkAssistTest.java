@@ -670,6 +670,10 @@ class SdkAssistTest {
         assertEquals(List.of("keyDown(65307)", "keyUp(65307)"), controller.events);
         assertTrue(run("key", "key", "Hyper", "desktop", true).isRefused());
         assertTrue(run("click", "x", 1, "y", 1, "desktop", true, "settleMs", 9000).isRefused());
+        controller.events.clear();
+        assertTrue(run("click", "x", 400, "y", 10, "desktop", true, "settleMs", 0).isRefused(), "off the frame");
+        assertTrue(run("scroll", "x", -1, "y", 10, "amount", 1, "desktop", true, "settleMs", 0).isRefused());
+        assertTrue(controller.events.isEmpty(), "nothing lands off the game: " + controller.events);
     }
 
     @Test
