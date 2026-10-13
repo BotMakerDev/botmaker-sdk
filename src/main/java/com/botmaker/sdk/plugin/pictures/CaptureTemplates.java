@@ -9,6 +9,7 @@ import com.botmaker.sdk.plugin.pictures.TemplateNaming.NamedCapture;
 import com.botmaker.sdk.plugin.pictures.TemplateNaming.NamedTemplate;
 import com.botmaker.sdk.plugin.screen.CaptureSurface;
 import com.botmaker.sdk.plugin.screen.CaptureSurface.Region;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
 import com.botmaker.sdk.plugin.screen.ObjectCaptureSurface;
 import com.botmaker.sdk.plugin.screen.OverlayStage;
@@ -149,7 +150,7 @@ public final class CaptureTemplates {
      */
     public static void pictureHere(ActionContext context) {
         StudioServices services = context.services();
-        CaptureSource target = context.overWindowTitle().map(CaptureSource::window).orElse(null);
+        CaptureSource target = context.overWindowTitle().flatMap(CaptureValue::windowTitled).orElse(null);
         open(services, Modals.owner(services), target, null, () -> {});
     }
 

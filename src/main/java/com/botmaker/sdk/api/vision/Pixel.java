@@ -41,7 +41,7 @@ import java.util.function.BooleanSupplier;
  *
  * <pre>{@code
  * // Is the health bar still red, in the top-left corner of the game window?
- * CaptureSource hud = CaptureSource.window("MyGame").region(new Rect(10, 10, 200, 30));
+ * CaptureSource hud = CaptureSource.window("mygame.exe", "").region(new Rect(10, 10, 200, 30));
  * if (Pixel.find(Color.RED, hud, Precision.DEFAULT.minArea(400).minCount(2000))) {
  *     Mouse.click(Vision.lastColorMatch().center());
  * }

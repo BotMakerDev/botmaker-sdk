@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 /**
  * Single-frame image lookup: does this template appear right now, and where?
  *
- * <p>Every matcher takes a {@link CaptureSource} — one of a {@link CaptureSource#window(String) window},
+ * <p>Every matcher takes a {@link CaptureSource} — one of a {@link CaptureSource#window(String, String) window},
  * a {@link CaptureSource#monitor(int) monitor}, or the whole {@link CaptureSource#desktop() desktop} — so a
  * search can be pinned to a window or a single screen and still return absolute, clickable coordinates. A
  * search <em>region</em> is expressed as a {@link CaptureSource#region(com.botmaker.sdk.api.geometry.Rect) region of a

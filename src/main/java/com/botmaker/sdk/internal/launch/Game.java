@@ -216,7 +216,7 @@ public class Game {
 
     /**
      * Whether the game's window is currently open. Pass the same {@link CaptureSource} the bot targets —
-     * typically {@code CaptureSource.window("Game Title")} — and this reports whether that window exists
+     * typically {@code CaptureSource.window("game.exe", "")} — and this reports whether that window exists
      * right now. A cheap way to tell if a game is already running before deciding to launch it.
      *
      * @param source the capture source identifying the game (usually a {@code CaptureSource.window(...)})

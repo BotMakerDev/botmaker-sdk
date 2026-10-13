@@ -10,7 +10,8 @@ import com.botmaker.session.DesktopSession;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
-import com.botmaker.shared.capture.WindowMatch;
+import com.botmaker.shared.launch.GameWindows;
+import com.botmaker.shared.launch.WindowIdentity;
 
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
@@ -76,20 +77,12 @@ public class Window implements CaptureSource {
     }
 
     /**
-     * The window {@code titleSubstring} <em>most</em> refers to (case-insensitive), or empty if none
-     * contains it. Ranking is delegated to shared {@link WindowMatch} so the bot runtime and Studio's
-     * pilot pick the same window: an exact/prefix/whole-word hit beats an incidental substring hit (a
-     * wiki tab or launcher entry named after the game), and dynamic title suffixes (score, level,
-     * document name, …) are tolerated — while the shortest, largest matching window wins ties.
+     * The open window {@code game} names — its class, and its exact title when the class is generic — or empty.
+     * BotMaker's own windows never answer ({@link GameWindows#named}).
      */
-    public static Optional<Window> find(String titleSubstring) {
-        if (titleSubstring == null) {
-            return Optional.empty();
-        }
-        GenericWindow gw = WindowMatch.best(controller().getAllWindows(), titleSubstring);
-        Optional<Window> hit = gw == null ? Optional.empty() : Optional.of(new Window(gw));
-        Debug.log("find \"" + titleSubstring + "\" -> "
-                + hit.map(Window::title).orElse("no match"));
+    public static Optional<Window> named(WindowIdentity game) {
+        Optional<Window> hit = GameWindows.named(game, controller().getAllWindows()).map(Window::new);
+        Debug.log("window " + game + " -> " + hit.map(Window::title).orElse("not open"));
         return hit;
     }
 

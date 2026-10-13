@@ -27,6 +27,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   answers once the window the bot looks at is open. With the game in a private display or a VM it refuses: a
   run starts the game there.
 
+### Changed
+
+- **A window is found by its class, never by its title alone.** `CaptureSource.window(windowClass, title)`
+  replaces `window(titleSubstring)`: the class is X11's `WM_CLASS` (a Windows program's file name, a Mac app),
+  and the title is written only when that class is one many programs share — Heroic's Firestone is
+  `window("steam_app_0", "Firestone")`. 🎯 Capture Source writes both from the window picked, shows each
+  window's class, and leaves BotMaker's own windows out; `set_capture_source` writes the open window of exactly
+  that title (no nearest title any more: "Firestone" found Discord's channel), and `list_windows` prints classes. A bot's old `window("Firestone")` now names a class nothing has:
+  pick the window again. Why: on 2026-10-13 Studio's "BotMaker Blocks - Firestone" was taken for the closed game,
+  the launch was skipped and the bot clicked in Studio.
+
 ### Fixed
 
 - **1.4.3 never built.** Its pom pinned botmaker-shared v0.2.4, a tag JitPack never built (Maven Central's 429),

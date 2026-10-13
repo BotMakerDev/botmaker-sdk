@@ -7,6 +7,14 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.CurrentSource;
+import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.shared.capture.GenericWindow;
+import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.launch.WindowIdentity;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * The {@code @SdkValue(SdkValue.Id.CAPTURE)} value — where a bot reads pixels from, written as the one expression
@@ -55,8 +63,33 @@ public final class CaptureValue {
             services.status("Nothing to point at — the overlay is not over a window.");
             return;
         }
-        point(services, CaptureSource.window(title));
+        Optional<CaptureSource> window = windowTitled(title);
+        if (window.isEmpty()) {
+            services.status("\"" + title + "\" has no window class to find it by — pick it in 🎯 Capture Source.");
+            return;
+        }
+        point(services, window.get());
         services.status("Capture source is now \"" + title + "\".");
+    }
+
+    /**
+     * The open window titled {@code title} as a source, by its class and, when that class is generic, its title
+     * ({@link WindowIdentity}); empty when no such window is open, it has no class, or the windows cannot be listed.
+     * Only {@linkplain OpenWindows#pickable pickable} windows, and the exact title ignoring case: a nearest title
+     * would pick "#tools | Firestone Idle RPG - Discord" for "Firestone".
+     */
+    public static Optional<CaptureSource> windowTitled(String title) {
+        if (title == null || title.isBlank()) return Optional.empty();
+        List<GenericWindow> open;
+        try {
+            open = OpenWindows.pickable(NativeControllerFactory.get().getAllWindows());
+        } catch (RuntimeException | LinkageError noWindows) {
+            return Optional.empty();
+        }
+        return open.stream()
+                .filter(w -> w.getTitle().trim().equalsIgnoreCase(title.trim()))
+                .map(WindowIdentity::of).filter(Objects::nonNull)
+                .findFirst().map(NamedWindow::of);
     }
 
     /**

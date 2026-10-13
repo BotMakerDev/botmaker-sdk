@@ -97,7 +97,8 @@ public final class SdkOverlay {
      * {@code source} as a screen Studio can find.
      *
      * <ul>
-     *   <li>A window is found by its title.</li>
+     *   <li>A window is found by its title: the open window's, else the picked one; a closed window picked by its
+     *       class alone is empty.</li>
      *   <li>The private display is the session.</li>
      *   <li>A region keeps the screen it narrows, so the panel docks beside the whole window.</li>
      *   <li>A monitor, the desktop and an emulator are empty, so Studio asks which window to use.</li>
@@ -106,7 +107,11 @@ public final class SdkOverlay {
     static Optional<Watched> of(CaptureSource source) {
         if (source == null) return Optional.empty();
         CaptureSource base = source.base();
-        if (base instanceof NamedWindow named) return Optional.of(Watched.window(named.titleSubstring()));
+        // Open, base() is the live window and its title below; closed, only a picked title can name it to Studio,
+        // which finds a window by title: a class is no title.
+        if (base instanceof NamedWindow named) {
+            return named.title().isBlank() ? Optional.empty() : Optional.of(Watched.window(named.title()));
+        }
         if (base instanceof Window window && window.title() != null && !window.title().isBlank()) {
             return Optional.of(Watched.window(window.title()));
         }

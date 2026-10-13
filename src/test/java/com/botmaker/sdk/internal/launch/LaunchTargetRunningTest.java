@@ -42,8 +42,8 @@ class LaunchTargetRunningTest {
 
     @Test
     void skipsLaunchWhenTheTargetWindowIsAlreadyOpen() {
-        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Firestone Online Idle RPG"))));
-        Source.set(CaptureSource.window("Firestone"));
+        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Firestone", "steam_app_0"))));
+        Source.set(CaptureSource.window("steam_app_0", "Firestone"));
 
         // Steam/Epic/Heroic take the shared default; a hit here means start() (a real launch) is never reached.
         assertTrue(trace(() -> LaunchTarget.parse("heroic:43d4ef20").startIfNotRunning()).contains(SKIP));
@@ -52,8 +52,19 @@ class LaunchTargetRunningTest {
 
     @Test
     void launchesWhenTheTargetWindowIsAbsent() {
-        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Some Other App"))));
-        Source.set(CaptureSource.window("Firestone"));
+        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Some Other App", "other"))));
+        Source.set(CaptureSource.window("steam_app_0", "Firestone"));
+
+        assertFalse(trace(() -> LaunchTarget.parse("cli:" + BOGUS).startIfNotRunning()).contains(SKIP));
+    }
+
+    /** 2026-10-13: Studio's own window, titled after a closed game, made the bot skip the launch and click in it. */
+    @Test
+    void studioTitledAfterTheGameIsNotTheGame() {
+        NativeControllerFactory.setForTesting(new FakeController(List.of(
+                window("BotMaker Blocks - Firestone", "com.botmaker.studio.BotMakerStudio"),
+                window("#tools | Firestone Idle RPG - Discord", "discord"))));
+        Source.set(CaptureSource.window("steam_app_0", "Firestone"));
 
         assertFalse(trace(() -> LaunchTarget.parse("cli:" + BOGUS).startIfNotRunning()).contains(SKIP));
     }
@@ -61,12 +72,12 @@ class LaunchTargetRunningTest {
     @Test
     void aSourceWithNoWindowIdentityNeverReportsRunning() {
         // The desktop is always "present", so trusting isPresent() here would skip the launch forever.
-        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Firestone"))));
+        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Firestone", "steam_app_0"))));
         Source.set(CaptureSource.desktop());
 
         assertFalse(trace(() -> LaunchTarget.parse("cli:" + BOGUS).startIfNotRunning()).contains(SKIP));
         assertFalse(CaptureSource.desktop().hasWindowIdentity());
-        assertTrue(CaptureSource.window("Firestone").hasWindowIdentity());
+        assertTrue(CaptureSource.window("steam_app_0", "Firestone").hasWindowIdentity());
     }
 
     @Test
@@ -97,8 +108,8 @@ class LaunchTargetRunningTest {
         return captured.toString();
     }
 
-    private static GenericWindow window(String title) {
-        return new GenericWindow(new Object(), title, new Rectangle(0, 0, 100, 100));
+    private static GenericWindow window(String title, String windowClass) {
+        return new GenericWindow(new Object(), title, new Rectangle(0, 0, 100, 100), GenericWindow.NO_PID, windowClass);
     }
 
     /** Minimal {@link NativeController} that only answers {@code getAllWindows}; everything else is a no-op. */

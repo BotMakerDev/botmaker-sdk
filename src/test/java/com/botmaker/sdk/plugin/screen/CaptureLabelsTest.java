@@ -18,13 +18,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class CaptureLabelsTest {
 
-    private static final CaptureSource GAME = CaptureSource.window("Game");
+    private static final CaptureSource GAME = CaptureSource.window("steam_app_0", "Game");
 
     @Test
     void aRegionOfAWindowReadsThatWindow() {
         CaptureSource narrowed = GAME.region(new Rect(10, 20, 300, 40));
         assertSame(GAME, CaptureLabels.whole(narrowed));
-        assertEquals("Game", CaptureLabels.windowTitle(narrowed));
+        assertSame(GAME, CaptureLabels.window(narrowed));
         assertFalse(CaptureLabels.isDesktop(narrowed));
     }
 
@@ -45,14 +45,15 @@ class CaptureLabelsTest {
     void theLabelsSayARegionIsOne() {
         CaptureSource narrowed = GAME.region(new Rect(10, 20, 300, 40));
         assertEquals("Game (region)", CaptureLabels.shortLabel(narrowed));
-        assertEquals("Window: Game — region 300×40 at (10, 20)", CaptureLabels.longLabel(narrowed));
+        assertEquals("Window: Game (steam_app_0) — region 300×40 at (10, 20)", CaptureLabels.longLabel(narrowed));
+        assertEquals("Window: game.exe", CaptureLabels.longLabel(CaptureSource.window("game.exe", "")));
         assertEquals("Project default", CaptureLabels.shortLabel(new CurrentSource()));
         assertEquals("Whole desktop", CaptureLabels.shortLabel(null));
     }
 
     @Test
     void twoRegionsAreTheSameOnlyWithTheSameRectangle() {
-        assertTrue(CaptureLabels.same(GAME.region(new Rect(1, 2, 3, 4)), CaptureSource.window("Game")
+        assertTrue(CaptureLabels.same(GAME.region(new Rect(1, 2, 3, 4)), CaptureSource.window("steam_app_0", "Game")
                 .region(new Rect(1, 2, 3, 4))));
         assertFalse(CaptureLabels.same(GAME.region(new Rect(1, 2, 3, 4)), GAME.region(new Rect(1, 2, 3, 5))));
         assertFalse(CaptureLabels.same(GAME.region(new Rect(1, 2, 3, 4)), GAME));

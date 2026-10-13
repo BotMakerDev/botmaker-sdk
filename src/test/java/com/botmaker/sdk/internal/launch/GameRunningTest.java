@@ -26,41 +26,43 @@ class GameRunningTest {
         NativeControllerFactory.setForTesting(null);
     }
 
-    private static GenericWindow window(String title) {
-        return new GenericWindow(new Object(), title, new Rectangle(0, 0, 100, 100));
+    private static GenericWindow window(String title, String windowClass) {
+        return new GenericWindow(new Object(), title, new Rectangle(0, 0, 100, 100), GenericWindow.NO_PID, windowClass);
     }
 
     @Test
-    void isRunningMatchesTitleSubstringCaseInsensitively() {
-        NativeControllerFactory.setForTesting(new FakeController(List.of(window("My Cool Game — Level 1"))));
-        assertTrue(Game.isRunning(CaptureSource.window("cool game")));
-        assertTrue(Game.isRunning(CaptureSource.window("Level 1")));
-        assertFalse(Game.isRunning(CaptureSource.window("Some Other App")));
+    void isRunningMatchesTheClassAndTheTitleOnlyWhenGiven() {
+        NativeControllerFactory.setForTesting(new FakeController(List.of(window("My Cool Game — Level 1", "coolgame.exe"),
+                window("Firestone", "steam_app_0"))));
+        assertTrue(Game.isRunning(CaptureSource.window("CoolGame.exe", "")));
+        assertTrue(Game.isRunning(CaptureSource.window("steam_app_0", "firestone")));
+        assertFalse(Game.isRunning(CaptureSource.window("steam_app_0", "Hades")));
+        assertFalse(Game.isRunning(CaptureSource.window("My Cool Game — Level 1", "")), "a title is not a class");
     }
 
     @Test
     void isRunningFalseWhenNoWindows() {
         NativeControllerFactory.setForTesting(new FakeController(List.of()));
-        assertFalse(Game.isRunning(CaptureSource.window("anything")));
+        assertFalse(Game.isRunning(CaptureSource.window("anything.exe", "")));
     }
 
     @Test
     void waitForLaunchReturnsFalseOnTimeoutWhenAbsent() {
-        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Unrelated"))));
-        assertFalse(Game.waitForLaunch(CaptureSource.window("MissingGame"), 200));
+        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Unrelated", "unrelated"))));
+        assertFalse(Game.waitForLaunch(CaptureSource.window("missinggame.exe", ""), 200));
     }
 
     @Test
     void waitForLaunchReturnsTrueImmediatelyWhenPresent() {
-        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Present Game"))));
-        assertTrue(Game.waitForLaunch(CaptureSource.window("Present Game"), 200));
+        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Present Game", "present.exe"))));
+        assertTrue(Game.waitForLaunch(CaptureSource.window("present.exe", ""), 200));
     }
 
     @Test
     void launchIfNotRunningSkipsWhenAlreadyRunning() {
-        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Already Here"))));
+        NativeControllerFactory.setForTesting(new FakeController(List.of(window("Already Here", "here.exe"))));
         // Returns false (not launched) without ever touching the executable path, so a bogus path is fine.
-        assertFalse(Game.launchIfNotRunning("/nonexistent/should-not-run", CaptureSource.window("Already Here")));
+        assertFalse(Game.launchIfNotRunning("/nonexistent/should-not-run", CaptureSource.window("here.exe", "")));
     }
 
     /** Minimal {@link NativeController} that only answers {@code getAllWindows}; everything else is a no-op. */

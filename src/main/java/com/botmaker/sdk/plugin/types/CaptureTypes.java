@@ -46,9 +46,9 @@ public final class CaptureTypes {
     public static final DeclaredCall<Monitor> MONITOR = ComponentType.part(Monitor.class)
             .writtenAs(CaptureSource::monitor, Monitor::index);
 
-    /** {@code CaptureSource.window("title")}. */
+    /** {@code CaptureSource.window("class", "title")}. */
     public static final DeclaredCall<NamedWindow> WINDOW = ComponentType.part(NamedWindow.class)
-            .writtenAs(CaptureSource::window, NamedWindow::titleSubstring);
+            .writtenAs(CaptureSource::window, NamedWindow::windowClass, NamedWindow::title);
 
     /**
      * {@code CaptureSource.emulator("name")}: the class behind it is {@code internal}, and a bot writes the

@@ -13,8 +13,8 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.launch.GameCatalog;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.screen.OpenWindows;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
-import com.botmaker.session.display.GamescopeHost;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.emulator.EmulatorInstance;
@@ -115,7 +115,7 @@ final class SetupTools {
         }
     }
 
-    record WindowTitle(@Describe("part of the window's title, as it appears in the taskbar") String window) {
+    record WindowTitle(@Describe("the window's title, as list_windows gives it") String window) {
     }
 
     record SetSetting(@Describe("which setting; get_settings lists them") Setting setting,
@@ -144,10 +144,12 @@ final class SetupTools {
                     .describedAs("Where the bot looks and clicks: Sdk.captureSource(), in words")
                     .takesNothing().handledBy(SetupTools::getCaptureSource),
             AssistantTool.named("set_capture_source")
-                    .describedAs("Points the bot at a window, so it looks at and clicks in that window")
+                    .describedAs("Points the bot at an open window, so it looks at and clicks in that window; the bot "
+                            + "finds it again by its class (and its title when the class is shared), never by title alone")
                     .takes(WindowTitle.class).handledBy(SetupTools::setCaptureSource),
             AssistantTool.named("list_windows")
-                    .describedAs("The windows open on the desktop now, each with its size, for set_capture_source")
+                    .describedAs("The windows open on the desktop now, each with its class and size, for "
+                            + "set_capture_source")
                     .takesNothing().handledBy(SetupTools::listWindows),
             AssistantTool.named("get_settings")
                     .describedAs("The bot's own settings, Sdk.settings(): its pauses, match confidence, input and "
@@ -190,9 +192,13 @@ final class SetupTools {
 
     static AgentReply setCaptureSource(WindowTitle title, AgentContext context) {
         if (title.window() == null || title.window().isBlank()) return AgentReply.refused("Name a window.");
-        String refused = FxCall.call(() -> CaptureValue.CAPTURE.write(context.services(),
-                CaptureSource.window(title.window().trim())).orElse(null));
-        return refused == null ? AgentReply.text("The bot now looks at the window \"" + title.window().trim() + "\".")
+        Optional<CaptureSource> window = CaptureValue.windowTitled(title.window());
+        if (window.isEmpty()) {
+            return AgentReply.refused("No open window \"" + title.window().trim() + "\" has a window class to find it "
+                    + "by: list_windows lists the ones that do.");
+        }
+        String refused = FxCall.call(() -> CaptureValue.CAPTURE.write(context.services(), window.get()).orElse(null));
+        return refused == null ? AgentReply.text("The bot now looks at " + CaptureLabels.longLabel(window.get()) + ".")
                 : AgentReply.refused(refused);
     }
 
@@ -203,14 +209,16 @@ final class SetupTools {
         } catch (RuntimeException | LinkageError e) {
             return AgentReply.refused("The open windows cannot be listed here: " + e.getMessage());
         }
-        // One line per title: window(title) matches the first window of that title, so a second is the same choice.
+        // One line per title, with the class the bot would find it by; BotMaker's own windows are never the game.
         Set<String> seen = new LinkedHashSet<>();
         List<String> lines = new ArrayList<>();
-        for (GenericWindow window : found) {
+        for (GenericWindow window : OpenWindows.pickable(found)) {
             String title = window.getTitle();
-            if (title == null || title.isBlank() || GamescopeHost.isHost(window) || !seen.add(title)) continue;
+            if (!seen.add(title)) continue;
             Rectangle r = window.getRect();
-            lines.add("\"" + title + "\"" + (r == null ? "" : " " + r.width + "×" + r.height + " at " + r.x + "," + r.y));
+            lines.add("\"" + title + "\" class " + (window.getWindowClass() == null ? "unknown (cannot be picked)"
+                    : window.getWindowClass()) + (r == null ? "" : ", " + r.width + "×" + r.height + " at " + r.x
+                    + "," + r.y));
         }
         return AgentReply.text(lines.isEmpty() ? "No named window is open." : String.join("\n", lines));
     }

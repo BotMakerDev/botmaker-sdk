@@ -19,7 +19,8 @@ public class RecordingNativeController implements NativeController {
     /** Targeted (window-routed) key events, kept separate so window-resolution noise doesn't pollute asserts. */
     public final List<String> windowInput = new ArrayList<>();
     public GenericWindow window =
-            new GenericWindow("h", "Test Game Window", new Rectangle(100, 50, 800, 600));
+            new GenericWindow("h", "Test Game Window", new Rectangle(100, 50, 800, 600), GenericWindow.NO_PID,
+                    "testgame.exe");
 
     @Override public GenericWindow getForegroundWindow() { events.add("getForegroundWindow"); return window; }
     @Override public List<GenericWindow> getChildWindows(GenericWindow parent) { return List.of(); }

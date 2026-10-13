@@ -32,6 +32,7 @@ import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -539,17 +540,28 @@ class SdkAssistTest {
 
     @Test
     void theCaptureSourceIsReadAndPointedAtAWindow() {
-        host.values.put("capture", TestContexts.row(CaptureSource.class, "").withValue(CaptureSource.window("Game")));
-        assertEquals("Window: Game.", text(run("get_capture_source")));
-        assertEquals("The bot now looks at the window \"Other\".", text(run("set_capture_source", "window", "Other")));
-        assertEquals("Window: Other", com.botmaker.sdk.plugin.screen.CaptureLabels.longLabel(
-                (CaptureSource) host.values.get("capture").value()));
+        host.values.put("capture", TestContexts.row(CaptureSource.class, "")
+                .withValue(CaptureSource.window("game.exe", "")));
+        assertEquals("Window: game.exe.", text(run("get_capture_source")));
+        RecordingNativeController open = new RecordingNativeController();
+        open.window = new GenericWindow("h", "Other", new java.awt.Rectangle(0, 0, 800, 600), GenericWindow.NO_PID,
+                "steam_app_0");
+        NativeControllerFactory.setForTesting(open);
+        try {
+            assertEquals("The bot now looks at Window: Other (steam_app_0).",
+                    text(run("set_capture_source", "window", "Other")));
+            assertEquals("Window: Other (steam_app_0)", com.botmaker.sdk.plugin.screen.CaptureLabels.longLabel(
+                    (CaptureSource) host.values.get("capture").value()));
+            assertTrue(text(run("set_capture_source", "window", "Missing")).contains("list_windows"));
+        } finally {
+            NativeControllerFactory.setForTesting(null);
+        }
     }
 
     @Test
     void theOpenWindowsAreListedOncePerTitle() {
         NativeControllerFactory.setForTesting(new RecordingNativeController());
-        assertEquals("\"Test Game Window\" 800×600 at 100,50", text(run("list_windows")));
+        assertEquals("\"Test Game Window\" class testgame.exe, 800×600 at 100,50", text(run("list_windows")));
     }
 
     @Test

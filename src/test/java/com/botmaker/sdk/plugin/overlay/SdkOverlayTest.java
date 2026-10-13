@@ -21,10 +21,12 @@ class SdkOverlayTest {
 
     @Test
     void theWatchedScreenIsTheCaptureSourcesWindow() {
-        assertEquals(Optional.of(Watched.window("Game")), SdkOverlay.of(CaptureSource.window("Game")));
+        assertEquals(Optional.of(Watched.window("Game")), SdkOverlay.of(CaptureSource.window("steam_app_0", "Game")));
         assertEquals(Optional.of(Watched.window("Game")),
-                SdkOverlay.of(CaptureSource.window("Game").region(new Rect(10, 10, 100, 50))),
+                SdkOverlay.of(CaptureSource.window("steam_app_0", "Game").region(new Rect(10, 10, 100, 50))),
                 "a region docks beside the window it narrows");
+        assertEquals(Optional.empty(), SdkOverlay.of(CaptureSource.window("nogame.exe", "")),
+                "a closed window picked by its class names no title Studio could find");
         assertEquals(Optional.empty(), SdkOverlay.of(CaptureSource.desktop()), "Studio asks instead");
         assertEquals(Optional.empty(), SdkOverlay.of(null));
     }

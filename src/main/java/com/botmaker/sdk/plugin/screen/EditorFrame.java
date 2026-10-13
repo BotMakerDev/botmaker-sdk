@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.screen;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -198,7 +199,7 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
         try {
             String label = CaptureLabels.shortLabel(source);
             if (CaptureLabels.emulatorName(source) != null) return emulatorFrame(source, label);
-            if (CaptureLabels.windowTitle(source) != null) return windowFrame(source, label, raise);
+            if (CaptureLabels.window(source) != null) return windowFrame(source, label, raise);
             boolean monitor = !CaptureLabels.isDesktop(source);
             int index = CaptureLabels.monitorIndex(source);
             Rectangle bounds = monitor
@@ -243,8 +244,8 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
      * source produced a blank frame" while the window is plainly on screen.
      */
     private static EditorFrame windowFrame(CaptureSource source, String label, boolean raise) {
-        String title = CaptureLabels.windowTitle(source);
-        GenericWindow window = findWindow(title);
+        NamedWindow named = CaptureLabels.window(source);
+        GenericWindow window = findWindow(named);
         if (window == null) return null;
         NativeController controller = NativeControllerFactory.get();
         if (raise) {
@@ -254,7 +255,7 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
             } catch (Throwable notRaised) {
                 System.err.println("Could not focus window: " + notRaised.getMessage());
             }
-            GenericWindow refreshed = findWindow(title);
+            GenericWindow refreshed = findWindow(named);
             if (refreshed != null) window = refreshed;
         }
         Rectangle bounds = window.getRect();
@@ -315,14 +316,9 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
         return image != null && image.getWidth() > 0 && image.getHeight() > 0 && !looksBlank(image);
     }
 
-    /** The first window whose title contains {@code titleSubstring}, case-insensitively, or {@code null}. */
-    static GenericWindow findWindow(String titleSubstring) {
-        String needle = titleSubstring.toLowerCase();
-        for (GenericWindow window : NativeControllerFactory.get().getAllWindows(true)) {
-            String title = window.getTitle();
-            if (title != null && title.toLowerCase().contains(needle)) return window;
-        }
-        return null;
+    /** The open window {@code named} names, by its class (and title when the class is generic), or {@code null}. */
+    static GenericWindow findWindow(NamedWindow named) {
+        return named.find(NativeControllerFactory.get().getAllWindows(true)).orElse(null);
     }
 
     /**

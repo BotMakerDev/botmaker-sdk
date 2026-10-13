@@ -105,7 +105,7 @@ class InputApiTest {
     @Test
     void targetedTapRoutesToTheResolvedWindow() {
         // CaptureSource.window(...) resolves to the recording controller's single window ("Test Game Window").
-        Keyboard.tap(CaptureSource.window("Test"), Key.ENTER);
+        Keyboard.tap(CaptureSource.window("testgame.exe", ""), Key.ENTER);
         assertEquals(List.of(
                 "keyDown(Test Game Window," + Key.ENTER.nativeCode() + ")",
                 "keyUp(Test Game Window," + Key.ENTER.nativeCode() + ")"
@@ -114,7 +114,7 @@ class InputApiTest {
 
     @Test
     void targetedComboHoldsThenReleasesInReverseOnTheWindow() {
-        Keyboard.combo(CaptureSource.window("Test"), Key.CTRL, Key.C);
+        Keyboard.combo(CaptureSource.window("testgame.exe", ""), Key.CTRL, Key.C);
         assertEquals(List.of(
                 "keyDown(Test Game Window," + Key.CTRL.nativeCode() + ")",
                 "keyDown(Test Game Window," + Key.C.nativeCode() + ")",
@@ -125,7 +125,7 @@ class InputApiTest {
 
     @Test
     void targetedTypeRoutesToTheWindow() {
-        Keyboard.type(CaptureSource.window("Test"), "Hi");
+        Keyboard.type(CaptureSource.window("testgame.exe", ""), "Hi");
         assertEquals(List.of("typeText(Test Game Window,Hi)"), fake.windowInput);
     }
 

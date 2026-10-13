@@ -54,7 +54,9 @@ public final class CaptureLabels {
         if (whole instanceof CurrentSource) label = "Project default";
         else if (whole instanceof Monitor monitor) label = "Screen " + (monitor.index() + 1);
         else if (whole instanceof NamedWindow window) {
-            label = "Window: " + (blank(window.titleSubstring()) ? "(any)" : window.titleSubstring());
+            label = "Window: " + (blank(window.label()) ? "(none picked)" : window.label())
+                    + (blank(window.windowClass()) || window.label().equals(window.windowClass()) ? ""
+                    : " (" + window.windowClass() + ")");
         } else if (whole instanceof EmulatorSource emulator) {
             label = EmulatorInstances.captionFor(emulator.instanceName());
         } else label = "Whole desktop (all monitors)";
@@ -76,7 +78,7 @@ public final class CaptureLabels {
         if (whole instanceof CurrentSource) label = "Project default";
         else if (whole instanceof Monitor monitor) label = "Screen " + (monitor.index() + 1);
         else if (whole instanceof NamedWindow window) {
-            label = blank(window.titleSubstring()) ? "Window" : window.titleSubstring();
+            label = blank(window.label()) ? "Window" : window.label();
         } else if (whole instanceof EmulatorSource emulator) {
             label = blank(emulator.instanceName()) ? "Emulator" : emulator.instanceName();
         } else label = "Whole desktop";
@@ -91,8 +93,10 @@ public final class CaptureLabels {
     public static boolean same(CaptureSource a, CaptureSource b) {
         if (a == null || b == null) return false;
         CaptureSource wa = whole(a), wb = whole(b);
-        return wa.getClass() == wb.getClass() && shortLabel(wa).equals(shortLabel(wb))
-                && Objects.equals(region(a), region(b));
+        boolean sameWhole = wa instanceof NamedWindow na && wb instanceof NamedWindow nb
+                ? na.identity().isPresent() && na.identity().get().sameAs(nb.identity().orElse(null))
+                : wa.getClass() == wb.getClass() && shortLabel(wa).equals(shortLabel(wb));
+        return sameWhole && Objects.equals(region(a), region(b));
     }
 
     /**
@@ -132,9 +136,9 @@ public final class CaptureLabels {
         return whole(source) instanceof Monitor monitor ? Math.max(0, monitor.index()) : 0;
     }
 
-    /** The window title substring {@code source} matches on, or {@code null} when it reads no window. */
-    public static String windowTitle(CaptureSource source) {
-        return whole(source) instanceof NamedWindow window ? window.titleSubstring() : null;
+    /** The window {@code source} reads, or {@code null} when it reads no window. */
+    public static NamedWindow window(CaptureSource source) {
+        return whole(source) instanceof NamedWindow window ? window : null;
     }
 
     /** The emulator instance {@code source} reads, or {@code null} when it reads no emulator. */

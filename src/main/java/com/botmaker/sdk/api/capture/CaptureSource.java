@@ -15,7 +15,7 @@ import com.botmaker.sdk.api.input.Mouse;
 import java.awt.image.BufferedImage;
 
 /**
- * <em>Where</em> the vision layer looks — exactly one of three things: a {@link #window(String) window}, a single
+ * <em>Where</em> the vision layer looks — exactly one of three things: a {@link #window(String, String) window}, a single
  * {@link #monitor(int) monitor}, or the whole {@link #desktop() desktop}. Every matcher
  * ({@code ImageFinder}/{@code ImageClicker}/{@code ImageWaiter}) takes a {@code CaptureSource} instead of a
  * loose screen rectangle, so a template is matched — and clicked — in the source's own coordinate space
@@ -26,7 +26,7 @@ import java.awt.image.BufferedImage;
  * <p>A search <em>region</em> is not a separate concept — it is a {@link Rect} <em>of</em> a source: narrow
  * any of the three with {@link #region(Rect)} to get a sub-source that only captures (and therefore only
  * matches within) that rectangle. Regions compose, so
- * {@code CaptureSource.window("Game").region(topBar)} is itself just another {@code CaptureSource}.
+ * {@code CaptureSource.window("game.exe", "").region(topBar)} is itself just another {@code CaptureSource}.
  *
  * <p><b>Curated for the palette</b> (see {@code @Palette}): eight of fourteen. What is offered is the whole of
  * how a bot <em>builds</em> a source — the four factories and the three {@link #region(Rect) region} narrowings
@@ -61,7 +61,7 @@ public interface CaptureSource {
     /**
      * Whether this source currently exists / can be captured. The whole {@link #desktop()} and a
      * {@link #monitor(int) monitor} are always present, so this defaults to {@code true}; a window
-     * source ({@link #window(String)}) overrides it to report whether a matching window is open right
+     * source ({@link #window(String, String)}) overrides it to report whether a matching window is open right
      * now. Used by the launch stack to tell if a game is already running.
      */
     default boolean isPresent() {
@@ -72,7 +72,7 @@ public interface CaptureSource {
      * Whether {@link #isPresent()} actually means something for this source. The whole {@link #desktop()}
      * and a {@link #monitor(int) monitor} always answer {@code true} to {@code isPresent()} because they
      * always exist — so a caller asking "is the target already up?" would get a permanent, meaningless
-     * "yes". Only a source tied to a specific application window ({@link #window(String)}) reports a real
+     * "yes". Only a source tied to a specific application window ({@link #window(String, String)}) reports a real
      * presence, and only those override this to {@code true}.
      *
      * <p>Used by the launch stack's {@code LaunchTarget.startIfNotRunning()} to decide whether the
@@ -112,14 +112,19 @@ public interface CaptureSource {
     }
 
     /**
-     * A capture source that targets the first window whose title contains {@code titleSubstring}
-     * (case-insensitive). The window is resolved <em>lazily on every use</em>, so the source survives
-     * the window not existing yet (e.g. before the game launches) and re-binds if the window moves or
-     * reopens: {@link #capture()} returns {@code null} while it is absent, and {@link #isPresent()}
-     * reports whether it is currently open.
+     * The window of class {@code windowClass} — X11's {@code WM_CLASS}, a Windows program's file name, a Mac app's
+     * name — and, when {@code title} is not blank, of exactly that title (case-insensitive). The class is the same
+     * on every computer whatever the game shows; the title is written only when the class is one many programs
+     * share ({@code steam_app_0}, every Proton game without a Steam id). Pick the window in 🎯 Capture Source, which
+     * writes both.
+     *
+     * <p>Never a window by its title alone (2026-10-13): Studio's own "BotMaker Blocks - Firestone" was taken for
+     * the game. The window is resolved <em>lazily on every use</em>, so the source survives the window not existing
+     * yet (e.g. before the game launches) and re-binds if the window moves or reopens: {@link #capture()} returns
+     * {@code null} while it is absent, and {@link #isPresent()} reports whether it is currently open.
      */
-    static CaptureSource window(String titleSubstring) {
-        return new NamedWindow(titleSubstring);
+    static CaptureSource window(String windowClass, String title) {
+        return new NamedWindow(windowClass, title);
     }
 
     /**

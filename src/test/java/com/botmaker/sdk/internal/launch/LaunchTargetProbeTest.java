@@ -8,6 +8,7 @@ import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
 import com.botmaker.shared.launch.RunningProbe;
+import com.botmaker.shared.launch.WindowIdentity;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -46,7 +47,7 @@ class LaunchTargetProbeTest {
 
         assertFalse(LaunchTarget.parse("heroic:" + game).isRunning(),
                 "a title alone proves nothing (2026-10-13): Studio's own window is named after the game too");
-        assertTrue(Launcher.isRunning(LaunchSpec.parse("heroic:" + game), "probegame.exe"),
+        assertTrue(Launcher.isRunning(LaunchSpec.parse("heroic:" + game), WindowIdentity.parse("probegame.exe")),
                 "a window of the bot's class is the game's, with no window source");
         assertFalse(LaunchTarget.parse("heroic:SomethingElseEntirely").isRunning());
     }

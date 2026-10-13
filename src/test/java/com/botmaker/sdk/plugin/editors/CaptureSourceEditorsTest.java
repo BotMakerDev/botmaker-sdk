@@ -27,13 +27,13 @@ class CaptureSourceEditorsTest {
 
     @Test
     void aWholeSourceIsWrittenAsItself() {
-        CaptureSource window = CaptureSource.window("Game");
+        CaptureSource window = CaptureSource.window("steam_app_0", "Game");
         assertSame(window, CaptureSourceEditors.valueOf(new SourcePicker.Selection.Concrete(window)));
     }
 
     @Test
     void aRegionSourceIsTheParentPlusItsRectangle() {
-        CaptureSource window = CaptureSource.window("Game");
+        CaptureSource window = CaptureSource.window("steam_app_0", "Game");
         CaptureSource value = CaptureSourceEditors.valueOf(
                 new SourcePicker.Selection.Concrete(window, new Rectangle(10, 20, 300, 40)));
         RegionSource region = assertInstanceOf(RegionSource.class, value);
@@ -49,14 +49,17 @@ class CaptureSourceEditorsTest {
     @Test
     void aRegionIsLabelledByWhatItNarrows() {
         assertEquals("Game (region)",
-                CaptureSourceEditors.label(CaptureSource.window("Game").region(new Rect(0, 0, 5, 5))));
+                CaptureSourceEditors.label(CaptureSource.window("steam_app_0", "Game").region(new Rect(0, 0, 5, 5))));
         assertEquals("Screen 2", CaptureSourceEditors.label(CaptureSource.monitor(1)));
     }
 
     @Test
     void twoSourcesAreTheSameWhenTheyNameTheSameThing() {
-        assertTrue(CaptureLabels.same(CaptureSource.window("Game"), CaptureSource.window("Game")));
-        assertFalse(CaptureLabels.same(CaptureSource.window("Game"), CaptureSource.window("Other")));
+        assertTrue(CaptureLabels.same(CaptureSource.window("steam_app_0", "Game"), CaptureSource.window("steam_app_0", "Game")));
+        assertFalse(CaptureLabels.same(CaptureSource.window("steam_app_0", "Game"),
+                CaptureSource.window("steam_app_0", "Other")));
+        assertFalse(CaptureLabels.same(CaptureSource.window("steam_app_0", "Game"), CaptureSource.window("Game", "")),
+                "a class named like the other's title is another window");
         assertFalse(CaptureLabels.same(CaptureSource.monitor(0), CaptureSource.desktop()));
         assertFalse(CaptureLabels.same(null, CaptureSource.desktop()));
     }

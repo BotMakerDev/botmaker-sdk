@@ -77,7 +77,7 @@ class SessionRoutingTest {
     @Test
     void aPinnedWindowOrDesktopIsFoundInTheSession() {
         BotSession.set(session);
-        CaptureSource game = CaptureSource.window("game window");
+        CaptureSource game = CaptureSource.window("testgame.exe", "");
         Source.set(game);
         assertTrue(game.isPresent(), "found among the session's windows (a game VM's guest windows)");
         assertNotNull(game.capture());

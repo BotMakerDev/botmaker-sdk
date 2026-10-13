@@ -10,6 +10,7 @@ import com.botmaker.session.PreviewFrame;
 import com.botmaker.session.remote.WindowIds;
 import com.botmaker.shared.emulator.EmulatorSurface;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.session.launch.BackgroundLauncher;
 
@@ -136,13 +137,13 @@ public final class TargetCapture {
     private Capture captureDesktop(TelemetryEvent.Target lastTarget) {
         TelemetryEvent.Target t = lastTarget;
         if (t != null && t.title() != null && t.width() > 0 && t.height() > 0) {
-            Capture c = captureWindowTarget(t.title());
+            Capture c = captureWindowTarget(resolveWindow(t.title()));
             if (c != null) return c;
         }
         CaptureSource def = safeDefault();
-        String windowTitle = CaptureLabels.windowTitle(def);
-        if (windowTitle != null) {
-            Capture c = captureWindowTarget(windowTitle);
+        NamedWindow window = CaptureLabels.window(def);
+        if (window != null) {
+            Capture c = captureWindowTarget(named(window));
             if (c != null) return c;
         } else if (def instanceof com.botmaker.sdk.internal.capture.Monitor) {
             return captureBounds(screenBounds(CaptureLabels.monitorIndex(def)));
@@ -242,7 +243,7 @@ public final class TargetCapture {
     }
 
     /**
-     * A window on the real {@code :0}, matched by title — <b>unless it is the live session's own container</b>.
+     * A window on the real {@code :0} — <b>unless it is the live session's own container</b>.
      *
      * <p>gamescope renames its output window after the app it hosts, so with a game running on {@code :N} the
      * best {@code :0} match for "Firestone" is gamescope itself. Streaming that looks right and is a trap: the
@@ -252,10 +253,9 @@ public final class TargetCapture {
      * ({@link PilotRoutes}); refusing the window here makes the bad path unreachable rather than merely
      * outranked.
      */
-    private Capture captureWindowTarget(String title) {
+    private Capture captureWindowTarget(GenericWindow win) {
+        if (win == null) return null;
         try {
-            GenericWindow win = resolveWindow(title);
-            if (win == null) return null;
             long host = safeHostWindow();
             if (host != 0 && WindowIds.of(win) == host) return null;
             BufferedImage img = NativeControllerFactory.get().captureWindow(win); // no focus — non-intrusive
@@ -334,6 +334,15 @@ public final class TargetCapture {
             int primary = List.of(env.getScreenDevices()).indexOf(env.getDefaultScreenDevice());
             // -1 when the screens changed between the two reads: no frame this tick, not the whole desktop.
             return primary < 0 ? null : ScreenCapture.monitorBounds(primary);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /** The open window {@code window} names, by its class (and title when the class is generic), or null. */
+    private static GenericWindow named(NamedWindow window) {
+        try {
+            return window.find(NativeControllerFactory.get().getAllWindows()).orElse(null);
         } catch (Throwable ignored) {
             return null;
         }

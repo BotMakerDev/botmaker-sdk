@@ -34,13 +34,14 @@ class CaptureTypesTest {
         assertEquals(List.of(), again(CaptureTypes.CURRENT, new CurrentSource()));
         assertEquals(List.of(), again(CaptureTypes.DESKTOP, CaptureSource.desktop()));
         assertEquals(List.of(2), again(CaptureTypes.MONITOR, CaptureSource.monitor(2)));
-        assertEquals(List.of("Game"), again(CaptureTypes.WINDOW, CaptureSource.window("Game")));
+        assertEquals(List.of("steam_app_0", "Game"),
+                again(CaptureTypes.WINDOW, CaptureSource.window("steam_app_0", "Game")));
         assertEquals(List.of("Pixel_7"), again(CaptureTypes.EMULATOR, new EmulatorSource("Pixel_7")));
     }
 
     @Test
     void aRegionIsItsSourceAndItsRectangle() {
-        RegionSource region = (RegionSource) CaptureSource.region(CaptureSource.window("Game"),
+        RegionSource region = (RegionSource) CaptureSource.region(CaptureSource.window("game.exe", ""),
                 new Rect(1, 2, 30, 40));
 
         List<Object> parts = CaptureTypes.REGION.components(region);
@@ -65,7 +66,7 @@ class CaptureTypesTest {
     /** {@code window("Game").region(r)} builds what the chained call does; it is read and never written. */
     @Test
     void theChainedRegionBuildsWhatTheChainDoes() throws NoSuchMethodException {
-        CaptureSource window = CaptureSource.window("Game");
+        CaptureSource window = CaptureSource.window("game.exe", "");
         Rect sub = new Rect(1, 2, 30, 40);
         RegionSource chained = (RegionSource) window.region(sub);
 

@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
  *
  * <pre>{@code
  * // Wait for a "Play" button's label, then click it.
- * CaptureSource game = CaptureSource.window("MyGame");
+ * CaptureSource game = CaptureSource.window("mygame.exe", "");
  * if (Text.waitFor("Play", game, Duration.ofSeconds(5))) {
  *     Mouse.click(Text.lastMatch().center());
  * }

@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.launch.WindowIdentity;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,10 +47,12 @@ class WindowApiTest {
     }
 
     @Test
-    void findMatchesTitleSubstringCaseInsensitively() {
-        assertTrue(Window.find("game").isPresent());
-        assertTrue(Window.find("TEST").isPresent());
-        assertEquals(Optional.empty(), Window.find("no-such-window"));
+    void namedFindsAWindowByItsClassNeverByATitleAlone() {
+        assertTrue(Window.named(WindowIdentity.parse("TESTGAME.EXE")).isPresent());
+        assertTrue(Window.named(WindowIdentity.parse("testgame.exe|test game window")).isPresent());
+        assertEquals(Optional.empty(), Window.named(WindowIdentity.parse("testgame.exe|Other")));
+        assertEquals(Optional.empty(), Window.named(WindowIdentity.parse("Test Game Window")),
+                "a title is not a class");
     }
 
     @Test

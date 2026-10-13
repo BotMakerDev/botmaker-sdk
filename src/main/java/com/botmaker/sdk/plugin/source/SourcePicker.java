@@ -6,11 +6,13 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
 import com.botmaker.sdk.plugin.screen.FrameShotSource;
+import com.botmaker.sdk.plugin.screen.OpenWindows;
 import com.botmaker.sdk.plugin.screen.ScreenOverlay;
 import com.botmaker.session.Preview;
 import com.botmaker.session.display.GamescopeHost;
@@ -21,6 +23,7 @@ import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorProbe;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
+import com.botmaker.shared.launch.WindowIdentity;
 import com.botmaker.shared.vm.GuestOs;
 import com.botmaker.shared.vm.GuestWindows;
 import com.botmaker.shared.vm.Hypervisor;
@@ -539,14 +542,18 @@ public final class SourcePicker {
                     long until = System.nanoTime() + GUEST_LIST_WAIT_MS * 1_000_000L;
                     while (screen.guestWindows().isEmpty() && System.nanoTime() < until) Thread.sleep(250);
                     show(screenTile, screen.captureScreen());
-                    java.util.Set<String> seen = new java.util.HashSet<>();
+                    java.util.Set<WindowIdentity> seen = new java.util.HashSet<>();
                     for (GuestWindow window : screen.guestWindows()) {
                         String title = window.title();
-                        if (title.isBlank() || !seen.add(title)) continue; // one tile per title, as below
-                        Image image = toFx(screen.captureWindow(new GenericWindow(window, title, window.rect())));
+                        GenericWindow guest = new GenericWindow(window, title, window.rect(), GenericWindow.NO_PID,
+                                window.process());
+                        WindowIdentity identity = WindowIdentity.of(guest);
+                        // One tile per identity, as below; a guest window's class is its program.
+                        if (title.isBlank() || identity == null || !seen.add(identity)) continue;
+                        Image image = toFx(screen.captureWindow(guest));
                         Platform.runLater(() -> {
-                            VBox tile = tile(title, "In the VM" + (window.process().isEmpty() ? "" : " · " + window.process()));
-                            CaptureSource target = CaptureSource.window(title);
+                            VBox tile = tile(title, "In the VM · " + identity.windowClass());
+                            CaptureSource target = NamedWindow.of(identity);
                             clickable(tile, target);
                             offer(tile, target);
                             setThumb(tile, image, "No preview");
@@ -577,15 +584,14 @@ public final class SourcePicker {
                 Platform.runLater(() -> into.getChildren().add(emptyWindowsHint()));
                 return;
             }
-            // One tile per title: the source a tile writes is window(title), which matches the first window of
-            // that title whichever tile was clicked, so a second tile would be the same choice drawn twice.
-            java.util.Set<String> seen = new java.util.HashSet<>();
-            for (GenericWindow window : found) {
+            // One tile per identity: the source a tile writes is window(class, title), which matches the first
+            // window it names whichever tile was clicked, so a second tile would be the same choice drawn twice.
+            // BotMaker's own windows are never the game (2026-10-13), and a window with no class cannot be named.
+            java.util.Set<WindowIdentity> seen = new java.util.HashSet<>();
+            for (GenericWindow window : OpenWindows.pickable(found)) {
                 String title = window.getTitle();
-                if (title == null || title.isBlank() || !seen.add(title)) continue;
-                // A compositor's output window is not an application: whatever is inside it is already listed
-                // under its own name, as the emulator tile or as the session.
-                if (GamescopeHost.isHost(window)) continue;
+                WindowIdentity identity = WindowIdentity.of(window);
+                if (identity == null || !seen.add(identity)) continue;
                 BufferedImage shot;
                 try {
                     shot = NativeControllerFactory.get().captureWindow(window);
@@ -594,8 +600,8 @@ public final class SourcePicker {
                 }
                 Image image = toFx(shot);
                 Platform.runLater(() -> {
-                    VBox tile = tile(title, "Window");
-                    CaptureSource target = CaptureSource.window(title);
+                    VBox tile = tile(title, "Window · " + identity.windowClass());
+                    CaptureSource target = NamedWindow.of(identity);
                     clickable(tile, target);
                     offer(tile, target);
                     setThumb(tile, image, "No preview");

@@ -3,49 +3,82 @@ package com.botmaker.sdk.internal.capture;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.shared.capture.GenericWindow;
+import com.botmaker.shared.launch.GameWindows;
+import com.botmaker.shared.launch.WindowIdentity;
 
 import java.awt.image.BufferedImage;
+import java.util.List;
 import java.util.Optional;
 
 /**
- * A {@link CaptureSource} that targets a window <em>by title substring</em>, resolved lazily on every
- * use via {@link Window#find(String)}. Unlike a concrete {@link Window} (which binds a native handle at
- * construction), this survives the window not existing yet and re-binds if the window reopens or moves —
- * which is what lets a bot point at a game before it has launched and lets
- * {@link com.botmaker.sdk.internal.launch.Game} tell whether that game is currently running.
+ * A {@link CaptureSource} that targets one window <em>by its identity</em> — its window class, and its exact title
+ * when that class is shared by unrelated programs ({@link WindowIdentity}) — resolved lazily on every use via
+ * {@link Window#named}. Unlike a concrete {@link Window} (which binds a native handle at construction), this
+ * survives the window not existing yet and re-binds if the window reopens or moves — which is what lets a bot
+ * point at a game before it has launched and lets {@link com.botmaker.sdk.internal.launch.Game} tell whether that
+ * game is currently running.
  *
- * <p>Obtain one via {@link CaptureSource#window(String)}.
+ * <p>Never a window by its title alone (2026-10-13): Studio's own "BotMaker Blocks - Firestone" was taken for the
+ * game and clicked in. Obtain one via {@link CaptureSource#window(String, String)}.
  */
 public final class NamedWindow implements CaptureSource, WindowBacked {
 
-    private final String titleSubstring;
+    private final String windowClass;
+    private final String title;
 
-    public NamedWindow(String titleSubstring) {
-        this.titleSubstring = titleSubstring;
+    public NamedWindow(String windowClass, String title) {
+        this.windowClass = windowClass == null ? "" : windowClass.trim();
+        this.title = title == null ? "" : title.trim();
     }
 
     /**
-     * The title substring this matches on — never resolved, just the text the user chose.
+     * The window class this matches — the text the user picked, never resolved.
      *
      * <p>Here for the same reason {@link Monitor#index()} is: the host writes a capture source through its
-     * components and a picker labels one on screen, and both need the argument back. It is deliberately the
-     * <em>pattern</em> rather than the matched window's real title: what a picker shows and what the host
-     * writes must be what the bot will match on, or a window that is not open right now would be relabelled
-     * or rewritten into something else.
+     * components and a picker labels one on screen, and both need the arguments back.
      */
-    public String titleSubstring() {
-        return titleSubstring;
+    public String windowClass() {
+        return windowClass;
+    }
+
+    /** The exact title this also matches, or {@code ""} when the class alone names the window. */
+    public String title() {
+        return title;
+    }
+
+    /** The source that finds the window {@code identity} names. */
+    public static NamedWindow of(WindowIdentity identity) {
+        return new NamedWindow(identity.windowClass(), identity.title());
+    }
+
+    /**
+     * What this names, or empty when it names no one window — no class, or a generic class with no title: then
+     * it matches nothing.
+     */
+    public Optional<WindowIdentity> identity() {
+        return Optional.ofNullable(WindowIdentity.of(windowClass, title));
+    }
+
+    /** The window among {@code windows} this names, BotMaker's own never ({@link GameWindows#named}). */
+    public Optional<GenericWindow> find(List<GenericWindow> windows) {
+        return identity().flatMap(game -> GameWindows.named(game, windows));
+    }
+
+    /** How a person reads it: the title when there is one, else the class. */
+    public String label() {
+        return title.isEmpty() ? windowClass : title;
     }
 
     private Optional<Window> resolve() {
-        return Window.find(titleSubstring);
+        return identity().flatMap(Window::named);
     }
 
     @Override
     public BufferedImage capture() {
         Optional<Window> w = resolve();
         if (w.isEmpty()) {
-            Debug.error("no window matching \"" + titleSubstring + "\" — capture returns null");
+            Debug.error("no window " + this + " is open — capture returns null");
             return null;
         }
         return w.get().capture();
@@ -61,7 +94,7 @@ public final class NamedWindow implements CaptureSource, WindowBacked {
         return resolve().isPresent();
     }
 
-    /** A title-matched window is the one source whose {@link #isPresent()} is a real "is it up?" answer. */
+    /** A window known by its class is the one source whose {@link #isPresent()} is a real "is it up?" answer. */
     @Override
     public boolean hasWindowIdentity() {
         return true;
@@ -75,12 +108,12 @@ public final class NamedWindow implements CaptureSource, WindowBacked {
 
     /** The resolved window's native handle when open, else {@code null} (→ global focused-window keys). */
     @Override
-    public com.botmaker.shared.capture.GenericWindow targetWindow() {
+    public GenericWindow targetWindow() {
         return resolve().map(WindowHandles::of).orElse(null);
     }
 
     @Override
     public String toString() {
-        return "Window[title~=" + titleSubstring + "]";
+        return "Window[" + identity().map(WindowIdentity::spec).orElse("no class") + "]";
     }
 }
