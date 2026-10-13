@@ -17,6 +17,7 @@ import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.flow.SkippedActivities;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.observe.IpcObserver;
+import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
@@ -114,8 +115,9 @@ public class Bot {
      * what Studio's ▶ Try calls with one statement as the body, from a caller it writes outside the project's
      * sources.
      *
-     * <p>No launch, no {@code goHome}, no recovery: a try is the statement against the screen as it is now. An
-     * exception from {@code body} is the try's failure and propagates; {@link #stop()} ends it quietly.
+     * <p>No launch, no {@code goHome}, no recovery: a try is the statement against the screen as it is now — in
+     * the private display Studio offers when the game runs in one. An exception from {@code body} is the try's
+     * failure and propagates; {@link #stop()} ends it quietly.
      *
      * @param body   the statement, and the locals it reads
      * @param values each plugin's values class, as {@link #runFlow} takes them
@@ -128,6 +130,7 @@ public class Bot {
         SdkValues.claim();
         ManagedValues.install(values);
         InstalledGame.install(values);
+        SessionBootstrap.joinOffered();
         try {
             body.run();
         } catch (BotStoppedException e) {

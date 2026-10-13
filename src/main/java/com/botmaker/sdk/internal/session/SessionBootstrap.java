@@ -285,6 +285,29 @@ public final class SessionBootstrap {
     }
 
     /**
+     * Joins the live display Studio offers, as {@link #launchIsolated} does first, and launches nothing: what a try
+     * does, which acts on the game as it is now. Without it a try looked for the game's window on {@code :0} while
+     * the game ran in the private display, and found none. Nothing to join, or the bot's settings keep it on
+     * {@code :0}: the try stays where it is.
+     */
+    public static void joinOffered() {
+        if (!isolationRequested() || where() == BotSettings.Where.VM || BotSession.isActive()) {
+            return;
+        }
+        DesktopSession offered = Sessions.offered().orElse(null);
+        if (offered == null) {
+            return;
+        }
+        if (offered.attached() == null) {
+            Debug.log("the offered display " + offered.displayName() + " has no window — not joining it");
+            offered.close();
+            return;
+        }
+        BotSession.set(offered);
+        Debug.log("joined the live display " + offered.displayName());
+    }
+
+    /**
      * Opens the game VM ({@link #vmName()}), registers it and starts {@code spec} in its Windows. A VM that can't
      * be opened stops the run, as a missing backend does: the user asked for the game off their desktop.
      */

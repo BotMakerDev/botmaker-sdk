@@ -53,6 +53,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **▶ Try joins the private display too.** A try, and the assistant's run_activity and try_statement, looked for the
+  game's window on the desktop while the game ran in the private display, and found none. A try now joins the
+  display it is offered, as a run does, and still launches nothing.
+- **Waiting for a picture is no longer "stuck".** The watchdog counted every miss as the same "miss", whatever the
+  picture, so an activity polling for a minute (a boss fight running its course) was recovered, and the recovery
+  restarted the game. A miss now ends a run of repeats; stuck is the same picture found at the same place over
+  and over, a click that changes nothing.
 - **A run joins the private display ▶ Launch brought up.** Since ▶ Launch moved into the SDK plugin, Studio's
   hand-off offered the run nothing (the plugin's session is on its own class loader), so the run started a second
   display and the single-instance launcher refused it (Heroic) or sent the game to the first. The launch now offers

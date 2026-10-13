@@ -13,8 +13,12 @@ import com.botmaker.sdk.internal.observe.MatchEvent;
  * {@link BotStuckException} so the {@link Bot#supervise supervisor} can recover (go home / restart).
  *
  * <p>It piggybacks on the match telemetry the SDK already emits ({@link Bots} / {@link MatchEvent}): while
- * enabled, an observer computes a <em>signature</em> for each match attempt (the template id + rounded
- * match location, or {@code "miss"}) and counts how many times in a row the signature is unchanged. The
+ * enabled, an observer computes a <em>signature</em> for each match that found its picture (the template id +
+ * rounded match location) and counts how many times in a row the signature is unchanged. A miss ends the run
+ * rather than adding to it: a bot that does not find a picture is waiting for one, polling within its own bound
+ * (a fight running its course, a button not ready yet), and every miss used to read as the same {@code "miss"}
+ * whatever the picture, so a minute's wait recovered — and a recovery restarts the game. Stuck is the same
+ * picture found at the same place over and over: a click that changes nothing. The
  * observer only <em>counts</em> — it never throws, because the vision layer
  * ({@link com.botmaker.sdk.api.vision.ImageFinder}) swallows {@code Exception} and would eat it.
  *
@@ -99,7 +103,9 @@ public final class Watchdog {
 
     private static void record(String signature) {
         State s = STATE.get();
-        if (signature.equals(s.signature)) {
+        if (signature == null) {
+            progress();
+        } else if (signature.equals(s.signature)) {
             s.repeats++;
         } else {
             s.signature = signature;
@@ -107,10 +113,10 @@ public final class Watchdog {
         }
     }
 
-    /** Template id + coarse location, so tiny match jitter doesn't read as progress; {@code "miss"} when not found. */
+    /** Template id + coarse location, so tiny match jitter doesn't read as progress; null when not found. */
     private static String signatureOf(MatchResult result) {
         if (result == null || !result.isFound()) {
-            return "miss";
+            return null;
         }
         Point c = result.center();
         long gx = Math.round(c.x() / 4.0);
