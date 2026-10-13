@@ -31,6 +31,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   is a public parameter too, `Sdk.captureSource` (was the method `captureSource()`), picked with the 🎯 source
   tiles. Both sit under *Game*. A bot whose `Sdk.java` still has the method: pick the window again, which writes
   the field, then delete the method. The window tiles list the most recently opened window first.
+- **▶ Launch beside each launcher.** In the Runner (and 👁 Preview) and the Parameters window, each launcher has
+  a ▶ Launch button that starts its game without running the bot, in the display the bot's settings say, so the
+  game's window is open to pick as the capture source. It is greyed out, saying why, for a launcher this
+  computer's system cannot start.
 
 ### Changed
 

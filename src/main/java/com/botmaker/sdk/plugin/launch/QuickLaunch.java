@@ -80,7 +80,15 @@ public final class QuickLaunch {
      * button and the target cannot disagree.
      */
     public static void bind(Button button, StudioServices services, Report report) {
-        LaunchSpec spec = LaunchTargetValue.spec(services);
+        bind(button, LaunchTargetValue.spec(services), services, report);
+    }
+
+    /**
+     * Points {@code button} at {@code spec} itself rather than at the one this machine launches: a launcher
+     * editor's ▶ Launch, so the game is up and its window can be picked as the capture source. Disabled with an
+     * explanatory tooltip for {@code null}.
+     */
+    public static void bind(Button button, LaunchSpec spec, StudioServices services, Report report) {
         if (spec == null) {
             button.setDisable(true);
             button.setOnAction(null);
@@ -199,7 +207,7 @@ public final class QuickLaunch {
             report.accept(false, SessionBootstrap.missingBackend(backend));
             BackendInstallPrompt.offer(services, button.getScene() == null ? null : button.getScene().getWindow(),
                     backend, (installed, message) -> report.accept(installed, installed
-                            ? message + " Press ▶ Launch now again." : message));
+                            ? message + " Press ▶ Launch again." : message));
             return;
         }
         Path resourcesDir = services.resourcesDir();
