@@ -889,9 +889,17 @@ class SdkAssistTest {
                 waited[0] += ms;
             }
         };
-        Iterator<BufferedImage> late = List.of(swayedBack, swayed, opened, opened).iterator();
-        assertSame(opened, ActTools.answered(still, motion, () -> Optional.of(late.next()), 5_000, clock)
+        BufferedImage popup = copy(swayedBack);
+        for (int y = 20; y < 40; y++) {
+            for (int x = 30; x < 50; x++) popup.setRGB(x, y, popup.getRGB(x, y) ^ 0x808080);
+        }
+        Iterator<BufferedImage> late = List.of(swayedBack, swayed, popup, popup).iterator();
+        assertSame(popup, ActTools.answered(still, motion, () -> Optional.of(late.next()), 5_000, clock)
                 .orElseThrow(), "the sway is waited past, not taken for the answer");
+
+        waited[0] = 0;
+        assertSame(opened, ActTools.answered(still, motion, () -> Optional.of(opened), 1_000, clock).orElseThrow());
+        assertEquals(1_000, waited[0], "a change under ANSWER_SHARE is read at the cap: it may be stray sway");
 
         waited[0] = 0;
         Iterator<BufferedImage> reads = List.of(swayed, swayedBack).iterator();

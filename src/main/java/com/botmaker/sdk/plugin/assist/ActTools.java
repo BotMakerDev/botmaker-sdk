@@ -60,6 +60,12 @@ final class ActTools {
     static final int AMBIENT_READS = 2;
     /** A sample that moved on its own hides this many pixels around it: a leaf sways a little further next time. */
     static final int AMBIENT_GROW = 6;
+    /**
+     * The share of the screen that must change for the wait to end early: a new screen or a popup. The mask misses
+     * sway that paused while it looked, and that alone ended the wait before Firestone drew the Engineer
+     * (2026-10-13). A smaller change, a button greying, is still told, at the end of the wait.
+     */
+    static final double ANSWER_SHARE = 0.03;
     /** A channel moving less than this is the same pixel: compression, a blended edge. */
     private static final int SAME = 24;
     /** Every this many pixels is compared; a change smaller than this is not a step's answer. */
@@ -328,11 +334,11 @@ final class ActTools {
     }
 
     /**
-     * The frame the game answered with: the screen read every {@link #POLL_MS} until it differs from
-     * {@code before}, then until two reads in a row are the same or {@link #SETTLING_MS} went by, never past
-     * {@code capMs} (reading a frame takes time too), each compare blind to {@code motion}. When nothing changed by
-     * then, the last frame read; empty when none could be read for {@link #SETTLING_MS}: a capture that is gone
-     * does not hold the answer for the whole cap.
+     * The frame the game answered with: the screen read every {@link #POLL_MS} until {@link #ANSWER_SHARE} of it
+     * differs from {@code before}, then until two reads in a row are the same or {@link #SETTLING_MS} went by,
+     * never past {@code capMs} (reading a frame takes time too), each compare blind to {@code motion}. A smaller
+     * change is read at the cap. When nothing changed by then, the last frame read; empty when none could be read
+     * for {@link #SETTLING_MS}: a capture that is gone does not hold the answer for the whole cap.
      */
     static Optional<BufferedImage> answered(BufferedImage before, Motion motion,
                                             Supplier<Optional<BufferedImage>> look, int capMs, Clock clock)
@@ -346,7 +352,7 @@ final class ActTools {
             long waited = clock.nowMs() - start;
             if (now.isPresent()) {
                 if (changedAt < 0) {
-                    if (changed(before, now.get(), motion).isPresent()) changedAt = waited;
+                    if (changedShare(before, now.get(), motion) >= ANSWER_SHARE) changedAt = waited;
                 } else if (last.isPresent() && changed(last.get(), now.get(), motion).isEmpty()) {
                     return now;
                 }
@@ -459,6 +465,23 @@ final class ActTools {
         int width = Math.min(after.getWidth(), right + STEP) - left;
         int height = Math.min(after.getHeight(), bottom + STEP) - top;
         return Optional.of(new Rect(left, top, width, height));
+    }
+
+    /** The share of the samples {@link #changed} compares that moved from {@code before} to {@code after}. */
+    static double changedShare(BufferedImage before, BufferedImage after, Motion motion) {
+        if (before.getWidth() != after.getWidth() || before.getHeight() != after.getHeight()) return 1;
+        int moved = 0;
+        int samples = 0;
+        for (int y = 0; y < after.getHeight(); y += STEP) {
+            for (int x = 0; x < after.getWidth(); x += STEP) {
+                samples++;
+                if (!same(before.getRGB(x, y), after.getRGB(x, y))
+                        && !motion.ignores(x, y, after.getWidth(), after.getHeight())) {
+                    moved++;
+                }
+            }
+        }
+        return (double) moved / samples;
     }
 
     private static boolean same(int a, int b) {
