@@ -1,4 +1,5 @@
 package com.botmaker.sdk.api.bot;
+import com.botmaker.plugin.api.assist.TrialEntry;
 import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.plugin.api.palette.EntryPoint;
 import com.botmaker.plugin.api.palette.Hidden;
@@ -8,10 +9,12 @@ import com.botmaker.plugin.api.palette.Untraced;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.config.InstalledGame;
+import com.botmaker.sdk.internal.flow.FlowTree;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.flow.SkippedActivities;
@@ -118,8 +121,9 @@ public class Bot {
      * what Studio's ▶ Try calls with one statement as the body, from a caller it writes outside the project's
      * sources.
      *
-     * <p>No launch, no {@code goHome}, no recovery: a try is the statement against the screen as it is now — in
-     * the private display Studio offers when the game runs in one. An exception from {@code body} is the try's
+     * <p>No launch, no recovery: a try is the statement against the screen as it is now — in the private display
+     * Studio offers when the game runs in one. Home runs only before an activity's body run whole whose card goes
+     * home, as the run does. An exception from {@code body} is the try's
      * failure and propagates; {@link #stop()} ends it quietly.
      *
      * @param body   the statement, and the locals it reads
@@ -136,10 +140,36 @@ public class Bot {
         SessionBootstrap.joinOffered();
         installPopups();
         try {
+            homeFirst(body, values);
             body.run();
         } catch (BotStoppedException e) {
             Debug.log("Stopped by request.");
         }
+    }
+
+    /**
+     * Runs the bot's home before a try that runs an activity's body whole ({@link TrialEntry#TARGET}) when that
+     * activity's card goes home, as the run would. The card is the one of the activity the method returns.
+     */
+    private static void homeFirst(Runnable body, Class<?>... values) {
+        // Read once: a later trial in this JVM that names no method must not find it.
+        String target = System.getProperty(TrialEntry.TARGET, "");
+        System.clearProperty(TrialEntry.TARGET);
+        int hash = target.indexOf('#');
+        Runnable home = InstalledRun.installed().home();
+        if (hash < 0 || home == null || !(InstalledGame.marked(SdkValue.Id.FLOW, values) instanceof Flow flow)) return;
+        Class<?> returned;
+        try {
+            returned = Class.forName(target.substring(0, hash), false, body.getClass().getClassLoader())
+                    .getDeclaredMethod(target.substring(hash + 1)).getReturnType();
+        } catch (ReflectiveOperationException | LinkageError e) {
+            return;
+        }
+        if (!Outcome.class.isAssignableFrom(returned)) return;
+        Flow.Step card = FlowTree.find(flow, Activity.of(returned.asSubclass(Outcome.class)));
+        if (card == null || !card.goHome()) return;
+        Debug.log("Going home first, as the " + card.label() + " card does.");
+        home.run();
     }
 
     /** The activity classes the {@code skip} parameter names; empty when the bot has none. */

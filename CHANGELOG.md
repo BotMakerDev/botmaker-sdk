@@ -130,6 +130,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **Running one activity goes home first when its card does.** Studio's ▶ Run on an activity and the assistant's
+  `run_activity` ran its body on whatever screen was up; `Bot.trial` now runs the bot's home before it when the
+  activity's card says `goesHome()`, as a run would.
 - **The assistant's click, key and scroll wait for the game to answer.** They waited a fixed 800 ms and said
   "nothing changed" when a game took longer, as Firestone takes seconds to open a screen. Now they read the screen
   until it changes and holds still, or 1.5 s after it first changed for a screen that never holds still, up to
