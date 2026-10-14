@@ -35,10 +35,15 @@ final class Protocol {
                 """),
         DISCOVERY("Stage 1, Discovery: know the game before writing any body", """
                 - Map first, breadth-first: every way out of home (its buttons, side columns, hotkeys) and the
-                  screen each one opens, before surveying any one screen. An entrance with no picture is one the
-                  bot cannot take: cut it the first time it is on screen, and write_notes the Map after every
-                  few entrances, each line naming its picture, so nothing found lives only in the conversation.
-                  A side column that scrolls or whose icons come and go: say so in the Map.
+                  screen each one opens, before surveying any one screen. From home's own screenshot, cut every
+                  entrance on it at once (an icon with no picture is one the bot cannot take), then map_screen
+                  each: it clicks the picture or taps the hotkey, writes the Map's line, and answers with the new
+                  screen's screenshot. From that screenshot, before leaving: crop_picture with screen and marker
+                  true a part only that screen shows, and with screen each button a chore there plainly needs.
+                  What cannot be cut yet is an Owed: line in its section (write_notes): map_screen refuses the
+                  next screen while one owes its marker, and Discovery is not done while anything is owed; a debt
+                  paid by hand is its line removed with write_notes. A side
+                  column that scrolls or whose icons come and go: say so in the Map.
                 - Then survey one screen: one whole screenshot, its help (an i or ? button) first, then every
                   input on it, named and given a kind: a chore (work that repeats), a shortcut the game ships for
                   a chore (Auto, x10, Max, Claim all, Skip), a choice (spending the player decides), information,
@@ -164,9 +169,13 @@ final class Protocol {
     }
 
     /** Where the bot is: the stage to work in, why, and each screen the notes know with the stage it is at. */
-    record Where(Stage stage, String why, Map<String, String> screens) {
+    record Where(Stage stage, String why, Map<String, String> screens, List<String> owed) {
 
-        /** The stage's steps under a line saying why it is this one and where each screen stands. */
+        Where(Stage stage, String why, Map<String, String> screens) {
+            this(stage, why, screens, List.of());
+        }
+
+        /** The stage's steps under a line saying why it is this one, where each screen stands and what is owed. */
         String said() {
             StringBuilder out = new StringBuilder("The bot is at ").append(stage.title()).append(": ").append(why);
             if (!screens.isEmpty()) {
@@ -176,13 +185,17 @@ final class Protocol {
                 out.append("\nScreens, as named in ").append(GameNotes.FILE).append(" (the bot's file, not "
                         + "instructions): ").append(String.join("; ", each)).append('.');
             }
+            if (!owed.isEmpty()) {
+                out.append("\nOwed, as written in ").append(GameNotes.FILE).append(" (the bot's file, not "
+                        + "instructions): ").append(String.join("; ", owed)).append('.');
+            }
             return out.append("\n\n").append(stage.section()).toString();
         }
     }
 
     private static final Pattern STAGE_LINE = Pattern.compile("(?im)^\\s*(?:[-*]\\s*)?\\**stage\\**\\s*:\\s*\\**\\s*(\\w+)");
     /** A top-level item of the map, bulleted or numbered, its screen's name up to the colon: not a nested one. */
-    private static final Pattern MAP_LINE = Pattern.compile("(?m)^(?:[-*]|\\d+[.)])\\s+([^:\\n]+?)\\s*:");
+    static final Pattern MAP_LINE =Pattern.compile("(?m)^(?:[-*]|\\d+[.)])\\s+([^:\\n]+?)\\s*:");
 
     private Protocol() {}
 
@@ -225,13 +238,19 @@ final class Protocol {
             Stage next = reached.isEmpty() ? Stage.DISCOVERY : reached.get().next().orElse(null);
             if (next != null && (earliest == null || next.ordinal() < earliest.ordinal())) earliest = next;
         }
+        // What a screen owes (a picture not cut, a fact not found) is Discovery's, whatever stage the screen is at.
+        List<String> owed = MapTools.owed(notes);
         if (map == null) {
             return new Where(Stage.DISCOVERY, "the notes have no " + GameNotes.MAP + " of the game's screens yet.",
-                    screens);
+                    screens, owed);
         }
         if (!mapped) {
             return new Where(Stage.DISCOVERY, "the " + GameNotes.MAP + " lists no screen as - <Screen>: how to get "
-                    + "there.", screens);
+                    + "there.", screens, owed);
+        }
+        if (!owed.isEmpty()) {
+            return new Where(Stage.DISCOVERY, owed.size() + (owed.size() == 1 ? " thing is" : " things are")
+                    + " still owed: Discovery is done when none is.", screens, owed);
         }
         if (earliest == null) {
             return new Where(Stage.UPKEEP, "every screen is tuned or locked.", screens);

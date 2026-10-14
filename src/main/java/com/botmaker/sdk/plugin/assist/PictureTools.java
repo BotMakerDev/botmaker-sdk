@@ -39,6 +39,7 @@ import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -73,7 +74,11 @@ final class PictureTools {
                 @Describe(value = IGNORE, optional = true) Integer ignoreX,
                 @Describe(value = "top edge of the part to skip", optional = true) Integer ignoreY,
                 @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
-                @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight) {
+                @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight,
+                @Describe(value = "the screen it is on, as the Map names it: noted in that screen's section",
+                        optional = true) String screen,
+                @Describe(value = "true when it is that screen's marker, a part no other screen shows: pays the "
+                        + "marker map_screen left owed", optional = true) Boolean marker) {
 
         /** The part to skip, when all four of its edges are given. */
         Optional<Rect> ignore() {
@@ -219,6 +224,23 @@ final class PictureTools {
                     + "declare_tag makes one. Nothing was saved.");
         }
         List<String> tags = catalog == null ? List.of() : catalog.declaredOnly(typed);
+        boolean marker = Boolean.TRUE.equals(crop.marker());
+        String screen = crop.screen() == null || crop.screen().isBlank() ? null : crop.screen().strip();
+        if (marker && screen == null) return AgentReply.refused("A marker is a screen's: give screen too.");
+        Optional<String> section = Optional.empty();
+        if (screen != null) {
+            Path project = context.services().projectDir();
+            if (project == null) return AgentReply.refused(Frames.noProject());
+            try {
+                section = MapTools.section(project, screen);
+            } catch (IllegalArgumentException | UncheckedIOException e) {
+                return AgentReply.refused(e.getMessage());
+            }
+            if (section.isEmpty()) {
+                return AgentReply.refused("No section " + screen + " in " + GameNotes.FILE + ": map_screen opens "
+                        + "one, or write_notes it. Nothing was saved.");
+            }
+        }
         Optional<String> moving = moving(context, frame.get(), new Rect(crop.x(), crop.y(), crop.width(),
                 crop.height()));
         if (moving.isPresent()) return AgentReply.refused(moving.get());
@@ -231,9 +253,17 @@ final class PictureTools {
         });
         Frames.mark(context, new Rect(crop.x(), crop.y(), crop.width(), crop.height()), Marks.Kind.NOTE, saved.name());
         String constant = TemplateNames.constantFor(saved.name());
+        String noted = "";
+        if (section.isPresent()) {
+            try {
+                noted = MapTools.noteCut(context.services().projectDir(), section.get(), saved.name(), marker);
+            } catch (IllegalArgumentException | UncheckedIOException e) {
+                noted = " It could not be noted in " + section.get() + ": " + e.getMessage();
+            }
+        }
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
                         + "." + constant) + (tags.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
-                        + saved.note().map(n -> " — " + n).orElse("") + "." + alike)
+                        + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike)
                 .and(AgentReply.image(picture.get().image()));
     }
 

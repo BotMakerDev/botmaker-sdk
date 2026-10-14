@@ -220,63 +220,103 @@ final class ActTools {
     }
 
     /**
+     * What an action did: the answer as click or key says it, and when it happened and the screen was read after
+     * it, the frames either side and what moved on its own; {@code how} says it in the Map's words
+     * ({@code click engineer_home}, {@code key Q}).
+     */
+    record Entered(AgentReply reply, BufferedImage before, BufferedImage after, Motion motion, String how) {
+        static Entered no(AgentReply reply) {
+            return new Entered(reply, null, null, Motion.NONE, null);
+        }
+
+        /** The share of the screen the action changed; 0 when it was not done or not read after. */
+        double share() {
+            return after == null ? 0 : changedShare(before, after, motion);
+        }
+    }
+
+    /**
+     * Clicks {@code picture} or taps {@code key} for map_screen, waiting up to {@code settleMs} for a change as big
+     * as {@code share} of the screen: a new screen, which the small change of a swaying home does not end early.
+     */
+    static Entered enter(AgentContext context, String picture, Key key, Boolean desktop, int settleMs, double share) {
+        if (key != null) {
+            return acted(context, null, null, desktop, settleMs, false, "Pressed " + key.label(), "key " + key.label(),
+                    share, hands -> hands.key(key));
+        }
+        Spotted spotted = spot(picture, "clicked", context);
+        if (spotted.refusal() != null) return Entered.no(spotted.refusal());
+        Point at = spotted.at();
+        return acted(context, spotted.frame(), at, desktop, settleMs, false, "Clicked " + spotted.name() + " at "
+                + at.x() + "," + at.y(), "click " + spotted.name(), share, hands -> hands.click(at.x(), at.y()));
+    }
+
+    /**
      * Does {@code action} with the hands the look tools' screen takes, waits {@code settleMs}, and says what changed
      * from {@code seen} (a frame already taken, or null to take one now). {@code at}, the point acted on, must be
      * on the frame; null for a key.
      */
     private static AgentReply act(AgentContext context, BufferedImage seen, Point at, Boolean desktop, Integer settleMs,
                                   Boolean show, String done, Action action) {
+        return acted(context, seen, at, desktop, settleMs, show, done, null, ANSWER_SHARE, action).reply();
+    }
+
+    private static Entered acted(AgentContext context, BufferedImage seen, Point at, Boolean desktop, Integer settleMs,
+                                 Boolean show, String done, String how, double share, Action action) {
         int settle = settleMs == null ? SETTLE_MS : settleMs;
         if (settle < 0 || settle > LONGEST_SETTLE_MS) {
-            return AgentReply.refused("Settle between 0 and " + LONGEST_SETTLE_MS + " ms.");
+            return Entered.no(AgentReply.refused("Settle between 0 and " + LONGEST_SETTLE_MS + " ms."));
         }
         Hands hands = hands(context);
         if (hands instanceof OnDesktop && !Boolean.TRUE.equals(desktop)) {
-            return AgentReply.refused("The game is on the user's own desktop, not in a private display: this would "
-                    + "take their mouse and keyboard. launch_game puts it in one; desktop: true acts anyway.");
+            return Entered.no(AgentReply.refused("The game is on the user's own desktop, not in a private display: "
+                    + "this would take their mouse and keyboard. launch_game puts it in one; desktop: true acts "
+                    + "anyway."));
         }
         if (hands instanceof OnDesktop && context.watchedArea().isEmpty()) {
-            return AgentReply.refused("Studio watches no window or area on this desktop, so a point has no place.");
+            return Entered.no(AgentReply.refused("Studio watches no window or area on this desktop, so a point has "
+                    + "no place."));
         }
         Optional<BufferedImage> before = seen != null ? Optional.of(seen) : Frames.look(context);
-        if (before.isEmpty()) return AgentReply.refused(Frames.noScreen());
+        if (before.isEmpty()) return Entered.no(AgentReply.refused(Frames.noScreen()));
         // A point off the frame is off the game: on the desktop it would land on another window.
         if (at != null && (at.x() < 0 || at.y() < 0 || at.x() >= before.get().getWidth()
                 || at.y() >= before.get().getHeight())) {
-            return AgentReply.refused(at.x() + "," + at.y() + " is outside the " + before.get().getWidth() + "×"
-                    + before.get().getHeight() + " screenshot; nothing was done.");
+            return Entered.no(AgentReply.refused(at.x() + "," + at.y() + " is outside the "
+                    + before.get().getWidth() + "×" + before.get().getHeight() + " screenshot; nothing was done."));
         }
         // The frame and the hands each ask where the game is: a display closing or opening between them would act
         // on another surface than the one read, or than the one the desktop check approved.
         if (hands(context).getClass() != hands.getClass()) {
-            return AgentReply.refused("Where the game is changed just now; nothing was done. Look again.");
+            return Entered.no(AgentReply.refused("Where the game is changed just now; nothing was done. Look again."));
         }
         List<BufferedImage> still = new ArrayList<>(List.of(before.get()));
         try {
             still.addAll(ambient(() -> Frames.look(context), Clock.REAL));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return AgentReply.text("Stopped before acting; nothing was done.");
+            return Entered.no(AgentReply.text("Stopped before acting; nothing was done."));
         }
         Motion motion = Motion.of(still);
         BufferedImage last = still.getLast();
         try {
             action.on(hands);
         } catch (UnsupportedOperationException cannot) {
-            return AgentReply.refused(cannot.getMessage());
+            return Entered.no(AgentReply.refused(cannot.getMessage()));
         } catch (RuntimeException failed) {
-            return AgentReply.refused("The input failed: " + failed.getMessage());
+            return Entered.no(AgentReply.refused("The input failed: " + failed.getMessage()));
         }
         // From here the action happened: an answer that is not a refusal, so it is not tried again.
         Optional<BufferedImage> after;
         try {
-            after = answered(last, motion, () -> Frames.look(context), settle, Clock.REAL);
+            after = answered(last, motion, () -> Frames.look(context), settle, share, Clock.REAL);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return AgentReply.text(done + "; stopped before the screen was read again.");
+            return Entered.no(AgentReply.text(done + "; stopped before the screen was read again."));
         }
-        if (after.isEmpty()) return AgentReply.text(done + "; the screen could not be captured after it.");
-        return answer(context, done, last, after.get(), motion, Boolean.TRUE.equals(show));
+        if (after.isEmpty()) return Entered.no(AgentReply.text(done + "; the screen could not be captured after it."));
+        return new Entered(answer(context, done, last, after.get(), motion, Boolean.TRUE.equals(show)), last,
+                after.get(), motion, how);
     }
 
     /** {@link #AMBIENT_READS} more reads of the screen, {@link #POLL_MS} apart; a read that failed is left out. */
@@ -370,6 +410,12 @@ final class ActTools {
     static Optional<BufferedImage> answered(BufferedImage before, Motion motion,
                                             Supplier<Optional<BufferedImage>> look, int capMs, Clock clock)
             throws InterruptedException {
+        return answered(before, motion, look, capMs, ANSWER_SHARE, clock);
+    }
+
+    /** As {@link #answered(BufferedImage, Motion, Supplier, int, Clock)}, ending early on {@code share} changed. */
+    static Optional<BufferedImage> answered(BufferedImage before, Motion motion, Supplier<Optional<BufferedImage>> look,
+                                            int capMs, double share, Clock clock) throws InterruptedException {
         if (Thread.interrupted()) throw new InterruptedException();
         long start = clock.nowMs();
         long changedAt = -1;
@@ -379,7 +425,7 @@ final class ActTools {
             long waited = clock.nowMs() - start;
             if (now.isPresent()) {
                 if (changedAt < 0) {
-                    if (changedShare(before, now.get(), motion) >= ANSWER_SHARE) changedAt = waited;
+                    if (changedShare(before, now.get(), motion) >= share) changedAt = waited;
                 } else if (last.isPresent() && changed(last.get(), now.get(), motion).isEmpty()) {
                     return now;
                 }

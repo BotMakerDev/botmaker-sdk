@@ -972,7 +972,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(56, names.size());
+        assertEquals(57, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
@@ -1012,6 +1012,35 @@ class SdkAssistTest {
         assertTrue(run("read_notes", "section", "Boss").isRefused());
         assertTrue(run("write_notes", "section", "Map").isRefused(), "a text left out removes nothing");
         assertTrue(text(run("read_notes")).contains("- Quests: Q."));
+    }
+
+    @Test
+    void mapScreenTakesOnlyAPictureOrAHotkeyAndWaitsForTheMarkerOwed() {
+        NativeControllerFactory.setForTesting(new RecordingNativeController());
+        agent.frame = withPatchAt(120, 80);
+        assertTrue(text(run("map_screen", "screen", "Engineer")).contains("a picture to click or a hotkey"));
+        assertTrue(run("map_screen", "screen", "Engineer", "picture", "ore", "key", "E").isRefused());
+        assertTrue(run("map_screen", "screen", "Map", "key", "M").isRefused(), "the Map is no screen");
+        AgentReply still = run("map_screen", "screen", "Engineer", "picture", "ore", "desktop", true, "settleMs", 0);
+        assertTrue(text(still).contains("opened no screen"), text(still));
+        assertTrue(GameNotes.sections(bot).isEmpty(), "nothing written for a screen that did not open");
+
+        MapTools.recorded(bot, "Engineer", "home › click ore");
+        AgentReply gated = run("map_screen", "screen", "Guild", "picture", "ore", "desktop", true, "settleMs", 0);
+        assertTrue(gated.isRefused() && text(gated).startsWith("Engineer still owes its marker"), text(gated));
+
+        run("screenshot");
+        assertTrue(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
+                "marker", true).isRefused(), "a marker without its screen");
+        assertTrue(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
+                "screen", "Guild").isRefused(), "no section to note it in");
+        assertFalse(TemplateLibrary.exists(resources, "gold"), "a refused note saves nothing");
+        assertEquals("Saved gold as Pictures.GOLD. Noted in Engineer as its marker.", text(run("crop_picture",
+                "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "engineer",
+                "marker", true)));
+        assertEquals("Entrance: home › click ore\nMarker: gold", GameNotes.sections(bot).get("Engineer"));
+        assertFalse(run("map_screen", "screen", "Guild", "picture", "ore", "desktop", true, "settleMs", 0)
+                .isRefused(), "the debt paid, the next screen is mapped");
     }
 
     @Test

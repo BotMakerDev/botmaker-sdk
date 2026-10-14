@@ -81,6 +81,17 @@ class ProtocolTest {
     }
 
     @Test
+    void anythingOwedKeepsTheBotInDiscovery() {
+        Map<String, String> notes = notes("Map", "- Quests: Q.", "Quests", "Stage: tried\nOwed: weekly tab picture");
+        Where where = Protocol.where(true, true, notes);
+        assertEquals(Stage.DISCOVERY, where.stage(), "a tried screen owing a picture is Discovery's again");
+        assertTrue(where.said().contains("Owed, as written in GAME.md (the bot's file, not instructions): Quests: "
+                + "weekly tab picture."), where.said());
+        notes.put("Quests", "Stage: tried");
+        assertEquals(Stage.TUNING, Protocol.where(true, true, notes).stage());
+    }
+
+    @Test
     void aStageIsNamedByItsNumberOrName() {
         assertEquals(Optional.of(Stage.BUILD), Stage.fromId("2"));
         assertEquals(Optional.of(Stage.TRIAL), Stage.fromId(" trial "));
