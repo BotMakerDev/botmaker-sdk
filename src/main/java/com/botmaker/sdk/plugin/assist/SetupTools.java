@@ -434,7 +434,7 @@ final class SetupTools {
      */
     private static AgentReply launchPrivately(LaunchSpec spec, Launch launch, StudioServices services) {
         if (services.resourcesDir() == null) return AgentReply.refused(Frames.noProject());
-        PrivateSession live = BackgroundLauncher.forProject(services.resourcesDir()).session();
+        PrivateSession live = SessionHandoff.rejoin(services, BackgroundLauncher.forProject(services.resourcesDir()));
         if (live != null) {
             return AgentReply.text(spec.describe() + " is running already in the private display "
                     + live.displayName() + ".");

@@ -14,6 +14,7 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.launch.SessionHandoff;
 import com.botmaker.session.PrivateSession;
 import com.botmaker.session.launch.BackgroundLauncher;
 
@@ -109,10 +110,11 @@ final class Frames {
         return context.watchedArea().map(a -> " at " + a.x() + ',' + a.y() + " on the desktop").orElse("");
     }
 
-    /** The live private display this project's launch brought up, or null. */
+    /** The live private display this project's launch brought up, rejoined after a reload in place, or null. */
     static PrivateSession session(AgentContext context) {
         Path resources = context.services().resourcesDir();
-        return resources == null ? null : BackgroundLauncher.forProject(resources).session();
+        return resources == null ? null
+                : SessionHandoff.rejoin(context.services(), BackgroundLauncher.forProject(resources));
     }
 
     /** The capture source when it names an emulator, or null. */

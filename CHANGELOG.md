@@ -23,7 +23,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - **A picture can leave a part out.** The assistant's `crop_picture` takes a box to ignore (`ignoreX`, `ignoreY`,
   `ignoreWidth`, `ignoreHeight`), saved transparent, which matching skips: map pins alike but for their timers'
-  digits all match one picture.
+  digits all match one picture. `replace_picture` takes the same box, so a recut keeps its name and uses.
+- **The assistant can wire a card's switched-off route.** `connect` and `disconnect` say that the outcome
+  `DISABLED` is where the run goes when a card is switched off or has no body yet.
+- **A reloaded plugin rejoins the game.** After Studio reloads the SDK in place, the assistant's tools and
+  `launch_game` join the private display the hand-off still names, so the game launched before keeps answering.
+- **The assistant's guide says what a click costs.** Each click pauses `found_delay` (500 ms by default); a bot
+  whose steps prove themselves by a picture can lower it with `set_setting found_delay 150`.
 - **Scroll and drag on pictures.** `ImageScroller.scrollAt(picture, notches)`, `drag(picture, dx, dy)` (a
   fraction of the game's window) and `drag(from, to)` find the picture, act on it and answer whether it left its
   place within the bot's patience (a twin further down the list does not count), so a list at its end answers false and a page loop is

@@ -70,17 +70,14 @@ final class PictureTools {
                 @Describe("height in pixels") int height,
                 @Describe(value = "tags to file it under, each declared (list_tags)", optional = true)
                 List<String> tags,
-                @Describe(value = "left edge of a part inside the box a run skips (a timer's digits, a count that "
-                        + "differs from copy to copy), in the screenshot's pixels; with ignoreY, ignoreWidth and "
-                        + "ignoreHeight", optional = true) Integer ignoreX,
+                @Describe(value = IGNORE, optional = true) Integer ignoreX,
                 @Describe(value = "top edge of the part to skip", optional = true) Integer ignoreY,
                 @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
                 @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight) {
 
         /** The part to skip, when all four of its edges are given. */
         Optional<Rect> ignore() {
-            if (ignoreX == null || ignoreY == null || ignoreWidth == null || ignoreHeight == null) return Optional.empty();
-            return Optional.of(new Rect(ignoreX, ignoreY, ignoreWidth, ignoreHeight));
+            return PictureTools.ignore(ignoreX, ignoreY, ignoreWidth, ignoreHeight);
         }
     }
 
@@ -100,7 +97,24 @@ final class PictureTools {
                    @Describe("left edge of its new image, in the last screenshot's pixels") int x,
                    @Describe("top edge") int y,
                    @Describe("width in pixels") int width,
-                   @Describe("height in pixels") int height) {
+                   @Describe("height in pixels") int height,
+                   @Describe(value = IGNORE, optional = true) Integer ignoreX,
+                   @Describe(value = "top edge of the part to skip", optional = true) Integer ignoreY,
+                   @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
+                   @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight) {
+
+        /** The part to skip, when all four of its edges are given. */
+        Optional<Rect> ignore() {
+            return PictureTools.ignore(ignoreX, ignoreY, ignoreWidth, ignoreHeight);
+        }
+    }
+
+    private static final String IGNORE = "left edge of a part inside the box a run skips (a timer's digits, a count "
+            + "that differs from copy to copy), in the screenshot's pixels; with ignoreY, ignoreWidth and ignoreHeight";
+
+    private static Optional<Rect> ignore(Integer x, Integer y, Integer width, Integer height) {
+        if (x == null || y == null || width == null || height == null) return Optional.empty();
+        return Optional.of(new Rect(x, y, width, height));
     }
 
     record NamedPoint(@Describe("the spot's name: claim button") String name,
@@ -152,7 +166,7 @@ final class PictureTools {
                     .takes(Delete.class).handledBy(PictureTools::deletePicture),
             AssistantTool.named("replace_picture")
                     .describedAs("Gives a picture a new image cut from the last screenshot, keeping its name and "
-                            + "every use")
+                            + "every use; a part given to ignore is left out of matching, as crop_picture's")
                     .takes(Replace.class).handledBy(PictureTools::replacePicture),
             AssistantTool.named("save_point")
                     .describedAs("Names a spot of the game as a Spots constant, in the bot's pixels, for a block to "
@@ -311,7 +325,8 @@ final class PictureTools {
         Optional<BufferedImage> frame = Frames.shown();
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
         Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), null,
-                new Area(replace.x(), replace.y(), replace.width(), replace.height()));
+                new Area(replace.x(), replace.y(), replace.width(), replace.height()))
+                .map(piece -> replace.ignore().map(part -> PictureCuts.masked(piece, part)).orElse(piece));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
         Optional<String> moving = moving(context, frame.get(), new Rect(replace.x(), replace.y(), replace.width(),

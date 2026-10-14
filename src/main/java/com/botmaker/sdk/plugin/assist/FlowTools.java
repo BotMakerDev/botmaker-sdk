@@ -77,16 +77,19 @@ final class FlowTools {
                 @Describe(value = WHICH, optional = true) String flow) {
     }
 
+    private static final String ON = "the outcome it leaves on; leave out for its first outcome, DISABLED for where "
+            + "the run goes when the card is switched off or has no body";
+
     /** One arrow between two cards, on one outcome. */
     record Arrow(@Describe("the activity the arrow leaves") String from,
-                 @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome,
+                 @Describe(value = ON, optional = true) String outcome,
                  @Describe("the card it goes to: " + CARD) String to,
                  @Describe(value = FROM_FLOW, optional = true) String fromFlow,
                  @Describe(value = WHICH, optional = true) String flow) {
     }
 
     record Leaving(@Describe("the activity the arrow leaves") String from,
-                   @Describe(value = "the outcome it leaves on; leave out for its first outcome", optional = true) String outcome,
+                   @Describe(value = ON, optional = true) String outcome,
                    @Describe(value = FROM_FLOW, optional = true) String fromFlow,
                    @Describe(value = WHICH, optional = true) String flow) {
     }

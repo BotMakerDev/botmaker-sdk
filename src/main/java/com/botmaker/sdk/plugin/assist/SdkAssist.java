@@ -83,7 +83,8 @@ public final class SdkAssist {
             - Prove each step by a picture of its result, never by time: the loop's own picture coming or
               going, or ImageWaiter.waitFor / waitUntilGone of a picture only that screen or state shows
               (a close button is on every screen: not a marker). Screen.waitStable and Wait guess, they prove
-              nothing.
+              nothing. Every click then pauses the bot's found delay (500 ms unless set): a bot whose steps all
+              prove themselves this way runs faster with it at 150 (set_setting).
             - Matching ignores colour: a lit button and its greyed-out twin both match (crop_picture says
               where else a cut is found). Cut the twin too and act with the compare forms, the lit one as
               good and the twin as bad: ImageFinder.whileFindCompare(good, bad, action), clickCompare.

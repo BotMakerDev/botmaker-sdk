@@ -3,8 +3,10 @@ package com.botmaker.sdk.plugin.launch;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.run.RunProperty;
 import com.botmaker.session.PrivateSession;
+import com.botmaker.session.SessionBackend;
 import com.botmaker.session.Sessions;
 import com.botmaker.session.impl.AdoptedSession;
+import com.botmaker.session.launch.BackgroundLauncher;
 
 import java.util.List;
 
@@ -20,10 +22,10 @@ import java.util.List;
  */
 public final class SessionHandoff {
 
-    private static final List<RunProperty<String>> PROPERTIES = List.of(
-            RunProperty.text(AdoptedSession.DISPLAY_PROPERTY),
-            RunProperty.text(AdoptedSession.WINDOW_PROPERTY),
-            RunProperty.text(AdoptedSession.BACKEND_PROPERTY));
+    private static final RunProperty<String> DISPLAY = RunProperty.text(AdoptedSession.DISPLAY_PROPERTY);
+    private static final RunProperty<String> WINDOW = RunProperty.text(AdoptedSession.WINDOW_PROPERTY);
+    private static final RunProperty<String> BACKEND = RunProperty.text(AdoptedSession.BACKEND_PROPERTY);
+    private static final List<RunProperty<String>> PROPERTIES = List.of(DISPLAY, WINDOW, BACKEND);
 
     private SessionHandoff() {}
 
@@ -32,6 +34,25 @@ public final class SessionHandoff {
         if (services == null) return;
         List<String> args = Sessions.handoffArguments(session);
         for (RunProperty<String> property : PROPERTIES) services.runs().set(property, value(args, property.name()));
+    }
+
+    /**
+     * The session {@code launcher} holds, or else the live display the offer still names, joined: this plugin reloaded
+     * in place (a local build tried over MCP) starts with an empty holder while the game its old copy launched keeps
+     * running there. Null when neither.
+     */
+    public static PrivateSession rejoin(StudioServices services, BackgroundLauncher launcher) {
+        PrivateSession held = launcher.session();
+        if (held != null || services == null) return held;
+        String display = services.runs().get(DISPLAY).orElse(null);
+        if (display == null || display.isBlank()) return null;
+        String window = services.runs().get(WINDOW).orElse(null);
+        SessionBackend backend = services.runs().get(BACKEND).flatMap(SessionBackend::fromId)
+                .orElse(SessionBackend.GAMESCOPE);
+        PrivateSession joined = launcher.adopt(display, window, backend);
+        // A display that has gone is withdrawn, so the next look does not try to join it again.
+        if (joined == null) offer(services, null);
+        return joined;
     }
 
     /** What {@code -D<name>=<value>} among {@code args} sets, or null. */
