@@ -53,6 +53,11 @@ public final class SdkAssist {
               within a second: cut a still part). Tag each picture with the
               activity that uses it, or a custom tag (declare_tag) for home and popups: crop_picture takes
               tags, list_tags shows them.
+            - Survey a screen before following any one control on it: one whole screenshot, then name every
+              input and what it does, its help (an i or ? button) first; each new word in an answer's
+              Appeared list is a question. Games ship their own shortcuts for chores (Auto, x10, Max, Claim
+              all, Skip): use one before writing a loop that repeats a click. After a run, look at the whole
+              screen again: a badge that came back is work left.
             - Before writing a step, find it: describe looks, click, key and scroll act, and all four answer
               in text. Then write it in the activity's body and run_activity it.
             - A click can be missed and a screen can be slow (lag, a dropped connection), so a step repeats

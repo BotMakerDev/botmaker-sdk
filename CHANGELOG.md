@@ -28,6 +28,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `DISABLED` is where the run goes when a card is switched off or has no body yet.
 - **A reloaded plugin rejoins the game.** After Studio reloads the SDK in place, the assistant's tools and
   `launch_game` join the private display the hand-off still names, so the game launched before keeps answering.
+- **The assistant's guide says to survey a screen first.** Name every input and read its help before following
+  one, and use the game's own shortcuts (Auto, x10, Max, Claim all) before a loop that repeats a click.
 - **The assistant's guide says what a click costs.** Each click pauses `found_delay` (500 ms by default); a bot
   whose steps prove themselves by a picture can lower it with `set_setting found_delay 150`.
 - **Scroll and drag on pictures.** `ImageScroller.scrollAt(picture, notches)`, `drag(picture, dx, dy)` (a
