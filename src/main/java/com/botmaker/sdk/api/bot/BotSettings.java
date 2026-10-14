@@ -103,6 +103,13 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
      */
     public static final int DEFAULT_PATIENCE = 3000;
 
+    /**
+     * How long the screen may stay still while the bot keeps clicking or pressing keys before the game counts as
+     * frozen, in ms: the next vision loop throws {@code BotStuckException} and the run recovers. A still screen the
+     * bot does not act on (a fight running its course) is never frozen.
+     */
+    public static final int DEFAULT_FROZEN_AFTER = 60_000;
+
     /** How long to wait for a launched game's window to appear, in milliseconds. */
     public static final long DEFAULT_LAUNCH_WAIT_TIMEOUT = 60000;
 
@@ -124,15 +131,18 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     }
 
     /**
-     * How the vision loops end. See {@link #DEFAULT_MAX_ROUNDS} and {@link #DEFAULT_PATIENCE}.
+     * How the vision loops end, and when a still screen is a frozen game. See {@link #DEFAULT_MAX_ROUNDS},
+     * {@link #DEFAULT_PATIENCE} and {@link #DEFAULT_FROZEN_AFTER}.
      *
-     * @param maxRounds the rounds a loop runs before the bot is stuck; at least 1
-     * @param patience  how long, in ms, a round gives its action to show; not negative
+     * @param maxRounds   the rounds a loop runs before the bot is stuck; at least 1
+     * @param patience    how long, in ms, a round gives its action to show; not negative
+     * @param frozenAfter how long, in ms, the screen may stay still while the bot acts; at least one second
      */
-    public record Loops(int maxRounds, int patience) {
+    public record Loops(int maxRounds, int patience, int frozenAfter) {
         public Loops {
             maxRounds = Math.max(1, maxRounds);
             patience = Math.max(0, patience);
+            frozenAfter = Math.max(1000, frozenAfter);
         }
     }
 
@@ -252,7 +262,7 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     public static final BotSettings DEFAULTS = new BotSettings(
             new Clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS),
             new Vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN),
-            new Loops(DEFAULT_MAX_ROUNDS, DEFAULT_PATIENCE),
+            new Loops(DEFAULT_MAX_ROUNDS, DEFAULT_PATIENCE, DEFAULT_FROZEN_AFTER),
             new RunIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO),
             DEFAULT_MAX_RETRY_ATTEMPTS, true);
 
@@ -261,7 +271,7 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
         clicks = clicks == null ? new Clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS)
                 : clicks;
         vision = vision == null ? new Vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN) : vision;
-        loops = loops == null ? new Loops(DEFAULT_MAX_ROUNDS, DEFAULT_PATIENCE) : loops;
+        loops = loops == null ? new Loops(DEFAULT_MAX_ROUNDS, DEFAULT_PATIENCE, DEFAULT_FROZEN_AFTER) : loops;
         runIn = runIn == null ? new RunIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO)
                 : runIn;
         maxRetryAttempts = Math.max(1, maxRetryAttempts);
@@ -397,6 +407,11 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
         return loops.patience;
     }
 
+    /** How long, in ms, the screen may stay still while the bot acts before the game counts as frozen. */
+    public int frozenAfter() {
+        return loops.frozenAfter;
+    }
+
     /** Where the game runs. */
     public Where where() {
         return runIn.where;
@@ -431,12 +446,15 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     }
 
     public BotSettings maxRounds(int rounds) {
-        return new BotSettings(clicks, vision, new Loops(rounds, loops.patience), runIn, maxRetryAttempts, debug);
+        return withLoops(new Loops(rounds, loops.patience, loops.frozenAfter));
     }
 
     public BotSettings patience(int milliseconds) {
-        return new BotSettings(clicks, vision, new Loops(loops.maxRounds, milliseconds), runIn, maxRetryAttempts,
-                debug);
+        return withLoops(new Loops(loops.maxRounds, milliseconds, loops.frozenAfter));
+    }
+
+    public BotSettings frozenAfter(int milliseconds) {
+        return withLoops(new Loops(loops.maxRounds, loops.patience, milliseconds));
     }
 
     public BotSettings maxRetryAttempts(int attempts) {
@@ -491,6 +509,10 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
 
     private BotSettings withClicks(Clicks next) {
         return new BotSettings(next, vision, loops, runIn, maxRetryAttempts, debug);
+    }
+
+    private BotSettings withLoops(Loops next) {
+        return new BotSettings(clicks, vision, next, runIn, maxRetryAttempts, debug);
     }
 
     private BotSettings withRunIn(RunIn next) {

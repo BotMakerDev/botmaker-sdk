@@ -38,6 +38,7 @@ public final class SettingsTypes {
             .with(BotSettings::compareMargin, BotSettings::compareMargin)
             .with(BotSettings::maxRounds, BotSettings::maxRounds)
             .with(BotSettings::patience, BotSettings::patience)
+            .with(BotSettings::frozenAfter, BotSettings::frozenAfter)
             .with(BotSettings::where, BotSettings::where)
             .flag(BotSettings::takesOver, BotSettings::takeOver)
             .with(BotSettings::displayBackend, settings -> settings.runIn().displayBackend())

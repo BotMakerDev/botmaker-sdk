@@ -839,7 +839,7 @@ public class ImageFinder {
         Vision.Frame frame;
         try {
             while ((frame = findFrame(one, source, BotSettings.current().confidence())).matches().has(template)) {
-                if (!rounds.next()) break;
+                if (!rounds.next(frame.pixels())) break;
                 MatchResult result = frame.matches().get(template);
                 Vision.setLastMatch(result);
                 action.accept(result);
@@ -880,7 +880,7 @@ public class ImageFinder {
         Vision.Frame frame;
         try {
             while (!(frame = compareFrame(good, bad, source, confidence(), margin())).matches().isEmpty()) {
-                if (!rounds.next()) break;
+                if (!rounds.next(frame.pixels())) break;
                 Vision.runInFrame(frame, action);
                 Rounds.awaitChange(frame, BotSettings.current().patience());
             }
@@ -933,17 +933,19 @@ public class ImageFinder {
      * @param action   the action to run
      */
     public static void untilFind(ImageTemplate template, CaptureSource source, Duration patience, Runnable action) {
-        untilSeen("untilFind(" + template.id() + ")", () -> find(template, source), patience, action);
+        untilSeen("untilFind(" + template.id() + ")", source, () -> find(template, source), patience, action);
     }
 
     /**
      * The until-loops' rounds: {@code seen} first, then act, look for {@code patience}, and act again until it is,
-     * or the loop has run out of rounds.
+     * or the loop has run out of rounds. Each round looks at one frame of {@code source} before it acts, which is
+     * how the loop tells a frozen game.
      */
-    private static void untilSeen(String loop, BooleanSupplier seen, Duration patience, Runnable action) {
+    private static void untilSeen(String loop, CaptureSource source, BooleanSupplier seen, Duration patience,
+                                  Runnable action) {
         if (seen.getAsBoolean()) return;
         Rounds rounds = new Rounds(loop);
-        while (rounds.next()) {
+        while (rounds.next(source.capture())) {
             action.run();
             if (Rounds.await(seen, patience.toMillis()) || seen.getAsBoolean()) return;
         }
@@ -1053,7 +1055,7 @@ public class ImageFinder {
         Vision.Frame frame;
         try {
             while (!(frame = findFrame(group, source, BotSettings.current().confidence())).matches().isEmpty()) {
-                if (!rounds.next()) break;
+                if (!rounds.next(frame.pixels())) break;
                 Vision.runInFrame(frame, action);
                 Rounds.awaitChange(frame, BotSettings.current().patience());
             }
@@ -1089,7 +1091,7 @@ public class ImageFinder {
         try {
             while ((frame = findFrame(group, source, BotSettings.current().confidence())).matches()
                     .hasAll(group.toArray())) {
-                if (!rounds.next()) break;
+                if (!rounds.next(frame.pixels())) break;
                 Vision.runInFrame(frame, action);
                 Rounds.awaitChange(frame, BotSettings.current().patience());
             }
@@ -1117,7 +1119,7 @@ public class ImageFinder {
      */
     public static void untilFindAny(ImageTemplateGroup group, CaptureSource source, Runnable action) {
         if (group.isEmpty()) return;   // nothing can ever appear, so this would run action forever
-        untilSeen(named("untilFindAny", group), () -> findAny(group, source),
+        untilSeen(named("untilFindAny", group), source, () -> findAny(group, source),
                 Duration.ofMillis(BotSettings.current().patience()), action);
     }
 
@@ -1140,7 +1142,7 @@ public class ImageFinder {
      */
     public static void untilFindAll(ImageTemplateGroup group, CaptureSource source, Runnable action) {
         if (group.isEmpty()) return;   // allMatch over nothing is vacuously true; keep it "matches nothing"
-        untilSeen(named("untilFindAll", group), () -> group.templates().stream().allMatch(t -> find(t, source)),
+        untilSeen(named("untilFindAll", group), source, () -> group.templates().stream().allMatch(t -> find(t, source)),
                 Duration.ofMillis(BotSettings.current().patience()), action);
     }
 }

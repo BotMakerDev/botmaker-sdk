@@ -207,6 +207,31 @@ class MatchesFindTest {
     }
 
     @Test
+    void aLoopActingOnAScreenThatNeverMovesSaysTheGameIsFrozen(@TempDir Path tmp) throws Exception {
+        BufferedImage mailPatch = patch(1);
+        ImageTemplate mail = write(tmp, "mail", mailPatch);
+        BotSettings.use(BotSettings.current().maxRounds(1000).patience(0).frozenAfter(60_000));
+        long[] now = {0};
+        Rounds.clock = () -> now[0] += 10_000;   // each round ten seconds later
+        try {
+            CountingSource source = new CountingSource(List.of(frameWith(mailPatch)));
+            int[] acted = {0};
+            BotStuckException stuck = assertThrows(BotStuckException.class,
+                    () -> ImageFinder.whileFindAny(ImageTemplateGroup.of(mail), source, found -> acted[0]++));
+            assertTrue(stuck.getMessage().contains("frozen"), stuck.getMessage());
+            assertEquals(6, acted[0], "still for 60 s after six rounds ten seconds apart, long before 1000 rounds");
+
+            now[0] = 0;
+            int[] tried = {0};
+            ImageTemplate gold = write(tmp, "gold", patch(2));
+            assertThrows(BotStuckException.class, () -> ImageFinder.untilFind(gold, source, () -> tried[0]++));
+            assertEquals(6, tried[0], "an until-loop watches its frames the same way");
+        } finally {
+            Rounds.clock = System::currentTimeMillis;
+        }
+    }
+
+    @Test
     void aRoundWaitsForWhatItActedOnToChangeAndNoLonger(@TempDir Path tmp) throws Exception {
         BufferedImage mailPatch = patch(1);
         ImageTemplate mail = write(tmp, "mail", mailPatch);

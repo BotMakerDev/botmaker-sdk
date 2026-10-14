@@ -77,6 +77,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A frozen game is seen, by each loop.** A vision loop acts every round, so it compares each round's whole frame,
+  as a small grey thumbnail, with the last: a frame still for `BotSettings.frozenAfter` (60 s) throws
+  `BotStuckException` before the loop has run its rounds out, and the run recovers (home, else a restart). Each
+  loop watches its own frames: a still screen outside a loop, which the bot only watches, is never frozen. Bot
+  Settings and `sdk_set_setting` (`frozen_after`) set it. The watchdog's count of the same match between
+  activities stays.
 - **A recovery restarts the game only when home cannot be reached.** A stuck or crashed pass runs the home method;
   the game restarts only when that throws (its loops ran out), not after every recovery. A setup still owed runs
   once home is reached. A cold start that fails restarts the game at once.

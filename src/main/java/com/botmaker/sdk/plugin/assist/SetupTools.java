@@ -82,6 +82,10 @@ final class SetupTools {
         PATIENCE("patience", "How long a vision loop gives each action to show, ms",
                 s -> String.valueOf(s.patience()),
                 (s, v) -> s.patience(whole(v, 0))),
+        FROZEN_AFTER("frozen_after", "How long the screen may stay still while the bot acts before the game is "
+                + "frozen, ms, 1000 or more",
+                s -> String.valueOf(s.frozenAfter()),
+                (s, v) -> s.frozenAfter(whole(v, 1000))),
         RUN_THE_GAME_IN("run_the_game_in", "Where the game runs",
                 s -> s.where().id(),
                 (s, v) -> s.where(choice(BotSettings.Where.values(), v, BotSettings.Where::id))),

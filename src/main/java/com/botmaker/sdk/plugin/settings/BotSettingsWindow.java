@@ -104,6 +104,7 @@ public final class BotSettingsWindow {
     private final Spinner<Double> compareMargin = new Spinner<>(0.0, 1.0, 0.05, 0.01);
     private final Spinner<Integer> maxRounds = new Spinner<>(1, 600_000, BotSettings.DEFAULT_MAX_ROUNDS, 1);
     private final Spinner<Integer> patience = new Spinner<>(0, 600_000, BotSettings.DEFAULT_PATIENCE, 100);
+    private final Spinner<Integer> frozenAfter = new Spinner<>(1, 3600, BotSettings.DEFAULT_FROZEN_AFTER / 1000, 5);
     private final Spinner<Integer> maxRetryAttempts = new Spinner<>(1, 600_000, 20, 1);
     private final ComboBox<BotSettings.InputBackend> inputBackend = new ComboBox<>();
     private final ComboBox<BotSettings.DisplayBackend> displayBackend = new ComboBox<>();
@@ -389,7 +390,7 @@ public final class BotSettingsWindow {
     /** Delays, confidence and retries — what the bot does around each match attempt. */
     private VBox visionPane() {
         for (Spinner<?> s : new Spinner<?>[] {foundDelay, notFoundDelay, confidence, compareMargin, maxRounds,
-                patience, maxRetryAttempts}) {
+                patience, frozenAfter, maxRetryAttempts}) {
             s.setEditable(true);
             s.setPrefWidth(120);
         }
@@ -406,7 +407,9 @@ public final class BotSettingsWindow {
                 note("How many rounds a loop runs before the bot is stuck and recovers."));
         grid.addRow(5, new Label("Loop patience (ms)"), patience,
                 note("How long a loop gives each action to show before it acts or looks again."));
-        grid.addRow(6, new Label("Stuck after N no-progress checks"), maxRetryAttempts,
+        grid.addRow(6, new Label("Frozen after (s)"), frozenAfter,
+                note("How long the screen may stay still while the bot keeps acting before it restarts the game."));
+        grid.addRow(7, new Label("Stuck after N no-progress checks"), maxRetryAttempts,
                 note("When the watchdog decides the bot is stuck and restarts it."));
         return new VBox(8, title("Clicks & matching"), grid, randomizeClicks);
     }
@@ -429,6 +432,7 @@ public final class BotSettingsWindow {
         compareMargin.getValueFactory().setValue(s.compareMargin());
         maxRounds.getValueFactory().setValue(s.maxRounds());
         patience.getValueFactory().setValue(s.patience());
+        frozenAfter.getValueFactory().setValue(Math.max(1, s.frozenAfter() / 1000));
         maxRetryAttempts.getValueFactory().setValue(s.maxRetryAttempts());
         randomizeClicks.setSelected(s.randomizeClicks());
         debug = s.debug();
@@ -443,13 +447,13 @@ public final class BotSettingsWindow {
      */
     BotSettings collect() {
         for (Spinner<?> s : new Spinner<?>[] {foundDelay, notFoundDelay, confidence, compareMargin, maxRounds,
-                patience, maxRetryAttempts}) {
+                patience, frozenAfter, maxRetryAttempts}) {
             commitTyped(s);
         }
         return new BotSettings(
                 new BotSettings.Clicks(foundDelay.getValue(), notFoundDelay.getValue(), randomizeClicks.isSelected()),
                 new BotSettings.Vision(confidence.getValue(), compareMargin.getValue()),
-                new BotSettings.Loops(maxRounds.getValue(), patience.getValue()),
+                new BotSettings.Loops(maxRounds.getValue(), patience.getValue(), frozenAfter.getValue() * 1000),
                 new BotSettings.RunIn(chosenWhere(), takeOver.isSelected(), displayBackend.getValue(),
                         inputBackend.getValue()),
                 maxRetryAttempts.getValue(), debug);

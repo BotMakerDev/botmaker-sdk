@@ -10,6 +10,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.LongSupplier;
 
 /**
  * How a vision loop ends when its action does not end it. Each loop counts its rounds and throws
@@ -17,8 +18,22 @@ import java.util.function.BooleanSupplier;
  * checkpoint runs between activities only, so a loop inside a body that never ends was never seen by it. And each
  * round gives its action {@link BotSettings#patience()} to show before the loop looks again, so a round is not a
  * blind re-find of a screen the game has not redrawn yet.
+ *
+ * <p>A loop also tells a frozen game (2026-10-14): it acts every round, so a whole frame that stays the same
+ * from round to round for {@link BotSettings#frozenAfter()} is a game that no longer answers, and the loop throws
+ * before it has run its rounds out. Each loop watches its own frames, with its own acts: a program-wide count of
+ * clicks and captures credited acts to screens the bot never looked at.
  */
 final class Rounds {
+
+    /** The frame a round compares is shrunk to grey this size. */
+    static final int THUMB_W = 64;
+    static final int THUMB_H = 36;
+    /** A mean grey difference per thumbnail pixel above this, out of 255, is a screen that moved. */
+    static final double MOVED = 2.0;
+
+    /** The time a still screen is measured in; a test replaces it. */
+    static LongSupplier clock = System::currentTimeMillis;
 
     /** How often a round looks at the screen while it waits. */
     static final int POLL_MS = 100;
@@ -31,24 +46,61 @@ final class Rounds {
 
     private final String loop;
     private final int max;
+    private final int frozenAfter;
     private int done;
+    /** The last round's frame, shrunk; and when the frame was last seen to move. */
+    private int[] thumb;
+    private long stillSince;
 
     Rounds(String loop) {
         this.loop = loop;
         this.max = BotSettings.current().maxRounds();
+        this.frozenAfter = BotSettings.current().frozenAfter();
     }
 
     /**
-     * Counts one round: false when the run is stopping (its thread interrupted), so the loop ends without acting
-     * again; throws when the loop has run all of them.
+     * Counts one round about to act on {@code seen}, the frame it looked at (null when there is none): false when
+     * the run is stopping (its thread interrupted), so the loop ends without acting again; throws when the loop
+     * has run all its rounds, or when its frames have not moved for {@link BotSettings#frozenAfter()}.
      */
-    boolean next() {
+    boolean next(BufferedImage seen) {
         if (Thread.currentThread().isInterrupted()) return false;
+        if (seen != null) {
+            long now = clock.getAsLong();
+            int[] shrunk = thumb(seen);
+            if (thumb == null || moved(thumb, shrunk)) {
+                thumb = shrunk;
+                stillSince = now;
+            } else if (now - stillSince >= frozenAfter) {
+                throw new BotStuckException("The game looks frozen: " + loop + " acted on the same screen for "
+                        + (now - stillSince) / 1000 + " s (BotSettings.frozenAfter)");
+            }
+        }
         if (++done > max) {
             throw new BotStuckException(loop + " ran " + max + " rounds and did not end; its action does not "
                     + "change what it looks for (BotSettings.maxRounds)");
         }
         return true;
+    }
+
+    static int[] thumb(BufferedImage frame) {
+        int[] grey = new int[THUMB_W * THUMB_H];
+        int w = frame.getWidth();
+        int h = frame.getHeight();
+        for (int ty = 0; ty < THUMB_H; ty++) {
+            for (int tx = 0; tx < THUMB_W; tx++) {
+                int rgb = frame.getRGB(Math.min(w - 1, (tx * w + w / 2) / THUMB_W),
+                        Math.min(h - 1, (ty * h + h / 2) / THUMB_H));
+                grey[ty * THUMB_W + tx] = (((rgb >> 16) & 0xFF) + ((rgb >> 8) & 0xFF) + (rgb & 0xFF)) / 3;
+            }
+        }
+        return grey;
+    }
+
+    static boolean moved(int[] before, int[] after) {
+        long sum = 0;
+        for (int i = 0; i < before.length; i++) sum += Math.abs(before[i] - after[i]);
+        return sum / (double) before.length > MOVED;
     }
 
     /** Waits until {@code seen} is true, looking every {@link #POLL_MS}, at most {@code patienceMs}. */
