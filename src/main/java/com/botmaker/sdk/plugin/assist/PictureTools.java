@@ -75,10 +75,10 @@ final class PictureTools {
                 @Describe(value = "top edge of the part to skip", optional = true) Integer ignoreY,
                 @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
                 @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight,
-                @Describe(value = "the screen it is on, as the Map names it: noted in that screen's section",
-                        optional = true) String screen,
+                @Describe(value = "the screen it is on, as its section names it: noted there as an input, untried "
+                        + "until try_input tries it", optional = true) String screen,
                 @Describe(value = "true when it is that screen's marker, a part no other screen shows: pays the "
-                        + "marker map_screen left owed", optional = true) Boolean marker) {
+                        + "marker try_input left owed", optional = true) Boolean marker) {
 
         /** The part to skip, when all four of its edges are given. */
         Optional<Rect> ignore() {
@@ -237,7 +237,7 @@ final class PictureTools {
                 return AgentReply.refused(e.getMessage());
             }
             if (section.isEmpty()) {
-                return AgentReply.refused("No section " + screen + " in " + GameNotes.FILE + ": map_screen opens "
+                return AgentReply.refused("No section " + screen + " in " + GameNotes.FILE + ": try_input opens "
                         + "one, or write_notes it. Nothing was saved.");
             }
         }

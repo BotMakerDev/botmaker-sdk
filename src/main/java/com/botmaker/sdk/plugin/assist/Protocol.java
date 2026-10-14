@@ -34,16 +34,25 @@ final class Protocol {
                 - Done when a run started from three different screens reaches home each time.
                 """),
         DISCOVERY("Stage 1, Discovery: know the game before writing any body", """
-                - Map first, breadth-first: every way out of home (its buttons, side columns, hotkeys) and the
-                  screen each one opens, before surveying any one screen. From home's own screenshot, cut every
-                  entrance on it at once (an icon with no picture is one the bot cannot take), then map_screen
-                  each: it clicks the picture or taps the hotkey, writes the Map's line, and answers with the new
-                  screen's screenshot. From that screenshot, before leaving: crop_picture with screen and marker
-                  true a part only that screen shows, and with screen each button a chore there plainly needs.
-                  What cannot be cut yet is an Owed: line in its section (write_notes): map_screen refuses the
-                  next screen while one owes its marker, and Discovery is not done while anything is owed; a debt
-                  paid by hand is its line removed with write_notes. A side
-                  column that scrolls or whose icons come and go: say so in the Map.
+                - Explore each screen across, then down: every input on a screen tried before going down any
+                  screen it opens, then one branch followed to its end before the next is begun. Home is the
+                  first screen (a section Home with its Marker: line). On a screen: one screenshot, then
+                  crop_picture with that screen every input on it (each button, icon, tab and toggle; an icon with
+                  no picture is one the bot cannot take): each is untried. Then try_input each, by its picture or
+                  its hotkey, giving opens the name the screen it opens shows when it shows one: try_input clicks
+                  it and records what it did. An input that opens a screen writes the Map's line and the new
+                  screen's section, owing a marker, and answers with its screenshot: crop_picture its marker
+                  (marker true, a part only that screen shows) and its inputs, go back, and try the next input.
+                  An input that changes the screen in place (a toggle, a tab, a sub-panel): cut what it shows;
+                  those are untried in turn. An input that spends premium currency or real money is tried with
+                  never and its reason, never clicked.
+                - A screen whose inputs all open screens is a menu; any other is an activity, and its sub-panels
+                  are part of it. try_input writes its Shape: line once nothing on it is untried.
+                - try_input refuses while a screen owes its marker, and while a screen this one was reached
+                  from has an input untried, or none tried yet, and while another branch begun is not finished. What cannot be cut yet is an Owed: line in its section (write_notes);
+                  Discovery is not done while anything is owed or untried; a debt paid by hand is its line
+                  removed with write_notes. A side column that scrolls or whose icons come and go: say so in
+                  the Map.
                 - Then survey one screen: one whole screenshot, its help (an i or ? button) first, then every
                   input on it, named and given a kind: a chore (work that repeats), a shortcut the game ships for
                   a chore (Auto, x10, Max, Claim all, Skip), a choice (spending the player decides), information,

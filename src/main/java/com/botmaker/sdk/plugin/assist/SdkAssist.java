@@ -9,7 +9,7 @@ import java.util.List;
  * The SDK's tools for the AI assistant that drives Studio: look at what the bot sees ({@link LookTools}), make
  * its pictures and places ({@link PictureTools}) and tag the pictures ({@link TagTools}), shape its activity flow ({@link FlowTools}), set where it
  * looks and how it runs ({@link SetupTools}), and keep the bot's notes on its game and the protocol's steps for
- * where it stands ({@link NotesTools}), and map the game's screens one entrance at a time ({@link MapTools}).
+ * where it stands ({@link NotesTools}), and map the game's screens one input at a time ({@link MapTools}).
  *
  * <p>Coordinates are the <b>screenshot's</b> pixels: {@code (0, 0)} is the top-left of what {@code screenshot}
  * returned, so the assistant crops what it was shown. Every write goes through the same path as the SDK's own
@@ -41,9 +41,8 @@ public final class SdkAssist {
             - When a stage's check passes for a screen, write_notes that screen's section with its new Stage
               line, and what the stage taught about the game, before going on.
             - Stage 0, Setup: the game in view, a home method and a popups method.
-            - Stage 1, Discovery: map every way out of home with map_screen, cutting each screen's marker and
-              buttons as it opens, then survey each screen's every input, its help first, before following any
-              one of them.
+            - Stage 1, Discovery: explore each screen across, from home: cut its marker and every input on it,
+              then try_input each one before any screen they open; then survey each screen, its help first.
             - Stage 2, Build: one chore at a time, through the game's own shortcuts, each step proved by a
               picture.
             - Stage 3, Trial: each activity from three states (work to do, nothing to do, interrupted), then

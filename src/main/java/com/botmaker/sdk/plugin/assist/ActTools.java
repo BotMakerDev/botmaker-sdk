@@ -219,6 +219,29 @@ final class ActTools {
         return new Spotted(frame.get(), match.rect().center(), base.get(), null);
     }
 
+    /** Why the game is not on {@code screen}, when its {@code marker} is not on a fresh look: try_input refuses. */
+    static Optional<AgentReply> notOn(AgentContext context, String marker, String screen) {
+        Spotted spotted = spot(marker, "done", context);
+        if (spotted.refusal() == null) return Optional.empty();
+        if (spotted.refusal().isRefused()) return Optional.of(spotted.refusal());
+        return Optional.of(AgentReply.refused("The game is not on " + screen + ": " + spotted.refusal().parts()
+                .getFirst().text() + " Go back to " + screen + " first."));
+    }
+
+    /** Whether the bot has a picture called {@code picture}. */
+    static boolean exists(AgentContext context, String picture) {
+        return Frames.resources(context).flatMap(r -> Frames.picture(r, picture)).isPresent();
+    }
+
+    /** Whether a run would find {@code picture} on {@code frame}. */
+    static boolean shows(AgentContext context, String picture, BufferedImage frame) {
+        Optional<Path> resources = Frames.resources(context);
+        Optional<String> base = resources.flatMap(r -> Frames.picture(r, picture));
+        if (base.isEmpty()) return false;
+        MatchResult match = LookTools.best(resources.get(), base.get(), frame);
+        return match.isFound() && match.confidence() >= Frames.confidence(context.services());
+    }
+
     /**
      * What an action did: the answer as click or key says it, and when it happened and the screen was read after
      * it, the frames either side and what moved on its own; {@code how} says it in the Map's words
@@ -236,8 +259,8 @@ final class ActTools {
     }
 
     /**
-     * Clicks {@code picture} or taps {@code key} for map_screen, waiting up to {@code settleMs} for a change as big
-     * as {@code share} of the screen: a new screen, which the small change of a swaying home does not end early.
+     * Clicks {@code picture} or taps {@code key} for try_input, waiting up to {@code settleMs} for a change as big
+     * as {@code share} of the screen.
      */
     static Entered enter(AgentContext context, String picture, Key key, Boolean desktop, int settleMs, double share) {
         if (key != null) {

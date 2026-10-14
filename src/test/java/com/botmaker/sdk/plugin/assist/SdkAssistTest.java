@@ -1017,32 +1017,49 @@ class SdkAssistTest {
     }
 
     @Test
-    void mapScreenTakesOnlyAPictureOrAHotkeyAndWaitsForTheMarkerOwed() {
+    void tryInputTakesAPictureOrAHotkeyAndEachScreensInputsBeforeTheScreensTheyOpen() {
         NativeControllerFactory.setForTesting(new RecordingNativeController());
         agent.frame = withPatchAt(120, 80);
-        assertTrue(text(run("map_screen", "screen", "Engineer")).contains("a picture to click or a hotkey"));
-        assertTrue(run("map_screen", "screen", "Engineer", "picture", "ore", "key", "E").isRefused());
-        assertTrue(run("map_screen", "screen", "Map", "key", "M").isRefused(), "the Map is no screen");
-        AgentReply still = run("map_screen", "screen", "Engineer", "picture", "ore", "desktop", true, "settleMs", 0);
-        assertTrue(text(still).contains("opened no screen"), text(still));
-        assertTrue(GameNotes.sections(bot).isEmpty(), "nothing written for a screen that did not open");
+        assertTrue(text(run("try_input", "screen", "Home")).contains("a picture to click or a hotkey"));
+        assertTrue(run("try_input", "screen", "Home", "picture", "ore", "key", "E").isRefused());
+        assertTrue(text(run("try_input", "screen", "Home", "key", "M")).contains("A hotkey names no screen"));
+        assertTrue(text(run("try_input", "screen", "Home", "picture", "ore", "desktop", true, "settleMs", 0))
+                .contains("write_notes Home"), "home's section is written first");
 
-        MapTools.recorded(bot, "Engineer", "home › click ore");
-        AgentReply gated = run("map_screen", "screen", "Guild", "picture", "ore", "desktop", true, "settleMs", 0);
-        assertTrue(gated.isRefused() && text(gated).startsWith("Engineer still owes its marker"), text(gated));
-
+        GameNotes.write(bot, "Home", "Marker: ore");
         run("screenshot");
         assertTrue(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
                 "marker", true).isRefused(), "a marker without its screen");
         assertTrue(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
                 "screen", "Guild").isRefused(), "no section to note it in");
         assertFalse(TemplateLibrary.exists(resources, "gold"), "a refused note saves nothing");
-        assertEquals("Saved gold as Pictures.GOLD. Noted in Engineer as its marker.", text(run("crop_picture",
-                "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "engineer",
-                "marker", true)));
-        assertEquals("Entrance: home › click ore\nMarker: gold", GameNotes.sections(bot).get("Engineer"));
-        assertFalse(run("map_screen", "screen", "Guild", "picture", "ore", "desktop", true, "settleMs", 0)
-                .isRefused(), "the debt paid, the next screen is mapped");
+        assertTrue(text(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
+                "screen", "home")).contains("Noted in Home as untried"));
+        assertEquals("Marker: ore\nUntried: gold", GameNotes.sections(bot).get("Home"));
+
+        MapTools.recorded(bot, "Engineer", "home › click ore");
+        AgentReply gated = run("try_input", "screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
+        assertTrue(gated.isRefused() && text(gated).startsWith("Engineer still owes its marker"), text(gated));
+        assertTrue(text(run("crop_picture", "name", "coin", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
+                "screen", "engineer", "marker", true)).contains("Noted in Engineer as its marker."));
+        AgentReply above = run("try_input", "screen", "Engineer", "picture", "coin", "desktop", true, "settleMs", 0);
+        assertTrue(above.isRefused() && text(above).startsWith("Finish Home first"), text(above));
+
+        AgentReply still = run("try_input", "screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
+        assertTrue(text(still).contains("Noted in Home: tried gold, no visible effect."), text(still));
+        assertEquals("Marker: ore\n- tried gold: no visible effect\nShape: activity", GameNotes.sections(bot)
+                .get("Home"));
+        assertFalse(run("try_input", "screen", "Engineer", "picture", "coin", "desktop", true, "settleMs", 0)
+                .isRefused(), "home finished, the screen it opened is next");
+        assertTrue(run("try_input", "screen", "Engineer", "picture", "coin", "never", " ").isRefused(),
+                "a blank reason never clicks");
+        assertTrue(run("try_input", "screen", "Engineer", "picture", "coin", "never", "spends gems").isRefused(),
+                "only an untried input is never clicked");
+        run("crop_picture", "name", "gem", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
+        assertTrue(text(run("try_input", "screen", "Engineer", "picture", "gem", "never", "spends gems"))
+                .contains("tried gem, never, spends gems."));
+        assertTrue(run("try_input", "screen", "Engineer", "picture", "home").isRefused(),
+                "a picture naming its screen Home asks for opens");
     }
 
     @Test

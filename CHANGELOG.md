@@ -21,10 +21,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
-- **The assistant maps a game one screen at a time.** `map_screen` clicks a picture or taps a hotkey, and
-  writes the screen's Map line and a section that owes its marker. It refuses the next screen while any section
-  still owes one. `crop_picture` takes `screen` and `marker`: a marker pays the debt, other cuts are listed on the
-  section. `Owed:` lines in GAME.md keep `read_guide` in Discovery and are listed there.
+- **The assistant explores a game one screen across at a time.** `crop_picture` takes `screen` and `marker`:
+  a marker is noted in that screen's section, and every other cut is an untried input. `try_input` clicks one (or
+  taps a hotkey) and records what it did: opened a screen (its Map line and a section owing a marker), changed
+  this one in place, or nothing; an input that spends premium currency is recorded `never`, not clicked. A screen
+  whose inputs all open screens is a menu, any other an activity. It explores each screen across, then down: it
+  refuses while a screen owes its marker, while a screen this one was reached from has an input left to try, and
+  while another branch begun is not finished. `Owed:` lines and untried inputs keep `read_guide` in Discovery and
+  are listed there.
 - **A picture can leave a part out.** The assistant's `crop_picture` takes a box to ignore (`ignoreX`, `ignoreY`,
   `ignoreWidth`, `ignoreHeight`), saved transparent, which matching skips: map pins alike but for their timers'
   digits all match one picture. `replace_picture` takes the same box, so a recut keeps its name and uses.
