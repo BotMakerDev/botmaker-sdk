@@ -1,9 +1,10 @@
 package com.botmaker.sdk.plugin.flow;
 
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Box;
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
+import com.botmaker.plugin.toolkit.graph.Routes;
 import com.botmaker.sdk.plugin.flow.FlowArrange.Card;
 import com.botmaker.sdk.plugin.flow.FlowArrange.Layout;
-import com.botmaker.sdk.plugin.flow.FlowArrange.Pt;
-import com.botmaker.sdk.plugin.flow.FlowArrange.Rect;
 import com.botmaker.sdk.plugin.flow.FlowArrange.Route;
 import org.junit.jupiter.api.Test;
 
@@ -78,7 +79,7 @@ class FlowArrangeTest {
         assertEquals(layout, FlowArrange.arrange(placed, flow.arrows, ""), "arranging twice moves nothing");
         assertTrue(layout.crossings() <= FlowArrange.arrange(flow.list(), flow.arrows, "", 1).crossings(),
                 "the sweeps never end with more crossings than one pass");
-        Rect box = FlowArrange.extent(placed, routes);
+        Box box = FlowArrange.extent(placed, routes);
         assertTrue(box.minX() >= 0 && box.minY() >= 0 && box.maxX() <= layout.width()
                 && box.maxY() <= layout.height(), "every wire is on the canvas: " + box);
         return layout;
@@ -107,8 +108,9 @@ class FlowArrangeTest {
     /** No point of a wire, away from its two ports, lies inside a card. */
     private static void noWireCrossesACard(List<Card> cards, List<Route> routes) {
         for (Route route : routes) {
-            for (Pt p : route.sample(3)) {
-                if (near(p, route.start()) || near(p, route.end())) continue;
+            Routes.Route path = route.path();
+            for (Pt p : path.sample(3)) {
+                if (near(p, path.start()) || near(p, path.end())) continue;
                 for (Card card : cards) {
                     if (card.rect().holds(p, 0.5)) {
                         fail(route.arrow() + " runs through " + card.name() + " at " + p);
@@ -213,8 +215,8 @@ class FlowArrangeTest {
         Card stranger = new Card("Stranger", (a.x() + b.x() + 900) / 2, a.y() - 20, 220, 120, Map.of());
         placed.add(stranger);
         List<Route> routes = FlowArrange.routes(placed, flow.arrows);
-        Route straight = new Route(routes.getFirst().arrow(),
-                List.of(new FlowArrange.Line(routes.getFirst().start(), routes.getFirst().end())));
+        Routes.Route first = routes.getFirst().path();
+        Routes.Route straight = new Routes.Route(first.link(), List.of(new Routes.Line(first.start(), first.end())));
         assertTrue(straight.sample(3).stream().anyMatch(p -> stranger.rect().holds(p, 0.5)),
                 "the straight wire would run through the stranger");
         noWireCrossesACard(placed, routes);
@@ -225,11 +227,25 @@ class FlowArrangeTest {
         Flow flow = chain(15);
         Layout layout = FlowArrange.arrange(flow.list(), flow.arrows, "");
         List<Card> placed = placed(flow, layout);
-        Rect box = FlowArrange.extent(placed, FlowArrange.routes(placed, flow.arrows));
+        Box box = FlowArrange.extent(placed, FlowArrange.routes(placed, flow.arrows));
         double zoom = FlowArrange.fitZoom(box, 1200, 800);
         assertTrue(zoom < 1, "15 columns do not fit 1200px at 1:1");
         assertTrue((box.width() + 2 * FlowArrange.FIT_MARGIN) * zoom <= 1200 + 1e-6);
         assertTrue((box.height() + 2 * FlowArrange.FIT_MARGIN) * zoom <= 800 + 1e-6);
-        assertEquals(1, FlowArrange.fitZoom(new Rect(0, 0, 300, 200), 1200, 800), "a small flow stays at 1:1");
+        assertEquals(1, FlowArrange.fitZoom(new Box(0, 0, 300, 200), 1200, 800), "a small flow stays at 1:1");
+    }
+
+    /** The gamebot's flow: Collect loops on itself, Battle and Rest loop back to it. */
+    @Test
+    void theGamebotFlowRunsLeftToRightWithEveryWireKept() {
+        Flow flow = new Flow().card("Collect", 2).card("Battle", 2).card("Rest", 1)
+                .wire("Collect", 0, "Collect").wire("Collect", 1, "Battle")
+                .wire("Battle", 0, "Collect").wire("Battle", 1, "Rest").wire("Rest", 0, "Collect");
+        Layout layout = FlowArrange.arrange(flow.list(), flow.arrows, "Collect");
+        readable(flow);
+        assertTrue(layout.at().get("Collect").x() < layout.at().get("Battle").x()
+                && layout.at().get("Battle").x() < layout.at().get("Rest").x(), "left to right: " + layout);
+        List<Route> routes = FlowArrange.routes(placed(flow, layout), flow.arrows);
+        assertEquals(flow.arrows, routes.stream().map(Route::arrow).toList(), "each wire keeps its outcome");
     }
 }

@@ -195,6 +195,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **🔀 Activity Flow's Auto-arrange and wires use the toolkit's graph layout**, the one 🗺 Screens draws with
+  (`LayeredLayout`, `Routes`). They were lifted from the flow editor, so a flow arranges as before; the flow
+  editor keeps no copy of its own.
 - **crop_picture no longer tags a picture with its screen's name.** 🖼 Manage Pictures groups it under its
   screen instead.
 - **A picture's tags are in the bot's Java; `templates.json` is gone.** A custom tag is a constant of a new

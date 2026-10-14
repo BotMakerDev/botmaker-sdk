@@ -1,5 +1,8 @@
 package com.botmaker.sdk.plugin.flow;
 
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Box;
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
+import com.botmaker.plugin.toolkit.graph.Routes;
 import com.botmaker.sdk.api.flow.Flow;
 import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
@@ -265,7 +268,7 @@ public final class FlowCanvas extends StackPane {
      * Grows the canvas so {@code box} has {@link FlowArrange#MARGIN} to spare right and below, in steps of
      * {@link #GROW_STEP} so a drag past the edge does not resize on every pixel.
      */
-    private void growToHold(FlowArrange.Rect box) {
+    private void growToHold(Box box) {
         if (box == null) return;
         double needW = box.maxX() + FlowArrange.MARGIN;
         double needH = box.maxY() + FlowArrange.MARGIN;
@@ -591,7 +594,7 @@ public final class FlowCanvas extends StackPane {
                 return;
             }
             List<FlowArrange.Card> now = layoutCards();
-            FlowArrange.Rect box = FlowArrange.extent(now, FlowArrange.routes(now, edges));
+            Box box = FlowArrange.extent(now, FlowArrange.routes(now, edges));
             double fit = FlowArrange.fitZoom(box, view.getWidth(), view.getHeight());
             setZoom(Math.max(MIN_ZOOM, fit));
             Point2D centre = new Point2D(box.centre().x(), box.centre().y());
@@ -882,8 +885,8 @@ public final class FlowCanvas extends StackPane {
         // A wire is symmetrical, so without a head you can't tell "A then B" from "B then A" — the direction
         // is the entire meaning of the wire. The head is aimed along the path's last direction rather than the
         // straight start→end line, so it stays flush with the path however the cards sit.
-        FlowArrange.Pt from = route.headFrom();
-        FlowArrange.Pt end = route.end();
+        Pt from = route.path().headFrom();
+        Pt end = route.path().end();
         Polygon head = arrowHead(from.x(), from.y(), end.x(), end.y());
 
         // The hitbox: the same path again, invisible and six times as wide, behind the visible one. Picking
@@ -943,11 +946,12 @@ public final class FlowCanvas extends StackPane {
 
     /** {@code route} as a JavaFX path: its lines and curves, in order. */
     private static Path path(FlowArrange.Route route) {
-        Path path = new Path(new MoveTo(route.start().x(), route.start().y()));
-        for (FlowArrange.Segment segment : route.segments()) {
+        Routes.Route way = route.path();
+        Path path = new Path(new MoveTo(way.start().x(), way.start().y()));
+        for (Routes.Segment segment : way.segments()) {
             path.getElements().add(switch (segment) {
-                case FlowArrange.Line line -> new LineTo(line.to().x(), line.to().y());
-                case FlowArrange.Cubic c -> new CubicCurveTo(c.c1().x(), c.c1().y(), c.c2().x(), c.c2().y(),
+                case Routes.Line line -> new LineTo(line.to().x(), line.to().y());
+                case Routes.Cubic c -> new CubicCurveTo(c.c1().x(), c.c1().y(), c.c2().x(), c.c2().y(),
                         c.to().x(), c.to().y());
             });
         }
