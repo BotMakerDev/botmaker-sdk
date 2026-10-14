@@ -201,9 +201,16 @@ final class GameNotes {
         return out.toString().strip();
     }
 
-    /** The notes as text; a byte that is not UTF-8, from an editor of the author's, reads as a replacement. */
+    /**
+     * The notes as text; a byte that is not UTF-8, from an editor of the author's, reads as a replacement. A link is
+     * refused: a gallery bot's maker could point it at any file of the user's, which would then reach the assistant.
+     */
     private static String notes(Path project) {
         Path file = project.resolve(FILE);
+        if (Files.isSymbolicLink(file)) {
+            throw new IllegalArgumentException(FILE + " is a link to another file, so it is not read: make it a file "
+                    + "of the bot's own.");
+        }
         try {
             return Files.isRegularFile(file) ? new String(Files.readAllBytes(file), StandardCharsets.UTF_8) : "";
         } catch (IOException e) {

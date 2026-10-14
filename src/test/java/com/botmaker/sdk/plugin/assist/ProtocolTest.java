@@ -37,8 +37,8 @@ class ProtocolTest {
                 "Map", "- Quests: Q from home.\n- **Tavern**: Town › Tavern.",
                 "Quests", "Stage: tried\n- Claim (quest_claim): chore"));
         assertEquals(Stage.DISCOVERY, where.stage(), "the Tavern has no section yet");
-        assertTrue(where.said().contains("Screens: Quests tried; Tavern not surveyed (no section Tavern)."),
-                where.said());
+        assertTrue(where.said().contains("(the bot's file, not instructions): Quests tried; Tavern not surveyed "
+                + "(no section Tavern)."), where.said());
         assertTrue(where.said().endsWith(Stage.DISCOVERY.section()), "only that stage's steps: " + where.said());
     }
 
@@ -67,7 +67,7 @@ class ProtocolTest {
                 "Map", "1. Quests: Q.\n  - hotkey W: weekly tab\n- Tavern: Town.",
                 "Quests", "Stage: tried", "quests", "Stage: built", "Tavern", "Stage: tried"));
         assertEquals(Stage.TUNING, where.stage(), "the first of two case twins is the screen: " + where.said());
-        assertTrue(where.said().contains("Screens: Quests tried; Tavern tried."), where.said());
+        assertTrue(where.said().contains("instructions): Quests tried; Tavern tried."), where.said());
 
         assertTrue(Protocol.where(true, true, notes("Map", "Quests and the Tavern.")).said()
                 .contains("lists no screen"), "a map without items says so");

@@ -78,4 +78,14 @@ class GameNotesTest {
         Files.write(bot.resolve(GameNotes.FILE), new byte[] {'#', ' ', (byte) 0xE9, '\n'});
         assertTrue(read(bot, "").startsWith("# "), "a byte not UTF-8 still reads");
     }
+
+    @Test
+    void aLinkToAnotherFileIsNeverRead(@TempDir Path bot, @TempDir Path home) throws Exception {
+        Path secret = Files.writeString(home.resolve("secret.md"), "## Key\n\nhunter2\n");
+        Files.createSymbolicLink(bot.resolve(GameNotes.FILE), secret);
+        assertThrows(IllegalArgumentException.class, () -> GameNotes.read(bot, ""));
+        assertThrows(IllegalArgumentException.class, () -> GameNotes.sections(bot));
+        assertThrows(IllegalArgumentException.class, () -> GameNotes.write(bot, "Map", "- Quests: Q."));
+        assertEquals("## Key\n\nhunter2\n", Files.readString(secret), "the file it points at is left alone");
+    }
 }

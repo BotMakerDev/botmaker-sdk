@@ -89,7 +89,7 @@ final class NotesTools {
         try {
             return AgentReply.text(Protocol.where(target.run().home() != null, target.run().popups() != null,
                     GameNotes.sections(project)).said());
-        } catch (UncheckedIOException e) {
+        } catch (IllegalArgumentException | UncheckedIOException e) {
             return AgentReply.refused(e.getMessage());
         }
     }
