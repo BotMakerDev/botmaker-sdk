@@ -86,6 +86,16 @@ final class PictureTools {
         }
     }
 
+    record Crops(@Describe("one line per picture, in the last screenshot's pixels: \"name x y width height\", then "
+                         + "optionally \"ignore x y width height\" for a part matching skips") List<String> boxes,
+                 @Describe(value = "the screen they are on, as its section names it: each noted there as an input, "
+                         + "untried until try_input tries it", optional = true) String screen,
+                 @Describe(value = "the name of the one box that is that screen's marker", optional = true)
+                 String marker,
+                 @Describe(value = "tags to file every one under, each declared (list_tags)", optional = true)
+                 List<String> tags) {
+    }
+
     record PictureName(@Describe("a picture's name, as list_pictures gives it") String picture) {
     }
 
@@ -158,6 +168,10 @@ final class PictureTools {
                             + "bot can find and click, declared as a Pictures constant; a part given to ignore "
                             + "is left out of matching, so copies that differ only there all match")
                     .takes(Crop.class).handledBy(PictureTools::cropPicture),
+            AssistantTool.named("crop_pictures")
+                    .describedAs("crop_picture for several boxes of the last screenshot in one call: every input "
+                            + "of a screen at once, its marker among them")
+                    .takes(Crops.class).handledBy(PictureTools::cropPictures),
             AssistantTool.named("show_picture")
                     .describedAs("A picture's image, its size, its constant and how many places use it")
                     .takes(PictureName.class).handledBy(PictureTools::showPicture),
@@ -206,6 +220,55 @@ final class PictureTools {
                     + "]"));
         }
         return AgentReply.text(lines.isEmpty() ? "No pictures yet; crop_picture makes one." : String.join("\n", lines));
+    }
+
+    /**
+     * Each box as crop_picture cuts it, all from the same screenshot. Every line is read before any is cut, so a
+     * line that does not read saves nothing; a box crop_picture refuses is said and the rest are cut.
+     */
+    static AgentReply cropPictures(Crops crops, AgentContext context) {
+        List<String> lines = crops.boxes() == null ? List.of() : crops.boxes().stream().filter(l -> !l.isBlank())
+                .toList();
+        if (lines.isEmpty()) return AgentReply.refused("Give one line per picture: name x y width height.");
+        List<Crop> cuts = new ArrayList<>();
+        for (String line : lines) {
+            Optional<Crop> crop = box(line, crops);
+            if (crop.isEmpty()) {
+                return AgentReply.refused("\"" + line + "\" does not read as name x y width height [ignore x y "
+                        + "width height]. Nothing was saved.");
+            }
+            cuts.add(crop.get());
+        }
+        String marker = crops.marker() == null || crops.marker().isBlank() ? null : crops.marker().strip();
+        if (marker != null && cuts.stream().noneMatch(c -> c.name().equals(marker))) {
+            return AgentReply.refused("No box is called " + marker + ", the marker named. Nothing was saved.");
+        }
+        AgentReply all = null;
+        for (Crop crop : cuts) {
+            AgentReply one = cropPicture(crop, context);
+            if (one.isRefused()) {
+                one = AgentReply.text("Not saved, " + crop.name() + ": " + one.parts().getFirst().text());
+            }
+            all = all == null ? one : all.and(one);
+        }
+        return all;
+    }
+
+    /** One crop_pictures line as crop_picture's box, its screen, tags and marker from the call. */
+    static Optional<Crop> box(String line, Crops crops) {
+        String[] words = line.strip().split("[\\s,]+");
+        if (words.length != 5 && !(words.length == 10 && words[5].equalsIgnoreCase("ignore"))) return Optional.empty();
+        try {
+            int[] at = new int[words.length == 10 ? 8 : 4];
+            for (int i = 0; i < at.length; i++) at[i] = Integer.parseInt(words[i < 4 ? i + 1 : i + 2]);
+            boolean ignoring = at.length == 8;
+            String name = words[0];
+            return Optional.of(new Crop(name, at[0], at[1], at[2], at[3], crops.tags(),
+                    ignoring ? at[4] : null, ignoring ? at[5] : null, ignoring ? at[6] : null, ignoring ? at[7] : null,
+                    crops.screen(), crops.marker() != null && crops.marker().strip().equals(name) ? true : null));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
     }
 
     static AgentReply cropPicture(Crop crop, AgentContext context) {

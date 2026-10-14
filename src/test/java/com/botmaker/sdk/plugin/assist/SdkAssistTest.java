@@ -974,7 +974,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(57, names.size());
+        assertEquals(58, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
@@ -1060,6 +1060,18 @@ class SdkAssistTest {
                 .contains("tried gem, never, spends gems."));
         assertTrue(run("try_input", "screen", "Engineer", "picture", "home").isRefused(),
                 "a picture naming its screen Home asks for opens");
+
+        assertTrue(run("crop_pictures", "boxes", List.of("pick 120 80 " + SIZE + " " + SIZE, "drop 1 2 3"))
+                .isRefused(), "a line that does not read");
+        assertFalse(TemplateLibrary.exists(resources, "pick"), "nothing saved when one line does not read");
+        assertTrue(run("crop_pictures", "boxes", List.of("pick 120 80 4 4"), "marker", "plan").isRefused());
+        AgentReply both = run("crop_pictures", "screen", "Engineer", "marker", "pick", "boxes", List.of(
+                "pick 120 80 " + SIZE + " " + SIZE, "spade 120, 80, " + SIZE + ", " + SIZE + " ignore 120 80 2 2",
+                "far 5000 5000 4 4"));
+        assertTrue(text(both).contains("Noted in Engineer as its marker, in place of coin.")
+                && text(both).contains("Saved spade") && text(both).contains("Not saved, far: "), text(both));
+        assertTrue(GameNotes.sections(bot).get("Engineer").contains("Marker: pick"));
+        assertTrue(MapTools.untried(GameNotes.sections(bot).get("Engineer")).contains("spade"));
     }
 
     @Test

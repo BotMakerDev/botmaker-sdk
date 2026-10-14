@@ -88,8 +88,9 @@ final class MapTools {
                             + "hotkey) and records in its section what that did: opened a screen (its Map line and "
                             + "its own section, owing a marker, with its screenshot), changed this one in place, or "
                             + "nothing. Every picture crop_picture cut with a screen is untried until this tries "
-                            + "it. Refused while a screen owes its marker, and while a screen this one was reached "
-                            + "from has an untried input: each screen's every input before the screens they open")
+                            + "it. Each screen across, then down: refused while a screen owes its marker, while a "
+                            + "screen this one was reached from has an input left to try, and while another branch "
+                            + "begun is not finished")
                     .takes(Input.class).handledBy(MapTools::tryInput));
 
     private MapTools() {}

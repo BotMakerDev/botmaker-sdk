@@ -29,6 +29,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   refuses while a screen owes its marker, while a screen this one was reached from has an input left to try, and
   while another branch begun is not finished. `Owed:` lines and untried inputs keep `read_guide` in Discovery and
   are listed there.
+- **Several pictures in one call.** The assistant's `crop_pictures` cuts many boxes of one screenshot, a line
+  each (`name x y width height`, optionally `ignore x y width height`), with one `screen`, `tags` and `marker`.
 - **A picture can leave a part out.** The assistant's `crop_picture` takes a box to ignore (`ignoreX`, `ignoreY`,
   `ignoreWidth`, `ignoreHeight`), saved transparent, which matching skips: map pins alike but for their timers'
   digits all match one picture. `replace_picture` takes the same box, so a recut keeps its name and uses.
