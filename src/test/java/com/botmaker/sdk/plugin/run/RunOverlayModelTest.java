@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.run;
 
+import com.botmaker.sdk.internal.screens.ScreenStep;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +34,23 @@ class RunOverlayModelTest {
 
         status = status.after(new TelemetryEvent.Step("Home", "", -1));
         assertEquals("Home", status.text(), "a new activity starts with nothing done");
+    }
+
+    @Test
+    void theBarNamesTheScreenAWalkReachedUntilAnother() {
+        RunStatus status = RunStatus.START.after(new TelemetryEvent.Step("Collect", "", -1))
+                .after(new TelemetryEvent.Click(SCREEN, 5, 6, 1, 42))
+                .after(new TelemetryEvent.Step("Collect", ScreenStep.action("Campaign"), -1));
+        assertEquals("Collect · 🗺 Campaign · clicked · line 42", status.text(), "reaching a screen undoes nothing");
+
+        status = status.after(new TelemetryEvent.Step("Upgrade", "", -1));
+        assertEquals("Upgrade · 🗺 Campaign", status.text(), "the game is still on it in the next activity");
+
+        status = status.after(new TelemetryEvent.Step("", ScreenStep.action("Home"), -1));
+        assertEquals("Upgrade · 🗺 Home", status.text(), "a step with no activity keeps the activity");
+        assertEquals("on screen Home", ScreenStep.action("Home"));
+        assertTrue(ScreenStep.screen("clicked").isEmpty());
+        assertTrue(ScreenStep.screen(ScreenStep.action("")).isEmpty());
     }
 
     @Test

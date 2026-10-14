@@ -891,8 +891,8 @@ class SdkAssistTest {
                 "screen", "home")).contains("Noted in Home as untried"));
         assertEquals("home", screen("HOME").marker().id());
         assertEquals(List.of("click gold"), screen("HOME").inputs().stream().map(Input::label).toList());
-        assertEquals(Set.of("Home"), TemplateLibrary.manifest(resources).tagsOf("gold"),
-                "a screen's pictures carry its tag, declared on its first cut");
+        assertEquals(Set.of(), TemplateLibrary.manifest(resources).tagsOf("gold"),
+                "a screen's pictures are grouped by the map, never tagged");
 
         // What try_input writes when an input opens a screen: a screen below, reached from Home, owing its marker.
         host.set("screen_map").put("ENGINEER", TestContexts.row(Object.class, "").withValue(GameScreen.named("Engineer")
@@ -948,7 +948,7 @@ class SdkAssistTest {
         assertTrue(text(both).contains("Noted in Engineer as its marker, in place of coin.")
                 && text(both).contains("Saved spade") && text(both).contains("Not saved, far: "), text(both));
         assertEquals("pick", screen("ENGINEER").marker().id());
-        assertEquals(Set.of("Engineer"), TemplateLibrary.manifest(resources).tagsOf("spade"));
+        assertEquals(Set.of(), TemplateLibrary.manifest(resources).tagsOf("spade"), "grouped by the map, not tagged");
         assertTrue(screen("ENGINEER").inputs().stream().anyMatch(i -> i.label().equals("click spade")));
     }
 

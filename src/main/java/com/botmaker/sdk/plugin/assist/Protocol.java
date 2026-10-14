@@ -220,6 +220,12 @@ final class Protocol {
 
     private Protocol() {}
 
+    /** What a screen's section of the notes says it has reached, by its {@code Stage:} line; empty with none. */
+    static Optional<Reached> reached(String section) {
+        Matcher stage = section == null ? null : STAGE_LINE.matcher(section);
+        return stage != null && stage.find() ? Reached.fromId(stage.group(1)) : Optional.empty();
+    }
+
     /**
      * The stage the bot is at: Setup while it lacks a home or popups method, then Discovery while it has no screen
      * map or anything is owed (by the map, or an {@code Owed:} line of the notes), or a screen of the map has no
@@ -239,9 +245,7 @@ final class Protocol {
         for (String constant : graph.screens().keySet()) {
             if (graph.screens().get(constant).isPopup()) continue;
             String screen = graph.shown(constant);
-            String text = byName.get(screen.toLowerCase(Locale.ROOT));
-            Matcher stage = text == null ? null : STAGE_LINE.matcher(text);
-            Optional<Reached> reached = stage != null && stage.find() ? Reached.fromId(stage.group(1)) : Optional.empty();
+            Optional<Reached> reached = reached(byName.get(screen.toLowerCase(Locale.ROOT)));
             screens.putIfAbsent(screen, reached.map(r -> r.name().toLowerCase(Locale.ROOT)).orElse("not surveyed"));
             Stage next = reached.isEmpty() ? Stage.DISCOVERY : reached.get().next().orElse(null);
             if (next != null && (earliest == null || next.ordinal() < earliest.ordinal())) earliest = next;

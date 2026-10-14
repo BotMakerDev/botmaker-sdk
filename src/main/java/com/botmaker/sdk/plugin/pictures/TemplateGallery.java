@@ -278,11 +278,14 @@ public final class TemplateGallery extends HBox {
         List<String> was = selectedTags();
         catalog = TemplateLibrary.tagCatalog(services);
         manifest = TemplateLibrary.manifest(resourcesDir);
-        byTag = TemplateLibrary.listByTag(services);
+        Map<String, List<Path>> read = new LinkedHashMap<>(TemplateLibrary.listByTag(services));
+        Map<String, List<Path>> screens = ScreenGroups.of(services, read.getOrDefault(TemplateManifest.ALL, List.of()));
+        read.putAll(screens);
+        byTag = read;
         facts = factsOf(byTag.getOrDefault(TemplateManifest.ALL, List.of()));
         unused = null;
         twins = null;
-        List<TemplateGalleryModel.Row> rows = TemplateGalleryModel.rows(byTag, catalog);
+        List<TemplateGalleryModel.Row> rows = TemplateGalleryModel.rows(byTag, catalog, List.copyOf(screens.keySet()));
         // One grid at the end, not one per row the selection passes through on the way back.
         restoring = true;
         try {
@@ -478,10 +481,13 @@ public final class TemplateGallery extends HBox {
         return tags.isEmpty() ? List.of(TemplateManifest.ALL) : tags;
     }
 
-    /** The selected tag when it is one templates can be filed under, else null ("All" and "Untagged" are not). */
+    /**
+     * The selected tag when it is one templates can be filed under, else null ("All", "Untagged" and a screen's group
+     * are not).
+     */
     public String selectedRealTag() {
         String tag = selectedTag();
-        return TemplateManifest.isSyntheticTag(tag) ? null : tag;
+        return TemplateManifest.isSyntheticTag(tag) || TemplateGalleryModel.isScreenKey(tag) ? null : tag;
     }
 
     private void refreshGrid() {
@@ -531,6 +537,9 @@ public final class TemplateGallery extends HBox {
         if (tags.size() > 1) return "No picture carries " + (everyTag.isSelected() ? "every one" : "any") + " of "
                 + String.join(", ", tags) + ".";
         if (TemplateManifest.ALL.equals(tags.getFirst())) return "This project has no image templates yet.";
+        if (TemplateGalleryModel.isScreenKey(tags.getFirst())) {
+            return "This screen of the map names no picture yet: its marker and inputs are cut in 🗺 Screens.";
+        }
         return "Nothing is filed under \"" + tags.getFirst() + "\" yet.";
     }
 

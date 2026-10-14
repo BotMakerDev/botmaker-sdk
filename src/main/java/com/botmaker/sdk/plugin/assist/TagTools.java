@@ -183,22 +183,6 @@ final class TagTools {
         return AgentReply.text("Deleted " + tag.name() + "; its pictures stay.");
     }
 
-    /**
-     * The tag a screen's pictures carry: the tag of the name its section has, an activity's or a custom one, declared
-     * as a custom tag when there is none yet, so each screen explored is a group in 🖼 Manage Pictures without a
-     * declare_tag per screen. Empty when the name cannot be a tag (a built-in group's).
-     */
-    static Optional<String> screenTag(StudioServices services, String screen) {
-        return FxCall.call(() -> {
-            String tag = TemplateManifest.sanitizeTag(screen);
-            TagCatalog catalog = TemplateLibrary.tagCatalog(services);
-            TagCatalog.Tag found = catalog.find(tag);
-            if (found != null) return Optional.of(found.name());
-            if (catalog.nameProblem(tag, null) != null) return Optional.empty();
-            return Optional.ofNullable(TemplateLibrary.declareTag(services, tag).find(tag)).map(TagCatalog.Tag::name);
-        });
-    }
-
     /** Each named picture's file name, or why one is not a picture. */
     private record Picked(List<String> names, String refusal) {
     }

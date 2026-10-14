@@ -78,7 +78,8 @@ final class PictureTools {
                 @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
                 @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight,
                 @Describe(value = "the screen it is on, as the bot's Screens names it: noted there as an input, "
-                        + "untried until try_input tries it, and tagged with the screen's tag", optional = true)
+                        + "untried until try_input tries it; 🖼 Manage Pictures groups it under that screen",
+                        optional = true)
                 String screen,
                 @Describe(value = "true when it is that screen's marker, a part no other screen shows: pays the "
                         + "marker try_input left owed, or starts the map's first screen", optional = true)
@@ -100,7 +101,8 @@ final class PictureTools {
     record Crops(@Describe("one line per picture, in the last screenshot's pixels: \"name x y width height\", then "
                          + "optionally \"ignore x y width height\" for a part matching skips") List<String> boxes,
                  @Describe(value = "the screen they are on, as the bot's Screens names it: each noted there as an input, "
-                         + "untried until try_input tries it, and tagged with the screen's tag", optional = true)
+                         + "untried until try_input tries it; 🖼 Manage Pictures groups them under that screen",
+                         optional = true)
                  String screen,
                  @Describe(value = "the name of the one box that is that screen's marker", optional = true)
                  String marker,
@@ -329,26 +331,17 @@ final class PictureTools {
         if (moving.isPresent()) return AgentReply.refused(moving.get());
         String alike = lookAlikes(context, frame.get(), picture.get().image(),
                 new Rect(crop.x(), crop.y(), crop.width(), crop.height())).map(a -> " " + a).orElse("");
-        Optional<String> screenTag;
-        try {
-            screenTag = section.flatMap(s -> TagTools.screenTag(context.services(), s.name()));
-        } catch (IllegalStateException busy) {
-            return AgentReply.refused("Studio is busy and could not file the picture under its screen's tag; try "
-                    + "again. Nothing was saved.");
-        }
         PictureCuts.Cut saved = FxCall.call(() -> {
             PictureCuts.Cut cut = PictureCuts.save(context.services(), picture.get(), crop.name(), frame.get());
             if (!tags.isEmpty()) TemplateLibrary.applyTags(context.services(), Map.of(cut.name(), tags));
-            screenTag.ifPresent(tag -> TemplateLibrary.addTag(context.services(), List.of(cut.name()), tag));
             return cut;
         });
-        List<String> tagged = Stream.concat(tags.stream(), screenTag.stream()).distinct().toList();
         Frames.mark(context, new Rect(crop.x(), crop.y(), crop.width(), crop.height()), Marks.Kind.NOTE, saved.name());
         String constant = TemplateNames.constantFor(saved.name());
         String noted = section.map(s -> MapTools.noteCut(context.services(), s, saved.name(), marker, back,
                 sometimes)).orElse("");
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
-                        + "." + constant) + (tagged.isEmpty() ? "" : ", tagged " + String.join(", ", tagged))
+                        + "." + constant) + (tags.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
                         + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike)
                 .and(AgentReply.image(picture.get().image()));
     }

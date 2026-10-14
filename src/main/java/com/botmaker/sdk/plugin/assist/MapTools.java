@@ -257,16 +257,10 @@ final class MapTools {
         Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> replaced(s, old, base))
                 .or(() -> ScreenBook.add(services, constant, made)));
         if (failed.isPresent()) return unwritten(failed.get());
-        String grouped;
-        try {
-            grouped = TagTools.screenTag(services, child).map(tag -> " Its pictures go under the tag " + tag + ".")
-                    .orElse("");
-        } catch (IllegalStateException e) {
-            grouped = "";   // Studio busy: its first cut declares the tag
-        }
         String from = graph.shown(screen);
         return AgentReply.text("Opened " + child + ", added to the map as Screens." + constant + ", reached from "
-                        + from + " by " + base.label() + "; it owes its marker." + grouped + " Before leaving it, "
+                        + from + " by " + base.label() + "; it owes its marker. 🖼 Manage Pictures groups the "
+                        + "pictures it names under it. Before leaving it, "
                         + "from the screenshot below: crop_picture with screen " + child + " and marker true a part "
                         + "only this screen shows, then with screen " + child + " every input on it (each button, "
                         + "icon, tab, toggle, arrow and list, and its close button); what cannot be cut now, "

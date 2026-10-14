@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.input.Mouse;
 import com.botmaker.sdk.api.vision.ImageClicker;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
+import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -30,6 +31,7 @@ import java.util.Optional;
  *       click on it is inserted at the caret.</li>
  *   <li><b>Point:</b> click a spot on the game, and {@code Mouse.click(new Point(x, y))} is inserted.</li>
  *   <li><b>Flow:</b> opens 🔀 Activity Flow.</li>
+ *   <li><b>Screens:</b> the bot's screen map, lit where a run is; opens 🗺 Screens ({@link ScreenMap}).</li>
  * </ul>
  *
  * <p>Each tab is built on the FX thread each time the panel opens. It writes nothing but the picture file and
@@ -40,6 +42,7 @@ public final class SdkTools {
     public static final OverlayTool PICTURE = OverlayTool.id("picture").named("Picture").pane(SdkTools::picture);
     public static final OverlayTool POINT = OverlayTool.id("point").named("Point").pane(SdkTools::point);
     public static final OverlayTool FLOW = OverlayTool.id("flow").named("Flow").pane(SdkTools::flow);
+    public static final OverlayTool SCREENS = OverlayTool.id("screens").named("Screens").pane(ScreenMap::pane);
 
     private SdkTools() {}
 

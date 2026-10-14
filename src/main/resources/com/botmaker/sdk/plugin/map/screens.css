@@ -1,0 +1,213 @@
+/*
+ * 🗺 Screens' look (ScreenMap, ScreenCanvas, ScreenPanel). Every colour resolves a -bm-* token the host's theme
+ * publishes on the scene root, so the map follows the editor into a dark theme without this file knowing what the
+ * themes are. A state is said by a colour and a word both: the pill names it, so no one must read the colour alone.
+ */
+
+.screen-map {
+    -bm-screen-card: -fx-control-inner-background;
+    -bm-screen-line: -bm-divider;
+    -bm-screen-owes: -bm-severity-error;
+    -bm-screen-untried: -bm-severity-warning;
+    -bm-screen-finished: -bm-severity-ok-text;
+    -bm-screen-plain: -bm-muted;
+    -bm-screen-here: -bm-accent;
+}
+
+.screen-map-bar {
+    -fx-border-color: transparent transparent -bm-screen-line transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+/* --- a screen's card --- */
+
+.screen-card {
+    -fx-background-color: -bm-screen-card;
+    -fx-background-radius: 10;
+    -fx-border-color: -bm-screen-line;
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+}
+
+/* Shows only at times, or locked: dashed, in every theme. */
+.screen-card:conditional {
+    -fx-border-style: dashed;
+    -fx-border-width: 1.5;
+}
+
+.screen-card:popup,
+.screen-card:popup .screen-card-bar {
+    -fx-background-radius: 18;
+    -fx-border-radius: 18;
+}
+
+.screen-card-bar {
+    -fx-background-radius: 10 10 0 0;
+    -fx-background-color: -bm-screen-plain;
+}
+
+.screen-card:owes .screen-card-bar { -fx-background-color: -bm-screen-owes; }
+.screen-card:untried .screen-card-bar { -fx-background-color: -bm-screen-untried; }
+.screen-card:finished .screen-card-bar { -fx-background-color: -bm-screen-finished; }
+
+.screen-card-name {
+    -fx-font-weight: bold;
+    -fx-font-size: 1.08em;
+    -fx-text-overrun: ellipsis;
+}
+
+.screen-card-thumb,
+.screen-row-thumb,
+.screen-edge-thumb {
+    -fx-background-color: derive(-bm-screen-card, -6%);
+    -fx-background-radius: 7;
+    -fx-border-color: -bm-screen-line;
+    -fx-border-radius: 7;
+}
+
+.screen-thumb-none {
+    -fx-text-fill: -bm-screen-plain;
+    -fx-font-weight: bold;
+}
+
+.screen-card-badge {
+    -fx-background-color: -bm-screen-card;
+    -fx-background-radius: 11;
+    -fx-border-color: -bm-screen-line;
+    -fx-border-radius: 11;
+    -fx-padding: 1 6;
+    -fx-font-size: 0.85em;
+    -fx-font-weight: bold;
+    -fx-text-fill: -bm-screen-plain;
+}
+
+/* The screen a run is on, and the ones it came through. */
+.screen-card-view:here .screen-card {
+    -fx-border-color: -bm-screen-here;
+    -fx-border-width: 3;
+}
+
+.screen-card-view:walked .screen-card {
+    -fx-border-color: -bm-screen-here;
+    -fx-border-width: 1.5;
+}
+
+/* The screen being tried pulses: its halo fades in and out (ScreenCanvas). */
+.screen-card-halo {
+    -fx-background-color: -bm-screen-untried;
+    -fx-background-radius: 14;
+}
+
+/* --- the progress ring --- */
+
+.screen-ring-track {
+    -fx-stroke: -bm-screen-line;
+    -fx-stroke-width: 3.5;
+    -fx-fill: transparent;
+}
+
+.screen-ring-done {
+    -fx-stroke: -bm-screen-plain;
+    -fx-stroke-width: 3.5;
+    -fx-stroke-line-cap: round;
+    -fx-fill: transparent;
+}
+
+.screen-card:owes .screen-ring-done { -fx-stroke: -bm-screen-owes; }
+.screen-card:untried .screen-ring-done { -fx-stroke: -bm-screen-untried; }
+.screen-card:finished .screen-ring-done { -fx-stroke: -bm-screen-finished; }
+
+.screen-ring-count {
+    -fx-font-size: 0.72em;
+    -fx-font-weight: bold;
+    -fx-text-fill: -bm-screen-plain;
+}
+
+/* --- pills: a word in the state's colour, outlined, so it reads on a light or a dark card --- */
+
+.screen-pill {
+    -fx-font-size: 0.78em;
+    -fx-font-weight: bold;
+    -fx-padding: 1 7;
+    -fx-background-color: transparent;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+    -fx-border-color: -bm-screen-line;
+    -fx-text-fill: -bm-screen-plain;
+    -fx-text-overrun: ellipsis;
+}
+
+.screen-pill-owes { -fx-border-color: -bm-screen-owes; -fx-text-fill: -bm-screen-owes; }
+.screen-pill-untried { -fx-border-color: -bm-screen-untried; -fx-text-fill: -bm-screen-untried; }
+.screen-pill-finished { -fx-border-color: -bm-screen-finished; -fx-text-fill: -bm-screen-finished; }
+.screen-pill-stage { -fx-border-color: -bm-screen-here; -fx-text-fill: -bm-screen-here; }
+
+/* --- an entrance's input, on its arrow --- */
+
+.screen-edge-chip {
+    -fx-background-color: -bm-screen-card;
+    -fx-background-radius: 8;
+    -fx-border-color: -bm-screen-line;
+    -fx-border-radius: 8;
+    -fx-padding: 2;
+}
+
+/* --- the side panel --- */
+
+.screen-panel-scroller,
+.screen-panel-scroller > .viewport {
+    -fx-background-color: -bm-screen-card;
+}
+
+.screen-panel-scroller {
+    -fx-border-color: transparent transparent transparent -bm-screen-line;
+    -fx-border-width: 0 0 0 1;
+}
+
+.screen-panel-name {
+    -fx-font-size: 1.45em;
+    -fx-font-weight: bold;
+}
+
+.screen-panel-path {
+    -fx-font-family: monospace;
+    -fx-font-size: 0.86em;
+    -fx-text-fill: -bm-screen-plain;
+}
+
+.screen-panel-heading {
+    -fx-font-size: 0.82em;
+    -fx-font-weight: bold;
+    -fx-text-fill: -bm-screen-plain;
+    -fx-padding: 4 0 0 0;
+}
+
+.screen-panel-primary {
+    -fx-font-weight: bold;
+}
+
+.screen-panel-notes {
+    -fx-text-fill: -bm-screen-plain;
+}
+
+.screen-panel-status {
+    -fx-font-size: 0.92em;
+}
+
+.screen-row {
+    -fx-background-color: derive(-bm-screen-card, -4%);
+    -fx-background-radius: 8;
+    -fx-padding: 5 7;
+}
+
+.screen-row-label {
+    -fx-font-family: monospace;
+    -fx-font-size: 0.9em;
+    -fx-text-overrun: ellipsis;
+}
+
+.screen-row-kind {
+    -fx-font-size: 0.8em;
+    -fx-text-fill: -bm-screen-plain;
+}

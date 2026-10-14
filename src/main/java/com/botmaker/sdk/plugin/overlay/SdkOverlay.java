@@ -51,6 +51,7 @@ public final class SdkOverlay {
             .tool(SdkTools.PICTURE)
             .tool(SdkTools.POINT)
             .tool(SdkTools.FLOW)
+            .tool(SdkTools.SCREENS)
             .probe(ImageFinder::find, ImageTemplate.class, SdkProbes::find)
             .probe(ImageWaiter::waitFor, ImageTemplate.class, Duration.class, SdkProbes::find)
             .probe(ImageWaiter::waitUntilGone, ImageTemplate.class, Duration.class, SdkProbes::gone)

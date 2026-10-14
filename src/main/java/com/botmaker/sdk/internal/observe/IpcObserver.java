@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.observe;
 
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.internal.screens.ScreenStep;
 import com.botmaker.shared.Diag;
 import com.botmaker.shared.ipc.TelemetryClient;
 import com.botmaker.shared.ipc.TelemetryEvent;
@@ -35,6 +36,8 @@ public final class IpcObserver implements BotObserver {
     private static volatile TelemetryClient installed;
 
     private final TelemetryClient client;
+    /** The activity the flow last entered, which a screen reached is a step of; empty before the first. */
+    private volatile String activity = "";
 
     // Package-private (not private) so the translation + send path can be unit-tested with a client
     // pointed at a local server, without setting process environment variables.
@@ -89,7 +92,14 @@ public final class IpcObserver implements BotObserver {
     /** Where the bot is in its flow, for the host's run overlay: the activity, with no action yet. */
     @Override
     public void onActivity(String label) {
+        activity = label;
         client.send(new TelemetryEvent.Step(label, "", -1));
+    }
+
+    /** The screen a walk of the map reached, as a step of the activity it is in ({@link ScreenStep}). */
+    @Override
+    public void onScreen(String name) {
+        client.send(new TelemetryEvent.Step(activity, ScreenStep.action(name), -1));
     }
 
     /**

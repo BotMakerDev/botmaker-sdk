@@ -43,14 +43,36 @@ public final class TemplateGalleryModel {
      * anything is untagged. A declared tag with nothing in it is still a row — it is somewhere to file to.
      */
     public static List<Row> rows(Map<String, List<Path>> byTag, TagCatalog catalog) {
+        return rows(byTag, catalog, List.of());
+    }
+
+    /**
+     * The same, with each screen of the bot's map under a heading of its own after the activities: {@code screens}
+     * are their keys in {@code byTag} ({@link #screenKey}), read-only rows like an activity's.
+     */
+    public static List<Row> rows(Map<String, List<Path>> byTag, TagCatalog catalog, List<String> screens) {
         List<Row> rows = new ArrayList<>();
         rows.add(new TagRow(TemplateManifest.ALL, count(byTag, TemplateManifest.ALL), false));
         addGroup(rows, "Activities", catalog.namesOf(TagCatalog.Kind.ACTIVITY), byTag, true);
+        addGroup(rows, "Screens", screens, byTag, true);
         addGroup(rows, "Custom", catalog.namesOf(TagCatalog.Kind.CUSTOM), byTag, false);
         if (byTag.containsKey(TemplateManifest.UNTAGGED)) {
             rows.add(new TagRow(TemplateManifest.UNTAGGED, count(byTag, TemplateManifest.UNTAGGED), false));
         }
         return List.copyOf(rows);
+    }
+
+    /** What starts a screen's row, so a custom tag of the same name (an older bot's screen tag) is another row. */
+    private static final String SCREEN_MARK = "🗺 ";
+
+    /** The rail key of the screen the game calls {@code name}: {@code 🗺 Campaign}. */
+    public static String screenKey(String name) {
+        return SCREEN_MARK + name;
+    }
+
+    /** Whether {@code key} is a screen's row, which no picture is filed under by hand. */
+    public static boolean isScreenKey(String key) {
+        return key != null && key.startsWith(SCREEN_MARK);
     }
 
     private static void addGroup(List<Row> rows, String heading, List<String> tags,

@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameDialog;
+import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
 import com.botmaker.sdk.plugin.pictures.ResourceManagerDialog;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
@@ -33,6 +34,7 @@ public final class SdkToolbarItems {
     public static final String CAPTURE_TEMPLATES_ID = "capture-templates";
     public static final String MANAGE_PICTURES_ID = "manage-templates";
     public static final String ACTIVITY_FLOW_ID = "activity-flow";
+    public static final String SCREEN_MAP_ID = "screen-map";
     public static final String CAPTURE_SOURCE_ID = "capture-source";
     public static final String BOT_SETTINGS_ID = "bot-settings";
     public static final String PROJECT_SETUP_ID = "project-setup";
@@ -70,6 +72,13 @@ public final class SdkToolbarItems {
                     + "runs next — the graph, its loop safety, and which activities are on")
             .in(ToolbarGroup.AUTHORING, 10)
             .onPress(() -> ActivityFlowDialog::open);
+
+    /** {@link ToolbarGroup#AUTHORING} at 20, after the flow: the screens the activities are done on. */
+    public static final ToolbarItem SCREEN_MAP = ToolbarItem.id(SCREEN_MAP_ID).label("🗺 Screens")
+            .tooltip("The game's screens as the bot knows them — how each was reached, its inputs and what they "
+                    + "did; try, cut and go to one, and see where a run is")
+            .in(ToolbarGroup.AUTHORING, 20)
+            .onPress(() -> ScreenMap::open);
 
     public static final ToolbarItem CAPTURE_SOURCE = ToolbarItem.id(CAPTURE_SOURCE_ID).label("🎯 Capture Source")
             .tooltip("Choose what the bot looks at — a monitor, an application window or an emulator instance")
@@ -116,7 +125,7 @@ public final class SdkToolbarItems {
 
     /** Every item, in declaration order; the host sorts on each item's group and order. */
     public static final List<ToolbarItem> ALL = List.of(PILOT, CAPTURE_TEMPLATES, MANAGE_PICTURES, ACTIVITY_FLOW,
-            CAPTURE_SOURCE, BOT_SETTINGS, GAME, PROJECT_SETUP, POINT_HERE, PICTURE_HERE);
+            SCREEN_MAP, CAPTURE_SOURCE, BOT_SETTINGS, GAME, PROJECT_SETUP, POINT_HERE, PICTURE_HERE);
 
     private SdkToolbarItems() {}
 }

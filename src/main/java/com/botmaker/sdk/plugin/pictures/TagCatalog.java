@@ -122,6 +122,9 @@ public record TagCatalog(List<Tag> tags) {
         if (TemplateManifest.isSyntheticTag(tag)) {
             return "\"" + tag + "\" is a built-in group. Choose a different name.";
         }
+        if (TemplateGalleryModel.isScreenKey(tag)) {
+            return "A name starting with 🗺 is a screen of the bot's map. Choose a different name.";
+        }
         Tag existing = find(tag);
         if (existing == null) return null;
         return existing.isManaged()

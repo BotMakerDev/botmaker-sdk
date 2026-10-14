@@ -339,6 +339,24 @@ public final class ScreenGraph {
         return owed;
     }
 
+    /**
+     * The pictures {@code constant} names, each once by its id, in the order they are met: its marker, each input's
+     * picture and lock, its way back's. Manage Pictures groups the bot's pictures by them.
+     */
+    public List<String> pictures(String constant) {
+        GameScreen screen = screens.get(constant);
+        if (screen == null) return List.of();
+        Set<String> ids = new LinkedHashSet<>();
+        if (screen.marker() != null) ids.add(screen.marker().id());
+        List<Input> named = new ArrayList<>(screen.inputs());
+        if (screen.back() != null) named.add(screen.back());
+        for (Input input : named) {
+            if (input.picture() != null) ids.add(input.picture().id());
+            if (input.lock() != null) ids.add(input.lock().id());
+        }
+        return List.copyOf(ids);
+    }
+
     private static String labels(List<Input> inputs) {
         return String.join(", ", inputs.stream().map(Input::label).toList());
     }

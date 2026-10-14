@@ -34,6 +34,21 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `BotStuckException` when the game is on no screen of the map, steps keep landing elsewhere, or a picture on the
   map's way is gone. `Navigate.isOn` and `Navigate.where` say where the game is. `runFlow` and
   `trial` read the bot's `Screens` class. Not in the palette yet.
+- **🗺 Screens draws the map.** A new toolbar button, and a Screens tab in the overlay editor, show the bot's
+  `Screens` as a tree from the first screen, left to right. Each card shows the screen's marker, its state
+  (owes its marker in red, inputs untried in amber, finished in green), how many of its inputs were tried, its
+  shape, its stage from the notes, and badges for chores and locks. The input each screen was found by is drawn
+  on its arrow. Other ways in and ways back are dashed and can be hidden. A screen that shows only at times or is
+  locked is drawn dashed. A double-click folds a screen's subtree. The window has search, a minimap, Fit, and
+  PNG export. Its side panel lists the selected screen's inputs and what each did, with what the notes say of it.
+  From there you can ▶ Try an input, ✂ Cut its marker or more inputs, and 🧭 Go here, by the assistant's own
+  try_input and go_to_screen. The map redraws while the assistant adds screens, and the screen being tried
+  pulses. During a run the screen `Navigate` reached is lit, with a trail of the screens before it.
+- **The run bar names the screen the bot is on**: `Collect · 🗺 Campaign · clicked · line 42`.
+- **🖼 Manage Pictures groups pictures by screen.** Under a *Screens* heading, each screen of the map is a
+  read-only group of the pictures its marker, inputs and way back name. Nothing is stored: a picture on two
+  screens is under both, and a renamed picture follows its constant. Deleting a picture `Screens` names warns
+  the same way as one the bot's code uses.
 - **The assistant's Discovery writes `Screens`, not GAME.md.** crop_picture with a screen adds an untried input
   to that screen's constant; with `marker` it sets the marker, and on a bot with no map it starts the map's first
   screen; `back` sets the screen's way back, `sometimes` marks an input that comes and goes, and `popup` with a
@@ -180,6 +195,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **crop_picture no longer tags a picture with its screen's name.** 🖼 Manage Pictures groups it under its
+  screen instead. Screen tags already in a bot stay as ordinary custom tags.
 - **Discovery explores every screen the same way, one screen to its end at a time.** The guide's Discovery steps
   are one algorithm for every screen: cut every input on it (buttons, icons, tabs, toggles, arrows, list items and
   the lists that scroll), try each, and explore a screen an input opens to its end before the next input of the

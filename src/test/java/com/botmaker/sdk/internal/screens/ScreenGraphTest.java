@@ -56,6 +56,19 @@ class ScreenGraphTest {
     }
 
     @Test
+    void aScreensPicturesAreItsMarkerItsInputsTheirLocksAndItsWayBackEachOnce() {
+        Map<String, GameScreen> screens = firestone();
+        screens.put("CAMPAIGN", screens.get("CAMPAIGN").back(click("close_x"))
+                .inputs(List.of(click("claim"), click("claim").did(Did.NONE), click("arena").locked(picture("padlock")),
+                        Input.key(Key.ESCAPE))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(List.of("campaign_title", "claim", "arena", "padlock", "close_x"), graph.pictures("CAMPAIGN"));
+        assertEquals(List.of(), graph.pictures("ENGINEER"), "no marker yet, nothing cut");
+        assertEquals(List.of(), graph.pictures("NOWHERE"));
+    }
+
+    @Test
     void anInputThatOpenedAScreenIsTriedAndTheTreeReadsOffEachScreensEntrance() {
         ScreenGraph graph = ScreenGraph.of(firestone());
 
