@@ -68,6 +68,18 @@ public final class EmulatorSource implements CaptureSource {
         }
     }
 
+    @Override
+    public void drag(Point from, Point to, long durationMs) {
+        Emulator emu = resolve();
+        if (emu != null) emu.drag(from, to, durationMs);
+    }
+
+    @Override
+    public void scroll(Point at, int notches) {
+        Emulator emu = resolve();
+        if (emu != null) emu.scroll(at, notches);
+    }
+
     /**
      * The live emulator, or {@code null} while it isn't reachable yet. Reuses a healthy cached connection;
      * otherwise looks the instance up, connects if it's running, or dispatches a one-time launch if it isn't.

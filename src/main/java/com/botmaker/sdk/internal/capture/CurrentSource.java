@@ -44,6 +44,16 @@ public final class CurrentSource implements CaptureSource, WindowBacked {
     }
 
     @Override
+    public void drag(Point from, Point to, long durationMs) {
+        Source.current().drag(from, to, durationMs);
+    }
+
+    @Override
+    public void scroll(Point at, int notches) {
+        Source.current().scroll(at, notches);
+    }
+
+    @Override
     public CaptureSource base() {
         return Source.current().base();
     }

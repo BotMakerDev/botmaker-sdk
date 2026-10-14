@@ -51,6 +51,16 @@ public final class ZoneSource implements CaptureSource, WindowBacked {
     }
 
     @Override
+    public void drag(Point from, Point to, long durationMs) {
+        of.base().drag(from, to, durationMs);
+    }
+
+    @Override
+    public void scroll(Point at, int notches) {
+        of.base().scroll(at, notches);
+    }
+
+    @Override
     public boolean isPresent() {
         return of.isPresent();
     }

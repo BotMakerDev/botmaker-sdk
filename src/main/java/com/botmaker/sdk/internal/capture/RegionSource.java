@@ -62,6 +62,16 @@ public final class RegionSource implements CaptureSource, WindowBacked {
     }
 
     @Override
+    public void drag(Point from, Point to, long durationMs) {
+        parent.drag(from, to, durationMs);
+    }
+
+    @Override
+    public void scroll(Point at, int notches) {
+        parent.scroll(at, notches);
+    }
+
+    @Override
     public boolean isPresent() {
         return parent.isPresent();
     }

@@ -101,6 +101,27 @@ public final class Emulator implements CaptureSource {
         }
     }
 
+    /** How far one wheel notch swipes, in emulator pixels: a touch screen has no wheel. */
+    private static final int NOTCH_PX = 120;
+
+    /** How long a wheel's swipe takes: slow enough that a list scrolls rather than flings. */
+    private static final long NOTCH_SWIPE_MS = 300;
+
+    @Override
+    public void drag(Point from, Point to, long durationMs) {
+        if (from == null || to == null) return;
+        swipe(from.x(), from.y(), to.x(), to.y(), durationMs);
+    }
+
+    /** A swipe from {@code at}: up the wheel (positive) moves the content down, as the finger does. */
+    @Override
+    public void scroll(Point at, int notches) {
+        if (at == null || notches == 0) return;
+        // Kept on the screen's top edge: a swipe ending above it is dropped or flings. The bottom edge is the
+        // device's, which this does not ask for.
+        swipe(at.x(), at.y(), at.x(), Math.max(0, at.y() + notches * NOTCH_PX), NOTCH_SWIPE_MS);
+    }
+
     /** Presses the Back button. */
     public void back() {
         Debug.log("back");

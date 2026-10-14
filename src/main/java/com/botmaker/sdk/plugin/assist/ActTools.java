@@ -97,8 +97,10 @@ final class ActTools {
                          + "focus; refused there otherwise", optional = true) Boolean desktop) {
     }
 
-    record Wheel(@Describe("x to scroll at, in the screenshot's pixels") int x,
-                 @Describe("y to scroll at") int y,
+    record Wheel(@Describe(value = "x to scroll at, in the screenshot's pixels; with y", optional = true) Integer x,
+                 @Describe(value = "y to scroll at", optional = true) Integer y,
+                 @Describe(value = "a picture's name instead of x and y: scrolls over its best match, when a run "
+                         + "would find it", optional = true) String picture,
                  @Describe("notches: positive scrolls up or away, negative down or toward you") int amount,
                  @Describe(value = SETTLE, optional = true) Integer settleMs,
                  @Describe(value = "true adds a small image of the part that changed", optional = true)
@@ -127,8 +129,8 @@ final class ActTools {
                     .describedAs("Taps a key on the game, waits for it to answer, and says what changed, as click")
                     .takes(Press.class).handledBy(ActTools::key),
             AssistantTool.named("scroll")
-                    .describedAs("Scrolls the wheel over a point of the game, waits, and says what changed, as "
-                            + "click")
+                    .describedAs("Scrolls the wheel over a point or a picture of the game, waits, and says what "
+                            + "changed, as click")
                     .takes(Wheel.class).handledBy(ActTools::scroll));
 
     private ActTools() {}
@@ -150,23 +152,12 @@ final class ActTools {
     static AgentReply click(Click click, AgentContext context) {
         if (click.picture() != null && !click.picture().isBlank()) {
             if (click.x() != null || click.y() != null) return AgentReply.refused("Give a picture or x and y, not both.");
-            Optional<Path> resources = Frames.resources(context);
-            if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
-            Optional<String> base = Frames.picture(resources.get(), click.picture());
-            if (base.isEmpty()) return AgentReply.refused(Frames.noPicture(click.picture()));
-            Optional<BufferedImage> frame = Frames.look(context);
-            if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
-            MatchResult match = LookTools.best(resources.get(), base.get(), frame.get());
-            double needs = Frames.confidence(context.services());
-            if (!match.isFound() || match.confidence() < needs) {
-                return AgentReply.text(base.get() + " is not on the screen (best "
-                        + (match.isFound() ? Frames.score(match.confidence()) : "none") + ", a run needs "
-                        + Frames.score(needs) + "); nothing was clicked.");
-            }
-            Point at = match.rect().center();
+            Spotted spotted = spot(click.picture(), "clicked", context);
+            if (spotted.refusal() != null) return spotted.refusal();
+            Point at = spotted.at();
             // The frame the picture was found on is the one the change is measured from: the click lands on it.
-            return act(context, frame.get(), at, click.desktop(), click.settleMs(), click.show(),
-                    "Clicked " + base.get() + " at " + at.x() + "," + at.y(), hands -> hands.click(at.x(), at.y()));
+            return act(context, spotted.frame(), at, click.desktop(), click.settleMs(), click.show(),
+                    "Clicked " + spotted.name() + " at " + at.x() + "," + at.y(), hands -> hands.click(at.x(), at.y()));
         }
         if (click.x() == null || click.y() == null) return AgentReply.refused("Give x and y, or a picture.");
         int x = click.x();
@@ -187,9 +178,45 @@ final class ActTools {
 
     static AgentReply scroll(Wheel wheel, AgentContext context) {
         if (wheel.amount() == 0) return AgentReply.refused("Scroll by at least one notch.");
-        return act(context, null, new Point(wheel.x(), wheel.y()), wheel.desktop(), wheel.settleMs(), wheel.show(),
-                "Scrolled " + wheel.amount() + " at " + wheel.x() + "," + wheel.y(),
-                hands -> hands.scroll(wheel.x(), wheel.y(), wheel.amount()));
+        if (wheel.picture() != null && !wheel.picture().isBlank()) {
+            if (wheel.x() != null || wheel.y() != null) return AgentReply.refused("Give a picture or x and y, not both.");
+            Spotted spotted = spot(wheel.picture(), "scrolled", context);
+            if (spotted.refusal() != null) return spotted.refusal();
+            Point at = spotted.at();
+            return act(context, spotted.frame(), at, wheel.desktop(), wheel.settleMs(), wheel.show(),
+                    "Scrolled " + wheel.amount() + " at " + spotted.name() + " (" + at.x() + "," + at.y() + ")",
+                    hands -> hands.scroll(at.x(), at.y(), wheel.amount()));
+        }
+        if (wheel.x() == null || wheel.y() == null) return AgentReply.refused("Give x and y, or a picture.");
+        int x = wheel.x();
+        int y = wheel.y();
+        return act(context, null, new Point(x, y), wheel.desktop(), wheel.settleMs(), wheel.show(),
+                "Scrolled " + wheel.amount() + " at " + x + "," + y, hands -> hands.scroll(x, y, wheel.amount()));
+    }
+
+    /** Where a picture's best match is on a fresh look, the frame it was found on, or the answer saying why not. */
+    private record Spotted(BufferedImage frame, Point at, String name, AgentReply refusal) {
+        static Spotted no(AgentReply refusal) {
+            return new Spotted(null, null, null, refusal);
+        }
+    }
+
+    /** {@code picture}'s best match, when a run would find it; {@code acted} says what was not done otherwise. */
+    private static Spotted spot(String picture, String acted, AgentContext context) {
+        Optional<Path> resources = Frames.resources(context);
+        if (resources.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noProject()));
+        Optional<String> base = Frames.picture(resources.get(), picture);
+        if (base.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noPicture(picture)));
+        Optional<BufferedImage> frame = Frames.look(context);
+        if (frame.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noScreen()));
+        MatchResult match = LookTools.best(resources.get(), base.get(), frame.get());
+        double needs = Frames.confidence(context.services());
+        if (!match.isFound() || match.confidence() < needs) {
+            return Spotted.no(AgentReply.text(base.get() + " is not on the screen (best "
+                    + (match.isFound() ? Frames.score(match.confidence()) : "none") + ", a run needs "
+                    + Frames.score(needs) + "); nothing was " + acted + "."));
+        }
+        return new Spotted(frame.get(), match.rect().center(), base.get(), null);
     }
 
     /**

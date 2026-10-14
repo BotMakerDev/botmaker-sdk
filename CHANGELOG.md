@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Scroll and drag on pictures.** `ImageScroller.scrollAt(picture, notches)`, `drag(picture, dx, dy)` (a
+  fraction of the game's window) and `drag(from, to)` find the picture, act on it and answer whether it left its
+  place within the bot's patience (a twin further down the list does not count), so a list at its end answers false and a page loop is
+  `untilFind(LIST_END, () -> ImageScroller.scrollAt(LIST_ITEM, -3))`. An emulator swipes. The assistant's
+  `scroll` takes a picture as `click` does.
 - **`ImageFinder.whileFindCompare(good, bad, found -> …)`.** `whileFindAny` for pictures with look-alikes: each
   pass hands the action the frame's `Matches` of the good pictures that win over every bad one there (so
   `found.get(X)`, `ImageClicker.clickLast()` and `clickAllLast()` work, the last skipping every grey twin), and a

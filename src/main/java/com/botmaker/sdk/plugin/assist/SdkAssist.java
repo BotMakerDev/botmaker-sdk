@@ -76,7 +76,10 @@ public final class SdkAssist {
               found.get(X)) or clickLast() act on them without looking again. A group is
               ImageTemplateGroup.of(…, …). No loop blocks, no chain of separate find-then-click calls.
             - Click pictures, never places: no Mouse.click on a Spot or on x, y, which cannot tell whether
-              they landed. A tab or button gets a picture.
+              they landed. A tab or button gets a picture. Scroll and drag on pictures too:
+              ImageScroller.scrollAt(item, notches), drag(item, dx, dy) (fractions of the game's window) and
+              drag(from, to) answer whether the picture moved, so a page loop is
+              untilFind(LIST_END, () -> ImageScroller.scrollAt(LIST_ITEM, -3)).
             - Prove each step by a picture of its result, never by time: the loop's own picture coming or
               going, or ImageWaiter.waitFor / waitUntilGone of a picture only that screen or state shows
               (a close button is on every screen: not a marker). Screen.waitStable and Wait guess, they prove

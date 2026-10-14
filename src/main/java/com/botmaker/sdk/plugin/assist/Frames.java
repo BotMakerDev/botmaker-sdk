@@ -276,5 +276,13 @@ final class Frames {
         @Override
         public void click(Point p) {
         }
+
+        @Override
+        public void drag(Point from, Point to, long durationMs) {
+        }
+
+        @Override
+        public void scroll(Point at, int notches) {
+        }
     }
 }

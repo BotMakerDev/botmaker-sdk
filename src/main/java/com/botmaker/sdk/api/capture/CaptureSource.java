@@ -96,6 +96,24 @@ public interface CaptureSource {
         Mouse.click(p);
     }
 
+    /**
+     * Drags from {@code from} to {@code to} over {@code durationMs}, both absolute points as {@link #click} takes
+     * them. The default is a real desktop drag; an emulator swipes through its own channel.
+     */
+    default void drag(Point from, Point to, long durationMs) {
+        Mouse.drag(from, to, durationMs);
+    }
+
+    /**
+     * Turns the wheel {@code notches} (positive up or away from you) with the pointer at {@code at}, an absolute
+     * point as {@link #click} takes it. The default moves the desktop pointer there first; an emulator, which has
+     * no wheel, swipes.
+     */
+    default void scroll(Point at, int notches) {
+        Mouse.move(at);
+        Mouse.scroll(notches);
+    }
+
     // --- The three canonical sources ---
 
     /** The whole virtual desktop (all monitors). The ultimate fallback source for every matcher. */
