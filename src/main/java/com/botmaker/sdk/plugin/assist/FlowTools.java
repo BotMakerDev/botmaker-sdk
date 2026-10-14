@@ -152,7 +152,7 @@ final class FlowTools {
                     .takes(NewActivity.class).handledBy(FlowTools::addActivity),
             AssistantTool.named("set_activity")
                     .describedAs("Changes a card in one flow as the Activity Flow window does: its body, its line, "
-                            + "and whether it goes home first, checks popups or may be switched off by the runner")
+                            + "and whether it goes home first or may be switched off by the runner")
                     .takes(Card.class).handledBy(FlowTools::setActivity),
             AssistantTool.named("rename_activity")
                     .describedAs("Renames an activity everywhere: its card in every flow, arrows and constant")

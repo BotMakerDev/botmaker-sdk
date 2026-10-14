@@ -69,7 +69,19 @@ final class PictureTools {
                 @Describe("width in pixels") int width,
                 @Describe("height in pixels") int height,
                 @Describe(value = "tags to file it under, each declared (list_tags)", optional = true)
-                List<String> tags) {
+                List<String> tags,
+                @Describe(value = "left edge of a part inside the box a run skips (a timer's digits, a count that "
+                        + "differs from copy to copy), in the screenshot's pixels; with ignoreY, ignoreWidth and "
+                        + "ignoreHeight", optional = true) Integer ignoreX,
+                @Describe(value = "top edge of the part to skip", optional = true) Integer ignoreY,
+                @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
+                @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight) {
+
+        /** The part to skip, when all four of its edges are given. */
+        Optional<Rect> ignore() {
+            if (ignoreX == null || ignoreY == null || ignoreWidth == null || ignoreHeight == null) return Optional.empty();
+            return Optional.of(new Rect(ignoreX, ignoreY, ignoreWidth, ignoreHeight));
+        }
     }
 
     record PictureName(@Describe("a picture's name, as list_pictures gives it") String picture) {
@@ -124,7 +136,8 @@ final class PictureTools {
                     .takesNothing().handledBy(PictureTools::listPictures),
             AssistantTool.named("crop_picture")
                     .describedAs("Cuts a box out of the last screenshot you took and saves it as a picture the "
-                            + "bot can find and click, declared as a Pictures constant")
+                            + "bot can find and click, declared as a Pictures constant; a part given to ignore "
+                            + "is left out of matching, so copies that differ only there all match")
                     .takes(Crop.class).handledBy(PictureTools::cropPicture),
             AssistantTool.named("show_picture")
                     .describedAs("A picture's image, its size, its constant and how many places use it")
@@ -180,7 +193,8 @@ final class PictureTools {
         Optional<BufferedImage> frame = Frames.shown();
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
         Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), null,
-                new Area(crop.x(), crop.y(), crop.width(), crop.height()));
+                new Area(crop.x(), crop.y(), crop.width(), crop.height()))
+                .map(piece -> crop.ignore().map(part -> PictureCuts.masked(piece, part)).orElse(piece));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
         List<String> typed = crop.tags() == null ? List.of() : crop.tags();

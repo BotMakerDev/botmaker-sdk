@@ -50,6 +50,26 @@ public final class PictureCuts {
     }
 
     /**
+     * {@code piece} with the part under {@code ignore}, in the frame's pixels as its place is, made transparent:
+     * the matcher reads a transparent pixel as one to skip, so a part that changes from copy to copy (a timer's
+     * digits on a map pin) no longer keeps the copies apart. Unchanged when {@code ignore} misses it.
+     */
+    public static Piece masked(Piece piece, Rect ignore) {
+        Rect place = piece.place();
+        int left = Math.max(ignore.x(), place.x()) - place.x();
+        int top = Math.max(ignore.y(), place.y()) - place.y();
+        int right = Math.min(ignore.x() + ignore.width(), place.x() + place.width()) - place.x();
+        int bottom = Math.min(ignore.y() + ignore.height(), place.y() + place.height()) - place.y();
+        if (right <= left || bottom <= top) return piece;
+        BufferedImage copy = new BufferedImage(place.width(), place.height(), BufferedImage.TYPE_INT_ARGB);
+        copy.getGraphics().drawImage(piece.image(), 0, 0, null);
+        for (int y = top; y < bottom; y++) {
+            for (int x = left; x < right; x++) copy.setRGB(x, y, copy.getRGB(x, y) & 0x00FFFFFF);
+        }
+        return new Piece(copy, place);
+    }
+
+    /**
      * Saves {@code piece} as {@code typed} (sanitised the way every picture name is) and declares its constant,
      * cut at its place in {@code frame}. On the FX thread, since declaring writes the bot's Java.
      *

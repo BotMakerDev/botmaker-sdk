@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A picture can leave a part out.** The assistant's `crop_picture` takes a box to ignore (`ignoreX`, `ignoreY`,
+  `ignoreWidth`, `ignoreHeight`), saved transparent, which matching skips: map pins alike but for their timers'
+  digits all match one picture.
 - **Scroll and drag on pictures.** `ImageScroller.scrollAt(picture, notches)`, `drag(picture, dx, dy)` (a
   fraction of the game's window) and `drag(from, to)` find the picture, act on it and answer whether it left its
   place within the bot's patience (a twin further down the list does not count), so a list at its end answers false and a page loop is
