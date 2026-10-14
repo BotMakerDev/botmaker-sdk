@@ -90,6 +90,7 @@ public final class TemplateGalleryDialog {
         Stage stage = Modals.window(services, owner, Modals.Frame.modal(options.title(), 820, 580, 560, 420), root);
 
         TemplateGallery gallery = new TemplateGallery(services, options.multiSelect());
+        gallery.showAll();
         if (options.filter() != null) gallery.setFilter(options.filter());
 
         Button choose = new Button(options.multiSelect() ? "Add" : "Choose");

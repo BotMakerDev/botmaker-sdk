@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.pictures;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
 import javafx.application.Platform;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.ListChangeListener;
 import javafx.css.PseudoClass;
 import javafx.geometry.Bounds;
@@ -10,6 +11,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
@@ -31,6 +33,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
+import javafx.stage.Window;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -51,6 +54,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
 
 /**
@@ -72,6 +76,10 @@ import java.util.stream.Collectors;
 public final class TemplateGallery extends HBox {
 
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
+    private static final Preferences PREFS = Preferences.userNodeForPackage(TemplateGallery.class);
+    private static final String SORT_KEY = "gallery.sort";
+    private static final String SHOW_KEY = "gallery.show";
+    private static final String EVERY_TAG_KEY = "gallery.everyTag";
     /** How far a press has to travel before it is a band and not a click on the background. */
     private static final double BAND_THRESHOLD = 4;
 
@@ -108,6 +116,14 @@ public final class TemplateGallery extends HBox {
     private boolean banding;
     /** While {@link #reload()} puts the rail's selection back, which redraws the grid once, when it is done. */
     private boolean restoring;
+    /** While {@link #showAll} widens the filter: not remembered as this person's pick. */
+    private boolean revealing;
+
+    /** Whether the window holding the gallery is open; held so its listener lives as long as the gallery. */
+    private final ObservableValue<Boolean> shown;
+    /** The picture folder's watch while the window is open, else null. */
+    private LibraryWatch watch;
+    private Runnable onLibraryChanged = this::reload;
 
     /**
      * The library as of the last {@link #reload()}: files by tag, their tags, the declared set. Held so that a
@@ -160,14 +176,25 @@ public final class TemplateGallery extends HBox {
 
         search.setPromptText("Search templates…");
         search.textProperty().addListener((o, was, is) -> refreshGrid());
+        // The sort and the filter are how this person likes to look, so they carry over to the next window.
         show.getItems().setAll(TemplateGalleryModel.Show.values());
-        show.setValue(TemplateGalleryModel.Show.ALL);
-        show.valueProperty().addListener((o, was, is) -> refreshGrid());
+        show.setValue(TemplateGalleryModel.Show.fromId(PREFS.get(SHOW_KEY, null)));
+        show.valueProperty().addListener((o, was, is) -> {
+            if (!revealing) PREFS.put(SHOW_KEY, is.id());
+            refreshGrid();
+        });
         sort.getItems().setAll(TemplateGalleryModel.Sort.values());
-        sort.setValue(TemplateGalleryModel.Sort.NAME_UP);
-        sort.valueProperty().addListener((o, was, is) -> refreshGrid());
+        sort.setValue(TemplateGalleryModel.Sort.fromId(PREFS.get(SORT_KEY, null)));
+        sort.valueProperty().addListener((o, was, is) -> {
+            PREFS.put(SORT_KEY, is.id());
+            refreshGrid();
+        });
         everyTag.setTooltip(new Tooltip("Only pictures carrying every tag picked on the left"));
-        everyTag.selectedProperty().addListener((o, was, is) -> refreshGrid());
+        everyTag.setSelected(PREFS.getBoolean(EVERY_TAG_KEY, false));
+        everyTag.selectedProperty().addListener((o, was, is) -> {
+            PREFS.putBoolean(EVERY_TAG_KEY, is);
+            refreshGrid();
+        });
         HBox.setHgrow(search, Priority.ALWAYS);
         HBox controls = new HBox(8, search, everyTag, show, sort);
         controls.setAlignment(Pos.CENTER_LEFT);
@@ -198,6 +225,19 @@ public final class TemplateGallery extends HBox {
         HBox.setHgrow(right, Priority.ALWAYS);
         getChildren().addAll(rail, right);
         reload();
+        // A picture the assistant cuts or tags while the window is open shows at once; watched only while shown.
+        shown = sceneProperty().flatMap(Scene::windowProperty).flatMap(Window::showingProperty).orElse(false);
+        shown.addListener((o, was, is) -> watch(is));
+    }
+
+    /** Called instead of {@link #reload()} when the picture folder changes under the window. */
+    public void setOnLibraryChanged(Runnable onLibraryChanged) {
+        this.onLibraryChanged = onLibraryChanged;
+    }
+
+    private void watch(boolean on) {
+        if (watch != null) watch.close();
+        watch = on ? LibraryWatch.start(TemplateLibrary.imagesDir(resourcesDir), () -> onLibraryChanged.run()) : null;
     }
 
     /** Narrows the gallery to the templates {@code filter} accepts — a group picker offers only its own. */
@@ -353,10 +393,23 @@ public final class TemplateGallery extends HBox {
     public void reveal(Collection<Path> files) {
         if (!tiles.keySet().containsAll(files)) {
             search.clear();
-            show.setValue(TemplateGalleryModel.Show.ALL);
+            showAll();
             rail.getSelectionModel().clearAndSelect(0);   // All, which rows() always puts first
         }
         setSelection(files);
+    }
+
+    /**
+     * Shows every picture, used or not, without remembering it as this person's filter: a picker choosing one for a
+     * slot offers them all, whatever Manage Pictures was left on.
+     */
+    public void showAll() {
+        revealing = true;
+        try {
+            show.setValue(TemplateGalleryModel.Show.ALL);
+        } finally {
+            revealing = false;
+        }
     }
 
     /** Selects every template the grid is currently showing — the tag being viewed, narrowed by the search. */

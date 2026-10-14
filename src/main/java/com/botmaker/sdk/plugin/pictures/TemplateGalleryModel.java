@@ -93,6 +93,17 @@ public final class TemplateGalleryModel {
             this.displayName = displayName;
         }
 
+        /** The key it is remembered by between sessions. */
+        public String id() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+
+        /** The sort remembered as {@code id}; Name A–Z for none or one this version does not have. */
+        public static Sort fromId(String id) {
+            for (Sort sort : values()) if (sort.id().equals(id)) return sort;
+            return NAME_UP;
+        }
+
         public String displayName() {
             return displayName;
         }
@@ -112,6 +123,17 @@ public final class TemplateGalleryModel {
 
         Show(String displayName) {
             this.displayName = displayName;
+        }
+
+        /** The key it is remembered by between sessions. */
+        public String id() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+
+        /** The filter remembered as {@code id}; All pictures for none or one this version does not have. */
+        public static Show fromId(String id) {
+            for (Show show : values()) if (show.id().equals(id)) return show;
+            return ALL;
         }
 
         public String displayName() {

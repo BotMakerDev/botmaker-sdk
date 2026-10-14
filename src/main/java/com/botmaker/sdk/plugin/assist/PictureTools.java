@@ -50,6 +50,7 @@ import java.util.OptionalLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * The assistant's pictures and places: each picture a {@code Pictures} constant, each named spot a
@@ -76,7 +77,7 @@ final class PictureTools {
                 @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
                 @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight,
                 @Describe(value = "the screen it is on, as its section names it: noted there as an input, untried "
-                        + "until try_input tries it", optional = true) String screen,
+                        + "until try_input tries it, and tagged with the screen's tag", optional = true) String screen,
                 @Describe(value = "true when it is that screen's marker, a part no other screen shows: pays the "
                         + "marker try_input left owed", optional = true) Boolean marker) {
 
@@ -89,7 +90,8 @@ final class PictureTools {
     record Crops(@Describe("one line per picture, in the last screenshot's pixels: \"name x y width height\", then "
                          + "optionally \"ignore x y width height\" for a part matching skips") List<String> boxes,
                  @Describe(value = "the screen they are on, as its section names it: each noted there as an input, "
-                         + "untried until try_input tries it", optional = true) String screen,
+                         + "untried until try_input tries it, and tagged with the screen's tag", optional = true)
+                 String screen,
                  @Describe(value = "the name of the one box that is that screen's marker", optional = true)
                  String marker,
                  @Describe(value = "tags to file every one under, each declared (list_tags)", optional = true)
@@ -309,11 +311,14 @@ final class PictureTools {
         if (moving.isPresent()) return AgentReply.refused(moving.get());
         String alike = lookAlikes(context, frame.get(), picture.get().image(),
                 new Rect(crop.x(), crop.y(), crop.width(), crop.height())).map(a -> " " + a).orElse("");
+        Optional<String> screenTag = section.flatMap(s -> TagTools.screenTag(context.services(), s));
         PictureCuts.Cut saved = FxCall.call(() -> {
             PictureCuts.Cut cut = PictureCuts.save(context.services(), picture.get(), crop.name(), frame.get());
             if (!tags.isEmpty()) TemplateLibrary.applyTags(context.services(), Map.of(cut.name(), tags));
+            screenTag.ifPresent(tag -> TemplateLibrary.addTag(context.services(), List.of(cut.name()), tag));
             return cut;
         });
+        List<String> tagged = Stream.concat(tags.stream(), screenTag.stream()).distinct().toList();
         Frames.mark(context, new Rect(crop.x(), crop.y(), crop.width(), crop.height()), Marks.Kind.NOTE, saved.name());
         String constant = TemplateNames.constantFor(saved.name());
         String noted = "";
@@ -325,7 +330,7 @@ final class PictureTools {
             }
         }
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
-                        + "." + constant) + (tags.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
+                        + "." + constant) + (tagged.isEmpty() ? "" : ", tagged " + String.join(", ", tagged))
                         + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike)
                 .and(AgentReply.image(picture.get().image()));
     }

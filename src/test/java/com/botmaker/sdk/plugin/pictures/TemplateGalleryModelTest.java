@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.sdk.plugin.pictures.TemplateGalleryModel.Facts;
+import com.botmaker.sdk.plugin.pictures.TemplateGalleryModel.Show;
 import com.botmaker.sdk.plugin.pictures.TemplateGalleryModel.Sort;
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +36,14 @@ class TemplateGalleryModelTest {
         assertEquals(List.of(A, C, B), TemplateGalleryModel.sorted(files, Sort.SMALLEST, facts), "ties by name");
         assertEquals(List.of(A, B, C), TemplateGalleryModel.sorted(files, Sort.SMALLEST, Map.of()),
                 "nothing known: all alike, by name");
+    }
+
+    @Test
+    void aRememberedSortOrFilterComesBackAndAnUnknownOneIsTheDefault() {
+        for (Sort sort : Sort.values()) assertEquals(sort, Sort.fromId(sort.id()));
+        for (Show show : Show.values()) assertEquals(show, Show.fromId(show.id()));
+        assertEquals(Sort.NAME_UP, Sort.fromId(null));
+        assertEquals(Show.ALL, Show.fromId("gone"));
     }
 
     @Test

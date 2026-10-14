@@ -194,12 +194,19 @@ final class MapTools {
                     return entered.reply().and(AgentReply.text(tried(project, screen, what, OPENS + known.get())
                             + " " + known.get() + " was mapped already: its marker came into view."));
                 }
-                String how = (screen.equalsIgnoreCase(HOME) ? HOME : screen) + " › " + entered.how();
+                String how = screen + " › " + entered.how();
                 String said = recorded(project, child, how);
                 String spelled = spelled(GameNotes.sections(project), child);
                 tried(project, screen, what, OPENS + spelled);
+                String grouped;
+                try {
+                    grouped = TagTools.screenTag(context.services(), spelled)
+                            .map(tag -> " Its pictures go under the tag " + tag + ".").orElse("");
+                } catch (IllegalStateException e) {
+                    grouped = "";   // Studio busy: its first cut declares the tag
+                }
                 return entered.reply()
-                        .and(AgentReply.text(said + " Before leaving it, from the screenshot below: crop_picture "
+                        .and(AgentReply.text(said + grouped + " Before leaving it, from the screenshot below: crop_picture "
                                 + "with screen " + spelled + " and marker true a part only this screen shows, then "
                                 + "with screen " + spelled + " every input on it (each button, tab and toggle); what "
                                 + "cannot be cut now, write_notes as an Owed: line in its section. Then go back to "

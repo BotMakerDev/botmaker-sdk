@@ -61,6 +61,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -1036,6 +1037,8 @@ class SdkAssistTest {
         assertTrue(text(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
                 "screen", "home")).contains("Noted in Home as untried"));
         assertEquals("Marker: ore\nUntried: gold", GameNotes.sections(bot).get("Home"));
+        assertEquals(Set.of("Home"), TemplateLibrary.manifest(resources).tagsOf("gold"),
+                "a screen's pictures carry its tag, declared on its first cut");
 
         MapTools.recorded(bot, "Engineer", "home › click ore");
         AgentReply gated = run("try_input", "screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
@@ -1071,6 +1074,7 @@ class SdkAssistTest {
         assertTrue(text(both).contains("Noted in Engineer as its marker, in place of coin.")
                 && text(both).contains("Saved spade") && text(both).contains("Not saved, far: "), text(both));
         assertTrue(GameNotes.sections(bot).get("Engineer").contains("Marker: pick"));
+        assertEquals(Set.of("Engineer"), TemplateLibrary.manifest(resources).tagsOf("spade"));
         assertTrue(MapTools.untried(GameNotes.sections(bot).get("Engineer")).contains("spade"));
     }
 

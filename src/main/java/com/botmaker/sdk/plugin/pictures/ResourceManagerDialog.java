@@ -124,6 +124,7 @@ public final class ResourceManagerDialog {
             refreshTagActions();
         });
         gallery.setOnTagChanged(this::refreshTagActions);
+        gallery.setOnLibraryChanged(this::reload);
 
         preview.setPreserveRatio(true);
         VBox previewBox = new VBox(6, new Label("Preview"), preview, singlePane());
