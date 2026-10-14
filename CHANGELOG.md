@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **`Key.named(String)`** reads a key a person typed: as the enum names it (`PAGE_UP`, `page up`), as printed on
+  the cap (`Esc`, `[`), or a digit (the top row's). Hidden from the palette; the assistant's key and try_input
+  use it.
 - **A picture file is decoded once.** Its pixels are kept while the file is unchanged on disk (same modified
   time and size), so a run that opens the same picture again, and the assistant's look that builds every
   picture anew on each call, copy memory instead of reading and decoding the PNG. At most 64 MB is kept.

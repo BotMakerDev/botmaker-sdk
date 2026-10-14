@@ -16,7 +16,8 @@ launch, the emulator transport, OpenCV matching) lives in **shared**, where Stud
   both before bumping anything in that stack.
 - `internal/flow`, `internal/bot`, `internal/capture` (the `CaptureSource` implementations, `RegionSource`,
   `CurrentSource`, `WindowBacked`), `internal/session`, `internal/vision` (`TemplateNames`, the `img:`
-  prefix), `internal/trace`, `internal/sound`.
+  prefix), `internal/trace`, `internal/sound`, `internal/input` (`Hands`: the assistant's click, key and scroll
+  outside a run, on a private display, an emulator or this desktop).
 - `internal/trace` — `Trace` (collapsed runs, located lines) and `TraceSources`: **a debug line never writes its
   own `[Name]`**. `Debug.log("…")` is printed and traced under the calling top-level class's simple name, and
   only that (`@TraceSource` deleted 2026-09-30). Only a class whose lines need two names (`BotSettings`,

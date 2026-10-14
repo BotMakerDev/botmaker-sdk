@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.input;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -23,6 +24,20 @@ class KeyTest {
                 List.of(Key.CTRL.label(), Key.S.label(), Key.NUM5.label(), Key.F5.label(), Key.PAGE_UP.label(),
                         Key.LEFT_BRACKET.label(), Key.NUMPAD_5.label(), Key.NUMPAD_ADD.label(),
                         Key.NUMPAD_ENTER.label(), Key.ESCAPE.label(), Key.CAPS_LOCK.label()));
+    }
+
+    @Test
+    void a_key_is_named_as_printed_or_as_the_enum_names_it() {
+        assertEquals(Optional.of(Key.ESCAPE), Key.named("Escape"));
+        assertEquals(Optional.of(Key.ESCAPE), Key.named("esc"));
+        assertEquals(Optional.of(Key.Q), Key.named("q"));
+        assertEquals(Optional.of(Key.NUM5), Key.named("5"));
+        assertEquals(Optional.of(Key.PAGE_UP), Key.named("Page Up"));
+        assertEquals(Optional.of(Key.PAGE_UP), Key.named("PAGE_UP"));
+        assertEquals(Optional.of(Key.F5), Key.named("f5"));
+        assertEquals(Optional.of(Key.LEFT_BRACKET), Key.named("["));
+        assertEquals(Optional.empty(), Key.named("Hyper"));
+        assertEquals(Optional.empty(), Key.named(" "));
     }
 
     @Test

@@ -26,7 +26,6 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
-import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
@@ -792,20 +791,6 @@ class SdkAssistTest {
         assertTrue(run("click", "x", 400, "y", 10, "desktop", true, "settleMs", 0).isRefused(), "off the frame");
         assertTrue(run("scroll", "x", -1, "y", 10, "amount", 1, "desktop", true, "settleMs", 0).isRefused());
         assertTrue(controller.events.isEmpty(), "nothing lands off the game: " + controller.events);
-    }
-
-    @Test
-    void aKeyIsNamedAsPrintedOrAsKeyNamesIt() {
-        assertEquals(Optional.of(Key.ESCAPE), ActTools.key("Escape"));
-        assertEquals(Optional.of(Key.ESCAPE), ActTools.key("esc"));
-        assertEquals(Optional.of(Key.Q), ActTools.key("q"));
-        assertEquals(Optional.of(Key.NUM5), ActTools.key("5"));
-        assertEquals(Optional.of(Key.PAGE_UP), ActTools.key("Page Up"));
-        assertEquals(Optional.of(Key.PAGE_UP), ActTools.key("PAGE_UP"));
-        assertEquals(Optional.of(Key.F5), ActTools.key("f5"));
-        assertEquals(Optional.of(Key.LEFT_BRACKET), ActTools.key("["));
-        assertEquals(Optional.empty(), ActTools.key("Hyper"));
-        assertEquals(Optional.empty(), ActTools.key(" "));
     }
 
     @Test

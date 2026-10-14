@@ -106,7 +106,7 @@ final class MapTools {
                     + "other. A button with no picture yet: screenshot, crop_picture it with its screen, then "
                     + "try_input it. Nothing was done.");
         }
-        Optional<Key> key = byKey ? ActTools.key(input.key()) : Optional.empty();
+        Optional<Key> key = byKey ? Key.named(input.key()) : Optional.empty();
         if (byKey && key.isEmpty()) return AgentReply.refused("\"" + input.key() + "\" is no key.");
         String opens = input.opens() == null || input.opens().isBlank() ? null : input.opens().strip();
         String asked = input.screen() == null ? "" : input.screen().strip();

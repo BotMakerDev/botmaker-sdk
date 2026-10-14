@@ -3,6 +3,9 @@ package com.botmaker.sdk.api.input;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.sun.jna.Platform;
 
+import java.util.Locale;
+import java.util.Optional;
+
 /**
  * OS-neutral keyboard keys for {@link Keyboard}. Each constant carries both an X11 keysym (Linux)
  * and a Windows virtual-key code; {@link #nativeCode()} resolves to the right one for the current
@@ -128,12 +131,30 @@ public enum Key {
         };
     }
 
+    /**
+     * The key {@code typed} names: as this enum names it ({@code PAGE_UP}, {@code page up}), as {@link #label()}
+     * prints it ({@code Esc}, {@code [}), or a digit ({@code 5} is the top row's); empty for anything else.
+     */
+    @Hidden("reads a key a person typed, for an assistant or an editor; a bot names the constant")
+    public static Optional<Key> named(String typed) {
+        if (typed == null || typed.isBlank()) return Optional.empty();
+        String text = typed.strip();
+        if (text.length() == 1 && text.charAt(0) >= '0' && text.charAt(0) <= '9') {
+            return Optional.of(valueOf("NUM" + text));
+        }
+        String name = text.toUpperCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+        for (Key key : values()) {
+            if (key.name().equals(name) || key.label().equalsIgnoreCase(text)) return Optional.of(key);
+        }
+        return Optional.empty();
+    }
+
     /** {@code PAGE_UP} → {@code Page Up}; a one-letter or F-key name stays as it is. */
     private static String words(String name) {
         StringBuilder out = new StringBuilder();
         for (String word : name.split("_")) {
             if (!out.isEmpty()) out.append(' ');
-            out.append(word.charAt(0)).append(word.substring(1).toLowerCase(java.util.Locale.ROOT));
+            out.append(word.charAt(0)).append(word.substring(1).toLowerCase(Locale.ROOT));
         }
         return out.toString();
     }

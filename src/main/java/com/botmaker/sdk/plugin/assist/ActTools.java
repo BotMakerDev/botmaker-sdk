@@ -4,25 +4,22 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
-import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
-import com.botmaker.sdk.api.input.MouseButton;
 import com.botmaker.sdk.api.text.OcrLanguage;
 import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.internal.input.Hands;
+import com.botmaker.sdk.internal.input.Hands.InSession;
+import com.botmaker.sdk.internal.input.Hands.OnDesktop;
+import com.botmaker.sdk.internal.input.Hands.OnEmulator;
 import com.botmaker.sdk.internal.vision.FrameChange;
 import com.botmaker.sdk.internal.vision.FrameChange.Clock;
 import com.botmaker.sdk.internal.vision.FrameChange.Motion;
-import com.botmaker.session.PointerPolicy;
 import com.botmaker.session.PrivateSession;
-import com.botmaker.shared.capture.GenericWindow;
-import com.botmaker.shared.capture.NativeController;
-import com.botmaker.shared.capture.NativeControllerFactory;
 
-import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -49,7 +46,6 @@ final class ActTools {
     private static final int MARGIN = 12;
     private static final int MOST_LINES = 15;
     private static final int MOST_DESCRIBED = 60;
-    private static final long KEY_HOLD_MS = 40;
     private static final String SETTLE = "the longest the game is given to answer, in milliseconds: the screen is "
             + "read until it changes and holds still; 5000 when left out, at most 10000, 0 reads it at once";
 
@@ -142,7 +138,7 @@ final class ActTools {
     }
 
     static AgentReply key(Press press, AgentContext context) {
-        Optional<Key> key = key(press.key());
+        Optional<Key> key = Key.named(press.key());
         if (key.isEmpty()) {
             return AgentReply.refused("\"" + press.key() + "\" is no key; name it as printed on it (Escape, Q, F5, "
                     + "Page Up) or as Key names it (PAGE_UP).");
@@ -389,21 +385,6 @@ final class ActTools {
         return new Rect(left, top, right - left, bottom - top);
     }
 
-    /**
-     * The key {@code typed} names: as {@link Key} names it ({@code PAGE_UP}, {@code page up}), as printed on it
-     * ({@code Esc}, {@code [}), or a digit ({@code 5} is the top row's); empty for anything else.
-     */
-    static Optional<Key> key(String typed) {
-        if (typed == null || typed.isBlank()) return Optional.empty();
-        String text = typed.strip();
-        if (text.length() == 1 && text.charAt(0) >= '0' && text.charAt(0) <= '9') return Optional.of(Key.valueOf("NUM" + text));
-        String name = text.toUpperCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
-        for (Key key : Key.values()) {
-            if (key.name().equals(name) || key.label().equalsIgnoreCase(text)) return Optional.of(key);
-        }
-        return Optional.empty();
-    }
-
     /** One line of text read on the screen, in screenshot pixels. */
     record Line(String text, Rect bounds) {
         String said() {
@@ -443,110 +424,12 @@ final class ActTools {
         void on(Hands hands);
     }
 
-    /** Input where the look tools look, in the screenshot's pixels. */
-    private sealed interface Hands permits InSession, OnEmulator, OnDesktop {
-        void click(int x, int y);
-
-        void key(Key key);
-
-        void scroll(int x, int y, int amount);
-    }
-
     /** The hands for where {@link Frames#look} reads, in its order. */
     private static Hands hands(AgentContext context) {
         PrivateSession session = Frames.session(context);
         if (session != null) return new InSession(session);
         CaptureSource emulator = Frames.emulator(context);
         if (emulator != null) return new OnEmulator(emulator);
-        return new OnDesktop(context.watchedArea().orElse(new Area(0, 0, 0, 0)));
-    }
-
-    /** The private display's own pointer and keyboard, as a run's {@code Mouse} and {@code Keyboard} use them. */
-    private record InSession(PrivateSession session) implements Hands {
-
-        @Override
-        public void click(int x, int y) {
-            Point o = origin();
-            PointerPolicy.click(session.controller(), session, o.x() + x, o.y() + y, MouseButton.LEFT.code());
-        }
-
-        @Override
-        public void key(Key key) {
-            NativeController controller = session.controller();
-            GenericWindow window = session.attached();
-            if (window == null) controller.keyDown(key.nativeCode());
-            else controller.keyDown(window, key.nativeCode());
-            hold();
-            if (window == null) controller.keyUp(key.nativeCode());
-            else controller.keyUp(window, key.nativeCode());
-        }
-
-        @Override
-        public void scroll(int x, int y, int amount) {
-            Point o = origin();
-            session.controller().mouseMove(o.x() + x, o.y() + y);
-            session.controller().scroll(amount);
-        }
-
-        /** Where the game's window sits in the display: the frame's (0, 0), as {@code SessionSource} says. */
-        private Point origin() {
-            GenericWindow window = session.attached();
-            Rectangle r = window == null ? null : window.getRect();
-            return r == null ? new Point(0, 0) : new Point(r.x, r.y);
-        }
-    }
-
-    /** The emulator's touch: a click only. */
-    private record OnEmulator(CaptureSource emulator) implements Hands {
-
-        @Override
-        public void click(int x, int y) {
-            emulator.click(new Point(x, y));
-        }
-
-        @Override
-        public void key(Key key) {
-            throw new UnsupportedOperationException("The emulator takes clicks here; a key needs try_statement.");
-        }
-
-        @Override
-        public void scroll(int x, int y, int amount) {
-            throw new UnsupportedOperationException("The emulator takes clicks here; a scroll needs try_statement.");
-        }
-    }
-
-    /** This desktop's pointer and keyboard, the cursor put back after a click or a scroll. */
-    private record OnDesktop(Area at) implements Hands {
-
-        @Override
-        public void click(int x, int y) {
-            PointerPolicy.click(NativeControllerFactory.get(), null, at.x() + x, at.y() + y, MouseButton.LEFT.code());
-        }
-
-        @Override
-        public void key(Key key) {
-            NativeController controller = NativeControllerFactory.get();
-            controller.keyDown(key.nativeCode());
-            hold();
-            controller.keyUp(key.nativeCode());
-        }
-
-        @Override
-        public void scroll(int x, int y, int amount) {
-            NativeController controller = NativeControllerFactory.get();
-            java.awt.Point back = controller.cursorPosition();
-            controller.mouseMove(at.x() + x, at.y() + y);
-            controller.scroll(amount);
-            if (back != null) controller.mouseMove(back.x, back.y);
-        }
-    }
-
-    /** A key's hold between press and release; an interrupt is kept for the settle that follows. */
-    private static void hold() {
-        try {
-            Thread.sleep(KEY_HOLD_MS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        return new OnDesktop(context.watchedArea().map(at -> new Point(at.x(), at.y())).orElse(new Point(0, 0)));
     }
 }
