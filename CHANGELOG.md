@@ -36,7 +36,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - The new `read_guide` works out the stage the bot is at: its home and popups methods first, then each
     screen's `Stage:` line in its notes. It answers with that stage's steps only, and with where each screen
     stands; `read_guide stage=2` gives another stage's steps.
-  - Discovery maps every way out of home before surveying any screen, then gives each input a kind.
+  - Discovery maps every way out of home before surveying any screen, then gives each input a kind. Each
+    entrance is cut the first time it is on screen and the Map written every few entrances, naming its
+    picture: on Firestone the assistant mapped a dozen entrances keeping them in the conversation, and a
+    side-column icon was gone before it came back to cut it.
   - A body calls a feature `LOCKED` only on a lock picture cut during Discovery. With neither the entrance nor
     a lock in view, the step fails.
   - Trial runs each activity from three states: work to do, nothing to do, interrupted.

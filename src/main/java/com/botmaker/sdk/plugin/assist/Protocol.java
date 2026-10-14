@@ -35,7 +35,10 @@ final class Protocol {
                 """),
         DISCOVERY("Stage 1, Discovery: know the game before writing any body", """
                 - Map first, breadth-first: every way out of home (its buttons, side columns, hotkeys) and the
-                  screen each one opens, before surveying any one screen. write_notes the Map section.
+                  screen each one opens, before surveying any one screen. An entrance with no picture is one the
+                  bot cannot take: cut it the first time it is on screen, and write_notes the Map after every
+                  few entrances, each line naming its picture, so nothing found lives only in the conversation.
+                  A side column that scrolls or whose icons come and go: say so in the Map.
                 - Then survey one screen: one whole screenshot, its help (an i or ? button) first, then every
                   input on it, named and given a kind: a chore (work that repeats), a shortcut the game ships for
                   a chore (Auto, x10, Max, Claim all, Skip), a choice (spending the player decides), information,
