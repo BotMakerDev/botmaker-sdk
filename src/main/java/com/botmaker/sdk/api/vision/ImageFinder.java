@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.MatchEvent;
 import com.botmaker.sdk.internal.observe.Surface;
@@ -16,6 +17,8 @@ import com.botmaker.shared.opencv.OpencvManager;
 import com.botmaker.shared.opencv.RawMatch;
 import org.opencv.core.Mat;
 
+import java.awt.Dimension;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -112,13 +115,31 @@ public class ImageFinder {
      */
     @Hidden("the assistant's look at a whole screen; a bot asks find() or a group's whileFind")
     public static List<MatchResult> bestMatches(List<ImageTemplate> templates, CaptureSource source) {
+        return bestMatches(templates, source, EVERYWHERE);
+    }
+
+    /**
+     * {@link #bestMatches}, each picture that says where it was cut ({@link ImageTemplate#at}) looked for only
+     * within {@code margin} pixels of that place, scaled to the frame; one that does not is looked for everywhere.
+     * For the assistant's list of what an action left on screen: a picture's own corner costs a fraction of the
+     * whole frame, and a picture away from its place is not listed.
+     */
+    @Hidden("the assistant's look at what an action left on screen; a bot asks find() or a group's whileFind")
+    public static List<MatchResult> bestMatchesNear(List<ImageTemplate> templates, int margin, CaptureSource source) {
+        return bestMatches(templates, source, Math.max(0, margin));
+    }
+
+    /** A margin that means the whole frame, not a picture's place. */
+    private static final int EVERYWHERE = -1;
+
+    private static List<MatchResult> bestMatches(List<ImageTemplate> templates, CaptureSource source, int margin) {
         List<MatchResult> none = templates.stream().map(t -> MatchResult.notFound()).toList();
         Mat background = null;
         try {
             BufferedImage screenshot = source.capture();
             if (screenshot == null) return none;
             background = OpencvManager.bufferedImageToMat(screenshot);
-            List<RawMatch> bests = bestEach(templates, background);
+            List<RawMatch> bests = bestEach(templates, background, margin);
             Point origin = source.origin();
             List<MatchResult> results = new ArrayList<>();
             for (int i = 0; i < templates.size(); i++) {
@@ -139,20 +160,40 @@ public class ImageFinder {
      * Each template's best match on {@code background} at its own primary scale, as {@link OpencvManager#findBest}
      * gives it, in order: the frame prepared once and the templates matched side by side. The templates are loaded
      * here, one at a time, before any match runs: loading is not safe from several threads. One that cannot be read
-     * is null, as one that matched nowhere, and the others are still matched.
+     * is null, as one that matched nowhere, and the others are still matched. A {@code margin} of 0 or more looks
+     * for each only {@link #near} its place.
      */
-    private static List<RawMatch> bestEach(List<ImageTemplate> templates, Mat background) {
+    private static List<RawMatch> bestEach(List<ImageTemplate> templates, Mat background, int margin) {
         List<OpencvManager.Search> searches = new ArrayList<>(templates.size());
         for (ImageTemplate template : templates) {
             OpencvManager.Search search;
             try {
-                search = new OpencvManager.Search(template.getMat(), template.authoredSize(), null);
+                search = new OpencvManager.Search(template.getMat(), template.authoredSize(),
+                        near(template, margin, background.width(), background.height()));
             } catch (RuntimeException unreadable) {
                 search = null;
             }
             searches.add(search);
         }
         return OpencvManager.findBestEach(background, searches, false);
+    }
+
+    /**
+     * Where {@code template} is looked for in a {@code width}×{@code height} frame: its place, scaled from the frame
+     * it was cut from to this one, grown by {@code margin} on each side; null for the whole frame (no place, or
+     * {@link #EVERYWHERE}). The matcher clips it to the frame.
+     */
+    private static Rectangle near(ImageTemplate template, int margin, int width, int height) {
+        Rect place = template.place();
+        if (margin < 0 || place == null) return null;
+        Dimension cut = template.authoredSize();
+        double sx = cut == null ? 1 : width / (double) cut.width;
+        double sy = cut == null ? 1 : height / (double) cut.height;
+        int left = (int) Math.floor(place.x() * sx) - margin;
+        int top = (int) Math.floor(place.y() * sy) - margin;
+        int right = (int) Math.ceil((place.x() + place.width()) * sx) + margin;
+        int bottom = (int) Math.ceil((place.y() + place.height()) * sy) + margin;
+        return new Rectangle(left, top, right - left, bottom - top);
     }
 
     /** The confidence every match uses: {@link BotSettings}'. */
@@ -200,7 +241,7 @@ public class ImageFinder {
             Point origin = source.origin();
 
             List<ImageTemplate> templates = group.templates();
-            List<RawMatch> bests = bestEach(templates, background);
+            List<RawMatch> bests = bestEach(templates, background, EVERYWHERE);
             List<MatchResult> results = new ArrayList<>();
             for (int i = 0; i < templates.size(); i++) {
                 ImageTemplate template = templates.get(i);
@@ -251,7 +292,7 @@ public class ImageFinder {
             Point origin = source.origin();
 
             List<ImageTemplate> goods = good.templates();
-            List<RawMatch> bests = bestEach(goods, background);
+            List<RawMatch> bests = bestEach(goods, background, EVERYWHERE);
             List<MatchResult> results = new ArrayList<>();
             for (int i = 0; i < goods.size(); i++) {
                 ImageTemplate template = goods.get(i);

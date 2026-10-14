@@ -4,6 +4,8 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.plugin.SpelledValues;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -108,6 +110,21 @@ class TemplateUsesTest {
     }
 
     @Test
+    void eachConstantOfOursSaysWhereItsPictureWasCut() {
+        Host host = new Host("ORE", "GOLD", "ELSEWHERE");
+        host.held.put("ORE", new ImageTemplate(TemplateLibrary.pathForName("ore")).at(new Rect(820, 610, 96, 40))
+                .in(new Size(1280, 720)));
+        host.held.put("GOLD", new ImageTemplate(TemplateLibrary.pathForName("gold")));
+        host.held.put("ELSEWHERE", new ImageTemplate("assets/elsewhere.png").at(new Rect(1, 2, 3, 4)));
+
+        Map<String, FrameCut> cuts = TemplateUses.cuts(host);
+
+        assertEquals(new FrameCut(new Size(1280, 720), new Rect(820, 610, 96, 40)), cuts.get("ore"));
+        assertEquals(new FrameCut(null, null), cuts.get("GOLD"), "no frame or place written; the name matches in any case");
+        assertEquals(2, cuts.size(), "a path the user chose is theirs: " + cuts);
+    }
+
+    @Test
     void theRepointNoteNamesBothPictures() {
         String note = TemplateUses.repointNote("ore", "gold");
         assertTrue(note.contains("\"ore\"") && note.contains("\"gold\""), note);
@@ -140,11 +157,15 @@ class TemplateUsesTest {
             opened = TestContexts.row(ImageTemplate.class, "new ImageTemplate(\"old.png\")");
             String path = paths.get(member);
             if (path != null) opened = opened.withValue(new ImageTemplate(path));
+            if (held.containsKey(member)) opened = opened.withValue(held.get(member));
             return Optional.of(opened);
         }
 
         /** The path each constant's initialiser holds, for the constants a test reads back. */
         final Map<String, String> paths = new LinkedHashMap<>();
+
+        /** The whole picture each constant holds, where a test needs more than its path. */
+        final Map<String, ImageTemplate> held = new LinkedHashMap<>();
 
         @Override
         public Optional<String> add(String id, String member, Object value) {

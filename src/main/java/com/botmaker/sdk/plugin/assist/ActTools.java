@@ -491,20 +491,24 @@ final class ActTools {
         if (lines.size() > MOST_LINES) said.add("  … " + (lines.size() - MOST_LINES) + " more; describe reads them.");
     }
 
-    /** The pictures a run would find on {@code frame}, best first, or the best that would not. */
+    /**
+     * The pictures a run would find on {@code frame}, best first, or the best that would not. Each is looked for near
+     * where it was cut ({@link LookTools#scoresNear}), so one away from its place is not listed; which_screen looks
+     * everywhere.
+     */
     private static String screen(AgentContext context, BufferedImage frame) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return "no project is open.";
-        List<LookTools.Scored> scored = LookTools.scores(resources.get(), frame);
+        List<LookTools.Scored> scored = LookTools.scoresNear(resources.get(), frame, LookTools.cuts(context));
         double needs = Frames.confidence(context.services());
         List<String> on = new ArrayList<>();
         for (LookTools.Scored s : scored) {
             if (s.match().confidence() >= needs) on.add(s.name() + " at " + Frames.box(s.match().rect()));
         }
         if (!on.isEmpty()) return String.join(", ", on) + ".";
-        return scored.isEmpty() ? "no picture matches at all." : "none of the pictures (best " + scored.getFirst().name()
-                + " " + Frames.score(scored.getFirst().match().confidence()) + ", a run needs " + Frames.score(needs)
-                + ").";
+        return scored.isEmpty() ? "no picture matches at all." : "none of the pictures where they were cut"
+                + " (best " + scored.getFirst().name() + " " + Frames.score(scored.getFirst().match().confidence())
+                + ", a run needs " + Frames.score(needs) + "; which_screen looks everywhere).";
     }
 
     /** Every line the OCR reads in {@code area} of {@code frame}, in the frame's pixels. */

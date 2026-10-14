@@ -11,8 +11,10 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -177,6 +179,22 @@ public final class TemplateUses {
             if (TemplateNames.pathFor(baseName).equals(path)) gone.add(baseName);
         }
         return List.copyOf(gone);
+    }
+
+    /**
+     * Where each picture was cut, by its name: what its constant's {@code .at} and {@code .in} say. Only a constant
+     * written as one of ours counts, as in {@link #missing}; a picture with none is not in the map. On the FX thread.
+     */
+    public static Map<String, FrameCut> cuts(PluginValues values) {
+        Map<String, FrameCut> cuts = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (Member member : SET.members(values)) {
+            String baseName = TemplateNames.baseNameFor(member.name());
+            if (baseName == null) continue;
+            SET.read(values, member)
+                    .filter(held -> TemplateNames.pathFor(baseName).equals(held.filePath()))
+                    .ifPresent(held -> cuts.put(baseName, new FrameCut(held.frame(), held.place())));
+        }
+        return cuts;
     }
 
     /**

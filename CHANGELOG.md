@@ -25,6 +25,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   compare forms, and `clickBest` read one capture and match every picture of the group on it in parallel. The
   frame is prepared once, and `clickBest` captures once where it captured once a picture. The assistant's
   which_screen and the "Screen:" list of describe, click, key and try_input do the same for every picture.
+- **The assistant's "Screen:" list looks for each picture where it was cut.** A picture whose constant says where
+  it was cut (`.at(Rect)`) is looked for within 48 pixels of that place, scaled to the frame, so the list after
+  describe, click, key, scroll and try_input costs a fraction of a whole-frame search (2.1 s instead of 17 s
+  for 190 pictures). A picture away from its place is not listed there; which_screen and find_picture still look
+  everywhere, and so does a bot's run. The list and which_screen scale each picture from the frame it was cut
+  from (`.in(Size)`).
 - **Every assistant tool says how long it took.** Its reply ends with one line, the total and where the time
   went, longest first: `Took 18.6 s: matching 9.2, reading text 5.0, settling 4.1.` The parts are capturing,
   watching motion (the screen read before acting), settling (the game given time to answer), matching pictures,

@@ -18,7 +18,9 @@ import com.botmaker.sdk.api.vision.Pixel;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.trace.MissFrames;
+import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.pictures.TemplateUses;
 
 import javax.imageio.ImageIO;
 import java.awt.AlphaComposite;
@@ -33,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -229,7 +232,7 @@ final class LookTools {
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
-        List<Scored> scored = scores(resources.get(), frame.get());
+        List<Scored> scored = scores(resources.get(), frame.get(), cuts(context));
         if (scored.isEmpty()) return AgentReply.text("No picture matched at all; crop_picture makes one.");
         double needs = Frames.confidence(context.services());
         List<String> lines = new ArrayList<>();
@@ -374,21 +377,52 @@ final class LookTools {
     record Scored(String name, MatchResult match) {
     }
 
+    /** How far from where it was cut {@link #scoresNear} looks for a picture, in the frame's pixels. */
+    static final int NEAR = 48;
+
+    /**
+     * Where each of the bot's pictures was cut, by name, as its constant says ({@link TemplateUses#cuts}); none when
+     * the FX thread does not answer (a dialog holds it), so the pictures are looked for everywhere rather than an
+     * action's answer lost.
+     */
+    static Map<String, FrameCut> cuts(AgentContext context) {
+        try {
+            return FxCall.call(() -> TemplateUses.cuts(context.services().pluginValues()));
+        } catch (RuntimeException unanswered) {
+            return Map.of();
+        }
+    }
+
     /**
      * Every picture's best match on {@code frame}, best first; a picture that matched nowhere is left out. All of them
-     * in one {@link ImageFinder#bestMatches}: the frame prepared once, the pictures matched side by side.
+     * in one {@link ImageFinder#bestMatches}: the frame prepared once, the pictures matched side by side. Each is
+     * scaled from the frame {@code cuts} says it was cut from.
      */
-    static List<Scored> scores(Path resources, BufferedImage frame) {
+    static List<Scored> scores(Path resources, BufferedImage frame, Map<String, FrameCut> cuts) {
+        return scores(resources, frame, cuts, false);
+    }
+
+    /**
+     * {@link #scores}, each picture whose place {@code cuts} knows looked for only {@link #NEAR} it
+     * ({@link ImageFinder#bestMatchesNear}); one with no place is looked for everywhere.
+     */
+    static List<Scored> scoresNear(Path resources, BufferedImage frame, Map<String, FrameCut> cuts) {
+        return scores(resources, frame, cuts, true);
+    }
+
+    private static List<Scored> scores(Path resources, BufferedImage frame, Map<String, FrameCut> cuts, boolean near) {
         List<String> names = new ArrayList<>();
         List<ImageTemplate> templates = new ArrayList<>();
         try {
             for (Path file : TemplateLibrary.list(resources)) {
                 if (TemplateLibrary.isUnmodifiedDefaultTemplate(file)) continue;
-                names.add(TemplateLibrary.baseName(file));
-                templates.add(new ImageTemplate(file.toString()));
+                String name = TemplateLibrary.baseName(file);
+                names.add(name);
+                templates.add(cutAt(new ImageTemplate(file.toString()), cuts.get(name)));
             }
-            List<MatchResult> bests = ToolTiming.timed(ToolTiming.Phase.MATCH,
-                    () -> ImageFinder.bestMatches(templates, new Frames.Still(frame)));
+            Frames.Still still = new Frames.Still(frame);
+            List<MatchResult> bests = ToolTiming.timed(ToolTiming.Phase.MATCH, () -> near
+                    ? ImageFinder.bestMatchesNear(templates, NEAR, still) : ImageFinder.bestMatches(templates, still));
             List<Scored> scored = new ArrayList<>();
             for (int i = 0; i < names.size(); i++) {
                 if (bests.get(i).isFound()) scored.add(new Scored(names.get(i), bests.get(i)));
@@ -399,6 +433,13 @@ final class LookTools {
             // Released after the match: an unreleased template is native memory.
             templates.forEach(ImageTemplate::close);
         }
+    }
+
+    /** {@code template} as cut at {@code cut}; as it is when the cut is not known. */
+    private static ImageTemplate cutAt(ImageTemplate template, FrameCut cut) {
+        if (cut == null) return template;
+        ImageTemplate placed = cut.place() == null ? template : template.at(cut.place());
+        return cut.frame() == null ? placed : placed.in(cut.frame());
     }
 
     /** The best match of the picture {@code name} on {@code frame}, in the frame's pixels. */
