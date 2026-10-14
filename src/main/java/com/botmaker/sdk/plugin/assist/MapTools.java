@@ -35,6 +35,8 @@ final class MapTools {
     static final String HOME = "home";
     /** How long an input is given to answer when the call says nothing: as long as a click's. */
     static final int SETTLE_MS = 5000;
+    /** How much longer a small change is read on while the screen's marker still shows: Garage drew a second late. */
+    static final int SLOW_SCREEN_MS = 2_500;
     private static final int DEEPEST = 32;
 
     /** What a screen's name cannot hold: the notes' own syntax, or markdown its heading would read otherwise. */
@@ -154,8 +156,8 @@ final class MapTools {
         }
         if (never) return AgentReply.text(tried(project, screen, what, GameNotes.NEVER
                 + input.never().strip()));
-        ActTools.Entered entered = ActTools.enter(context, byPicture ? input.picture() : null, key.orElse(null),
-                input.desktop(), settle, FrameChange.ANSWER_SHARE);
+        ActTools.Entered entered = slowScreen(context, ActTools.enter(context, byPicture ? input.picture() : null,
+                key.orElse(null), input.desktop(), settle, FrameChange.ANSWER_SHARE), marker);
         if (entered.after() == null) {
             return entered.reply().isRefused() ? entered.reply() : entered.reply().and(AgentReply.text(
                     "Nothing was written. Look where the game is before trying it again from " + screen + "."));
@@ -200,6 +202,21 @@ final class MapTools {
             return entered.reply().and(AgentReply.refused("The input was used, but the notes could not be written: "
                     + e.getMessage()));
         }
+    }
+
+    /**
+     * {@code first} read on while it changed less than a screen and the screen's {@code marker} still shows: a
+     * screen slow to draw (Garage, a second late) would be noted as a change in place. A change that grew with the
+     * marker still in view is drift, not a screen.
+     */
+    private static ActTools.Entered slowScreen(AgentContext context, ActTools.Entered first, Optional<String> marker) {
+        if (first.after() == null || first.share() >= SCREEN_SHARE || marker.isEmpty()
+                || !ActTools.shows(context, marker.get(), first.after())) {
+            return first;
+        }
+        ActTools.Entered later = ActTools.later(context, first, SLOW_SCREEN_MS, SCREEN_SHARE);
+        return later.after() == null || later != first && !ActTools.shows(context, marker.get(), later.after())
+                ? later : first;
     }
 
     /**

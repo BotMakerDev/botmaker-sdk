@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * The assistant's hands: a click, a key or a scroll on the game the look tools see, each answered in text — the
@@ -217,11 +219,12 @@ final class ActTools {
     /**
      * What an action did: the answer as click or key says it, and when it happened and the screen was read after
      * it, the frames either side and what moved on its own; {@code how} says it in the Map's words
-     * ({@code click engineer_home}, {@code key Q}).
+     * ({@code click engineer_home}, {@code key Q}) and {@code done} in the answer's ({@code Clicked … at x,y}).
      */
-    record Entered(AgentReply reply, BufferedImage before, BufferedImage after, Motion motion, String how) {
+    record Entered(AgentReply reply, BufferedImage before, BufferedImage after, Motion motion, String how,
+                   String done) {
         static Entered no(AgentReply reply) {
-            return new Entered(reply, null, null, Motion.NONE, null);
+            return new Entered(reply, null, null, Motion.NONE, null, null);
         }
 
         /** The share of the screen the action changed; 0 when it was not done or not read after. */
@@ -313,7 +316,35 @@ final class ActTools {
         }
         if (after.isEmpty()) return Entered.no(AgentReply.text(done + "; the screen could not be captured after it."));
         return new Entered(answer(context, done, last, after.get(), motion, Boolean.TRUE.equals(show)), last,
-                after.get(), motion, how);
+                after.get(), motion, how, done);
+    }
+
+    /**
+     * {@code entered} read on for up to {@code capMs}, for a screen slow to draw: a small first change (a button's
+     * press, a background swaying past the motion it was seen with) ends the wait before the screen it opens shows.
+     * The later frame and its answer once {@code share} of the screen changed; else {@code entered} as it was; no
+     * frame when stopped meanwhile.
+     */
+    static Entered later(AgentContext context, Entered entered, int capMs, double share) {
+        try {
+            return ToolTiming.timed(ToolTiming.Phase.SETTLE, () -> later(entered, () -> Frames.look(context), capMs,
+                    share, Clock.REAL, after -> answer(context, entered.done(), entered.before(), after,
+                            entered.motion(), false)));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Entered.no(AgentReply.text(entered.done() + "; stopped before the screen was read again."));
+        }
+    }
+
+    static Entered later(Entered entered, Supplier<Optional<BufferedImage>> look, int capMs, double share, Clock clock,
+                         Function<BufferedImage, AgentReply> answer) throws InterruptedException {
+        Optional<BufferedImage> after = FrameChange.answered(entered.before(), entered.motion(), look, capMs, share,
+                clock);
+        if (after.isEmpty() || FrameChange.share(entered.before(), after.get(), entered.motion()) < share) {
+            return entered;
+        }
+        return new Entered(answer.apply(after.get()), entered.before(), after.get(), entered.motion(), entered.how(),
+                entered.done());
     }
 
     /** What changed from {@code before} to {@code after}, in text, with the changed part's image when asked. */

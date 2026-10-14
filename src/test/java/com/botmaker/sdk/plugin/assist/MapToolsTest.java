@@ -1,9 +1,17 @@
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.plugin.api.assist.AgentReply;
+import com.botmaker.sdk.internal.vision.FrameChange.Clock;
+import com.botmaker.sdk.internal.vision.FrameChange.Motion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +20,7 @@ import java.util.OptionalInt;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** try_input's notes: the Map's line, the section owing its marker, each input untried until tried, and its shape. */
@@ -107,5 +116,58 @@ class MapToolsTest {
         assertEquals("Tavern choice", MapTools.nameFrom("tavern_choice_town", "Town"));
         assertEquals("Upgrades", MapTools.nameFrom("upgrades", "Home"));
         assertEquals("Guild hall", MapTools.nameFrom("guild_hall", "Home"));
+    }
+
+    /** A screen that draws a second after a small first change is still read as the screen it opens. */
+    @Test
+    void aScreenSlowToDrawIsWaitedFor() throws InterruptedException {
+        BufferedImage before = filled(Color.GRAY, 0);
+        BufferedImage pressed = filled(Color.GRAY, 20);     // a button's press: a corner, under SCREEN_SHARE
+        BufferedImage garage = filled(Color.BLUE, 0);
+        ActTools.Entered first = new ActTools.Entered(AgentReply.text("Clicked garage; changed a corner."), before,
+                pressed, Motion.NONE, "click garage", "Clicked garage");
+        assertTrue(first.share() < MapTools.SCREEN_SHARE);
+
+        long[] waited = {0};
+        Deque<BufferedImage> reads = new ArrayDeque<>(List.of(pressed, pressed, pressed, garage, garage));
+        ActTools.Entered later = ActTools.later(first, () -> Optional.of(reads.size() > 1 ? reads.poll()
+                : reads.peek()), MapTools.SLOW_SCREEN_MS, MapTools.SCREEN_SHARE, counting(waited),
+                after -> AgentReply.text("answered"));
+        assertSame(garage, later.after());
+        assertTrue(later.share() >= MapTools.SCREEN_SHARE);
+        assertEquals("answered", later.reply().parts().getFirst().text());
+        assertEquals("click garage", later.how());
+
+        waited[0] = 0;
+        ActTools.Entered same = ActTools.later(first, () -> Optional.of(pressed), MapTools.SLOW_SCREEN_MS,
+                MapTools.SCREEN_SHARE, counting(waited), after -> AgentReply.text("answered"));
+        assertSame(first, same, "a change in place stays one");
+        assertEquals(MapTools.SLOW_SCREEN_MS, waited[0], "read on to the cap, never past it");
+    }
+
+    /** A {@code color} frame with its top-left {@code corner}×{@code corner} square white. */
+    private static BufferedImage filled(Color color, int corner) {
+        BufferedImage image = new BufferedImage(320, 180, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = image.createGraphics();
+        g.setColor(color);
+        g.fillRect(0, 0, 320, 180);
+        g.setColor(Color.WHITE);
+        g.fillRect(0, 0, corner, corner);
+        g.dispose();
+        return image;
+    }
+
+    private static Clock counting(long[] waited) {
+        return new Clock() {
+            @Override
+            public long nowMs() {
+                return waited[0];
+            }
+
+            @Override
+            public void sleep(long ms) {
+                waited[0] += ms;
+            }
+        };
     }
 }

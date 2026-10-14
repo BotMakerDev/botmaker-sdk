@@ -206,6 +206,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **try_input waits for a screen slow to draw.** A small first change (a button's press, the background swaying)
+  ended the wait before the screen it opens showed, and the input was noted as changing the screen in place.
+  While the screen's marker still shows, the tool now reads on for up to 2.5 s more.
 - **A picture shared by two threads is decoded once.** `ImageTemplate` loads its pixels under a lock, and two
   first looks at the same file keep one copy in the picture cache instead of the second replacing the first.
 - **Two `Untried:` lines in a screen's notes are read as one.** A section written by hand with a second line had
