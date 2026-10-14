@@ -13,6 +13,9 @@ import com.botmaker.sdk.api.input.MouseButton;
 import com.botmaker.sdk.api.text.OcrLanguage;
 import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.internal.vision.FrameChange;
+import com.botmaker.sdk.internal.vision.FrameChange.Clock;
+import com.botmaker.sdk.internal.vision.FrameChange.Motion;
 import com.botmaker.session.PointerPolicy;
 import com.botmaker.session.PrivateSession;
 import com.botmaker.shared.capture.GenericWindow;
@@ -23,13 +26,11 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Supplier;
 
 /**
  * The assistant's hands: a click, a key or a scroll on the game the look tools see, each answered in text — the
@@ -44,32 +45,6 @@ final class ActTools {
 
     static final int SETTLE_MS = 5_000;
     static final int LONGEST_SETTLE_MS = 10_000;
-    /** How often the screen is read while the game answers. */
-    static final int POLL_MS = 200;
-    /**
-     * How long a screen that started changing is given to finish: one that animates on its own never holds still.
-     * A game can take seconds to start answering (Firestone's Library, 2026-10-13), so no fixed wait fits.
-     */
-    static final int SETTLING_MS = 1_500;
-    /**
-     * Before acting the screen is read this many times more, {@link #POLL_MS} apart: what moves among those reads
-     * moves on its own (Firestone's leaves and heroes), and is not the game's answer. Counted as one, the first
-     * read after a click already differed and the next held still, so the answer was the screen before the
-     * Tavern opened (2026-10-13).
-     */
-    static final int AMBIENT_READS = 2;
-    /** A sample that moved on its own hides this many pixels around it: a leaf sways a little further next time. */
-    static final int AMBIENT_GROW = 6;
-    /**
-     * The share of the screen that must change for the wait to end early: a new screen or a popup. The mask misses
-     * sway that paused while it looked, and that alone ended the wait before Firestone drew the Engineer
-     * (2026-10-13). A smaller change, a button greying, is still told, at the end of the wait.
-     */
-    static final double ANSWER_SHARE = 0.03;
-    /** A channel moving less than this is the same pixel: compression, a blended edge. */
-    private static final int SAME = 24;
-    /** Every this many pixels is compared; a change smaller than this is not a step's answer. */
-    private static final int STEP = 2;
     /** The box the text is read in grows by this much, so a line the change cut at its edge is read whole. */
     private static final int MARGIN = 12;
     private static final int MOST_LINES = 15;
@@ -254,7 +229,7 @@ final class ActTools {
 
         /** The share of the screen the action changed; 0 when it was not done or not read after. */
         double share() {
-            return after == null ? 0 : changedShare(before, after, motion);
+            return after == null ? 0 : FrameChange.share(before, after, motion);
         }
     }
 
@@ -281,7 +256,7 @@ final class ActTools {
      */
     private static AgentReply act(AgentContext context, BufferedImage seen, Point at, Boolean desktop, Integer settleMs,
                                   Boolean show, String done, Action action) {
-        return acted(context, seen, at, desktop, settleMs, show, done, null, ANSWER_SHARE, action).reply();
+        return acted(context, seen, at, desktop, settleMs, show, done, null, FrameChange.ANSWER_SHARE, action).reply();
     }
 
     private static Entered acted(AgentContext context, BufferedImage seen, Point at, Boolean desktop, Integer settleMs,
@@ -315,7 +290,8 @@ final class ActTools {
         }
         List<BufferedImage> still = new ArrayList<>(List.of(before.get()));
         try {
-            still.addAll(ToolTiming.timed(ToolTiming.Phase.MOTION, () -> ambient(() -> Frames.look(context), Clock.REAL)));
+            still.addAll(ToolTiming.timed(ToolTiming.Phase.MOTION, () -> FrameChange.ambient(() -> Frames.look(context),
+                    Clock.REAL)));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Entered.no(AgentReply.text("Stopped before acting; nothing was done."));
@@ -333,7 +309,7 @@ final class ActTools {
         Optional<BufferedImage> after;
         try {
             after = ToolTiming.timed(ToolTiming.Phase.SETTLE,
-                    () -> answered(last, motion, () -> Frames.look(context), settle, share, Clock.REAL));
+                    () -> FrameChange.answered(last, motion, () -> Frames.look(context), settle, share, Clock.REAL));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Entered.no(AgentReply.text(done + "; stopped before the screen was read again."));
@@ -343,130 +319,10 @@ final class ActTools {
                 after.get(), motion, how);
     }
 
-    /** {@link #AMBIENT_READS} more reads of the screen, {@link #POLL_MS} apart; a read that failed is left out. */
-    static List<BufferedImage> ambient(Supplier<Optional<BufferedImage>> look, Clock clock)
-            throws InterruptedException {
-        List<BufferedImage> read = new ArrayList<>();
-        for (int i = 0; i < AMBIENT_READS; i++) {
-            clock.sleep(POLL_MS);
-            look.get().ifPresent(read::add);
-        }
-        return read;
-    }
-
-    /**
-     * The samples {@link #changed} compares that moved on their own across some frames, each grown by
-     * {@link #AMBIENT_GROW}: a change there is not an answer. Frames of another size than the first add nothing.
-     */
-    record Motion(int width, int height, BitSet moving) {
-
-        static final Motion NONE = new Motion(0, 0, new BitSet());
-
-        static Motion of(List<BufferedImage> frames) {
-            if (frames.size() < 2) return NONE;
-            BufferedImage first = frames.getFirst();
-            int width = first.getWidth();
-            int height = first.getHeight();
-            BitSet moved = new BitSet();
-            for (int i = 1; i < frames.size(); i++) {
-                BufferedImage a = frames.get(i - 1);
-                BufferedImage b = frames.get(i);
-                if (a.getWidth() != width || a.getHeight() != height || b.getWidth() != width
-                        || b.getHeight() != height) {
-                    continue;
-                }
-                for (int y = 0; y < height; y += STEP) {
-                    for (int x = 0; x < width; x += STEP) {
-                        if (!same(a.getRGB(x, y), b.getRGB(x, y))) moved.set(y * width + x);
-                    }
-                }
-            }
-            // A screen that moves nearly all over would hide every answer: compared whole, it still says something.
-            int samples = ((width + STEP - 1) / STEP) * ((height + STEP - 1) / STEP);
-            if (moved.isEmpty() || moved.cardinality() * 2 > samples) return NONE;
-            // Grown on the sample grid only: changed() asks of no other pixel.
-            BitSet grown = new BitSet();
-            int reach = AMBIENT_GROW / STEP * STEP;
-            for (int at = moved.nextSetBit(0); at >= 0; at = moved.nextSetBit(at + 1)) {
-                int x = at % width;
-                int y = at / width;
-                for (int gy = Math.max(0, y - reach); gy <= Math.min(height - 1, y + reach); gy += STEP) {
-                    for (int gx = Math.max(0, x - reach); gx <= Math.min(width - 1, x + reach); gx += STEP) {
-                        grown.set(gy * width + gx);
-                    }
-                }
-            }
-            return new Motion(width, height, grown);
-        }
-
-        /** Whether the pixel at {@code x},{@code y} of a {@code w}×{@code h} frame moves on its own. */
-        boolean ignores(int x, int y, int w, int h) {
-            return w == width && h == height && moving.get(y * width + x);
-        }
-    }
-
-    /** Time as {@link #answered} counts it: the wall clock in a run, a counter in a test. */
-    interface Clock {
-        Clock REAL = new Clock() {
-            @Override
-            public long nowMs() {
-                return System.nanoTime() / 1_000_000;
-            }
-
-            @Override
-            public void sleep(long ms) throws InterruptedException {
-                Thread.sleep(ms);
-            }
-        };
-
-        long nowMs();
-
-        void sleep(long ms) throws InterruptedException;
-    }
-
-    /**
-     * The frame the game answered with: the screen read every {@link #POLL_MS} until {@link #ANSWER_SHARE} of it
-     * differs from {@code before}, then until two reads in a row are the same or {@link #SETTLING_MS} went by,
-     * never past {@code capMs} (reading a frame takes time too), each compare blind to {@code motion}. A smaller
-     * change is read at the cap. When nothing changed by then, the last frame read; empty when none could be read
-     * for {@link #SETTLING_MS}: a capture that is gone does not hold the answer for the whole cap.
-     */
-    static Optional<BufferedImage> answered(BufferedImage before, Motion motion,
-                                            Supplier<Optional<BufferedImage>> look, int capMs, Clock clock)
-            throws InterruptedException {
-        return answered(before, motion, look, capMs, ANSWER_SHARE, clock);
-    }
-
-    /** As {@link #answered(BufferedImage, Motion, Supplier, int, Clock)}, ending early on {@code share} changed. */
-    static Optional<BufferedImage> answered(BufferedImage before, Motion motion, Supplier<Optional<BufferedImage>> look,
-                                            int capMs, double share, Clock clock) throws InterruptedException {
-        if (Thread.interrupted()) throw new InterruptedException();
-        long start = clock.nowMs();
-        long changedAt = -1;
-        Optional<BufferedImage> last = Optional.empty();
-        while (true) {
-            Optional<BufferedImage> now = look.get();
-            long waited = clock.nowMs() - start;
-            if (now.isPresent()) {
-                if (changedAt < 0) {
-                    if (changedShare(before, now.get(), motion) >= share) changedAt = waited;
-                } else if (last.isPresent() && changed(last.get(), now.get(), motion).isEmpty()) {
-                    return now;
-                }
-                last = now;
-            }
-            if (waited >= capMs || changedAt >= 0 && waited - changedAt >= SETTLING_MS
-                    || last.isEmpty() && waited >= SETTLING_MS) {
-                return last;
-            }
-            clock.sleep(Math.min(POLL_MS, capMs - waited));
-        }
-    }
-
     /** What changed from {@code before} to {@code after}, in text, with the changed part's image when asked. */
     private static AgentReply answer(AgentContext context, String done, BufferedImage before, BufferedImage after,
                                      Motion motion, boolean show) {
-        Optional<Rect> changed = changed(before, after, motion);
+        Optional<Rect> changed = FrameChange.box(before, after, motion);
         if (changed.isEmpty()) return AgentReply.text(done + "; nothing changed.");
         Rect box = changed.get();
         Rect read = grown(box, MARGIN, after);
@@ -531,66 +387,6 @@ final class ActTools {
         int right = Math.min(frame.getWidth(), box.x() + box.width() + by);
         int bottom = Math.min(frame.getHeight(), box.y() + box.height() + by);
         return new Rect(left, top, right - left, bottom - top);
-    }
-
-    /**
-     * The box around every pixel that moved from {@code before} to {@code after}, or empty when none did. Another
-     * size is the whole of {@code after}: the window was resized or replaced.
-     */
-    static Optional<Rect> changed(BufferedImage before, BufferedImage after) {
-        return changed(before, after, Motion.NONE);
-    }
-
-    /** As {@link #changed(BufferedImage, BufferedImage)}, blind where {@code motion} moves on its own. */
-    static Optional<Rect> changed(BufferedImage before, BufferedImage after, Motion motion) {
-        if (before.getWidth() != after.getWidth() || before.getHeight() != after.getHeight()) {
-            return Optional.of(new Rect(0, 0, after.getWidth(), after.getHeight()));
-        }
-        int left = Integer.MAX_VALUE;
-        int top = Integer.MAX_VALUE;
-        int right = -1;
-        int bottom = -1;
-        for (int y = 0; y < after.getHeight(); y += STEP) {
-            for (int x = 0; x < after.getWidth(); x += STEP) {
-                if (same(before.getRGB(x, y), after.getRGB(x, y))
-                        || motion.ignores(x, y, after.getWidth(), after.getHeight())) {
-                    continue;
-                }
-                left = Math.min(left, x);
-                top = Math.min(top, y);
-                right = Math.max(right, x);
-                bottom = Math.max(bottom, y);
-            }
-        }
-        if (right < 0) return Optional.empty();
-        int width = Math.min(after.getWidth(), right + STEP) - left;
-        int height = Math.min(after.getHeight(), bottom + STEP) - top;
-        return Optional.of(new Rect(left, top, width, height));
-    }
-
-    /**
-     * The share of the samples {@link #changed} compares that moved from {@code before} to {@code after}, out of the
-     * still ones only: a sample that moves on its own can never count, so counting it would shrink a panel opened over
-     * a swaying fight (Firestone's Bag, 11% of the whole screen, 2026-10-14).
-     */
-    static double changedShare(BufferedImage before, BufferedImage after, Motion motion) {
-        if (before.getWidth() != after.getWidth() || before.getHeight() != after.getHeight()) return 1;
-        int moved = 0;
-        int samples = 0;
-        for (int y = 0; y < after.getHeight(); y += STEP) {
-            for (int x = 0; x < after.getWidth(); x += STEP) {
-                if (motion.ignores(x, y, after.getWidth(), after.getHeight())) continue;
-                samples++;
-                if (!same(before.getRGB(x, y), after.getRGB(x, y))) moved++;
-            }
-        }
-        return samples == 0 ? 0 : (double) moved / samples;
-    }
-
-    private static boolean same(int a, int b) {
-        return Math.abs((a >> 16 & 0xff) - (b >> 16 & 0xff)) < SAME
-                && Math.abs((a >> 8 & 0xff) - (b >> 8 & 0xff)) < SAME
-                && Math.abs((a & 0xff) - (b & 0xff)) < SAME;
     }
 
     /**

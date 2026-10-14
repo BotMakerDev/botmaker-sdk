@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.internal.vision.FrameChange;
 
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -176,7 +177,7 @@ final class MapTools {
         }
         if (never) return AgentReply.text(tried(project, screen, what, NEVER + input.never().strip()));
         ActTools.Entered entered = ActTools.enter(context, byPicture ? input.picture() : null, key.orElse(null),
-                input.desktop(), settle, ActTools.ANSWER_SHARE);
+                input.desktop(), settle, FrameChange.ANSWER_SHARE);
         if (entered.after() == null) {
             return entered.reply().isRefused() ? entered.reply() : entered.reply().and(AgentReply.text(
                     "Nothing was written. Look where the game is before trying it again from " + screen + "."));
@@ -213,7 +214,7 @@ final class MapTools {
                                 + screen + " and try its next input."))
                         .and(LookTools.screenshot(new LookTools.Shot(null, null, null, null, null, null), context));
             }
-            boolean changed = ActTools.changed(entered.before(), entered.after(), entered.motion()).isPresent();
+            boolean changed = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
             String said = tried(project, screen, what, changed ? IN_PLACE : NO_EFFECT);
             return entered.reply().and(AgentReply.text(said + (changed ? " Cut, with screen " + screen + ", each new "
                     + "input it shows (another state of a toggle, a tab's buttons): they are untried in turn." : "")));

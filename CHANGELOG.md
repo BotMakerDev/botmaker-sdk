@@ -146,6 +146,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **`Screen.waitStable` and `Screen.waitChange` see a change of colour, not only of brightness.** They and the
+  assistant's click, key and scroll now judge a change by one rule: a pixel moved when one of its channels moved by
+  24 of 255 or more, a frame changed when more than 0.5 % of its pixels did, compared every 2 pixels (coarser past
+  1920), each row read in one call. A red button turning a green of the same brightness now counts, where the
+  bot's waits missed it.
 - **`clickCompare`, `clickAnyCompare` and `clickAllCompare` match as `findCompare` and its forms do**: they
   share one compare, so their matches show on the run overlay like a find's. A picture that cannot be loaded is
   now a miss there, as it already was for `findCompare` and `clickBest`, not an exception.
