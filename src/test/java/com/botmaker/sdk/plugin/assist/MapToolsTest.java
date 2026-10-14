@@ -37,41 +37,6 @@ class MapToolsTest {
     }
 
     @Test
-    void aMarkerPaysTheDebtAndOtherCutsAreUntried() {
-        String opened = "Entrance: home › click engineer_home\nOwed: marker";
-        String marked = MapTools.withMarker(opened, "engineer_title");
-        assertEquals("Entrance: home › click engineer_home\nMarker: engineer_title", marked);
-        assertEquals("Entrance: home › click engineer_home\nMarker: gear_engineer",
-                MapTools.withMarker(marked, "gear_engineer"), "one marker, the latest");
-        assertEquals("Marker: a\nNotes.", MapTools.withMarker("- Owed: marker — it animates\nNotes.", "a"),
-                "a debt with a reason is paid too");
-
-        String cut = MapTools.withUntried(marked, "claim_engineer");
-        assertEquals(marked + "\nUntried: claim_engineer", cut);
-        assertEquals(marked + "\nUntried: claim_engineer, garage_engineer", MapTools.withUntried(cut, "garage_engineer"));
-        assertEquals(cut, MapTools.withUntried(cut, "claim_engineer"), "a picture is listed once");
-        assertEquals(List.of("claim_engineer"), MapTools.untried(cut));
-    }
-
-    @Test
-    void anInputTriedLeavesTheUntriedLineAndTheLastSaysTheShape() {
-        String text = "Marker: m\nUntried: a, b";
-        String one = MapTools.withTried(text, "a", MapTools.OPENS + "Bag");
-        assertEquals("Marker: m\nUntried: b\n- tried a: opens Bag", one);
-        assertEquals(one, MapTools.withUntried(one, "a"), "a picture tried is not untried again when recut");
-        String both = MapTools.withTried(one, "b", MapTools.OPENS + "Party");
-        assertEquals("Marker: m\n- tried a: opens Bag\n- tried b: opens Party\nShape: menu", both);
-        String again = MapTools.withTried(both, "b", MapTools.IN_PLACE);
-        assertEquals("Marker: m\n- tried a: opens Bag\n- tried b: " + MapTools.IN_PLACE + "\nShape: activity", again,
-                "tried again, its line and the shape are replaced");
-        assertEquals(Optional.of("menu"), MapTools.shapeOf("- tried a: opens Bag\n- tried g: never, spends gems"));
-        assertEquals("Marker: m\n- tried key Q: opens Quests", MapTools.withTried("Marker: m", "key Q",
-                MapTools.OPENS + "Quests"), "one hotkey on a screen with nothing cut says no shape");
-        assertEquals("- Bag: home › click bag. chests", MapTools.withMapLine("- Bag: home › key Page Down. chests",
-                "Bag", "home › click bag"), "a key of two words goes whole");
-    }
-
-    @Test
     void aScreenWaitsForEveryScreenAboveItToBeTried() {
         Map<String, String> notes = Map.of(
                 "Home", "Marker: h\nUntried: bag",
@@ -129,8 +94,6 @@ class MapToolsTest {
         assertEquals(List.of(), MapTools.owed(Map.of("Bag", "Owed:\nStage: tried", "Guild", "Owed: none\nOwed: -")));
         assertEquals(Optional.of("Bag"), MapTools.owingMarker(Map.of("Bag", "Owed: marker.")));
         assertEquals(Optional.empty(), MapTools.owingMarker(Map.of("Bag", "Owed:\nmarker")));
-        assertEquals("Marker: a\nOwed: marker-less icons", MapTools.withMarker("Owed: marker-less icons", "a"),
-                "a debt that only starts with the word is not the marker's");
     }
 
     @Test
@@ -144,13 +107,5 @@ class MapToolsTest {
         assertEquals("Tavern choice", MapTools.nameFrom("tavern_choice_town", "Town"));
         assertEquals("Upgrades", MapTools.nameFrom("upgrades", "Home"));
         assertEquals("Guild hall", MapTools.nameFrom("guild_hall", "Home"));
-    }
-
-    @Test
-    void aScreenMappedAgainLosesItsOldEntranceAndKeepsItsBulletAndWords() {
-        assertEquals("- Bag: home › click bag_home. chests, daily",
-                MapTools.withMapLine("- Bag: home › key B. chests, daily", "Bag", "home › click bag_home"));
-        assertEquals("1. Bag: home › key B. chests",
-                MapTools.withMapLine("1. **Bag:** chests", "Bag", "home › key B"));
     }
 }

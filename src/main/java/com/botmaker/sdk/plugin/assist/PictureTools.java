@@ -22,7 +22,9 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.vision.DigitReader;
+import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.internal.vision.Places;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
@@ -350,7 +352,7 @@ final class PictureTools {
         Rect box = inside.get();
         double needs = Frames.confidence(context.services());
         try (ImageTemplate template = ImageTemplate.of("alike", cut)) {
-            ImageFinder.findAll(template, new Frames.Still(shown));
+            ImageFinder.findAll(template, new StillSource(shown));
             List<String> elsewhere = Vision.lastMatchList().stream()
                     .filter(m -> m.confidence() >= needs)
                     .filter(m -> Math.abs(m.rect().x() - box.x()) > SELF_SLACK
@@ -476,7 +478,7 @@ final class PictureTools {
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
         Optional<Rect> area = Frames.within(frame.get(), digits.x(), digits.y(), digits.width(), digits.height());
         if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));
-        BufferedImage number = Frames.cut(frame.get(), area.get());
+        BufferedImage number = Images.cut(frame.get(), area.get());
         List<Rect> boxes = DigitCuts.characters(number);
         AgentReply seen = AgentReply.image(enlarged(number, boxes));
         if (boxes.size() != shows.length()) {
@@ -549,7 +551,7 @@ final class PictureTools {
                 Math.min(shown.getHeight() - Math.max(0, box.y() - STILL_SLACK), box.height() + 2 * STILL_SLACK));
         if (around.isEmpty()) return Optional.empty();
         double needs = Frames.confidence(context.services());
-        try (ImageTemplate cut = ImageTemplate.of("still", Frames.cut(shown, box))) {
+        try (ImageTemplate cut = ImageTemplate.of("still", Images.cut(shown, box))) {
             for (int look = 0; look < STILL_LOOKS; look++) {
                 if (look > 0) Thread.sleep(STILL_MS / (STILL_LOOKS - 1));
                 Optional<BufferedImage> live = Frames.look(context);
@@ -557,7 +559,7 @@ final class PictureTools {
                         || live.get().getHeight() != shown.getHeight()) {
                     return Optional.empty();
                 }
-                MatchResult best = ImageFinder.bestMatch(cut, new Frames.Still(Frames.cut(live.get(), around.get())));
+                MatchResult best = ImageFinder.bestMatch(cut, new StillSource(Images.cut(live.get(), around.get())));
                 double score = best.isFound() ? best.confidence() : 0;
                 if (score < needs) {
                     return Optional.of("That box changes: " + (look * STILL_MS / (STILL_LOOKS - 1)) + " ms later "
@@ -584,7 +586,7 @@ final class PictureTools {
         List<Rect> scaled = boxes.stream().map(r -> new Rect((int) Math.round(r.x() * scale),
                 (int) Math.round(r.y() * scale), (int) Math.round(r.width() * scale),
                 (int) Math.round(r.height() * scale))).toList();
-        return Frames.boxed(Frames.scaled(number, scale), scaled, Frames.FOUND);
+        return Frames.boxed(Images.scaled(number, scale), scaled, Frames.FOUND);
     }
 
     /**

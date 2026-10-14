@@ -11,7 +11,7 @@ package com.botmaker.sdk.api.geometry;
  * what makes two abutting regions tile without overlapping.
  *
  * <p><b>Curated for the palette</b> (see {@code @Palette}): everything is offered — the static
- * {@link #around(Point, int, int)}, all thirteen declared instance methods, and the four record components,
+ * {@link #around(Point, int, int)}, all fourteen declared instance methods, and the four record components,
  * which carry the annotation on the component so it propagates to the generated accessor. This is the first
  * record in the sweep, and the reason it is fully offered is that a geometry type has no <em>spellings</em>
  * to choose between: every method here answers a different question about the same four numbers.
@@ -109,6 +109,11 @@ public record Rect(int x, int y, int width, int height) {
         return new Rect(newX, newY,
                 Math.min(x + width, other.x + other.width) - newX,
                 Math.min(y + height, other.y + other.height) - newY);
+    }
+
+    /** This region moved {@code dx} right and {@code dy} down, its size kept: a part's place back in the whole. */
+    public Rect translate(int dx, int dy) {
+        return new Rect(x + dx, y + dy, width, height);
     }
 
     /** This region grown by {@code amount} on every side. */

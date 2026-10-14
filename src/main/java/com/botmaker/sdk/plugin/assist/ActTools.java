@@ -18,6 +18,7 @@ import com.botmaker.sdk.internal.input.Hands.OnEmulator;
 import com.botmaker.sdk.internal.vision.FrameChange;
 import com.botmaker.sdk.internal.vision.FrameChange.Clock;
 import com.botmaker.sdk.internal.vision.FrameChange.Motion;
+import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.session.PrivateSession;
 
 import java.awt.image.BufferedImage;
@@ -321,7 +322,7 @@ final class ActTools {
         Optional<Rect> changed = FrameChange.box(before, after, motion);
         if (changed.isEmpty()) return AgentReply.text(done + "; nothing changed.");
         Rect box = changed.get();
-        Rect read = grown(box, MARGIN, after);
+        Rect read = box.expand(MARGIN).intersection(Images.bounds(after));
         List<String> said = new ArrayList<>();
         said.add(done + "; changed " + Frames.box(box) + ".");
         said.add("Screen: " + screen(context, after));
@@ -331,8 +332,8 @@ final class ActTools {
         listed(said, "Went:", diff.went());
         AgentReply text = AgentReply.text(String.join("\n", said));
         if (!show) return text;
-        BufferedImage part = Frames.cut(after, box);
-        return text.and(AgentReply.image(Frames.scaled(part, Frames.fit(part.getWidth(), part.getHeight(),
+        BufferedImage part = Images.cut(after, box);
+        return text.and(AgentReply.image(Images.scaled(part, Frames.fit(part.getWidth(), part.getHeight(),
                 Frames.BOXED_EDGE))));
     }
 
@@ -366,7 +367,7 @@ final class ActTools {
     /** Every line the OCR reads in {@code area} of {@code frame}, in the frame's pixels. */
     private static List<Line> lines(BufferedImage frame, Rect area) {
         List<Line> lines = new ArrayList<>();
-        for (TextMatch m : LookTools.recognise(Frames.cut(frame, area), OcrLanguage.ENGLISH)) {
+        for (TextMatch m : LookTools.recognise(Images.cut(frame, area), OcrLanguage.ENGLISH)) {
             String text = m.text().strip();
             if (!text.isEmpty()) {
                 Rect b = m.bounds();
@@ -374,15 +375,6 @@ final class ActTools {
             }
         }
         return lines;
-    }
-
-    /** {@code box} grown by {@code by} on each side, kept inside {@code frame}. */
-    private static Rect grown(Rect box, int by, BufferedImage frame) {
-        int left = Math.max(0, box.x() - by);
-        int top = Math.max(0, box.y() - by);
-        int right = Math.min(frame.getWidth(), box.x() + box.width() + by);
-        int bottom = Math.min(frame.getHeight(), box.y() + box.height() + by);
-        return new Rect(left, top, right - left, bottom - top);
     }
 
     /** One line of text read on the screen, in screenshot pixels. */

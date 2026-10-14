@@ -20,6 +20,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The bot's notes on its game, {@value #FILE} at the project's root: what the assistant learnt automating it — the
@@ -237,5 +240,185 @@ final class GameNotes {
             }
             throw new UncheckedIOException("Could not write " + FILE + ": " + e.getMessage(), e);
         }
+    }
+
+    // ── a section's lines: Entrance, Marker, Owed, Untried, the tried inputs and the Shape ─────────────────────
+
+    /** What a tried input that opened a screen says, before the screen's name. */
+    static final String OPENS = "opens ";
+    static final String IN_PLACE = "changes this screen in place";
+    static final String NO_EFFECT = "no visible effect";
+    /** What an input never clicked says, before why: it spends what a bot must not. */
+    static final String NEVER = "never, ";
+    static final String OWED_MARKER = "Owed: marker";
+
+    /** A line saying the screen still owes its marker, with no reason given. */
+    private static final Pattern OWES_MARKER =
+            Pattern.compile("(?im)^[ \\t]*(?:[-*][ \\t]*)?owed[ \\t]*:[ \\t]*marker[ \\t]*\\.?[ \\t]*$");
+    /** Any line owing the marker, a reason given after a dash or not, with its line break: cutting a marker pays it. */
+    private static final Pattern MARKER_DEBT = Pattern.compile(
+            "(?im)^[ \\t]*(?:[-*][ \\t]*)?owed[ \\t]*:[ \\t]*marker(?:[ \\t]*\\.?[ \\t]*|[ \\t]+[—–-][ \\t].*)$\\R?");
+    /** A thing the notes owe, said on its own line: a picture to cut, a fact to find. */
+    private static final Pattern OWED = Pattern.compile("(?im)^[ \\t]*(?:[-*][ \\t]*)?owed[ \\t]*:[ \\t]*(.+?)[ \\t]*$");
+    /** What an {@code Owed:} line says when nothing is owed. */
+    private static final Pattern NOTHING = Pattern.compile("(?i)(?:none|nothing|n/?a|[—–-])\\.?");
+    private static final Pattern MARKER_LINE =
+            Pattern.compile("(?im)^[ \\t]*(?:[-*][ \\t]*)?marker[ \\t]*:[ \\t]*(.*?)[ \\t]*(?:\\R|$)");
+    private static final Pattern ENTRANCE_LINE =
+            Pattern.compile("(?im)^[ \\t]*(?:[-*][ \\t]*)?entrance[ \\t]*:[ \\t]*([^›\\n]*?)[ \\t]*(?:›.*)?$");
+    private static final Pattern UNTRIED_LINE = Pattern.compile("(?im)^([ \\t]*(?:[-*][ \\t]*)?untried[ \\t]*:)(.*)$");
+    /** {@code - tried <input>: <what it did>}, an input tried. */
+    private static final Pattern TRIED_LINE =
+            Pattern.compile("(?im)^[ \\t]*[-*][ \\t]*tried[ \\t]+([^:\\n]+?)[ \\t]*:[ \\t]*(.*?)[ \\t]*$");
+    private static final Pattern SHAPE_LINE = Pattern.compile("(?im)^[ \\t]*(?:[-*][ \\t]*)?shape[ \\t]*:.*$");
+    /** The entrance a Map line said before it was mapped again: {@code home › click x.} */
+    private static final Pattern OLD_ENTRANCE = Pattern.compile(
+            "^[^›\\n.]+›[ \\t]*(?:click[ \\t]+[^ \\t.]+|key[ \\t]+[^.\\n]+?)(?:\\.[ \\t]*|$)");
+
+    /** Whether {@code text} still owes its marker with no reason given. */
+    static boolean owesMarker(String text) {
+        return OWES_MARKER.matcher(text).find();
+    }
+
+    /** What {@code text}'s {@code Owed:} lines owe, a line saying nothing is owed left out. */
+    static List<String> owed(String text) {
+        List<String> owed = new ArrayList<>();
+        Matcher line = OWED.matcher(text);
+        while (line.find()) if (!NOTHING.matcher(line.group(1)).matches()) owed.add(line.group(1));
+        return owed;
+    }
+
+    /** Whether {@code text} says its shape: written once every input is tried, or by hand for a screen with none. */
+    static boolean hasShape(String text) {
+        return SHAPE_LINE.matcher(text).find();
+    }
+
+    /** Whether {@code text} has an input tried. */
+    static boolean triedAny(String text) {
+        return TRIED_LINE.matcher(text).find();
+    }
+
+    /** The Map with {@code screen}'s top-level line saying {@code how}, what it said after that kept. */
+    static String withMapLine(String map, String screen, String how) {
+        List<String> lines = new ArrayList<>(map.isEmpty() ? List.of() : map.lines().toList());
+        for (int i = 0; i < lines.size(); i++) {
+            Matcher item = Protocol.MAP_LINE.matcher(lines.get(i));
+            if (item.lookingAt() && clean(item.group(1)).equalsIgnoreCase(screen)) {
+                String bullet = lines.get(i).substring(0, item.start(1));
+                String rest = lines.get(i).substring(item.end()).replaceFirst("^[*`]+", "").strip();
+                rest = OLD_ENTRANCE.matcher(rest).replaceFirst("").strip();
+                lines.set(i, bullet + screen + ": " + how + (rest.isEmpty() ? "" : ". " + rest));
+                return String.join("\n", lines);
+            }
+        }
+        lines.add("- " + screen + ": " + how);
+        return String.join("\n", lines).strip();
+    }
+
+    /** {@code screen} as the Map's top-level line spells it, when it has one. */
+    static Optional<String> mapName(String map, String screen) {
+        Matcher item = Protocol.MAP_LINE.matcher(map);
+        while (item.find()) {
+            String name = clean(item.group(1));
+            if (name.equalsIgnoreCase(screen)) return Optional.of(name);
+        }
+        return Optional.empty();
+    }
+
+    private static String clean(String name) {
+        return name.replace("*", "").replace("`", "").strip();
+    }
+
+    /** {@code text} with {@code picture} as its marker: any other Marker line and any marker debt gone. */
+    static String withMarker(String text, String picture) {
+        String rest = MARKER_DEBT.matcher(MARKER_LINE.matcher(text).replaceAll("")).replaceAll("").strip();
+        String line = "Marker: " + picture;
+        Matcher entrance = ENTRANCE_LINE.matcher(rest);
+        if (entrance.find()) {
+            return (rest.substring(0, entrance.end()) + "\n" + line + rest.substring(entrance.end())).strip();
+        }
+        return (line + "\n" + rest).strip();
+    }
+
+    /** {@code text} with {@code picture} on its {@code Untried:} line, unless it was tried already. */
+    static String withUntried(String text, String picture) {
+        if (triedLine(text, picture).isPresent()) return text;
+        List<String> names = new ArrayList<>(untried(text));
+        if (names.contains(picture)) return text;
+        names.add(picture);
+        return withUntriedLine(text, names);
+    }
+
+    /**
+     * {@code text} with {@code what} off its {@code Untried:} line and a {@code - tried} line saying {@code did}, in
+     * place of one said before; once nothing is untried, a {@code Shape:} line says whether it is a menu.
+     */
+    static String withTried(String text, String what, String did) {
+        boolean listing = UNTRIED_LINE.matcher(text).find();
+        List<String> names = new ArrayList<>(untried(text));
+        names.removeIf(name -> name.equalsIgnoreCase(what));
+        String rest = withUntriedLine(text, names);
+        String line = "- tried " + what + ": " + did;
+        Optional<Matcher> was = triedLine(rest, what);
+        rest = was.isPresent()
+                ? rest.substring(0, was.get().start()) + line + rest.substring(was.get().end())
+                : (rest + "\n" + line).strip();
+        // The shape once the last untried input is tried, and kept up to date after; never off one stray hotkey.
+        if (!names.isEmpty() || !listing && !SHAPE_LINE.matcher(rest).find()) return rest;
+        String shape = "Shape: " + shapeOf(rest).orElse("activity");
+        Matcher old = SHAPE_LINE.matcher(rest);
+        return old.find() ? rest.substring(0, old.start()) + shape + rest.substring(old.end()) : rest + "\n" + shape;
+    }
+
+    /** {@code menu} when every input tried, the ones never clicked aside, opened a screen; {@code activity} else. */
+    static Optional<String> shapeOf(String text) {
+        Matcher line = TRIED_LINE.matcher(text);
+        boolean opened = false;
+        while (line.find()) {
+            String did = line.group(2);
+            if (did.startsWith(NEVER)) continue;
+            if (!did.startsWith(OPENS)) return Optional.of("activity");
+            opened = true;
+        }
+        return opened ? Optional.of("menu") : Optional.empty();
+    }
+
+    /** The pictures {@code text}'s {@code Untried:} line names, in its order. */
+    static List<String> untried(String text) {
+        Matcher line = UNTRIED_LINE.matcher(text == null ? "" : text);
+        if (!line.find()) return List.of();
+        List<String> names = new ArrayList<>();
+        for (String name : line.group(2).split(",")) if (!name.isBlank()) names.add(name.strip());
+        return names;
+    }
+
+    /** {@code text}'s {@code Marker:} picture, when it has one. */
+    static Optional<String> marker(String text) {
+        Matcher line = MARKER_LINE.matcher(text == null ? "" : text);
+        return line.find() && !line.group(1).isBlank() ? Optional.of(line.group(1)) : Optional.empty();
+    }
+
+    /** The screen {@code text}'s {@code Entrance:} line says it is reached from. */
+    static Optional<String> entranceFrom(String text) {
+        Matcher line = ENTRANCE_LINE.matcher(text);
+        return line.find() && !line.group(1).isBlank() ? Optional.of(line.group(1).strip()) : Optional.empty();
+    }
+
+    /** {@code text} with its {@code Untried:} line naming {@code names}, gone when they are none. */
+    static String withUntriedLine(String text, List<String> names) {
+        Matcher line = UNTRIED_LINE.matcher(text);
+        if (!line.find()) return names.isEmpty() ? text : (text.strip() + "\nUntried: " + String.join(", ", names)).strip();
+        if (names.isEmpty()) {
+            int end = line.end() < text.length() ? line.end() + 1 : line.end();
+            return (text.substring(0, line.start()) + text.substring(end)).strip();
+        }
+        return text.substring(0, line.start()) + line.group(1) + " " + String.join(", ", names)
+                + text.substring(line.end());
+    }
+
+    private static Optional<Matcher> triedLine(String text, String what) {
+        Matcher line = TRIED_LINE.matcher(text);
+        while (line.find()) if (line.group(1).equalsIgnoreCase(what)) return Optional.of(line);
+        return Optional.empty();
     }
 }

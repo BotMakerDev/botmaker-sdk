@@ -17,7 +17,10 @@ import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Pixel;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.Vision;
+import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.trace.MissFrames;
+import com.botmaker.sdk.internal.vision.ColorText;
+import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
@@ -171,7 +174,7 @@ final class LookTools {
         double scale = Frames.fit(image.getWidth(), image.getHeight(), Frames.LOOK_EDGE);
         StringBuilder said = new StringBuilder(missed.name() + ", " + image.getWidth() + "×" + image.getHeight());
         if (scale < 1) {
-            image = Frames.scaled(image, scale);
+            image = Images.scaled(image, scale);
             said.append(", shrunk to ").append(image.getWidth()).append('×').append(image.getHeight())
                     .append(": multiply what you see by ").append(Frames.undo(scale));
         }
@@ -191,12 +194,12 @@ final class LookTools {
         // Kept only once it is shown: a refused call must not swap the frame a crop is cut from.
         Frames.show(full);
         Rect area = part.get();
-        BufferedImage image = Frames.cut(full, area);
+        BufferedImage image = Images.cut(full, area);
         if (shot.grid() != null) grid(image, area, shot.grid());
         // A grid is there to be read off, so a grid asked for without a scale is shown whole.
         double scale = shot.scale() != null ? shot.scale()
                 : shot.grid() != null ? 1 : Frames.fit(area.width(), area.height(), Frames.LOOK_EDGE);
-        if (scale < 1) image = Frames.scaled(image, scale);
+        if (scale < 1) image = Images.scaled(image, scale);
         StringBuilder said = new StringBuilder(full.getWidth() + "×" + full.getHeight()).append(Frames.place(context))
                 .append('.');
         if (area.width() != full.getWidth() || area.height() != full.getHeight()) {
@@ -271,7 +274,7 @@ final class LookTools {
                 Optional<BufferedImage> frame = Frames.look(context);
                 if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
                 MatchResult match = ToolTiming.timed(ToolTiming.Phase.MATCH,
-                        () -> ImageFinder.bestMatch(template, new Frames.Still(frame.get())));
+                        () -> ImageFinder.bestMatch(template, new StillSource(frame.get())));
                 if (match.isFound() && match.confidence() >= needs) {
                     long ms = (System.nanoTime() - start) / 1_000_000L;
                     Frames.mark(context, match.rect(), Marks.Kind.FOUND, base.get());
@@ -300,11 +303,12 @@ final class LookTools {
         Optional<Rect> area = Frames.within(frame.get(), read.x(), read.y(), read.width(), read.height());
         if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));
         OcrLanguage language = read.language() == null ? OcrLanguage.ENGLISH : read.language();
-        List<TextMatch> lines = recognise(Frames.cut(frame.get(), area.get()), language);
+        List<TextMatch> lines = recognise(Images.cut(frame.get(), area.get()), language);
         if (lines.isEmpty()) return AgentReply.text("No text could be read there.");
         List<String> said = new ArrayList<>();
+        Rect at = area.get();
         for (TextMatch line : lines) {
-            said.add("\"" + line.text() + "\" at " + Frames.box(moved(line.bounds(), area.get())) + ", "
+            said.add("\"" + line.text() + "\" at " + Frames.box(line.bounds().translate(at.x(), at.y())) + ", "
                     + Frames.score(line.confidence() / 100.0));
         }
         return AgentReply.text(String.join("\n", said));
@@ -336,12 +340,12 @@ final class LookTools {
                     + image.getHeight() + " screenshot.");
         }
         Color color = new Color(image.getRGB(spot.x(), spot.y()), false);
-        return AgentReply.text(spot.x() + "," + spot.y() + " is " + hex(color) + " (" + color.getRed() + ","
+        return AgentReply.text(spot.x() + "," + spot.y() + " is " + ColorText.hex(color) + " (" + color.getRed() + ","
                 + color.getGreen() + "," + color.getBlue() + ").");
     }
 
     static AgentReply findColor(ColorArea search, AgentContext context) {
-        Optional<Color> color = color(search.color());
+        Optional<Color> color = ColorText.parse(search.color());
         if (color.isEmpty()) return AgentReply.refused("\"" + search.color() + "\" is not a colour: #RRGGBB, or r,g,b.");
         double tolerance = search.tolerance() == null ? Precision.DEFAULT.deltaE() : search.tolerance();
         if (!(tolerance >= 0 && tolerance <= 100)) return AgentReply.refused("The tolerance is between 0 and 100.");
@@ -351,26 +355,26 @@ final class LookTools {
         if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));
         List<ColorMatch> patches;
         try {
-            Pixel.findAll(color.get(), new Frames.Still(Frames.cut(frame.get(), area.get())), Precision.of(tolerance));
+            Pixel.findAll(color.get(), new StillSource(Images.cut(frame.get(), area.get())), Precision.of(tolerance));
             patches = List.copyOf(Vision.lastColorMatchList());
         } finally {
             Vision.clearLastColorMatch();
         }
-        if (patches.isEmpty()) return AgentReply.text(hex(color.get()) + " is not on the screen there.");
+        if (patches.isEmpty()) return AgentReply.text(ColorText.hex(color.get()) + " is not on the screen there.");
         List<Rect> boxes = new ArrayList<>();
         List<String> said = new ArrayList<>();
         for (ColorMatch patch : patches) {
-            Rect r = moved(patch.bounds(), area.get());
+            Rect r = patch.bounds().translate(area.get().x(), area.get().y());
             boxes.add(r);
             if (said.size() < MOST_LISTED) {
                 Point c = patch.center();
                 said.add(patch.pixelCount() + " px at " + Frames.box(r) + ", centre " + (c.x() + area.get().x())
                         + "," + (c.y() + area.get().y()));
             }
-            Frames.mark(context, r, Marks.Kind.FOUND, hex(color.get()));
+            Frames.mark(context, r, Marks.Kind.FOUND, ColorText.hex(color.get()));
         }
-        return Frames.found(patches.size() + " patch" + (patches.size() == 1 ? "" : "es") + " of " + hex(color.get())
-                + ", largest first:\n" + String.join("\n", said), frame.get(), boxes, Frames.FOUND, search.show());
+        return Frames.found(patches.size() + " patch" + (patches.size() == 1 ? "" : "es") + " of "
+                + ColorText.hex(color.get()) + ", largest first:\n" + String.join("\n", said), frame.get(), boxes, Frames.FOUND, search.show());
     }
 
     /** A picture's best match on one frame. */
@@ -420,7 +424,7 @@ final class LookTools {
                 names.add(name);
                 templates.add(cutAt(new ImageTemplate(file.toString()), cuts.get(name)));
             }
-            Frames.Still still = new Frames.Still(frame);
+            StillSource still = new StillSource(frame);
             List<MatchResult> bests = ToolTiming.timed(ToolTiming.Phase.MATCH, () -> near
                     ? ImageFinder.bestMatchesNear(templates, NEAR, still) : ImageFinder.bestMatches(templates, still));
             List<Scored> scored = new ArrayList<>();
@@ -447,7 +451,7 @@ final class LookTools {
         return ToolTiming.timed(ToolTiming.Phase.MATCH, () -> {
             // Released after each match: an unreleased template is native memory.
             try (ImageTemplate template = new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString())) {
-                return ImageFinder.bestMatch(template, new Frames.Still(frame));
+                return ImageFinder.bestMatch(template, new StillSource(frame));
             }
         });
     }
@@ -456,42 +460,12 @@ final class LookTools {
     static List<TextMatch> recognise(BufferedImage image, OcrLanguage language) {
         return ToolTiming.timed(ToolTiming.Phase.TEXT, () -> {
             try {
-                Text.readAll(new Frames.Still(image), Text.DEFAULT_OPTIONS.withLanguages(language));
+                Text.readAll(new StillSource(image), Text.DEFAULT_OPTIONS.withLanguages(language));
                 return List.copyOf(Text.lastMatchList());
             } finally {
                 Text.clearLastMatch();
             }
         });
-    }
-
-    private static Rect moved(Rect r, Rect by) {
-        return new Rect(r.x() + by.x(), r.y() + by.y(), r.width(), r.height());
-    }
-
-    static String hex(Color color) {
-        return String.format(Locale.ROOT, "#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
-    }
-
-    /** {@code #RRGGBB}, {@code RRGGBB} or {@code r,g,b}; empty for anything else. */
-    static Optional<Color> color(String typed) {
-        if (typed == null) return Optional.empty();
-        String text = typed.trim();
-        try {
-            if (text.contains(",")) {
-                String[] parts = text.split(",");
-                if (parts.length != 3) return Optional.empty();
-                int r = Integer.parseInt(parts[0].trim());
-                int g = Integer.parseInt(parts[1].trim());
-                int b = Integer.parseInt(parts[2].trim());
-                if ((r | g | b) < 0 || r > 255 || g > 255 || b > 255) return Optional.empty();
-                return Optional.of(new Color(r, g, b));
-            }
-            String digits = text.startsWith("#") ? text.substring(1) : text;
-            if (digits.length() != 6) return Optional.empty();
-            return Optional.of(new Color(Integer.parseInt(digits, 16)));
-        } catch (NumberFormatException e) {
-            return Optional.empty();
-        }
     }
 
     /** Lines every {@code step} screenshot pixels over {@code image}, which shows {@code area}, each labelled. */

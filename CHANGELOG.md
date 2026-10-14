@@ -21,6 +21,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **`Rect.translate(dx, dy)`**: the same region moved, its size kept. A match found in a part of the screen
+  goes back to the whole screen with the part's top-left.
 - **`Key.named(String)`** reads a key a person typed: as the enum names it (`PAGE_UP`, `page up`), as printed on
   the cap (`Esc`, `[`), or a digit (the top row's). Hidden from the palette; the assistant's key and try_input
   use it.

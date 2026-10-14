@@ -11,8 +11,6 @@ import com.botmaker.shared.opencv.RawMatch;
 import org.opencv.core.Mat;
 
 import javax.imageio.ImageIO;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -206,17 +204,6 @@ public final class DigitReader {
     }
 
     private static BufferedImage resized(BufferedImage image, double scale) {
-        if (Math.abs(scale - 1) < 0.005) return image;
-        int width = Math.max(1, (int) Math.round(image.getWidth() * scale));
-        int height = Math.max(1, (int) Math.round(image.getHeight() * scale));
-        BufferedImage copy = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = copy.createGraphics();
-        try {
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g.drawImage(image, 0, 0, width, height, null);
-        } finally {
-            g.dispose();
-        }
-        return copy;
+        return Math.abs(scale - 1) < 0.005 ? image : Images.scaled(image, scale);
     }
 }

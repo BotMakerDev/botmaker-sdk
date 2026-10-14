@@ -763,6 +763,17 @@ class SdkAssistTest {
                 "the launcher set last is the bot's first");
     }
 
+    @Test
+    void anAreaIsClippedToTheFrameAndAnEmptyOneIsNone() {
+        BufferedImage frame = new BufferedImage(100, 50, BufferedImage.TYPE_INT_RGB);
+        assertEquals(Optional.of(new Rect(0, 0, 100, 50)), Frames.within(frame, null, null, null, null));
+        assertEquals(Optional.of(new Rect(90, 0, 10, 20)), Frames.within(frame, 90, -5, 30, 25));
+        assertEquals(Optional.empty(), Frames.within(frame, 5, 5, 0, 10), "no width");
+        assertEquals(Optional.empty(), Frames.within(frame, 50, 5, -10, 10), "a negative width");
+        assertEquals(Optional.empty(), Frames.within(frame, 200, 5, 10, 10), "off the frame");
+        assertEquals(Optional.empty(), Frames.within(frame, 5, 5, 10, null), "only some numbers");
+    }
+
     // ── acting ──────────────────────────────────────────────────────────────────────────────────────────
 
     @Test
@@ -909,7 +920,7 @@ class SdkAssistTest {
                 && text(both).contains("Saved spade") && text(both).contains("Not saved, far: "), text(both));
         assertTrue(GameNotes.sections(bot).get("Engineer").contains("Marker: pick"));
         assertEquals(Set.of("Engineer"), TemplateLibrary.manifest(resources).tagsOf("spade"));
-        assertTrue(MapTools.untried(GameNotes.sections(bot).get("Engineer")).contains("spade"));
+        assertTrue(GameNotes.untried(GameNotes.sections(bot).get("Engineer")).contains("spade"));
     }
 
     @Test

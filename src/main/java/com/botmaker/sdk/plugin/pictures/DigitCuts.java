@@ -2,9 +2,9 @@ package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.vision.DigitReader;
+import com.botmaker.sdk.internal.vision.Images;
 
 import javax.imageio.ImageIO;
-import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -86,7 +86,7 @@ public final class DigitCuts {
         for (int i = 0; i < shown.length(); i++) {
             int digit = Character.digit(shown.charAt(i), 10);
             if (digit < 0 || saved.contains(digit)) continue;
-            ImageIO.write(cut(image, boxes.get(i)), "png", folder.resolve(digit + ".png").toFile());
+            ImageIO.write(Images.cut(image, boxes.get(i)), "png", folder.resolve(digit + ".png").toFile());
             saved.add(digit);
         }
         return saved;
@@ -103,17 +103,6 @@ public final class DigitCuts {
                 return Optional.empty();
             }
         });
-    }
-
-    private static BufferedImage cut(BufferedImage image, Rect box) {
-        BufferedImage copy = new BufferedImage(box.width(), box.height(), BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = copy.createGraphics();
-        try {
-            g.drawImage(image.getSubimage(box.x(), box.y(), box.width(), box.height()), 0, 0, null);
-        } finally {
-            g.dispose();
-        }
-        return copy;
     }
 
     /** The median colour of the image's border, channel by channel. */

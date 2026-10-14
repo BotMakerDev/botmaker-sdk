@@ -8,10 +8,10 @@ import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
@@ -21,7 +21,6 @@ import com.botmaker.session.launch.BackgroundLauncher;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.List;
@@ -152,33 +151,17 @@ final class Frames {
      * frame; a box only partly inside is clipped.
      */
     static Optional<Rect> within(BufferedImage frame, Integer x, Integer y, Integer width, Integer height) {
-        if (x == null && y == null && width == null && height == null) {
-            return Optional.of(new Rect(0, 0, frame.getWidth(), frame.getHeight()));
-        }
+        Rect whole = Images.bounds(frame);
+        if (x == null && y == null && width == null && height == null) return Optional.of(whole);
         if (x == null || y == null || width == null || height == null) return Optional.empty();
-        int left = Math.max(0, x);
-        int top = Math.max(0, y);
-        int right = Math.min(frame.getWidth(), x + width);
-        int bottom = Math.min(frame.getHeight(), y + height);
-        return right <= left || bottom <= top ? Optional.empty() : Optional.of(new Rect(left, top, right - left,
-                bottom - top));
+        // Rect.overlaps reads an empty box inside the frame as overlapping it: refused here, as nothing to cut.
+        if (width <= 0 || height <= 0) return Optional.empty();
+        return Optional.ofNullable(whole.intersection(new Rect(x, y, width, height)));
     }
 
     static String outside(BufferedImage frame) {
         return "Give x, y, width and height together, inside the " + frame.getWidth() + "×" + frame.getHeight()
                 + " screenshot.";
-    }
-
-    /** The part of {@code frame} under {@code area}, as its own image. */
-    static BufferedImage cut(BufferedImage frame, Rect area) {
-        BufferedImage copy = new BufferedImage(area.width(), area.height(), BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = copy.createGraphics();
-        try {
-            g.drawImage(frame.getSubimage(area.x(), area.y(), area.width(), area.height()), 0, 0, null);
-        } finally {
-            g.dispose();
-        }
-        return copy;
     }
 
     /**
@@ -216,7 +199,7 @@ final class Frames {
      */
     static BufferedImage boxed(BufferedImage frame, List<Rect> boxes, Color color) {
         double scale = fit(frame.getWidth(), frame.getHeight(), BOXED_EDGE);
-        BufferedImage copy = scaled(frame, scale);
+        BufferedImage copy = Images.scaled(frame, scale);
         Graphics2D g = copy.createGraphics();
         try {
             g.setColor(color);
@@ -237,21 +220,6 @@ final class Frames {
         return String.format(Locale.ROOT, "%.4f", 1 / scale);
     }
 
-    /** {@code image} resized by {@code scale}, smoothly. */
-    static BufferedImage scaled(BufferedImage image, double scale) {
-        int w = Math.max(1, (int) Math.round(image.getWidth() * scale));
-        int h = Math.max(1, (int) Math.round(image.getHeight() * scale));
-        BufferedImage small = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = small.createGraphics();
-        try {
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g.drawImage(image, 0, 0, w, h, null);
-        } finally {
-            g.dispose();
-        }
-        return small;
-    }
-
     /** Shows {@code box}, in screenshot pixels, on the game where the watched screen sits. */
     static void mark(AgentContext context, Rect box, Marks.Kind kind, String label) {
         lookArea(context).ifPresent(at -> context.marks().show(new Area(at.x() + box.x(), at.y() + box.y(),
@@ -264,31 +232,5 @@ final class Frames {
 
     static String box(Rect r) {
         return r.x() + "," + r.y() + " (" + r.width() + "×" + r.height() + ")";
-    }
-
-    /** {@code image} as a source with its own top-left at {@code (0, 0)}, so matches are in screenshot pixels. */
-    record Still(BufferedImage image) implements CaptureSource {
-
-        @Override
-        public BufferedImage capture() {
-            return image;
-        }
-
-        @Override
-        public Point origin() {
-            return new Point(0, 0);
-        }
-
-        @Override
-        public void click(Point p) {
-        }
-
-        @Override
-        public void drag(Point from, Point to, long durationMs) {
-        }
-
-        @Override
-        public void scroll(Point at, int notches) {
-        }
     }
 }
