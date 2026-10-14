@@ -267,7 +267,8 @@ final class LookTools {
             while (true) {
                 Optional<BufferedImage> frame = Frames.look(context);
                 if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
-                MatchResult match = ImageFinder.bestMatch(template, new Frames.Still(frame.get()));
+                MatchResult match = ToolTiming.timed(ToolTiming.Phase.MATCH,
+                        () -> ImageFinder.bestMatch(template, new Frames.Still(frame.get())));
                 if (match.isFound() && match.confidence() >= needs) {
                     long ms = (System.nanoTime() - start) / 1_000_000L;
                     Frames.mark(context, match.rect(), Marks.Kind.FOUND, base.get());
@@ -277,7 +278,10 @@ final class LookTools {
                 }
                 if (match.isFound()) best = Math.max(best, match.confidence());
                 if (System.nanoTime() >= deadline) break;
-                Thread.sleep(POLL_MS);
+                ToolTiming.timed(ToolTiming.Phase.WAIT, () -> {
+                    Thread.sleep(POLL_MS);
+                    return null;
+                });
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -385,20 +389,24 @@ final class LookTools {
 
     /** The best match of the picture {@code name} on {@code frame}, in the frame's pixels. */
     static MatchResult best(Path resources, String name, BufferedImage frame) {
-        // Released after each match: an unreleased template is native memory.
-        try (ImageTemplate template = new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString())) {
-            return ImageFinder.bestMatch(template, new Frames.Still(frame));
-        }
+        return ToolTiming.timed(ToolTiming.Phase.MATCH, () -> {
+            // Released after each match: an unreleased template is native memory.
+            try (ImageTemplate template = new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString())) {
+                return ImageFinder.bestMatch(template, new Frames.Still(frame));
+            }
+        });
     }
 
     /** Every line the SDK's OCR reads on {@code image}, in its pixels; the thread's last match is left clear. */
     static List<TextMatch> recognise(BufferedImage image, OcrLanguage language) {
-        try {
-            Text.readAll(new Frames.Still(image), Text.DEFAULT_OPTIONS.withLanguages(language));
-            return List.copyOf(Text.lastMatchList());
-        } finally {
-            Text.clearLastMatch();
-        }
+        return ToolTiming.timed(ToolTiming.Phase.TEXT, () -> {
+            try {
+                Text.readAll(new Frames.Still(image), Text.DEFAULT_OPTIONS.withLanguages(language));
+                return List.copyOf(Text.lastMatchList());
+            } finally {
+                Text.clearLastMatch();
+            }
+        });
     }
 
     private static Rect moved(Rect r, Rect by) {

@@ -78,6 +78,10 @@ final class Frames {
      * assistant was shown Studio's own window while Firestone ran in gamescope (2026-10-13). Blocking.
      */
     static Optional<BufferedImage> look(AgentContext context) {
+        return ToolTiming.timed(ToolTiming.Phase.CAPTURE, () -> lookNow(context));
+    }
+
+    private static Optional<BufferedImage> lookNow(AgentContext context) {
         PrivateSession session = session(context);
         if (session != null) {
             try {

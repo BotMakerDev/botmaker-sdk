@@ -315,7 +315,7 @@ final class ActTools {
         }
         List<BufferedImage> still = new ArrayList<>(List.of(before.get()));
         try {
-            still.addAll(ambient(() -> Frames.look(context), Clock.REAL));
+            still.addAll(ToolTiming.timed(ToolTiming.Phase.MOTION, () -> ambient(() -> Frames.look(context), Clock.REAL)));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Entered.no(AgentReply.text("Stopped before acting; nothing was done."));
@@ -332,7 +332,8 @@ final class ActTools {
         // From here the action happened: an answer that is not a refusal, so it is not tried again.
         Optional<BufferedImage> after;
         try {
-            after = answered(last, motion, () -> Frames.look(context), settle, share, Clock.REAL);
+            after = ToolTiming.timed(ToolTiming.Phase.SETTLE,
+                    () -> answered(last, motion, () -> Frames.look(context), settle, share, Clock.REAL));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Entered.no(AgentReply.text(done + "; stopped before the screen was read again."));

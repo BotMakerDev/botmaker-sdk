@@ -62,6 +62,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -1094,9 +1095,17 @@ class SdkAssistTest {
     private AgentReply run(String tool, Object... arguments) {
         Map<String, Object> sent = new LinkedHashMap<>();
         for (int i = 0; i < arguments.length; i += 2) sent.put((String) arguments[i], arguments[i + 1]);
-        return SdkAssist.ALL.stream().filter(t -> t.name().equals(tool)).findFirst().orElseThrow()
+        AgentReply reply = SdkAssist.ALL.stream().filter(t -> t.name().equals(tool)).findFirst().orElseThrow()
                 .invoke(sent, agent);
+        // Arguments that do not fit are refused before the tool runs, with nothing to time; a refusal the tool
+        // itself answers still ends with its time.
+        assertTrue(reply.isRefused() || TIMING.matcher(reply.parts().getLast().text()).matches(),
+                tool + " says how long it took");
+        return reply;
     }
+
+    /** The line every tool's reply ends with ({@link ToolTiming}); {@link #text} leaves it out. */
+    private static final Pattern TIMING = Pattern.compile("\nTook \\d+\\.\\d s(: .+)?\\.");
 
     private Flow flow() {
         return (Flow) host.set("flows").get("MAIN").value();
@@ -1104,6 +1113,7 @@ class SdkAssistTest {
 
     private static String text(AgentReply reply) {
         return reply.parts().stream().filter(p -> p.kind() == AgentReply.Kind.TEXT).map(AgentReply.Part::text)
+                .filter(line -> !TIMING.matcher(line).matches())
                 .collect(Collectors.joining("\n"));
     }
 

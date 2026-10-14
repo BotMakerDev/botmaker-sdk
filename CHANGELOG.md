@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Every assistant tool says how long it took.** Its reply ends with one line, the total and where the time
+  went, longest first: `Took 18.6 s: matching 9.2, reading text 5.0, settling 4.1.` The parts are capturing,
+  watching motion (the screen read before acting), settling (the game given time to answer), matching pictures,
+  reading text and waiting (wait_for_picture's pauses); a part under 0.05 s is not named.
 - **Manage Pictures sorts and filters.** The gallery sorts by name (A–Z, Z–A), by when a picture was cut
   (newest, oldest) or by size; shows only the pictures the bot does not use, or only duplicates and near twins
   (a recut a few pixels off counts), each tile naming its twins; and Ctrl-click on a second tag shows the

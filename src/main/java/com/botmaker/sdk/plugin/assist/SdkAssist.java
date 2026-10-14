@@ -21,7 +21,7 @@ import java.util.List;
  */
 public final class SdkAssist {
 
-    /** Every tool, by group. */
+    /** Every tool, by group, each reply ending with how long it took ({@link ToolTiming}). */
     public static final List<AssistantTool<?>> ALL = join(LookTools.TOOLS, ActTools.TOOLS, PictureTools.TOOLS,
             TagTools.TOOLS, FlowTools.TOOLS, SetupTools.TOOLS, NotesTools.TOOLS, MapTools.TOOLS);
 
@@ -77,7 +77,9 @@ public final class SdkAssist {
     @SafeVarargs
     private static List<AssistantTool<?>> join(List<AssistantTool<?>>... groups) {
         List<AssistantTool<?>> all = new ArrayList<>();
-        for (List<AssistantTool<?>> group : groups) all.addAll(group);
+        for (List<AssistantTool<?>> group : groups) {
+            for (AssistantTool<?> tool : group) all.add(ToolTiming.timed(tool));
+        }
         return List.copyOf(all);
     }
 }
