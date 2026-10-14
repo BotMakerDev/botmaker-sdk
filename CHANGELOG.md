@@ -77,6 +77,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A vision loop ends.** `whileFind`, `whileFindAny`, `whileFindAll`, `whileFindCompare`, `untilFind`,
+  `untilFindAny` and `untilFindAll` throw `BotStuckException` after `BotSettings.maxRounds` rounds (50), and the
+  run recovers through the home method: before, a loop whose action changed nothing ran for ever, unseen by the
+  watchdog, which checks between activities. Each round gives its action `BotSettings.patience` (3 s) to show: an
+  until-loop looks for its picture every 100 ms before acting again, a while-loop waits until what it acted on
+  changes before it looks again. `untilFind(picture, Duration, action)` sets its own patience. Both settings are
+  in Bot Settings and `sdk_set_setting` (`max_rounds`, `patience`). A body drops the `ImageWaiter.waitFor` it
+  carried after an action only as a pause.
 - **The assistant's finds answer in text.** `find_picture`, `which_screen`, `wait_for_picture`, `find_text` and
   `find_color` give the places and scores as text and add the boxed screenshot only with `show: true`; a whole
   `screenshot` fits 768 pixels instead of 1024. Images were most of what a session with the assistant cost.

@@ -53,13 +53,14 @@ public final class SdkAssist {
             - A click can be missed and a screen can be slow (lag, a dropped connection), so a step repeats
               until the screen shows it worked, never clicks once and trusts it. The home method, for one:
               its marker is a picture no other screen shows (a sidebar icon shown everywhere is not one), and
-              it stays visible under a popup. untilFind(marker, action) runs its action again at once, so
-              the action presses Escape and then waits for the marker (ImageWaiter.waitFor, under a second):
-              without that wait it presses again while the game answers. Then whileFindAny(the group of close
-              and claim buttons) clears what still covers home. An Escape too many on home may open the
-              game's exit dialog; its close button belongs in that group. A game that froze is not the
-              body's to handle: the run's watchdog sees the same screen over and over and recovers through
-              the home method.
+              it stays visible under a popup. untilFind(marker, action) presses Escape and gives the game
+              the bot's patience (BotSettings.patience, 3 s) to show the marker before it presses again;
+              untilFind(marker, Duration, action) for a slower screen. No ImageWaiter.waitFor inside the
+              action. Then whileFindAny(the group of close and claim buttons) clears what still covers home;
+              each round waits for what it acted on to change before it looks again. An Escape too many on
+              home may open the game's exit dialog; its close button belongs in that group. A loop that runs
+              BotSettings.maxRounds rounds (50) without ending throws BotStuckException, and the run recovers
+              through the home method: a body does not count its own tries.
             - Write a body foolproof, out of the loop methods that take a lambda: ImageFinder.whileFindAny,
               whileFindAll, ifFindAny (group, found -> …), whileFindCompare (good, bad, found -> …),
               untilFind(picture, action).

@@ -36,6 +36,8 @@ public final class SettingsTypes {
             .flag(BotSettings::centredClicks, settings -> !settings.randomizeClicks())
             .with(BotSettings::confidence, BotSettings::confidence)
             .with(BotSettings::compareMargin, BotSettings::compareMargin)
+            .with(BotSettings::maxRounds, BotSettings::maxRounds)
+            .with(BotSettings::patience, BotSettings::patience)
             .with(BotSettings::where, BotSettings::where)
             .flag(BotSettings::takesOver, BotSettings::takeOver)
             .with(BotSettings::displayBackend, settings -> settings.runIn().displayBackend())

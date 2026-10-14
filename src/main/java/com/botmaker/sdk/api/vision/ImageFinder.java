@@ -17,9 +17,11 @@ import com.botmaker.shared.opencv.RawMatch;
 import org.opencv.core.Mat;
 
 import java.awt.image.BufferedImage;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -832,12 +834,20 @@ public class ImageFinder {
      */
     public static void whileFind(ImageTemplate template, CaptureSource source, Consumer<MatchResult> action) {
         PopupGuard.check();
-        MatchResult result;
-        while ((result = findInternal(template, source, BotSettings.current().confidence())).isFound()) {
-            Vision.setLastMatch(result);
-            action.accept(result);
+        Rounds rounds = new Rounds("whileFind(" + template.id() + ")");
+        ImageTemplateGroup one = ImageTemplateGroup.of(template);
+        Vision.Frame frame;
+        try {
+            while ((frame = findFrame(one, source, BotSettings.current().confidence())).matches().has(template)) {
+                if (!rounds.next()) break;
+                MatchResult result = frame.matches().get(template);
+                Vision.setLastMatch(result);
+                action.accept(result);
+                Rounds.awaitChange(frame, BotSettings.current().patience());
+            }
+        } finally {
+            Vision.setLastMatch(MatchResult.notFound());
         }
-        Vision.setLastMatch(MatchResult.notFound());
     }
 
     /**
@@ -866,21 +876,41 @@ public class ImageFinder {
     public static void whileFindCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source,
                                         Consumer<Matches> action) {
         PopupGuard.check();
+        Rounds rounds = new Rounds(named("whileFindCompare", good));
         Vision.Frame frame;
-        while (!(frame = compareFrame(good, bad, source, confidence(), margin())).matches().isEmpty()) {
-            Vision.runInFrame(frame, action);
+        try {
+            while (!(frame = compareFrame(good, bad, source, confidence(), margin())).matches().isEmpty()) {
+                if (!rounds.next()) break;
+                Vision.runInFrame(frame, action);
+                Rounds.awaitChange(frame, BotSettings.current().patience());
+            }
+        } finally {
+            Vision.setLastMatches(Matches.none());
         }
-        Vision.setLastMatches(Matches.none());
     }
 
     /**
-     * Keep running {@code action} until {@code template} appears (no match found while it's absent).
+     * Keep running {@code action} until {@code template} appears: after each action it looks every 100 ms for
+     * {@link BotSettings#patience()}, then acts again; after {@link BotSettings#maxRounds()} actions the bot is
+     * stuck.
      *
      * @param template the image template to search for
      * @param action   the action to run
      */
     public static void untilFind(ImageTemplate template, Runnable action) {
         untilFind(template, Source.current(), action);
+    }
+
+    /**
+     * {@link #untilFind(ImageTemplate, Runnable)} giving each action {@code patience} to show instead of
+     * {@link BotSettings#patience()}: a screen the game is slow to open.
+     *
+     * @param template the image template to search for
+     * @param patience how long to look for it after each action
+     * @param action   the action to run
+     */
+    public static void untilFind(ImageTemplate template, Duration patience, Runnable action) {
+        untilFind(template, Source.current(), patience, action);
     }
 
     /**
@@ -891,9 +921,37 @@ public class ImageFinder {
      * @param action   the action to run
      */
     public static void untilFind(ImageTemplate template, CaptureSource source, Runnable action) {
-        while (!find(template, source)) {
+        untilFind(template, source, Duration.ofMillis(BotSettings.current().patience()), action);
+    }
+
+    /**
+     * {@link #untilFind(ImageTemplate, Duration, Runnable)} on a specific source.
+     *
+     * @param template the image template to search for
+     * @param source   the capture source to search within
+     * @param patience how long to look for it after each action
+     * @param action   the action to run
+     */
+    public static void untilFind(ImageTemplate template, CaptureSource source, Duration patience, Runnable action) {
+        untilSeen("untilFind(" + template.id() + ")", () -> find(template, source), patience, action);
+    }
+
+    /**
+     * The until-loops' rounds: {@code seen} first, then act, look for {@code patience}, and act again until it is,
+     * or the loop has run out of rounds.
+     */
+    private static void untilSeen(String loop, BooleanSupplier seen, Duration patience, Runnable action) {
+        if (seen.getAsBoolean()) return;
+        Rounds rounds = new Rounds(loop);
+        while (rounds.next()) {
             action.run();
+            if (Rounds.await(seen, patience.toMillis()) || seen.getAsBoolean()) return;
         }
+    }
+
+    /** {@code loop(a, b, …)}, the loop and its pictures, for the message a loop that ran out throws. */
+    private static String named(String loop, ImageTemplateGroup group) {
+        return loop + "(" + group.templates().stream().map(ImageTemplate::id).collect(Collectors.joining(", ")) + ")";
     }
 
     // --- Lambda control-flow over a group: "Any" (at least one visible) / "All" (every one visible) ---
@@ -991,11 +1049,17 @@ public class ImageFinder {
      */
     public static void whileFindAny(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         PopupGuard.check();
+        Rounds rounds = new Rounds(named("whileFindAny", group));
         Vision.Frame frame;
-        while (!(frame = findFrame(group, source, BotSettings.current().confidence())).matches().isEmpty()) {
-            Vision.runInFrame(frame, action);
+        try {
+            while (!(frame = findFrame(group, source, BotSettings.current().confidence())).matches().isEmpty()) {
+                if (!rounds.next()) break;
+                Vision.runInFrame(frame, action);
+                Rounds.awaitChange(frame, BotSettings.current().patience());
+            }
+        } finally {
+            Vision.setLastMatches(Matches.none());
         }
-        Vision.setLastMatches(Matches.none());
     }
 
     /**
@@ -1020,11 +1084,18 @@ public class ImageFinder {
     public static void whileFindAll(ImageTemplateGroup group, CaptureSource source, Consumer<Matches> action) {
         if (group.isEmpty()) return;   // vacuous hasAll would spin this loop forever on an empty group
         PopupGuard.check();
+        Rounds rounds = new Rounds(named("whileFindAll", group));
         Vision.Frame frame;
-        while ((frame = findFrame(group, source, BotSettings.current().confidence())).matches().hasAll(group.toArray())) {
-            Vision.runInFrame(frame, action);
+        try {
+            while ((frame = findFrame(group, source, BotSettings.current().confidence())).matches()
+                    .hasAll(group.toArray())) {
+                if (!rounds.next()) break;
+                Vision.runInFrame(frame, action);
+                Rounds.awaitChange(frame, BotSettings.current().patience());
+            }
+        } finally {
+            Vision.setLastMatches(Matches.none());
         }
-        Vision.setLastMatches(Matches.none());
     }
 
     /**
@@ -1046,9 +1117,8 @@ public class ImageFinder {
      */
     public static void untilFindAny(ImageTemplateGroup group, CaptureSource source, Runnable action) {
         if (group.isEmpty()) return;   // nothing can ever appear, so this would run action forever
-        while (!findAny(group, source)) {
-            action.run();
-        }
+        untilSeen(named("untilFindAny", group), () -> findAny(group, source),
+                Duration.ofMillis(BotSettings.current().patience()), action);
     }
 
     /**
@@ -1070,8 +1140,7 @@ public class ImageFinder {
      */
     public static void untilFindAll(ImageTemplateGroup group, CaptureSource source, Runnable action) {
         if (group.isEmpty()) return;   // allMatch over nothing is vacuously true; keep it "matches nothing"
-        while (!group.templates().stream().allMatch(t -> find(t, source))) {
-            action.run();
-        }
+        untilSeen(named("untilFindAll", group), () -> group.templates().stream().allMatch(t -> find(t, source)),
+                Duration.ofMillis(BotSettings.current().patience()), action);
     }
 }

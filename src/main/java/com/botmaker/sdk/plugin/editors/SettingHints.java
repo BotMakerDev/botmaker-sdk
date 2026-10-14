@@ -35,20 +35,25 @@ public final class SettingHints {
 
     // The ceiling on the two delays is ten minutes rather than Integer.MAX_VALUE: a spinner whose range is the
     // whole int has no scale, and a bot waiting longer than that between checks is writing a different bot.
-    private static final Map<Executable, Hint> HINTS = Map.of(
-            whole(BotSettings::foundDelay), new Hint("Delay after a match", "Milliseconds (≥ 0):", " ms",
-                    0, 600_000, 50, 500),
-            whole(BotSettings::notFoundDelay), new Hint("Delay after no match", "Milliseconds (≥ 0):", " ms",
-                    0, 600_000, 50, 200),
-            flag(BotSettings::randomizeClicks), Hint.flag("Randomize click points"),
-            fraction(BotSettings::confidence), new Hint("Match confidence", "Confidence (0.0 – 1.0):", "",
-                    0, 1, 0.05, 0.8),
-            fraction(BotSettings::compareMargin), new Hint("Compare margin",
-                    "How far the right template must beat a look-alike (0.0 – 1.0):", "", 0, 1, 0.01, 0.05),
-            whole(BotSettings::maxRetryAttempts), new Hint("Max stuck checks",
-                    "Checks before considered stuck (≥ 1):", "", 1, 600_000, 1, 20),
-            flag(BotSettings::takeOver), Hint.flag("Take over the mouse and keyboard"),
-            flag(BotSettings::debug), Hint.flag("Debug logging"));
+    private static final Map<Executable, Hint> HINTS = Map.ofEntries(
+            Map.entry(whole(BotSettings::foundDelay), new Hint("Delay after a match", "Milliseconds (≥ 0):", " ms",
+                    0, 600_000, 50, 500)),
+            Map.entry(whole(BotSettings::notFoundDelay), new Hint("Delay after no match", "Milliseconds (≥ 0):",
+                    " ms", 0, 600_000, 50, 200)),
+            Map.entry(flag(BotSettings::randomizeClicks), Hint.flag("Randomize click points")),
+            Map.entry(fraction(BotSettings::confidence), new Hint("Match confidence", "Confidence (0.0 – 1.0):", "",
+                    0, 1, 0.05, 0.8)),
+            Map.entry(fraction(BotSettings::compareMargin), new Hint("Compare margin",
+                    "How far the right template must beat a look-alike (0.0 – 1.0):", "", 0, 1, 0.01, 0.05)),
+            Map.entry(whole(BotSettings::maxRounds), new Hint("Loop rounds", "Rounds before a loop is stuck (≥ 1):",
+                    "", 1, 600_000, 1, BotSettings.DEFAULT_MAX_ROUNDS)),
+            Map.entry(whole(BotSettings::patience), new Hint("Loop patience",
+                    "Milliseconds an action gets to show (≥ 0):", " ms", 0, 600_000, 100,
+                    BotSettings.DEFAULT_PATIENCE)),
+            Map.entry(whole(BotSettings::maxRetryAttempts), new Hint("Max stuck checks",
+                    "Checks before considered stuck (≥ 1):", "", 1, 600_000, 1, 20)),
+            Map.entry(flag(BotSettings::takeOver), Hint.flag("Take over the mouse and keyboard")),
+            Map.entry(flag(BotSettings::debug), Hint.flag("Debug logging")));
 
     private SettingHints() {}
 

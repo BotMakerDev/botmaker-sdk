@@ -1,7 +1,10 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.bot.BotStuckException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -15,6 +18,7 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -160,7 +164,9 @@ class MatchesFindTest {
         BufferedImage mailPatch = patch(1);
         ImageTemplate mail = write(tmp, "mail", mailPatch);
 
-        // Two frames still showing the popup, then a clear one — the loop must stop on the clear frame.
+        // Two frames still showing the popup, then a clear one — the loop must stop on the clear frame. No
+        // patience: the wait for a round's action to show takes captures of its own (see the tests below).
+        BotSettings.use(BotSettings.current().patience(0));
         CountingSource source = new CountingSource(
                 List.of(frameWith(mailPatch), frameWith(mailPatch), noise()));
 
@@ -173,6 +179,62 @@ class MatchesFindTest {
         assertEquals(2, iterations[0]);
         assertEquals(3, source.captures, "one capture per iteration plus the terminating check");
         assertTrue(Vision.lastMatches().isEmpty(), "the context must reflect the final, clear frame");
+    }
+
+    @AfterEach
+    void defaultSettings() {
+        BotSettings.use(BotSettings.DEFAULTS);
+    }
+
+    @Test
+    void aLoopWhoseActionChangesNothingIsStuckAfterItsRounds(@TempDir Path tmp) throws Exception {
+        BufferedImage mailPatch = patch(1);
+        ImageTemplate mail = write(tmp, "mail", mailPatch);
+        BotSettings.use(BotSettings.current().maxRounds(3).patience(0));
+        CountingSource source = new CountingSource(List.of(frameWith(mailPatch)));
+
+        int[] acted = {0};
+        BotStuckException stuck = assertThrows(BotStuckException.class,
+                () -> ImageFinder.whileFindAny(ImageTemplateGroup.of(mail), source, found -> acted[0]++));
+        assertEquals(3, acted[0], "it acts maxRounds times, then the bot is stuck");
+        assertTrue(stuck.getMessage().contains("whileFindAny(mail)"), stuck.getMessage());
+        assertTrue(Vision.lastMatches().isEmpty(), "a loop that ran out leaves no match behind");
+
+        int[] tried = {0};
+        ImageTemplate gold = write(tmp, "gold", patch(2));
+        assertThrows(BotStuckException.class, () -> ImageFinder.untilFind(gold, source, () -> tried[0]++));
+        assertEquals(3, tried[0]);
+    }
+
+    @Test
+    void aRoundWaitsForWhatItActedOnToChangeAndNoLonger(@TempDir Path tmp) throws Exception {
+        BufferedImage mailPatch = patch(1);
+        ImageTemplate mail = write(tmp, "mail", mailPatch);
+        BotSettings.use(BotSettings.current().patience(5000));
+        BufferedImage shown = frameWith(mailPatch);
+        // The action's answer comes on the third look after it: the round waits for it, then the loop sees it gone.
+        CountingSource source = new CountingSource(List.of(shown, shown, shown, noise()));
+
+        long start = System.nanoTime();
+        int[] acted = {0};
+        ImageFinder.whileFindAny(ImageTemplateGroup.of(mail), source, found -> acted[0]++);
+        long ms = (System.nanoTime() - start) / 1_000_000;
+
+        assertEquals(1, acted[0], "one action: the loop looked again only once the box had changed");
+        assertTrue(ms < 4500, "it waits for the change, not the whole patience: " + ms + " ms");
+    }
+
+    @Test
+    void untilFindLooksForItsPictureAfterEachActionBeforeActingAgain(@TempDir Path tmp) throws Exception {
+        BufferedImage goldPatch = patch(2);
+        ImageTemplate gold = write(tmp, "gold", goldPatch);
+        BotSettings.use(BotSettings.current().patience(5000));
+        // Not there, then there on the second look after the one action.
+        CountingSource source = new CountingSource(List.of(noise(), noise(), frameWith(goldPatch)));
+
+        int[] acted = {0};
+        ImageFinder.untilFind(gold, source, () -> acted[0]++);
+        assertEquals(1, acted[0], "the picture came within the patience: no second action");
     }
 
     /**

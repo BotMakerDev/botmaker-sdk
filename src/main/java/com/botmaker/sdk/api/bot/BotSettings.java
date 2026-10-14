@@ -53,13 +53,16 @@ import java.util.Optional;
  * desktop. The two backends are kept, for a machine that needs one pinned.
  *
  * @param vision           how sure a match has to be
- * @param runIn            where the game runs, and whether the bot takes over the mouse and keyboard there
+ * @param loops            how long a vision loop gives each action to show, and how many rounds it runs before
+ *                         the bot is stuck
+ * @param runIn           where the game runs, and whether the bot takes over the mouse and keyboard there
  * @param maxRetryAttempts how many no-progress checks {@link Watchdog} tolerates before the bot is stuck; at
  *                         least 1
  * @param debug            whether the SDK's debug output starts on, for a run that does not say: a
  *                         {@code -Dbotmaker.debug=true|false} on the run (Studio's Debug output toggle) wins
  */
-public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetryAttempts, boolean debug) {
+public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn, int maxRetryAttempts,
+                          boolean debug) {
 
     /** Pause after a successful match, in ms — long enough for a game's animation to settle. */
     public static final int DEFAULT_FOUND_DELAY = 500;
@@ -88,6 +91,18 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
      */
     public static final int DEFAULT_MAX_RETRY_ATTEMPTS = 20;
 
+    /**
+     * How many rounds a vision loop ({@code whileFindAny}, {@code untilFind}, …) runs before it throws
+     * {@code BotStuckException}: a loop whose action never ends it is a bot stuck, which the run recovers from.
+     */
+    public static final int DEFAULT_MAX_ROUNDS = 50;
+
+    /**
+     * How long a vision loop gives its action to show, in ms: {@code untilFind} waits this long for its picture
+     * before acting again, a {@code whileFind…} this long for what it acted on to change before it looks again.
+     */
+    public static final int DEFAULT_PATIENCE = 3000;
+
     /** How long to wait for a launched game's window to appear, in milliseconds. */
     public static final long DEFAULT_LAUNCH_WAIT_TIMEOUT = 60000;
 
@@ -105,6 +120,19 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
         public Vision {
             confidence = unit(confidence, DEFAULT_CONFIDENCE);
             compareMargin = unit(compareMargin, DEFAULT_COMPARE_MARGIN);
+        }
+    }
+
+    /**
+     * How the vision loops end. See {@link #DEFAULT_MAX_ROUNDS} and {@link #DEFAULT_PATIENCE}.
+     *
+     * @param maxRounds the rounds a loop runs before the bot is stuck; at least 1
+     * @param patience  how long, in ms, a round gives its action to show; not negative
+     */
+    public record Loops(int maxRounds, int patience) {
+        public Loops {
+            maxRounds = Math.max(1, maxRounds);
+            patience = Math.max(0, patience);
         }
     }
 
@@ -224,6 +252,7 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
     public static final BotSettings DEFAULTS = new BotSettings(
             new Clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS),
             new Vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN),
+            new Loops(DEFAULT_MAX_ROUNDS, DEFAULT_PATIENCE),
             new RunIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO),
             DEFAULT_MAX_RETRY_ATTEMPTS, true);
 
@@ -232,6 +261,7 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
         clicks = clicks == null ? new Clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS)
                 : clicks;
         vision = vision == null ? new Vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN) : vision;
+        loops = loops == null ? new Loops(DEFAULT_MAX_ROUNDS, DEFAULT_PATIENCE) : loops;
         runIn = runIn == null ? new RunIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO)
                 : runIn;
         maxRetryAttempts = Math.max(1, maxRetryAttempts);
@@ -357,6 +387,16 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
         return vision.compareMargin;
     }
 
+    /** The rounds a vision loop runs before the bot is stuck. */
+    public int maxRounds() {
+        return loops.maxRounds;
+    }
+
+    /** How long, in ms, a vision loop's round gives its action to show. */
+    public int patience() {
+        return loops.patience;
+    }
+
     /** Where the game runs. */
     public Where where() {
         return runIn.where;
@@ -382,15 +422,25 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
     }
 
     public BotSettings confidence(double confidence) {
-        return new BotSettings(clicks, new Vision(confidence, vision.compareMargin), runIn, maxRetryAttempts, debug);
+        return new BotSettings(clicks, new Vision(confidence, vision.compareMargin), loops, runIn, maxRetryAttempts,
+                debug);
     }
 
     public BotSettings compareMargin(double margin) {
-        return new BotSettings(clicks, new Vision(vision.confidence, margin), runIn, maxRetryAttempts, debug);
+        return new BotSettings(clicks, new Vision(vision.confidence, margin), loops, runIn, maxRetryAttempts, debug);
+    }
+
+    public BotSettings maxRounds(int rounds) {
+        return new BotSettings(clicks, vision, new Loops(rounds, loops.patience), runIn, maxRetryAttempts, debug);
+    }
+
+    public BotSettings patience(int milliseconds) {
+        return new BotSettings(clicks, vision, new Loops(loops.maxRounds, milliseconds), runIn, maxRetryAttempts,
+                debug);
     }
 
     public BotSettings maxRetryAttempts(int attempts) {
-        return new BotSettings(clicks, vision, runIn, attempts, debug);
+        return new BotSettings(clicks, vision, loops, runIn, attempts, debug);
     }
 
     public BotSettings takeOver(boolean takeOver) {
@@ -398,7 +448,7 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
     }
 
     public BotSettings debug(boolean on) {
-        return new BotSettings(clicks, vision, runIn, maxRetryAttempts, on);
+        return new BotSettings(clicks, vision, loops, runIn, maxRetryAttempts, on);
     }
 
     /** Clicks land on the match's centre rather than a random point of it. */
@@ -440,11 +490,11 @@ public record BotSettings(Clicks clicks, Vision vision, RunIn runIn, int maxRetr
     }
 
     private BotSettings withClicks(Clicks next) {
-        return new BotSettings(next, vision, runIn, maxRetryAttempts, debug);
+        return new BotSettings(next, vision, loops, runIn, maxRetryAttempts, debug);
     }
 
     private BotSettings withRunIn(RunIn next) {
-        return new BotSettings(clicks, vision, next, maxRetryAttempts, debug);
+        return new BotSettings(clicks, vision, loops, next, maxRetryAttempts, debug);
     }
 
     private static double unit(double value, double fallback) {

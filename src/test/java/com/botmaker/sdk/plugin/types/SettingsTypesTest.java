@@ -17,7 +17,7 @@ class SettingsTypesTest {
 
     @SuppressWarnings("deprecation")
     private static final BotSettings TUNED = BotSettings.defaults().foundDelay(750).notFoundDelay(125)
-            .centredClicks().confidence(0.62).compareMargin(0.11).where(BotSettings.Where.MY_DESKTOP).takesOver()
+            .centredClicks().confidence(0.62).compareMargin(0.11).maxRounds(7).patience(1200).where(BotSettings.Where.MY_DESKTOP).takesOver()
             .displayBackend(BotSettings.DisplayBackend.XEPHYR).inputBackend(BotSettings.InputBackend.UINPUT)
             .maxRetryAttempts(7).debugOff();
 
@@ -31,7 +31,7 @@ class SettingsTypesTest {
     @Test
     void everySettingIsALinkAfterTheDefaults() {
         assertEquals(0, SettingsTypes.SETTINGS.factory().getParameterCount());
-        assertEquals(11, SettingsTypes.SETTINGS.withers().size());
+        assertEquals(13, SettingsTypes.SETTINGS.withers().size());
         assertEquals(SettingsTypes.SETTINGS.withers().size(), SettingsTypes.SETTINGS.componentTypes().size());
         assertEquals(BotSettings.DEFAULTS, SettingsTypes.SETTINGS.build(List.of()), "no part: the defaults");
         assertNull(SettingsTypes.SETTINGS.build(List.of(1, 2)), "neither no part nor every part: not this call");
