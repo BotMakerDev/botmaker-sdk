@@ -34,32 +34,36 @@ final class Protocol {
                 - Done when a run started from three different screens reaches home each time.
                 """),
         DISCOVERY("Stage 1, Discovery: know the game before writing any body", """
-                - Explore each screen across, then down: every input on a screen tried before going down any
-                  screen it opens, then one branch followed to its end before the next is begun. Home is the
-                  first screen (a section Home with its Marker: line). On a screen: one screenshot, then
-                  crop_picture with that screen every input on it (each button, icon, tab and toggle; an icon with
-                  no picture is one the bot cannot take): each is untried. Then try_input each, by its picture or
-                  its hotkey, giving opens the name the screen it opens shows when it shows one: try_input clicks
-                  it and records what it did. An input that opens a screen writes the Map's line and the new
-                  screen's section, owing a marker, and answers with its screenshot: crop_picture its marker
-                  (marker true, a part only that screen shows) and its inputs, go back, and try the next input.
-                  An input that changes the screen in place (a toggle, a tab, a sub-panel): cut what it shows;
-                  those are untried in turn. An input that spends premium currency or real money is tried with
-                  never and its reason, never clicked.
-                - A screen whose inputs all open screens is a menu; any other is an activity, and its sub-panels
-                  are part of it. try_input writes its Shape: line once nothing on it is untried.
-                - try_input refuses while a screen owes its marker, and while a screen this one was reached
-                  from has an input untried, or none tried yet, and while another branch begun is not finished. What cannot be cut yet is an Owed: line in its section (write_notes);
-                  Discovery is not done while anything is owed or untried; a debt paid by hand is its line
-                  removed with write_notes. A side column that scrolls or whose icons come and go: say so in
-                  the Map.
-                - Then survey one screen: one whole screenshot, its help (an i or ? button) first, then every
-                  input on it, named and given a kind: a chore (work that repeats), a shortcut the game ships for
-                  a chore (Auto, x10, Max, Claim all, Skip), a choice (spending the player decides), information,
-                  or never (it spends real money or premium currency). Note what the screen spends and earns,
-                  what refills it (a timer, a battle), the badge that says it has work, and the daily quests it
-                  feeds. describe looks, click, key and scroll act, and all four answer in text; each new word in
-                  an answer's Appeared list is a question.
+                - Every screen is explored the same way, Home first (a section Home with its Marker: line). The
+                  chores are chosen after Discovery, from what the notes say each screen holds.
+                  1. Cut the whole screen: one screenshot, then crop_picture with that screen every input on it,
+                     each untried until tried: every button, icon, tab, toggle, arrow, "+" of a counter and list
+                     item, and every list or panel that scrolls (cut a still part of it). An icon with no
+                     picture is one the bot cannot take.
+                  2. try_input each one, by its picture or its hotkey; try_input with scroll every list and
+                     panel to its end both ways. Claim buttons and other free spends are clicked; an input that
+                     spends premium currency or real money is tried with never and its reason, never clicked.
+                     What a tab, toggle, arrow or scroll brings into view is cut, and untried in turn.
+                  3. An input that opens a screen (give opens the name it shows) writes its Map line and its
+                     section, owing a marker, and the answer brings its screenshot: crop_picture its marker
+                     (marker true, a part only that screen shows), then explore it by these same steps, to its
+                     end, before the next input of the screen it was opened from.
+                  4. A screen is finished when nothing on it is untried. Then go back up.
+                - try_input writes a screen's Shape: line once nothing on it is untried (menu when every input
+                  opened a screen, else activity: a fact for Build, not a rule here), and then asks once
+                  whether every list was scrolled and every tab opened: answer it with the screen still open. It
+                  refuses while a screen owes its marker, while a screen reached from this one is unfinished, and
+                  while another branch begun is not finished. What cannot be cut yet is an Owed: line in its
+                  section (write_notes); Discovery is not done while anything is owed or untried; a debt paid by
+                  hand is its line removed with write_notes. A side column whose icons come and go: say so in the
+                  Map.
+                - On each screen, as it is explored: read its help (an i or ? button) first, then name every
+                  input and give it a kind: a chore (work that repeats), a shortcut the game ships for a chore
+                  (Auto, x10, Max, Claim all, Skip), a choice (spending the player decides), information, or never
+                  (it spends real money or premium currency). Note what the screen spends and earns, what refills
+                  it (a timer, a battle), the badge that says it has work, and the daily quests it feeds. describe
+                  looks, click, key and scroll act, and all four answer in text; each new word in an answer's
+                  Appeared list is a question.
                 - Locks: a newer account has features the game has not opened yet. Note each lock seen (a
                   padlock, a greyed building, "unlocks at level N", read with read_text) and cut its picture: a
                   body will only call a feature locked when it sees that picture.

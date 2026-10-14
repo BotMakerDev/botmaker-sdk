@@ -13,10 +13,12 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,30 +48,28 @@ class MapToolsTest {
     }
 
     @Test
-    void aScreenWaitsForEveryScreenAboveItToBeTried() {
+    void aScreenOpenedIsFinishedBeforeTheNextInputOfTheOneItWasOpenedFrom() {
         Map<String, String> notes = Map.of(
-                "Home", "Marker: h\nUntried: bag",
-                "Bag", "Entrance: home › click bag\nMarker: b\nUntried: chest",
-                "Chest", "Entrance: Bag › click chest\nMarker: c");
-        assertEquals(Optional.of("Bag"), MapTools.unfinishedAbove(notes, "Chest"), "the nearest first");
-        assertEquals(Optional.of("Home"), MapTools.unfinishedAbove(notes, "Bag"));
-        assertEquals(Optional.empty(), MapTools.unfinishedAbove(notes, "Home"));
-        assertEquals(OptionalInt.of(2), MapTools.depth(notes, "Chest"));
+                "Home", "Marker: h\n- tried bag: opens Bag\nUntried: shop",
+                "Bag", "Entrance: home › click bag\nMarker: b\nUntried: chest");
+        assertEquals(Optional.of("Bag"), MapTools.unfinishedBelow(notes, "Home"), "Bag before Home's shop");
+        assertEquals(Optional.empty(), MapTools.unfinishedBelow(notes, "Bag"), "Bag goes on, Home unfinished above it");
 
-        Map<String, String> level = Map.of(
-                "Home", "Marker: h\nShape: menu",
-                "Bag", "Entrance: home › click bag\nUntried: chest",
-                "Upgrades", "Entrance: home › click upgrades\nMarker: u\nShape: activity",
-                "Detail", "Entrance: Upgrades › click detail\nUntried: row");
-        assertEquals(Optional.empty(), MapTools.unfinishedAbove(level, "Detail"),
-                "a finished screen's branch goes down while a sibling still waits: depth across branches");
-        assertEquals(Optional.empty(), MapTools.unfinishedAbove(level, "Upgrades"), "one depth in any order");
-        assertEquals(Optional.of("Upgrades"), MapTools.unfinishedAbove(Map.of("Home", "Shape: menu",
-                        "Upgrades", "Entrance: home › click u\nMarker: u", "Detail", "Entrance: Upgrades › click d"),
-                "Detail"), "a screen with nothing tried yet is not finished");
-        assertEquals(List.of("Upgrades: no input tried yet"), MapTools.owed(Map.of("Home", "Shape: menu",
-                "Upgrades", "Entrance: home › click u\nMarker: u")));
-        assertEquals(Optional.empty(), MapTools.unfinishedAbove(Map.of("A", "Entrance: B › key A", "B",
+        Map<String, String> deeper = Map.of(
+                "Home", "Marker: h\nUntried: shop",
+                "Bag", "Entrance: home › click bag\nMarker: b\n- tried chest: opens Chest\nShape: menu",
+                "Chest", "Entrance: Bag › click chest\nMarker: c");
+        assertEquals(Optional.of("Chest"), MapTools.unfinishedBelow(deeper, "Home"),
+                "a finished child's own child, nothing tried on it yet, holds Home too");
+        assertEquals(OptionalInt.of(2), MapTools.depth(deeper, "Chest"));
+        assertEquals(Set.of("Home: untried shop", "Chest: no input tried yet"), new HashSet<>(MapTools.owed(deeper)));
+
+        assertEquals(Optional.of("Shop"), MapTools.unfinishedBelow(Map.of("Home", "Untried: x", "Bag",
+                "Entrance: home › click bag\nShape: activity", "Shop", "Entrance: home › click shop\nUntried: y"),
+                "Home"), "a finished sibling hides no unfinished one");
+        assertEquals(Optional.empty(), MapTools.unfinishedBelow(Map.of("Home", "Untried: shop", "Bag",
+                "Entrance: home › click bag\n- tried chest: in place\nShape: activity"), "Home"), "Bag finished");
+        assertEquals(Optional.empty(), MapTools.unfinishedBelow(Map.of("A", "Entrance: B › key A\nShape: menu", "B",
                 "Entrance: A › key B\nShape: menu"), "A"), "a loop ends");
     }
 
@@ -84,6 +84,19 @@ class MapToolsTest {
         assertEquals(Optional.empty(), MapTools.branchBegun(notes, "Deep"), "its own branch goes on");
         notes.put("Deep", "Entrance: A › click x\nMarker: d\n- tried y: no visible effect\nShape: activity");
         assertEquals(Optional.empty(), MapTools.branchBegun(notes, "B"), "A's branch done, B is next");
+    }
+
+    /** A list scrolled says nothing of the shape, and the last input tried asks once about what hides inputs. */
+    @Test
+    void aScrolledListIsTriedAndTheLastInputAsksAboutHiddenOnes(@TempDir Path bot) {
+        GameNotes.write(bot, "Home", "Marker: h\nUntried: column, bag");
+        String first = MapTools.tried(bot, "Home", "column", GameNotes.SCROLLED + "-10, " + GameNotes.IN_PLACE);
+        assertEquals("Noted in Home: tried column, scrolled -10, changes this screen in place. Untried: bag.", first);
+        String last = MapTools.tried(bot, "Home", "bag", GameNotes.OPENS + "Bag");
+        assertTrue(last.contains("a menu.") && last.contains("scrolled to both ends"), last);
+        assertTrue(GameNotes.sections(bot).get("Home").endsWith("Shape: menu"), "the column scrolled is no activity");
+        assertFalse(MapTools.tried(bot, "Home", "bag", GameNotes.OPENS + "Bag").contains("scrolled to both ends"),
+                "asked once, as the last input goes");
     }
 
     @Test

@@ -41,8 +41,9 @@ public final class SdkAssist {
             - When a stage's check passes for a screen, write_notes that screen's section with its new Stage
               line, and what the stage taught about the game, before going on.
             - Stage 0, Setup: the game in view, a home method and a popups method.
-            - Stage 1, Discovery: explore each screen across, from home: cut its marker and every input on it,
-              then try_input each one before any screen they open; then survey each screen, its help first.
+            - Stage 1, Discovery: every screen the same way, from home: cut its marker and every input on it,
+              try each (every list scrolled to both ends), and finish a screen an input opens before the next
+              input.
             - Stage 2, Build: one chore at a time, through the game's own shortcuts, each step proved by a
               picture.
             - Stage 3, Trial: each activity from three states (work to do, nothing to do, interrupted), then

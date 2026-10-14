@@ -5,6 +5,7 @@ import com.botmaker.sdk.plugin.assist.Protocol.Where;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -89,6 +90,18 @@ class ProtocolTest {
                 + "weekly tab picture."), where.said());
         notes.put("Quests", "Stage: tried");
         assertEquals(Stage.TUNING, Protocol.where(true, true, notes).stage());
+    }
+
+    /** The user's rule: every screen the same way, cut whole, each input tried, a screen opened finished first. */
+    @Test
+    void discoveryFinishesEachScreenItOpensAndScrollsEveryList() {
+        String steps = Stage.DISCOVERY.section();
+        for (String rule : List.of("Every screen is explored the same way", "explore it by these same steps, to "
+                + "its end, before the next input of the screen it was opened from", "try_input with scroll every "
+                + "list and panel to its end both ways", "other free spends are clicked")) {
+            assertTrue(steps.replaceAll("\\s+", " ").contains(rule), rule);
+        }
+        assertEquals(1, steps.split("help \\(an i or \\? button\\)", -1).length - 1, "one survey step, not two");
     }
 
     @Test

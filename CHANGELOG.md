@@ -151,6 +151,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **Discovery explores every screen the same way, one screen to its end at a time.** The guide's Discovery steps
+  are one algorithm for every screen: cut every input on it (buttons, icons, tabs, toggles, arrows, list items and
+  the lists that scroll), try each, and explore a screen an input opens to its end before the next input of the
+  screen it was opened from. try_input refuses a screen while one reached from it is unfinished (it used to
+  refuse going down before the screen above was finished). It takes `scroll`, notches over a picture, so a list is
+  an input untried until scrolled; a scroll is recorded as `scrolled N` and never decides a screen's shape. When a
+  screen's last input is tried, it asks once whether every list was scrolled and every tab opened.
 - **`Screen.waitStable` and `Screen.waitChange` see a change of colour, not only of brightness.** They and the
   assistant's click, key and scroll now judge a change by one rule: a pixel moved when one of its channels moved by
   24 of 255 or more, a frame changed when more than 0.5 % of its pixels did, compared every 2 pixels (coarser past

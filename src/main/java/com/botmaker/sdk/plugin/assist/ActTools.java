@@ -234,17 +234,23 @@ final class ActTools {
     }
 
     /**
-     * Clicks {@code picture} or taps {@code key} for try_input, waiting up to {@code settleMs} for a change as big
-     * as {@code share} of the screen.
+     * Clicks {@code picture}, scrolls {@code notches} over it when they are not 0, or taps {@code key} for try_input,
+     * waiting up to {@code settleMs} for a change as big as {@code share} of the screen.
      */
-    static Entered enter(AgentContext context, String picture, Key key, Boolean desktop, int settleMs, double share) {
+    static Entered enter(AgentContext context, String picture, int notches, Key key, Boolean desktop, int settleMs,
+                         double share) {
         if (key != null) {
             return acted(context, null, null, desktop, settleMs, false, "Pressed " + key.label(), "key " + key.label(),
                     share, hands -> hands.key(key));
         }
-        Spotted spotted = spot(picture, "clicked", context);
+        Spotted spotted = spot(picture, notches == 0 ? "clicked" : "scrolled", context);
         if (spotted.refusal() != null) return Entered.no(spotted.refusal());
         Point at = spotted.at();
+        if (notches != 0) {
+            return acted(context, spotted.frame(), at, desktop, settleMs, false, "Scrolled " + notches + " at "
+                    + spotted.name() + " (" + at.x() + "," + at.y() + ")", "scroll " + spotted.name() + " " + notches,
+                    share, hands -> hands.scroll(at.x(), at.y(), notches));
+        }
         return acted(context, spotted.frame(), at, desktop, settleMs, false, "Clicked " + spotted.name() + " at "
                 + at.x() + "," + at.y(), "click " + spotted.name(), share, hands -> hands.click(at.x(), at.y()));
     }

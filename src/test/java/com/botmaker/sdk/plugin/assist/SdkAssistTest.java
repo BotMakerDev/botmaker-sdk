@@ -890,22 +890,30 @@ class SdkAssistTest {
         assertTrue(gated.isRefused() && text(gated).startsWith("Engineer still owes its marker"), text(gated));
         assertTrue(text(run("crop_picture", "name", "coin", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
                 "screen", "engineer", "marker", true)).contains("Noted in Engineer as its marker."));
-        AgentReply above = run("try_input", "screen", "Engineer", "picture", "coin", "desktop", true, "settleMs", 0);
-        assertTrue(above.isRefused() && text(above).startsWith("Finish Home first"), text(above));
+        assertFalse(run("try_input", "screen", "Engineer", "picture", "coin", "desktop", true, "settleMs", 0)
+                .isRefused(), "the screen just opened is explored, Home unfinished above it");
+        AgentReply next = run("try_input", "screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
+        assertTrue(next.isRefused() && text(next).startsWith("Finish Engineer first"), text(next));
+        assertTrue(run("try_input", "screen", "Engineer", "picture", "coin", "never", " ").isRefused(),
+                "a blank reason never clicks");
+        assertTrue(run("try_input", "screen", "Engineer", "picture", "coin", "never", "spends gems").isRefused(),
+                "only an untried input is never clicked");
+        assertTrue(run("try_input", "screen", "Engineer", "picture", "coin", "scroll", 0).isRefused());
+        assertTrue(run("try_input", "screen", "Engineer", "key", "Q", "scroll", 3).isRefused(), "a scroll is over a "
+                + "picture");
+        run("crop_picture", "name", "gem", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
+        run("crop_picture", "name", "list", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
+        String scrolled = text(run("try_input", "screen", "Engineer", "picture", "list", "scroll", -3, "desktop",
+                true, "settleMs", 0));
+        assertTrue(scrolled.contains("tried list, scrolled -3, no visible effect.") && scrolled.contains("that end is "
+                + "reached"), scrolled);
+        String last = text(run("try_input", "screen", "Engineer", "picture", "gem", "never", "spends gems"));
+        assertTrue(last.contains("tried gem, never, spends gems.") && last.contains("scrolled to both ends"), last);
 
         AgentReply still = run("try_input", "screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
         assertTrue(text(still).contains("Noted in Home: tried gold, no visible effect."), text(still));
         assertEquals("Marker: ore\n- tried gold: no visible effect\nShape: activity", GameNotes.sections(bot)
                 .get("Home"));
-        assertFalse(run("try_input", "screen", "Engineer", "picture", "coin", "desktop", true, "settleMs", 0)
-                .isRefused(), "home finished, the screen it opened is next");
-        assertTrue(run("try_input", "screen", "Engineer", "picture", "coin", "never", " ").isRefused(),
-                "a blank reason never clicks");
-        assertTrue(run("try_input", "screen", "Engineer", "picture", "coin", "never", "spends gems").isRefused(),
-                "only an untried input is never clicked");
-        run("crop_picture", "name", "gem", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
-        assertTrue(text(run("try_input", "screen", "Engineer", "picture", "gem", "never", "spends gems"))
-                .contains("tried gem, never, spends gems."));
         assertTrue(run("try_input", "screen", "Engineer", "picture", "home").isRefused(),
                 "a picture naming its screen Home asks for opens");
 

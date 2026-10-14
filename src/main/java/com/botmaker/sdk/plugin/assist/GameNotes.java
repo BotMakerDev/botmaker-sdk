@@ -250,6 +250,8 @@ final class GameNotes {
     static final String NO_EFFECT = "no visible effect";
     /** What an input never clicked says, before why: it spends what a bot must not. */
     static final String NEVER = "never, ";
+    /** What a list or panel scrolled says, before the notches: it reveals inputs, so it says nothing of the shape. */
+    static final String SCROLLED = "scrolled ";
     static final String OWED_MARKER = "Owed: marker";
 
     /** A line saying the screen still owes its marker, with no reason given. */
@@ -370,13 +372,16 @@ final class GameNotes {
         return old.find() ? rest.substring(0, old.start()) + shape + rest.substring(old.end()) : rest + "\n" + shape;
     }
 
-    /** {@code menu} when every input tried, the ones never clicked aside, opened a screen; {@code activity} else. */
+    /**
+     * {@code menu} when every input tried, the ones never clicked and the lists scrolled aside (a menu's side column
+     * scrolls), opened a screen; {@code activity} else.
+     */
     static Optional<String> shapeOf(String text) {
         Matcher line = TRIED_LINE.matcher(text);
         boolean opened = false;
         while (line.find()) {
             String did = line.group(2);
-            if (did.startsWith(NEVER)) continue;
+            if (did.startsWith(NEVER) || did.startsWith(SCROLLED)) continue;
             if (!did.startsWith(OPENS)) return Optional.of("activity");
             opened = true;
         }

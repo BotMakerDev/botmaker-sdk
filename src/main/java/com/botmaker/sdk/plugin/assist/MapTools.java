@@ -22,11 +22,12 @@ import java.util.regex.Pattern;
 /**
  * Discovery's map, kept by a tool rather than by the assistant's memory (the user's call, 2026-10-14: mapping
  * Firestone, the assistant clicked through a dozen screens, cut nothing and wrote nothing until asked; then cut a
- * screen's buttons and left without trying one). A screen is explored across, never down: every input cut on it
- * with crop_picture is untried until try_input clicks it, and try_input records what it did (opened a screen, changed
- * this one in place, did nothing). A screen whose inputs all open screens is a menu; any other is an activity. The
- * tool refuses a screen while one it was reached from has an untried input, and any screen while one owes its
- * marker. read_guide keeps Discovery open while anything is owed or untried ({@link Protocol}).
+ * screen's buttons and left without trying one). Every input cut on a screen with crop_picture is untried until
+ * try_input clicks it (or scrolls over it, a list's), and try_input records what it did (opened a screen, changed this
+ * one in place, did nothing). A screen whose inputs all open screens is a menu; any other is an activity. A screen
+ * opened is finished before the next input of the one it was opened from: the tool refuses a screen while one
+ * reached from it has an untried input, and any screen while one owes its marker. read_guide keeps Discovery open
+ * while anything is owed or untried ({@link Protocol}).
  */
 final class MapTools {
 
@@ -45,6 +46,9 @@ final class MapTools {
     record Input(@Describe("the screen the input is on, as its section names it: Home, Upgrades") String screen,
                  @Describe(value = "a picture cut on that screen, clicked at its best match", optional = true)
                  String picture,
+                 @Describe(value = "notches to scroll over the picture instead of clicking it, for a list or a panel "
+                         + "that scrolls: positive up or away, negative down or toward you", optional = true)
+                 Integer scroll,
                  @Describe(value = "a hotkey instead of a picture, as printed on it: Q", optional = true) String key,
                  @Describe(value = "the name the screen it opens shows, when it opens one; left out, the picture's "
                          + "name names it", optional = true) String opens,
@@ -58,13 +62,13 @@ final class MapTools {
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("try_input")
-                    .describedAs("Discovery's one way to act on a screen: clicks an input cut on it (or taps a "
-                            + "hotkey) and records in its section what that did: opened a screen (its Map line and "
-                            + "its own section, owing a marker, with its screenshot), changed this one in place, or "
-                            + "nothing. Every picture crop_picture cut with a screen is untried until this tries "
-                            + "it. Each screen across, then down: refused while a screen owes its marker, while a "
-                            + "screen this one was reached from has an input left to try, and while another branch "
-                            + "begun is not finished")
+                    .describedAs("Discovery's one way to act on a screen: clicks an input cut on it (scrolls over "
+                            + "it, or taps a hotkey) and records in its section what that did: opened a screen (its "
+                            + "Map line and its own section, owing a marker, with its screenshot), changed this one "
+                            + "in place, or nothing. Every picture crop_picture cut with a screen is untried until "
+                            + "this tries it. A screen opened is finished before the next input of the screen it was "
+                            + "opened from: refused while a screen owes its marker, while a screen opened from this "
+                            + "one has an input left to try, and while another branch begun is not finished")
                     .takes(Input.class).handledBy(MapTools::tryInput));
 
     private MapTools() {}
@@ -91,6 +95,12 @@ final class MapTools {
         if (never && input.never().isBlank()) {
             return AgentReply.refused("Say why it is never clicked (it spends gems). Nothing was done.");
         }
+        int notches = input.scroll() == null ? 0 : input.scroll();
+        if (input.scroll() != null && (notches == 0 || !byPicture || never)) {
+            return AgentReply.refused(notches == 0 ? "Scroll by at least one notch." : !byPicture ? "A scroll is over "
+                    + "a picture: the list or panel, cut with its screen." : "A scroll spends nothing: leave never "
+                    + "out.");
+        }
         if (byKey && opens == null && !never) {
             return AgentReply.refused("A hotkey names no screen: give opens, the name the screen it opens shows. "
                     + "Nothing was done.");
@@ -111,19 +121,21 @@ final class MapTools {
         String screen = found.get();
         Optional<String> owing = owingMarker(notes);
         if (owing.isPresent()) return AgentReply.refused(owes(owing.get()));
-        Optional<String> before = unfinishedAbove(notes, screen);
-        if (before.isPresent()) {
-            String above = notes.get(before.get());
-            List<String> waiting = GameNotes.untried(above);
+        Optional<String> below = unfinishedBelow(notes, screen);
+        if (below.isPresent()) {
+            String child = notes.get(below.get());
+            List<String> waiting = GameNotes.untried(child);
             // Tried by hotkey or by pictures never cut with its screen, a section has no Untried: line, so no Shape:
             // is written for it on its own: one stray hotkey must not call a screen finished.
             String why = !waiting.isEmpty() ? "it still has untried inputs (" + String.join(", ", waiting) + ")"
-                    : GameNotes.triedAny(above) ? "its inputs were tried, but none was cut with screen " + before.get()
+                    : GameNotes.triedAny(child) ? "its inputs were tried, but none was cut with screen " + below.get()
                     + ", so its shape is not known: crop_picture its other inputs with that screen, or write_notes "
                     + "its section with a Shape: menu or Shape: activity line when it has none"
-                    : "nothing on it is tried yet";
-            return AgentReply.refused("Finish " + before.get() + " first: " + why + ", and " + screen + " was reached "
-                    + "from it. Every input of a screen before going down any. Nothing was done.");
+                    : "nothing on it is tried yet: crop_picture every input on it with screen " + below.get()
+                    + ", then try each; a screen with no input at all, write_notes its section with a Shape: line";
+            return AgentReply.refused("Finish " + below.get() + " first: " + why + ", and it is below " + screen
+                    + ". A screen opened is finished, every button, tab, toggle and arrow tried and every "
+                    + "list scrolled, before the next input of the screen it was opened from. Nothing was done.");
         }
         Optional<String> begun = branchBegun(notes, screen);
         if (begun.isPresent()) {
@@ -144,7 +156,7 @@ final class MapTools {
                     + screen + " first. Nothing was done.");
         }
         String child = opens != null ? opens : nameFrom(what, screen);
-        if (!never && (!isName(child) || child.equalsIgnoreCase(screen) || child.equalsIgnoreCase(GameNotes.MAP)
+        if (!never && notches == 0 && (!isName(child) || child.equalsIgnoreCase(screen) || child.equalsIgnoreCase(GameNotes.MAP)
                 || child.equalsIgnoreCase(HOME))) {
             return AgentReply.refused(what + " would name the screen it opens \"" + child + "\": give opens, the name "
                     + "that screen shows. Nothing was done.");
@@ -156,13 +168,24 @@ final class MapTools {
         }
         if (never) return AgentReply.text(tried(project, screen, what, GameNotes.NEVER
                 + input.never().strip()));
-        ActTools.Entered entered = slowScreen(context, ActTools.enter(context, byPicture ? input.picture() : null,
-                key.orElse(null), input.desktop(), settle, FrameChange.ANSWER_SHARE), marker);
+        ActTools.Entered first = ActTools.enter(context, byPicture ? input.picture() : null, notches,
+                key.orElse(null), input.desktop(), settle, FrameChange.ANSWER_SHARE);
+        ActTools.Entered entered = notches == 0 ? slowScreen(context, first, marker) : first;
         if (entered.after() == null) {
             return entered.reply().isRefused() ? entered.reply() : entered.reply().and(AgentReply.text(
                     "Nothing was written. Look where the game is before trying it again from " + screen + "."));
         }
         try {
+            if (notches != 0) {
+                // A list scrolled moves much of the screen and opens nothing: the end shows when nothing moves.
+                boolean moved = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
+                String said = tried(project, screen, what, GameNotes.SCROLLED + notches + ", "
+                        + (moved ? GameNotes.IN_PLACE : GameNotes.NO_EFFECT));
+                return entered.reply().and(AgentReply.text(said + (moved ? " Scroll it again the same way until "
+                        + "nothing moves (its end), then the other way to its other end; cut, with screen " + screen
+                        + ", each input it brings into view: they are untried in turn."
+                        : " Nothing moved: that end is reached. Its other end too, when not scrolled to yet.")));
+            }
             if (entered.share() >= SCREEN_SHARE) {
                 // Back, close, or another way to a screen mapped already: its marker came into view, and its Map
                 // line stays. A marker on screen before the click proves nothing: a panel opens over it.
@@ -189,9 +212,10 @@ final class MapTools {
                 return entered.reply()
                         .and(AgentReply.text(said + grouped + " Before leaving it, from the screenshot below: crop_picture "
                                 + "with screen " + spelled + " and marker true a part only this screen shows, then "
-                                + "with screen " + spelled + " every input on it (each button, tab and toggle); what "
-                                + "cannot be cut now, write_notes as an Owed: line in its section. Then go back to "
-                                + screen + " and try its next input."))
+                                + "with screen " + spelled + " every input on it (each button, icon, tab, toggle, "
+                                + "arrow and list); what cannot be cut now, write_notes as an Owed: line in its "
+                                + "section. Then try each of them, and finish " + spelled + " before going back to "
+                                + screen + " for its next input."))
                         .and(LookTools.screenshot(new LookTools.Shot(null, null, null, null, null, null), context));
             }
             boolean changed = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
@@ -247,8 +271,15 @@ final class MapTools {
         String now = GameNotes.withTried(text, what, did);
         GameNotes.write(project, screen, now);
         List<String> left = GameNotes.untried(now);
+        // Asked as the last one goes: a list never scrolled or a tab never opened hides inputs never cut. Not on a
+        // scroll that moved: its own answer says to scroll on to both ends first.
+        boolean last = left.isEmpty() && !GameNotes.untried(text).isEmpty()
+                && !(did.startsWith(GameNotes.SCROLLED) && did.endsWith(GameNotes.IN_PLACE));
         return "Noted in " + screen + ": tried " + what + ", " + did + "." + (left.isEmpty()
                 ? " Every input cut on it is tried: " + GameNotes.shapeOf(now).map(s -> "a " + s + ".").orElse("")
+                + (last ? " Before leaving " + screen + ": was every list and panel on it scrolled to both ends "
+                + "(try_input with scroll), every tab opened, every toggle flipped, every arrow paged? Each one "
+                + "that was not: crop_picture it with screen " + screen + " and try it." : "")
                 : " Untried: " + String.join(", ", left) + ".");
     }
 
@@ -290,19 +321,26 @@ final class MapTools {
     }
 
     /**
-     * The nearest screen {@code screen} was reached from, through the Entrance lines, still unfinished. A game's
-     * screens are a shallow tree of many branches (the user's call, 2026-10-14): each screen's every input is tried
-     * before going down (breadth on one screen), then one branch is followed down at a time (depth across them).
+     * The nearest screen reached from {@code screen}, through the Entrance lines, still unfinished: a child before
+     * its own children. A game's screens are a shallow tree of many branches (the user's rule, 2026-10-14): a menu's
+     * every picture is cut, then one is picked and the screen it opens finished, every input tried and every list
+     * scrolled, before the menu's next input.
      */
-    static Optional<String> unfinishedAbove(Map<String, String> notes, String screen) {
-        Set<String> seen = new HashSet<>();
-        String at = screen;
-        while (seen.add(at.toLowerCase(Locale.ROOT)) && seen.size() < DEEPEST) {
-            Optional<String> from = Optional.ofNullable(notes.get(at)).flatMap(GameNotes::entranceFrom)
-                    .flatMap(name -> named(notes, name));
-            if (from.isEmpty() || seen.contains(from.get().toLowerCase(Locale.ROOT))) return Optional.empty();
-            at = from.get();
-            if (unfinished(notes.get(at))) return Optional.of(at);
+    static Optional<String> unfinishedBelow(Map<String, String> notes, String screen) {
+        return unfinishedBelow(notes, screen, new HashSet<>());
+    }
+
+    private static Optional<String> unfinishedBelow(Map<String, String> notes, String screen, Set<String> seen) {
+        if (!seen.add(screen.toLowerCase(Locale.ROOT)) || seen.size() > DEEPEST * DEEPEST) return Optional.empty();
+        List<String> children = notes.entrySet().stream()
+                .filter(e -> !e.getKey().equalsIgnoreCase(screen) && !e.getKey().equalsIgnoreCase(GameNotes.MAP))
+                .filter(e -> GameNotes.entranceFrom(e.getValue()).filter(from -> from.equalsIgnoreCase(screen)).isPresent())
+                .map(Map.Entry::getKey).toList();
+        for (String child : children) {
+            if (seen.contains(child.toLowerCase(Locale.ROOT))) continue;
+            if (unfinished(notes.get(child))) return Optional.of(child);
+            Optional<String> deeper = unfinishedBelow(notes, child, seen);
+            if (deeper.isPresent()) return deeper;
         }
         return Optional.empty();
     }
