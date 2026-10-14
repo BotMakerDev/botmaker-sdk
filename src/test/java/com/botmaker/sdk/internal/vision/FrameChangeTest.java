@@ -85,6 +85,29 @@ class FrameChangeTest {
                 filled(new Color(136, 136, 136), 640, 360)));
     }
 
+    /**
+     * An emulator's capture is compressed video: every channel of every pixel wanders a little on its own. Under
+     * {@link FrameChange#SAME} it is still the same screen, so a wait for it to hold still ends.
+     */
+    @Test
+    void everyChannelWanderingUnderTheToleranceIsNoChange() {
+        BufferedImage before = noise(320, 180, 3);
+        BufferedImage wandered = copy(before);
+        Random rnd = new Random(4);
+        int most = FrameChange.SAME - 1;
+        for (int y = 0; y < 180; y++) {
+            for (int x = 0; x < 320; x++) {
+                int rgb = wandered.getRGB(x, y);
+                int r = Math.clamp((rgb >> 16 & 0xff) + rnd.nextInt(-most, most + 1), 0, 255);
+                int g = Math.clamp((rgb >> 8 & 0xff) + rnd.nextInt(-most, most + 1), 0, 255);
+                int b = Math.clamp((rgb & 0xff) + rnd.nextInt(-most, most + 1), 0, 255);
+                wandered.setRGB(x, y, r << 16 | g << 8 | b);
+            }
+        }
+        assertFalse(FrameChange.changed(before, wandered));
+        assertTrue(FrameChange.box(before, wandered, Motion.NONE).isEmpty(), "and it holds still for a wait");
+    }
+
     @Test
     void aNewScreenOrAPanelIsAChange() {
         assertTrue(FrameChange.changed(filled(Color.GRAY, 640, 360), filled(Color.BLACK, 640, 360)));
@@ -242,5 +265,21 @@ class FrameChangeTest {
 
         assertSame(Motion.NONE, Motion.of(List.of(still, noise(60, 40, 2))),
                 "a screen moving all over is compared whole, or no answer would show");
+    }
+
+    /** A 4K frame is compared every 4 pixels: its motion lies on that grid, and grows by whole steps. */
+    @Test
+    void motionOnACoarserGridGrowsByItsSteps() {
+        BufferedImage still = filled(Color.GRAY, 3840, 2160);
+        BufferedImage swayed = copy(still);
+        swayed.setRGB(400, 400, Color.WHITE.getRGB());
+        swayed.setRGB(801, 801, Color.WHITE.getRGB());
+        Motion motion = Motion.of(List.of(still, swayed));
+        int step = FrameChange.step(3840, 2160);
+        int reach = FrameChange.AMBIENT_GROW / step * step;
+        assertTrue(motion.ignores(400, 400, 3840, 2160));
+        assertTrue(motion.ignores(400 + reach, 400 - reach, 3840, 2160));
+        assertFalse(motion.ignores(400 + reach + step, 400, 3840, 2160), "past the grow it is the game's answer");
+        assertFalse(motion.ignores(800, 800, 3840, 2160), "a pixel between the grid's is never compared");
     }
 }

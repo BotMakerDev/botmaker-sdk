@@ -111,11 +111,17 @@ final class MapTools {
         if (owing.isPresent()) return AgentReply.refused(owes(owing.get()));
         Optional<String> before = unfinishedAbove(notes, screen);
         if (before.isPresent()) {
-            List<String> waiting = GameNotes.untried(notes.get(before.get()));
-            return AgentReply.refused("Finish " + before.get() + " first: " + (waiting.isEmpty() ? "nothing on it is "
-                    + "tried yet" : "it still has untried inputs (" + String.join(", ", waiting) + ")") + ", and "
-                    + screen + " was reached from it. Every input of a screen before going down any. Nothing was "
-                    + "done.");
+            String above = notes.get(before.get());
+            List<String> waiting = GameNotes.untried(above);
+            // Tried by hotkey or by pictures never cut with its screen, a section has no Untried: line, so no Shape:
+            // is written for it on its own: one stray hotkey must not call a screen finished.
+            String why = !waiting.isEmpty() ? "it still has untried inputs (" + String.join(", ", waiting) + ")"
+                    : GameNotes.triedAny(above) ? "its inputs were tried, but none was cut with screen " + before.get()
+                    + ", so its shape is not known: crop_picture its other inputs with that screen, or write_notes "
+                    + "its section with a Shape: menu or Shape: activity line when it has none"
+                    : "nothing on it is tried yet";
+            return AgentReply.refused("Finish " + before.get() + " first: " + why + ", and " + screen + " was reached "
+                    + "from it. Every input of a screen before going down any. Nothing was done.");
         }
         Optional<String> begun = branchBegun(notes, screen);
         if (begun.isPresent()) {

@@ -312,7 +312,13 @@ final class PictureTools {
         if (moving.isPresent()) return AgentReply.refused(moving.get());
         String alike = lookAlikes(context, frame.get(), picture.get().image(),
                 new Rect(crop.x(), crop.y(), crop.width(), crop.height())).map(a -> " " + a).orElse("");
-        Optional<String> screenTag = section.flatMap(s -> TagTools.screenTag(context.services(), s));
+        Optional<String> screenTag;
+        try {
+            screenTag = section.flatMap(s -> TagTools.screenTag(context.services(), s));
+        } catch (IllegalStateException busy) {
+            return AgentReply.refused("Studio is busy and could not file the picture under its screen's tag; try "
+                    + "again. Nothing was saved.");
+        }
         PictureCuts.Cut saved = FxCall.call(() -> {
             PictureCuts.Cut cut = PictureCuts.save(context.services(), picture.get(), crop.name(), frame.get());
             if (!tags.isEmpty()) TemplateLibrary.applyTags(context.services(), Map.of(cut.name(), tags));

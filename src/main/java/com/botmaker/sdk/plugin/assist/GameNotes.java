@@ -383,12 +383,18 @@ final class GameNotes {
         return opened ? Optional.of("menu") : Optional.empty();
     }
 
-    /** The pictures {@code text}'s {@code Untried:} line names, in its order. */
+    /**
+     * The pictures {@code text}'s {@code Untried:} lines name, in their order, each once: a section written by hand
+     * can hold two, and the second's names were never tried nor offered.
+     */
     static List<String> untried(String text) {
         Matcher line = UNTRIED_LINE.matcher(text == null ? "" : text);
-        if (!line.find()) return List.of();
         List<String> names = new ArrayList<>();
-        for (String name : line.group(2).split(",")) if (!name.isBlank()) names.add(name.strip());
+        while (line.find()) {
+            for (String name : line.group(2).split(",")) {
+                if (!name.isBlank() && !names.contains(name.strip())) names.add(name.strip());
+            }
+        }
         return names;
     }
 
@@ -404,16 +410,26 @@ final class GameNotes {
         return line.find() && !line.group(1).isBlank() ? Optional.of(line.group(1).strip()) : Optional.empty();
     }
 
-    /** {@code text} with its {@code Untried:} line naming {@code names}, gone when they are none. */
+    /**
+     * {@code text} with one {@code Untried:} line naming {@code names}, where its first was, gone when they are none;
+     * any later {@code Untried:} line goes ({@link #untried} read its names into {@code names}).
+     */
     static String withUntriedLine(String text, List<String> names) {
         Matcher line = UNTRIED_LINE.matcher(text);
         if (!line.find()) return names.isEmpty() ? text : (text.strip() + "\nUntried: " + String.join(", ", names)).strip();
-        if (names.isEmpty()) {
-            int end = line.end() < text.length() ? line.end() + 1 : line.end();
-            return (text.substring(0, line.start()) + text.substring(end)).strip();
+        StringBuilder out = new StringBuilder(text.substring(0, line.start()));
+        if (!names.isEmpty()) out.append(line.group(1)).append(' ').append(String.join(", ", names));
+        int from = names.isEmpty() ? skipBreak(text, line.end()) : line.end();
+        while (line.find()) {
+            out.append(text, from, line.start());
+            from = skipBreak(text, line.end());
         }
-        return text.substring(0, line.start()) + line.group(1) + " " + String.join(", ", names)
-                + text.substring(line.end());
+        return out.append(text.substring(from)).toString().strip();
+    }
+
+    /** {@code at}, past the line break there when there is one: a removed line takes its break with it. */
+    private static int skipBreak(String text, int at) {
+        return at < text.length() && text.charAt(at) == '\n' ? at + 1 : at;
     }
 
     private static Optional<Matcher> triedLine(String text, String what) {

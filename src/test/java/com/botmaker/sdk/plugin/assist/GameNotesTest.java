@@ -140,4 +140,14 @@ class GameNotesTest {
                 "Bag", "home › click bag"), "a key of two words goes whole");
         assertEquals(Optional.of("Bag"), GameNotes.mapName("1. **Bag:** chests", "bag"));
     }
+
+    /** A section written by hand with two Untried lines: both are read, and the first write leaves one. */
+    @Test
+    void twoUntriedLinesAreReadAsOneAndWrittenAsOne() {
+        String text = "Marker: m\nUntried: a, b\nnotes\nUntried: b, c\nmore";
+        assertEquals(List.of("a", "b", "c"), GameNotes.untried(text));
+        assertEquals("Marker: m\nUntried: b, c\nnotes\nmore\n- tried a: " + GameNotes.IN_PLACE,
+                GameNotes.withTried(text, "a", GameNotes.IN_PLACE));
+        assertEquals("Marker: m\nnotes\nmore", GameNotes.withUntriedLine(text, List.of()));
+    }
 }

@@ -78,12 +78,20 @@ public final class TemplateCache {
             if (kept != null && kept.stamp().equals(stamp)) return kept.mat().clone();
         }
         Mat decoded = decode(path, workingDirectory, loader);
-        if (stamp != null) keep(key, new Kept(decoded.clone(), stamp));
+        if (stamp != null) keep(key, decoded, stamp);
         return decoded;
     }
 
-    private static void keep(String key, Kept kept) {
+    /**
+     * Keeps a copy of {@code decoded} under {@code key}, unless a caller that missed at the same time kept the same
+     * file first: the matcher's pool asks for many pictures at once, and each first ask decodes. The decode is paid
+     * twice then, never the keep.
+     */
+    private static void keep(String key, Mat decoded, Stamp stamp) {
         synchronized (KEPT) {
+            Kept there = KEPT.get(key);
+            if (there != null && there.stamp().equals(stamp)) return;
+            Kept kept = new Kept(decoded.clone(), stamp);
             Kept old = KEPT.put(key, kept);
             if (old != null) {
                 bytes -= old.bytes();

@@ -206,6 +206,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **A picture shared by two threads is decoded once.** `ImageTemplate` loads its pixels under a lock, and two
+  first looks at the same file keep one copy in the picture cache instead of the second replacing the first.
+- **Two `Untried:` lines in a screen's notes are read as one.** A section written by hand with a second line had
+  its names never offered nor tried; the next write leaves one line.
 - **Running one activity goes home first when its card does.** Studio's ▶ Run on an activity and the assistant's
   `run_activity` ran its body on whatever screen was up; `Bot.trial` now runs the bot's home before it when the
   activity's card says `goesHome()`, as a run would.

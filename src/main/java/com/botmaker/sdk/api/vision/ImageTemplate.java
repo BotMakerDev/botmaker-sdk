@@ -129,7 +129,9 @@ public class ImageTemplate implements AutoCloseable {
      * and link the native library. {@link OpenCvNative#ensureLoaded()} is idempotent and
      * synchronized, so paying it per call costs a volatile read after the first one.
      */
-    Mat getMat() {
+    synchronized Mat getMat() {
+        // Locked: a Pictures constant is one object every thread of a run shares (the guard and the body, the
+        // matcher's pool), and two first reads at once each decoded it, the later one leaking the other's pixels.
         OpenCvNative.ensureLoaded();
         if (mat == null || mat.empty()) {
             // The file as written first, then the classpath (TemplateSource says why): a bot run from an IDE
@@ -166,7 +168,7 @@ public class ImageTemplate implements AutoCloseable {
      */
     @Hidden("memory management the runtime does on its own; a bot that unloads a template mid-run "
             + "pays a reload on the next find and gains nothing")
-    public void unload() {
+    public synchronized void unload() {
         if (mat != null) {
             mat.release();
             mat = null;
