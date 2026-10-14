@@ -111,4 +111,17 @@ class BestMatchesNearTest {
             assertTrue(near.confidence() > 0.8, "scored " + near.confidence());
         }
     }
+
+    @Test
+    void aPictureHeldInMemoryMatchesAsItsSavedFileWould(@TempDir Path dir) throws IOException {
+        CaptureSource source = still(frame(640, 400, patch(), 300, 200, 1));
+        try (ImageTemplate held = ImageTemplate.of("ore", patch()).in(new Size(640, 400));
+             ImageTemplate saved = saved(dir).in(new Size(640, 400))) {
+            List<MatchResult> both = ImageFinder.bestMatches(List.of(held, saved), source);
+
+            assertEquals("ore", held.id());
+            assertEquals(both.get(1).topLeft(), both.get(0).topLeft());
+            assertEquals(both.get(1).confidence(), both.get(0).confidence(), 1e-6);
+        }
+    }
 }

@@ -349,7 +349,7 @@ public class ImageClicker {
      */
     public static boolean clickCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         PopupGuard.check();
-        MatchResult result = compareInternal(good.templates(), bad.templates(), source,
+        MatchResult result = ImageFinder.compare(good.templates(), bad.templates(), source,
                 ImageFinder.confidence(), ImageFinder.margin());
         Vision.setLastMatch(result);
         return clickResult(source, result);
@@ -385,7 +385,7 @@ public class ImageClicker {
      */
     public static boolean clickAnyCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         PopupGuard.check();
-        MatchResult result = compareAnyInternal(good.templates(), bad.templates(), source,
+        MatchResult result = ImageFinder.compareAny(good.templates(), bad.templates(), source,
                 ImageFinder.confidence(), ImageFinder.margin());
         Vision.setLastMatch(result);
         return clickResult(source, result);
@@ -418,7 +418,7 @@ public class ImageClicker {
      */
     public static int clickAllCompare(ImageTemplateGroup good, ImageTemplateGroup bad, CaptureSource source) {
         PopupGuard.check();
-        List<MatchResult> winners = compareAllInternal(good.templates(), bad.templates(), source,
+        List<MatchResult> winners = ImageFinder.compareAll(good.templates(), bad.templates(), source,
                 ImageFinder.confidence(), ImageFinder.margin());
         Vision.setLastMatchList(winners);
         for (MatchResult match : winners) {
@@ -521,143 +521,6 @@ public class ImageClicker {
      */
     private static MatchResult findBestInternal(ImageTemplateGroup group, CaptureSource source, double confidence) {
         return ImageFinder.findFrame(group, source, confidence).matches().best();
-    }
-
-    /**
-     * Internal compare method that returns MatchResult.
-     */
-    private static MatchResult compareInternal(List<ImageTemplate> goods, List<ImageTemplate> bads,
-                                               CaptureSource source, double confidence, double margin) {
-        // Import the compare method from ImageFinder
-        // We'll duplicate the logic here for now to avoid circular dependencies
-        com.botmaker.shared.opencv.RawMatch bestRaw = null;
-        MatchResult best = MatchResult.notFound();
-        java.awt.image.BufferedImage screenshot = source.capture();
-        if (screenshot == null) {
-            return MatchResult.notFound();
-        }
-        org.opencv.core.Mat background = com.botmaker.shared.opencv.OpencvManager.bufferedImageToMat(screenshot);
-        try {
-            Point origin = source.origin();
-            int offsetX = origin.x();
-            int offsetY = origin.y();
-
-            for (ImageTemplate good : goods) {
-                com.botmaker.shared.opencv.RawMatch gm = com.botmaker.shared.opencv.OpencvManager.findBestMatch(
-                        good.getMat(), background, false, confidence, good.authoredSize());
-                if (gm == null) {
-                    continue;
-                }
-                boolean wins = true;
-                for (ImageTemplate bad : bads) {
-                    double badScore = com.botmaker.shared.opencv.OpencvManager.scoreAround(
-                            bad.getMat(), background, false, gm.x(), gm.y(), 4);
-                    if (badScore >= gm.score() - margin) {
-                        wins = false;
-                        break;
-                    }
-                }
-                if (wins && (!best.isFound() || gm.score() > best.confidence())) {
-                    best = new MatchResult(
-                            new Point(gm.x() + offsetX, gm.y() + offsetY),
-                            gm.width(), gm.height(), gm.score(), good.id());
-                }
-            }
-            return best;
-        } finally {
-            if (background != null) {
-                background.release();
-            }
-        }
-    }
-
-    /**
-     * Compare variant that returns the FIRST good (in list order) whose best match beats every bad template
-     * at its location by {@code margin}. Powers {@link #clickAnyCompare}.
-     */
-    private static MatchResult compareAnyInternal(List<ImageTemplate> goods, List<ImageTemplate> bads,
-                                                  CaptureSource source, double confidence, double margin) {
-        java.awt.image.BufferedImage screenshot = source.capture();
-        if (screenshot == null) {
-            return MatchResult.notFound();
-        }
-        org.opencv.core.Mat background = com.botmaker.shared.opencv.OpencvManager.bufferedImageToMat(screenshot);
-        try {
-            Point origin = source.origin();
-            int offsetX = origin.x();
-            int offsetY = origin.y();
-
-            for (ImageTemplate good : goods) {
-                com.botmaker.shared.opencv.RawMatch gm = com.botmaker.shared.opencv.OpencvManager.findBestMatch(
-                        good.getMat(), background, false, confidence, good.authoredSize());
-                if (gm == null) {
-                    continue;
-                }
-                if (beatsAll(gm.x(), gm.y(), gm.score(), background, bads, margin)) {
-                    return new MatchResult(
-                            new Point(gm.x() + offsetX, gm.y() + offsetY),
-                            gm.width(), gm.height(), gm.score(), good.id());
-                }
-            }
-            return MatchResult.notFound();
-        } finally {
-            if (background != null) {
-                background.release();
-            }
-        }
-    }
-
-    /**
-     * Compare variant that returns EVERY location of every good template that beats all bad templates by
-     * {@code margin}. Powers {@link #clickAllCompare}.
-     */
-    private static List<MatchResult> compareAllInternal(List<ImageTemplate> goods, List<ImageTemplate> bads,
-                                                        CaptureSource source, double confidence, double margin) {
-        List<MatchResult> winners = new java.util.ArrayList<>();
-        java.awt.image.BufferedImage screenshot = source.capture();
-        if (screenshot == null) {
-            return winners;
-        }
-        org.opencv.core.Mat background = com.botmaker.shared.opencv.OpencvManager.bufferedImageToMat(screenshot);
-        try {
-            Point origin = source.origin();
-            int offsetX = origin.x();
-            int offsetY = origin.y();
-
-            for (ImageTemplate good : goods) {
-                List<com.botmaker.shared.opencv.RawMatch> matches =
-                        com.botmaker.shared.opencv.OpencvManager.findMultipleMatches(
-                                good.getMat(), background, false, confidence, good.authoredSize());
-                for (com.botmaker.shared.opencv.RawMatch gm : matches) {
-                    if (beatsAll(gm.x(), gm.y(), gm.score(), background, bads, margin)) {
-                        winners.add(new MatchResult(
-                                new Point(gm.x() + offsetX, gm.y() + offsetY),
-                                gm.width(), gm.height(), gm.score(), good.id()));
-                    }
-                }
-            }
-            return winners;
-        } finally {
-            if (background != null) {
-                background.release();
-            }
-        }
-    }
-
-    /**
-     * True when no {@code bad} template scores within {@code margin} of {@code goodScore} in a small
-     * neighbourhood of ({@code x},{@code y}) — i.e. the good match at that location wins.
-     */
-    private static boolean beatsAll(int x, int y, double goodScore, org.opencv.core.Mat background,
-                                    List<ImageTemplate> bads, double margin) {
-        for (ImageTemplate bad : bads) {
-            double badScore = com.botmaker.shared.opencv.OpencvManager.scoreAround(
-                    bad.getMat(), background, false, x, y, 4);
-            if (badScore >= goodScore - margin) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**

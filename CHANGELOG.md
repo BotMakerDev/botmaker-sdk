@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A picture file is decoded once.** Its pixels are kept while the file is unchanged on disk (same modified
+  time and size), so a run that opens the same picture again, and the assistant's look that builds every
+  picture anew on each call, copy memory instead of reading and decoding the PNG. At most 64 MB is kept.
 - **A group's pictures are matched side by side.** `whileFind`, `ifFind` and the other group checks, their
   compare forms, and `clickBest` read one capture and match every picture of the group on it in parallel. The
   frame is prepared once, and `clickBest` captures once where it captured once a picture. The assistant's
@@ -143,6 +146,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **`clickCompare`, `clickAnyCompare` and `clickAllCompare` match as `findCompare` and its forms do**: they
+  share one compare, so their matches show on the run overlay like a find's. A picture that cannot be loaded is
+  now a miss there, as it already was for `findCompare` and `clickBest`, not an exception.
+- **The assistant checks a cut without a temporary file.** crop_picture's look-alike and still checks match the
+  cut from memory (`ImageTemplate.of`, hidden from the palette) instead of writing a PNG to the temp folder.
 - **`main` is `Bot.runFlow(Sdk.class)`.** The run reads its parameters `flow`, `doSetup` and `skip` off
   `Sdk.java` by their marks, as it reads the launchers and the capture source, so nothing in `main` is wired by
   hand. `Bot.runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class)` is gone: a `main` still calling it no longer

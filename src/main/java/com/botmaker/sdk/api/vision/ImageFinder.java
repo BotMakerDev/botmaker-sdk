@@ -546,7 +546,7 @@ public class ImageFinder {
      * whose location out-scores every bad template (re-scored on the same frame) by {@code margin}.
      * This is an internal method - callers are responsible for updating Vision.
      */
-    private static MatchResult compare(List<ImageTemplate> goods, List<ImageTemplate> bads,
+    static MatchResult compare(List<ImageTemplate> goods, List<ImageTemplate> bads,
                                        CaptureSource source, double confidence, double margin) {
         Mat background = null;
         try {
@@ -592,7 +592,7 @@ public class ImageFinder {
      * out-scores every bad template (re-scored on the same frame) by {@code margin}. Internal — callers
      * update Vision.
      */
-    private static MatchResult compareAny(List<ImageTemplate> goods, List<ImageTemplate> bads,
+    static MatchResult compareAny(List<ImageTemplate> goods, List<ImageTemplate> bads,
                                           CaptureSource source, double confidence, double margin) {
         Mat background = null;
         try {
@@ -639,7 +639,7 @@ public class ImageFinder {
      * out-scores every bad template (re-scored on the same frame) by {@code margin}. Internal — callers
      * update Vision.
      */
-    private static List<MatchResult> compareAll(List<ImageTemplate> goods, List<ImageTemplate> bads,
+    static List<MatchResult> compareAll(List<ImageTemplate> goods, List<ImageTemplate> bads,
                                                 CaptureSource source, double confidence, double margin) {
         Mat background = null;
         try {

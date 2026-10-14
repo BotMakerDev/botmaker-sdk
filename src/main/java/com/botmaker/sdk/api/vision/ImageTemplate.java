@@ -4,16 +4,14 @@ import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.internal.vision.BotScreen;
-import com.botmaker.sdk.internal.vision.TemplateSource;
+import com.botmaker.sdk.internal.vision.TemplateCache;
 import com.botmaker.shared.opencv.OpenCvNative;
+import com.botmaker.shared.opencv.OpencvManager;
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfByte;
-import org.opencv.imgcodecs.Imgcodecs;
 
+import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -40,6 +38,8 @@ public class ImageTemplate implements AutoCloseable {
     private final Size frame;
     /** Where in that frame it was cut; null when unknown. */
     private final Rect place;
+    /** The pixels themselves, for a picture held in memory and never saved; null for a file's. */
+    private final BufferedImage image;
 
     // Lazily-loaded OpenCV image data. Null until getMat() is first called.
     private Mat mat;
@@ -49,16 +49,26 @@ public class ImageTemplate implements AutoCloseable {
      * @param filePath Path to the image (e.g. "images/accept_button.png")
      */
     public ImageTemplate(String filePath) {
-        this(filePath, null, null);
+        this(filePath, null, null, null);
     }
 
-    private ImageTemplate(String filePath, Size frame, Rect place) {
+    /**
+     * A picture held in memory, matched as one read from a file would be: the assistant checks a cut before it is
+     * saved without writing it to disk. {@code name} stands for the file's path and is its {@link #id()}.
+     */
+    @Hidden("the assistant's check of a picture it has not saved yet; a bot names its pictures by file")
+    public static ImageTemplate of(String name, BufferedImage image) {
+        return new ImageTemplate(name, null, null, Objects.requireNonNull(image, "image"));
+    }
+
+    private ImageTemplate(String filePath, Size frame, Rect place, BufferedImage image) {
         if (filePath == null || filePath.isBlank()) {
             throw new IllegalArgumentException("File path cannot be empty");
         }
         this.filePath = filePath;
         this.frame = frame == null || frame.empty() ? null : frame;
         this.place = place == null || place.empty() ? null : place;
+        this.image = image;
 
         // Extract ID from filename: "images/btn_ok.png" -> "btn_ok"
         Path path = Paths.get(filePath);
@@ -80,7 +90,7 @@ public class ImageTemplate implements AutoCloseable {
      * 40))}. Written by the windows that cut it, so where a picture belongs is in the bot's Java.
      */
     public ImageTemplate at(Rect place) {
-        return new ImageTemplate(filePath, frame, place);
+        return new ImageTemplate(filePath, frame, place, image);
     }
 
     /**
@@ -88,7 +98,7 @@ public class ImageTemplate implements AutoCloseable {
      * the matcher rescales it by the live frame against this size. Written only when the two differ.
      */
     public ImageTemplate in(Size frame) {
-        return new ImageTemplate(filePath, frame, place);
+        return new ImageTemplate(filePath, frame, place, image);
     }
 
     /** Where in its frame it was cut, or null when that is unknown. */
@@ -124,23 +134,8 @@ public class ImageTemplate implements AutoCloseable {
         if (mat == null || mat.empty()) {
             // The file as written first, then the classpath (TemplateSource says why): a bot run from an IDE
             // rooted elsewhere, or from its own jar, has no src/main/resources relative to its working dir.
-            List<String> tried = new ArrayList<>();
-            TemplateSource.Found found = TemplateSource.read(filePath, tried).orElseThrow(() ->
-                    new RuntimeException("Failed to load image template \"" + filePath + "\". Looked in: "
-                            + String.join("; ", tried) + " (working directory "
-                            + Path.of("").toAbsolutePath() + ")"));
-            // IMREAD_UNCHANGED keeps a transparent PNG's alpha channel (4-channel BGRA) so the matcher can
-            // use it as a mask (ignoring transparent pixels); opaque PNGs still load as 3-channel BGR.
-            MatOfByte encoded = new MatOfByte(found.bytes());
-            try {
-                mat = Imgcodecs.imdecode(encoded, Imgcodecs.IMREAD_UNCHANGED);
-            } finally {
-                encoded.release();                      // native memory; the decoded Mat is a copy
-            }
-            if (mat.empty()) {
-                throw new RuntimeException("Failed to load image template \"" + filePath + "\": "
-                        + found.where() + " is not an image OpenCV can decode");
-            }
+            // TemplateCache decodes each file once while it stays unchanged on disk.
+            mat = image != null ? OpencvManager.bufferedImageToMat(image) : TemplateCache.load(filePath);
         }
         return mat;
     }
@@ -184,11 +179,14 @@ public class ImageTemplate implements AutoCloseable {
         unload();
     }
 
-    /** The same file, cut at the same place from the same frame; the loaded pixels are not compared. */
+    /**
+     * The same file, cut at the same place from the same frame; the loaded pixels are not compared, and a picture
+     * held in memory equals only one holding the same image.
+     */
     @Override
     public boolean equals(Object other) {
         return other instanceof ImageTemplate that && filePath.equals(that.filePath)
-                && Objects.equals(frame, that.frame) && Objects.equals(place, that.place);
+                && Objects.equals(frame, that.frame) && Objects.equals(place, that.place) && image == that.image;
     }
 
     @Override

@@ -40,7 +40,6 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -350,14 +349,7 @@ final class PictureTools {
         if (inside.isEmpty()) return Optional.empty();
         Rect box = inside.get();
         double needs = Frames.confidence(context.services());
-        Path file;
-        try {
-            file = Files.createTempFile("botmaker-alike-", ".png");
-            ImageIO.write(cut, "png", file.toFile());
-        } catch (IOException e) {
-            return Optional.empty();
-        }
-        try (ImageTemplate template = new ImageTemplate(file.toString())) {
+        try (ImageTemplate template = ImageTemplate.of("alike", cut)) {
             ImageFinder.findAll(template, new Frames.Still(shown));
             List<String> elsewhere = Vision.lastMatchList().stream()
                     .filter(m -> m.confidence() >= needs)
@@ -370,12 +362,6 @@ final class PictureTools {
                     + Frames.score(needs) + " it needs: matching ignores colour, so a greyed-out twin counts. "
                     + "If those are not the same thing, cut one as its look-alike and act with "
                     + "ImageFinder.whileFindCompare or ImageClicker.clickCompare, this as good and it as bad.");
-        } finally {
-            try {
-                Files.deleteIfExists(file);
-            } catch (IOException ignored) {
-                // a temp file left behind is the system's to clear
-            }
         }
     }
 
@@ -563,14 +549,7 @@ final class PictureTools {
                 Math.min(shown.getHeight() - Math.max(0, box.y() - STILL_SLACK), box.height() + 2 * STILL_SLACK));
         if (around.isEmpty()) return Optional.empty();
         double needs = Frames.confidence(context.services());
-        Path file;
-        try {
-            file = Files.createTempFile("botmaker-still-", ".png");
-            ImageIO.write(Frames.cut(shown, box), "png", file.toFile());
-        } catch (IOException e) {
-            return Optional.empty();
-        }
-        try (ImageTemplate cut = new ImageTemplate(file.toString())) {
+        try (ImageTemplate cut = ImageTemplate.of("still", Frames.cut(shown, box))) {
             for (int look = 0; look < STILL_LOOKS; look++) {
                 if (look > 0) Thread.sleep(STILL_MS / (STILL_LOOKS - 1));
                 Optional<BufferedImage> live = Frames.look(context);
@@ -591,12 +570,6 @@ final class PictureTools {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Optional.empty();
-        } finally {
-            try {
-                Files.deleteIfExists(file);
-            } catch (IOException ignored) {
-                // a temp file left behind is the system's to clear
-            }
         }
     }
 
