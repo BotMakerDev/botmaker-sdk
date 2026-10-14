@@ -192,9 +192,9 @@ class ActivityFlowValidationTest {
     /** The canvas's cards and arrows make the board a save writes: a DISABLED arrow is its card's off-wire. */
     @Test
     void the_canvas_makes_a_board() {
-        ActivityDraft mining = new ActivityDraft("Mining", "", true, List.of(Arrow.NEXT, "Bag full"), false, true, 0, 0,
+        ActivityDraft mining = new ActivityDraft("Mining", "", true, List.of(Arrow.NEXT, "Bag full"), false, 0, 0,
                 "Mining::body");
-        ActivityDraft bank = new ActivityDraft("Bank", "", false, List.of(Arrow.NEXT), false, true, 0, 0);
+        ActivityDraft bank = new ActivityDraft("Bank", "", false, List.of(Arrow.NEXT), false, 0, 0);
         bank.runnerSwitchProperty().set(true);
         Board board = ActivityFlowDialog.board(List.of(mining, bank), List.of(new Arrow("Mining", "Bank", "Bag full"),
                         new Arrow("Bank", "Mining", Arrow.DISABLED)), "Mining", Flow.Limits.DEFAULT);

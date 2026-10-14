@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.flow;
 
+import com.botmaker.plugin.api.meta.ReplacedBy;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.InstalledRun;
@@ -22,8 +23,7 @@ import java.util.List;
  * public final class Flows {
  *     public static final Flow MAIN = Flow.of(
  *             List.of(Flow.activity(Activities.Collect.class, Collect::body)
- *                             .described("Click collect while there is one.")
- *                             .checksPopups(),
+ *                             .described("Click collect while there is one."),
  *                     Flow.activity(Activities.Rest.class, Rest::body).switchable()),
  *             List.of(Flow.edge(Activities.Collect.NEXT, Activities.Collect.class),
  *                     Flow.edge(Activities.Collect.NOTHING_LEFT, Activities.Rest.class),
@@ -45,7 +45,8 @@ import java.util.List;
  *
  * <p>{@link #activity} takes the two things every step has, the activity and its work, and each other part is a
  * named link after it, written only when it is not the default: {@code .described("…")}, {@code .off()},
- * {@code .goesHome()}, {@code .checksPopups()}, {@code .switchable()}, {@code .whenOff(…)}.
+ * {@code .goesHome()}, {@code .switchable()}, {@code .whenOff(…)}. Popups are the run's, not a step's:
+ * {@code Run.popups}.
  *
  * <h2>A flow inside a flow</h2>
  *
@@ -165,19 +166,19 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
 
     /**
      * A sub-flow card running {@code inner}, switched on, with nothing else set; {@link Step#described},
-     * {@link Step#off}, {@link Step#goesHome}, {@link Step#checksPopups} and {@link Step#whenOff} link after it as
+     * {@link Step#off}, {@link Step#goesHome} and {@link Step#whenOff} link after it as
      * after an activity.
      *
      * @param inner the flow to run, declared above this one — {@code DAILY}
      */
     public static Step subflow(Flow inner) {
-        return new Step(new Sub(inner), null, "", true, false, false, false, Activity.NONE);
+        return new Step(new Sub(inner), null, "", true, false, false, Activity.NONE);
     }
 
     /**
-     * One activity's step, switched on, with no description, no go-home, no popup check, not switchable by the
-     * runner and no off-wire; each of those is a link after it ({@link Step#described}, {@link Step#off},
-     * {@link Step#goesHome}, {@link Step#checksPopups}, {@link Step#switchable}, {@link Step#whenOff}).
+     * One activity's step, switched on, with no description, no go-home, not switchable by the runner and no
+     * off-wire; each of those is a link after it ({@link Step#described}, {@link Step#off}, {@link Step#goesHome},
+     * {@link Step#switchable}, {@link Step#whenOff}).
      *
      * @param activity which activity this is — {@code Activities.Collect.class}
      * @param body     the work, as a method reference returning that enum — {@code Collect::body}; or
@@ -185,7 +186,7 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
      * @param <O>      the activity's enum, which the body returns
      */
     public static <O extends Outcome> Step activity(Class<O> activity, ActivityBody<O> body) {
-        return new Step(Activity.of(activity), body, "", true, false, false, false, Activity.NONE);
+        return new Step(Activity.of(activity), body, "", true, false, false, Activity.NONE);
     }
 
     /** One wire: leaving {@code on}'s activity when it reports {@code on}, arriving at {@code to}. */
@@ -229,14 +230,13 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
      * @param description one line, shown on the canvas and nowhere else
      * @param enabled     whether it runs; a disabled card takes its off-wire rather than its work
      * @param goHome      whether the bot's {@link Run#home} runs before this card
-     * @param popupCheck  whether the popup guard runs while it does
      * @param runnerSwitch whether the person running the bot may switch it off (or back on) for their machine,
      *                    without opening the project ({@link #switchable()})
      * @param whenOff     where the run goes when this card is switched off or has no body yet;
      *                    {@link Activity#NONE} ends the run there
      */
     public record Step(Node node, ActivityBody<?> body, String description, boolean enabled,
-                       boolean goHome, boolean popupCheck, boolean runnerSwitch, Node whenOff) {
+                       boolean goHome, boolean runnerSwitch, Node whenOff) {
 
         public Step {
             node = node == null ? Activity.NONE : node;
@@ -251,37 +251,45 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
 
         /** This step with {@code description}, the one line the canvas shows. */
         public Step described(String description) {
-            return new Step(node, body, description, enabled, goHome, popupCheck, runnerSwitch, whenOff);
+            return new Step(node, body, description, enabled, goHome, runnerSwitch, whenOff);
         }
 
         /** This step switched off: the run takes its off-wire rather than its work. */
         public Step off() {
-            return new Step(node, body, description, false, goHome, popupCheck, runnerSwitch, whenOff);
+            return new Step(node, body, description, false, goHome, runnerSwitch, whenOff);
         }
 
         /** This step with the bot's {@link Run#home} run before it. */
         public Step goesHome() {
-            return new Step(node, body, description, enabled, true, popupCheck, runnerSwitch, whenOff);
+            return new Step(node, body, description, enabled, true, runnerSwitch, whenOff);
         }
 
-        /** This step with the popup guard running while it does. */
+        /**
+         * This step, unchanged.
+         *
+         * @deprecated since 2026-10-14 the bot's popup method ({@link Run#popups}) runs before every vision call
+         * of every activity, so there is nothing to switch on per card. Kept so a flow written with it still reads;
+         * Studio no longer writes it.
+         */
+        @Deprecated
+        @ReplacedBy(note = "Popups are handled in every activity by the run's popups method (Run.popups).")
         public Step checksPopups() {
-            return new Step(node, body, description, enabled, goHome, true, runnerSwitch, whenOff);
+            return this;
         }
 
         /** This step offered to the person running the bot, who may switch it off or back on for their machine. */
         public Step switchable() {
-            return new Step(node, body, description, enabled, goHome, popupCheck, true, whenOff);
+            return new Step(node, body, description, enabled, goHome, true, whenOff);
         }
 
         /** This step going on to {@code to} when it is switched off or has no body yet. */
         public Step whenOff(Class<? extends Outcome> to) {
-            return new Step(node, body, description, enabled, goHome, popupCheck, runnerSwitch, Activity.of(to));
+            return new Step(node, body, description, enabled, goHome, runnerSwitch, Activity.of(to));
         }
 
         /** This step going on to the sub-flow card {@code to} when it is switched off or has no body yet. */
         public Step whenOff(Flow to) {
-            return new Step(node, body, description, enabled, goHome, popupCheck, runnerSwitch, new Sub(to));
+            return new Step(node, body, description, enabled, goHome, runnerSwitch, new Sub(to));
         }
 
         /** The card's label, which is what the canvas and the trace show. */

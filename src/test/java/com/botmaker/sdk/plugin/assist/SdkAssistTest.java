@@ -503,15 +503,15 @@ class SdkAssistTest {
         assertEquals("Research::body", FlowTypes.sourceOf(step.body()));
         assertTrue(step.goHome());
         assertEquals("Start research.", step.description());
-        assertFalse(step.popupCheck());
 
         // What is left out stays as it was.
-        assertFalse(run("set_activity", "name", "Research", "checksPopups", true).isRefused());
+        assertFalse(run("set_activity", "name", "Research", "switchable", true).isRefused());
         step = flow().steps().getFirst();
         assertEquals("Research::body", FlowTypes.sourceOf(step.body()));
-        assertTrue(step.goHome() && step.popupCheck());
+        assertTrue(step.goHome() && step.runnerSwitch());
         assertEquals("Start research.", step.description());
-        assertTrue(text(run("read_flow")).contains("• Research — Research::body, goes home first, checks popups"));
+        assertTrue(text(run("read_flow")).contains("• Research — Research::body, goes home first, the runner may"),
+                text(run("read_flow")));
         assertFalse(run("set_activity", "name", "Research", "description", "", "goesHome", false).isRefused());
         step = flow().steps().getFirst();
         assertEquals("", step.description(), "an empty line is none");

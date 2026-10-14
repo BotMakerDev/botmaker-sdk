@@ -74,6 +74,7 @@ public final class FlowTypes {
 
         static final Held<Run, String> HOME = Held.as(String.class, run -> sourceOf(run.home()));
         static final Held<Run, String> SETUP = Held.as(String.class, run -> sourceOf(run.setup()));
+        static final Held<Run, String> POPUPS = Held.as(String.class, run -> sourceOf(run.popups()));
 
         static final Held<Flow.Step, Activity> CARD = Held.as(Activity.class, Flow.Step::activity);
         static final Held<Flow.Step, String> BODY = Held.as(String.class,
@@ -160,11 +161,12 @@ public final class FlowTypes {
             .writtenAs(Run::of)
             .<Runnable>with(Run::home, Parts.HOME.part(FlowTypes::method))
             .<Runnable>with(Run::setup, Parts.SETUP.part(FlowTypes::method))
+            .<Runnable>with(Run::popups, Parts.POPUPS.part(FlowTypes::method))
             .constants(Run.NONE);
 
     /**
      * {@code Flow.activity(Class, ActivityBody)} and its links: {@code .described(String)}, {@code .off()},
-     * {@code .goesHome()}, {@code .checksPopups()}, {@code .switchable()}, {@code .whenOff(Class)}, each written
+     * {@code .goesHome()}, {@code .switchable()}, {@code .whenOff(Class)}, each written
      * only when the step is not as {@code Flow.activity} makes it. A new step is on, so its flag is the negative
      * {@code off()}.
      *
@@ -195,7 +197,8 @@ public final class FlowTypes {
                 .with(Flow.Step::described, Flow.Step::description)
                 .flag(Flow.Step::off, step -> !step.enabled())
                 .flag(Flow.Step::goesHome, Flow.Step::goHome)
-                .flag(Flow.Step::checksPopups, Flow.Step::popupCheck)
+                // Read in a flow written before 2026-10-14, never written: popups are handled in every activity.
+                .flag(Flow.Step::checksPopups, step -> false)
                 .flag(Flow.Step::switchable, Flow.Step::runnerSwitch)
                 .<Class<? extends Outcome>, Activity>with(Flow.Step::whenOff, Parts.OFF, FlowTypes::whenOff)
                 .<Flow>with(Flow.Step::whenOff, step -> innerOf(step.whenOff()));
@@ -215,7 +218,7 @@ public final class FlowTypes {
     /** {@code step} going on to {@code to} when switched off: {@code .whenOff(…)} for an activity held by name. */
     public static Flow.Step whenOff(Flow.Step step, Flow.Node to) {
         return new Flow.Step(step.node(), step.body(), step.description(), step.enabled(), step.goHome(),
-                step.popupCheck(), step.runnerSwitch(), to);
+                step.runnerSwitch(), to);
     }
 
     /** {@code Flow.edge(Outcome, Class)}: the activity it leaves is the outcome's. */
@@ -289,7 +292,7 @@ public final class FlowTypes {
      * class, switched on and with no links.
      */
     public static Flow.Step step(Activity activity, ActivityBody<?> body) {
-        return new Flow.Step(activity, body, "", true, false, false, false, Activity.NONE);
+        return new Flow.Step(activity, body, "", true, false, false, Activity.NONE);
     }
 
     /**

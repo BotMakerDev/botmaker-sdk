@@ -15,18 +15,17 @@ import com.botmaker.sdk.internal.trace.Trace;
  * <p><b>The logic is the bot author's, not ours.</b> Blind-clicking anything that looks like a ✕ is wrong: the
  * same cross may be part of the screen the bot is actually working on, and a popup's body usually isn't
  * clickable at all — so dismissal is a question about which <em>combination</em> of templates is on screen,
- * which is exactly what {@link com.botmaker.sdk.api.vision.Matches} answers. Studio therefore generates an
- * editable {@code Popups} activity in the project and installs it here; this class only decides <em>when</em>
- * it runs.
+ * which is exactly what {@link com.botmaker.sdk.api.vision.Matches} answers. The bot writes its own method and
+ * names it in {@code Sdk.run()}, which {@code Bot.runFlow} installs here (2026-10-14); this class only decides
+ * <em>when</em> it runs: before every vision call of every activity.
  *
  * <pre>{@code
- * PopupGuard.install(Popups.INSTANCE::execute);      // generated entry point
+ * Run.of().home(Gamebot::goHome).popups(Gamebot::clearPopups)     // Sdk.run()
  *
- * // …and in the project's own Popups.run(), which the user edits in the block editor:
- * ImageFinder.whileFindAny(POPUPS, found -> {
- *     if (found.has(mail) && found.has(claimAll)) ImageClicker.click(found.get(claimAll));
- *     else if (found.has(tapToClose))             ImageClicker.click(found.get(tapToClose));
- * });
+ * public static void clearPopups() {
+ *     ImageFinder.whileFindAny(ImageTemplateGroup.of(Pictures.MAIL_CLOSE, Pictures.OFFER_CLOSE),
+ *             found -> ImageClicker.clickLast());
+ * }
  * }</pre>
  *
  * <p><b>Reentrancy.</b> The check is itself written with {@code ImageFinder}/{@code ImageClicker}, which would
@@ -41,10 +40,9 @@ import com.botmaker.sdk.internal.trace.Trace;
  *
  * <p><b>Curated for the palette</b> (see {@code @Palette}): three of the five are offered — {@link #check()},
  * {@link #enabled(boolean)} and {@link #isEnabled()}, which are the vocabulary of a bot <em>using</em> the
- * guard. {@link #install(Runnable)} and {@link #uninstall()} are not: they are the wiring, written once by the
- * generated entry point ({@code PopupGuard.install(Popups.INSTANCE::execute)}), and a second {@code install}
- * inserted from a menu silently replaces the project's own {@code Popups} activity — the javadoc above says a
- * second call replaces the first. Same reasoning as {@code Activity.execute()}: a member the generated code
+ * guard. {@link #install(Runnable)} and {@link #uninstall()} are not: they are the wiring, done by
+ * {@code Bot.runFlow} from {@code Run.popups}, and a second {@code install} inserted from a menu silently replaces
+ * the bot's own popups method — a second call replaces the first. Same reasoning as {@code Activity.execute()}: a member the generated code
  * owns is not a menu entry, because reaching it by hand can only undo what the scaffold set up. Both stay
  * public for a bot that genuinely wants a custom guard.
  *
@@ -63,15 +61,15 @@ public final class PopupGuard {
     /** The project's check, or null when none is installed (then everything here is a no-op). */
     private static volatile Runnable handler;
 
-    /** The per-activity toggle the generated flow driver writes; see {@link #enabled(boolean)}. */
+    /** The switch a body turns around a popup-shaped step, back on at each run's start; see {@link #enabled(boolean)}. */
     private static volatile boolean enabled = true;
 
     /** True while this thread is inside {@link #check()} — the recursion stop. */
     private static final ThreadLocal<Boolean> running = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     /**
-     * Installs the project's popup check. Called once from the generated entry point with the project's
-     * {@code Popups} activity; a second call replaces the first.
+     * Installs the bot's popup check. {@code Bot.runFlow} calls it with the run's {@code Run.popups} method; a second
+     * call replaces the first, and null removes it.
      */
     public static void install(Runnable check) {
         handler = check;
@@ -83,10 +81,9 @@ public final class PopupGuard {
     }
 
     /**
-     * Turns the guard on or off for the rest of the run. This is the per-activity opt-out: the generated
-     * {@code FlowDriver} emits one of these before each activity, from its "check for popups" tick, because an
-     * activity that is <em>itself</em> working through a popup-shaped screen must not have it dismissed
-     * underneath it.
+     * Turns the guard on or off until it is turned again. A body that is <em>itself</em> working through a
+     * popup-shaped screen turns it off around that step, so the popup is not dismissed underneath it, and back on
+     * after. The flow no longer switches it per activity (2026-10-14): popups are handled everywhere.
      */
     public static void enabled(boolean on) {
         enabled = on;

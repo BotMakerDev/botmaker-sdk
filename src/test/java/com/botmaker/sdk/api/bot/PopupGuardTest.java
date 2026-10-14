@@ -186,4 +186,16 @@ class PopupGuardTest {
         assertTrue(runs.get() > 1,
                 "a popup that opens during the wait must be seen before the timeout burns, got " + runs.get());
     }
+
+    @Test
+    void aTryInAWarmJvmKeepsNoPopupsOrSwitchOfTheRunBefore() {
+        PopupGuard.install(() -> {});
+        PopupGuard.enabled(false);
+        AtomicInteger checked = new AtomicInteger();
+        Bot.trial(() -> {
+            assertFalse(PopupGuard.isEnabled(), "a bot with no popups method has no guard");
+            PopupGuard.install(checked::incrementAndGet);
+            assertTrue(PopupGuard.isEnabled(), "the switch a body left off is back on");
+        });
+    }
 }

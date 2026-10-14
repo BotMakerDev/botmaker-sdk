@@ -43,9 +43,6 @@ public final class ActivityDraft {
     /** Run the bot's home method ({@code Run.home}) before this activity. On by default; see the card's tick. */
     private final BooleanProperty goHome = new SimpleBooleanProperty(true);
 
-    /** Let the popup guard dismiss popups during this activity. On by default; see the card's tick. */
-    private final BooleanProperty popupCheck = new SimpleBooleanProperty(true);
-
     /** Let the person running the bot switch this activity off for their machine ({@code .switchable()}). Off by default. */
     private final BooleanProperty runnerSwitch = new SimpleBooleanProperty(false);
 
@@ -70,19 +67,18 @@ public final class ActivityDraft {
     private List<String> brokenExits = List.of();
 
     public ActivityDraft(String name, String description, boolean enabled, List<String> outcomes,
-                         boolean goHome, boolean popupCheck, double x, double y) {
-        this(name, description, enabled, outcomes, goHome, popupCheck, x, y, "");
+                         boolean goHome, double x, double y) {
+        this(name, description, enabled, outcomes, goHome, x, y, "");
     }
 
     public ActivityDraft(String name, String description, boolean enabled, List<String> outcomes,
-                         boolean goHome, boolean popupCheck, double x, double y, String body) {
+                         boolean goHome, double x, double y, String body) {
         this.body = body == null ? "" : body;
         this.name.set(name);
         this.description.set(description == null ? "" : description);
         this.enabled.set(enabled);
         this.outcomes.setAll(outcomes);
         this.goHome.set(goHome);
-        this.popupCheck.set(popupCheck);
         this.x = x;
         this.y = y;
     }
@@ -93,7 +89,7 @@ public final class ActivityDraft {
      */
     public static ActivityDraft of(Flow.Step step, List<String> exits, double x, double y) {
         ActivityDraft draft = new ActivityDraft(step.label(), step.description(), step.enabled(), exits,
-                step.goHome(), step.popupCheck(), x, y, FlowTypes.sourceOf(step.body()));
+                step.goHome(), x, y, FlowTypes.sourceOf(step.body()));
         draft.runnerSwitch.set(step.runnerSwitch());
         return draft;
     }
@@ -109,7 +105,7 @@ public final class ActivityDraft {
      */
     public Flow.Step toStep(Flow.Node whenOff) {
         return new Flow.Step(FlowNames.node(name.get()), isSubflow() ? null : FlowTypes.body(body), description.get(),
-                enabled.get(), goHome.get(), popupCheck.get(), runnerSwitch.get(), whenOff);
+                enabled.get(), goHome.get(), runnerSwitch.get(), whenOff);
     }
 
     /** The flow this card runs, {@code DAILY}, when it is a sub-flow card ({@code ▸ DAILY}); else null. */
@@ -162,8 +158,6 @@ public final class ActivityDraft {
     public StringProperty descriptionProperty() { return description; }
     public BooleanProperty enabledProperty() { return enabled; }
     public BooleanProperty goHomeProperty() { return goHome; }
-
-    public BooleanProperty popupCheckProperty() { return popupCheck; }
     public BooleanProperty runnerSwitchProperty() { return runnerSwitch; }
     public ObservableList<String> outcomes() { return outcomes; }
 
@@ -171,8 +165,6 @@ public final class ActivityDraft {
     public String description() { return description.get(); }
     public boolean enabled() { return enabled.get(); }
     public boolean goHome() { return goHome.get(); }
-
-    public boolean popupCheck() { return popupCheck.get(); }
 
     public double x() { return x; }
     public double y() { return y; }

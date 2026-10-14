@@ -8,6 +8,7 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
+import com.botmaker.sdk.api.flow.Run;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
@@ -131,6 +132,9 @@ public final class ActivityFlowDialog {
 
     /** The run's setup, {@code Gamebot::setup}: written like {@link #home}. */
     private Runnable setup;
+
+    /** The run's popups method, {@code Gamebot::clearPopups}: written like {@link #home}. */
+    private Runnable popups;
 
     /**
      * Canvas renames not yet saved, label at last save → label now; an outcome's keyed first by its activity's
@@ -305,6 +309,7 @@ public final class ActivityFlowDialog {
         FlowRefs refs = FlowRefs.of(services.pluginValues());
         home = target.run().home();
         setup = target.run().setup();
+        popups = target.run().popups();
         FlowLayout layout = loadLayout();
         FlowLayout.Cards cards = layout.cardsOf(target.name());
         boolean anyPlaced = false;
@@ -593,7 +598,7 @@ public final class ActivityFlowDialog {
         if (again.problem() == null) target = again;
         Point2D at = canvas.nextFreeSpot();
         List<String> exits = FlowRefs.of(services.pluginValues()).exits(inner);
-        canvas.add(new ActivityDraft(FlowNames.subflowLabel(inner), "", true, exits, false, false, at.getX(),
+        canvas.add(new ActivityDraft(FlowNames.subflowLabel(inner), "", true, exits, false, at.getX(),
                 at.getY()));
         error("");
         buildTreePane();
@@ -649,7 +654,7 @@ public final class ActivityFlowDialog {
         Point2D at = canvas.nextFreeSpot();
         List<String> outcomes = FlowConstants.outcomesOf(services.pluginValues(), step.label());
         ActivityDraft draft = ActivityDraft.of(new Flow.Step(step.activity(), step.body(), step.description(), true,
-                step.goHome(), step.popupCheck(), step.runnerSwitch(), Activity.NONE),
+                step.goHome(), step.runnerSwitch(), Activity.NONE),
                 outcomes.isEmpty() ? List.of(Arrow.NEXT) : outcomes, at.getX(), at.getY());
         canvas.add(draft);
         error("");
@@ -739,6 +744,7 @@ public final class ActivityFlowDialog {
             sidePanel.getChildren().addAll(heading("Variables"), buildParametersNote());
             sidePanel.getChildren().addAll(new Separator(), buildHomeSection());
             sidePanel.getChildren().addAll(new Separator(), buildSetupSection());
+            sidePanel.getChildren().addAll(new Separator(), buildPopupsSection());
             sidePanel.getChildren().addAll(new Separator(), buildFlowLimitsSection());
             return;
         }
@@ -756,7 +762,6 @@ public final class ActivityFlowDialog {
         TextField description = descriptionField(draft);
         CheckBox goHome = tick("Go home first", draft.goHomeProperty(),
                 FlowNames.GO_HOME_TIP + " Same tick as the ⌂ on the card.");
-        CheckBox popupCheck = tick("Check for popups", draft.popupCheckProperty(), FlowNames.POPUP_TIP);
         CheckBox runnerSwitch = tick("Runner may switch this off", draft.runnerSwitchProperty(), "Offer this "
                 + "activity to the person running the bot, who may switch it off (or back on) for their computer "
                 + "without opening the project. A switched-off activity takes its 'disabled' arrow, as when you "
@@ -783,8 +788,7 @@ public final class ActivityFlowDialog {
         head.addRow(1, new Label("Runs"), body);
         head.addRow(2, new Label("Description"), description);
         head.add(goHome, 1, 3);
-        head.add(popupCheck, 1, 4);
-        head.add(runnerSwitch, 1, 5);
+        head.add(runnerSwitch, 1, 4);
         GridPane.setHgrow(name, Priority.ALWAYS);
         GridPane.setHgrow(body, Priority.ALWAYS);
         GridPane.setHgrow(description, Priority.ALWAYS);
@@ -819,10 +823,9 @@ public final class ActivityFlowDialog {
         TextField description = descriptionField(draft);
         head.addRow(0, new Label("Description"), description);
         head.add(tick("Go home first", draft.goHomeProperty(), FlowNames.GO_HOME_TIP), 1, 1);
-        head.add(tick("Check for popups", draft.popupCheckProperty(), FlowNames.POPUP_TIP), 1, 2);
         head.add(tick("Runner may switch this off", draft.runnerSwitchProperty(), "Offer this sub-flow to the "
                 + "person running the bot, who may switch it off for their computer: it then takes its 'disabled' "
-                + "arrow."), 1, 3);
+                + "arrow."), 1, 2);
         GridPane.setHgrow(description, Priority.ALWAYS);
 
         VBox exits = new VBox(4);
@@ -1069,6 +1072,23 @@ public final class ActivityFlowDialog {
         box.getChildren().add(explain);
         box.getChildren().add(methodChoice("setup", setup, "GameSetup::prepare",
                 picked -> setup = picked));
+        return box;
+    }
+
+    /**
+     * The bot's popups method — {@code Sdk.run()}'s {@code .popups(Gamebot::clearPopups)}, run before every vision
+     * call of every activity — picked as the home is.
+     */
+    private Node buildPopupsSection() {
+        VBox box = new VBox(6);
+        box.getChildren().add(heading("Popups"));
+        Label explain = new Label("The method that clears a popup the game opened on its own (an offer, a mail, a "
+                + "level-up): run before every look at the screen in every activity, so no activity has to expect "
+                + "one. It looks for the popups' close buttons and clicks them.");
+        explain.setWrapText(true);
+        explain.getStyleClass().add("dialog-hint-text");
+        box.getChildren().add(explain);
+        box.getChildren().add(methodChoice("popups", popups, "Popups::clear", picked -> popups = picked));
         return box;
     }
 
@@ -1461,7 +1481,7 @@ public final class ActivityFlowDialog {
             // Read again: the first save of a project with no flow wrote Flows.MAIN, which the next save edits.
             target = FlowValue.target(services, target.name());
             // After the flow, so the run names the flow as just written; nothing when home and setup are as read.
-            refused = FlowValue.writeRun(services, target, home, setup);
+            refused = FlowValue.writeRun(services, target, new Run(home, setup, popups));
         }
         Throwable failure = null;
         FlowLayout layout = currentLayout(renamedTypes);

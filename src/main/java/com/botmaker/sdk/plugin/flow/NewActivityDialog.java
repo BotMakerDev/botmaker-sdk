@@ -51,7 +51,6 @@ public final class NewActivityDialog {
     private final TextField name = new TextField();
     private final TextField description = new TextField();
     private final CheckBox goHome = new CheckBox("Go home first");
-    private final CheckBox popupCheck = new CheckBox("Check for popups");
     private final Label error = new Label();
     private final VBox outcomeRows = new VBox(6);
 
@@ -76,8 +75,6 @@ public final class NewActivityDialog {
         description.setPromptText("what it does (optional)");
         goHome.setSelected(goHomeByDefault);
         goHome.setTooltip(new Tooltip(FlowNames.GO_HOME_TIP));
-        popupCheck.setSelected(true);
-        popupCheck.setTooltip(new Tooltip(FlowNames.POPUP_TIP));
 
         GridPane head = new GridPane();
         head.setHgap(8);
@@ -85,7 +82,6 @@ public final class NewActivityDialog {
         head.addRow(0, new Label("Name"), name);
         head.addRow(1, new Label("Description"), description);
         head.add(goHome, 1, 2);
-        head.add(popupCheck, 1, 3);
         GridPane.setHgrow(name, Priority.ALWAYS);
         GridPane.setHgrow(description, Priority.ALWAYS);
 
@@ -199,7 +195,7 @@ public final class NewActivityDialog {
         // the methods is a way people work, the card is written as ActivityBody.none(), and the "Runs" box in
         // the side panel is where the method reference goes when it exists.
         created = new ActivityDraft(candidate, text, true, List.copyOf(outcomes),
-                goHome.isSelected(), popupCheck.isSelected(), x, y);
+                goHome.isSelected(), x, y);
         stage.close();
     }
 

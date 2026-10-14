@@ -252,9 +252,4 @@ public final class FlowNames {
     /** The go-home tick's tooltip. */
     public static final String GO_HOME_TIP = "Run the bot's home method (Run.home(…)) immediately before "
             + "this activity, so it starts from a known screen.";
-
-    /** The popup tick's tooltip. */
-    public static final String POPUP_TIP = "Let the popup handler installed with PopupGuard dismiss popups "
-            + "before each vision step of this activity. Turn it off for an activity that works through a "
-            + "popup itself — otherwise the guard closes it underneath.";
 }

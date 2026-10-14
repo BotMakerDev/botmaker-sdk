@@ -72,7 +72,6 @@ final class FlowTools {
                         + "methods with no parameter returning the activity's enum" + KEPT, optional = true) String body,
                 @Describe(value = "the one line the canvas shows under it, empty for none" + KEPT, optional = true) String description,
                 @Describe(value = "true runs the bot's home before it" + KEPT, optional = true) Boolean goesHome,
-                @Describe(value = "true runs the popup guard while it does" + KEPT, optional = true) Boolean checksPopups,
                 @Describe(value = "true lets the person running the bot switch it off for their machine" + KEPT,
                         optional = true) Boolean switchable,
                 @Describe(value = WHICH, optional = true) String flow) {
@@ -107,22 +106,31 @@ final class FlowTools {
     record FlowName(@Describe("the flow's name") String name) {
     }
 
-    /** The run's own methods, one each for the whole bot: {@code .home(…)} and {@code .setup(…)}. */
+    /** The run's own methods, one each for the whole bot: {@code .home(…)}, {@code .setup(…)}, {@code .popups(…)}. */
     enum Hook {
-        HOME, SETUP;
+        HOME, SETUP, POPUPS;
 
         Runnable of(Run run) {
-            return this == HOME ? run.home() : run.setup();
+            return switch (this) {
+                case HOME -> run.home();
+                case SETUP -> run.setup();
+                case POPUPS -> run.popups();
+            };
         }
 
         Run set(Run run, Runnable method) {
-            return this == HOME ? run.home(method) : run.setup(method);
+            return switch (this) {
+                case HOME -> run.home(method);
+                case SETUP -> run.setup(method);
+                case POPUPS -> run.popups(method);
+            };
         }
     }
 
     record FlowMethod(@Describe("home: gets the game back to a known screen; setup: makes the game ready, "
                               + "its settings included, after the bot starts it when its doSetup parameter is "
-                              + "ticked") Hook which,
+                              + "ticked; popups: clears a popup the game opened on its own, run before every "
+                              + "look at the screen of every activity") Hook which,
                       @Describe(value = "one of the bot's public static void methods with no parameter, as "
                               + "Gamebot::setup; leave out for none", optional = true) String method) {
     }
@@ -131,7 +139,7 @@ final class FlowTools {
             AssistantTool.named("read_flow")
                     .describedAs("The bot's flows by name, then one flow: each activity with its body, switches and "
                             + "outcomes, each sub-flow card with its exits, every arrow, where a run starts, its "
-                            + "limits, and the bot's home and setup")
+                            + "limits, and the bot's home, setup and popups")
                     .takes(Which.class).handledBy(FlowTools::readFlow),
             AssistantTool.named("add_subflow")
                     .describedAs("Adds a card running another of the bot's flows: the run walks that flow to its "
@@ -174,7 +182,7 @@ final class FlowTools {
                     .describedAs("Deletes a flow no code names; its activities stay for the other flows")
                     .takes(FlowName.class).handledBy(FlowTools::removeFlow),
             AssistantTool.named("set_flow_method")
-                    .describedAs("Sets the bot's home or setup (one each, whichever flow runs) to one of the bot's "
+                    .describedAs("Sets the bot's home, setup or popups (one each, whichever flow runs) to one of the bot's "
                             + "methods; create the method with the code tools first")
                     .takes(FlowMethod.class).handledBy(FlowTools::setMethod));
 
@@ -217,7 +225,6 @@ final class FlowTools {
             List<String> switches = new ArrayList<>();
             if (!step.enabled()) switches.add("off");
             if (step.goHome()) switches.add("goes home first");
-            if (step.popupCheck()) switches.add("checks popups");
             if (step.runnerSwitch()) switches.add("the runner may switch it off");
             String switched = switches.isEmpty() ? "" : ", " + String.join(", ", switches);
             String described = step.description().isBlank() ? "" : ". " + step.description();
@@ -321,7 +328,7 @@ final class FlowTools {
                 }
             }
             return FlowEdits.setCard(board, label, card.body(), card.description(), card.goesHome(),
-                    card.checksPopups(), card.switchable());
+                    card.switchable());
         }, flow -> Map.of(), "Changed " + card.name() + ".");
     }
 
@@ -486,7 +493,7 @@ final class FlowTools {
 
     /** Only a method the bot has: a name it lacks would not compile. */
     static AgentReply setMethod(FlowMethod set, AgentContext context) {
-        if (set.which() == null) return AgentReply.refused("Say which: home or setup.");
+        if (set.which() == null) return AgentReply.refused("Say which: home, setup or popups.");
         String which = set.which().name().toLowerCase(Locale.ROOT);
         String method = set.method() == null ? "" : set.method().strip();
         if (!method.isEmpty()) {
@@ -500,7 +507,7 @@ final class FlowTools {
         return FxCall.call(() -> {
             FlowValue.Target target = FlowValue.target(services);
             Run run = set.which().set(target.run(), FlowTypes.method(method));
-            String refused = FlowValue.writeRun(services, target, run.home(), run.setup());
+            String refused = FlowValue.writeRun(services, target, run);
             if (refused != null) return AgentReply.refused(refused);
             return AgentReply.text(method.isEmpty() ? "The bot has no " + which + " now."
                     : "The bot's " + which + " is now " + method + ".");

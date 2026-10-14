@@ -253,13 +253,16 @@ class FlowWalkerTest {
     }
 
     @Test
-    void popupCheckIsSetPerActivityRatherThanInherited() {
-        PopupGuard.enabled(false);
+    void popupsAreCheckedInEveryActivityAndTheWalkerLeavesTheGuardAlone() {
         walk(flow(A.class, List.of(on(A.class), step(B.class, body(B.class), true, false, false), on(C.class)),
                 Flow.edge(A.NEXT, B.class), Flow.edge(B.NEXT, C.class)));
+        assertEquals(List.of("A+popup", "B+popup", "C+popup"), log,
+                "since 2026-10-14 no card switches the guard: a card without .checksPopups() is guarded too");
 
-        assertEquals(List.of("A+popup", "B-popup", "C+popup"), log,
-                "PopupGuard is process-global, so every activity states what it wants");
+        log.clear();
+        PopupGuard.enabled(false);
+        walk(flow(A.class, List.of(on(A.class)), Flow.edge(A.NEXT, A.class)));
+        assertEquals("A-popup", log.getFirst(), "a body that switched the guard off keeps it off");
     }
 
     @Test

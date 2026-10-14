@@ -39,6 +39,11 @@ public final class SdkAssist {
             - Navigation lives in one place: the home method takes the game back to the screen every
               activity starts from, safe to call at any moment. Make it with add_method, then name it with
               set_flow_method. An activity that needs another screen opens it from there in its own body.
+            - Popups the game opens on its own (an offer, a mail, a level-up) are no body's business: one
+              popups method clears them (ImageFinder.whileFindAny of their close buttons, clickLast), named
+              with set_flow_method popups, and the run calls it before every look at the screen of every
+              activity. A body that works through a popup-shaped screen itself switches it off around that
+              step with PopupGuard.enabled(false), and back on after.
             - Pictures, points and regions are the bot's constants (Pictures.CLAIM_RESEARCH): one per idea and
               place, named <idea>_<where>; the same idea on another screen is another picture. On a screen
               reached for the first time, cut every button and marker a chore will need from one screenshot,

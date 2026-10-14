@@ -2,7 +2,6 @@ package com.botmaker.sdk.internal.flow;
 
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.api.bot.Outcome;
-import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
@@ -165,8 +164,6 @@ public final class FlowWalker {
         if (step == null) return Hop.to(null);
         boolean noBody = node instanceof Activity && (step.body() == null || step.body() == ActivityBody.none());
         if (noBody || !active(step)) return Hop.to(step.whenOff());
-        // Set for every card, not only the ones that opt out: PopupGuard.enabled is process-global.
-        PopupGuard.enabled(step.popupCheck());
         // After the active() check: there is nothing to go home for if the card won't run.
         if (step.goHome() && goHome != null) goHome.run();
         Outcome outcome = switch (node) {

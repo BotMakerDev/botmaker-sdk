@@ -360,15 +360,14 @@ public final class FlowValue {
     }
 
     /**
-     * Writes the run's home and setup: {@code Sdk.run()} is written only when one of them changed. On the JavaFX
-     * application thread.
+     * Writes the run's home, setup and popups: {@code Sdk.run()} is written only when one of them changed. On the
+     * JavaFX application thread.
      *
      * @return null when it was written or nothing changed, else why it could not be
      */
-    public static String writeRun(StudioServices services, Target target, Runnable home, Runnable setup) {
+    public static String writeRun(StudioServices services, Target target, Run run) {
         if (target.problem() != null) return target.problem();
-        Run run = target.run();
-        if (Objects.equals(run.home(), home) && Objects.equals(run.setup(), setup)) return null;
-        return RUN.write(services, new Run(home, setup)).orElse(null);
+        if (Objects.equals(target.run(), run)) return null;
+        return RUN.write(services, run).orElse(null);
     }
 }

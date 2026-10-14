@@ -22,11 +22,13 @@ package com.botmaker.sdk.api.flow;
  * @param setup what makes the game ready for this bot, once it is started: its settings, such as the ones a
  *              user chose in the bot's {@code @Param}s. Run when the bot's {@code doSetup} parameter is ticked;
  *              {@code null} for nothing
+ * @param popups what clears a popup the game opened on its own (an offer, a mail, a level-up): run before every
+ *              vision call of every activity, so no body has to expect one; {@code null} for nothing
  */
-public record Run(Runnable home, Runnable setup) {
+public record Run(Runnable home, Runnable setup, Runnable popups) {
 
-    /** No home and no setup: what a project with nothing drawn has. */
-    public static final Run NONE = new Run(null, null);
+    /** No home, no setup and no popups: what a project with nothing drawn has. */
+    public static final Run NONE = new Run(null, null, null);
 
     /** A run with no {@link #home} or {@link #setup} yet. */
     public static Run of() {
@@ -35,7 +37,7 @@ public record Run(Runnable home, Runnable setup) {
 
     /** This run, getting the game back to a known screen with {@code home} — {@code Gamebot::goHome}. */
     public Run home(Runnable home) {
-        return new Run(home, setup);
+        return new Run(home, setup, popups);
     }
 
     /**
@@ -45,6 +47,15 @@ public record Run(Runnable home, Runnable setup) {
      * by hand.
      */
     public Run setup(Runnable setup) {
-        return new Run(home, setup);
+        return new Run(home, setup, popups);
+    }
+
+    /**
+     * This run, clearing popups with {@code popups} — {@code Gamebot::clearPopups} — before every vision call of
+     * every activity. The bot writes it: look for its popups' close buttons ({@code ImageFinder.ifFindAny}) and
+     * click them. A vision call made inside it does not run it again.
+     */
+    public Run popups(Runnable popups) {
+        return new Run(home, setup, popups);
     }
 }

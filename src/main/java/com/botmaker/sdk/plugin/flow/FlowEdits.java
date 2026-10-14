@@ -61,7 +61,7 @@ public final class FlowEdits {
         String problem = FlowNames.activityNameProblem(shared.label(), labels(board.flow()));
         if (problem != null) throw new IllegalArgumentException(problem);
         return addStep(board, new Flow.Step(shared.activity(), shared.body(), shared.description(), true,
-                shared.goHome(), shared.popupCheck(), shared.runnerSwitch(), Activity.NONE), outcomes);
+                shared.goHome(), shared.runnerSwitch(), Activity.NONE), outcomes);
     }
 
     /**
@@ -136,7 +136,7 @@ public final class FlowEdits {
         Activity was = step.activity();
         Activity now = FlowNames.activity(label);
         List<Flow.Step> steps = flow.steps().stream().map(s -> new Flow.Step(swap(s.node(), was, now), s.body(),
-                s.description(), s.enabled(), s.goHome(), s.popupCheck(), s.runnerSwitch(),
+                s.description(), s.enabled(), s.goHome(), s.runnerSwitch(),
                 swap(s.whenOff(), was, now))).toList();
         // An outcome names its enum, so a wire on one of was's renames with it, a sub-flow card's exit included.
         List<Flow.Edge> edges = flow.edges().stream().map(e -> new Flow.Edge(e.via(),
@@ -235,7 +235,7 @@ public final class FlowEdits {
      * as it is when null, the body also when blank; a blank line is none. A sub-flow card runs its flow and has no body to give.
      */
     public static Board setCard(Board board, String name, String bodySource, String description, Boolean goHome,
-                                Boolean popupCheck, Boolean runnerSwitch) {
+                                Boolean runnerSwitch) {
         Flow flow = board.flow();
         Flow.Step was = step(flow, name);
         boolean newBody = bodySource != null && !bodySource.isBlank();
@@ -244,8 +244,7 @@ public final class FlowEdits {
         }
         Flow.Step now = new Flow.Step(was.node(), newBody ? body(bodySource) : was.body(),
                 description == null ? was.description() : description.strip(), was.enabled(),
-                goHome == null ? was.goHome() : goHome, popupCheck == null ? was.popupCheck() : popupCheck,
-                runnerSwitch == null ? was.runnerSwitch() : runnerSwitch, was.whenOff());
+                goHome == null ? was.goHome() : goHome, runnerSwitch == null ? was.runnerSwitch() : runnerSwitch, was.whenOff());
         List<Flow.Step> steps = flow.steps().stream().map(s -> s == was ? now : s).toList();
         return board.with(with(flow, steps, flow.edges(), flow.start()));
     }

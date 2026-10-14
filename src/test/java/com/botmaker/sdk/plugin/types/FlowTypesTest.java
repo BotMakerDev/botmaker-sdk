@@ -81,8 +81,11 @@ class FlowTypesTest {
         assertEquals("Gamebot::goHome", FlowTypes.sourceOf(none.home()), "dropping the setup keeps the home");
         assertNull(run().home(null).home());
         assertEquals("Gamebot::setup", FlowTypes.sourceOf(run().home(null).setup()), "and the other way round");
-        assertEquals(2, FlowTypes.RUN_SHAPE.withers().size());
-        assertEquals(List.of(Runnable.class, Runnable.class), FlowTypes.RUN_SHAPE.componentTypes());
+        assertEquals(3, FlowTypes.RUN_SHAPE.withers().size());
+        assertEquals(List.of(Runnable.class, Runnable.class, Runnable.class), FlowTypes.RUN_SHAPE.componentTypes());
+        Run popups = run().popups(FlowTypes.method("Gamebot::clearPopups"));
+        assertEquals("Gamebot::clearPopups", FlowTypes.sourceOf(roundTrip(FlowTypes.RUN_SHAPE, popups).popups()));
+        assertEquals("Gamebot::goHome", FlowTypes.sourceOf(popups.home()), "the popups keep the home");
         assertEquals(Run.NONE, roundTrip(FlowTypes.RUN_SHAPE, Run.NONE));
     }
 

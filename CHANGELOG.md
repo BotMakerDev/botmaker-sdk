@@ -77,6 +77,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **Popups are handled in every activity, by one method of the bot.** `Run.popups(Gamebot::clearPopups)` in
+  `Sdk.run()` names it, beside home and setup; `Bot.runFlow` installs it and the SDK runs it before every vision
+  call of every activity, so no body mentions a popup. The flow canvas has a Popups section and
+  `sdk_set_flow_method` a `popups` choice. The per-card `.checksPopups()` switch is gone: it is kept, deprecated,
+  as a no-op so a flow written with it still reads, and Studio no longer writes it; the card's "Check for popups"
+  tick went with it. A body that works through a popup-shaped screen switches the guard off around that step
+  with `PopupGuard.enabled(false)`.
 - **A frozen game is seen, by each loop.** A vision loop acts every round, so it compares each round's whole frame,
   as a small grey thumbnail, with the last: a frame still for `BotSettings.frozenAfter` (60 s) throws
   `BotStuckException` before the loop has run its rounds out, and the run recovers (home, else a restart). Each

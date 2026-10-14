@@ -27,7 +27,7 @@ class SubflowCardsTest {
             "Collect", List.of("NEXT", "BAG_FULL"));
 
     private static Flow.Step activity(String type) {
-        return new Flow.Step(new Activity(type), null, "", true, false, false, false, Activity.NONE);
+        return new Flow.Step(new Activity(type), null, "", true, false, false, Activity.NONE);
     }
 
     private static Flow.Step card(String flow) {
@@ -115,9 +115,9 @@ class SubflowCardsTest {
 
     @Test
     void theCanvasSavesASubflowCardAndItsWiresAndReadsThemBack() {
-        ActivityDraft collect = new ActivityDraft("Collect", "", true, List.of("Next", "Bag full"), false, false, 0, 0);
+        ActivityDraft collect = new ActivityDraft("Collect", "", true, List.of("Next", "Bag full"), false, 0, 0);
         ActivityDraft daily = new ActivityDraft("▸ DAILY", "Once a day", true,
-                List.of("Claim · Done", "Rest · Next"), false, false, 200, 0);
+                List.of("Claim · Done", "Rest · Next"), false, 200, 0);
         List<Arrow> arrows = List.of(new Arrow("Collect", "▸ DAILY", "Bag full"),
                 new Arrow("▸ DAILY", "Collect", "Claim · Done"), new Arrow("▸ DAILY", "Collect", Arrow.DISABLED));
         Board board = ActivityFlowDialog.board(List.of(collect, daily), arrows, "▸ DAILY", Flow.Limits.DEFAULT);

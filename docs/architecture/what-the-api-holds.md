@@ -21,7 +21,7 @@
   bot's `Flows` (2026-10-11; presets are gone, a preset is a flow), `Flow.activity(Activities.Collect.class,
   Collect::body)` building a `Flow.Step`, each other part a named link written only when not the default
   (`.described(…)`, `.off()`, `.switchable()` — the runner may skip it through `Sdk.skip` — `.goesHome()`,
-  `.checksPopups()`, `.whenOff(…)`; 2026-10-09, as `BotSettings.defaults().foundDelay(…)…` is),
+  `.whenOff(…)`; 2026-10-09, as `BotSettings.defaults().foundDelay(…)…` is),
   `Flow.edge(Activities.Collect.NOTHING_LEFT, Activities.Battle.class)` (its source is the outcome's enum),
   `Run` (`Run.of().home(Gamebot::goHome).setup(Gamebot::setup)` in `Sdk.run()`, once for the bot; an activity's
   work, the way home and setup are **method references**, so a rename is a compile error naming the holder),
