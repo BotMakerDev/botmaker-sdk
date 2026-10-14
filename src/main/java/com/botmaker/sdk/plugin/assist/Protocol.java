@@ -50,7 +50,8 @@ final class Protocol {
                      screen Home and marker true. Its close button: back true. An input that shows only at
                      times (a Claim when loot is ready, an event's icon): sometimes true. A popup the game opens
                      on its own: its marker with popup true, then its close button with back true.
-                  2. try_input each one, by its picture or its hotkey; try_input with scroll every list and
+                  2. try_input each one, by its picture or its hotkey (try_inputs clicks a screen's plain
+                     buttons in one call, stopping at the first that leaves it); try_input with scroll every list and
                      panel to its end both ways. Claim buttons and other free spends are clicked; an input that
                      spends premium currency or real money is tried with never and its reason, never clicked; one
                      proved locked (a padlock on it) with locked, the lock's picture. What a tab, toggle, arrow or
@@ -60,11 +61,14 @@ final class Protocol {
                      only that screen shows), then explore it by these same steps, to its end, before the next
                      input of the screen it was opened from. One that leads to a screen mapped already is a way
                      into it, or this screen's way back.
-                  4. A screen is finished when nothing on it is untried. Then go back up: go_to_screen walks
-                     the map as a run does, and which_screen says where the game is.
+                  4. A screen is finished when nothing on it is untried. try_input then goes back up by itself,
+                     to the nearest screen with inputs left (its way back, else the picture named close x, else Escape),
+                     and checks that screen's marker; stay true on the last input keeps the screen open.
+                     go_to_screen walks the map as a run does, and which_screen says where the game is.
                 - try_input says a screen's shape once nothing on it is untried (menu when every input opened a
                   screen, else activity: a fact for Build, not a rule here), and then asks once whether every
-                  list was scrolled and every tab opened: answer it with the screen still open. It refuses while
+                  list was scrolled and every tab opened: answer it on that screen (go_to_screen back to it when
+                  try_input went up). It refuses while
                   a screen owes its marker, while a screen reached from this one is unfinished, and while another
                   branch begun is not finished. What cannot be cut yet is an Owed: line in its section of the
                   notes (write_notes); Discovery is not done while anything is owed or untried; a debt paid by

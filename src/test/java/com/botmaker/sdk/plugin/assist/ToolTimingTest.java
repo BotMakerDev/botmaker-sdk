@@ -4,7 +4,11 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -62,6 +66,26 @@ class ToolTimingTest {
         String line = reply.parts().getLast().text();
         assertTrue(line.contains("matching 0."), line);
         assertFalse(line.contains("reading text"), line);
+    }
+
+    /** Each call is a row of the bot's tool-times.tsv, under a header naming each part (2026-10-14). */
+    @Test
+    void eachCallIsARowOfTheProjectsTimes(@TempDir Path project) throws IOException {
+        ToolTiming.time("try_input", project, () -> ToolTiming.timed(ToolTiming.Phase.SETTLE, () -> {
+            pause();
+            return AgentReply.text("x");
+        }));
+        ToolTiming.time("screenshot", project, () -> AgentReply.text("y"));
+
+        List<String> lines = Files.readAllLines(project.resolve(ToolTiming.FILE));
+        assertEquals(List.of("started", "tool", "total_ms", "capture_ms", "motion_ms", "settle_ms", "match_ms",
+                "text_ms", "wait_ms"), List.of(lines.getFirst().split("\t")));
+        assertEquals(3, lines.size(), "one header, then a row a call");
+        String[] row = lines.get(1).split("\t");
+        assertEquals("try_input", row[1]);
+        assertTrue(Long.parseLong(row[5]) >= 50 && Long.parseLong(row[2]) >= Long.parseLong(row[5]),
+                "settling counted, within the total: " + lines.get(1));
+        assertEquals("screenshot", lines.get(2).split("\t")[1]);
     }
 
     @Test

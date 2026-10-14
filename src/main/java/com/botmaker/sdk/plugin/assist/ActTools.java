@@ -45,6 +45,11 @@ final class ActTools {
 
     static final int SETTLE_MS = 5_000;
     static final int LONGEST_SETTLE_MS = 10_000;
+    /**
+     * How long what moved on its own on a screen, read before one of try_input's inputs, stands for the next ones on
+     * that screen: reading it again took half a second before each (2026-10-14).
+     */
+    static final long MOTION_REUSE_MS = 30_000;
     /** The box the text is read in grows by this much, so a line the change cut at its edge is read whole. */
     private static final int MARGIN = 12;
     private static final int MOST_LINES = 15;
@@ -106,6 +111,18 @@ final class ActTools {
                     .describedAs("Scrolls the wheel over a point or a picture of the game, waits, and says what "
                             + "changed, as click")
                     .takes(Wheel.class).handledBy(ActTools::scroll));
+
+    /** The motion last read before an input of try_input's, on {@code screen} at {@code atMs}. */
+    record Ambient(String screen, Motion motion, long atMs) {
+
+        /** Whether it stands for {@code screen} at {@code nowMs}, on a frame {@code width}×{@code height}. */
+        boolean fits(String screen, long nowMs, int width, int height) {
+            return this.screen.equals(screen) && nowMs - atMs < MOTION_REUSE_MS
+                    && (motion == Motion.NONE || motion.width() == width && motion.height() == height);
+        }
+    }
+
+    private static volatile Ambient ambient;
 
     private ActTools() {}
 
@@ -233,25 +250,27 @@ final class ActTools {
     }
 
     /**
-     * Clicks {@code picture}, scrolls {@code notches} over it when they are not 0, or taps {@code key} for try_input,
-     * waiting up to {@code settleMs} for a change as big as {@code share} of the screen.
+     * Clicks {@code picture}, scrolls {@code notches} over it when they are not 0, or taps {@code key} for try_input
+     * on {@code screen}, waiting up to {@code settleMs} for a change as big as {@code share} of the screen, and
+     * {@link FrameChange#QUIET_MS} when nothing moves at all. What moves on its own there is read again only past
+     * {@link #MOTION_REUSE_MS}.
      */
-    static Entered enter(AgentContext context, String picture, int notches, Key key, Boolean desktop, int settleMs,
-                         double share) {
+    static Entered enter(AgentContext context, String screen, String picture, int notches, Key key, Boolean desktop,
+                         int settleMs, double share) {
         if (key != null) {
-            return acted(context, null, null, desktop, settleMs, false, "Pressed " + key.label(), "key " + key.label(),
-                    share, hands -> hands.key(key));
+            return acted(context, screen, null, null, desktop, settleMs, false, "Pressed " + key.label(),
+                    "key " + key.label(), share, hands -> hands.key(key));
         }
         Spotted spotted = spot(picture, notches == 0 ? "clicked" : "scrolled", context);
         if (spotted.refusal() != null) return Entered.no(spotted.refusal());
         Point at = spotted.at();
         if (notches != 0) {
-            return acted(context, spotted.frame(), at, desktop, settleMs, false, "Scrolled " + notches + " at "
-                    + spotted.name() + " (" + at.x() + "," + at.y() + ")", "scroll " + spotted.name() + " " + notches,
-                    share, hands -> hands.scroll(at.x(), at.y(), notches));
+            return acted(context, screen, spotted.frame(), at, desktop, settleMs, false, "Scrolled " + notches
+                    + " at " + spotted.name() + " (" + at.x() + "," + at.y() + ")", "scroll " + spotted.name() + " "
+                    + notches, share, hands -> hands.scroll(at.x(), at.y(), notches));
         }
-        return acted(context, spotted.frame(), at, desktop, settleMs, false, "Clicked " + spotted.name() + " at "
-                + at.x() + "," + at.y(), "click " + spotted.name(), share, hands -> hands.click(at.x(), at.y()));
+        return acted(context, screen, spotted.frame(), at, desktop, settleMs, false, "Clicked " + spotted.name()
+                + " at " + at.x() + "," + at.y(), "click " + spotted.name(), share, hands -> hands.click(at.x(), at.y()));
     }
 
     /**
@@ -261,11 +280,14 @@ final class ActTools {
      */
     private static AgentReply act(AgentContext context, BufferedImage seen, Point at, Boolean desktop, Integer settleMs,
                                   Boolean show, String done, Action action) {
-        return acted(context, seen, at, desktop, settleMs, show, done, null, FrameChange.ANSWER_SHARE, action).reply();
+        return acted(context, null, seen, at, desktop, settleMs, show, done, null, FrameChange.ANSWER_SHARE, action)
+                .reply();
     }
 
-    private static Entered acted(AgentContext context, BufferedImage seen, Point at, Boolean desktop, Integer settleMs,
-                                 Boolean show, String done, String how, double share, Action action) {
+    /** As {@link #act}; {@code screen}, try_input's (null for the other tools), reuses its motion and waits less. */
+    private static Entered acted(AgentContext context, String screen, BufferedImage seen, Point at, Boolean desktop,
+                                 Integer settleMs, Boolean show, String done, String how, double share,
+                                 Action action) {
         int settle = settleMs == null ? SETTLE_MS : settleMs;
         if (settle < 0 || settle > LONGEST_SETTLE_MS) {
             return Entered.no(AgentReply.refused("Settle between 0 and " + LONGEST_SETTLE_MS + " ms."));
@@ -286,16 +308,27 @@ final class ActTools {
         if (hands(context).getClass() != hands.getClass()) {
             return Entered.no(AgentReply.refused("Where the game is changed just now; nothing was done. Look again."));
         }
-        List<BufferedImage> still = new ArrayList<>(List.of(before.get()));
-        try {
-            still.addAll(ToolTiming.timed(ToolTiming.Phase.MOTION, () -> FrameChange.ambient(() -> Frames.look(context),
-                    Clock.REAL)));
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return Entered.no(AgentReply.text("Stopped before acting; nothing was done."));
+        Ambient kept = ambient;
+        long now = Clock.REAL.nowMs();
+        Motion motion;
+        BufferedImage last;
+        if (screen != null && kept != null && kept.fits(screen, now, before.get().getWidth(), before.get().getHeight())) {
+            motion = kept.motion();
+            last = before.get();
+        } else {
+            List<BufferedImage> still = new ArrayList<>(List.of(before.get()));
+            try {
+                still.addAll(ToolTiming.timed(ToolTiming.Phase.MOTION, () -> FrameChange.ambient(
+                        () -> Frames.look(context), Clock.REAL)));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return Entered.no(AgentReply.text("Stopped before acting; nothing was done."));
+            }
+            motion = Motion.of(still);
+            last = still.getLast();
+            if (screen != null) ambient = new Ambient(screen, motion, now);
         }
-        Motion motion = Motion.of(still);
-        BufferedImage last = still.getLast();
+        int quiet = screen == null ? 0 : FrameChange.QUIET_MS;
         try {
             action.on(hands);
         } catch (UnsupportedOperationException cannot) {
@@ -307,12 +340,15 @@ final class ActTools {
         Optional<BufferedImage> after;
         try {
             after = ToolTiming.timed(ToolTiming.Phase.SETTLE,
-                    () -> FrameChange.answered(last, motion, () -> Frames.look(context), settle, share, Clock.REAL));
+                    () -> FrameChange.answered(last, motion, () -> Frames.look(context), settle, share, quiet,
+                            Clock.REAL));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Entered.no(AgentReply.text(done + "; stopped before the screen was read again."));
         }
         if (after.isEmpty()) return Entered.no(AgentReply.text(done + "; the screen could not be captured after it."));
+        // A screen the input changed may move otherwise now (a tab, a toggle): its motion is read again next time.
+        if (screen != null && FrameChange.box(last, after.get(), motion).isPresent()) ambient = null;
         return new Entered(answer(context, done, last, after.get(), motion, Boolean.TRUE.equals(show)), last,
                 after.get(), motion, how, done);
     }

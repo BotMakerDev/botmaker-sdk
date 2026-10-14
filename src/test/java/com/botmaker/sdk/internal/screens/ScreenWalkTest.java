@@ -180,6 +180,20 @@ class ScreenWalkTest {
         assertEquals(List.of("key ESCAPE", "key ESCAPE", "click engineer"), game.done);
     }
 
+    /** The game's usual close button, given, is clicked where it shows; Escape only where it does not (2026-10-14). */
+    @Test
+    void aWayBackWithNoInputClicksTheUsualCloseButtonWhileItShows() {
+        Game game = new Game("MAP");
+        game.shows.get("CAMPAIGN").add("close_x");
+        game.leads.put("CAMPAIGN click close_x", "HOME");
+
+        ScreenWalk.Result walked = new ScreenWalk(game.map, game, STEP_MS, null, click("close_x")).go("ENGINEER", null);
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome());
+        assertEquals(List.of("key ESCAPE", "click close_x", "click engineer"), game.done,
+                "Map shows no close_x: Escape; Campaign shows it: clicked");
+    }
+
     @Test
     void aStepThatLandsElsewhereIsReadAgainAndPlannedFromThere() {
         Game game = new Game("HOME");

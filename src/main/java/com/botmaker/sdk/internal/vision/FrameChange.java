@@ -55,6 +55,12 @@ public final class FrameChange {
      * (2026-10-13). A smaller change, a button greying, is read at the end of the wait.
      */
     public static final double ANSWER_SHARE = 0.03;
+    /**
+     * How long Discovery waits on an input that moved nothing at all, not a pixel past the screen's own motion: the
+     * whole cap was spent on every input with no effect, five seconds each (2026-10-14). A game slow to start
+     * answering still shows the button pressed, which keeps the wait going.
+     */
+    public static final int QUIET_MS = 2_000;
 
     private FrameChange() {}
 
@@ -245,9 +251,20 @@ public final class FrameChange {
     public static Optional<BufferedImage> answered(BufferedImage before, Motion motion,
                                                    Supplier<Optional<BufferedImage>> look, int capMs, double share,
                                                    Clock clock) throws InterruptedException {
+        return answered(before, motion, look, capMs, share, 0, clock);
+    }
+
+    /**
+     * As {@link #answered(BufferedImage, Motion, Supplier, int, double, Clock)}, ending at {@code quietMs} too when
+     * no read so far moved a compared pixel from {@code before} ({@link #box}): an input with no effect. 0 waits on.
+     */
+    public static Optional<BufferedImage> answered(BufferedImage before, Motion motion,
+                                                   Supplier<Optional<BufferedImage>> look, int capMs, double share,
+                                                   int quietMs, Clock clock) throws InterruptedException {
         if (Thread.interrupted()) throw new InterruptedException();
         long start = clock.nowMs();
         long changedAt = -1;
+        boolean stirred = false;
         Optional<BufferedImage> last = Optional.empty();
         while (true) {
             Optional<BufferedImage> now = look.get();
@@ -255,13 +272,15 @@ public final class FrameChange {
             if (now.isPresent()) {
                 if (changedAt < 0) {
                     if (share(before, now.get(), motion) >= share) changedAt = waited;
+                    else if (!stirred && quietMs > 0) stirred = box(before, now.get(), motion).isPresent();
                 } else if (last.isPresent() && box(last.get(), now.get(), motion).isEmpty()) {
                     return now;
                 }
                 last = now;
             }
             if (waited >= capMs || changedAt >= 0 && waited - changedAt >= SETTLING_MS
-                    || last.isEmpty() && waited >= SETTLING_MS) {
+                    || last.isEmpty() && waited >= SETTLING_MS
+                    || quietMs > 0 && changedAt < 0 && !stirred && last.isPresent() && waited >= quietMs) {
                 return last;
             }
             clock.sleep(Math.min(POLL_MS, capMs - waited));

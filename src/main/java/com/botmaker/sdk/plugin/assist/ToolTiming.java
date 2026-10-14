@@ -2,9 +2,15 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
+import com.botmaker.sdk.internal.trace.MissFrames;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.RecordComponent;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -62,24 +68,69 @@ final class ToolTiming {
 
     private ToolTiming() {}
 
-    /** {@code tool}, its reply ending with how long it took. */
+    /** {@code tool}, its reply ending with how long it took, and the call a row of the project's {@link #FILE}. */
     static <P extends Record> AssistantTool<P> timed(AssistantTool<P> tool) {
         return AssistantTool.named(tool.name()).describedAs(tool.description()).takes(tool.paramsType())
-                .handledBy((params, context) -> time(() -> tool.invoke(arguments(params), context)));
+                .handledBy((params, context) -> time(tool.name(), context == null || context.services() == null
+                        ? null : context.services().projectDir(), () -> tool.invoke(arguments(params), context)));
     }
 
     /** Runs {@code call} and adds the line saying how long it took and on what. */
     static AgentReply time(Supplier<AgentReply> call) {
+        return time(null, null, call);
+    }
+
+    /** As {@link #time(Supplier)}, and a row of {@code project}'s {@link #FILE} for {@code tool}, when both are given. */
+    static AgentReply time(String tool, Path project, Supplier<AgentReply> call) {
         if (CURRENT.get() != null) return call.get();
         ToolTiming timing = new ToolTiming();
         CURRENT.set(timing);
+        long started = System.currentTimeMillis();
         long start = System.nanoTime();
         try {
             AgentReply reply = call.get();
+            long total = System.nanoTime() - start;
+            if (tool != null && project != null) timing.write(project.resolve(FILE), tool, started, total);
             // On a line of its own: a client may run the reply's text parts together.
-            return reply.and(AgentReply.text("\n" + timing.line(System.nanoTime() - start)));
+            return reply.and(AgentReply.text("\n" + timing.line(total)));
         } finally {
             CURRENT.remove();
+        }
+    }
+
+    /**
+     * Where each call's times go, in the bot's folder beside the runs' frames, one row a call: which waits to cut
+     * is read off it rather than guessed (2026-10-14).
+     */
+    static final Path FILE = MissFrames.FOLDER.resolve("tool-times.tsv");
+
+    /** The file's first line. */
+    static String header() {
+        return "started\ttool\ttotal_ms\t" + Arrays.stream(Phase.values())
+                .map(phase -> phase.name().toLowerCase(Locale.ROOT) + "_ms").collect(Collectors.joining("\t"));
+    }
+
+    /** One call's row: when it began, the tool, its total and each part, in milliseconds. */
+    String row(String tool, long startedMs, long totalNanos) {
+        return Instant.ofEpochMilli(startedMs) + "\t" + tool + "\t" + totalNanos / 1_000_000 + "\t"
+                + Arrays.stream(spent).mapToObj(nanos -> String.valueOf(nanos / 1_000_000))
+                .collect(Collectors.joining("\t"));
+    }
+
+    /** Appends the row, one call at a time; a file that cannot be written loses the row, never the call. */
+    private void write(Path file, String tool, long startedMs, long totalNanos) {
+        synchronized (ToolTiming.class) {
+            append(file, tool, startedMs, totalNanos);
+        }
+    }
+
+    private void append(Path file, String tool, long startedMs, long totalNanos) {
+        try {
+            Files.createDirectories(file.getParent());
+            String lines = (Files.exists(file) ? "" : header() + "\n") + row(tool, startedMs, totalNanos) + "\n";
+            Files.writeString(file, lines, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException | RuntimeException unwritten) {
+            // Times are for the next session to read; a call never fails for them.
         }
     }
 

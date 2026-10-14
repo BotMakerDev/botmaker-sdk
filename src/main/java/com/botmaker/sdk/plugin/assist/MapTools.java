@@ -20,9 +20,11 @@ import com.botmaker.sdk.internal.vision.FrameChange;
 import java.awt.image.BufferedImage;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -69,9 +71,22 @@ final class MapTools {
                @Describe(value = "what it is for: chore, shortcut, choice or info", optional = true) String kind,
                @Describe(value = "the longest the input is given to answer, in milliseconds; 5000 when left out",
                        optional = true) Integer settleMs,
+               @Describe(value = STAY, optional = true) Boolean stay,
                @Describe(value = "true to act on the user's own desktop, taking their mouse; refused there "
                        + "otherwise", optional = true) Boolean desktop) {
     }
+
+    record Tries(@Describe("the screen the inputs are on, as the map names it: Home, or its constant HOME") String screen,
+                 @Describe("pictures cut on that screen, clicked in this order, each at its best match") List<String> pictures,
+                 @Describe(value = "the longest each is given to answer, in milliseconds; 5000 when left out",
+                         optional = true) Integer settleMs,
+                 @Describe(value = STAY, optional = true) Boolean stay,
+                 @Describe(value = "true to act on the user's own desktop, taking their mouse; refused there "
+                         + "otherwise", optional = true) Boolean desktop) {
+    }
+
+    private static final String STAY = "true stays on the screen when this leaves it finished; left out, the game is "
+            + "walked back up to the nearest screen with inputs left to try";
 
     record Goal(@Describe("the screen to go to, as the map names it: Campaign, or its constant CAMPAIGN") String screen,
                 @Describe(value = "true to act on the user's own desktop, taking their mouse; refused there "
@@ -86,8 +101,15 @@ final class MapTools {
                             + "this one in place, or nothing. Every picture crop_picture cut with a screen is untried "
                             + "until this tries it. A screen opened is finished before the next input of the screen "
                             + "it was opened from: refused while a screen owes its marker, while a screen opened from "
-                            + "this one has an input left to try, and while another branch begun is not finished")
+                            + "this one has an input left to try, and while another branch begun is not finished. "
+                            + "Once nothing on the screen is left to try, it goes back up by itself (stay keeps it)")
                     .takes(Try.class).handledBy(MapTools::tryInput),
+            AssistantTool.named("try_inputs")
+                    .describedAs("try_input for several pictures of one screen in one call, in order: each is "
+                            + "clicked and recorded as try_input does, and the call stops at the first that leaves "
+                            + "the screen (opens one, or leads to one mapped already) or is refused. For the plain "
+                            + "buttons of a screen; scrolls, hotkeys, never and locked go through try_input")
+                    .takes(Tries.class).handledBy(MapTools::tryInputs),
             AssistantTool.named("go_to_screen")
                     .describedAs("Walks the game to a screen of the bot's Screens as a run does: finds where it is "
                             + "by the markers, then does each input on the way and waits for each screen; a popup "
@@ -103,6 +125,57 @@ final class MapTools {
         } catch (IllegalStateException busy) {
             return AgentReply.refused("Studio did not answer while reading or writing the bot's Screens: "
                     + busy.getMessage() + " Look where the game is and read the map (read_guide) before trying again.");
+        }
+    }
+
+    /**
+     * try_inputs: each picture as try_input tries it, staying on the screen, until one is refused or leaves it (it is
+     * recorded as anything but a change in place or no effect); then the walk up, once, when the screen is finished.
+     */
+    static AgentReply tryInputs(Tries tries, AgentContext context) {
+        List<String> pictures = tries.pictures() == null ? List.of()
+                : tries.pictures().stream().filter(p -> p != null && !p.isBlank()).map(String::strip).toList();
+        if (pictures.isEmpty()) return AgentReply.refused("Give the pictures to try, in order. Nothing was done.");
+        AgentReply all = null;
+        for (int i = 0; i < pictures.size(); i++) {
+            AgentReply one = tryInput(new Try(tries.screen(), pictures.get(i), null, null, null, null, null, null,
+                    tries.settleMs(), true, tries.desktop()), context);
+            if (one.isRefused()) {
+                if (all == null) return one;
+                return all.and(AgentReply.text("Stopped before " + pictures.get(i) + ": " + one.parts().getFirst()
+                        .text() + " Not tried: " + String.join(", ", pictures.subList(i, pictures.size())) + "."));
+            }
+            all = all == null ? one : all.and(one);
+            if (!stayed(context, tries.screen(), pictures.get(i))) {
+                return i + 1 == pictures.size() ? all : all.and(AgentReply.text("Stopped: " + pictures.get(i)
+                        + " left the screen. Not tried: " + String.join(", ", pictures.subList(i + 1, pictures.size()))
+                        + "."));
+            }
+        }
+        Optional<String> screen = readScreen(context, tries.screen());
+        return screen.isEmpty() ? all : up(context, all, screen.get(), new Try(tries.screen(), null, null, null, null,
+                null, null, null, null, tries.stay(), tries.desktop()));
+    }
+
+    /** Whether {@code picture}, just tried on {@code typed}, is recorded as keeping the game there. */
+    private static boolean stayed(AgentContext context, String typed, String picture) {
+        try {
+            ScreenGraph graph = FxCall.call(() -> ScreenBook.read(context.services()));
+            return ScreenBook.find(graph, typed).map(c -> graph.screens().get(c).inputs().stream()
+                    .filter(i -> i.act() == Input.Act.CLICK && i.picture() != null
+                            && i.picture().id().equalsIgnoreCase(picture))
+                    .anyMatch(i -> i.did() == Did.IN_PLACE || i.did() == Did.NONE)).orElse(false);
+        } catch (IllegalStateException busy) {
+            return false;
+        }
+    }
+
+    /** The constant {@code typed} names in the map; empty when none or Studio is busy. */
+    private static Optional<String> readScreen(AgentContext context, String typed) {
+        try {
+            return ScreenBook.find(FxCall.call(() -> ScreenBook.read(context.services())), typed);
+        } catch (IllegalStateException busy) {
+            return Optional.empty();
         }
     }
 
@@ -206,10 +279,10 @@ final class MapTools {
         if (never || locked) {
             Input settled = never ? base.never(input.never().strip())
                     : base.locked(FxCall.call(() -> ScreenBook.picture(services, input.locked().strip())));
-            return noted(services, screen, old, settled, never ? "never, " + input.never().strip()
-                    : "locked by " + input.locked().strip(), ask);
+            return up(context, noted(services, screen, old, settled, never ? "never, " + input.never().strip()
+                    : "locked by " + input.locked().strip(), ask), screen, input);
         }
-        ActTools.Entered first = ActTools.enter(context, byPicture ? what : null, notches, key.orElse(null),
+        ActTools.Entered first = ActTools.enter(context, screen, byPicture ? what : null, notches, key.orElse(null),
                 input.desktop(), settle, FrameChange.ANSWER_SHARE);
         ActTools.Entered entered = notches == 0 ? slowScreen(context, first, on.marker()) : first;
         if (entered.after() == null) {
@@ -244,9 +317,76 @@ final class MapTools {
         boolean changed = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
         AgentReply said = noted(services, screen, old, base.did(changed ? Did.IN_PLACE : Did.NONE),
                 changed ? "changes this screen in place" : "no visible effect", ask);
-        return entered.reply().and(changed ? said.and(AgentReply.text("Cut, with screen " + name + ", each new "
-                + "input it shows (another state of a toggle, a tab's buttons): they are untried in turn.")) : said);
+        return up(context, entered.reply().and(changed ? said.and(AgentReply.text("Cut, with screen " + name
+                + ", each new input it shows (another state of a toggle, a tab's buttons): they are untried in turn."))
+                : said), screen, input);
     }
+
+    /**
+     * {@code said}, and when the try left {@code screen} finished, the game walked back up to the nearest screen above
+     * it with work left ({@link #upTo}), checked by that screen's marker; {@code input}'s {@code stay} keeps it.
+     */
+    private static AgentReply up(AgentContext context, AgentReply said, String screen, Try input) {
+        if (said.isRefused() || Boolean.TRUE.equals(input.stay())) return said;
+        ScreenGraph graph;
+        try {
+            graph = FxCall.call(() -> ScreenBook.read(context.services()));
+        } catch (IllegalStateException busy) {
+            return said;
+        }
+        Optional<String> to = upTo(graph, screen);
+        Optional<ToolReach> reach = ToolReach.of(context);
+        if (to.isEmpty() || reach.isEmpty()
+                || ActTools.desktopRefusal(context, reach.get().hands(), input.desktop()).isPresent()) {
+            return said;
+        }
+        ScreenWalk.Result walked = new ScreenWalk(graph, reach.get(), STEP_MS, null, close(context)).go(to.get(),
+                screen);
+        seen(graph, walked.at());
+        String back = graph.shown(to.get());
+        String left = graph.shown(screen);
+        return said.and(AgentReply.text(walked.arrived()
+                ? "Nothing left to try on " + left + ": went back up to " + back + ". Anything on " + left + " not cut "
+                + "yet (a tab's buttons, a list's far end): go_to_screen " + left + ", cut it with screen " + left
+                + " and try it."
+                : "Nothing left to try on " + left + ", but the way up to " + back + " failed: " + walked.why()
+                + " Look where the game is (which_screen)."));
+    }
+
+    /**
+     * Where the game goes once {@code screen} is finished: up its parents to the first with work left on or below it,
+     * else the top one. Empty while it has work left, and for a popup or the top screen.
+     */
+    static Optional<String> upTo(ScreenGraph graph, String screen) {
+        if (workLeft(graph, screen) || graph.screen(screen).filter(GameScreen::isPopup).isPresent()) {
+            return Optional.empty();
+        }
+        Set<String> seen = new HashSet<>(Set.of(screen));
+        Optional<String> up = graph.parent(screen);
+        while (up.isPresent() && !workLeft(graph, up.get()) && graph.parent(up.get()).isPresent()) {
+            if (!seen.add(up.get())) return Optional.empty();    // a map whose ways in loop has no top to go to
+            up = graph.parent(up.get());
+        }
+        return up.filter(c -> !c.equals(screen));
+    }
+
+    /** Whether {@code constant}, or a screen below it, still has an input to try. */
+    private static boolean workLeft(ScreenGraph graph, String constant) {
+        return graph.unfinished(constant) || graph.unfinishedBelow(constant).isPresent();
+    }
+
+    /** The game's usual close button, the bot's picture {@value #CLOSE}, as a way back with none tries it first. */
+    private static Input close(AgentContext context) {
+        if (!ActTools.exists(context, CLOSE)) return null;
+        try {
+            return FxCall.call(() -> Input.click(ScreenBook.picture(context.services(), CLOSE)));
+        } catch (IllegalStateException busy) {
+            return null;
+        }
+    }
+
+    /** The picture name a way back with no input of its own clicks first, before Escape: Firestone's close_x. */
+    static final String CLOSE = "close_x";
 
     /** {@code base}, which opened a screen the map has not: added below the others, owing its marker. */
     private static AgentReply opened(AgentContext context, ScreenGraph graph, String screen, Input old, Input base,
@@ -424,7 +564,8 @@ final class MapTools {
         if (reach.isEmpty()) return AgentReply.refused(Frames.noProject());
         Optional<AgentReply> desktop = ActTools.desktopRefusal(context, reach.get().hands(), goal.desktop());
         if (desktop.isPresent()) return desktop.get();
-        ScreenWalk.Result walked = new ScreenWalk(graph, reach.get(), STEP_MS, null).go(target.get(), lastSeen);
+        ScreenWalk.Result walked = new ScreenWalk(graph, reach.get(), STEP_MS, null, close(context)).go(target.get(),
+                lastSeen);
         seen(graph, walked.at());
         String path = walked.walked().isEmpty() ? "" : " Walked: " + String.join(" › ",
                 walked.walked().stream().map(graph::shown).toList()) + ".";

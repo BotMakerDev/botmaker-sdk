@@ -282,4 +282,30 @@ class FrameChangeTest {
         assertFalse(motion.ignores(400 + reach + step, 400, 3840, 2160), "past the grow it is the game's answer");
         assertFalse(motion.ignores(800, 800, 3840, 2160), "a pixel between the grid's is never compared");
     }
+
+    /** An input that moved nothing at all is not waited on to the cap; one that pressed a button is (2026-10-14). */
+    @Test
+    void anInputThatMovedNothingIsWaitedOnOnlyUntilQuiet() throws InterruptedException {
+        BufferedImage before = noise(40, 20, 1);
+        long[] waited = {0};
+        Clock clock = counting(waited);
+        double share = FrameChange.ANSWER_SHARE;
+        int quiet = FrameChange.QUIET_MS;
+
+        assertSame(before, FrameChange.answered(before, Motion.NONE, () -> Optional.of(before), 5_000, share, quiet,
+                clock).orElseThrow());
+        assertEquals(quiet, waited[0], "nothing moved: read until QUIET_MS, not the cap");
+
+        BufferedImage pressed = copy(before);
+        pressed.setRGB(0, 0, ~before.getRGB(0, 0));
+        assertTrue(FrameChange.box(before, pressed, Motion.NONE).isPresent()
+                && FrameChange.share(before, pressed, Motion.NONE) < share, "a change too small to answer");
+        waited[0] = 0;
+        FrameChange.answered(before, Motion.NONE, () -> Optional.of(pressed), 5_000, share, quiet, clock);
+        assertEquals(5_000, waited[0], "a button pressed is a game about to answer: read until the cap");
+
+        waited[0] = 0;
+        FrameChange.answered(before, Motion.NONE, () -> Optional.of(before), 5_000, share, 0, clock);
+        assertEquals(5_000, waited[0], "0 waits on");
+    }
 }

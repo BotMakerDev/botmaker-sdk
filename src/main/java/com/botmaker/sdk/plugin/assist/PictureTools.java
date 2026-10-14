@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -260,8 +261,10 @@ final class PictureTools {
         AgentReply all = null;
         // The marker first: it may start the screen the other boxes are noted on.
         cuts.sort(Comparator.comparing((Crop c) -> !Boolean.TRUE.equals(c.marker())));
+        // One watch of the screen for every box: each box watched alone took a second (2026-10-14).
+        Supplier<List<BufferedImage>> live = liveLooks(context);
         for (Crop crop : cuts) {
-            AgentReply one = cropPicture(crop, context);
+            AgentReply one = cropPicture(crop, context, live);
             if (one.isRefused()) {
                 one = AgentReply.text("Not saved, " + crop.name() + ": " + one.parts().getFirst().text());
             }
@@ -289,6 +292,11 @@ final class PictureTools {
     }
 
     static AgentReply cropPicture(Crop crop, AgentContext context) {
+        return cropPicture(crop, context, liveLooks(context));
+    }
+
+    /** crop_picture, the box checked still on {@code live}, the screen watched once for every box of a call. */
+    private static AgentReply cropPicture(Crop crop, AgentContext context, Supplier<List<BufferedImage>> live) {
         Optional<BufferedImage> frame = Frames.shown();
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
         Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), null,
@@ -327,7 +335,7 @@ final class PictureTools {
             if (section.get().refusal() != null) return AgentReply.refused(section.get().refusal());
         }
         Optional<String> moving = moving(context, frame.get(), new Rect(crop.x(), crop.y(), crop.width(),
-                crop.height()));
+                crop.height()), live);
         if (moving.isPresent()) return AgentReply.refused(moving.get());
         String alike = lookAlikes(context, frame.get(), picture.get().image(),
                 new Rect(crop.x(), crop.y(), crop.width(), crop.height())).map(a -> " " + a).orElse("");
@@ -428,7 +436,7 @@ final class PictureTools {
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
         Optional<String> moving = moving(context, frame.get(), new Rect(replace.x(), replace.y(), replace.width(),
-                replace.height()));
+                replace.height()), liveLooks(context));
         if (moving.isPresent()) return AgentReply.refused(moving.get());
         PictureEdits.Done done = FxCall.call(() -> PictureEdits.replace(context.services(), base.get(),
                 picture.get().image(), FrameCut.of(frame.get().getWidth(), frame.get().getHeight(),
@@ -547,13 +555,45 @@ final class PictureTools {
     private static final int STILL_SLACK = 8;
 
     /**
-     * Why {@code asked} is no picture to cut, or empty when a run would find it: the cut is matched, as a run
-     * matches a picture ({@link ImageFinder#bestMatch}), around its own place on {@value #STILL_LOOKS} live frames
-     * over {@value #STILL_MS} ms, and a score under the bot's confidence on any of them means an animation, a
-     * counter, a sparkle passing, or the screen moved since the screenshot. Such a picture matches only the
-     * moment it was cut at. With no live frame of the screenshot's size the check is skipped. Blocking.
+     * {@value #STILL_LOOKS} live frames over {@value #STILL_MS} ms, read the first time they are asked for and kept
+     * for the call; none when one could not be read or the wait was stopped, read again for the next box. Blocking;
+     * one call's boxes are checked on its own thread, one after another.
      */
-    private static Optional<String> moving(AgentContext context, BufferedImage shown, Rect asked) {
+    static Supplier<List<BufferedImage>> liveLooks(AgentContext context) {
+        List<List<BufferedImage>> read = new ArrayList<>(1);
+        return () -> {
+            if (!read.isEmpty()) return read.getFirst();
+            List<BufferedImage> looks = looks(context);
+            if (!looks.isEmpty()) read.add(looks);
+            return looks;
+        };
+    }
+
+    private static List<BufferedImage> looks(AgentContext context) {
+        List<BufferedImage> looks = new ArrayList<>();
+        try {
+            for (int look = 0; look < STILL_LOOKS; look++) {
+                if (look > 0) Thread.sleep(STILL_MS / (STILL_LOOKS - 1));
+                Optional<BufferedImage> live = Frames.look(context);
+                if (live.isEmpty()) return List.of();
+                looks.add(live.get());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return List.of();
+        }
+        return looks;
+    }
+
+    /**
+     * Why {@code asked} is no picture to cut, or empty when a run would find it: the cut is matched, as a run
+     * matches a picture ({@link ImageFinder#bestMatch}), around its own place on the {@code live} frames
+     * ({@link #liveLooks}), and a score under the bot's confidence on any of them means an animation, a
+     * counter, a sparkle passing, or the screen moved since the screenshot. Such a picture matches only the
+     * moment it was cut at. With no live frame of the screenshot's size the check is skipped.
+     */
+    private static Optional<String> moving(AgentContext context, BufferedImage shown, Rect asked,
+                                           Supplier<List<BufferedImage>> live) {
         Optional<Rect> inside = Frames.within(shown, asked.x(), asked.y(), asked.width(), asked.height());
         if (inside.isEmpty()) return Optional.empty();
         Rect box = inside.get();
@@ -563,26 +603,22 @@ final class PictureTools {
                 Math.min(shown.getHeight() - Math.max(0, box.y() - STILL_SLACK), box.height() + 2 * STILL_SLACK));
         if (around.isEmpty()) return Optional.empty();
         double needs = Frames.confidence(context.services());
+        List<BufferedImage> looks = live.get();
+        if (looks.stream().anyMatch(l -> l.getWidth() != shown.getWidth() || l.getHeight() != shown.getHeight())) {
+            return Optional.empty();
+        }
         try (ImageTemplate cut = ImageTemplate.of("still", Images.cut(shown, box))) {
-            for (int look = 0; look < STILL_LOOKS; look++) {
-                if (look > 0) Thread.sleep(STILL_MS / (STILL_LOOKS - 1));
-                Optional<BufferedImage> live = Frames.look(context);
-                if (live.isEmpty() || live.get().getWidth() != shown.getWidth()
-                        || live.get().getHeight() != shown.getHeight()) {
-                    return Optional.empty();
-                }
-                MatchResult best = ImageFinder.bestMatch(cut, new StillSource(Images.cut(live.get(), around.get())));
+            for (int look = 0; look < looks.size(); look++) {
+                MatchResult best = ImageFinder.bestMatch(cut, new StillSource(Images.cut(looks.get(look),
+                        around.get())));
                 double score = best.isFound() ? best.confidence() : 0;
                 if (score < needs) {
-                    return Optional.of("That box changes: " + (look * STILL_MS / (STILL_LOOKS - 1)) + " ms later "
-                            + "a run would score it " + Frames.score(score) + " where it was cut, under the "
+                    return Optional.of("That box changes: " + (look * STILL_MS / (STILL_LOOKS - 1)) + " ms into "
+                            + "the watch a run would score it " + Frames.score(score) + " where it was cut, under the "
                             + Frames.score(needs) + " it needs. It is animated, or the screen moved since the "
                             + "screenshot: take a new one and cut a part that holds still. Nothing was saved.");
                 }
             }
-            return Optional.empty();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             return Optional.empty();
         }
     }

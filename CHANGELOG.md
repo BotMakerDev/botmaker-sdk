@@ -200,6 +200,20 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **Discovery is faster.** These changes are to the assistant's map-building tools:
+  - **Goes back up by itself.** Once nothing on a screen is left to try, try_input walks the game back up to the
+    nearest screen that still has inputs to try. It uses the screen's way back first, then the bot's `close_x`
+    picture when it shows, then Escape, and checks that screen's marker. Pass `stay: true` to stay on the screen.
+    go_to_screen also tries `close_x` before Escape.
+  - **New `try_inputs`.** It clicks several of a screen's buttons in one call, in order, and stops at the first one
+    that leaves the screen or is refused.
+  - **Shorter waits.**
+    - An input that moves nothing on the screen is waited on for 2 s instead of the full 5 s.
+    - What moves on a screen by itself is read once, then reused for that screen's inputs for 30 s.
+  - **Faster `crop_pictures`.** It checks whether the boxes hold still against one 1 s watch of the screen, instead
+    of a 1 s watch for each box.
+  - **Timing log.** Every tool call writes a row to `target/botmaker-runs/tool-times.tsv` in the bot's folder, with
+    the time spent in each part of the call.
 - **🔀 Activity Flow's Auto-arrange and wires use the toolkit's graph layout**, the one 🗺 Screens draws with
   (`LayeredLayout`, `Routes`). They were lifted from the flow editor, so a flow arranges as before; the flow
   editor keeps no copy of its own.

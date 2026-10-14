@@ -846,7 +846,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(59, names.size());
+        assertEquals(60, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
@@ -951,6 +951,15 @@ class SdkAssistTest {
                 screen("HOME").inputs().getFirst());
         assertTrue(run("try_input", "screen", "Engineer", "picture", "home").isRefused(),
                 "a picture naming a screen the map has asks for opens");
+
+        assertTrue(run("try_inputs", "screen", "Home", "pictures", List.of(" ")).isRefused(), "no picture given");
+        AgentReply none = run("try_inputs", "screen", "Guild", "pictures", List.of("gold", "gem"));
+        assertTrue(none.isRefused() && text(none).startsWith("No screen Guild"), "a first refusal is the answer");
+        AgentReply stopped = run("try_inputs", "screen", "Home", "pictures", List.of("gold", "nosuch", "gem"),
+                "desktop", true, "settleMs", 0);
+        assertFalse(stopped.isRefused(), "gold was tried");
+        assertTrue(text(stopped).contains("Noted in Home: tried click gold") && text(stopped).contains("Stopped "
+                + "before nosuch: ") && text(stopped).contains("Not tried: nosuch, gem."), text(stopped));
 
         assertTrue(run("go_to_screen", "screen", "Guild").isRefused());
         String walked = text(run("go_to_screen", "screen", "Engineer", "desktop", true));

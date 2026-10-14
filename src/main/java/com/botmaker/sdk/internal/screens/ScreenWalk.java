@@ -20,7 +20,7 @@ import java.util.function.Predicate;
  * Walks the bot's screen map on the game: which screen it is on ({@link #where}), and the way to another
  * ({@link #go}), one edge at a time. Each step does the edge's input, then waits for the next screen's marker. A
  * popup that shows is closed first; a step that lands elsewhere is read again and the way planned anew from there.
- * A way back with no input is Escape.
+ * A way back with no input is the game's usual close button when the walk is given one, else Escape.
  *
  * <p>What is not always there decides the answer when no way is open now: one only through an input that comes and
  * goes is {@link Outcome#NOT_NOW}, one only through a locked input {@link Outcome#LOCKED}, and none at all — the map
@@ -50,16 +50,23 @@ public final class ScreenWalk {
     private final Reach reach;
     private final long stepMs;
     private final Consumer<String> reached;
+    private final Input close;
 
     /**
      * A walk over {@code graph} by {@code reach}, giving each step {@code stepMs} to show the next screen's marker,
      * and telling {@code reached} each screen it reaches by constant.
      */
     public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached) {
+        this(graph, reach, stepMs, reached, null);
+    }
+
+    /** As above; a way back with no input clicks {@code close}, the game's usual close button, while it shows. */
+    public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Input close) {
         this.graph = graph;
         this.reach = reach;
         this.stepMs = stepMs;
         this.reached = reached == null ? name -> {} : reached;
+        this.close = close;
     }
 
     /** The screen the game shows now, {@code near}'s neighbours looked for first; popups aside. */
@@ -167,10 +174,14 @@ public final class ScreenWalk {
                 + "game as the map has it" + (missed.isEmpty() ? "." : ": " + labels(missed) + " not found."));
     }
 
-    /** Does {@code edge}'s input; a way back with none is Escape. False when its picture is not on {@code frame}. */
+    /**
+     * Does {@code edge}'s input; a way back with none is the usual close button while it shows, else Escape: the walk
+     * is on a screen below another then, never on the top one, where Escape may ask to quit the game. False when its
+     * picture is not on {@code frame}.
+     */
     private boolean perform(ScreenGraph.Edge edge, BufferedImage frame) {
         if (edge.via() == null) {
-            reach.key(Key.ESCAPE);
+            if (close == null || !reach.perform(close, frame)) reach.key(Key.ESCAPE);
             return true;
         }
         return reach.perform(edge.via(), frame);
