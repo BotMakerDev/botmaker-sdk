@@ -197,6 +197,14 @@
             <version>2.17.0</version>
         </dependency>
 
+        <!-- Markdown read as a tree, not by line: the bot's GAME.md, edited a section at a time by the assistant
+             (its source spans). Studio draws the same file with the same version. -->
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <version>0.21.0</version>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

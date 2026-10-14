@@ -78,7 +78,8 @@ final class FlowTools {
     }
 
     private static final String ON = "the outcome it leaves on; leave out for its first outcome, DISABLED for where "
-            + "the run goes when the card is switched off or has no body";
+            + "the run goes when the card is switched off or has no body; from an activity, a name it has not got "
+            + "yet (LOCKED) adds that outcome to its enum";
 
     /** One arrow between two cards, on one outcome. */
     record Arrow(@Describe("the activity the arrow leaves") String from,

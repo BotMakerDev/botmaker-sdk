@@ -30,6 +30,20 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `launch_game` join the private display the hand-off still names, so the game launched before keeps answering.
 - **The assistant's guide says to survey a screen first.** Name every input and read its help before following
   one, and use the game's own shortcuts (Auto, x10, Max, Claim all) before a loop that repeats a click.
+- **The assistant automates a game by a protocol in six stages.** The stages are Setup, Discovery, Build,
+  Trial, Tuning and Upkeep, each with its own exit check.
+  - The plugin's guide now holds only the bot's shape and one line per stage.
+  - The new `read_guide` works out the stage the bot is at: its home and popups methods first, then each
+    screen's `Stage:` line in its notes. It answers with that stage's steps only, and with where each screen
+    stands; `read_guide stage=2` gives another stage's steps.
+  - Discovery maps every way out of home before surveying any screen, then gives each input a kind.
+  - A body calls a feature `LOCKED` only on a lock picture cut during Discovery. With neither the entrance nor
+    a lock in view, the step fails.
+  - Trial runs each activity from three states: work to do, nothing to do, interrupted.
+  - `connect`'s outcome says that, from an activity, a new name adds that outcome to its enum.
+- **The bot's notes on its game (`GAME.md`) are the SDK's.** `read_notes` and `write_notes` moved here from
+  Studio, and a new file says its shape: a `Map` section, then one section per screen with its stage, marker,
+  unlock and inputs. The SDK now depends on commonmark 0.21.0, the version Studio has.
 - **The assistant's guide says what a click costs.** Each click pauses `found_delay` (500 ms by default); a bot
   whose steps prove themselves by a picture can lower it with `set_setting found_delay 150`.
 - **Scroll and drag on pictures.** `ImageScroller.scrollAt(picture, notches)`, `drag(picture, dx, dy)` (a

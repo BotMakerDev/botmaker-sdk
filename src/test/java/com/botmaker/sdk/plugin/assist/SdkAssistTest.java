@@ -972,12 +972,13 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(53, names.size());
+        assertEquals(56, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
     /** Studio's own tools the guide names beside the SDK's. */
-    private static final java.util.Set<String> STUDIOS = java.util.Set.of("add_method", "run_activity", "set_slot");
+    private static final java.util.Set<String> STUDIOS = java.util.Set.of("add_method", "run_activity", "set_slot",
+            "read_trace");
 
     @Test
     void theGuideNamesOnlyToolsThereAreAndThePluginGivesIt() {
@@ -986,12 +987,42 @@ class SdkAssistTest {
         }
         java.util.Set<String> names = SdkAssist.ALL.stream().map(AssistantTool::name)
                 .collect(java.util.stream.Collectors.toSet());
-        java.util.regex.Matcher named = java.util.regex.Pattern.compile("\\b[a-z]+_[a-z_]+\\b").matcher(SdkAssist.GUIDE);
+        StringBuilder said = new StringBuilder(SdkAssist.GUIDE);
+        for (Protocol.Stage stage : Protocol.Stage.values()) said.append('\n').append(stage.section());
+        java.util.regex.Matcher named = java.util.regex.Pattern.compile("\\b[a-z]+_[a-z_]+\\b").matcher(said);
         while (named.find()) {
             assertTrue(names.contains(named.group()) || STUDIOS.contains(named.group()),
                     "the guide names " + named.group() + ", which is no tool");
         }
         assertEquals(SdkAssist.GUIDE.strip(), new com.botmaker.sdk.plugin.SdkPlugin().assistantGuide());
+    }
+
+    @Test
+    void readGuideGivesTheBotsStageAndTheNotesKeepWhereEachScreenStands() {
+        assertTrue(run("read_guide").isRefused(), "no run to read the home method from: said, not guessed");
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        String fresh = text(run("read_guide"));
+        assertTrue(fresh.startsWith("The bot is at " + Protocol.Stage.SETUP.title()), fresh);
+        assertFalse(fresh.contains(Protocol.Stage.BUILD.title()), "only the stage the bot is at: " + fresh);
+        assertEquals(Protocol.Stage.BUILD.section(), text(run("read_guide", "stage", "2")));
+        assertTrue(run("read_guide", "stage", "Polish").isRefused());
+
+        assertEquals("Added Map to GAME.md.", text(run("write_notes", "section", "Map", "text", "- Quests: Q.")));
+        assertTrue(text(run("read_notes", "section", "map")).endsWith("## Map\n\n- Quests: Q."));
+        assertTrue(run("read_notes", "section", "Boss").isRefused());
+        assertTrue(run("write_notes", "section", "Map").isRefused(), "a text left out removes nothing");
+        assertTrue(text(run("read_notes")).contains("- Quests: Q."));
+    }
+
+    @Test
+    void theGuideNamesEveryStageInOrder() {
+        int at = -1;
+        for (Protocol.Stage stage : Protocol.Stage.values()) {
+            String name = stage.title().substring(0, stage.title().indexOf(':'));
+            int next = SdkAssist.GUIDE.indexOf("- " + name + ":");
+            assertTrue(next > at, name + " is missing or out of order");
+            at = next;
+        }
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────

@@ -7,8 +7,9 @@ import java.util.List;
 
 /**
  * The SDK's tools for the AI assistant that drives Studio: look at what the bot sees ({@link LookTools}), make
- * its pictures and places ({@link PictureTools}) and tag the pictures ({@link TagTools}), shape its activity flow ({@link FlowTools}), and set where it
- * looks and how it runs ({@link SetupTools}).
+ * its pictures and places ({@link PictureTools}) and tag the pictures ({@link TagTools}), shape its activity flow ({@link FlowTools}), set where it
+ * looks and how it runs ({@link SetupTools}), and keep the bot's notes on its game and the protocol's steps for
+ * where it stands ({@link NotesTools}).
  *
  * <p>Coordinates are the <b>screenshot's</b> pixels: {@code (0, 0)} is the top-left of what {@code screenshot}
  * returned, so the assistant crops what it was shown. Every write goes through the same path as the SDK's own
@@ -22,77 +23,52 @@ public final class SdkAssist {
 
     /** Every tool, by group. */
     public static final List<AssistantTool<?>> ALL = join(LookTools.TOOLS, ActTools.TOOLS, PictureTools.TOOLS,
-            TagTools.TOOLS, FlowTools.TOOLS, SetupTools.TOOLS);
+            TagTools.TOOLS, FlowTools.TOOLS, SetupTools.TOOLS, NotesTools.TOOLS);
 
     /**
      * How a bot on the SDK is laid out, said to the assistant beside these tools: a bot is its activities, and a
      * flow says which runs next. What the gamebot template's {@code Gamebot} javadoc tells a person, said as rules.
+     * It names the {@link Protocol}'s stages only: read_guide gives the steps of the one the bot is at.
      */
     public static final String GUIDE = """
-            A bot is a set of activities and a flow that says which runs next.
+            A bot is a set of activities and a flow that says which runs next. Automating a game goes through
+            stages: Setup once; then each screen through Discovery, Build and Trial, in that order; Tuning once
+            its trial passed; Upkeep when the game changes. Never write a body for a screen not yet surveyed:
+            it would miss the game's own controls.
+            - read_guide gives the steps of the stage the bot is at, worked out from its home and popups
+              methods and its notes (read_notes, write_notes), and where each screen stands; read_guide with a
+              stage gives another's. Read it before starting, and again whenever a stage's check passes.
+            - When a stage's check passes for a screen, write_notes that screen's section with its new Stage
+              line, and what the stage taught about the game, before going on.
+            - Stage 0, Setup: the game in view, a home method and a popups method.
+            - Stage 1, Discovery: map every way out of home, then survey each screen's every input, its help
+              first, before following any one of them.
+            - Stage 2, Build: one chore at a time, through the game's own shortcuts, each step proved by a
+              picture.
+            - Stage 3, Trial: each activity from three states (work to do, nothing to do, interrupted), then
+              the whole flow.
+            - Stage 4, Tuning: faster, once it is right.
+            - Stage 5, Upkeep: a marker or an entrance stops being found.
+
+            The bot's shape
             - One activity per chore (collect the loot, claim the quests, fight the boss). add_activity adds
               its card and its enum in Activities, whose constants are the outcomes it can report (NEXT to
-              start with). Its work is a public static body() in a class of its own, returning that enum. A
-              body does one unit of work, returns, and never loops forever: the flow repeats it.
+              start with; connect on an outcome it has not got yet adds it). Its work is a public static
+              body() in a class of its own, returning that enum. A body does one unit of work, returns, and
+              never loops forever: the flow repeats it.
             - The flow (read_flow, connect, set_start, add_flow) wires each outcome to the next activity. Put
               the order of chores there, never in a body calling another body.
             - Navigation lives in one place: the home method takes the game back to the screen every
               activity starts from, safe to call at any moment. Make it with add_method, then name it with
               set_flow_method. An activity that needs another screen opens it from there in its own body.
             - Popups the game opens on its own (an offer, a mail, a level-up) are no body's business: one
-              popups method clears them (ImageFinder.whileFindAny of their close buttons, clickLast), named
-              with set_flow_method popups, and the run calls it before every look at the screen of every
-              activity. A body that works through a popup-shaped screen itself switches it off around that
-              step with PopupGuard.enabled(false), and back on after.
+              popups method clears them, named with set_flow_method popups, and the run calls it before every
+              look at the screen of every activity. A body that works through a popup-shaped screen itself
+              switches it off around that step with PopupGuard.enabled(false), and back on after.
             - Pictures, points and regions are the bot's constants (Pictures.CLAIM_RESEARCH): one per idea and
-              place, named <idea>_<where>; the same idea on another screen is another picture. On a screen
-              reached for the first time, cut every button and marker a chore will need from one screenshot,
-              not one per trip. Cut a button's image, not its label: a label's text changes with the game's
-              language and shows through to a moving background; leave out the corner a badge (a red count
-              or bell) comes and goes on, and any part that moves (crop_picture refuses a box that changes
-              within a second: cut a still part). Tag each picture with the
-              activity that uses it, or a custom tag (declare_tag) for home and popups: crop_picture takes
-              tags, list_tags shows them.
-            - Survey a screen before following any one control on it: one whole screenshot, then name every
-              input and what it does, its help (an i or ? button) first; each new word in an answer's
-              Appeared list is a question. Games ship their own shortcuts for chores (Auto, x10, Max, Claim
-              all, Skip): use one before writing a loop that repeats a click. After a run, look at the whole
-              screen again: a badge that came back is work left.
-            - Before writing a step, find it: describe looks, click, key and scroll act, and all four answer
-              in text. Then write it in the activity's body and run_activity it.
-            - A click can be missed and a screen can be slow (lag, a dropped connection), so a step repeats
-              until the screen shows it worked, never clicks once and trusts it. The home method, for one:
-              its marker is a picture no other screen shows (a sidebar icon shown everywhere is not one), and
-              it stays visible under a popup. untilFind(marker, action) presses Escape and gives the game
-              the bot's patience (BotSettings.patience, 3 s) to show the marker before it presses again;
-              untilFind(marker, Duration, action) for a slower screen. No ImageWaiter.waitFor inside the
-              action. Then whileFindAny(the group of close and claim buttons) clears what still covers home;
-              each round waits for what it acted on to change before it looks again. An Escape too many on
-              home may open the game's exit dialog; its close button belongs in that group. A loop that runs
-              BotSettings.maxRounds rounds (50) without ending throws BotStuckException, and the run recovers
-              through the home method, restarting the game when that fails too: a body does not count its
-              own tries.
-            - Write a body foolproof, out of the loop methods that take a lambda: ImageFinder.whileFindAny,
-              whileFindAll, ifFindAny (group, found -> …), whileFindCompare (good, bad, found -> …),
-              untilFind(picture, action).
-              Each pass looks at the screen again, so a missed click or a slow screen is retried, not
-              trusted. Build the logic from what the lambda is handed (its parameter by var:<its name>):
-              found.has(X) and found.get(X) say which pictures this frame shows, ImageClicker.click(
-              found.get(X)) or clickLast() act on them without looking again. A group is
-              ImageTemplateGroup.of(…, …). No loop blocks, no chain of separate find-then-click calls.
-            - Click pictures, never places: no Mouse.click on a Spot or on x, y, which cannot tell whether
-              they landed. A tab or button gets a picture. Scroll and drag on pictures too:
-              ImageScroller.scrollAt(item, notches), drag(item, dx, dy) (fractions of the game's window) and
-              drag(from, to) answer whether the picture moved, so a page loop is
-              untilFind(LIST_END, () -> ImageScroller.scrollAt(LIST_ITEM, -3)).
-            - Prove each step by a picture of its result, never by time: the loop's own picture coming or
-              going, or ImageWaiter.waitFor / waitUntilGone of a picture only that screen or state shows
-              (a close button is on every screen: not a marker). Screen.waitStable and Wait guess, they prove
-              nothing. Every click then pauses the bot's found delay (500 ms unless set): a bot whose steps all
-              prove themselves this way runs faster with it at 150 (set_setting).
-            - Matching ignores colour: a lit button and its greyed-out twin both match (crop_picture says
-              where else a cut is found). Cut the twin too and act with the compare forms, the lit one as
-              good and the twin as bad: ImageFinder.whileFindCompare(good, bad, action), clickCompare.
+              place, named <idea>_<where>; the same idea on another screen is another picture. Tag each
+              picture with the activity that uses it, or a custom tag (declare_tag) for home and popups:
+              crop_picture takes tags, list_tags shows them.
             - A run's choices (which flow, which activity is on) are @Param fields, never run properties.
             """;
 
