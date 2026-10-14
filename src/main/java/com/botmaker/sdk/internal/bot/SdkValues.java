@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -137,6 +138,18 @@ public final class SdkValues {
                     + " game shows to add or fix one.");
 
     /**
+     * The game's screens — {@code static final GameScreen CAMPAIGN = GameScreen.named("Campaign")…}. A screen names
+     * the one it is reached from as that constant, read by name like a sub-flow ({@link BotConstants#screen}), so a
+     * screen equal to another, or not filled in yet, is still its own.
+     */
+    public static final ManagedValue<GameScreen> SCREEN_MAP = ManagedValue.openSet(SdkValue.Id.SCREEN_MAP)
+            .of(GameScreen.class)
+            .referredToAs(BotConstants::screen)
+            .in("Screens")
+            .because("Screens.java is the game's map, as Discovery found it. Fill it in with ▶ Try in 🗺 Screens, or"
+                    + " ask Claude to try_input on the game.");
+
+    /**
      * The bot's screen size — {@code new Size(1280, 720)}: the frame its pictures were cut from, which a picture
      * names apart only when it was cut from another ({@code .in(Size)}). Written by the first picture cut while it
      * is {@code 0×0}, which is no size: pictures are matched as they are, and a private display is made at the
@@ -221,9 +234,9 @@ public final class SdkValues {
             .when(SdkValues::vmApplies)
             .because(GAME_PARAM);
 
-    /** All sixteen, in the order the plugin declares them. */
+    /** All seventeen, in the order the plugin declares them. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOWS, RUN, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            ACTIVITIES, SPOTS, ZONES, DIGITS, SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, VM);
+            ACTIVITIES, SPOTS, ZONES, DIGITS, SCREEN_MAP, SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, VM);
 
     private static boolean claimed;
 

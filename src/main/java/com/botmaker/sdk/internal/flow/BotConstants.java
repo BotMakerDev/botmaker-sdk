@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.flow;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.screens.GameScreen;
 
 import java.util.List;
 
@@ -58,6 +59,24 @@ public final class BotConstants {
     public static Flow flow(String name) {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("A flow reference needs a name");
         return new Flow(List.of(), List.of(), new Activity(REFERENCE + name), Flow.Limits.DEFAULT);
+    }
+
+    /**
+     * The bot's screen {@code name}, {@code Screens.HOME}, as an editor holds a reference to it: a screen called by
+     * the reference mark and the constant's name, with nothing else, equal to another only when it names the same
+     * constant ({@code ManagedValue.referredToAs}). A run never meets one: there {@code Way.from} holds the screen.
+     *
+     * @throws IllegalArgumentException for a blank name, which names no constant
+     */
+    public static GameScreen screen(String name) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("A screen reference needs a name");
+        return GameScreen.named(REFERENCE + name);
+    }
+
+    /** The constant {@code screen} refers to when it is a {@link #screen} reference, {@code HOME}; else null. */
+    public static String screenName(GameScreen screen) {
+        return screen != null && screen.name() != null && screen.name().startsWith(REFERENCE)
+                && screen.equals(GameScreen.named(screen.name())) ? screen.name().substring(REFERENCE.length()) : null;
     }
 
     /** The constant {@code flow} refers to when it is a {@link #flow} reference, {@code DAILY}; else null. */

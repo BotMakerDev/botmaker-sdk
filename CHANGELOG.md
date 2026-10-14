@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The game's screen map as Java (`api.screens`).** A bot's `Screens` class holds one `GameScreen` constant per
+  screen: its marker picture, the way in it was found by (`from(Way.of(HOME, Input.click(…)))`), other ways in
+  (`alsoFrom`), its way back, and its inputs (`Input.click`, `key`, `scroll`). Each input says what it did
+  (`Did.IN_PLACE`, `NONE`), its `Kind`, or why it is never done; `sometimes()` marks one that comes and goes,
+  `locked(picture)` one proved locked, and `popup()` a screen outside the tree. It is the managed value
+  `SCREEN_MAP`; a screen named inside another is held by its constant, like a sub-flow. Nothing reads or walks it
+  yet.
 - **`Rect.translate(dx, dy)`**: the same region moved, its size kept. A match found in a part of the screen
   goes back to the whole screen with the part's top-left.
 - **`Key.named(String)`** reads a key a person typed: as the enum names it (`PAGE_UP`, `page up`), as printed on

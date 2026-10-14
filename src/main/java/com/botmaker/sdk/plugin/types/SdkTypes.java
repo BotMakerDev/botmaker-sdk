@@ -356,7 +356,7 @@ public final class SdkTypes {
      * value rather than a string.
      */
     public static final List<ComponentType<?>> PARTS = Stream.of(
-                    FlowTypes.ALL, CaptureTypes.ALL, SettingsTypes.ALL, PRECISION_WITHERS, OCR_CHAINS,
+                    FlowTypes.ALL, ScreenTypes.ALL, CaptureTypes.ALL, SettingsTypes.ALL, PRECISION_WITHERS, OCR_CHAINS,
                     List.of(COMBO_HELD, STEP))
             .<ComponentType<?>>flatMap(List::stream).toList();
 }
