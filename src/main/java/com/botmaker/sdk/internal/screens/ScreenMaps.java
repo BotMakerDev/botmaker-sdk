@@ -17,7 +17,44 @@ public final class ScreenMaps {
     /** The class the screen constants live in, beside {@code Sdk}. */
     public static final String HOLDER = "Screens";
 
+    /** The map the running bot holds, set at its start; empty before. */
+    private static volatile ScreenGraph installed = ScreenGraph.of(Map.of());
+
     private ScreenMaps() {}
+
+    /**
+     * Learns the running bot's map: the {@code Screens} class beside the first of {@code holders} ({@code Sdk.class})
+     * that has one. A bot with none walks an empty map.
+     */
+    public static void install(Class<?>... holders) {
+        ScreenGraph found = ScreenGraph.of(Map.of());
+        for (Class<?> holder : holders == null ? new Class<?>[0] : holders) {
+            Optional<ScreenGraph> map = beside(holder);
+            if (map.isPresent()) {
+                found = map.get();
+                break;
+            }
+        }
+        installed = found;
+        last = null;
+    }
+
+    /** The screen of the installed map the game was last seen on: a walk looks for its neighbours first. */
+    private static volatile String last;
+
+    public static String lastSeen() {
+        return last;
+    }
+
+    /** Remembers {@code constant} as the screen the game was last seen on; a popup is never one. */
+    public static void seen(String constant) {
+        if (constant != null && installed.screen(constant).filter(s -> !s.isPopup()).isPresent()) last = constant;
+    }
+
+    /** The running bot's map, as {@link #install} learned it. */
+    public static ScreenGraph installed() {
+        return installed;
+    }
 
     /**
      * The map in the {@code Screens} class beside {@code holder}; empty when the bot has none. A map whose constants

@@ -177,20 +177,19 @@ final class ActTools {
 
     /** {@code picture}'s best match, when a run would find it; {@code acted} says what was not done otherwise. */
     private static Spotted spot(String picture, String acted, AgentContext context) {
-        Optional<Path> resources = Frames.resources(context);
-        if (resources.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noProject()));
-        Optional<String> base = Frames.picture(resources.get(), picture);
+        Optional<ToolReach> reach = ToolReach.of(context);
+        if (reach.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noProject()));
+        Optional<String> base = Frames.picture(reach.get().resources(), picture);
         if (base.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noPicture(picture)));
-        Optional<BufferedImage> frame = Frames.look(context);
+        Optional<BufferedImage> frame = reach.get().look();
         if (frame.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noScreen()));
-        MatchResult match = LookTools.best(resources.get(), base.get(), frame.get());
-        double needs = Frames.confidence(context.services());
-        if (!match.isFound() || match.confidence() < needs) {
+        MatchResult match = reach.get().best(base.get(), frame.get());
+        if (!reach.get().clears(match)) {
             return Spotted.no(AgentReply.text(base.get() + " is not on the screen (best "
                     + (match.isFound() ? Frames.score(match.confidence()) : "none") + ", a run needs "
-                    + Frames.score(needs) + "); nothing was " + acted + "."));
+                    + Frames.score(reach.get().confidence()) + "); nothing was " + acted + "."));
         }
-        return new Spotted(frame.get(), match.rect().center(), base.get(), null);
+        return new Spotted(frame.get(), reach.get().pointOn(match.rect()), base.get(), null);
     }
 
     /** Why the game is not on {@code screen}, when its {@code marker} is not on a fresh look: try_input refuses. */
@@ -454,7 +453,7 @@ final class ActTools {
     }
 
     /** The hands for where {@link Frames#look} reads, in its order. */
-    private static Hands hands(AgentContext context) {
+    static Hands hands(AgentContext context) {
         PrivateSession session = Frames.session(context);
         if (session != null) return new InSession(session);
         CaptureSource emulator = Frames.emulator(context);

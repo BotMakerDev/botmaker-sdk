@@ -23,4 +23,7 @@ public interface BotObserver {
 
     /** The flow entered the activity labelled {@code label}. */
     default void onActivity(String label) {}
+
+    /** A walk of the bot's screen map reached the screen the game calls {@code name}. */
+    default void onScreen(String name) {}
 }

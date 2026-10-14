@@ -26,8 +26,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   (`alsoFrom`), its way back, and its inputs (`Input.click`, `key`, `scroll`). Each input says what it did
   (`Did.IN_PLACE`, `NONE`), its `Kind`, or why it is never done; `sometimes()` marks one that comes and goes,
   `locked(picture)` one proved locked, and `popup()` a screen outside the tree. It is the managed value
-  `SCREEN_MAP`; a screen named inside another is held by its constant, like a sub-flow. Nothing reads or walks it
-  yet.
+  `SCREEN_MAP`; a screen named inside another is held by its constant, like a sub-flow.
+- **`Navigate.to(Screens.X)`** walks the map at run time. It finds which screen the game shows by its marker, does
+  each input on the shortest way, and waits up to 10 s for each next marker. A popup that shows is closed first,
+  and a step that lands elsewhere is planned again from there. It answers false when the way passes an input that
+  comes and goes and is not showing, or a locked one, and for a popup, which shows on its own. It throws
+  `BotStuckException` when the game is on no screen of the map, steps keep landing elsewhere, or a picture on the
+  map's way is gone. `Navigate.isOn` and `Navigate.where` say where the game is. `runFlow` and
+  `trial` read the bot's `Screens` class. Not in the palette yet.
 - **`Rect.translate(dx, dy)`**: the same region moved, its size kept. A match found in a part of the screen
   goes back to the whole screen with the part's top-left.
 - **`Key.named(String)`** reads a key a person typed: as the enum names it (`PAGE_UP`, `page up`), as printed on

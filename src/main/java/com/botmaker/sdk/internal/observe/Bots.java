@@ -73,6 +73,16 @@ public final class Bots {
         }
     }
 
+    /** Tells every observer a walk of the screen map reached the screen called {@code name}. */
+    public static void fireScreen(String name) {
+        for (BotObserver observer : OBSERVERS) {
+            try {
+                observer.onScreen(name);
+            } catch (RuntimeException ignored) {
+            }
+        }
+    }
+
     /** Dispatches a swipe event to every observer; a misbehaving observer cannot break the bot. */
     public static void fireSwipe(SwipeEvent event) {
         for (BotObserver observer : OBSERVERS) {

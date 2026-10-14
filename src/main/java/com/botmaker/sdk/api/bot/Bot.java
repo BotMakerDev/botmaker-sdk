@@ -20,6 +20,7 @@ import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.flow.SkippedActivities;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.observe.IpcObserver;
+import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.vision.BotScreen;
@@ -100,6 +101,7 @@ public class Bot {
         ManagedValues.install(values);
         InstalledGame.install(values);
         InstalledRun.nameFlows(values);
+        ScreenMaps.install(values);
         if (InstalledGame.marked(SdkValue.Id.FLOW, values) instanceof Flow flow) InstalledRun.walk(flow);
         else {
             InstalledRun.walk(null);
@@ -137,6 +139,7 @@ public class Bot {
         SdkValues.claim();
         ManagedValues.install(values);
         InstalledGame.install(values);
+        ScreenMaps.install(values);
         SessionBootstrap.joinOffered();
         installPopups();
         try {
