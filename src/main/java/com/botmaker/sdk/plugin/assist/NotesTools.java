@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.flow.FlowValue;
 
 import java.io.UncheckedIOException;
@@ -19,10 +20,12 @@ import java.util.Optional;
  */
 final class NotesTools {
 
-    record Section(@Describe(value = "one section's heading: Map; empty for all", optional = true) String section) {
+    record Section(@Describe(value = "one section's heading: Campaign; empty for all", optional = true)
+                   String section) {
     }
 
-    record Note(@Describe("the section's heading, one line: Map, or a screen's name as the map gives it") String section,
+    record Note(@Describe("the section's heading, one line: a screen's name as the game shows it, or a topic: "
+            + "Getting around") String section,
                 @Describe("its whole new text, Markdown; empty removes the section") String text) {
     }
 
@@ -33,8 +36,8 @@ final class NotesTools {
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("read_notes")
                     .describedAs("Read the bot's notes on its game (" + GameNotes.FILE + "): what earlier sessions "
-                            + "learnt automating it, the map of its screens and where each stands. Read them before "
-                            + "exploring")
+                            + "learnt automating it, what each screen holds and where each stands. Read them before "
+                            + "exploring; the map of the screens is the bot's Screens class")
                     .takes(Section.class).handledBy(NotesTools::readNotes),
             AssistantTool.named("write_notes")
                     .describedAs("Save what you learnt about the game in the bot's notes (" + GameNotes.FILE + "), "
@@ -43,8 +46,9 @@ final class NotesTools {
                             + "first to keep what holds")
                     .takes(Note.class).handledBy(NotesTools::writeNotes),
             AssistantTool.named("read_guide")
-                    .describedAs("The steps of the stage the bot is at, worked out from its home and popups methods "
-                            + "and its notes (each screen's Stage line), with where each screen stands; or one "
+                    .describedAs("The steps of the stage the bot is at, worked out from its home and popups methods, "
+                            + "its Screens and its notes (each screen's Stage line), with where each screen stands; "
+                            + "or one "
                             + "stage's steps by its number or name. Read it before starting and whenever a stage's "
                             + "check passes")
                     .takes(Which.class).handledBy(NotesTools::readGuide));
@@ -87,9 +91,10 @@ final class NotesTools {
         FlowValue.Target target = FxCall.call(() -> FlowValue.target(services));
         if (target.problem() != null) return AgentReply.refused(target.problem());
         try {
+            ScreenGraph map = FxCall.call(() -> ScreenBook.read(services));
             return AgentReply.text(Protocol.where(target.run().home() != null, target.run().popups() != null,
-                    GameNotes.sections(project)).said());
-        } catch (IllegalArgumentException | UncheckedIOException e) {
+                    map, GameNotes.sections(project)).said());
+        } catch (IllegalArgumentException | IllegalStateException | UncheckedIOException e) {
             return AgentReply.refused(e.getMessage());
         }
     }

@@ -34,6 +34,22 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `BotStuckException` when the game is on no screen of the map, steps keep landing elsewhere, or a picture on the
   map's way is gone. `Navigate.isOn` and `Navigate.where` say where the game is. `runFlow` and
   `trial` read the bot's `Screens` class. Not in the palette yet.
+- **The assistant's Discovery writes `Screens`, not GAME.md.** crop_picture with a screen adds an untried input
+  to that screen's constant; with `marker` it sets the marker, and on a bot with no map it starts the map's first
+  screen; `back` sets the screen's way back, `sometimes` marks an input that comes and goes, and `popup` with a
+  marker adds a popup. try_input records what each input did on its `Input`: an input that opens a screen adds the
+  screen below the others, reached from this one and owing its marker. One that leads to a screen already mapped
+  becomes a way into it, or this screen's way back. When the map cannot name that screen from here, the input
+  says `Did.LEAVES`. try_input also takes `locked` (the lock's picture) and `kind`. The order of Discovery comes
+  from the graph: a screen opened is finished before the next input of the one it was opened from. A marker still
+  owed holds every other screen back, unless the screen's notes say why with `Owed: marker — <why>`.
+- **go_to_screen** walks the game to a screen of the map, as `Navigate.to` does at run time. **which_screen** first
+  says which screen of the map the game shows, by the markers, nearest the last one seen first.
+- **read_guide reads where the bot stands from `Screens` and the notes.** Discovery stays open while the map has
+  no screen, or owes a marker or an untried input, or the notes owe something. Each screen's stage is still the
+  `Stage:` line of its section in GAME.md. GAME.md now keeps prose only: what a screen spends and earns, its
+  timers, badges and quirks. Its old Map, Entrance, Marker, Untried, `- tried` and Shape lines are no longer read;
+  a game mapped that way is discovered again.
 - **`Rect.translate(dx, dy)`**: the same region moved, its size kept. A match found in a part of the screen
   goes back to the whole screen with the part's top-left.
 - **`Key.named(String)`** reads a key a person typed: as the enum names it (`PAGE_UP`, `page up`), as printed on

@@ -67,7 +67,8 @@ public final class ScreenWalk {
         return reach.look().flatMap(frame -> whereOn(frame, near));
     }
 
-    Optional<String> whereOn(BufferedImage frame, String near) {
+    /** The same, on {@code frame}: a look taken already. */
+    public Optional<String> whereOn(BufferedImage frame, String near) {
         Set<String> order = new LinkedHashSet<>();
         if (near != null && graph.screens().containsKey(near)) {
             order.add(near);

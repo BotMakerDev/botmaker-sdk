@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Way;
@@ -12,6 +13,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -94,6 +96,23 @@ public final class ScreenGraph {
         return screen(constant).map(GameScreen::from).flatMap(way -> constantOf(way.from()));
     }
 
+    /**
+     * The screens {@code constant}'s ways in name, and theirs in turn: each must be declared above it, since Java reads
+     * a constant only once it is declared.
+     */
+    public Set<String> dependsOn(String constant) {
+        Set<String> found = new LinkedHashSet<>();
+        Deque<String> next = new ArrayDeque<>(List.of(constant));
+        while (!next.isEmpty() && found.size() < DEEPEST * DEEPEST) {
+            GameScreen screen = screens.get(next.poll());
+            if (screen == null) continue;
+            for (Way way : ways(screen)) {
+                constantOf(way.from()).filter(found::add).ifPresent(next::add);
+            }
+        }
+        return found;
+    }
+
     /** The screens made known from {@code constant}, in declared order. */
     public List<String> children(String constant) {
         return screens.keySet().stream().filter(c -> !c.equals(constant))
@@ -133,9 +152,17 @@ public final class ScreenGraph {
         return inputs(constant).stream().anyMatch(i -> tried(constant, i));
     }
 
-    /** Whether {@code constant} still has inputs to try, or none cut yet: every screen has one, its way out. */
+    /**
+     * Whether {@code constant} still has inputs to try, or none cut yet: every screen has one, its way out, which
+     * counts once it is the screen's {@code back}.
+     */
     public boolean unfinished(String constant) {
-        return inputs(constant).isEmpty() || !untried(constant).isEmpty();
+        return noneCut(constant) || !untried(constant).isEmpty();
+    }
+
+    private boolean noneCut(String constant) {
+        GameScreen screen = screens.get(constant);
+        return inputs(constant).isEmpty() && (screen == null || screen.back() == null);
     }
 
     /** The first screen, popups included, with no marker yet. */
@@ -203,7 +230,7 @@ public final class ScreenGraph {
         boolean opened = false;
         for (Input input : inputs(constant)) {
             if (input.never() != null || input.lock() != null || input.act() == Input.Act.SCROLL
-                    || !tried(constant, input)) {
+                    || input.did() == Did.LEAVES || !tried(constant, input)) {
                 continue;
             }
             if (opens(constant, input).isEmpty()) return Optional.of(Shape.ACTIVITY);
@@ -305,7 +332,7 @@ public final class ScreenGraph {
             if (screens.get(c).marker() == null) owed.add(name + ": marker");
             List<Input> untried = untried(c);
             if (!untried.isEmpty()) owed.add(name + ": untried " + labels(untried));
-            else if (inputs(c).isEmpty()) owed.add(name + ": no input cut yet");
+            else if (noneCut(c) && !screens.get(c).isPopup()) owed.add(name + ": no input cut yet");
             List<Input> unseen = unseen(c);
             if (!unseen.isEmpty()) owed.add(name + ": never seen to try " + labels(unseen) + " (comes and goes)");
         }

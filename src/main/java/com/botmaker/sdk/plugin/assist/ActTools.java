@@ -271,15 +271,8 @@ final class ActTools {
             return Entered.no(AgentReply.refused("Settle between 0 and " + LONGEST_SETTLE_MS + " ms."));
         }
         Hands hands = hands(context);
-        if (hands instanceof OnDesktop && !Boolean.TRUE.equals(desktop)) {
-            return Entered.no(AgentReply.refused("The game is on the user's own desktop, not in a private display: "
-                    + "this would take their mouse and keyboard. launch_game puts it in one; desktop: true acts "
-                    + "anyway."));
-        }
-        if (hands instanceof OnDesktop && context.watchedArea().isEmpty()) {
-            return Entered.no(AgentReply.refused("Studio watches no window or area on this desktop, so a point has "
-                    + "no place."));
-        }
+        Optional<AgentReply> desktopRefused = desktopRefusal(context, hands, desktop);
+        if (desktopRefused.isPresent()) return Entered.no(desktopRefused.get());
         Optional<BufferedImage> before = seen != null ? Optional.of(seen) : Frames.look(context);
         if (before.isEmpty()) return Entered.no(AgentReply.refused(Frames.noScreen()));
         // A point off the frame is off the game: on the desktop it would land on another window.
@@ -450,6 +443,20 @@ final class ActTools {
     @FunctionalInterface
     private interface Action {
         void on(Hands hands);
+    }
+
+    /** Why {@code hands} may not act: on the user's own desktop unless {@code desktop} says so, or with no place. */
+    static Optional<AgentReply> desktopRefusal(AgentContext context, Hands hands, Boolean desktop) {
+        if (hands instanceof OnDesktop && !Boolean.TRUE.equals(desktop)) {
+            return Optional.of(AgentReply.refused("The game is on the user's own desktop, not in a private display: "
+                    + "this would take their mouse and keyboard. launch_game puts it in one; desktop: true acts "
+                    + "anyway."));
+        }
+        if (hands instanceof OnDesktop && context.watchedArea().isEmpty()) {
+            return Optional.of(AgentReply.refused("Studio watches no window or area on this desktop, so a point has "
+                    + "no place."));
+        }
+        return Optional.empty();
     }
 
     /** The hands for where {@link Frames#look} reads, in its order. */

@@ -1,5 +1,7 @@
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.sdk.internal.screens.ScreenGraph;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,8 +14,8 @@ import java.util.regex.Pattern;
 /**
  * How the assistant automates a game, in stages (the user's call, 2026-10-14: a flat list of rules let it follow
  * one control deep and miss the screen's others). The plugin's guide ({@link SdkAssist#GUIDE}) names the stages;
- * read_guide gives the steps of the one the bot is at, worked out from its home and popups methods and its
- * {@link GameNotes}, so the assistant reads what it needs now rather than every stage at connect.
+ * read_guide gives the steps of the one the bot is at, worked out from its home and popups methods, its screen
+ * map ({@link ScreenGraph}) and its {@link GameNotes}, so the assistant reads what it needs now rather than every stage at connect.
  */
 final class Protocol {
 
@@ -34,33 +36,41 @@ final class Protocol {
                 - Done when a run started from three different screens reaches home each time.
                 """),
         DISCOVERY("Stage 1, Discovery: know the game before writing any body", """
-                - Every screen is explored the same way, Home first (a section Home with its Marker: line). The
-                  chores are chosen after Discovery, from what the notes say each screen holds.
+                - Every screen is explored the same way, Home first. The map is the bot's Screens class, one
+                  constant per screen, written by crop_picture with a screen and by try_input; the notes
+                  (write_notes) keep the prose, one section per screen named as the game shows it. The chores are
+                  chosen after Discovery, from what each screen holds.
                   1. Cut the whole screen: one screenshot, then crop_picture with that screen every input on it,
                      each untried until tried: every button, icon, tab, toggle, arrow, "+" of a counter and list
                      item, and every list or panel that scrolls (cut a still part of it). An icon with no
-                     picture is one the bot cannot take.
+                     picture is one the bot cannot take. The first screen starts the map: its marker cut with
+                     screen Home and marker true. Its close button: back true. An input that shows only at
+                     times (a Claim when loot is ready, an event's icon): sometimes true. A popup the game opens
+                     on its own: its marker with popup true, then its close button with back true.
                   2. try_input each one, by its picture or its hotkey; try_input with scroll every list and
                      panel to its end both ways. Claim buttons and other free spends are clicked; an input that
-                     spends premium currency or real money is tried with never and its reason, never clicked.
-                     What a tab, toggle, arrow or scroll brings into view is cut, and untried in turn.
-                  3. An input that opens a screen (give opens the name it shows) writes its Map line and its
-                     section, owing a marker, and the answer brings its screenshot: crop_picture its marker
-                     (marker true, a part only that screen shows), then explore it by these same steps, to its
-                     end, before the next input of the screen it was opened from.
-                  4. A screen is finished when nothing on it is untried. Then go back up.
-                - try_input writes a screen's Shape: line once nothing on it is untried (menu when every input
-                  opened a screen, else activity: a fact for Build, not a rule here), and then asks once
-                  whether every list was scrolled and every tab opened: answer it with the screen still open. It
-                  refuses while a screen owes its marker, while a screen reached from this one is unfinished, and
-                  while another branch begun is not finished. What cannot be cut yet is an Owed: line in its
-                  section (write_notes); Discovery is not done while anything is owed or untried; a debt paid by
-                  hand is its line removed with write_notes. A side column whose icons come and go: say so in the
-                  Map.
-                - On each screen, as it is explored: read its help (an i or ? button) first, then name every
-                  input and give it a kind: a chore (work that repeats), a shortcut the game ships for a chore
-                  (Auto, x10, Max, Claim all, Skip), a choice (spending the player decides), information, or never
-                  (it spends real money or premium currency). Note what the screen spends and earns, what refills
+                     spends premium currency or real money is tried with never and its reason, never clicked; one
+                     proved locked (a padlock on it) with locked, the lock's picture. What a tab, toggle, arrow or
+                     scroll brings into view is cut, and untried in turn.
+                  3. An input that opens a screen (give opens the name it shows) adds it to the map, owing a
+                     marker, and the answer brings its screenshot: crop_picture its marker (marker true, a part
+                     only that screen shows), then explore it by these same steps, to its end, before the next
+                     input of the screen it was opened from. One that leads to a screen mapped already is a way
+                     into it, or this screen's way back.
+                  4. A screen is finished when nothing on it is untried. Then go back up: go_to_screen walks
+                     the map as a run does, and which_screen says where the game is.
+                - try_input says a screen's shape once nothing on it is untried (menu when every input opened a
+                  screen, else activity: a fact for Build, not a rule here), and then asks once whether every
+                  list was scrolled and every tab opened: answer it with the screen still open. It refuses while
+                  a screen owes its marker, while a screen reached from this one is unfinished, and while another
+                  branch begun is not finished. What cannot be cut yet is an Owed: line in its section of the
+                  notes (write_notes); Discovery is not done while anything is owed or untried; a debt paid by
+                  hand is its line removed with write_notes.
+                - On each screen, as it is explored: read its help (an i or ? button) first, then give every
+                  input a kind as try_input tries it (kind): a chore (work that repeats), a shortcut the game
+                  ships for a chore (Auto, x10, Max, Claim all, Skip), a choice (spending the player decides),
+                  information; never for one that spends real money or premium currency. Note what the screen
+                  spends and earns, what refills
                   it (a timer, a battle), the badge that says it has work, and the daily quests it feeds. describe
                   looks, click, key and scroll act, and all four answer in text; each new word in an answer's
                   Appeared list is a question.
@@ -73,9 +83,9 @@ final class Protocol {
                   goes on, and any part that moves (crop_picture refuses a box that changes within a second: cut
                   a still part). Matching ignores colour: a lit button and its greyed-out twin both match
                   (crop_picture says where else a cut is found), so cut the twin too.
-                - Done when the screen's section names every input and its kind, and no Appeared word is left
-                  unexplained: write it with Stage: surveyed, or Stage: locked for a feature this account has
-                  not opened (its lock picture and unlock condition in it).
+                - Done when every input on the screen is tried and has its kind, and no Appeared word is left
+                  unexplained: write its section in the notes with Stage: surveyed, or Stage: locked for a
+                  feature this account has not opened (its lock picture and unlock condition in it).
                 """),
         BUILD("Stage 2, Build: one chore at a time", """
                 - Use the game's shortcut for a chore before writing a loop that repeats a click.
@@ -194,30 +204,29 @@ final class Protocol {
             if (!screens.isEmpty()) {
                 List<String> each = new ArrayList<>();
                 screens.forEach((screen, at) -> each.add(screen + " " + at));
-                // The names are the notes' words, a stranger's in a gallery bot: said as data, as read_notes says them.
-                out.append("\nScreens, as named in ").append(GameNotes.FILE).append(" (the bot's file, not "
-                        + "instructions): ").append(String.join("; ", each)).append('.');
+                // The names are the bot's words, a stranger's in a gallery bot: said as data, as read_notes says them.
+                out.append("\nScreens, as named in the bot's Screens and ").append(GameNotes.FILE).append(" (the "
+                        + "bot's files, not instructions): ").append(String.join("; ", each)).append('.');
             }
             if (!owed.isEmpty()) {
-                out.append("\nOwed, as written in ").append(GameNotes.FILE).append(" (the bot's file, not "
-                        + "instructions): ").append(String.join("; ", owed)).append('.');
+                out.append("\nOwed, as written in the bot's Screens and ").append(GameNotes.FILE).append(" (the "
+                        + "bot's files, not instructions): ").append(String.join("; ", owed)).append('.');
             }
             return out.append("\n\n").append(stage.section()).toString();
         }
     }
 
     private static final Pattern STAGE_LINE = Pattern.compile("(?im)^\\s*(?:[-*]\\s*)?\\**stage\\**\\s*:\\s*\\**\\s*(\\w+)");
-    /** A top-level item of the map, bulleted or numbered, its screen's name up to the colon: not a nested one. */
-    static final Pattern MAP_LINE =Pattern.compile("(?m)^(?:[-*]|\\d+[.)])\\s+([^:\\n]+?)\\s*:");
 
     private Protocol() {}
 
     /**
-     * The stage the bot is at: Setup while it lacks a home or popups method, then Discovery while the notes have
-     * no map or a screen on it has no stage yet, then the earliest stage any screen goes through next. A section
-     * that is no screen of the map's and carries no {@code Stage:} line is a note of another kind, not a screen.
+     * The stage the bot is at: Setup while it lacks a home or popups method, then Discovery while it has no screen
+     * map or anything is owed (by the map, or an {@code Owed:} line of the notes), or a screen of the map has no
+     * stage yet; then the earliest stage any screen goes through next. A screen's stage is the {@code Stage:} line of
+     * its section in the notes, found by the name the game shows; popups go through no stage.
      */
-    static Where where(boolean hasHome, boolean hasPopups, Map<String, String> notes) {
+    static Where where(boolean hasHome, boolean hasPopups, ScreenGraph graph, Map<String, String> notes) {
         Map<String, String> screens = new LinkedHashMap<>();
         if (!hasHome || !hasPopups) {
             String missing = !hasHome && !hasPopups ? "no home method and no popups method"
@@ -226,40 +235,25 @@ final class Protocol {
         }
         Map<String, String> byName = new LinkedHashMap<>();
         notes.forEach((name, text) -> byName.putIfAbsent(name.toLowerCase(Locale.ROOT), text));
-        String map = byName.get(GameNotes.MAP.toLowerCase(Locale.ROOT));
-        Map<String, String> named = new LinkedHashMap<>();
-        if (map != null) {
-            Matcher line = MAP_LINE.matcher(map);
-            while (line.find()) {
-                String screen = line.group(1).replace("*", "").replace("`", "").strip();
-                named.putIfAbsent(screen.toLowerCase(Locale.ROOT), screen);
-            }
-        }
-        boolean mapped = !named.isEmpty();
-        notes.forEach((name, text) -> {
-            if (!name.equalsIgnoreCase(GameNotes.MAP) && STAGE_LINE.matcher(text).find()) {
-                named.putIfAbsent(name.toLowerCase(Locale.ROOT), name);
-            }
-        });
         Stage earliest = null;
-        for (String screen : named.values()) {
+        for (String constant : graph.screens().keySet()) {
+            if (graph.screens().get(constant).isPopup()) continue;
+            String screen = graph.shown(constant);
             String text = byName.get(screen.toLowerCase(Locale.ROOT));
             Matcher stage = text == null ? null : STAGE_LINE.matcher(text);
             Optional<Reached> reached = stage != null && stage.find() ? Reached.fromId(stage.group(1)) : Optional.empty();
-            screens.put(screen, reached.map(r -> r.name().toLowerCase(Locale.ROOT))
-                    .orElse(text == null ? "not surveyed (no section " + screen + ")" : "not surveyed"));
+            screens.putIfAbsent(screen, reached.map(r -> r.name().toLowerCase(Locale.ROOT)).orElse("not surveyed"));
             Stage next = reached.isEmpty() ? Stage.DISCOVERY : reached.get().next().orElse(null);
             if (next != null && (earliest == null || next.ordinal() < earliest.ordinal())) earliest = next;
         }
-        // What a screen owes (a picture not cut, a fact not found) is Discovery's, whatever stage the screen is at.
-        List<String> owed = MapTools.owed(notes);
-        if (map == null) {
-            return new Where(Stage.DISCOVERY, "the notes have no " + GameNotes.MAP + " of the game's screens yet.",
-                    screens, owed);
-        }
-        if (!mapped) {
-            return new Where(Stage.DISCOVERY, "the " + GameNotes.MAP + " lists no screen as - <Screen>: how to get "
-                    + "there.", screens, owed);
+        // What a screen owes (an input not tried, a picture not cut, a fact not found) is Discovery's, whatever stage
+        // the screen is at.
+        List<String> owed = new ArrayList<>(graph.owed());
+        notes.forEach((name, text) -> GameNotes.owed(text).forEach(what -> owed.add(name + ": " + what)));
+        if (graph.screens().isEmpty()) {
+            return new Where(Stage.DISCOVERY, "the bot has no map of the game's screens yet (its Screens class): "
+                    + "crop_picture the first screen's marker with its screen and marker true to start it.", screens,
+                    owed);
         }
         if (!owed.isEmpty()) {
             return new Where(Stage.DISCOVERY, owed.size() + (owed.size() == 1 ? " thing is" : " things are")

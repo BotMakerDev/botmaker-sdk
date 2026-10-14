@@ -41,9 +41,9 @@ import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -77,10 +77,19 @@ final class PictureTools {
                 @Describe(value = "top edge of the part to skip", optional = true) Integer ignoreY,
                 @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
                 @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight,
-                @Describe(value = "the screen it is on, as its section names it: noted there as an input, untried "
-                        + "until try_input tries it, and tagged with the screen's tag", optional = true) String screen,
+                @Describe(value = "the screen it is on, as the bot's Screens names it: noted there as an input, "
+                        + "untried until try_input tries it, and tagged with the screen's tag", optional = true)
+                String screen,
                 @Describe(value = "true when it is that screen's marker, a part no other screen shows: pays the "
-                        + "marker try_input left owed", optional = true) Boolean marker) {
+                        + "marker try_input left owed, or starts the map's first screen", optional = true)
+                Boolean marker,
+                @Describe(value = "true when it is that screen's close button, its way back", optional = true)
+                Boolean back,
+                @Describe(value = "true when the input shows only at times (a Claim when loot is ready, an event's "
+                        + "icon): it holds the screen back only while it shows", optional = true) Boolean sometimes,
+                @Describe(value = "true, with marker, when the screen is a popup the game opens on its own (a "
+                        + "reward, an offer): it starts it apart from the map's tree", optional = true)
+                Boolean popup) {
 
         /** The part to skip, when all four of its edges are given. */
         Optional<Rect> ignore() {
@@ -90,7 +99,7 @@ final class PictureTools {
 
     record Crops(@Describe("one line per picture, in the last screenshot's pixels: \"name x y width height\", then "
                          + "optionally \"ignore x y width height\" for a part matching skips") List<String> boxes,
-                 @Describe(value = "the screen they are on, as its section names it: each noted there as an input, "
+                 @Describe(value = "the screen they are on, as the bot's Screens names it: each noted there as an input, "
                          + "untried until try_input tries it, and tagged with the screen's tag", optional = true)
                  String screen,
                  @Describe(value = "the name of the one box that is that screen's marker", optional = true)
@@ -247,6 +256,8 @@ final class PictureTools {
             return AgentReply.refused("No box is called " + marker + ", the marker named. Nothing was saved.");
         }
         AgentReply all = null;
+        // The marker first: it may start the screen the other boxes are noted on.
+        cuts.sort(Comparator.comparing((Crop c) -> !Boolean.TRUE.equals(c.marker())));
         for (Crop crop : cuts) {
             AgentReply one = cropPicture(crop, context);
             if (one.isRefused()) {
@@ -268,7 +279,8 @@ final class PictureTools {
             String name = words[0];
             return Optional.of(new Crop(name, at[0], at[1], at[2], at[3], crops.tags(),
                     ignoring ? at[4] : null, ignoring ? at[5] : null, ignoring ? at[6] : null, ignoring ? at[7] : null,
-                    crops.screen(), crops.marker() != null && crops.marker().strip().equals(name) ? true : null));
+                    crops.screen(), crops.marker() != null && crops.marker().strip().equals(name) ? true : null,
+                    null, null, null));
         } catch (NumberFormatException e) {
             return Optional.empty();
         }
@@ -292,20 +304,25 @@ final class PictureTools {
         List<String> tags = catalog == null ? List.of() : catalog.declaredOnly(typed);
         boolean marker = Boolean.TRUE.equals(crop.marker());
         String screen = crop.screen() == null || crop.screen().isBlank() ? null : crop.screen().strip();
-        if (marker && screen == null) return AgentReply.refused("A marker is a screen's: give screen too.");
-        Optional<String> section = Optional.empty();
+        boolean back = Boolean.TRUE.equals(crop.back());
+        boolean sometimes = Boolean.TRUE.equals(crop.sometimes());
+        boolean popup = Boolean.TRUE.equals(crop.popup());
+        if ((marker || back || sometimes || popup) && screen == null) {
+            return AgentReply.refused("A marker, a way back, an input that comes and goes and a popup are a screen's: "
+                    + "give screen too.");
+        }
+        if (Stream.of(marker, back, sometimes).filter(b -> b).count() > 1 || popup && !marker) {
+            return AgentReply.refused("A cut is one of a marker, a way back or an input; popup goes with marker.");
+        }
+        Optional<MapTools.Placing> section = Optional.empty();
         if (screen != null) {
-            Path project = context.services().projectDir();
-            if (project == null) return AgentReply.refused(Frames.noProject());
+            if (context.services().projectDir() == null) return AgentReply.refused(Frames.noProject());
             try {
-                section = MapTools.section(project, screen);
-            } catch (IllegalArgumentException | UncheckedIOException e) {
-                return AgentReply.refused(e.getMessage());
+                section = Optional.of(MapTools.placing(context.services(), screen, marker, popup));
+            } catch (IllegalStateException busy) {
+                return AgentReply.refused("Studio did not hand over the bot's Screens: " + busy.getMessage());
             }
-            if (section.isEmpty()) {
-                return AgentReply.refused("No section " + screen + " in " + GameNotes.FILE + ": try_input opens "
-                        + "one, or write_notes it. Nothing was saved.");
-            }
+            if (section.get().refusal() != null) return AgentReply.refused(section.get().refusal());
         }
         Optional<String> moving = moving(context, frame.get(), new Rect(crop.x(), crop.y(), crop.width(),
                 crop.height()));
@@ -314,7 +331,7 @@ final class PictureTools {
                 new Rect(crop.x(), crop.y(), crop.width(), crop.height())).map(a -> " " + a).orElse("");
         Optional<String> screenTag;
         try {
-            screenTag = section.flatMap(s -> TagTools.screenTag(context.services(), s));
+            screenTag = section.flatMap(s -> TagTools.screenTag(context.services(), s.name()));
         } catch (IllegalStateException busy) {
             return AgentReply.refused("Studio is busy and could not file the picture under its screen's tag; try "
                     + "again. Nothing was saved.");
@@ -328,14 +345,8 @@ final class PictureTools {
         List<String> tagged = Stream.concat(tags.stream(), screenTag.stream()).distinct().toList();
         Frames.mark(context, new Rect(crop.x(), crop.y(), crop.width(), crop.height()), Marks.Kind.NOTE, saved.name());
         String constant = TemplateNames.constantFor(saved.name());
-        String noted = "";
-        if (section.isPresent()) {
-            try {
-                noted = MapTools.noteCut(context.services().projectDir(), section.get(), saved.name(), marker);
-            } catch (IllegalArgumentException | UncheckedIOException e) {
-                noted = " It could not be noted in " + section.get() + ": " + e.getMessage();
-            }
-        }
+        String noted = section.map(s -> MapTools.noteCut(context.services(), s, saved.name(), marker, back,
+                sometimes)).orElse("");
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
                         + "." + constant) + (tagged.isEmpty() ? "" : ", tagged " + String.join(", ", tagged))
                         + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike)

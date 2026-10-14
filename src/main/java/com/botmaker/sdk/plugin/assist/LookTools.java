@@ -122,8 +122,8 @@ final class LookTools {
                     .describedAs("Where a picture is on the screen now and how sure the match is")
                     .takes(PictureName.class).handledBy(LookTools::findPicture),
             AssistantTool.named("which_screen")
-                    .describedAs("Every picture scored on one frame, best first, the ones a run would find "
-                            + "ticked: which screen of the game this is")
+                    .describedAs("Which screen of the bot's Screens the game shows, by their markers, then every "
+                            + "picture scored on that frame, best first, the ones a run would find ticked")
                     .takes(Shown.class).handledBy(LookTools::whichScreen),
             AssistantTool.named("wait_for_picture")
                     .describedAs("Waits until a picture is on the screen, as ImageFinder.waitFor would, and says "
@@ -235,8 +235,9 @@ final class LookTools {
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
+        String onMap = MapTools.where(context, frame.get()).map(line -> line + "\n").orElse("");
         List<Scored> scored = scores(resources.get(), frame.get(), cuts(context));
-        if (scored.isEmpty()) return AgentReply.text("No picture matched at all; crop_picture makes one.");
+        if (scored.isEmpty()) return AgentReply.text(onMap + "No picture matched at all; crop_picture makes one.");
         double needs = Frames.confidence(context.services());
         List<String> lines = new ArrayList<>();
         List<Rect> found = new ArrayList<>();
@@ -253,7 +254,8 @@ final class LookTools {
         }
         String head = found.isEmpty() ? "None of the pictures is on screen (a run needs " + Frames.score(needs) + ")."
                 : found.size() + " on screen (✓, a run needs " + Frames.score(needs) + "):";
-        return Frames.found(head + "\n" + String.join("\n", lines), frame.get(), found, Frames.FOUND, shown.show());
+        return Frames.found(onMap + head + "\n" + String.join("\n", lines), frame.get(), found, Frames.FOUND,
+                shown.show());
     }
 
     static AgentReply waitForPicture(Wait wait, AgentContext context) {

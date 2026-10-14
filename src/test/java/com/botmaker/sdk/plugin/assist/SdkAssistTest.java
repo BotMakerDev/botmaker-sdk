@@ -26,9 +26,15 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.screens.Did;
+import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
@@ -820,7 +826,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(58, names.size());
+        assertEquals(59, names.size());
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
@@ -870,52 +876,67 @@ class SdkAssistTest {
         assertTrue(run("try_input", "screen", "Home", "picture", "ore", "key", "E").isRefused());
         assertTrue(text(run("try_input", "screen", "Home", "key", "M")).contains("A hotkey names no screen"));
         assertTrue(text(run("try_input", "screen", "Home", "picture", "ore", "desktop", true, "settleMs", 0))
-                .contains("write_notes Home"), "home's section is written first");
+                .contains("crop_picture the first screen's marker"), "the map is started first");
 
-        GameNotes.write(bot, "Home", "Marker: ore");
         run("screenshot");
         assertTrue(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
                 "marker", true).isRefused(), "a marker without its screen");
         assertTrue(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
-                "screen", "Guild").isRefused(), "no section to note it in");
+                "screen", "Guild").isRefused(), "only a marker starts the map");
         assertFalse(TemplateLibrary.exists(resources, "gold"), "a refused note saves nothing");
+        String started = text(run("crop_picture", "name", "home", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
+                "screen", "Home", "marker", true));
+        assertTrue(started.contains("Added Home to the map as Screens.HOME"), started);
         assertTrue(text(run("crop_picture", "name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
                 "screen", "home")).contains("Noted in Home as untried"));
-        assertEquals("Marker: ore\nUntried: gold", GameNotes.sections(bot).get("Home"));
+        assertEquals("home", screen("HOME").marker().id());
+        assertEquals(List.of("click gold"), screen("HOME").inputs().stream().map(Input::label).toList());
         assertEquals(Set.of("Home"), TemplateLibrary.manifest(resources).tagsOf("gold"),
                 "a screen's pictures carry its tag, declared on its first cut");
 
-        MapTools.recorded(bot, "Engineer", "home › click ore");
+        // What try_input writes when an input opens a screen: a screen below, reached from Home, owing its marker.
+        host.set("screen_map").put("ENGINEER", TestContexts.row(Object.class, "").withValue(GameScreen.named("Engineer")
+                .from(Way.of(BotConstants.screen("HOME"), Input.click(screen("HOME").marker())))));
         AgentReply gated = run("try_input", "screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
         assertTrue(gated.isRefused() && text(gated).startsWith("Engineer still owes its marker"), text(gated));
         assertTrue(text(run("crop_picture", "name", "coin", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
                 "screen", "engineer", "marker", true)).contains("Noted in Engineer as its marker."));
-        assertFalse(run("try_input", "screen", "Engineer", "picture", "coin", "desktop", true, "settleMs", 0)
-                .isRefused(), "the screen just opened is explored, Home unfinished above it");
+        run("crop_picture", "name", "gem", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
+        run("crop_picture", "name", "list", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
         AgentReply next = run("try_input", "screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
         assertTrue(next.isRefused() && text(next).startsWith("Finish Engineer first"), text(next));
-        assertTrue(run("try_input", "screen", "Engineer", "picture", "coin", "never", " ").isRefused(),
+        assertTrue(run("try_input", "screen", "Engineer", "picture", "gem", "never", " ").isRefused(),
                 "a blank reason never clicks");
         assertTrue(run("try_input", "screen", "Engineer", "picture", "coin", "never", "spends gems").isRefused(),
                 "only an untried input is never clicked");
-        assertTrue(run("try_input", "screen", "Engineer", "picture", "coin", "scroll", 0).isRefused());
+        assertTrue(run("try_input", "screen", "Engineer", "picture", "list", "scroll", 0).isRefused());
         assertTrue(run("try_input", "screen", "Engineer", "key", "Q", "scroll", 3).isRefused(), "a scroll is over a "
                 + "picture");
-        run("crop_picture", "name", "gem", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
-        run("crop_picture", "name", "list", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
+        assertTrue(run("try_input", "screen", "Engineer", "picture", "gem", "kind", "loot").isRefused(), "no such kind");
         String scrolled = text(run("try_input", "screen", "Engineer", "picture", "list", "scroll", -3, "desktop",
                 true, "settleMs", 0));
-        assertTrue(scrolled.contains("tried list, scrolled -3, no visible effect.") && scrolled.contains("that end is "
+        assertTrue(scrolled.contains("tried scroll list -3, no visible effect.") && scrolled.contains("that end is "
                 + "reached"), scrolled);
         String last = text(run("try_input", "screen", "Engineer", "picture", "gem", "never", "spends gems"));
-        assertTrue(last.contains("tried gem, never, spends gems.") && last.contains("scrolled to both ends"), last);
+        assertTrue(last.contains("tried click gem, never, spends gems.") && last.contains("scrolled to both ends"),
+                last);
+        assertEquals(List.of("click gem", "scroll list -3"), screen("ENGINEER").inputs().stream().map(Input::label)
+                .toList(), "the list's cut became its scroll");
 
-        AgentReply still = run("try_input", "screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
-        assertTrue(text(still).contains("Noted in Home: tried gold, no visible effect."), text(still));
-        assertEquals("Marker: ore\n- tried gold: no visible effect\nShape: activity", GameNotes.sections(bot)
-                .get("Home"));
+        AgentReply still = run("try_input", "screen", "Home", "picture", "gold", "kind", "chore", "desktop", true,
+                "settleMs", 0);
+        assertTrue(text(still).contains("Noted in Home: tried click gold, no visible effect. Every input cut on it is "
+                + "tried: an activity."), text(still));
+        assertEquals(Input.click(screen("HOME").inputs().getFirst().picture()).did(Did.NONE).kind(Kind.CHORE),
+                screen("HOME").inputs().getFirst());
         assertTrue(run("try_input", "screen", "Engineer", "picture", "home").isRefused(),
-                "a picture naming its screen Home asks for opens");
+                "a picture naming a screen the map has asks for opens");
+
+        assertTrue(run("go_to_screen", "screen", "Guild").isRefused());
+        String walked = text(run("go_to_screen", "screen", "Engineer", "desktop", true));
+        assertTrue(walked.startsWith("On Engineer.") && walked.contains("Walked: Engineer."), walked);
+        assertTrue(text(run("which_screen")).startsWith("On Engineer (Screens.ENGINEER): its marker shows."),
+                "the last screen seen is looked for first");
 
         assertTrue(run("crop_pictures", "boxes", List.of("pick 120 80 " + SIZE + " " + SIZE, "drop 1 2 3"))
                 .isRefused(), "a line that does not read");
@@ -926,9 +947,14 @@ class SdkAssistTest {
                 "far 5000 5000 4 4"));
         assertTrue(text(both).contains("Noted in Engineer as its marker, in place of coin.")
                 && text(both).contains("Saved spade") && text(both).contains("Not saved, far: "), text(both));
-        assertTrue(GameNotes.sections(bot).get("Engineer").contains("Marker: pick"));
+        assertEquals("pick", screen("ENGINEER").marker().id());
         assertEquals(Set.of("Engineer"), TemplateLibrary.manifest(resources).tagsOf("spade"));
-        assertTrue(GameNotes.untried(GameNotes.sections(bot).get("Engineer")).contains("spade"));
+        assertTrue(screen("ENGINEER").inputs().stream().anyMatch(i -> i.label().equals("click spade")));
+    }
+
+    /** The bot's screen {@code constant}, as try_input and crop_picture last wrote it. */
+    private GameScreen screen(String constant) {
+        return (GameScreen) host.set("screen_map").get(constant).value();
     }
 
     @Test

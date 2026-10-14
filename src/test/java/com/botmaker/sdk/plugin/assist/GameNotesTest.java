@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -91,63 +90,10 @@ class GameNotesTest {
         assertEquals("## Key\n\nhunter2\n", Files.readString(secret), "the file it points at is left alone");
     }
 
-    // ── a section's lines ───────────────────────────────────────────────────────────────────────────────────
-
     @Test
-    void aMarkerPaysTheDebtAndOtherCutsAreUntried() {
-        String opened = "Entrance: home › click engineer_home\nOwed: marker";
-        String marked = GameNotes.withMarker(opened, "engineer_title");
-        assertEquals("Entrance: home › click engineer_home\nMarker: engineer_title", marked);
-        assertEquals("Entrance: home › click engineer_home\nMarker: gear_engineer",
-                GameNotes.withMarker(marked, "gear_engineer"), "one marker, the latest");
-        assertEquals("Marker: a\nNotes.", GameNotes.withMarker("- Owed: marker — it animates\nNotes.", "a"),
-                "a debt with a reason is paid too");
-        assertEquals("Marker: a\nOwed: marker-less icons", GameNotes.withMarker("Owed: marker-less icons", "a"),
-                "a debt that only starts with the word is not the marker's");
-
-        String cut = GameNotes.withUntried(marked, "claim_engineer");
-        assertEquals(marked + "\nUntried: claim_engineer", cut);
-        assertEquals(marked + "\nUntried: claim_engineer, garage_engineer",
-                GameNotes.withUntried(cut, "garage_engineer"));
-        assertEquals(cut, GameNotes.withUntried(cut, "claim_engineer"), "a picture is listed once");
-        assertEquals(List.of("claim_engineer"), GameNotes.untried(cut));
-        assertEquals(Optional.of("engineer_title"), GameNotes.marker(cut));
-    }
-
-    @Test
-    void anInputTriedLeavesTheUntriedLineAndTheLastSaysTheShape() {
-        String text = "Marker: m\nUntried: a, b";
-        String one = GameNotes.withTried(text, "a", GameNotes.OPENS + "Bag");
-        assertEquals("Marker: m\nUntried: b\n- tried a: opens Bag", one);
-        assertEquals(one, GameNotes.withUntried(one, "a"), "a picture tried is not untried again when recut");
-        String both = GameNotes.withTried(one, "b", GameNotes.OPENS + "Party");
-        assertEquals("Marker: m\n- tried a: opens Bag\n- tried b: opens Party\nShape: menu", both);
-        String again = GameNotes.withTried(both, "b", GameNotes.IN_PLACE);
-        assertEquals("Marker: m\n- tried a: opens Bag\n- tried b: " + GameNotes.IN_PLACE + "\nShape: activity", again,
-                "tried again, its line and the shape are replaced");
-        assertEquals(Optional.of("menu"), GameNotes.shapeOf("- tried a: opens Bag\n- tried g: never, spends gems"));
-        assertEquals("Marker: m\n- tried key Q: opens Quests", GameNotes.withTried("Marker: m", "key Q",
-                GameNotes.OPENS + "Quests"), "one hotkey on a screen with nothing cut says no shape");
-    }
-
-    @Test
-    void aScreenMappedAgainLosesItsOldEntranceAndKeepsItsBulletAndWords() {
-        assertEquals("- Bag: home › click bag_home. chests, daily",
-                GameNotes.withMapLine("- Bag: home › key B. chests, daily", "Bag", "home › click bag_home"));
-        assertEquals("1. Bag: home › key B. chests",
-                GameNotes.withMapLine("1. **Bag:** chests", "Bag", "home › key B"));
-        assertEquals("- Bag: home › click bag. chests", GameNotes.withMapLine("- Bag: home › key Page Down. chests",
-                "Bag", "home › click bag"), "a key of two words goes whole");
-        assertEquals(Optional.of("Bag"), GameNotes.mapName("1. **Bag:** chests", "bag"));
-    }
-
-    /** A section written by hand with two Untried lines: both are read, and the first write leaves one. */
-    @Test
-    void twoUntriedLinesAreReadAsOneAndWrittenAsOne() {
-        String text = "Marker: m\nUntried: a, b\nnotes\nUntried: b, c\nmore";
-        assertEquals(List.of("a", "b", "c"), GameNotes.untried(text));
-        assertEquals("Marker: m\nUntried: b, c\nnotes\nmore\n- tried a: " + GameNotes.IN_PLACE,
-                GameNotes.withTried(text, "a", GameNotes.IN_PLACE));
-        assertEquals("Marker: m\nnotes\nmore", GameNotes.withUntriedLine(text, List.of()));
+    void anOwedLineSaysItsOwnThingAndNothingOwedIsNoDebt() {
+        assertEquals(List.of("weekly tab picture", "the boss's timer"),
+                GameNotes.owed("Stage: tried\n- Owed: weekly tab picture\nOwed: the boss's timer\nOwed: none"));
+        assertEquals(List.of(), GameNotes.owed("Owed: —\nOwed: n/a"));
     }
 }
