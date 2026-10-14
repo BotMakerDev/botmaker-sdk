@@ -87,6 +87,20 @@ public final class InstalledGame {
         return null;
     }
 
+    /**
+     * The value of the first {@code public static} field marked {@code id} in {@code values}, or null when none
+     * marks it — how {@code Bot.runFlow} reads the run's own parameters ({@code flow}, {@code doSetup},
+     * {@code skip}).
+     */
+    public static Object marked(SdkValue.Id id, Class<?>... values) {
+        if (values == null) return null;
+        for (Class<?> type : values) {
+            Object value = type == null ? null : field(type, id);
+            if (value != null) return value;
+        }
+        return null;
+    }
+
     /** The value of the {@code public static} field of {@code type} marked {@code id}, or null. */
     private static Object field(Class<?> type, SdkValue.Id id) {
         Field[] declared;

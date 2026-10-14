@@ -37,8 +37,8 @@ import java.util.Set;
  * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
  * size its pictures were cut at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS}, {@code ZONES} and
  * {@code DIGITS} the classes of constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the
- * run's {@code @Param} fields in {@code Sdk.java}, which the bot's {@code main} hands to {@code Bot.runFlow} and
- * nothing claims; {@code LAUNCH_TARGETS}, {@code CAPTURE} (where pixels are read from) and {@code VM} the game's,
+ * run's {@code @Param} fields in {@code Sdk.java}, which {@code Bot.runFlow} reads by their marks and nothing
+ * claims; {@code LAUNCH_TARGETS}, {@code CAPTURE} (where pixels are read from) and {@code VM} the game's,
  * which {@code Bot.runFlow} reads by their marks.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract,
@@ -154,7 +154,7 @@ public final class SdkValues {
     private static final String RUN_PARAM = "The SDK reads this parameter in the bot's main. Change its value in the"
             + " Runner or in Project ▸ Parameters.";
 
-    /** Which flow a run walks — {@code public static Flow flow}, passed to {@code Bot.runFlow}. */
+    /** Which flow a run walks — {@code public static Flow flow}, read by {@code Bot.runFlow} by its mark. */
     public static final ManagedValue<Flow> FLOW = ManagedValue.param(SdkValue.Id.FLOW)
             .in(HOLDER)
             .startsAs(SdkValues::noFlow)

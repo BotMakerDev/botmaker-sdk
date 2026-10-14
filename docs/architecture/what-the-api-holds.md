@@ -7,11 +7,12 @@
   `TextMatch`, `TextResult`, `OcrOptions`, `OcrLanguage`. `Precision` is `Pixel`'s knobs as one value (`EXACT`/`TIGHT`/`DEFAULT`/`LOOSE`, a validating
   `of(…)`, withers): a type because ΔE has no obvious scale and the pixel count is an *area* routinely misread
   as a width, and because an editor is claimed by **type**, never by a method and an argument index.
-- `api.bot` — `Bot.runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class)`, "Run activity flow", offered in
+- `api.bot` — `Bot.runFlow(Sdk.class)`, "Run activity flow", offered in
   `main` only (`@EntryPoint`; installs every managed value in the classes it is handed, `@SdkValue` or another
-  plugin's mark, and walks the flow the bot's `flow` `@Param` names, `internal/flow/FlowWalker`; it was
-  `Bot.run(goHome, …)` until 2026-10-10, when what gets home moved onto the flow, and `runFlow(Sdk.class)` until
-  2026-10-11, when what a run does became the bot's `@Param`s), `Bot.stop("…")` (ends the run saying why), `Outcome` (the interface each activity's enum implements; `Outcome.NONE` is "no outcome yet",
+  plugin's mark, reads the run's `@Param`s `flow`, `doSetup` and `skip` by their marks, and walks the flow
+  `flow` names, `internal/flow/FlowWalker`; it was `Bot.run(goHome, …)` until 2026-10-10, when what gets home
+  moved onto the flow, and `runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class)` from 2026-10-11 to 2026-10-14,
+  when its arguments stopped being wired by hand), `Bot.stop("…")` (ends the run saying why), `Outcome` (the interface each activity's enum implements; `Outcome.NONE` is "no outcome yet",
   what a fresh editor value holds), `ActivitySwitch` (`enable`/`disable`/`active` an activity by its class,
   `Activities.Battle.class`, `@ActivityClass` for its picker), and
   **`BotSettings`**, the runtime tuning

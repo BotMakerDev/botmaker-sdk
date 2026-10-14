@@ -6,7 +6,7 @@ package com.botmaker.sdk.api.flow;
  *
  * <p>A bot can have several flows ({@code Flows.MAIN}, {@code Flows.DAILY}…), but one game: its home screen
  * and its settings do not change with the flow, so they are said once, here, and not in each flow. Which flow
- * runs is the bot's {@code @Param}, handed to {@code Bot.runFlow} beside this.
+ * runs is the bot's {@code @Param}, which {@code Bot.runFlow} reads off {@code Sdk.java} beside this.
  *
  * <pre>{@code
  * @SdkValue(SdkValue.Id.RUN)

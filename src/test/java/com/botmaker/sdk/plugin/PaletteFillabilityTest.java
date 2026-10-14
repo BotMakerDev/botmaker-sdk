@@ -46,13 +46,6 @@ class PaletteFillabilityTest {
      */
     private static final Set<String> FILLED_BY_THE_HOST = Set.of("Bot#runFlow(Class[])");
 
-    /**
-     * Offered members whose parameter no type declares but one of this plugin's slot editors draws: a flow, picked
-     * among the bot's {@code Flows} constants, and the set of activities to skip, a host list of class literals
-     * each picked among the switchable ones ({@code SdkEditors}).
-     */
-    private static final Set<String> DRAWN_BY_AN_EDITOR = Set.of("Bot#runFlow(Flow)", "Bot#runFlow(Set)");
-
     @Test
     void every_offered_parameter_can_be_filled() {
         Set<Class<?>> declared = new HashSet<>();
@@ -72,7 +65,7 @@ class PaletteFillabilityTest {
                     if (fillable(p, declared)) continue;
                     String key = facade.type().getSimpleName() + "#" + m.getName() + "("
                             + p.getType().getSimpleName() + ")";
-                    if (FILLED_BY_THE_HOST.contains(key) || DRAWN_BY_AN_EDITOR.contains(key)) continue;
+                    if (FILLED_BY_THE_HOST.contains(key)) continue;
                     if (NULL_MEANS_DEFAULT.contains(key)) excused.add(key);
                     else unfillable.add(key);
                 }

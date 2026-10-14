@@ -28,6 +28,16 @@ class InstalledGameTest {
 
         @SdkValue(SdkValue.Id.CAPTURE)
         public static CaptureSource game = CaptureSource.window("firestone.exe", "");
+
+        @SdkValue(SdkValue.Id.DO_SETUP)
+        public static boolean setUpFirst = true;
+    }
+
+    @Test
+    void theRunsOwnParametersAreReadByTheirMarksFromTheFirstClassMarkingThem() {
+        assertEquals(Boolean.TRUE, InstalledGame.marked(SdkValue.Id.DO_SETUP, null, Object.class, Sdk.class));
+        assertNull(InstalledGame.marked(SdkValue.Id.SKIP, Sdk.class), "a bot with no skip field has none");
+        assertNull(InstalledGame.marked(SdkValue.Id.FLOW, (Class<?>[]) null));
     }
 
     @AfterEach

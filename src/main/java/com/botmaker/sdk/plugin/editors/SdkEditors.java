@@ -40,7 +40,7 @@ public final class SdkEditors {
             SlotEditor.onParameter(EmulatorName.class).draw(() -> EmulatorEditors::instanceName),
             // An activity is its enum's class literal, which no type of this plugin's can claim: a Class.
             SlotEditor.onParameter(ActivityClass.class).draw(() -> ActivityEditors::activity),
-            // The bot's run choices, @Params handed to Bot.runFlow: which flow, and the activities it skips. Only a
+            // The bot's run choices, @Params Bot.runFlow reads: which flow, and the activities it skips. Only a
             // value with no call site, a parameter's: a Flows constant's own Flow.of(…) is the flow editor's.
             SlotEditor.when(ActivityEditors::isFlowChoice).draw(() -> ActivityEditors::flow),
             SlotEditor.when(ActivityEditors::isSkippedActivity).draw(() -> ActivityEditors::switchable),

@@ -77,6 +77,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **`main` is `Bot.runFlow(Sdk.class)`.** The run reads its parameters `flow`, `doSetup` and `skip` off
+  `Sdk.java` by their marks, as it reads the launchers and the capture source, so nothing in `main` is wired by
+  hand. `Bot.runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class)` is gone: a `main` still calling it no longer
+  compiles, and the fix is to drop the first three arguments.
 - **Popups are handled in every activity, by one method of the bot.** `Run.popups(Gamebot::clearPopups)` in
   `Sdk.run()` names it, beside home and setup; `Bot.runFlow` installs it and the SDK runs it before every vision
   call of every activity, so no body mentions a popup. The flow canvas has a Popups section and

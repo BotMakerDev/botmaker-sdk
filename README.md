@@ -40,7 +40,7 @@ and a direct entry wins by Maven's nearest-wins rule at a version the SDK was no
 ```java
 public static void main(String[] args) {
     // walk the flow the bot's @Params pick, with the home, setup and capture source read off Sdk.java
-    Bot.runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class);
+    Bot.runFlow(Sdk.class);
 }
 
 public static Activities.Collect body() {           // one activity: do one unit of work, report an outcome

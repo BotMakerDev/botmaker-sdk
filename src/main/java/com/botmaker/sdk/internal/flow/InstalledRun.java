@@ -14,7 +14,7 @@ import java.util.Set;
  * The run a bot does: the flow it walks, its home and setup, the activities its runner switched off, and the names
  * of the bot's flows.
  *
- * <p>{@code Bot.runFlow(Sdk.flow, …, Sdk.class)} installs the value your {@code @SdkValue(SdkValue.Id.RUN)} method
+ * <p>{@code Bot.runFlow(Sdk.class)} installs the value your {@code @SdkValue(SdkValue.Id.RUN)} method
  * returns ({@link #use}) and the flow its {@code @Param} names ({@link #walk}), then walks that flow: two hand-offs,
  * since the run holds no flow. Named apart from the bot's own {@code Flows} class, which a bot's code names
  * and this one would shadow.

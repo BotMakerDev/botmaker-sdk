@@ -21,6 +21,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -60,48 +61,49 @@ public class Bot {
     protected Bot() {}
 
     /**
-     * Installs this bot's managed values (the SDK's {@code @SdkValue} ones and any other plugin's) and runs
-     * {@code flow} — the whole of a bot's {@code main}.
+     * Installs this bot's managed values (the SDK's {@code @SdkValue} ones and any other plugin's) and runs the
+     * flow its {@code flow} parameter names — the whole of a bot's {@code main}.
      *
      * <pre>{@code
      * public final class Gamebot extends Bot {
      *
      *     public static void main(String[] args) {
-     *         runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class);
+     *         runFlow(Sdk.class);
      *     }
      * }
      * }</pre>
      *
-     * <p>What the person running the bot chooses is the bot's own {@code @Param}s, handed in here: which of the
-     * {@code Flows} runs, whether the game is set up first, and which activities the flow lets them switch off
-     * are skipped. What gets the game back to a known screen is {@code Sdk.run()}'s
-     * {@link com.botmaker.sdk.api.flow.Run#home}, run at start-up, after anything unexpected and before each step
-     * that goes home; a run with none goes nowhere.
+     * <p>What the person running the bot chooses is the bot's own {@code @Param}s, read off {@code values} by their
+     * marks ({@code @SdkValue(SdkValue.Id.FLOW)}, {@code DO_SETUP}, {@code SKIP}): which of the {@code Flows} runs,
+     * whether the game is set up first, and which activities the flow lets them switch off are skipped. A bot with
+     * no {@code flow} runs nothing; with no {@code doSetup} it skips the setup. An activity in {@code skip} that the
+     * flow does not draw {@code .switchable()} runs anyway, and the debug trace says so. What gets the game back to
+     * a known screen is {@code Sdk.run()}'s {@link com.botmaker.sdk.api.flow.Run#home}, run at start-up, after
+     * anything unexpected and before each step that goes home; a run with none goes nowhere.
      *
      * <p>Offered in the insert menu inside {@code main} only ({@link EntryPoint}): anywhere else it would start
      * a second supervised run inside the first.
      *
-     * @param flow    the flow to walk — a constant of the bot's {@code Flows}
-     * @param doSetup whether {@code Sdk.run()}'s {@link com.botmaker.sdk.api.flow.Run#setup} runs first, once the
-     *                game has started: tick it on a new computer, or after changing a game setting
-     * @param skip    the activities to switch off, each one the flow draws {@code .switchable()}; another is run
-     *                anyway, and the debug trace says so
      * @param values  each plugin's values class in this bot — {@code Sdk.class}, the file that plugin shipped and
      *                this project now owns
      */
     @EntryPoint
     @PaletteLabel("Run activity flow")
     @Untraced("holds the whole run")
-    public static void runFlow(Flow flow, boolean doSetup, Set<Class<? extends Outcome>> skip,
-                               Class<?>... values) {
+    public static void runFlow(Class<?>... values) {
         observe();
         MissFrames.start();
         SdkValues.claim();
         ManagedValues.install(values);
         InstalledGame.install(values);
         InstalledRun.nameFlows(values);
-        InstalledRun.walk(flow);
-        InstalledRun.skip(SkippedActivities.of(InstalledRun.flow(), skip));
+        if (InstalledGame.marked(SdkValue.Id.FLOW, values) instanceof Flow flow) InstalledRun.walk(flow);
+        else {
+            InstalledRun.walk(null);
+            Debug.log("No @SdkValue(SdkValue.Id.FLOW) field in the classes runFlow was given: no flow runs.");
+        }
+        InstalledRun.skip(SkippedActivities.of(InstalledRun.flow(), skipped(values)));
+        boolean doSetup = InstalledGame.marked(SdkValue.Id.DO_SETUP, values) instanceof Boolean on && on;
         Runnable goHome = () -> {
             Runnable home = InstalledRun.installed().home();
             if (home != null) home.run();
@@ -138,6 +140,20 @@ public class Bot {
         } catch (BotStoppedException e) {
             Debug.log("Stopped by request.");
         }
+    }
+
+    /** The activity classes the {@code skip} parameter names; empty when the bot has none. */
+    private static Set<Class<? extends Outcome>> skipped(Class<?>... values) {
+        if (!(InstalledGame.marked(SdkValue.Id.SKIP, values) instanceof Set<?> set)) return Set.of();
+        Set<Class<? extends Outcome>> out = new HashSet<>();
+        for (Object each : set) {
+            if (each instanceof Class<?> type && Outcome.class.isAssignableFrom(type)) {
+                out.add(type.asSubclass(Outcome.class));
+            } else {
+                Debug.log("skip holds " + each + ", which is no activity: it skips nothing.");
+            }
+        }
+        return out;
     }
 
     /**

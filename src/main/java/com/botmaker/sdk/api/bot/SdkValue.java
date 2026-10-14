@@ -32,7 +32,7 @@ import java.lang.annotation.Target;
  * }
  * }</pre>
  *
- * <p>{@code Bot.runFlow(…, Sdk.class)} reads each marked method off the class it is given and applies the value
+ * <p>{@code Bot.runFlow(Sdk.class)} reads each marked member off the class it is given and applies the value
  * before the first click. Everywhere else a marked member is ordinary Java: a misspelt {@link Id} is a
  * compile error, and a developer with no BotMaker installed reads the whole bot by opening its files.
  */

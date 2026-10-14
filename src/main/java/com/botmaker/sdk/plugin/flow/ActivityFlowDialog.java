@@ -1047,7 +1047,7 @@ public final class ActivityFlowDialog {
         box.getChildren().add(methodChoice("home", home, "Home::goHome", picked -> home = picked));
 
         Label start = new Label("To start the flow, insert Bot ▸ Run activity flow in your bot's main. It is "
-                + "offered there only: Bot.runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class) walks the flow the "
+                + "offered there only: Bot.runFlow(Sdk.class) walks the flow the "
                 + "bot's flow parameter names.");
         start.setWrapText(true);
         start.getStyleClass().add("dialog-hint-text");
