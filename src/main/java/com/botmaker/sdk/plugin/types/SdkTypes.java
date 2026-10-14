@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.DeclaredCallType;
 import com.botmaker.plugin.api.value.DeclaredType;
+import com.botmaker.plugin.api.value.Held;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.Outcome;
@@ -26,6 +27,7 @@ import com.botmaker.sdk.api.vision.ColorMatch;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.api.vision.Matches;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.Vision;
@@ -81,6 +83,13 @@ public final class SdkTypes {
     }
 
     /**
+     * A picture's activities as the host holds them: each enum's class literal crosses as its {@link Activity}
+     * ({@code ManagedValue.groupedAs}), which {@link ImageTemplate#inActivities} takes.
+     */
+    private static final Held<ImageTemplate, List<Activity>> PICTURE_ACTIVITIES =
+            Held.list(Activity.class, ImageTemplate::activities);
+
+    /**
      * A named picture, {@code new ImageTemplate("images/ore.png")}.
      *
      * <p><b>The one type whose fresh value is a choice rather than a fallback.</b> A new picture value
@@ -93,7 +102,18 @@ public final class SdkTypes {
             .preview(() -> TemplateEditors::preview)
             .writtenAs(ImageTemplate::new, ImageTemplate::filePath)
             .with(ImageTemplate::at, ImageTemplate::place)
-            .with(ImageTemplate::in, ImageTemplate::frame);
+            .with(ImageTemplate::in, ImageTemplate::frame)
+            .<List<PictureTag>>with(ImageTemplate::tags, ImageTemplate::tags)
+            .<List<Class<? extends Outcome>>, List<Activity>>with(ImageTemplate::activities, PICTURE_ACTIVITIES,
+                    ImageTemplate::inActivities);
+
+    /**
+     * A tag spelled out, {@code PictureTag.named("UI")}: what a {@code Tags} constant holds. A tag inside a picture is
+     * a reference to that constant ({@link BotConstants#tag}) and is written only as the constant.
+     */
+    public static final DeclaredCall<PictureTag> PICTURE_TAG = ComponentType.part(PictureTag.class)
+            .<String, PictureTag>writtenAs(PictureTag::named, PictureTag::name)
+            .when(tag -> BotConstants.tagName(tag) == null);
 
     /**
      * How exact a pixel match has to be.
@@ -357,6 +377,6 @@ public final class SdkTypes {
      */
     public static final List<ComponentType<?>> PARTS = Stream.of(
                     FlowTypes.ALL, ScreenTypes.ALL, CaptureTypes.ALL, SettingsTypes.ALL, PRECISION_WITHERS, OCR_CHAINS,
-                    List.of(COMBO_HELD, STEP))
+                    List.of(COMBO_HELD, STEP, PICTURE_TAG))
             .<ComponentType<?>>flatMap(List::stream).toList();
 }

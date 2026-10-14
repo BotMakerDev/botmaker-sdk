@@ -14,13 +14,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TemplateNamingTest {
 
     @Test
-    void aRenameMayNotBeBlankTakenOrReserved(@TempDir Path resources) throws IOException {
+    void aRenameMayNotBeBlankOrTaken(@TempDir Path resources) throws IOException {
         save(resources, "ore");
         save(resources, "gold");
 
         assertTrue(TemplateNaming.renameProblem(resources, "ore", "").contains("needs a name"));
         assertTrue(TemplateNaming.renameProblem(resources, "ore", "gold").contains("already exists"));
-        assertTrue(TemplateNaming.renameProblem(resources, "ore", "templates").contains("reserved"));
+        assertNull(TemplateNaming.renameProblem(resources, "ore", "templates"), "no file of the library's is called that now");
         assertNull(TemplateNaming.renameProblem(resources, "ore", "iron"));
     }
 

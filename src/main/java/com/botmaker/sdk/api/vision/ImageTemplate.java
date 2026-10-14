@@ -1,6 +1,8 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.internal.vision.BotScreen;
@@ -12,7 +14,9 @@ import org.opencv.core.Mat;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Public handle for a template image used by the vision API.
@@ -40,6 +44,10 @@ public class ImageTemplate implements AutoCloseable {
     private final Rect place;
     /** The pixels themselves, for a picture held in memory and never saved; null for a file's. */
     private final BufferedImage image;
+    /** The tags 🖼 Manage Pictures files it under; a run never reads them. */
+    private final List<PictureTag> tags;
+    /** The activities 🖼 Manage Pictures files it under; a run never reads them. */
+    private final List<Activity> activities;
 
     // Lazily-loaded OpenCV image data. Null until getMat() is first called.
     private Mat mat;
@@ -62,6 +70,11 @@ public class ImageTemplate implements AutoCloseable {
     }
 
     private ImageTemplate(String filePath, Size frame, Rect place, BufferedImage image) {
+        this(filePath, frame, place, image, List.of(), List.of());
+    }
+
+    private ImageTemplate(String filePath, Size frame, Rect place, BufferedImage image, List<PictureTag> tags,
+                          List<Activity> activities) {
         if (filePath == null || filePath.isBlank()) {
             throw new IllegalArgumentException("File path cannot be empty");
         }
@@ -69,6 +82,9 @@ public class ImageTemplate implements AutoCloseable {
         this.frame = frame == null || frame.empty() ? null : frame;
         this.place = place == null || place.empty() ? null : place;
         this.image = image;
+        this.tags = tags == null ? List.of() : tags.stream().filter(Objects::nonNull).distinct().toList();
+        this.activities = activities == null ? List.of()
+                : activities.stream().filter(a -> a != null && !a.isNone()).distinct().toList();
 
         // Extract ID from filename: "images/btn_ok.png" -> "btn_ok"
         Path path = Paths.get(filePath);
@@ -90,7 +106,7 @@ public class ImageTemplate implements AutoCloseable {
      * 40))}. Written by the windows that cut it, so where a picture belongs is in the bot's Java.
      */
     public ImageTemplate at(Rect place) {
-        return new ImageTemplate(filePath, frame, place, image);
+        return new ImageTemplate(filePath, frame, place, image, tags, activities);
     }
 
     /**
@@ -98,7 +114,41 @@ public class ImageTemplate implements AutoCloseable {
      * the matcher rescales it by the live frame against this size. Written only when the two differ.
      */
     public ImageTemplate in(Size frame) {
-        return new ImageTemplate(filePath, frame, place, image);
+        return new ImageTemplate(filePath, frame, place, image, tags, activities);
+    }
+
+    /**
+     * This picture, filed under {@code tags} in 🖼 Manage Pictures — {@code .tags(List.of(Tags.UI))}, each a constant
+     * of the bot's {@code Tags} class. A run never reads them.
+     */
+    public ImageTemplate tags(List<PictureTag> tags) {
+        return new ImageTemplate(filePath, frame, place, image, tags, activities);
+    }
+
+    /**
+     * This picture, filed under the activities it belongs to in 🖼 Manage Pictures —
+     * {@code .activities(List.of(Activities.Collect.class))}, each an activity's enum, so the group follows a rename
+     * and goes with the activity. A run never reads them.
+     */
+    public ImageTemplate activities(List<Class<? extends Outcome>> activities) {
+        return new ImageTemplate(filePath, frame, place, image, tags,
+                activities == null ? List.of() : activities.stream().map(Activity::of).toList());
+    }
+
+    /** {@link #activities(List)} by the activities' names, as an editor holds them: it cannot load the bot's enums. */
+    @Hidden("an editor's way of filing a picture; a bot names its activities by their enums")
+    public ImageTemplate inActivities(List<Activity> activities) {
+        return new ImageTemplate(filePath, frame, place, image, tags, activities);
+    }
+
+    /** The tags it is filed under; empty when none. */
+    public List<PictureTag> tags() {
+        return tags;
+    }
+
+    /** The activities it is filed under; empty when none. */
+    public List<Activity> activities() {
+        return activities;
     }
 
     /** Where in its frame it was cut, or null when that is unknown. */
@@ -182,13 +232,15 @@ public class ImageTemplate implements AutoCloseable {
     }
 
     /**
-     * The same file, cut at the same place from the same frame; the loaded pixels are not compared, and a picture
-     * held in memory equals only one holding the same image.
+     * The same file, cut at the same place from the same frame, filed under the same tags and activities; the loaded
+     * pixels are not compared, and a picture held in memory equals only one holding the same image.
      */
     @Override
     public boolean equals(Object other) {
         return other instanceof ImageTemplate that && filePath.equals(that.filePath)
-                && Objects.equals(frame, that.frame) && Objects.equals(place, that.place) && image == that.image;
+                && Objects.equals(frame, that.frame) && Objects.equals(place, that.place) && image == that.image
+                && Set.copyOf(tags).equals(Set.copyOf(that.tags))
+                && Set.copyOf(activities).equals(Set.copyOf(that.activities));
     }
 
     @Override

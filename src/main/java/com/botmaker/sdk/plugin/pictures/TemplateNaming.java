@@ -280,7 +280,7 @@ public final class TemplateNaming {
     /**
      * Why {@code name} cannot be used, phrased for the user, or {@code null} when it can.
      *
-     * <p>One method because the single dialog and the batch enforced the same three rules in two places, and
+     * <p>One method because the single dialog and the batch enforced the same rules in two places, and
      * had already drifted in their wording. It is deliberately not asked of a discarded row: a row nobody is
      * keeping has no name to be wrong.
      *
@@ -291,9 +291,6 @@ public final class TemplateNaming {
         if (name == null || name.isBlank()) return blankReason;
         if (resources != null && TemplateLibrary.exists(resources, name)) {
             return "A picture named \"" + name + "\" already exists. Choose a different name.";
-        }
-        if (TemplateLibrary.isReservedName(name)) {
-            return "\"" + name + "\" is reserved — choose another name.";
         }
         return null;
     }

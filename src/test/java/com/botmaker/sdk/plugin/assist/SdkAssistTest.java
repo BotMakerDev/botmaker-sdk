@@ -19,6 +19,7 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.geometry.Anchor;
@@ -33,6 +34,7 @@ import com.botmaker.sdk.api.screens.Kind;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.trace.MissFrames;
@@ -284,34 +286,52 @@ class SdkAssistTest {
                 "tags", List.of("Home")).isRefused(), "Home is not declared");
         assertFalse(TemplateLibrary.exists(resources, "gold"), "a refused tag saves nothing");
 
-        assertEquals("Declared Home; tag_pictures puts it on pictures.", text(run("declare_tag", "tag", " Home ")));
+        assertEquals("Declared Home in Tags; tag_pictures puts it on pictures.",
+                text(run("declare_tag", "tag", " Home ")));
+        assertEquals(PictureTag.named("Home"), host.set("tags").get("HOME").value(), "Tags.HOME, in the bot's Java");
         assertTrue(run("declare_tag", "tag", "home").isRefused(), "already there, in another case");
         assertTrue(run("declare_tag", "tag", TemplateManifest.UNTAGGED).isRefused(), "a built-in group");
         assertEquals("Saved gold as Pictures.GOLD, tagged Home.", text(run("crop_picture", "name", "gold",
                 "x", 120, "y", 80, "width", SIZE, "height", SIZE, "tags", List.of("home", "HOME"))),
                 "spelled as declared, once");
+        assertEquals(List.of(BotConstants.tag("HOME")),
+                ((ImageTemplate) host.set("pictures").get("GOLD").value()).tags(), ".tags(List.of(Tags.HOME))");
         assertTrue(text(run("list_pictures")).contains("gold → Pictures.GOLD [Home]"));
 
         run("declare_tag", "tag", "Popups");
         assertTrue(run("tag_pictures", "tag", "Nope", "pictures", List.of("gold")).isRefused());
         assertTrue(run("tag_pictures", "tag", "Popups", "pictures", List.of("gold", "nothing")).isRefused());
         assertFalse(run("tag_pictures", "tag", "popups", "pictures", List.of("gold", "ore")).isRefused());
-        assertEquals(java.util.Set.of("Home", "Popups"), TemplateLibrary.manifest(resources).tagsOf("gold"));
+        assertEquals(java.util.Set.of("Home", "Popups"), TemplateLibrary.manifest(host).tagsOf("gold"));
         String listed = text(run("list_tags"));
         assertTrue(listed.contains("Popups: gold, ore"), listed);
 
         assertEquals("Took Popups off ore.", text(run("untag_pictures", "tag", "Popups", "pictures", List.of("ore"))));
-        assertTrue(TemplateLibrary.manifest(resources).tagsOf("ore").isEmpty());
+        assertTrue(TemplateLibrary.manifest(host).tagsOf("ore").isEmpty());
         assertTrue(run("untag_pictures", "tag", "Popups", "pictures", List.of("ore")).isRefused(), "ore has none");
         assertEquals("gold carries Popups.", text(run("set_tags", "picture", "gold", "tags", List.of("Popups"))));
 
         assertTrue(run("rename_tag", "tag", "Popups", "to", "Home").isRefused(), "taken");
         assertEquals("Renamed Popups to Dialogs.", text(run("rename_tag", "tag", "Popups", "to", "Dialogs")));
-        assertEquals(java.util.Set.of("Dialogs"), TemplateLibrary.manifest(resources).tagsOf("gold"));
+        assertEquals(PictureTag.named("Dialogs"), host.set("tags").get("DIALOGS").value(), "constant and words");
+        assertEquals(java.util.Set.of("Dialogs"), TemplateLibrary.manifest(host).tagsOf("gold"));
         assertEquals("Deleted Dialogs; its pictures stay.", text(run("delete_tag", "tag", "Dialogs")));
-        assertTrue(TemplateLibrary.manifest(resources).tagsOf("gold").isEmpty());
+        assertTrue(TemplateLibrary.manifest(host).tagsOf("gold").isEmpty());
+        assertFalse(host.set("tags").containsKey("DIALOGS"));
         assertTrue(TemplateLibrary.exists(resources, "gold"));
         assertTrue(run("delete_tag", "tag", "Dialogs").isRefused());
+    }
+
+    @Test
+    void aPictureIsFiledUnderAnActivityByItsEnum() {
+        host.values.put("run", TestContexts.row(Run.class, "").withValue(Run.NONE));
+        assertFalse(run("add_activity", "name", "Collect").isRefused());
+
+        assertEquals("ore carries Collect.", text(run("set_tags", "picture", "ore", "tags", List.of("collect"))));
+        assertEquals(List.of(new Activity("Collect")),
+                ((ImageTemplate) host.set("pictures").get("ORE").value()).activities(),
+                ".activities(List.of(Activities.Collect.class))");
+        assertTrue(((ImageTemplate) host.set("pictures").get("ORE").value()).tags().isEmpty());
     }
 
     @Test
@@ -891,7 +911,7 @@ class SdkAssistTest {
                 "screen", "home")).contains("Noted in Home as untried"));
         assertEquals("home", screen("HOME").marker().id());
         assertEquals(List.of("click gold"), screen("HOME").inputs().stream().map(Input::label).toList());
-        assertEquals(Set.of(), TemplateLibrary.manifest(resources).tagsOf("gold"),
+        assertEquals(Set.of(), TemplateLibrary.manifest(host).tagsOf("gold"),
                 "a screen's pictures are grouped by the map, never tagged");
 
         // What try_input writes when an input opens a screen: a screen below, reached from Home, owing its marker.
@@ -948,7 +968,7 @@ class SdkAssistTest {
         assertTrue(text(both).contains("Noted in Engineer as its marker, in place of coin.")
                 && text(both).contains("Saved spade") && text(both).contains("Not saved, far: "), text(both));
         assertEquals("pick", screen("ENGINEER").marker().id());
-        assertEquals(Set.of(), TemplateLibrary.manifest(resources).tagsOf("spade"), "grouped by the map, not tagged");
+        assertEquals(Set.of(), TemplateLibrary.manifest(host).tagsOf("spade"), "grouped by the map, not tagged");
         assertTrue(screen("ENGINEER").inputs().stream().anyMatch(i -> i.label().equals("click spade")));
     }
 
@@ -1174,6 +1194,15 @@ class SdkAssistTest {
             // A grouped member, "Group.NAME", is renamed within its group.
             String renamed = member.contains(".") ? member.substring(0, member.indexOf('.') + 1) + newName : newName;
             set(name(id)).put(renamed, set(name(id)).remove(member));
+            // A tag's uses follow it, as the host's rename by binding moves them: each picture naming it.
+            if (name(id).equals("tags")) {
+                for (TestContexts.Recording picture : set("pictures").values()) {
+                    if (!(picture.value() instanceof ImageTemplate held)) continue;
+                    picture.set(held.tags(held.tags().stream()
+                            .map(tag -> tag.equals(BotConstants.tag(member)) ? BotConstants.tag(newName) : tag)
+                            .toList()));
+                }
+            }
             return Optional.empty();
         }
 

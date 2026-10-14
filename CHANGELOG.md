@@ -196,7 +196,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 ### Changed
 
 - **crop_picture no longer tags a picture with its screen's name.** 🖼 Manage Pictures groups it under its
-  screen instead. Screen tags already in a bot stay as ordinary custom tags.
+  screen instead.
+- **A picture's tags are in the bot's Java; `templates.json` is gone.** A custom tag is a constant of a new
+  `Tags` class (`@SdkValue(SdkValue.Id.TAGS)`, `public static final PictureTag UI = PictureTag.named("UI")`), and a
+  picture names its tags and its activities on its own constant: `new ImageTemplate("…").tags(List.of(Tags.UI))
+  .activities(List.of(Activities.Collect.class))`. So a tag is renamed with every picture carrying it, an
+  activity's group follows the activity's enum, and a picture's tags go with its constant when it is renamed,
+  recut or deleted. 🖼 Manage Pictures, its tag manager, the tag pickers and the assistant's tag tools read and
+  write these. Nothing reads `src/main/resources/images/templates.json` any more: a bot's old tags are not
+  carried over, and the file can be deleted. A `.bmtemplates` archive carries the pictures only, and an import
+  skips an older archive's `templates.json`. A picture may now be called `templates`.
 - **Discovery explores every screen the same way, one screen to its end at a time.** The guide's Discovery steps
   are one algorithm for every screen: cut every input on it (buttons, icons, tabs, toggles, arrows, list items and
   the lists that scroll), try each, and explore a screen an input opens to its end before the next input of the

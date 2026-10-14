@@ -67,7 +67,8 @@ import java.util.TreeSet;
  *
  * <p>The listing itself is {@link TemplateGallery} — the same component a template slot opens as a picker, so
  * "which templates exist and how are they filed" has one rendering. Organisation comes from
- * {@link TemplateManifest} rather than from directories (see that class for why the files stay flat): a
+ * the pictures' tags in the bot's Java ({@link PictureTags}) rather than from directories (see {@link TemplateManifest}
+ * for why the files stay flat): a
  * template with two tags appears under either rail row and is still one file.
  */
 public final class ResourceManagerDialog {
@@ -282,7 +283,7 @@ public final class ResourceManagerDialog {
         if (addTagButton.isShowing()) return;
         previewTags.getChildren().clear();
         List<String> tags = TemplateLibrary.tagCatalog(services)
-                .declaredOnly(TemplateLibrary.manifest(resources()).tagsOf(name));
+                .declaredOnly(TemplateLibrary.manifest(services).tagsOf(name));
         for (String tag : tags) previewTags.getChildren().add(tagChip(name, tag));
         previewTags.getChildren().add(tagMenu(name, tags));
     }
@@ -365,9 +366,10 @@ public final class ResourceManagerDialog {
         remove.getStyleClass().add("tag-chip-remove");
         remove.setTooltip(new Tooltip("Take \"" + tag + "\" off " + templateName));
         remove.setOnAction(e -> {
-            TemplateLibrary.removeTag(resources(), List.of(templateName), tag);
+            List<String> refused = TemplateLibrary.removeTag(services, List.of(templateName), tag);
             published();
             reload();
+            refusedSay(refused);
         });
         HBox chip = new HBox(4, label, remove);
         chip.getStyleClass().add("tag-chip");
@@ -389,12 +391,14 @@ public final class ResourceManagerDialog {
             CheckBox box = new CheckBox(tag);
             box.setSelected(carried.contains(tag));
             box.setOnAction(e -> {
-                if (box.isSelected()) TemplateLibrary.addTag(services, List.of(templateName), tag);
-                else TemplateLibrary.removeTag(resources(), List.of(templateName), tag);
+                List<String> refused = box.isSelected()
+                        ? TemplateLibrary.addTag(services, List.of(templateName), tag)
+                        : TemplateLibrary.removeTag(services, List.of(templateName), tag);
                 published();
                 // Repaint the chips and the rail counts without closing the menu the user is still working in.
                 gallery.reload();
                 refreshTagActions();
+                refusedSay(refused);
             });
             CustomMenuItem item = new CustomMenuItem(box);
             item.setHideOnClick(false);
@@ -403,13 +407,20 @@ public final class ResourceManagerDialog {
         if (!addTagButton.getItems().isEmpty()) addTagButton.getItems().add(new SeparatorMenuItem());
         MenuItem create = new MenuItem("New tag…");
         create.setOnAction(e -> TagPicker.promptNewTag(services, stage).ifPresent(tag -> {
-            TemplateLibrary.declareTag(services, tag);
-            TemplateLibrary.addTag(services, List.of(templateName), tag);
+            Optional<String> undeclared = TemplateLibrary.declareTag(services, tag);
+            List<String> refused = undeclared.isPresent() ? List.of(undeclared.get())
+                    : TemplateLibrary.addTag(services, List.of(templateName), tag);
             published();
             reload();
+            refusedSay(refused);
         }));
         addTagButton.getItems().add(create);
         return addTagButton;
+    }
+
+    /** Says why a tag change was not written, after the reload that would otherwise hide it. */
+    private void refusedSay(List<String> refused) {
+        if (!refused.isEmpty()) statusLabel.setText(String.join(" ", refused));
     }
 
     /** Names the two per-tag buttons after the tag the rail is on, and disables them where they make no sense. */
@@ -433,17 +444,19 @@ public final class ResourceManagerDialog {
     private void addTemplatesToCurrentTag() {
         String tag = gallery.selectedRealTag();
         if (tag == null) return;
-        TemplateManifest manifest = TemplateLibrary.manifest(resources());
+        TemplateManifest manifest = TemplateLibrary.manifest(services);
         TemplateGalleryDialog.Options options = TemplateGalleryDialog.Options
                 .pickOne("Add templates to \"" + tag + "\"").multi()
                 // Offer only what is not already filed here — re-adding is a no-op the user would have to
                 // check for themselves.
                 .withFilter(file -> !manifest.tagsOf(TemplateLibrary.baseName(file)).contains(tag));
         TemplateGalleryDialog.open(services, stage, options, files -> {
-            TemplateLibrary.addTag(services, files.stream().map(TemplateLibrary::baseName).toList(), tag);
+            List<String> refused = TemplateLibrary.addTag(services,
+                    files.stream().map(TemplateLibrary::baseName).toList(), tag);
             published();
             reload();
-            statusLabel.setText("Added " + files.size() + " template(s) to \"" + tag + "\".");
+            statusLabel.setText(refused.isEmpty() ? "Added " + files.size() + " template(s) to \"" + tag + "\"."
+                    : String.join(" ", refused));
         });
     }
 
@@ -455,10 +468,12 @@ public final class ResourceManagerDialog {
             statusLabel.setText("Select the templates to take out of this tag.");
             return;
         }
-        TemplateLibrary.removeTag(resources(), files.stream().map(TemplateLibrary::baseName).toList(), tag);
+        List<String> refused = TemplateLibrary.removeTag(services,
+                files.stream().map(TemplateLibrary::baseName).toList(), tag);
         published();
         reload();
-        statusLabel.setText("Removed \"" + tag + "\" from " + files.size() + " template(s).");
+        statusLabel.setText(refused.isEmpty() ? "Removed \"" + tag + "\" from " + files.size() + " template(s)."
+                : String.join(" ", refused));
     }
 
     /** Opens the tag manager, and picks up whatever it changed when it closes. */
@@ -632,7 +647,7 @@ public final class ResourceManagerDialog {
                 break;
             }
             try {
-                TemplateLibrary.deleteTemplate(resources(), file);
+                TemplateLibrary.deleteTemplate(file);
                 deleted++;
             } catch (IOException e) {
                 stopped = "Failed to delete " + name + ": " + e.getMessage();
@@ -679,7 +694,7 @@ public final class ResourceManagerDialog {
         java.io.File target = chooser.showSaveDialog(stage);
         if (target == null) return;
         try {
-            TemplateArchive.export(resources(), files, target.toPath());
+            TemplateArchive.export(files, target.toPath());
             statusLabel.setText("Exported " + files.size() + " template(s) to " + target.getName());
         } catch (IOException e) {
             statusLabel.setText("Failed to export: " + e.getMessage());
@@ -830,17 +845,14 @@ public final class ResourceManagerDialog {
         }
     }
 
-    /** Drops the manifest entries and the {@code Pictures} constants of templates that no longer have a file. */
+    /** Drops the {@code Pictures} constants, and their tags with them, of templates that no longer have a file. */
     private void forgetMissing(List<String> missing) {
-        TemplateManifest manifest = TemplateLibrary.manifest(resources());
         List<String> stillUsed = new ArrayList<>();
         for (String name : missing) {
-            manifest = manifest.without(name);
-            // Its constant goes too, unless something still reads it: the host refuses that, and a constant
-            // naming a missing file is the user's to fix where it is used rather than ours to guess about.
+            // Unless something still reads it: the host refuses that, and a constant naming a missing file is the
+            // user's to fix where it is used rather than ours to guess about.
             if (TemplateUses.forget(values(), name).isPresent()) stillUsed.add(name);
         }
-        TemplateLibrary.saveManifest(resources(), manifest);
         published();
         reload();
         statusLabel.setText("Forgot " + missing.size() + (missing.size() == 1 ? " template" : " templates")

@@ -80,7 +80,6 @@ public final class PictureCuts {
         if (resources == null) throw new IllegalArgumentException("No project is open to save a picture into.");
         String name = TemplateLibrary.sanitizeName(typed);
         if (name.isEmpty()) throw new IllegalArgumentException("A picture needs a name.");
-        if (TemplateLibrary.isReservedName(name)) throw new IllegalArgumentException("\"" + name + "\" is reserved.");
         if (TemplateLibrary.exists(resources, name)) {
             throw new IllegalArgumentException("A picture called \"" + name + "\" already exists.");
         }

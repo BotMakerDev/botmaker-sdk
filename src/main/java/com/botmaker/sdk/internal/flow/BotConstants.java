@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.vision.PictureTag;
 
 import java.util.List;
 
@@ -71,6 +72,24 @@ public final class BotConstants {
     public static GameScreen screen(String name) {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("A screen reference needs a name");
         return GameScreen.named(REFERENCE + name);
+    }
+
+    /**
+     * The bot's tag {@code name}, {@code Tags.UI}, as an editor holds a reference to it: a tag called by the reference
+     * mark and the constant's name ({@code ManagedValue.referredToAs}). Like every tag it equals another of the same
+     * name in any case, so {@code Tags.UI} and a {@code Tags.ui} beside it read as one. A run never meets one: there
+     * the picture holds the tag.
+     *
+     * @throws IllegalArgumentException for a blank name, which names no constant
+     */
+    public static PictureTag tag(String name) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("A tag reference needs a name");
+        return PictureTag.named(REFERENCE + name);
+    }
+
+    /** The constant {@code tag} refers to when it is a {@link #tag} reference, {@code UI}; else null. */
+    public static String tagName(PictureTag tag) {
+        return tag != null && tag.name().startsWith(REFERENCE) ? tag.name().substring(REFERENCE.length()) : null;
     }
 
     /** The constant {@code screen} refers to when it is a {@link #screen} reference, {@code HOME}; else null. */

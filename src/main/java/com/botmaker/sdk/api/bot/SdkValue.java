@@ -64,6 +64,8 @@ public @interface SdkValue {
         SETTINGS,
         /** The pictures the bot looks for — a class of {@code ImageTemplate} constants. */
         PICTURES,
+        /** The groups 🖼 Manage Pictures files pictures under that no activity owns — a class of {@code PictureTag} constants. */
+        TAGS,
         /** The cards of the Activity Flow — a class of enums, one per activity, whose {@link Outcome} constants are its exits. */
         ACTIVITIES,
         /** Named spots of the game, in the bot's pixels — a class of {@code Spot} constants. */

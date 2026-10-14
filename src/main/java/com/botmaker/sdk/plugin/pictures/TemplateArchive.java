@@ -17,14 +17,14 @@ import java.util.zip.ZipOutputStream;
  * Import/export of image templates on their own — a {@code .bmtemplates} zip — so a set of templates can move
  * between projects without carrying a whole bot with it.
  *
- * <p>Smaller than a published project: the PNGs and a slice of the tag manifest covering exactly the exported
- * names. Where a picture was cut is its constant's ({@code .at}, {@code .in}), which stays in the bot it came
- * from: an imported picture is declared plain, and is matched at the bot's screen size.
+ * <p>Smaller than a published project: the PNGs alone. Where a picture was cut and the tags it is filed under are
+ * its constant's ({@code .at}, {@code .in}, {@code .tags}), which stays in the bot it came from: an imported
+ * picture is declared plain, untagged, and is matched at the bot's screen size. An archive written before
+ * 2026-10-14 also holds a {@code templates.json}, which an import skips.
  *
  * <p>Layout inside the zip mirrors the images root, one level down, so the file is legible in any zip tool:
  * <pre>
  *   images/accept.png
- *   templates.json
  * </pre>
  *
  * <p>Import never overwrites: a name already taken in the destination is imported under a suffixed name and
@@ -92,52 +92,18 @@ public final class TemplateArchive {
         }
     }
 
-    /**
-     * Writes {@code templates} (PNG paths from the project's images root) plus their tags to
-     * {@code destination}.
-     */
-    public static void export(Path resourcesDir, Collection<Path> templates, Path destination)
-            throws IOException {
-        List<String> names = templates.stream().map(TemplateLibrary::baseName).toList();
-        TemplateManifest slice = TemplateLibrary.manifest(resourcesDir).restrictedTo(names);
-
+    /** Writes {@code templates} (PNG paths from the project's images root) to {@code destination}. */
+    public static void export(Collection<Path> templates, Path destination) throws IOException {
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(destination))) {
             for (Path png : templates) {
                 writeEntry(zip, IMAGES_PREFIX + png.getFileName(), Files.readAllBytes(png));
             }
-            // The manifest is written through the same writer the project uses, via a scratch directory, so
-            // an exported manifest and a project one can never be two different shapes.
-            Path scratch = Files.createTempDirectory("bmtemplates");
-            try {
-                slice.write(scratch);
-                Path manifest = scratch.resolve(TemplateManifest.FILE_NAME);
-                if (Files.isRegularFile(manifest)) {
-                    writeEntry(zip, TemplateManifest.FILE_NAME, Files.readAllBytes(manifest));
-                }
-            } finally {
-                deleteRecursively(scratch);
-            }
         }
     }
 
-    /**
-     * Unpacks {@code archive} into the project's images root, renaming around existing names and merging the
-     * imported tags into the project's manifest.
-     */
+    /** Unpacks {@code archive}'s pictures into the project's images root, renaming around existing names. */
     public static ImportResult importInto(Path resourcesDir, Path archive) throws IOException {
         Map<String, byte[]> entries = readEntries(archive);
-
-        TemplateManifest incoming = TemplateManifest.empty();
-        byte[] manifestBytes = entries.remove(TemplateManifest.FILE_NAME);
-        if (manifestBytes != null) {
-            Path scratch = Files.createTempDirectory("bmtemplates");
-            try {
-                Files.write(scratch.resolve(TemplateManifest.FILE_NAME), manifestBytes);
-                incoming = TemplateManifest.read(scratch);
-            } finally {
-                deleteRecursively(scratch);
-            }
-        }
 
         Path imagesRoot = resourcesDir.resolve("images");
         Files.createDirectories(imagesRoot);
@@ -145,19 +111,17 @@ public final class TemplateArchive {
         Map<String, String> renamed = new LinkedHashMap<>();
         List<String> unchanged = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
-        TemplateManifest merged = TemplateLibrary.manifest(resourcesDir);
 
         for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
             String fileName = entry.getKey();
             if (!fileName.toLowerCase().endsWith(".png")) continue;
             String source = fileName.substring(0, fileName.length() - ".png".length());
             String sanitized = TemplateLibrary.sanitizeName(source);
-            if (sanitized.isBlank() || TemplateLibrary.isReservedName(sanitized)) {
+            if (sanitized.isBlank()) {
                 skipped.add(source);
                 continue;
             }
-            // Same name, same picture: the project already has this template. Its tags are left as the
-            // project has them — an import is not the place to re-file what is already filed.
+            // Same name, same picture: the project already has this template.
             if (TemplateLibrary.exists(resourcesDir, sanitized)
                     && TemplateLibrary.sameContent(imagesRoot.resolve(sanitized + ".png"), entry.getValue())) {
                 unchanged.add(sanitized);
@@ -169,25 +133,9 @@ public final class TemplateArchive {
                 continue;
             }
             Files.write(imagesRoot.resolve(target + ".png"), entry.getValue());
-
-            merged = merged.withTags(target, incoming.tagsOf(source));
             imported.add(target);
             if (!target.equals(sanitized)) renamed.put(sanitized, target);
         }
-
-        // A custom tag an imported picture carries arrives declared. An assignment to a tag nothing declares
-        // is inert, so without this every imported picture was filed under Untagged. A tag nothing imported
-        // carries is not declared: the pictures that wore it were already here.
-        for (String tag : incoming.customTags()) {
-            for (String name : imported) {
-                if (merged.tagsOf(name).contains(tag)) {
-                    merged = merged.declaring(tag);
-                    break;
-                }
-            }
-        }
-
-        TemplateLibrary.saveManifest(resourcesDir, merged);
         return new ImportResult(imported, renamed, unchanged, skipped);
     }
 
@@ -227,19 +175,5 @@ public final class TemplateArchive {
         zip.putNextEntry(new ZipEntry(name));
         zip.write(bytes);
         zip.closeEntry();
-    }
-
-    private static void deleteRecursively(Path dir) {
-        try (var walk = Files.walk(dir)) {
-            walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
-                try {
-                    Files.deleteIfExists(p);
-                } catch (IOException ignored) {
-                    // a temp file we could not remove is not worth failing an export over
-                }
-            });
-        } catch (IOException ignored) {
-            // ditto
-        }
     }
 }

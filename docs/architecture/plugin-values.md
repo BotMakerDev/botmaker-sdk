@@ -9,7 +9,10 @@ declares (`FLOW`, `DO_SETUP`, `SKIP`, 2026-10-11: which flow runs, whether setup
 activities this run skips) that the host writes back when missing and whose value alone is the user's — then
 **`Flows.java`** (`FLOWS`, an open set: one `Flow` constant per way of playing, `MAIN` by default, each its
 steps, arrows and start, `Flow.activity(Activities.Collect.class, Collect::body).described("…").goesHome()`),
-**`Pictures.java`**, `PICTURES` on the type, one `ImageTemplate` constant per picture, and
+**`Pictures.java`**, `PICTURES` on the type, one `ImageTemplate` constant per picture, filed under its tags and
+activities by its own chain (`.tags(List.of(Tags.UI)).activities(List.of(Activities.Collect.class))`, 2026-10-14),
+**`Tags.java`** (`TAGS`: one `PictureTag.named("UI")` per custom tag 🖼 Manage Pictures groups pictures under,
+which a picture refers to by its constant), and
 **`Activities.java`** (`ACTIVITIES`: one nested `enum Collect implements Outcome { NEXT, NOTHING_LEFT }` per
 activity, each name's label its words). Beside them the host writes **`Spots.java`** and
 **`Zones.java`** (`SPOTS`, `ZONES`, 2026-10-11): named `Spot`s and `Zone`s in the bot's pixels from the game's
@@ -25,7 +28,8 @@ canvas while this plugin is loaded (its values change in this plugin's windows).
 them from the host on bind, from the `ManagedValue`s `SdkValues` declares.
 
 **Nothing is stored anywhere else.** There is no `activities.json`, `capture.json`, `capture.source`, `Wire`,
-`ProjectData`, parameters JSON or generated source, and **no reader of those files**: a project written before
+`ProjectData`, parameters JSON, `templates.json` (the picture tags, gone 2026-10-14) or generated source, and
+**no reader of those files**: a project written before
 the flow was Java reads as having no flow, and nothing deletes anyone's old file. A later change to a managed
 value's shape converts nothing either: Studio's upgrade repairs the bot's values as it repairs its code, an id
 that is gone removed and a value that no longer compiles reset to its first value and marked `@Refactor`

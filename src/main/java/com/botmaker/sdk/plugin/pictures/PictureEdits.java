@@ -80,7 +80,7 @@ public final class PictureEdits {
         Optional<String> kept = TemplateUses.forget(services.pluginValues(), name);
         if (kept.isPresent()) return Done.refused("Not deleted: " + kept.get());
         try {
-            TemplateLibrary.deleteTemplate(resources, file);
+            TemplateLibrary.deleteTemplate(file);
         } catch (IOException e) {
             return Done.refused("Failed to delete " + name + ": " + e.getMessage());
         }

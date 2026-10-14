@@ -347,7 +347,7 @@ public final class CaptureTemplates {
                         TemplateNaming.promptNew(services, null, cropped.image(), suggestedTag);
                 if (named.isEmpty()) return;
                 save(cropped.image(), named.get().name(), cutIn(frame.image(), cropped));
-                TemplateLibrary.applyTags(services, Map.of(named.get().name(), named.get().tags()));
+                TemplateLibrary.applyTags(services, Map.of(named.get().name(), named.get().tags())).forEach(this::warn);
             } catch (Exception failed) {
                 warn("Failed to save the picture: " + failed.getMessage());
             } finally {
@@ -391,7 +391,7 @@ public final class CaptureTemplates {
                             : cutIn(frame.image(), piece));
                     written.add(template.name());
                 }
-                TemplateLibrary.applyTags(services, batch.tagsFor(written));
+                TemplateLibrary.applyTags(services, batch.tagsFor(written)).forEach(this::warn);
             } catch (Exception failed) {
                 warn("Failed to save the pictures: " + failed.getMessage());
             } finally {
@@ -423,7 +423,7 @@ public final class CaptureTemplates {
             Optional<NamedCapture> named = TemplateNaming.promptNew(services, null, cut, suggestedTag);
             if (named.isEmpty()) return;
             save(cut, named.get().name(), FrameCut.of(objectFrameWidth, objectFrameHeight, null));
-            TemplateLibrary.applyTags(services, Map.of(named.get().name(), named.get().tags()));
+            TemplateLibrary.applyTags(services, Map.of(named.get().name(), named.get().tags())).forEach(this::warn);
         } catch (Exception failed) {
             warn("Failed to save the object: " + failed.getMessage());
         } finally {

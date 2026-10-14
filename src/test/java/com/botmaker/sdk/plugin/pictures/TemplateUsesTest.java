@@ -4,9 +4,11 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.plugin.SpelledValues;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
+import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -96,17 +98,28 @@ class TemplateUsesTest {
     }
 
     @Test
-    void aConstantWhoseFileIsGoneIsMissingEvenWithNoTag(@TempDir Path resources) throws IOException {
+    void aConstantWhoseFileIsGoneIsMissing(@TempDir Path resources) throws IOException {
         TemplateLibrary.saveTemplate(resources, new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB), "ore");
         Host host = new Host("ORE", "GOLD", "ELSEWHERE");
         host.paths.put("ORE", TemplateLibrary.pathForName("ore"));
         host.paths.put("GOLD", TemplateLibrary.pathForName("gold"));
         host.paths.put("ELSEWHERE", "assets/elsewhere.png");
-        TemplateLibrary.saveManifest(resources, TemplateManifest.empty().declaring("Loot")
-                .withTags("silver", List.of("Loot")));
 
-        assertEquals(List.of("gold", "silver"), TemplateUses.missing(host, resources),
-                "gold's constant and silver's tag outlived their files; a path the user chose is theirs");
+        assertEquals(List.of("gold"), TemplateUses.missing(host, resources),
+                "gold's constant outlived its file; a path the user chose is theirs");
+    }
+
+    @Test
+    void aRenameKeepsThePicturesTagsAndActivities() {
+        Host host = new Host("ORE");
+        // What the constant holds once the host has renamed it, before its path is rewritten.
+        host.held.put("IRON", new ImageTemplate(TemplateLibrary.pathForName("ore"))
+                .tags(List.of(BotConstants.tag("UI"))).inActivities(List.of(new Activity("Collect"))));
+
+        assertEquals(Optional.empty(), TemplateUses.rename(host, "ore", "iron"));
+        ImageTemplate renamed = (ImageTemplate) host.opened.value();
+        assertEquals(List.of(BotConstants.tag("UI")), renamed.tags());
+        assertEquals(List.of(new Activity("Collect")), renamed.activities());
     }
 
     @Test

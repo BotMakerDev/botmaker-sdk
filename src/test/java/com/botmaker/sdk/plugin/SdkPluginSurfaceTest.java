@@ -241,27 +241,28 @@ class SdkPluginSurfaceTest {
      * <p>The order values are asserted rather than only the sequence, because a bar assembled from two
      * plugins interleaves by order and ties break on the plugin id — so a wrong number here moves a button
      * on a bar this test cannot see. {@code activity-flow} takes {@link ToolbarGroup#AUTHORING} at 10, which
-     * is the slot Studio's own 🔀 Flow button vacated when the graph editor moved here on 2026-09-11.
+     * is the slot Studio's own 🔀 Flow button vacated when the graph editor moved here on 2026-09-11; 🗺 Screens
+     * ({@code screen-map}) follows it at 20 (2026-10-14).
      *
      * <p>The last two are {@link ToolbarGroup#OVERLAY}: they are drawn on the overlay editor's own row rather
      * than on the main bar, and their subject is the window the HUD is drawn over. Recording is not among
      * them: it is the host's, and this plugin takes part through {@code @Records} and {@code recordedValues()}.
      */
     @Test
-    void the_toolbar_contributes_ten_items_in_their_groups_and_orders() {
+    void the_toolbar_contributes_eleven_items_in_their_groups_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();
 
         assertEquals(List.of("pilot", "capture-templates", "manage-templates",
-                        "activity-flow", "capture-source", "bot-settings", "game", "project-setup",
+                        "activity-flow", "screen-map", "capture-source", "bot-settings", "game", "project-setup",
                         "point-here", "picture-here"),
                 items.stream().map(ToolbarItem::id).toList());
 
         assertEquals(List.of(ToolbarGroup.RUN, ToolbarGroup.TOOLS, ToolbarGroup.TOOLS,
-                        ToolbarGroup.AUTHORING, ToolbarGroup.PROJECT, ToolbarGroup.PROJECT, ToolbarGroup.PROJECT,
-                        ToolbarGroup.PROJECT, ToolbarGroup.OVERLAY, ToolbarGroup.OVERLAY),
+                        ToolbarGroup.AUTHORING, ToolbarGroup.AUTHORING, ToolbarGroup.PROJECT, ToolbarGroup.PROJECT,
+                        ToolbarGroup.PROJECT, ToolbarGroup.PROJECT, ToolbarGroup.OVERLAY, ToolbarGroup.OVERLAY),
                 items.stream().map(ToolbarItem::group).toList());
 
-        assertEquals(List.of(10, 20, 30, 10, 50, 60, 30, 40, 10, 20),
+        assertEquals(List.of(10, 20, 30, 10, 20, 50, 60, 30, 40, 10, 20),
                 items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {

@@ -49,11 +49,6 @@ public final class TagManagerDialog {
         this.onChanged = onChanged;
     }
 
-    /** The project's picture folder — every question below is asked of it. */
-    private java.nio.file.Path resources() {
-        return services.resourcesDir();
-    }
-
     public void show() {
         list.setCellFactory(v -> new ListCell<>() {
             @Override protected void updateItem(TagCatalog.Tag item, boolean empty) {
@@ -115,8 +110,7 @@ public final class TagManagerDialog {
 
     private void createTag() {
         TagPicker.promptNewTag(services, stage).ifPresent(tag -> {
-            TemplateLibrary.declareTag(services, tag);
-            changed("Created \"" + tag + "\".");
+            changed(TemplateLibrary.declareTag(services, tag).orElse("Created \"" + tag + "\"."));
         });
     }
 
@@ -131,9 +125,7 @@ public final class TagManagerDialog {
             return;
         }
         TagPicker.promptRenameTag(services, stage, tag.name()).ifPresent(renamed -> {
-            TemplateLibrary.saveManifest(resources(),
-                    TemplateLibrary.manifest(resources()).renamedTag(tag.name(), renamed));
-            changed("Renamed to \"" + renamed + "\".");
+            changed(PictureTags.rename(services, tag.name(), renamed).orElse("Renamed to \"" + renamed + "\"."));
         });
     }
 
@@ -155,8 +147,7 @@ public final class TagManagerDialog {
                                 + " template(s). The templates themselves are not deleted.");
         confirm.initOwner(stage);
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
-        TemplateLibrary.saveManifest(resources(), TemplateLibrary.manifest(resources()).undeclaring(tag.name()));
-        changed("Deleted \"" + tag.name() + "\".");
+        changed(PictureTags.delete(services, tag.name()).orElse("Deleted \"" + tag.name() + "\"."));
     }
 
     private void changed(String message) {

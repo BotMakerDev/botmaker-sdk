@@ -18,11 +18,12 @@ import java.util.TreeSet;
  * makes the set finite and knowable: every assignment UI is a picklist over <em>this</em>, never a text
  * field, so a tag cannot be invented by a typo and cannot vanish by accident.
  *
- * <p><b>Two kinds, one of them managed.</b> An {@link Kind#ACTIVITY} tag is not stored anywhere — it is the
- * name of an activity in the bot's flow, derived on every read. It appears when the activity is
- * created and is gone when the activity is, which is exactly the lifecycle a hand-managed copy would fail to
- * keep. It cannot be renamed or deleted here; rename the activity. A {@link Kind#CUSTOM} tag is the user's
- * own, declared in {@link TemplateManifest#customTags()} and edited in one place.
+ * <p><b>Two kinds, one of them managed.</b> An {@link Kind#ACTIVITY} tag is no declaration of its own — it is
+ * an activity of the bot's flow, and a picture names it by the activity's enum ({@code .activities(…)}). It
+ * appears when the activity is created and is gone when the activity is, which is exactly the lifecycle a
+ * hand-managed copy would fail to keep. It cannot be renamed or deleted here; rename the activity. A
+ * {@link Kind#CUSTOM} tag is the user's own, a constant of the bot's {@code Tags} class ({@link PictureTags}),
+ * edited in one place.
  *
  * <p>Assignments to tags this catalog doesn't declare are inert rather than erroneous — see
  * {@link TemplateManifest#byTag(Collection, TagCatalog)} for what that buys.
@@ -135,7 +136,7 @@ public record TagCatalog(List<Tag> tags) {
     /**
      * {@code names} narrowed to the tags this catalog declares, spelled the way the catalog spells them and
      * ordered the way it orders them — what every assignment path saves, so a stale selection or a
-     * hand-edited manifest can't put an undeclared tag back into the file.
+     * hand-edited picture can't have an undeclared tag written back onto it.
      */
     public List<String> declaredOnly(Collection<String> names) {
         if (names == null) return List.of();

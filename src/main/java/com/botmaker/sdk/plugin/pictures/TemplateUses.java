@@ -102,8 +102,8 @@ public final class TemplateUses {
             if (held.isEmpty()) {
                 return Optional.of("Pictures." + constant + " is written by hand; it was left as it is.");
             }
-            // Its own path, which the user may have pointed elsewhere: only where it was cut changes.
-            ctx.get().set(ScreenSize.cut(services, new ImageTemplate(held.get().filePath()), cut));
+            // Its own path, which the user may have pointed elsewhere, and its tags: only where it was cut changes.
+            ctx.get().set(ScreenSize.cut(services, filed(new ImageTemplate(held.get().filePath()), held.get()), cut));
             return Optional.empty();
         } catch (RuntimeException refused) {
             return Optional.of("Pictures." + constant + " was not rewritten: " + refused.getMessage());
@@ -126,10 +126,10 @@ public final class TemplateUses {
         Optional<String> refused = SET.rename(values, from, to.name());
         if (refused.isPresent()) return refused;
         return SET.open(values, to).map(value -> {
-            // Where it was cut stays: the same picture under a new name.
+            // Where it was cut and its tags stay: the same picture under a new name.
             ImageTemplate held = SET.read(value).orElse(null);
             ImageTemplate renamed = picture(newName);
-            value.set(held == null ? renamed : renamed.at(held.place()).in(held.frame()));
+            value.set(held == null ? renamed : filed(renamed.at(held.place()).in(held.frame()), held));
             return Optional.<String>empty();
         }).orElse(Optional.of(TemplateNames.CLASS_NAME + "." + to + " was renamed, but its path could not be "
                 + "rewritten."));
@@ -161,15 +161,14 @@ public final class TemplateUses {
     }
 
     /**
-     * Every picture whose file is gone while something still names it — a tag in the manifest, or a
-     * {@code Pictures} constant — sorted. A file deleted in a file manager or lost to a checkout left both
-     * behind, and an untagged picture was invisible to a manifest-only check until a run failed to load it.
+     * Every picture whose file is gone while its {@code Pictures} constant still names it, sorted: a file deleted in
+     * a file manager or lost to a checkout left the constant, and its tags with it, behind.
      *
      * <p>Only a constant written as one of ours counts ({@code ORE = new ImageTemplate(".../ore.png")}): one the
      * user pointed at some other path is theirs, and nothing here answers for it.
      */
     public static List<String> missing(PluginValues values, Path resourcesDir) {
-        Set<String> gone = new TreeSet<>(TemplateLibrary.missingTemplates(resourcesDir));
+        Set<String> gone = new TreeSet<>();
         for (Member member : SET.members(values)) {
             String baseName = TemplateNames.baseNameFor(member.name());
             if (baseName == null || TemplateLibrary.exists(resourcesDir, baseName)) continue;
@@ -219,6 +218,11 @@ public final class TemplateUses {
     private static Member constantFor(String baseName) {
         String constant = TemplateNames.constantFor(baseName);
         return constant == null ? null : Member.of(constant);
+    }
+
+    /** {@code picture} filed under what {@code held} is: its tags and activities. */
+    private static ImageTemplate filed(ImageTemplate picture, ImageTemplate held) {
+        return picture.tags(held.tags()).inActivities(held.activities());
     }
 
     private static ImageTemplate picture(String baseName) {

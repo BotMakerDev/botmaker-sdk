@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
+import com.botmaker.sdk.plugin.pictures.PictureTags;
 import com.botmaker.sdk.plugin.pictures.TagCatalog;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateManifest;
@@ -99,20 +100,17 @@ final class TagTools {
         Picked picked = pictures(resources.get(), tagging.pictures());
         if (picked.refusal() != null) return AgentReply.refused(picked.refusal());
         if (add) {
-            FxCall.call(() -> {
-                TemplateLibrary.addTag(context.services(), picked.names(), tag.name());
-                return null;
-            });
+            List<String> refused = FxCall.call(() -> TemplateLibrary.addTag(context.services(), picked.names(),
+                    tag.name()));
+            if (!refused.isEmpty()) return AgentReply.refused(String.join(" ", refused));
             return AgentReply.text("Tagged " + String.join(", ", picked.names()) + " " + tag.name() + ".");
         }
-        TemplateManifest manifest = TemplateLibrary.manifest(resources.get());
+        TemplateManifest manifest = FxCall.call(() -> TemplateLibrary.manifest(context.services()));
         List<String> had = picked.names().stream().filter(n -> manifest.tagsOf(n).contains(tag.name())).toList();
         if (had.isEmpty()) return AgentReply.refused("None of " + String.join(", ", picked.names()) + " carries "
                 + tag.name() + ".");
-        FxCall.call(() -> {
-            TemplateLibrary.removeTag(resources.get(), had, tag.name());
-            return null;
-        });
+        List<String> refused = FxCall.call(() -> TemplateLibrary.removeTag(context.services(), had, tag.name()));
+        if (!refused.isEmpty()) return AgentReply.refused(String.join(" ", refused));
         return AgentReply.text("Took " + tag.name() + " off " + String.join(", ", had) + ".");
     }
 
@@ -126,10 +124,9 @@ final class TagTools {
         for (String tag : tags) {
             if (!catalog.isDeclared(tag)) return AgentReply.refused(undeclared(tag, catalog));
         }
-        FxCall.call(() -> {
-            TemplateLibrary.applyTags(context.services(), Map.of(base.get(), tags));
-            return null;
-        });
+        List<String> refused = FxCall.call(() -> TemplateLibrary.applyTags(context.services(),
+                Map.of(base.get(), tags)));
+        if (!refused.isEmpty()) return AgentReply.refused(String.join(" ", refused));
         List<String> now = catalog.declaredOnly(tags);
         return AgentReply.text(base.get() + (now.isEmpty() ? " is untagged." : " carries " + String.join(", ", now)
                 + "."));
@@ -142,8 +139,9 @@ final class TagTools {
         TagCatalog catalog = FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
         String problem = catalog.nameProblem(tag, null);
         if (problem != null) return AgentReply.refused(problem);
-        FxCall.call(() -> TemplateLibrary.declareTag(context.services(), tag));
-        return AgentReply.text("Declared " + tag + "; tag_pictures puts it on pictures.");
+        Optional<String> refused = FxCall.call(() -> PictureTags.declare(context.services(), tag));
+        if (refused.isPresent()) return AgentReply.refused(refused.get());
+        return AgentReply.text("Declared " + tag + " in Tags; tag_pictures puts it on pictures.");
     }
 
     static AgentReply renameTag(RenameTag rename, AgentContext context) {
@@ -158,11 +156,8 @@ final class TagTools {
         String to = TemplateManifest.sanitizeTag(rename.to());
         String problem = catalog.nameProblem(to, tag.name());
         if (problem != null) return AgentReply.refused(problem);
-        FxCall.call(() -> {
-            TemplateLibrary.saveManifest(resources.get(),
-                    TemplateLibrary.manifest(resources.get()).renamedTag(tag.name(), to));
-            return null;
-        });
+        Optional<String> refused = FxCall.call(() -> PictureTags.rename(context.services(), tag.name(), to));
+        if (refused.isPresent()) return AgentReply.refused(refused.get());
         return AgentReply.text("Renamed " + tag.name() + " to " + to + ".");
     }
 
@@ -175,11 +170,8 @@ final class TagTools {
         if (tag.isManaged()) {
             return AgentReply.refused(tag.name() + " belongs to its activity: remove the activity to remove it.");
         }
-        FxCall.call(() -> {
-            TemplateLibrary.saveManifest(resources.get(),
-                    TemplateLibrary.manifest(resources.get()).undeclaring(tag.name()));
-            return null;
-        });
+        Optional<String> refused = FxCall.call(() -> PictureTags.delete(context.services(), tag.name()));
+        if (refused.isPresent()) return AgentReply.refused(refused.get());
         return AgentReply.text("Deleted " + tag.name() + "; its pictures stay.");
     }
 

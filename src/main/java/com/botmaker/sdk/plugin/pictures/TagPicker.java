@@ -35,8 +35,8 @@ import java.util.Set;
  * declares it rather than attaching a string to one picture.
  *
  * <p><b>It is the plugin's, and the reason is that a tag is a tag <em>of a picture</em>.</b> A picture is
- * {@code ImageTemplate}'s concept and the catalog it draws is {@link TagCatalog}, read out of this plugin's
- * own manifest under {@link StudioServices#resourcesDir()}. The host is the only possible source of which
+ * {@code ImageTemplate}'s concept and the catalog it draws is {@link TagCatalog}, read out of the bot's
+ * {@code Tags} class and its activities through {@link StudioServices#pluginValues()}. The host is the only possible source of which
  * project is open; everything after that is vocabulary, and vocabulary on the contract is the back door the
  * platform exists to close.
  *
@@ -131,7 +131,12 @@ public class TagPicker extends MenuButton {
     private void createTag() {
         Window owner = getScene() == null ? null : getScene().getWindow();
         promptNewTag(services, owner).ifPresent(tag -> {
-            catalog = TemplateLibrary.declareTag(services, tag);
+            Optional<String> refused = TemplateLibrary.declareTag(services, tag);
+            catalog = TemplateLibrary.tagCatalog(services);
+            if (refused.isPresent()) {
+                services.status(refused.get());
+                return;
+            }
             selected.add(tag);
             rebuild();
             refreshLabel();

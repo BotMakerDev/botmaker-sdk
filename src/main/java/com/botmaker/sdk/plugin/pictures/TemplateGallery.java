@@ -127,8 +127,8 @@ public final class TemplateGallery extends HBox {
 
     /**
      * The library as of the last {@link #reload()}: files by tag, their tags, the declared set. Held so that a
-     * keystroke in the search or a click on the rail redraws the grid without listing the folder, parsing the
-     * manifest and reading the flow again; every change made here reloads.
+     * keystroke in the search or a click on the rail redraws the grid without listing the folder, reading the
+     * pictures' tags and reading the flow again; every change made here reloads.
      */
     private Map<String, List<Path>> byTag = Map.of();
     private TemplateManifest manifest = TemplateManifest.empty();
@@ -277,7 +277,7 @@ public final class TemplateGallery extends HBox {
         }
         List<String> was = selectedTags();
         catalog = TemplateLibrary.tagCatalog(services);
-        manifest = TemplateLibrary.manifest(resourcesDir);
+        manifest = TemplateLibrary.manifest(services);
         Map<String, List<Path>> read = new LinkedHashMap<>(TemplateLibrary.listByTag(services));
         Map<String, List<Path>> screens = ScreenGroups.of(services, read.getOrDefault(TemplateManifest.ALL, List.of()));
         read.putAll(screens);
@@ -715,7 +715,7 @@ public final class TemplateGallery extends HBox {
      * The picture at {@code file}, scaled to fit {@code size}, or {@code null} when there is nothing to show.
      *
      * <p>A missing file is an ordinary state, not an error — a template whose PNG was deleted outside the
-     * editor still has a manifest entry, and the tile renders as its name alone. This used to be Studio's
+     * editor still has its constant, and the tile renders as its name alone. This used to be Studio's
      * {@code ImageTemplatePicker.thumbnail}; it is six lines and reaching back across the plugin boundary
      * for them would be the only thing tying this gallery to a host.
      */

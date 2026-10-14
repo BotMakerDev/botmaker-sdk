@@ -222,7 +222,7 @@ final class PictureTools {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         List<String> lines = new ArrayList<>();
-        TemplateManifest manifest = TemplateLibrary.manifest(resources.get());
+        TemplateManifest manifest = FxCall.call(() -> TemplateLibrary.manifest(context.services()));
         TagCatalog catalog = FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
         for (Path file : TemplateLibrary.list(resources.get())) {
             if (TemplateLibrary.isUnmodifiedDefaultTemplate(file)) continue;
@@ -331,9 +331,10 @@ final class PictureTools {
         if (moving.isPresent()) return AgentReply.refused(moving.get());
         String alike = lookAlikes(context, frame.get(), picture.get().image(),
                 new Rect(crop.x(), crop.y(), crop.width(), crop.height())).map(a -> " " + a).orElse("");
+        List<String> untagged = new ArrayList<>();
         PictureCuts.Cut saved = FxCall.call(() -> {
             PictureCuts.Cut cut = PictureCuts.save(context.services(), picture.get(), crop.name(), frame.get());
-            if (!tags.isEmpty()) TemplateLibrary.applyTags(context.services(), Map.of(cut.name(), tags));
+            if (!tags.isEmpty()) untagged.addAll(TemplateLibrary.applyTags(context.services(), Map.of(cut.name(), tags)));
             return cut;
         });
         Frames.mark(context, new Rect(crop.x(), crop.y(), crop.width(), crop.height()), Marks.Kind.NOTE, saved.name());
@@ -341,8 +342,9 @@ final class PictureTools {
         String noted = section.map(s -> MapTools.noteCut(context.services(), s, saved.name(), marker, back,
                 sometimes)).orElse("");
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
-                        + "." + constant) + (tags.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
-                        + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike)
+                        + "." + constant) + (tags.isEmpty() || !untagged.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
+                        + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike
+                        + (untagged.isEmpty() ? "" : " Not tagged: " + String.join(" ", untagged)))
                 .and(AgentReply.image(picture.get().image()));
     }
 

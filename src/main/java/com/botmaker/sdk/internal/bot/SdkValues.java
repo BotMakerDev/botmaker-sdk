@@ -19,6 +19,7 @@ import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.vision.BotScreen;
@@ -31,13 +32,13 @@ import java.util.Set;
 /**
  * The SDK's managed values, each declared once, and what a run does with each one.
  *
- * <p>Sixteen declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
+ * <p>Eighteen declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
  * plugin lists {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOWS} are the activity
  * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
  * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
- * size its pictures were cut at, and {@code PICTURES}, {@code ACTIVITIES}, {@code SPOTS}, {@code ZONES} and
- * {@code DIGITS} the classes of constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the
+ * size its pictures were cut at, and {@code PICTURES}, {@code TAGS}, {@code ACTIVITIES}, {@code SPOTS},
+ * {@code ZONES}, {@code DIGITS} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the
  * run's {@code @Param} fields in {@code Sdk.java}, which {@code Bot.runFlow} reads by their marks and nothing
  * claims; {@code LAUNCH_TARGETS}, {@code CAPTURE} (where pixels are read from) and {@code VM} the game's,
  * which {@code Bot.runFlow} reads by their marks.
@@ -90,6 +91,18 @@ public final class SdkValues {
             .in(TemplateNames.CLASS_NAME)
             .because("Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every"
                     + " use of it together.");
+
+    /**
+     * The pictures' own tags — {@code static final PictureTag UI = PictureTag.named("UI")}, which a picture names
+     * in {@code .tags(List.of(Tags.UI))} (2026-10-14). A tag inside a picture is a reference to the constant, read by
+     * name ({@link BotConstants#tag}), so two tags of one name in two spellings stay one constant.
+     */
+    public static final ManagedValue<PictureTag> TAGS = ManagedValue.openSet(SdkValue.Id.TAGS)
+            .of(PictureTag.class)
+            .referredToAs(BotConstants::tag)
+            .in("Tags")
+            .because("Tags.java holds the groups 🖼 Manage Pictures files pictures under. Add, rename or delete one"
+                    + " there, which changes every picture it holds together.");
 
     /**
      * The activities, each an enum of its outcomes nested in one class —
@@ -234,9 +247,9 @@ public final class SdkValues {
             .when(SdkValues::vmApplies)
             .because(GAME_PARAM);
 
-    /** All seventeen, in the order the plugin declares them. */
+    /** All eighteen, in the order the plugin declares them. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOWS, RUN, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            ACTIVITIES, SPOTS, ZONES, DIGITS, SCREEN_MAP, SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, VM);
+            TAGS, ACTIVITIES, SPOTS, ZONES, DIGITS, SCREEN_MAP, SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, VM);
 
     private static boolean claimed;
 

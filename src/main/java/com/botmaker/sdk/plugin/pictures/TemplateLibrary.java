@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -162,15 +163,6 @@ public final class TemplateLibrary {
         return raw == null ? "" : raw.trim().replaceAll("[^A-Za-z0-9_]", "_").toLowerCase(Locale.ROOT);
     }
 
-    /**
-     * Whether {@code baseName} would collide with a file the library owns rather than a template — today the
-     * one name whose {@code <name>.json} <em>is</em> {@link TemplateManifest#FILE_NAME}. Checked by every naming
-     * path alongside {@link #exists}, so a picture's name never reads as the tag manifest's.
-     */
-    public static boolean isReservedName(String baseName) {
-        return baseName != null && TemplateManifest.FILE_NAME.equalsIgnoreCase(baseName + ".json");
-    }
-
     /** All saved template PNGs, sorted by file name. */
     public static List<Path> list(Path resourcesDir) {
         Path dir = imagesDir(resourcesDir);
@@ -267,34 +259,25 @@ public final class TemplateLibrary {
 
     // ── Tags ────────────────────────────────────────────────────────────────────────────────────────────
     //
-    // The manifest is read from disk on every call rather than cached. Templates are captured by an overlay,
-    // a batch dialog and the resource manager, and imported by an archive — a cache here would be a fifth
-    // thing to invalidate, for a file of a few hundred bytes read only when a menu opens.
+    // The tags are the bot's Java (PictureTags), read on every call rather than cached: pictures are cut by an
+    // overlay, a batch dialog, the resource manager and the assistant, and a cache here would be one more
+    // thing to invalidate. Every method here that reads or writes them is on the FX thread.
 
-    /** The project's tag manifest, or an empty one when it has none. */
-    public static TemplateManifest manifest(Path resourcesDir) {
-        return TemplateManifest.read(imagesDir(resourcesDir));
-    }
-
-    /** Persists {@code manifest} for the project; best-effort — a failure loses tags, never templates. */
-    public static void saveManifest(Path resourcesDir, TemplateManifest manifest) {
-        try {
-            manifest.write(imagesDir(resourcesDir));
-        } catch (IOException e) {
-            System.err.println("Failed to save template tags: " + e.getMessage());
-        }
+    /** Every picture's tags, read off its constant, and the custom tags {@code Tags} declares. */
+    public static TemplateManifest manifest(StudioServices services) {
+        return PictureTags.read(services);
     }
 
     /**
-     * The project's declared tags — one per activity, plus the custom ones from the manifest. Read afresh
-     * for the same reason the manifest is (see above): the activities are edited by a dialog, a canvas and a
+     * The project's declared tags — one per activity, plus the custom ones {@code Tags} declares. Read afresh
+     * for the same reason the tags are (see above): the activities are edited by a dialog, a canvas and a
      * repair pass, and a cache here would be another of them to invalidate.
      *
      * <p>It takes the services rather than a folder because half of it is the flow, which is a value in the
      * bot's own Java and read through the host.
      */
     public static TagCatalog tagCatalog(StudioServices services) {
-        return TagCatalog.of(activityNames(services), manifest(services.resourcesDir()).customTags());
+        return TagCatalog.of(activityNames(services), manifest(services).customTags());
     }
 
     /**
@@ -322,70 +305,75 @@ public final class TemplateLibrary {
         for (Path file : files) byName.put(baseName(file), file);
 
         Map<String, List<Path>> grouped = new LinkedHashMap<>();
-        manifest(resourcesDir).byTag(byName.keySet(), tagCatalog(services)).forEach((tag, names) ->
+        manifest(services).byTag(byName.keySet(), tagCatalog(services)).forEach((tag, names) ->
                 grouped.put(tag, names.stream().map(byName::get).filter(Objects::nonNull).toList()));
         return grouped;
     }
 
     /**
-     * Files each template under the tags chosen for it, dropping any that the project doesn't declare, and
-     * saves once. The map is {@code base name → tags}; a name mapped to an empty list is left untagged.
+     * Files each template under the tags chosen for it, dropping any that the project doesn't declare. The map is
+     * {@code base name → tags}; a name mapped to an empty list is left untagged.
      *
-     * <p>One call rather than one per template because the manifest is a single file: saving inside a loop
-     * would rewrite it once per capture and, if the last write lost, silently drop the earlier ones.
+     * @return why a picture's constant was not rewritten, one sentence each; empty when all were
      */
-    public static void applyTags(StudioServices services,
-                                 Map<String, ? extends Collection<String>> tagsByTemplate) {
-        if (tagsByTemplate.isEmpty()) return;
-        Path resourcesDir = services.resourcesDir();
+    public static List<String> applyTags(StudioServices services,
+                                         Map<String, ? extends Collection<String>> tagsByTemplate) {
         TagCatalog catalog = tagCatalog(services);
-        TemplateManifest updated = manifest(resourcesDir);
+        List<String> refused = new ArrayList<>();
         for (Map.Entry<String, ? extends Collection<String>> entry : tagsByTemplate.entrySet()) {
-            updated = updated.withTags(entry.getKey(), catalog.declaredOnly(entry.getValue()));
+            PictureTags.set(services, entry.getKey(), catalog.declaredOnly(entry.getValue())).ifPresent(refused::add);
         }
-        saveManifest(resourcesDir, updated);
+        return refused;
     }
 
     /**
-     * Adds one declared {@code tag} to every named template and saves once — "add these to this tag", the
-     * operation a tag view wants, as opposed to {@link #applyTags} which <em>replaces</em> a template's whole
-     * tag set. An undeclared tag is refused rather than declared as a side effect: declaring is
-     * {@link #declareTag}'s job, and a typo should not become a group.
+     * Adds one declared {@code tag} to every named template — "add these to this tag", the operation a tag view
+     * wants, as opposed to {@link #applyTags} which <em>replaces</em> a template's whole tag set. An undeclared tag
+     * is refused rather than declared as a side effect: declaring is {@link #declareTag}'s job, and a typo should
+     * not become a group.
      */
-    public static void addTag(StudioServices services, Collection<String> baseNames, String tag) {
-        if (baseNames.isEmpty() || !tagCatalog(services).isDeclared(tag)) return;
-        Path resourcesDir = services.resourcesDir();
-        saveManifest(resourcesDir, manifest(resourcesDir).tagged(baseNames, tag));
+    public static List<String> addTag(StudioServices services, Collection<String> baseNames, String tag) {
+        if (baseNames.isEmpty() || !tagCatalog(services).isDeclared(tag)) return List.of();
+        return retag(services, baseNames, tag, true);
     }
 
-    /** Takes {@code tag} off every named template and saves once. The tag itself survives, empty. */
-    public static void removeTag(Path resourcesDir, Collection<String> baseNames, String tag) {
-        if (baseNames.isEmpty()) return;
-        saveManifest(resourcesDir, manifest(resourcesDir).untagged(baseNames, tag));
+    /** Takes {@code tag} off every named template. The tag itself survives, empty. */
+    public static List<String> removeTag(StudioServices services, Collection<String> baseNames, String tag) {
+        return retag(services, baseNames, tag, false);
     }
 
-    /** Declares {@code tag} as a custom tag and saves; returns the catalog it now belongs to. */
-    public static TagCatalog declareTag(StudioServices services, String tag) {
-        Path resourcesDir = services.resourcesDir();
-        saveManifest(resourcesDir, manifest(resourcesDir).declaring(tag));
-        return tagCatalog(services);
+    private static List<String> retag(StudioServices services, Collection<String> baseNames, String tag,
+                                      boolean add) {
+        TemplateManifest manifest = manifest(services);
+        Map<String, List<String>> changed = new LinkedHashMap<>();
+        for (String name : baseNames) {
+            List<String> tags = new ArrayList<>(manifest.tagsOf(name));
+            boolean had = tags.stream().anyMatch(tag::equalsIgnoreCase);
+            if (add == had) continue;
+            if (add) tags.add(tag);
+            else tags.removeIf(tag::equalsIgnoreCase);
+            changed.put(name, tags);
+        }
+        return applyTags(services, changed);
+    }
+
+    /** Declares {@code tag} as a custom tag in {@code Tags}; empty when done, else why not. */
+    public static Optional<String> declareTag(StudioServices services, String tag) {
+        return PictureTags.declare(services, tag);
     }
 
     /**
-     * Renames a template: the PNG and its tags, in that order. Single entry point because the two used to be
-     * moved by the caller and the tags weren't moved at all — the manifest is keyed by base name, so a rename
-     * that skips it silently untags the template.
+     * Renames a template's file. Its tags are on its constant, which {@link TemplateUses#rename} renames with
+     * every use; they follow it there.
      */
     public static void renameTemplate(Path resourcesDir, Path file, String newBaseName) throws IOException {
         Path target = imagesDir(resourcesDir).resolve(newBaseName + ".png");
         Files.move(file, target, StandardCopyOption.REPLACE_EXISTING);
-        saveManifest(resourcesDir, manifest(resourcesDir).renamed(baseName(file), newBaseName));
     }
 
-    /** Deletes a template: the PNG and its manifest entry. */
-    public static void deleteTemplate(Path resourcesDir, Path file) throws IOException {
+    /** Deletes a template's file. Its tags go with its constant ({@link TemplateUses#forget}). */
+    public static void deleteTemplate(Path file) throws IOException {
         Files.deleteIfExists(file);
-        saveManifest(resourcesDir, manifest(resourcesDir).without(baseName(file)));
     }
 
     // ── The same picture twice ──────────────────────────────────────────────────────────────────────────
@@ -452,7 +440,7 @@ public final class TemplateLibrary {
      *
      * <p>Built by decoding the library, which is why it is computed when the resource manager opens and not
      * held: a project has tens of small PNGs, and a cache here would be one more thing every capture, import,
-     * rename and replace would have to invalidate (see the note on the manifest above).
+     * rename and replace would have to invalidate (see the note on the tags above).
      */
     public static Map<String, List<String>> duplicatePictures(Path resourcesDir) {
         Map<String, List<String>> byHash = new LinkedHashMap<>();
@@ -468,17 +456,5 @@ public final class TemplateLibrary {
             }
         }
         return duplicates;
-    }
-
-    /**
-     * Templates the manifest still files under a tag but whose PNG is no longer on disk — someone deleted the
-     * file outside Studio. {@link #list} simply stops returning them, so nothing else notices. The manifest's
-     * half of {@link TemplateUses#missing}, which adds the {@code Pictures} constants left naming a gone file.
-     */
-    public static List<String> missingTemplates(Path resourcesDir) {
-        return manifest(resourcesDir).tagsByTemplate().keySet().stream()
-                .filter(name -> !exists(resourcesDir, name))
-                .sorted()
-                .toList();
     }
 }
