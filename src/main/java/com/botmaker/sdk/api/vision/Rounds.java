@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -7,8 +8,12 @@ import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 
 import java.awt.image.BufferedImage;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 
@@ -44,7 +49,9 @@ final class Rounds {
     /** A mean difference per channel above this, out of 255, is a change; below it, noise and compression. */
     static final double CHANGED = 6;
 
-    private final String loop;
+    /** The loop method, by reference, and the arguments it was called with: what a loop that throws names. */
+    private final Ref loop;
+    private final Object[] args;
     private final int max;
     private final int frozenAfter;
     private int done;
@@ -52,10 +59,46 @@ final class Rounds {
     private int[] thumb;
     private long stillSince;
 
-    Rounds(String loop) {
+    private Rounds(Ref loop, Object... args) {
         this.loop = loop;
+        this.args = args;
         this.max = BotSettings.current().maxRounds();
         this.frozenAfter = BotSettings.current().frozenAfter();
+    }
+
+    /** The rounds of {@code loop}, called with {@code a}, {@code b}, {@code c}: {@code ImageFinder::whileFindAny}. */
+    static <A, B, C> Rounds of(Ref.Void3<A, B, C> loop, A a, B b, C c) {
+        return new Rounds(loop, a, b, c);
+    }
+
+    /** The rounds of a loop of four arguments: {@code ImageFinder::untilFind} with its patience. */
+    static <A, B, C, D> Rounds of(Ref.Void4<A, B, C, D> loop, A a, B b, C c, D d) {
+        return new Rounds(loop, a, b, c, d);
+    }
+
+    /**
+     * {@code whileFindAny(mail, claim)}: the loop's method and the pictures it looks for, resolved only when a
+     * loop throws. The source and the action say nothing a reader can use, so they are left out.
+     */
+    String named() {
+        String name;
+        try {
+            name = Ref.resolve(loop).getName();
+        } catch (IllegalArgumentException e) {
+            name = "a vision loop";
+        }
+        return name + "(" + Arrays.stream(args).map(Rounds::shown).filter(Objects::nonNull)
+                .collect(Collectors.joining(", ")) + ")";
+    }
+
+    private static String shown(Object arg) {
+        return switch (arg) {
+            case ImageTemplate template -> template.id();
+            case ImageTemplateGroup group -> group.templates().stream().map(ImageTemplate::id)
+                    .collect(Collectors.joining(", "));
+            case Duration patience -> patience.toMillis() + " ms";
+            case null, default -> null;
+        };
     }
 
     /**
@@ -72,12 +115,12 @@ final class Rounds {
                 thumb = shrunk;
                 stillSince = now;
             } else if (now - stillSince >= frozenAfter) {
-                throw new BotStuckException("The game looks frozen: " + loop + " acted on the same screen for "
+                throw new BotStuckException("The game looks frozen: " + named() + " acted on the same screen for "
                         + (now - stillSince) / 1000 + " s (BotSettings.frozenAfter)");
             }
         }
         if (++done > max) {
-            throw new BotStuckException(loop + " ran " + max + " rounds and did not end; its action does not "
+            throw new BotStuckException(named() + " ran " + max + " rounds and did not end; its action does not "
                     + "change what it looks for (BotSettings.maxRounds)");
         }
         return true;
