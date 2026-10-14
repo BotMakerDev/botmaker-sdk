@@ -1,18 +1,26 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.source.PluginValues;
+import javafx.application.Platform;
+import javafx.collections.ListChangeListener;
 import javafx.css.PseudoClass;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.MultipleSelectionModel;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
@@ -24,16 +32,26 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * The project's image templates, as a tag rail beside a thumbnail grid. <b>The</b> gallery: the resource
@@ -42,9 +60,10 @@ import java.util.function.Predicate;
  * tree in the manager and tag submenus in the picker, neither of which showed a picture at the size you pick
  * by and neither of which could be searched.
  *
- * <p>The rail's rows and the search are {@link TemplateGalleryModel}, deliberately outside this class: they
- * are the decisions (what a group is, what an empty declared tag looks like, what a query matches) and they
- * are testable without a display. What is left here is genuinely a widget.
+ * <p>The rail's rows, the search, the sort and the several-tag pick are {@link TemplateGalleryModel}, and which
+ * pictures are twins is {@link PictureTwins}, deliberately outside this class: they are the decisions (what a
+ * group is, what an empty declared tag looks like, what a query matches) and they are testable without a
+ * display. What is left here is genuinely a widget.
  *
  * <p>Selection is by tile, and multiple selection is opt-in ({@code multiSelect}) because the two callers
  * want different things: the manager tags and deletes in bulk, a single {@code ImageTemplate} slot holds
@@ -65,6 +84,10 @@ public final class TemplateGallery extends HBox {
 
     private final ListView<TemplateGalleryModel.Row> rail = new ListView<>();
     private final TextField search = new TextField();
+    private final ComboBox<TemplateGalleryModel.Show> show = new ComboBox<>();
+    private final ComboBox<TemplateGalleryModel.Sort> sort = new ComboBox<>();
+    /** With several tags picked on the rail: pictures carrying every one of them, rather than any. */
+    private final CheckBox everyTag = new CheckBox("Every tag");
     private final FlowPane grid = new FlowPane(10, 10);
     private final Label empty = new Label();
     /** "N selected · Select all · Clear" — only built, and only shown, for a multi-select gallery. */
@@ -83,6 +106,8 @@ public final class TemplateGallery extends HBox {
     private double bandOriginX;
     private double bandOriginY;
     private boolean banding;
+    /** While {@link #reload()} puts the rail's selection back, which redraws the grid once, when it is done. */
+    private boolean restoring;
 
     /**
      * The library as of the last {@link #reload()}: files by tag, their tags, the declared set. Held so that a
@@ -92,6 +117,10 @@ public final class TemplateGallery extends HBox {
     private Map<String, List<Path>> byTag = Map.of();
     private TemplateManifest manifest = TemplateManifest.empty();
     private TagCatalog catalog = TagCatalog.empty();
+    private Map<Path, TemplateGalleryModel.Facts> facts = Map.of();
+    /** Asked of the bot's Java and decoded from every picture, so made only when shown, and dropped on reload. */
+    private Set<Path> unused;
+    private List<List<String>> twins;
 
     private Predicate<Path> filter = file -> true;
     private Runnable onSelectionChanged;
@@ -108,17 +137,40 @@ public final class TemplateGallery extends HBox {
         rail.setMinWidth(180);
         rail.setPrefWidth(180);
         rail.setCellFactory(v -> new RailCell());
+        rail.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        rail.setTooltip(new Tooltip("Ctrl-click another tag to see both"));
         rail.getSelectionModel().selectedItemProperty().addListener((o, was, is) -> {
-            // A heading is a label, not a bucket. Bounce the selection back rather than showing nothing.
+            // A heading is a label, not a bucket: keyboard navigation walks onto it, and on to the next row the
+            // way it was going. Later, so the selection is not changed while it is changing.
             if (is instanceof TemplateGalleryModel.Heading) {
-                rail.getSelectionModel().select(was);
-                return;
+                int at = rail.getItems().indexOf(is);
+                int from = rail.getItems().indexOf(was);
+                Platform.runLater(() -> tidyRail(from > at ? at - 1 : at + 1));
+            }
+        });
+        rail.getSelectionModel().getSelectedItems().addListener((ListChangeListener<TemplateGalleryModel.Row>) c -> {
+            if (restoring) return;
+            if (!(rail.getSelectionModel().getSelectedItem() instanceof TemplateGalleryModel.Heading)
+                    && rail.getSelectionModel().getSelectedIndices().size() != 1) {
+                // A range over a heading, All picked with a tag, or the last row Ctrl-clicked off.
+                Platform.runLater(() -> tidyRail(0));
             }
             refreshGrid();
         });
 
         search.setPromptText("Search templates…");
         search.textProperty().addListener((o, was, is) -> refreshGrid());
+        show.getItems().setAll(TemplateGalleryModel.Show.values());
+        show.setValue(TemplateGalleryModel.Show.ALL);
+        show.valueProperty().addListener((o, was, is) -> refreshGrid());
+        sort.getItems().setAll(TemplateGalleryModel.Sort.values());
+        sort.setValue(TemplateGalleryModel.Sort.NAME_UP);
+        sort.valueProperty().addListener((o, was, is) -> refreshGrid());
+        everyTag.setTooltip(new Tooltip("Only pictures carrying every tag picked on the left"));
+        everyTag.selectedProperty().addListener((o, was, is) -> refreshGrid());
+        HBox.setHgrow(search, Priority.ALWAYS);
+        HBox controls = new HBox(8, search, everyTag, show, sort);
+        controls.setAlignment(Pos.CENTER_LEFT);
 
         grid.setPadding(new Insets(4));
         grid.setPrefWrapLength(520);
@@ -141,7 +193,7 @@ public final class TemplateGallery extends HBox {
         empty.getStyleClass().add("template-gallery-empty");
         empty.setWrapText(true);
 
-        VBox right = new VBox(8, search, selectionBar(), scroll, empty);
+        VBox right = new VBox(8, controls, selectionBar(), scroll, empty);
         VBox.setVgrow(scroll, Priority.ALWAYS);
         HBox.setHgrow(right, Priority.ALWAYS);
         getChildren().addAll(rail, right);
@@ -180,23 +232,104 @@ public final class TemplateGallery extends HBox {
         // written into every project at creation. Best-effort, for the same reason.
         try {
             TemplateLibrary.ensurePlaceholder(resourcesDir);
-        } catch (java.io.IOException ignored) {
+        } catch (IOException ignored) {
             // an unwritable folder is a gallery with one fewer cell, not a refusal
         }
-        TemplateGalleryModel.Row was = rail.getSelectionModel().getSelectedItem();
+        List<String> was = selectedTags();
         catalog = TemplateLibrary.tagCatalog(services);
         manifest = TemplateLibrary.manifest(resourcesDir);
         byTag = TemplateLibrary.listByTag(services);
+        facts = factsOf(byTag.getOrDefault(TemplateManifest.ALL, List.of()));
+        unused = null;
+        twins = null;
         List<TemplateGalleryModel.Row> rows = TemplateGalleryModel.rows(byTag, catalog);
-        rail.getItems().setAll(rows);
-
-        String wanted = was instanceof TemplateGalleryModel.TagRow row ? row.tag() : TemplateManifest.ALL;
-        rows.stream()
-                .filter(r -> r instanceof TemplateGalleryModel.TagRow t && t.tag().equalsIgnoreCase(wanted))
-                .findFirst()
-                .ifPresentOrElse(r -> rail.getSelectionModel().select(r),
-                        () -> rail.getSelectionModel().selectFirst());
+        // One grid at the end, not one per row the selection passes through on the way back.
+        restoring = true;
+        try {
+            rail.getItems().setAll(rows);
+            rail.getSelectionModel().clearSelection();
+            for (int i = 0; i < rows.size(); i++) {
+                if (rows.get(i) instanceof TemplateGalleryModel.TagRow t
+                        && was.stream().anyMatch(tag -> tag.equalsIgnoreCase(t.tag()))) {
+                    rail.getSelectionModel().select(i);
+                }
+            }
+            if (rail.getSelectionModel().isEmpty()) rail.getSelectionModel().clearAndSelect(0);
+        } finally {
+            restoring = false;
+        }
         refreshGrid();
+    }
+
+    /**
+     * Lets go of every heading on the rail, and of All once a tag is picked with it, so what is highlighted is
+     * what the grid shows; when nothing is left, the tag row at {@code fallback}, else All.
+     */
+    private void tidyRail(int fallback) {
+        MultipleSelectionModel<TemplateGalleryModel.Row> model = rail.getSelectionModel();
+        List<Integer> picked = List.copyOf(model.getSelectedIndices());
+        boolean withAll = picked.contains(0) && picked.size() > 1;
+        for (int i : picked) {
+            if (rail.getItems().get(i) instanceof TemplateGalleryModel.Heading || (withAll && i == 0)) {
+                model.clearSelection(i);
+            }
+        }
+        if (model.isEmpty()) {
+            boolean tag = fallback >= 0 && fallback < rail.getItems().size()
+                    && rail.getItems().get(fallback) instanceof TemplateGalleryModel.TagRow;
+            model.clearAndSelect(tag ? fallback : 0);
+        }
+    }
+
+    /** When each picture was written and how many pixels it has, read off the file and its header. */
+    private static Map<Path, TemplateGalleryModel.Facts> factsOf(List<Path> files) {
+        Map<Path, TemplateGalleryModel.Facts> read = new HashMap<>();
+        for (Path file : files) {
+            try (ImageInputStream in = ImageIO.createImageInputStream(file.toFile())) {
+                long area = 0;
+                Iterator<ImageReader> readers = in == null ? Collections.emptyIterator() : ImageIO.getImageReaders(in);
+                if (readers.hasNext()) {
+                    ImageReader reader = readers.next();
+                    try {
+                        reader.setInput(in);
+                        area = (long) reader.getWidth(0) * reader.getHeight(0);
+                    } finally {
+                        reader.dispose();
+                    }
+                }
+                read.put(file, new TemplateGalleryModel.Facts(Files.getLastModifiedTime(file).toMillis(), area));
+            } catch (IOException | RuntimeException ignored) {
+                // a picture that won't read sorts as the oldest and smallest
+            }
+        }
+        return read;
+    }
+
+    /** The pictures no line of the bot uses: its {@code Pictures} constant has no use, or it has no constant. */
+    private Set<Path> unused() {
+        if (unused == null) {
+            PluginValues values = services.pluginValues();
+            unused = byTag.getOrDefault(TemplateManifest.ALL, List.of()).stream()
+                    .filter(file -> TemplateUses.find(values, TemplateLibrary.baseName(file)).isEmpty())
+                    .collect(Collectors.toSet());
+        }
+        return unused;
+    }
+
+    /** The library's groups of pictures that look the same or nearly ({@link PictureTwins}). */
+    private List<List<String>> twins() {
+        if (twins == null) {
+            Map<String, BufferedImage> pictures = new HashMap<>();
+            for (Path file : byTag.getOrDefault(TemplateManifest.ALL, List.of())) {
+                try {
+                    pictures.put(TemplateLibrary.baseName(file), ImageIO.read(file.toFile()));
+                } catch (IOException ignored) {
+                    // a picture that won't decode has no twin
+                }
+            }
+            twins = PictureTwins.groups(pictures);
+        }
+        return twins;
     }
 
     /**
@@ -220,7 +353,8 @@ public final class TemplateGallery extends HBox {
     public void reveal(Collection<Path> files) {
         if (!tiles.keySet().containsAll(files)) {
             search.clear();
-            rail.getSelectionModel().selectFirst();   // All, which rows() always puts first
+            show.setValue(TemplateGalleryModel.Show.ALL);
+            rail.getSelectionModel().clearAndSelect(0);   // All, which rows() always puts first
         }
         setSelection(files);
     }
@@ -273,8 +407,22 @@ public final class TemplateGallery extends HBox {
      * asks the question a per-tag action needs answered.
      */
     public String selectedTag() {
-        TemplateGalleryModel.Row row = rail.getSelectionModel().getSelectedItem();
-        return row instanceof TemplateGalleryModel.TagRow tag ? tag.tag() : TemplateManifest.ALL;
+        List<String> tags = selectedTags();
+        return tags.size() == 1 ? tags.getFirst() : TemplateManifest.ALL;
+    }
+
+    /**
+     * The rail rows picked, in the rail's order; All drops out once another is picked with it, and nothing
+     * picked is All.
+     */
+    private List<String> selectedTags() {
+        List<String> tags = rail.getSelectionModel().getSelectedItems().stream()
+                .filter(TemplateGalleryModel.TagRow.class::isInstance)
+                .map(row -> ((TemplateGalleryModel.TagRow) row).tag())
+                .distinct()
+                .toList();
+        if (tags.size() > 1) tags = tags.stream().filter(tag -> !TemplateManifest.ALL.equals(tag)).toList();
+        return tags.isEmpty() ? List.of(TemplateManifest.ALL) : tags;
     }
 
     /** The selected tag when it is one templates can be filed under, else null ("All" and "Untagged" are not). */
@@ -284,13 +432,29 @@ public final class TemplateGallery extends HBox {
     }
 
     private void refreshGrid() {
-        List<Path> files = byTag.getOrDefault(selectedTag(), List.of()).stream().filter(filter).toList();
-        List<Path> visible = TemplateGalleryModel.matching(files, search.getText());
+        List<String> tags = selectedTags();
+        everyTag.setManaged(tags.size() > 1);
+        everyTag.setVisible(tags.size() > 1);
+        List<Path> files = TemplateGalleryModel.underTags(byTag, tags, everyTag.isSelected()).stream()
+                .filter(filter).toList();
+        List<Path> matched = TemplateGalleryModel.matching(files, search.getText());
+        TemplateGalleryModel.Show showing = show.getValue();
+        List<Path> shown = showing == TemplateGalleryModel.Show.UNUSED
+                ? matched.stream().filter(unused()::contains).toList() : matched;
+        List<Path> visible = TemplateGalleryModel.sorted(shown, sort.getValue(), facts);
+        Map<String, List<String>> twinOf = new HashMap<>();
+        if (showing == TemplateGalleryModel.Show.TWINS) {
+            visible = TemplateGalleryModel.twinsFirst(visible, twins());
+            for (List<String> group : twins()) {
+                for (String name : group) twinOf.put(name, group.stream().filter(n -> !n.equals(name)).toList());
+            }
+        }
 
         tiles.clear();
         grid.getChildren().clear();
         for (Path file : visible) {
-            Node tile = tile(file, catalog.declaredOnly(manifest.tagsOf(TemplateLibrary.baseName(file))));
+            String name = TemplateLibrary.baseName(file);
+            Node tile = tile(file, catalog.declaredOnly(manifest.tagsOf(name)), twinOf.getOrDefault(name, List.of()));
             tiles.put(file, tile);
             grid.getChildren().add(tile);
         }
@@ -302,15 +466,19 @@ public final class TemplateGallery extends HBox {
         if (onSelectionChanged != null) onSelectionChanged.run();
         if (onTagChanged != null) onTagChanged.run();
 
-        empty.setText(visible.isEmpty() ? emptyMessage(files.isEmpty()) : "");
+        empty.setText(visible.isEmpty() ? emptyMessage(tags, files.isEmpty(), matched.isEmpty()) : "");
         empty.setManaged(visible.isEmpty());
         empty.setVisible(visible.isEmpty());
     }
 
-    private String emptyMessage(boolean nothingAtAll) {
-        if (!nothingAtAll) return "No template here matches \"" + search.getText().trim() + "\".";
-        if (TemplateManifest.ALL.equals(selectedTag())) return "This project has no image templates yet.";
-        return "Nothing is filed under \"" + selectedTag() + "\" yet.";
+    private String emptyMessage(List<String> tags, boolean nothingAtAll, boolean nothingMatches) {
+        if (!nothingAtAll && nothingMatches) return "No template here matches \"" + search.getText().trim() + "\".";
+        if (!nothingAtAll) return show.getValue() == TemplateGalleryModel.Show.UNUSED
+                ? "The bot uses every picture here." : "No two pictures here look alike.";
+        if (tags.size() > 1) return "No picture carries " + (everyTag.isSelected() ? "every one" : "any") + " of "
+                + String.join(", ", tags) + ".";
+        if (TemplateManifest.ALL.equals(tags.getFirst())) return "This project has no image templates yet.";
+        return "Nothing is filed under \"" + tags.getFirst() + "\" yet.";
     }
 
     /**
@@ -342,9 +510,19 @@ public final class TemplateGallery extends HBox {
         return box;
     }
 
-    /** One template: its picture at the size you would judge it by, its name, and the tags it carries. */
-    private Node tile(Path file, List<String> tags) {
+    /**
+     * One template: its picture at the size you would judge it by, its name, the tags it carries and, when twins
+     * are shown, the names of its twins.
+     */
+    private Node tile(Path file, List<String> tags, List<String> twinNames) {
         VBox box = plainTile(file, 96);
+        if (!twinNames.isEmpty()) {
+            Label like = new Label("like " + String.join(", ", twinNames));
+            like.getStyleClass().add("template-gallery-empty");
+            like.setWrapText(true);
+            like.setMaxWidth(112);
+            box.getChildren().add(like);
+        }
 
         if (!tags.isEmpty()) {
             FlowPane chips = new FlowPane(3, 3);

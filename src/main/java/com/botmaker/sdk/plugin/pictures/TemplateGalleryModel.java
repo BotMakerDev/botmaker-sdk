@@ -2,9 +2,13 @@ package com.botmaker.sdk.plugin.pictures;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * What the template gallery's tag rail shows, and which templates survive its search box — the parts of the
@@ -72,5 +76,106 @@ public final class TemplateGalleryModel {
         return files.stream()
                 .filter(f -> TemplateLibrary.baseName(f).toLowerCase(Locale.ROOT).contains(needle))
                 .toList();
+    }
+
+    /** The order the grid shows its pictures in. */
+    public enum Sort {
+        NAME_UP("Name A–Z"),
+        NAME_DOWN("Name Z–A"),
+        NEWEST("Newest cut"),
+        OLDEST("Oldest cut"),
+        LARGEST("Largest"),
+        SMALLEST("Smallest");
+
+        private final String displayName;
+
+        Sort(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String displayName() {
+            return displayName;
+        }
+
+        @Override public String toString() {
+            return displayName;
+        }
+    }
+
+    /** Which pictures of the rail's tags the grid shows. */
+    public enum Show {
+        ALL("All pictures"),
+        UNUSED("Unused"),
+        TWINS("Duplicates and near twins");
+
+        private final String displayName;
+
+        Show(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String displayName() {
+            return displayName;
+        }
+
+        @Override public String toString() {
+            return displayName;
+        }
+    }
+
+    /** What a sort reads off a picture: when it was last written, and its pixel count. */
+    public record Facts(long modified, long area) {}
+
+    /**
+     * {@code files} in {@code sort}'s order, ties by name. A file {@code facts} does not know sorts as the
+     * oldest and smallest.
+     */
+    public static List<Path> sorted(List<Path> files, Sort sort, Map<Path, Facts> facts) {
+        Comparator<Path> byName = Comparator.comparing(f -> TemplateLibrary.baseName(f).toLowerCase(Locale.ROOT));
+        Facts none = new Facts(0, 0);
+        Comparator<Path> order = switch (sort) {
+            case NAME_UP -> byName;
+            case NAME_DOWN -> byName.reversed();
+            case NEWEST -> Comparator.<Path>comparingLong(f -> facts.getOrDefault(f, none).modified()).reversed()
+                    .thenComparing(byName);
+            case OLDEST -> Comparator.<Path>comparingLong(f -> facts.getOrDefault(f, none).modified())
+                    .thenComparing(byName);
+            case LARGEST -> Comparator.<Path>comparingLong(f -> facts.getOrDefault(f, none).area()).reversed()
+                    .thenComparing(byName);
+            case SMALLEST -> Comparator.<Path>comparingLong(f -> facts.getOrDefault(f, none).area())
+                    .thenComparing(byName);
+        };
+        return files.stream().sorted(order).toList();
+    }
+
+    /**
+     * The pictures under {@code tags}: those carrying any of them, or with {@code every} those carrying all of
+     * them, in {@link TemplateManifest#ALL}'s order. One tag is that tag's list.
+     */
+    public static List<Path> underTags(Map<String, List<Path>> byTag, List<String> tags, boolean every) {
+        if (tags.size() == 1) return byTag.getOrDefault(tags.getFirst(), List.of());
+        List<Set<Path>> sets = tags.stream().map(tag -> Set.copyOf(byTag.getOrDefault(tag, List.of()))).toList();
+        return byTag.getOrDefault(TemplateManifest.ALL, List.of()).stream()
+                .filter(file -> every ? sets.stream().allMatch(s -> s.contains(file))
+                        : sets.stream().anyMatch(s -> s.contains(file)))
+                .toList();
+    }
+
+    /**
+     * The twins among {@code files}, one group after another: a group's place is its first picture's in
+     * {@code files}, and its pictures keep {@code files}' order. A picture whose twin is outside {@code files} is
+     * still shown, so a twin under another tag is not hidden.
+     */
+    public static List<Path> twinsFirst(List<Path> files, List<List<String>> groups) {
+        Map<String, Integer> groupOf = new HashMap<>();
+        for (int i = 0; i < groups.size(); i++) {
+            for (String name : groups.get(i)) groupOf.put(name, i);
+        }
+        Map<Integer, List<Path>> byGroup = new LinkedHashMap<>();
+        for (Path file : files) {
+            Integer group = groupOf.get(TemplateLibrary.baseName(file));
+            if (group != null) byGroup.computeIfAbsent(group, g -> new ArrayList<>()).add(file);
+        }
+        return byGroup.values().stream().flatMap(List::stream).toList();
     }
 }

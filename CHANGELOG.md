@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Manage Pictures sorts and filters.** The gallery sorts by name (A–Z, Z–A), by when a picture was cut
+  (newest, oldest) or by size; shows only the pictures the bot does not use, or only duplicates and near twins
+  (a recut a few pixels off counts), each tile naming its twins; and Ctrl-click on a second tag shows the
+  pictures under either, or with *Every tag* under both.
 - **The assistant explores a game one screen across at a time.** `crop_picture` takes `screen` and `marker`:
   a marker is noted in that screen's section, and every other cut is an untried input. `try_input` clicks one (or
   taps a hotkey) and records what it did: opened a screen (its Map line and a section owing a marker), changed
