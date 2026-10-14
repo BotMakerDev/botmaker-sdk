@@ -174,14 +174,14 @@ public class Bot {
 
     /**
      * Runs {@code body} forever with the standard "get home, then (re)start the configured launch target"
-     * lifecycle around it — a one-time cold start before the first pass, and a {@code goHome} → restart recovery
-     * on every crash or stuck state. The launch target is this machine's {@code botmaker.launch.target}
+     * lifecycle around it — a one-time cold start before the first pass, and on every crash or stuck state a
+     * {@code goHome} recovery that restarts the game only when {@code goHome} fails. The launch target is this machine's {@code botmaker.launch.target}
      * property; a project with none configured launches nothing.
      *
      * <p>{@code setup} makes the game ready once, at the first start of the game: at the cold start before the
-     * {@code goHome} that follows it. A setup that throws is still owed, so it runs after the restart that recovers.
-     * A restart after the setup returned does not run it again: the game keeps its settings. Every restart is
-     * followed by a {@code goHome} of its own, since the recovery's ran before the game came back.
+     * {@code goHome} that follows it. A setup that throws is still owed, so it runs at the next recovery: after the
+     * restart, or after the {@code goHome} that got home without one. A restart after the setup returned does not
+     * run it again: the game keeps its settings. Every restart is followed by a {@code goHome} of its own.
      *
      * @param body   the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param goHome navigate from wherever the bot is back to a safe/home screen
@@ -189,15 +189,30 @@ public class Bot {
      */
     static void lifecycle(Runnable body, Runnable goHome, Runnable setup) {
         AtomicReference<Runnable> owed = new AtomicReference<>(setup);
-        supervise(body, goHome, mode -> {
-            launchConfiguredTarget(mode);
+        Runnable runOwed = () -> {
             Runnable due = owed.get();
             if (due != null) {
                 Debug.log("setup");
                 due.run();
                 owed.set(null);
             }
-            // The recovery's goHome ran before the game came back, so a restarted game is taken home again.
+        };
+        // A recovery that gets home without a restart still owes a setup that threw. A setup that throws again here
+        // stays owed and is said: the game got home, so it is no reason to restart it.
+        Runnable homeThenOwed = () -> {
+            goHome.run();
+            try {
+                runOwed.run();
+            } catch (BotStoppedException e) {
+                throw e;
+            } catch (RuntimeException e) {
+                Debug.error("setup failed again, still owed: " + e);
+            }
+        };
+        supervise(body, homeThenOwed, mode -> {
+            launchConfiguredTarget(mode);
+            runOwed.run();
+            // A restarted game is taken home: the recovery's goHome, if it ran, ran before the game came back.
             if (mode == StartMode.RESTART) {
                 Debug.log("goHome");
                 goHome.run();
@@ -290,17 +305,17 @@ public class Bot {
     }
 
     /**
-     * Convenience supervisor whose recovery is "get back home, then (re)start the game", and which also runs a
-     * one-time start-up before the loop.
+     * Convenience supervisor whose recovery is "get back home, or restart the game when that fails", and which
+     * also runs a one-time start-up before the loop.
      *
      * <p><b>Cold start (once, before the first pass):</b> {@code startGame(COLD)} then {@code goHome} — launch
      * the game (only if it isn't already open), then navigate to a known-good screen. Without this the loop
      * began against whatever was on screen, so "launch the game in Startup" never fired on a normal run (Startup
-     * only ran during recovery).
+     * only ran during recovery). A cold start that fails restarts the game: there is no home to go to yet.
      *
-     * <p><b>Recovery (on every crash/stuck):</b> {@code goHome} then {@code startGame(RESTART)} — get back
-     * home, then restart the game (shutting a frozen one down first). A failure <em>during</em> cold start
-     * routes through this same recovery rather than aborting the bot.
+     * <p><b>Recovery (on every crash/stuck):</b> {@code goHome}; only when it throws (its loops ran out, the game
+     * is frozen or gone) {@code startGame(RESTART)}, shutting the game down first. Until 2026-10-14 every
+     * recovery restarted the game, even one {@code goHome} had already brought back.
      *
      * @param body      the bot's main work
      * @param goHome    navigate from wherever the bot is back to a safe/home screen
@@ -309,14 +324,25 @@ public class Bot {
      */
     static void supervise(Runnable body, Runnable goHome, Consumer<StartMode> startGame) {
         observe();
-        Runnable recovery = () -> {
-            // Both halves are announced because a recovery is where a bot spends its most confusing time:
-            // without these, "goHome" navigating a game that is already gone and "restart" waiting on a
-            // launch are one indistinguishable silence.
-            Debug.log("goHome");
-            goHome.run();
+        Runnable restart = () -> {
             Debug.log("restarting the game");
             startGame.accept(StartMode.RESTART);
+        };
+        Runnable recovery = () -> {
+            // Each step is announced because a recovery is where a bot spends its most confusing time: without
+            // these, "goHome" navigating a game that is gone and "restart" waiting on a launch are one silence.
+            Debug.log("goHome");
+            try {
+                goHome.run();
+                Debug.log("home reached");
+                return;
+            } catch (BotStoppedException e) {
+                throw e;
+            } catch (RuntimeException e) {
+                Debug.error("goHome failed: " + e);
+                Watchdog.reset();
+            }
+            restart.run();
         };
         Watchdog.enable();
         // Cold start: open the game and reach a known screen once, before the loop. A failure here recovers
@@ -332,11 +358,11 @@ public class Bot {
         } catch (BotStuckException e) {
             Debug.error("Stuck during start-up: " + e.getMessage() + " — recovering.");
             Watchdog.reset();
-            if (!recovered(recovery)) return;
+            if (!recovered(restart)) return;
         } catch (RuntimeException e) {
             Debug.error("Crashed during start-up: " + e + " — recovering.");
             Watchdog.reset();
-            if (!recovered(recovery)) return;
+            if (!recovered(restart)) return;
         }
         supervise(body, recovery);
     }

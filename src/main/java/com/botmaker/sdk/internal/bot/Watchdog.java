@@ -17,7 +17,7 @@ import com.botmaker.sdk.internal.observe.MatchEvent;
  * rounded match location) and counts how many times in a row the signature is unchanged. A miss ends the run
  * rather than adding to it: a bot that does not find a picture is waiting for one, polling within its own bound
  * (a fight running its course, a button not ready yet), and every miss used to read as the same {@code "miss"}
- * whatever the picture, so a minute's wait recovered — and a recovery restarts the game. Stuck is the same
+ * whatever the picture, so a minute's wait recovered — and a recovery then always restarted the game. Stuck is the same
  * picture found at the same place over and over: a click that changes nothing. The
  * observer only <em>counts</em> — it never throws, because the vision layer
  * ({@link com.botmaker.sdk.api.vision.ImageFinder}) swallows {@code Exception} and would eat it.

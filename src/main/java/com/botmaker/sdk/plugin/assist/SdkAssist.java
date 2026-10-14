@@ -60,7 +60,8 @@ public final class SdkAssist {
               each round waits for what it acted on to change before it looks again. An Escape too many on
               home may open the game's exit dialog; its close button belongs in that group. A loop that runs
               BotSettings.maxRounds rounds (50) without ending throws BotStuckException, and the run recovers
-              through the home method: a body does not count its own tries.
+              through the home method, restarting the game when that fails too: a body does not count its
+              own tries.
             - Write a body foolproof, out of the loop methods that take a lambda: ImageFinder.whileFindAny,
               whileFindAll, ifFindAny (group, found -> …), whileFindCompare (good, bad, found -> …),
               untilFind(picture, action).

@@ -77,6 +77,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A recovery restarts the game only when home cannot be reached.** A stuck or crashed pass runs the home method;
+  the game restarts only when that throws (its loops ran out), not after every recovery. A setup still owed runs
+  once home is reached. A cold start that fails restarts the game at once.
 - **A vision loop ends.** `whileFind`, `whileFindAny`, `whileFindAll`, `whileFindCompare`, `untilFind`,
   `untilFindAny` and `untilFindAll` throw `BotStuckException` after `BotSettings.maxRounds` rounds (50), and the
   run recovers through the home method: before, a loop whose action changed nothing ran for ever, unseen by the

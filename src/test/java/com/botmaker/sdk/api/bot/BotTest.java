@@ -63,23 +63,47 @@ class BotTest {
     }
 
     @Test
-    void superviseRecoversWithGoHomeThenStartGameAfterColdStart() {
-        // Mid-run recovery keeps its original order (goHome then startGame), distinct from cold start.
+    void aRecoveryThatGetsHomeDoesNotRestartTheGame() {
         StringBuilder order = new StringBuilder();
+        AtomicInteger passes = new AtomicInteger();
+        java.util.List<StartMode> modes = new java.util.ArrayList<>();
+        assertThrows(StopLoop.class, () -> Bot.supervise(
+                () -> {
+                    order.append("B");
+                    if (passes.incrementAndGet() >= 2) throw new StopLoop();
+                    throw new BotStuckException("stuck");
+                },
+                () -> order.append("H"),                              // goHome
+                mode -> {                                             // startGame
+                    modes.add(mode);
+                    order.append("S");
+                }));
+        // cold start S,H → body B (stuck) → recovery H, home reached → body B (StopLoop)
+        assertEquals("SHBHB", order.toString());
+        assertEquals(java.util.List.of(StartMode.COLD), modes, "home was reached: no restart");
+    }
+
+    @Test
+    void aRecoveryWhoseGoHomeFailsRestartsTheGame() {
+        StringBuilder order = new StringBuilder();
+        AtomicInteger homes = new AtomicInteger();
         AtomicInteger starts = new AtomicInteger();
         java.util.List<StartMode> modes = new java.util.ArrayList<>();
         assertThrows(StopLoop.class, () -> Bot.supervise(
                 () -> { order.append("B"); throw new BotStuckException("stuck"); },
-                () -> order.append("H"),                              // goHome
+                () -> {                                               // goHome: fine at cold start, then stuck
+                    order.append("H");
+                    if (homes.incrementAndGet() >= 2) throw new BotStuckException("goHome ran out of rounds");
+                },
                 mode -> {                                             // startGame
                     modes.add(mode);
                     order.append("S");
                     if (starts.incrementAndGet() >= 2) throw new StopLoop();  // stop on the recovery restart
                 }));
-        // cold start S,H → body B (stuck) → recovery H,S(2nd → StopLoop)
+        // cold start S,H → body B (stuck) → recovery H (throws) → restart S (StopLoop)
         assertEquals("SHBHS", order.toString());
         assertEquals(java.util.List.of(StartMode.COLD, StartMode.RESTART), modes,
-                "cold start is COLD; the recovery restart is RESTART");
+                "cold start is COLD; the restart after a failed goHome is RESTART");
     }
 
     @Test
@@ -106,8 +130,8 @@ class BotTest {
             if (passes.incrementAndGet() == 1) throw new IllegalStateException("crash");
             throw new StopLoop();
         }, () -> order.append("H"), () -> order.append("S")));
-        // Cold start: setup, home, body. The crash: home, restart (the game kept its settings), home again, body.
-        assertEquals("SHBHHB", order.toString());
+        // Cold start: setup, home, body. The crash: home, reached, so no restart and no setup again; body.
+        assertEquals("SHBHB", order.toString());
     }
 
     @Test
@@ -122,8 +146,27 @@ class BotTest {
             order.append("S");
             if (setups.incrementAndGet() == 1) throw new IllegalStateException("settings did not open");
         }));
-        // Cold start: setup throws. Recovery: home, restart, setup again, home again. Then the body.
-        assertEquals("SHSHB", order.toString());
+        // Cold start: setup throws, so the game restarts: setup again, home. Then the body.
+        assertEquals("SSHB", order.toString());
+    }
+
+    @Test
+    void aSetupThatThrewMidRunRunsAfterTheRecoveryGetsHome() {
+        com.botmaker.sdk.internal.launch.Target.set((String) null);
+        StringBuilder order = new StringBuilder();
+        AtomicInteger setups = new AtomicInteger();
+        AtomicInteger passes = new AtomicInteger();
+        assertThrows(StopLoop.class, () -> Bot.lifecycle(() -> {
+            order.append("B");
+            if (passes.incrementAndGet() >= 2) throw new StopLoop();
+            throw new IllegalStateException("crash");
+        }, () -> order.append("H"), () -> {
+            order.append("S");
+            if (setups.incrementAndGet() <= 2) throw new IllegalStateException("settings did not open");
+        }));
+        // Cold start: setup throws; restart: setup throws again (the recovery failed); body crashes; recovery: home
+        // reached, so no restart, and the setup still owed runs there; body.
+        assertEquals("SSBHSB", order.toString());
     }
 
     @Test
@@ -173,7 +216,7 @@ class BotTest {
                     order.append("S");
                     if (starts.incrementAndGet() == 1) throw new IllegalStateException("cold start boom");
                 }));
-        // cold start S (throws) → recovery H,S → loop body B (StopLoop)
-        assertEquals("SHSB", order.toString());
+        // cold start S (throws) → restart S, no home to go to yet → loop body B (StopLoop)
+        assertEquals("SSB", order.toString());
     }
 }
