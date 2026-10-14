@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Navigate in the palette.** `Navigate.to`, `isOn` and `where` are blocks under Interaction. A block's screen
+  is picked from the bot's map: a button showing the screen's marker and name lists the map's screens (popups only for
+  `isOn`), and the pick is written as the `Screens` constant. A block dropped before a pick holds `null`, which `Navigate`
+  reads as no screen. The assistant's Setup stage says the home method can be `Navigate.to(Screens.HOME)` once
+  Home is mapped.
 - **The game's screen map as Java (`api.screens`).** A bot's `Screens` class holds one `GameScreen` constant per
   screen: its marker picture, the way in it was found by (`from(Way.of(HOME, Input.click(…)))`), other ways in
   (`alsoFrom`), its way back, and its inputs (`Input.click`, `key`, `scroll`). Each input says what it did

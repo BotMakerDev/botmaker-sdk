@@ -34,6 +34,9 @@ final class Protocol {
                 - Make the popups method (set_flow_method popups): ImageFinder.whileFindAny of the close buttons
                   of what the game opens on its own, clickLast.
                 - Done when a run started from three different screens reaches home each time.
+                - Once Discovery has mapped Home, the home method can be Navigate.to(Screens.HOME): it walks the
+                  map's back inputs and closes the popups it knows on the way. A screen off the map throws, and
+                  the run recovers by restarting the game.
                 """),
         DISCOVERY("Stage 1, Discovery: know the game before writing any body", """
                 - Every screen is explored the same way, Home first. The map is the bot's Screens class, one

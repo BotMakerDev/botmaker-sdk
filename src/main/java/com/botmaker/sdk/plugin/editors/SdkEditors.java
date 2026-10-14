@@ -44,6 +44,9 @@ public final class SdkEditors {
             // value with no call site, a parameter's: a Flows constant's own Flow.of(…) is the flow editor's.
             SlotEditor.when(ActivityEditors::isFlowChoice).draw(() -> ActivityEditors::flow),
             SlotEditor.when(ActivityEditors::isSkippedActivity).draw(() -> ActivityEditors::switchable),
+            // A screen of the bot's map in a block, Navigate.to(Screens.HOME). GameScreen is only parts, like Flow:
+            // no type of this plugin's holds it, so no type's editor can draw it.
+            SlotEditor.when(ScreenEditors::isScreen).draw(() -> ScreenEditors::screen),
 
             // Several named pictures. Ahead of SdkTypes' single-picture editor because it claims a subset of
             // what that one would, and the host consults a plugin's slot editors before its types' editors:

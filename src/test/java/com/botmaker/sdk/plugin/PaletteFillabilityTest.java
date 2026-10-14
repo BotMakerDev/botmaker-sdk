@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.basics.values.BasicsTypes;
+import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
@@ -46,6 +47,13 @@ class PaletteFillabilityTest {
      */
     private static final Set<String> FILLED_BY_THE_HOST = Set.of("Bot#runFlow(Class[])");
 
+    /**
+     * Types no plugin gives a fresh value, whose slot a plugin's editor fills by picking one of the bot's constants:
+     * a screen of the map ({@code ScreenEditors}). A dropped block holds {@code null} until the pick, which the call
+     * reads as none picked ({@code Navigate.to(null)} is false).
+     */
+    private static final Set<Class<?>> PICKED_BY_AN_EDITOR = Set.of(GameScreen.class);
+
     @Test
     void every_offered_parameter_can_be_filled() {
         Set<Class<?>> declared = new HashSet<>();
@@ -82,7 +90,7 @@ class PaletteFillabilityTest {
         Class<?> type = p.getType();
         if (p.getAnnotations().length > 0) return true;                      // @SteamAppId, @ActivityName, …
         if (type.isArray()) type = type.getComponentType();                   // a run: its elements are drawn
-        if (declared.contains(type)) return true;
+        if (declared.contains(type) || PICKED_BY_AN_EDITOR.contains(type)) return true;
         if (type.isEnum()) return true;                                       // the host's constant dropdown
         return type.isInterface() && type.isAnnotationPresent(FunctionalInterface.class); // a lambda body
     }

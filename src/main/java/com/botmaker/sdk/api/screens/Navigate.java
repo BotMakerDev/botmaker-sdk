@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.observe.Bots;
@@ -15,8 +16,10 @@ import java.util.Optional;
  * finds where the game is, then does each input on the way and waits for each screen's marker. A popup that shows is
  * closed on the way.
  *
- * <p>Not offered in the palette yet: a block's {@code GameScreen} slot needs the screen picker first.
+ * <p>A block's screen is picked from the map ({@code ScreenEditors}); one dropped and not picked yet is {@code null},
+ * which every method here reads as no screen.
  */
+@Palette(category = "interaction", categoryLabel = "Interaction", icon = "🗺")
 public final class Navigate {
 
     /** How long one step is given for the next screen's marker to show. */
