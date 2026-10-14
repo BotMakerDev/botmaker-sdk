@@ -105,6 +105,56 @@ public class ImageFinder {
         }
     }
 
+    /**
+     * {@link #bestMatch} for many pictures on one capture: each one's best place at any score, in their order,
+     * read from the same frame. For the assistant's look at which pictures a screen shows; like {@code bestMatch}
+     * it stores nothing in {@link Vision}, sends no telemetry and writes no trace.
+     */
+    @Hidden("the assistant's look at a whole screen; a bot asks find() or a group's whileFind")
+    public static List<MatchResult> bestMatches(List<ImageTemplate> templates, CaptureSource source) {
+        List<MatchResult> none = templates.stream().map(t -> MatchResult.notFound()).toList();
+        Mat background = null;
+        try {
+            BufferedImage screenshot = source.capture();
+            if (screenshot == null) return none;
+            background = OpencvManager.bufferedImageToMat(screenshot);
+            List<RawMatch> bests = bestEach(templates, background);
+            Point origin = source.origin();
+            List<MatchResult> results = new ArrayList<>();
+            for (int i = 0; i < templates.size(); i++) {
+                RawMatch best = bests.get(i);
+                results.add(best == null ? MatchResult.notFound()
+                        : new MatchResult(new Point(best.x() + origin.x(), best.y() + origin.y()), best.width(),
+                        best.height(), best.score(), templates.get(i).id()));
+            }
+            return results;
+        } catch (RuntimeException e) {
+            return none;
+        } finally {
+            if (background != null) background.release();
+        }
+    }
+
+    /**
+     * Each template's best match on {@code background} at its own primary scale, as {@link OpencvManager#findBest}
+     * gives it, in order: the frame prepared once and the templates matched side by side. The templates are loaded
+     * here, one at a time, before any match runs: loading is not safe from several threads. One that cannot be read
+     * is null, as one that matched nowhere, and the others are still matched.
+     */
+    private static List<RawMatch> bestEach(List<ImageTemplate> templates, Mat background) {
+        List<OpencvManager.Search> searches = new ArrayList<>(templates.size());
+        for (ImageTemplate template : templates) {
+            OpencvManager.Search search;
+            try {
+                search = new OpencvManager.Search(template.getMat(), template.authoredSize(), null);
+            } catch (RuntimeException unreadable) {
+                search = null;
+            }
+            searches.add(search);
+        }
+        return OpencvManager.findBestEach(background, searches, false);
+    }
+
     /** The confidence every match uses: {@link BotSettings}'. */
     static double confidence() {
         return BotSettings.current().confidence();
@@ -149,9 +199,12 @@ public class ImageFinder {
             background = OpencvManager.bufferedImageToMat(screenshot);
             Point origin = source.origin();
 
+            List<ImageTemplate> templates = group.templates();
+            List<RawMatch> bests = bestEach(templates, background);
             List<MatchResult> results = new ArrayList<>();
-            for (ImageTemplate template : group.templates()) {
-                RawMatch best = OpencvManager.findBest(template.getMat(), background, false, template.authoredSize());
+            for (int i = 0; i < templates.size(); i++) {
+                ImageTemplate template = templates.get(i);
+                RawMatch best = bests.get(i);
                 if (best != null && best.score() >= confidence) {
                     Point location = new Point(best.x() + origin.x(), best.y() + origin.y());
                     MatchResult result = new MatchResult(
@@ -197,9 +250,12 @@ public class ImageFinder {
             background = OpencvManager.bufferedImageToMat(screenshot);
             Point origin = source.origin();
 
+            List<ImageTemplate> goods = good.templates();
+            List<RawMatch> bests = bestEach(goods, background);
             List<MatchResult> results = new ArrayList<>();
-            for (ImageTemplate template : good.templates()) {
-                RawMatch gm = OpencvManager.findBest(template.getMat(), background, false, template.authoredSize());
+            for (int i = 0; i < goods.size(); i++) {
+                ImageTemplate template = goods.get(i);
+                RawMatch gm = bests.get(i);
                 if (gm != null && gm.score() >= confidence && beatsAllBads(gm, bad.templates(), background, margin)) {
                     MatchResult result = new MatchResult(new Point(gm.x() + origin.x(), gm.y() + origin.y()),
                             gm.width(), gm.height(), gm.score(), template.id());

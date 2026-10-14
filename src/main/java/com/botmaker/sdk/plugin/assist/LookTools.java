@@ -374,17 +374,31 @@ final class LookTools {
     record Scored(String name, MatchResult match) {
     }
 
-    /** Every picture's best match on {@code frame}, best first; a picture that matched nowhere is left out. */
+    /**
+     * Every picture's best match on {@code frame}, best first; a picture that matched nowhere is left out. All of them
+     * in one {@link ImageFinder#bestMatches}: the frame prepared once, the pictures matched side by side.
+     */
     static List<Scored> scores(Path resources, BufferedImage frame) {
-        List<Scored> scored = new ArrayList<>();
-        for (Path file : TemplateLibrary.list(resources)) {
-            if (TemplateLibrary.isUnmodifiedDefaultTemplate(file)) continue;
-            String name = TemplateLibrary.baseName(file);
-            MatchResult best = best(resources, name, frame);
-            if (best.isFound()) scored.add(new Scored(name, best));
+        List<String> names = new ArrayList<>();
+        List<ImageTemplate> templates = new ArrayList<>();
+        try {
+            for (Path file : TemplateLibrary.list(resources)) {
+                if (TemplateLibrary.isUnmodifiedDefaultTemplate(file)) continue;
+                names.add(TemplateLibrary.baseName(file));
+                templates.add(new ImageTemplate(file.toString()));
+            }
+            List<MatchResult> bests = ToolTiming.timed(ToolTiming.Phase.MATCH,
+                    () -> ImageFinder.bestMatches(templates, new Frames.Still(frame)));
+            List<Scored> scored = new ArrayList<>();
+            for (int i = 0; i < names.size(); i++) {
+                if (bests.get(i).isFound()) scored.add(new Scored(names.get(i), bests.get(i)));
+            }
+            scored.sort(Comparator.comparingDouble((Scored s) -> s.match().confidence()).reversed());
+            return scored;
+        } finally {
+            // Released after the match: an unreleased template is native memory.
+            templates.forEach(ImageTemplate::close);
         }
-        scored.sort(Comparator.comparingDouble((Scored s) -> s.match().confidence()).reversed());
-        return scored;
     }
 
     /** The best match of the picture {@code name} on {@code frame}, in the frame's pixels. */

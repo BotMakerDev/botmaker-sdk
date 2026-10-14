@@ -516,17 +516,11 @@ public class ImageClicker {
     // --- Internal helper methods ---
 
     /**
-     * Internal method for clickBest that returns MatchResult for a group.
+     * Internal method for clickBest that returns MatchResult for a group: its best match on one capture, a tie
+     * keeping the earlier template.
      */
     private static MatchResult findBestInternal(ImageTemplateGroup group, CaptureSource source, double confidence) {
-        MatchResult best = MatchResult.notFound();
-        for (ImageTemplate template : group.templates()) {
-            MatchResult result = ImageFinder.findInternal(template, source, confidence);
-            if (result.isFound() && (!best.isFound() || result.confidence() > best.confidence())) {
-                best = result;
-            }
-        }
-        return best;
+        return ImageFinder.findFrame(group, source, confidence).matches().best();
     }
 
     /**

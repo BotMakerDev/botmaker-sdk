@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A group's pictures are matched side by side.** `whileFind`, `ifFind` and the other group checks, their
+  compare forms, and `clickBest` read one capture and match every picture of the group on it in parallel. The
+  frame is prepared once, and `clickBest` captures once where it captured once a picture. The assistant's
+  which_screen and the "Screen:" list of describe, click, key and try_input do the same for every picture.
 - **Every assistant tool says how long it took.** Its reply ends with one line, the total and where the time
   went, longest first: `Took 18.6 s: matching 9.2, reading text 5.0, settling 4.1.` The parts are capturing,
   watching motion (the screen read before acting), settling (the game given time to answer), matching pictures,
