@@ -914,6 +914,8 @@ class SdkAssistTest {
         for (int y = 20; y < 40; y++) {
             for (int x = 30; x < 50; x++) popup.setRGB(x, y, popup.getRGB(x, y) ^ 0x808080);
         }
+        assertEquals(100.0 / (600 - 36), ActTools.changedShare(still, popup, motion), 1e-9,
+                "a share of the still samples only: the 36 that sway can never count");
         Iterator<BufferedImage> late = List.of(swayedBack, swayed, popup, popup).iterator();
         assertSame(popup, ActTools.answered(still, motion, () -> Optional.of(late.next()), 5_000, clock)
                 .orElseThrow(), "the sway is waited past, not taken for the answer");

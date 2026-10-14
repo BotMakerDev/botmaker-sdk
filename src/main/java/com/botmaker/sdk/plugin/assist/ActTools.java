@@ -540,21 +540,23 @@ final class ActTools {
         return Optional.of(new Rect(left, top, width, height));
     }
 
-    /** The share of the samples {@link #changed} compares that moved from {@code before} to {@code after}. */
+    /**
+     * The share of the samples {@link #changed} compares that moved from {@code before} to {@code after}, out of the
+     * still ones only: a sample that moves on its own can never count, so counting it would shrink a panel opened over
+     * a swaying fight (Firestone's Bag, 11% of the whole screen, 2026-10-14).
+     */
     static double changedShare(BufferedImage before, BufferedImage after, Motion motion) {
         if (before.getWidth() != after.getWidth() || before.getHeight() != after.getHeight()) return 1;
         int moved = 0;
         int samples = 0;
         for (int y = 0; y < after.getHeight(); y += STEP) {
             for (int x = 0; x < after.getWidth(); x += STEP) {
+                if (motion.ignores(x, y, after.getWidth(), after.getHeight())) continue;
                 samples++;
-                if (!same(before.getRGB(x, y), after.getRGB(x, y))
-                        && !motion.ignores(x, y, after.getWidth(), after.getHeight())) {
-                    moved++;
-                }
+                if (!same(before.getRGB(x, y), after.getRGB(x, y))) moved++;
             }
         }
-        return (double) moved / samples;
+        return samples == 0 ? 0 : (double) moved / samples;
     }
 
     private static boolean same(int a, int b) {
