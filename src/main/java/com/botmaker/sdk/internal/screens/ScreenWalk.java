@@ -41,6 +41,11 @@ public final class ScreenWalk {
         }
     }
 
+    /**
+     * How long one step is given for the next screen's marker to show, by a run and by the assistant's walks alike:
+     * fixed, not the bot's timeouts, since a screen slow to draw is the game's pace, not the bot's.
+     */
+    public static final long STEP_MS = 10_000;
     /** How often the screen is read while waiting for a marker. */
     static final long POLL_MS = 250;
     /** How many popups in a row are closed before a step; more is a loop. */

@@ -103,8 +103,8 @@ final class PictureTools {
                         optional = true)
                 String state,
                 @Describe(value = "for an input that comes and goes, the bot's or a plugin's method saying when it is "
-                        + "there, as a method reference: Firestone::eventOn. It must exist; add_method makes one",
-                        optional = true)
+                        + "there, as a method reference: Firestone::eventOn; with screenLook and marker, when that look "
+                        + "shows. It must exist; add_method makes one", optional = true)
                 String when,
                 @Describe(value = "the look of the screen this belongs to, in plain words (Halloween): the same screen, "
                         + "reached and left the same way, dressed otherwise. With marker, what tells that look apart; "
@@ -129,7 +129,10 @@ final class PictureTools {
                  List<String> tags,
                  @Describe(value = "the name of the one box that is that screen's close button, its way back",
                          optional = true)
-                 String back) {
+                 String back,
+                 @Describe(value = "the names of the boxes that show only at times on that screen (a Claim when "
+                         + "loot is ready): each held back only while it shows", optional = true)
+                 List<String> sometimes) {
     }
 
     record PictureName(@Describe("a picture's name, as list_pictures gives it") String picture) {
@@ -210,8 +213,10 @@ final class PictureTools {
                             + "🖼 Manage Pictures does")
                     .takes(Rename.class).handledBy(PictureTools::renamePicture),
             AssistantTool.named("delete_picture")
-                    .describedAs("Deletes a picture and its constant. One still in use is refused with where, "
-                            + "unless its uses are pointed at another picture first")
+                    .describedAs("Deletes a picture and its constant. One only the bot's Screens use leaves the "
+                            + "screens with it (unless a way into a screen needs it). One still in use is refused "
+                            + "with where, unless pointUsesAt names another picture its uses, the map's too, look "
+                            + "for instead")
                     .takes(Delete.class).handledBy(PictureTools::deletePicture),
             AssistantTool.named("replace_picture")
                     .describedAs("Gives a picture a new image cut from the last screenshot, keeping its name and "
@@ -276,6 +281,17 @@ final class PictureTools {
         }
         String screen = crops.screen() == null || crops.screen().isBlank() ? null : crops.screen().strip();
         if (back != null && screen == null) return AgentReply.refused("A way back is a screen's: give screen too.");
+        List<String> comes = crops.sometimes() == null ? List.of() : crops.sometimes().stream()
+                .filter(s -> s != null && !s.isBlank()).map(String::strip).toList();
+        Optional<String> stray = comes.stream().filter(s -> s.equals(marker) || s.equals(back)
+                || cuts.stream().noneMatch(c -> c.name().equals(s))).findFirst();
+        if (stray.isPresent()) {
+            return AgentReply.refused("No box other than the marker and the way back is called " + stray.get()
+                    + ", named in sometimes. Nothing was saved.");
+        }
+        if (!comes.isEmpty() && screen == null) {
+            return AgentReply.refused("An input that comes and goes is a screen's: give screen too.");
+        }
         AgentReply all = null;
         // The marker first: it may start the screen the other boxes are noted on.
         cuts.sort(Comparator.comparing((Crop c) -> !Boolean.TRUE.equals(c.marker())));
@@ -284,6 +300,7 @@ final class PictureTools {
         // The others noted on the screen together after they are cut: a write of it per box was 0.5 s each.
         MapTools.Placing at = null;
         List<String> inputs = new ArrayList<>();
+        List<String> sometimes = new ArrayList<>();
         String backCut = null;
         for (Crop crop : cuts) {
             boolean isMarker = Boolean.TRUE.equals(crop.marker());
@@ -302,16 +319,17 @@ final class PictureTools {
             } else if (!isMarker && at != null) {
                 String name = TemplateLibrary.sanitizeName(crop.name());
                 if (crop.name().equals(back)) backCut = name;
+                else if (comes.contains(crop.name())) sometimes.add(name);
                 else inputs.add(name);
             }
             all = all == null ? one : all.and(one);
         }
         if (at == null) return all;
         List<String> noted = new ArrayList<>();
-        Optional<String> failed = MapTools.noteAll(context.services(), at, backCut, inputs, List.of(), noted);
+        Optional<String> failed = MapTools.noteAll(context.services(), at, backCut, inputs, sometimes, noted);
         String name = at.name();
         return all.and(AgentReply.text(failed.map(why -> "\nNot noted in " + name + ": " + why)
-                .orElse(MapTools.noted(name, noted, !inputs.isEmpty()))));
+                .orElse(MapTools.noted(name, noted, !inputs.isEmpty() || !sometimes.isEmpty()))));
     }
 
     /** {@code crop} cut without noting it on its screen: crop_pictures notes the boxes together. */
@@ -379,8 +397,8 @@ final class PictureTools {
             return AgentReply.refused("A screen's look is named in plain words, on one line, and holds a marker or "
                     + "inputs only. Nothing was saved.");
         }
-        // What says when an input is there says it comes and goes.
-        sometimes = sometimes || when != null;
+        // What says when an input is there says it comes and goes; with a screen look's marker, when the look shows.
+        sometimes = sometimes || when != null && !(screenLook != null && marker);
         Optional<State> state = Optional.ofNullable(blankless(crop.state())).flatMap(PictureTools::stateNamed);
         if ((marker || back || sometimes || popup || variantOf != null || screenLook != null) && screen == null) {
             return AgentReply.refused("A marker, a way back, an input that comes and goes, another look of an input "

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
@@ -322,8 +323,21 @@ final class ScreenPanel {
 
     private void tryRow(Row row) {
         String constant = selected;
+        if (!ScreenDesk.asksWhatItOpens(graph, constant, row.input())) {
+            tryRow(row, constant, null);
+            return;
+        }
+        // A hotkey, or a picture whose name names no new screen: the name the screen it opens shows, asked first.
+        TextField opens = new TextField();
+        Modals.form(services, "Try " + row.label(), new VBox(8, new Label("The name the screen it opens shows, if "
+                + "it opens one; blank when it opens none"), opens), () -> tryRow(row, constant,
+                opens.getText().isBlank() ? null : opens.getText().strip()));
+    }
+
+    private void tryRow(Row row, String constant, String opens) {
         PanelContext context = new PanelContext(services, CaptureValue.current(services));
-        run("Trying " + row.label() + "…", constant, () -> ScreenDesk.tryInput(context, constant, row.input()));
+        run("Trying " + row.label() + "…", constant, () -> ScreenDesk.tryInput(context, constant, row.input(),
+                opens));
     }
 
     private void goHere() {

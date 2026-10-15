@@ -34,23 +34,32 @@ public final class ScreenDesk {
     }
 
     /**
-     * Tries {@code input} on {@code constant} as try_input does, and says what it recorded. Off the FX thread: it
-     * acts on the game and waits for it. Acting on the user's own desktop is allowed, since they pressed ▶ Try.
+     * Tries {@code input} on {@code constant} as try_input does, and says what it recorded; {@code opens} is the name
+     * the screen it opens shows, null to leave it to the picture's name. Off the FX thread: it acts on the game and
+     * waits for it. Acting on the user's own desktop is allowed, since they pressed ▶ Try.
      */
-    public static String tryInput(AgentContext context, String constant, Input input) {
+    public static String tryInput(AgentContext context, String constant, Input input, String opens) {
         MapTools.Try asked = new MapTools.Try(constant,
                 input.picture() == null ? null : input.picture().id(),
                 input.act() == Input.Act.SCROLL ? input.notches() : null,
                 input.key() == null ? null : input.key().label(),
-                null, null, null,
+                opens, null, null,
                 input.kind() == null ? null : input.kind().name().toLowerCase(Locale.ROOT),
                 null, true, true);
-        return said(MapTools.tryInput(asked, context));
+        return text(MapTools.tryInput(asked, context));
+    }
+
+    /**
+     * Whether ▶ Try asks for the name of the screen {@code input} of {@code constant} may open: a hotkey names none,
+     * and a picture whose name names no new screen ({@code close_x}, or a screen the map has) is refused without one.
+     */
+    public static boolean asksWhatItOpens(ScreenGraph graph, String constant, Input input) {
+        return MapTools.asksWhatItOpens(graph, constant, input);
     }
 
     /** Walks the game to {@code constant} as go_to_screen does, and says where it ended. Off the FX thread. */
     public static String goTo(AgentContext context, String constant) {
-        return said(MapTools.goToScreen(new MapTools.Goal(constant, true), context));
+        return text(MapTools.goToScreen(new MapTools.Goal(constant, true), context));
     }
 
     /**
@@ -68,8 +77,8 @@ public final class ScreenDesk {
         return MapTools.noteCut(services, at, picture, marker, false, false).strip();
     }
 
-    /** A reply's text, its pictures aside. */
-    private static String said(AgentReply reply) {
+    /** A reply's text, its pictures aside: what the window says of a tool it ran. */
+    static String text(AgentReply reply) {
         return reply.parts().stream().filter(p -> p.kind() == AgentReply.Kind.TEXT).map(AgentReply.Part::text)
                 .collect(Collectors.joining("\n")).strip();
     }

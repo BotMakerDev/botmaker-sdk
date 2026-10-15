@@ -572,9 +572,11 @@ public final class ResourceManagerDialog {
         Map<String, TemplateUses.Scan> used = new LinkedHashMap<>();
         for (Path file : files) {
             String name = TemplateLibrary.baseName(file);
-            // Only the screen map using it: it leaves the map with its file.
-            TemplateUses.Scan scan = TemplateUses.offTheMap(values(), name);
-            if (!scan.isEmpty()) used.put(name, scan);
+            // Only the screen map using it: it leaves the map with its file. Taken off here only to see what else
+            // uses it, and put back at once; deleteAll takes it off again just before its file goes.
+            TemplateUses.MapCut cut = TemplateUses.offTheMap(values(), name);
+            cut.undo(values());
+            if (!cut.scan().isEmpty()) used.put(name, cut.scan());
         }
         if (used.isEmpty()) {
             deleteAll(files, skippedDefault, 0);
@@ -635,15 +637,18 @@ public final class ResourceManagerDialog {
 
     /**
      * Deletes each file after its constant. A constant the host will not remove — something still uses it —
-     * keeps its file too, so no {@code Pictures} constant is ever left naming a file that is gone.
+     * keeps its file too, so no {@code Pictures} constant is ever left naming a file that is gone, and the screens
+     * it was taken off just before get it back.
      */
     private void deleteAll(List<Path> files, boolean skippedDefault, int rewritten) {
         int deleted = 0;
         String stopped = null;
         for (Path file : files) {
             String name = TemplateLibrary.baseName(file);
+            TemplateUses.MapCut cut = TemplateUses.offTheMap(values(), name);
             Optional<String> kept = TemplateUses.forget(values(), name);
             if (kept.isPresent()) {
+                cut.undo(values());
                 stopped = "Stopped before " + name + ": " + kept.get();
                 break;
             }

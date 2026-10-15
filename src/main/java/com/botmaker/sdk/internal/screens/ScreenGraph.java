@@ -512,7 +512,8 @@ public final class ScreenGraph {
         return picture != null && picture.id().equals(id);
     }
 
-    private static String labels(List<Input> inputs) {
+    /** How {@code inputs} read in a sentence: {@code click gold, scroll list -3}. */
+    public static String labels(List<Input> inputs) {
         return String.join(", ", inputs.stream().map(Input::label).toList());
     }
 

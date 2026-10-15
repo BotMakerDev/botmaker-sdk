@@ -36,8 +36,10 @@ class MapToolsTest {
     @Test
     void aScreenIsNamedInPlainWordsOrFromThePictureThatOpensIt() {
         assertTrue(MapTools.isName("Guild hall"));
-        for (String bad : List.of("", "Guild *Hall*", "# Guild", "Guild #", "Bag: chests", "Bag\nStage: tried",
-                "Bag\tchests", "[Bag]", "Town › Tavern")) {
+        // The name is a Java string in the bot's Screens: only a line of its own holds it.
+        assertTrue(MapTools.isName("Bag: chests"));
+        assertTrue(MapTools.isName("Town › Tavern"));
+        for (String bad : List.of("", "Bag\nStage: tried", "Bag\tchests")) {
             assertFalse(MapTools.isName(bad), bad);
         }
         assertEquals("Engineer", MapTools.nameFrom("engineer_home", "Home"));

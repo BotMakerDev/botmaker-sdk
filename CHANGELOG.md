@@ -238,6 +238,38 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - **A screen with no marker, over the screen it was opened from, is reached.** Before, the walk read the
     screen under it and did the same input again.
 
+- **Discovery records what an input did more surely.** These changes are to the assistant's map-building tools:
+  - **Closing a panel is its way back.** The screen under a panel often shows its marker under the panel too.
+    try_input now reads which screen the game is on the way a walk does. Closing a panel to the screen it was
+    opened from is recorded as the panel's way back, never as a new screen ("Close x"). The game then goes back
+    up when the panel is finished.
+  - **A screen covered by a panel is not the screen.** try_input on Tavern while Info luck is open over it first
+    closes Info luck; an input is never recorded on a screen a panel covers.
+  - **A popup stops try_inputs.** The buttons after it are left for after the popup is closed.
+  - **A button's usual look names no look.** The way opened by clicking a button's usual picture is taken
+    whatever the button looks; only a click on one of its other looks (a badge) names that look.
+  - **A scroll keeps what was said of the input.** A list cut as an input that comes and goes, with a kind or
+    with looks, keeps them once scrolled. A scroll that reached the list's end finishes the screen as a click
+    does, and a way back ends with what is left on the screen.
+  - **An input tried again keeps one result.** An input once recorded as changing the screen in place, which
+    now opens a screen, is no longer both.
+  - **A hotkey needs a name only when it opens a screen.** One that changes the screen in place is recorded
+    without `opens`. 🗺 Screens' ▶ Try asks the name of the screen a hotkey, or a `close_x` picture, may open.
+  - **not_a_screen takes back every way in.** Each `alsoFrom` way into the screen is recorded as changing its
+    screen in place too, so trying it again does not bring the screen back. It no longer guesses the way in
+    from a picture's name.
+  - **Parameters that were refused or ignored now work.**
+    - crop_picture with `marker` and `popup` on a screen the map has makes that screen a popup.
+    - crop_picture with `screenLook`, `marker` and `when` says when that look shows.
+    - crop_pictures takes `sometimes`, the boxes that come and go.
+  - **A screen's name may hold any character but a line break.** Colons, `#` and `›` were refused while notes
+    were kept in GAME.md.
+- **A picture only the map uses goes back on the map when its delete stops.** delete_picture, and 🖼 Manage
+  Pictures' Delete, took the picture off the bot's `Screens` before deleting it. When the delete stopped (another
+  use was found, the constant could not be removed, or the user cancelled), the map stayed without it. It is now
+  put back. delete_picture says which screens the picture left, and with `pointUsesAt` the map's uses look for
+  the other picture instead of being dropped.
+
 - **Discovery is faster.** These changes are to the assistant's map-building tools:
   - **Goes back up by itself.** Once nothing on a screen is left to try, try_input walks the game back up to the
     nearest screen that still has inputs to try. It uses the screen's way back first, then the bot's `close_x`

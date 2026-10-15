@@ -22,12 +22,6 @@ import java.util.Optional;
 @Palette(category = "interaction", categoryLabel = "Interaction", icon = "🗺")
 public final class Navigate {
 
-    /**
-     * How long one step is given for the next screen's marker to show: fixed, not the bot's timeouts, since a screen
-     * slow to draw is the game's pace, not the bot's.
-     */
-    private static final long STEP_MS = 10_000;
-
     private Navigate() {}
 
     /**
@@ -45,7 +39,7 @@ public final class Navigate {
             Debug.log((screen == null ? "No screen" : screen.name()) + " is not in the bot's screen map.");
             return false;
         }
-        ScreenWalk.Result walked = new ScreenWalk(map, new RunReach(), STEP_MS, constant -> tell(map, constant))
+        ScreenWalk.Result walked = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, constant -> tell(map, constant))
                 .go(target.get(), ScreenMaps.lastSeen());
         ScreenMaps.seen(walked.at());
         return switch (walked.outcome()) {
@@ -73,7 +67,7 @@ public final class Navigate {
     /** The screen of the bot's map the game shows now, popups aside; empty when it shows none. */
     public static Optional<GameScreen> where() {
         ScreenGraph map = ScreenMaps.installed();
-        Optional<String> here = new ScreenWalk(map, new RunReach(), STEP_MS, null).where(ScreenMaps.lastSeen());
+        Optional<String> here = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, null).where(ScreenMaps.lastSeen());
         here.ifPresent(constant -> tell(map, constant));
         return here.flatMap(map::screen);
     }

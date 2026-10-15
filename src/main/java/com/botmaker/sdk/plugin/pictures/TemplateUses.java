@@ -80,28 +80,68 @@ public final class TemplateUses {
      * {@link #find}, after taking {@code baseName} out of the bot's {@code Screens} when only they use it: a screen's
      * marker, an input, a look of a button or of a screen, a lock or a way back goes with its picture rather than
      * keeping it (the user's call, 2026-10-15). A way into a screen stays, so a picture one opens by keeps it used;
-     * then nothing is written, and the scan is as {@link #find} gives it. On the FX thread.
+     * then nothing is written, and the scan is as {@link #find} gives it. A use the map's own cannot take with them
+     * (one written by hand in {@code Screens.java}) puts the screens back. The delete that stops after this calls
+     * {@link MapCut#undo} before anything else writes the map: the undo writes each screen back whole. On the FX
+     * thread.
      */
-    public static Scan offTheMap(PluginValues values, String baseName) {
+    public static MapCut offTheMap(PluginValues values, String baseName) {
         Scan scan = find(values, baseName);
+        MapCut none = MapCut.none(scan);
         boolean mapOnly = scan.uses().stream().allMatch(use -> use.file().getFileName().toString()
                 .equals(SCREENS_FILE));
-        if (scan.isEmpty() || !mapOnly) return scan;
-        record Held(ValueContext at, GameScreen screen) {}
+        if (scan.isEmpty() || !mapOnly) return none;
+        record Held(Member member, ValueContext at, GameScreen screen) {}
         List<Held> screens = new ArrayList<>();
         for (Member member : MAP.members(values)) {
             Optional<ValueContext> at = MAP.open(values, member);
             Optional<GameScreen> screen = at.flatMap(MAP::read);
-            if (screen.isEmpty()) return scan;    // a screen written by hand may name it: leave the map alone
-            if (ScreenGraph.enteredBy(screen.get(), baseName)) return scan;
-            screens.add(new Held(at.get(), screen.get()));
+            if (screen.isEmpty()) return none;    // a screen written by hand may name it: leave the map alone
+            if (ScreenGraph.enteredBy(screen.get(), baseName)) return none;
+            screens.add(new Held(member, at.get(), screen.get()));
         }
         // Every use goes with the map's own: only then is the map written.
-        for (Held held : screens) {
-            GameScreen without = ScreenGraph.without(held.screen(), baseName);
-            if (!without.equals(held.screen())) held.at().set(without);
+        List<MapCut.Kept> kept = new ArrayList<>();
+        try {
+            for (Held held : screens) {
+                GameScreen without = ScreenGraph.without(held.screen(), baseName);
+                if (without.equals(held.screen())) continue;
+                held.at().set(without);
+                kept.add(new MapCut.Kept(held.member(), held.screen()));
+            }
+        } catch (RuntimeException refused) {
+            // A screen the host would not write: the ones written already go back as they were.
+            new MapCut(scan, List.copyOf(kept)).undo(values);
+            throw refused;
         }
-        return find(values, baseName);
+        MapCut cut = new MapCut(find(values, baseName), List.copyOf(kept));
+        if (cut.scan().isEmpty()) return cut;
+        cut.undo(values);
+        return none;
+    }
+
+    /**
+     * What {@link #offTheMap} did: the uses left once the map let go of the picture, and each screen it was taken off,
+     * as it was before, to put back when the delete goes no further.
+     */
+    public record MapCut(Scan scan, List<Kept> kept) {
+
+        /** A screen the picture was taken off, as it was. */
+        public record Kept(Member member, GameScreen was) {}
+
+        static MapCut none(Scan scan) {
+            return new MapCut(scan, List.of());
+        }
+
+        /** Writes each screen back as it was: the picture stays, so its uses do. On the FX thread. */
+        public void undo(PluginValues values) {
+            for (Kept screen : kept) MAP.open(values, screen.member()).ifPresent(at -> at.set(screen.was()));
+        }
+
+        /** The names the game shows of the screens the picture was taken off, in the map's order. */
+        public List<String> screens() {
+            return kept.stream().map(k -> k.was().name()).toList();
+        }
     }
 
     /**

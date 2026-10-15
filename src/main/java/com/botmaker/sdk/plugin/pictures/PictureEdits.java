@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.StudioServices;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -55,15 +56,20 @@ public final class PictureEdits {
     /**
      * Deletes the picture {@code name}: its constant, then its file. One still in use is refused with where,
      * unless {@code pointUsesAt} names another picture, which its uses then look for instead — a guess, marked
-     * for review as Manage Pictures marks it.
+     * for review as Manage Pictures marks it. With none, a picture only the bot's {@code Screens} use leaves them with
+     * its file; a delete that stops puts them back.
      */
     public static Done delete(StudioServices services, String name, String pointUsesAt) {
         Path resources = services.resourcesDir();
         Path file = TemplateLibrary.fileForName(resources, name);
         if (TemplateLibrary.isDefaultTemplate(file)) return Done.refused("The default picture cannot be deleted.");
-        TemplateUses.Scan scan = TemplateUses.offTheMap(services.pluginValues(), name);
+        boolean repointing = pointUsesAt != null && !pointUsesAt.isBlank();
+        // Uses pointed at another picture keep their place, the map's too: a marker replaced stays a marker.
+        TemplateUses.MapCut cut = repointing ? TemplateUses.MapCut.none(TemplateUses.find(services.pluginValues(), name))
+                : TemplateUses.offTheMap(services.pluginValues(), name);
+        TemplateUses.Scan scan = cut.scan();
         if (!scan.isEmpty()) {
-            if (pointUsesAt == null || pointUsesAt.isBlank()) {
+            if (!repointing) {
                 StringBuilder where = new StringBuilder(name + " is still used: " + scan.describe() + ".");
                 scan.uses().stream().limit(10).forEach(use -> where.append("\n  ").append(use.file().getFileName())
                         .append(':').append(use.line()).append("  ").append(use.text()));
@@ -78,13 +84,18 @@ public final class PictureEdits {
             if (refused.isPresent()) return Done.refused("Nothing was deleted: " + refused.get());
         }
         Optional<String> kept = TemplateUses.forget(services.pluginValues(), name);
-        if (kept.isPresent()) return Done.refused("Not deleted: " + kept.get());
+        if (kept.isPresent()) {
+            cut.undo(services.pluginValues());
+            return Done.refused("Not deleted: " + kept.get());
+        }
         try {
             TemplateLibrary.deleteTemplate(file);
         } catch (IOException e) {
             return Done.refused("Failed to delete " + name + ": " + e.getMessage());
         }
-        return Done.ok(scan.isEmpty() ? "Deleted " + name + "."
+        List<String> left = cut.screens();
+        return Done.ok(scan.isEmpty() ? "Deleted " + name + (left.isEmpty() ? "." : "; it left the map's "
+                + String.join(", ", left) + ".")
                 : "Deleted " + name + " after pointing " + scan.describe() + " at " + pointUsesAt.trim()
                         + "; each is marked for review.");
     }

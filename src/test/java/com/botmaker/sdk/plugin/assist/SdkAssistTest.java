@@ -35,6 +35,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
@@ -57,7 +58,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -398,6 +401,27 @@ class SdkAssistTest {
         assertTrue(host.calls.contains("add pictures GOLD"), host.calls.toString());
         assertTrue(host.calls.stream().anyMatch(c -> c.startsWith("repoint pictures ORE GOLD")), host.calls.toString());
         assertTrue(host.calls.contains("remove pictures ORE"), host.calls.toString());
+    }
+
+    /** A picture only the bot's Screens use leaves them with its file; a delete that stops puts them back. */
+    @Test
+    void aPictureOnlyTheMapUsesLeavesItWithItsFile() {
+        ImageTemplate ore = new ImageTemplate(TemplateLibrary.pathForName("ore"));
+        host.set("screen_map").put("HOME", TestContexts.row(Object.class, "").withValue(GameScreen.named("Home")
+                .marker(ore).inputs(List.of(Input.click(ore)))));
+        host.uses.put("ORE", List.of(new PluginValues.Use(Path.of("Screens.java"), 40, "helper(Pictures.ORE);")));
+
+        AgentReply kept = run("delete_picture", "picture", "ore");
+        assertTrue(kept.isRefused() && text(kept).contains("Screens.java:40"), text(kept));
+        assertEquals("ore", screen("HOME").marker().id(), "a use the map cannot take puts the screens back");
+        assertEquals(1, screen("HOME").inputs().size());
+
+        host.uses.clear();
+        String deleted = text(run("delete_picture", "picture", "ore"));
+        assertEquals("Deleted ore; it left the map's Home.", deleted);
+        assertNull(screen("HOME").marker());
+        assertTrue(screen("HOME").inputs().isEmpty());
+        assertFalse(TemplateLibrary.exists(resources, "ore"));
     }
 
     @Test
@@ -882,11 +906,13 @@ class SdkAssistTest {
 
     @Test
     void tryInputTakesAPictureOrAHotkeyAndEachScreensInputsBeforeTheScreensTheyOpen() {
-        NativeControllerFactory.setForTesting(new RecordingNativeController());
+        Game game = new Game();
+        NativeControllerFactory.setForTesting(game);
         agent.frame = withPatchAt(120, 80);
         assertTrue(text(run("try_input", "screen", "Home")).contains("a picture to click or a hotkey"));
         assertTrue(run("try_input", "screen", "Home", "picture", "ore", "key", "E").isRefused());
-        assertTrue(text(run("try_input", "screen", "Home", "key", "M")).contains("A hotkey names no screen"));
+        assertTrue(text(run("try_input", "screen", "Home", "key", "M")).contains("crop_picture the first screen's "
+                + "marker"), "a hotkey needs no name until it opens a screen");
         assertTrue(text(run("try_input", "screen", "Home", "picture", "ore", "desktop", true, "settleMs", 0))
                 .contains("crop_picture the first screen's marker"), "the map is started first");
 
@@ -911,8 +937,11 @@ class SdkAssistTest {
                 .from(Way.of(BotConstants.screen("HOME"), Input.click(screen("HOME").marker())))));
         AgentReply gated = run("try_input", "screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
         assertTrue(gated.isRefused() && text(gated).startsWith("Engineer still owes its marker"), text(gated));
-        assertTrue(text(run("crop_picture", "name", "coin", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
+        assertTrue(text(run("crop_picture", "name", "coin", "x", 300, "y", 200, "width", SIZE, "height", SIZE,
                 "screen", "engineer", "marker", true)).contains("Noted in Engineer as its marker."));
+        BufferedImage over = agent.frame;
+        // Engineer closed: Home's marker alone shows.
+        BufferedImage homeAlone = covered(over, 300, 200, SIZE, SIZE, 5);
         run("crop_picture", "name", "gem", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
         run("crop_picture", "name", "list", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
         AgentReply next = run("try_input", "screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
@@ -935,6 +964,8 @@ class SdkAssistTest {
         assertEquals(List.of("click gem", "scroll list -3"), screen("ENGINEER").inputs().stream().map(Input::label)
                 .toList(), "the list's cut became its scroll");
 
+        // Engineer, opened from Home, covers it: closed first by its way back, Escape with no close button.
+        game.then(homeAlone);
         AgentReply still = run("try_input", "screen", "Home", "picture", "gold", "kind", "chore", "desktop", true,
                 "settleMs", 0);
         assertTrue(text(still).contains("Noted in Home: tried click gold, no visible effect. Every input cut on it is "
@@ -954,6 +985,7 @@ class SdkAssistTest {
                 + "before nosuch: ") && text(stopped).contains("Not tried: nosuch, gem."), text(stopped));
 
         assertTrue(run("go_to_screen", "screen", "Guild").isRefused());
+        agent.frame = over;
         String walked = text(run("go_to_screen", "screen", "Engineer", "desktop", true));
         assertEquals("On Engineer.", walked.lines().findFirst().orElse(""),
                 "both markers show on the still frame: Engineer, opened from Home, is the one over it");
@@ -991,6 +1023,116 @@ class SdkAssistTest {
                 + "in place."), taken);
         assertFalse(host.set("screen_map").containsKey("ENGINEER"));
         assertTrue(screen("HOME").inputs().stream().anyMatch(i -> i.did() == Did.IN_PLACE));
+    }
+
+    /**
+     * try_input reads where each input left the game on the frame the game shows after it (2026-10-15): a panel
+     * closed to the screen under it, whose marker showed under the panel too, is that screen's way back and no new
+     * screen; a popup stops try_inputs; a scroll keeps what was said of its input; a hotkey needs a name only once it
+     * opened a screen; a button's usual look names no look on the way it opens.
+     */
+    @Test
+    void eachInputIsReadOnTheFrameTheGameShowsAfterIt() {
+        Game game = new Game();
+        NativeControllerFactory.setForTesting(game);
+        BufferedImage home = noise(WATCHED.width(), WATCHED.height(), 21);
+        BufferedImage shop = covered(home, 150, 0, 250, 300, 22);
+        BufferedImage gift = covered(home, 0, 120, 140, 180, 23);
+        agent.frame = home;
+        run("screenshot");
+        run("crop_picture", "name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home",
+                "marker", true);
+        String cut = text(run("crop_pictures", "screen", "Home", "sometimes", List.of("feed"), "boxes",
+                List.of("shop_home 200 120 48 48", "bag 80 20 48 48", "feed 90 75 40 40")));
+        assertTrue(cut.contains("feed: comes and goes"), cut);
+        run("crop_picture", "name", "shop_badge", "x", 250, "y", 120, "width", SIZE, "height", SIZE, "screen",
+                "Home", "variantOf", "shop_home", "state", "badge");
+
+        game.then(shop);
+        String opened = text(run("try_input", "screen", "Home", "picture", "shop_home", "desktop", true, "settleMs",
+                0));
+        assertTrue(opened.contains("Opened Shop, added to the map as Screens.SHOP"), opened);
+        assertNull(screen("SHOP").from().state(), "the button's usual look is no look the way needs");
+        run("crop_pictures", "screen", "Shop", "marker", "shop", "boxes", List.of("shop 300 40 48 48",
+                "close_shop 200 200 48 48"));
+
+        game.then(home);
+        String closed = text(run("try_input", "screen", "Shop", "picture", "close_shop", "desktop", true,
+                "settleMs", 0));
+        assertTrue(closed.contains("tried click close_shop, its way back to Home") && closed.contains("went back up "
+                + "to Home"), closed);
+        assertEquals(List.of("HOME", "SHOP"), List.copyOf(host.set("screen_map").keySet()), "no screen Close shop");
+        assertEquals("close_shop", screen("SHOP").back().picture().id());
+
+        agent.frame = gift;
+        run("screenshot");
+        run("crop_picture", "name", "gift", "x", 30, "y", 200, "width", SIZE, "height", SIZE, "screen", "Gift",
+                "marker", true, "popup", true);
+        agent.frame = home;
+        game.then(gift);
+        String covered = text(run("try_inputs", "screen", "Home", "pictures", List.of("bag", "feed"), "desktop",
+                true, "settleMs", 0));
+        assertTrue(covered.contains("tried click bag, shows the popup Gift") && covered.contains("Not tried: feed."),
+                covered);
+        run("screenshot");
+        run("crop_picture", "name", "gift_ok", "x", 60, "y", 240, "width", SIZE, "height", SIZE, "screen", "Gift");
+        game.then(home);
+        String shut = text(run("try_input", "screen", "Gift", "picture", "gift_ok", "desktop", true, "settleMs", 0));
+        assertTrue(shut.contains("tried click gift_ok, its way back to Home"), "a popup's input is tried over the "
+                + "screen it covers: " + shut);
+
+        agent.frame = home;
+        run("try_input", "screen", "Home", "picture", "feed", "scroll", -2, "desktop", true, "settleMs", 0);
+        Input scrolled = screen("HOME").inputs().stream().filter(i -> i.label().equals("scroll feed -2")).findFirst()
+                .orElseThrow();
+        assertTrue(scrolled.comesAndGoes(), "the scroll still comes and goes");
+
+        String still = text(run("try_input", "screen", "Home", "key", "Q", "desktop", true, "settleMs", 0));
+        assertTrue(still.contains("tried key Q, no visible effect"), still);
+        game.then(noise(WATCHED.width(), WATCHED.height(), 24));
+        String away = text(run("try_input", "screen", "Home", "key", "W", "desktop", true, "settleMs", 0));
+        assertTrue(away.contains("Nothing was written: key W opened a screen the map does not have"), away);
+    }
+
+    /** {@code frame} with the box at {@code x, y} drawn over by other pixels: a panel opened over it. */
+    private static BufferedImage covered(BufferedImage frame, int x, int y, int width, int height, long seed) {
+        BufferedImage now = new BufferedImage(frame.getWidth(), frame.getHeight(), BufferedImage.TYPE_3BYTE_BGR);
+        Graphics2D g = now.createGraphics();
+        g.drawImage(frame, 0, 0, null);
+        g.drawImage(noise(width, height, seed), x, y, null);
+        g.dispose();
+        return now;
+    }
+
+    /** The game: each click, key or scroll shows the next frame it was given, if any. */
+    private final class Game extends RecordingNativeController {
+        private final Deque<BufferedImage> next = new ArrayDeque<>();
+
+        void then(BufferedImage frame) {
+            next.add(frame);
+        }
+
+        @Override
+        public void mouseButton(int button, boolean press) {
+            super.mouseButton(button, press);
+            if (!press) answer();
+        }
+
+        @Override
+        public void keyUp(int nativeKeyCode) {
+            super.keyUp(nativeKeyCode);
+            answer();
+        }
+
+        @Override
+        public void scroll(int amount) {
+            super.scroll(amount);
+            answer();
+        }
+
+        private void answer() {
+            if (!next.isEmpty()) agent.frame = next.poll();
+        }
     }
 
     /** 🗺 Screens' hand tools set what try_input records, and add and remove screens (2026-10-15). */
@@ -1239,7 +1381,18 @@ class SdkAssistTest {
             return Optional.empty();
         }
 
-        @Override public List<Use> uses(String id, String member) { return uses.getOrDefault(member, List.of()); }
+        @Override
+        public List<Use> uses(String id, String member) {
+            List<Use> all = new ArrayList<>(uses.getOrDefault(member, List.of()));
+            // The map's own, as Studio finds them in Screens.java: each screen naming the picture.
+            for (TestContexts.Recording row : set("screen_map").values()) {
+                if (row.value() instanceof GameScreen screen
+                        && !ScreenGraph.without(screen, member.toLowerCase(Locale.ROOT)).equals(screen)) {
+                    all.add(new Use(Path.of("Screens.java"), 1, screen.name()));
+                }
+            }
+            return all;
+        }
 
         @Override
         public Optional<String> rename(String id, String member, String newName) {

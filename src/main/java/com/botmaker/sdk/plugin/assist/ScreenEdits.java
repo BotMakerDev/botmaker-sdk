@@ -2,7 +2,6 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
-import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Way;
@@ -18,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
-import java.util.stream.Collectors;
 
 /**
  * The map edited by hand from 🗺 Screens' side panel: what the assistant's tools record by trying, set by the user
@@ -86,7 +84,7 @@ public final class ScreenEdits {
 
     /** not_a_screen: {@code constant} off the map, its way in noted on its parent as changing it in place. */
     public static String notAScreen(AgentContext context, String constant) {
-        return text(MapTools.notAScreen(new MapTools.Mistake(constant), context));
+        return ScreenDesk.text(MapTools.notAScreen(new MapTools.Mistake(constant), context));
     }
 
     /** Deletes {@code constant} and its shot; refused while another screen is reached from it. */
@@ -111,7 +109,8 @@ public final class ScreenEdits {
     /** place_pictures: pictures the bot has, put on {@code screen} as inputs, its marker or its way back. */
     public static String place(AgentContext context, String screen, List<String> pictures, String marker,
                                String back) {
-        return text(MapTools.placePictures(new MapTools.Places(screen, pictures, marker, back, null, null), context));
+        return ScreenDesk.text(MapTools.placePictures(new MapTools.Places(screen, pictures, marker, back, null, null),
+                context));
     }
 
     /**
@@ -187,10 +186,5 @@ public final class ScreenEdits {
 
     private static String said(Optional<String> failed, String done) {
         return failed.map(why -> "Not written: " + why).orElse(done);
-    }
-
-    private static String text(AgentReply reply) {
-        return reply.parts().stream().filter(p -> p.kind() == AgentReply.Kind.TEXT).map(AgentReply.Part::text)
-                .collect(Collectors.joining("\n")).strip();
     }
 }
