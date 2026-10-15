@@ -62,7 +62,7 @@ class SdkOverlayTest {
     void activitiesAreTargetsByTypeAndClicksAreActing() throws NoSuchMethodException {
         OverlayPart part = SdkOverlay.PART;
         assertEquals(List.of(new OverlayPart.TargetType(ActivityBody.class.getName(), "Activities")), part.targets());
-        assertEquals(List.of("picture", "point", "flow"), part.tools().stream().map(t -> t.id()).toList());
+        assertEquals(List.of("picture", "point", "flow", "screens"), part.tools().stream().map(t -> t.id()).toList());
         assertTrue(part.changeWatched().isPresent());
 
         assertTrue(part.probeFor(ImageFinder.class.getMethod("find", ImageTemplate.class)).orElseThrow().readsOnly());
