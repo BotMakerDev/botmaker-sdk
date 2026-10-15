@@ -1078,7 +1078,7 @@ final class MapTools {
         return all;
     }
 
-    private static Optional<Kind> kindNamed(String typed) {
+    static Optional<Kind> kindNamed(String typed) {
         String id = typed.strip().toUpperCase(Locale.ROOT);
         for (Kind kind : Kind.values()) if (kind.name().equals(id)) return Optional.of(kind);
         return Optional.empty();

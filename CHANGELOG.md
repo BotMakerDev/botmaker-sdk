@@ -21,6 +21,21 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **edit_map: the assistant fixes the map by hand**, as 🗺 Screens' menus do and by the same code, clicking
+  nothing. One tool, an action per edit: `rename`, `delete`, `popup`, `set_input` (its result, kind, never, lock,
+  coming and going), `reset_input`, `remove_input`, `use_as_back`, `remove_back`, `remove_way`, `way_when`,
+  `input_when`, `look_when` and `new_screen`. An input is named as try_input names it (picture, scroll, key). The
+  guide and the Discovery and Upkeep steps say to fix a wrong record with it rather than by trying the input again.
+  - `remove_back` takes a screen's own way back off and makes it an untried input again: a panel taken for the
+    screen's way back.
+  - `remove_way` takes a way in off; when it was the tree's, the next way in becomes the tree's. A screen's only way
+    in stays: delete the screen instead.
+  - `look_when` sets when one of a screen's looks shows.
+  - A way's "open only while" set on a way the screen does not have now says so, instead of reporting it written.
+  - A new screen opened by an input of one of its parent's looks no longer copies that input onto the parent.
+  - An edit that left the map as it was (a name taken, no such way) is a refusal, not a success.
+  - Use as the way back keeps the way back it replaces as an untried input, and a rename refuses a name another
+    screen has (in the window too).
 - **🗺 Screens fills the window and answers clicks.** The tree lays out rightward or downward, whichever the window
   shows bigger, and picks again on resize. The toolbar has − Fit +. A click on a link shows the input that takes
   it; a right-click on a card or a link opens its menu. A link's menu sets "Open only while" to one of the bot's

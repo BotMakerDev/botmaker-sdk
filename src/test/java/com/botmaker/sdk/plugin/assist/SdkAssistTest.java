@@ -28,7 +28,9 @@ import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -42,6 +44,7 @@ import com.botmaker.sdk.plugin.flow.FlowValue;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateManifest;
 import com.botmaker.sdk.plugin.types.FlowTypes;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -862,7 +865,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(61, names.size(), "save_point went on 2026-10-15");
+        assertEquals(62, names.size(), "edit_map came on 2026-10-15");
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
@@ -877,6 +880,8 @@ class SdkAssistTest {
         }
         java.util.Set<String> names = SdkAssist.and(com.botmaker.sdk.plugin.map.MapReport.TOOLS).stream()
                 .map(AssistantTool::name).collect(java.util.stream.Collectors.toSet());
+        // edit_map's actions are named beside it.
+        for (MapEdits.Action action : MapEdits.Action.values()) names.add(action.id());
         StringBuilder said = new StringBuilder(SdkAssist.GUIDE);
         for (Protocol.Stage stage : Protocol.Stage.values()) said.append('\n').append(stage.section());
         java.util.regex.Matcher named = java.util.regex.Pattern.compile("\\b[a-z]+_[a-z_]+\\b").matcher(said);
@@ -1165,6 +1170,111 @@ class SdkAssistTest {
         ScreenEdits.useAsBack(host, "HOME", screen("HOME").inputs().getFirst());
         assertEquals("ore", screen("HOME").back().picture().id());
         assertTrue(screen("HOME").inputs().isEmpty(), "the way back is no input to try");
+    }
+
+    /** edit_map does what 🗺 Screens' hand tools do, each input named as try_input names it (2026-10-15). */
+    @Test
+    void editMapFixesTheMapByHand() throws IOException {
+        for (String name : List.of("gem", "tab", "coin", "close", "lock")) {
+            TemplateLibrary.saveTemplate(resources, patch(), name);
+        }
+        Input gem = Input.click(picture("gem"));
+        Input q = Input.key(Key.named("Q").orElseThrow());
+        Input tab = Input.click(picture("tab"));
+        host.set("screen_map").put("HOME", TestContexts.row(Object.class, "").withValue(GameScreen.named("Home")
+                .marker(picture("ore")).inputs(List.of(gem, q, tab))
+                .variants(List.of(ScreenVariant.named("Event").marker(picture("coin"))))));
+        host.set("screen_map").put("SHOP", TestContexts.row(Object.class, "").withValue(GameScreen.named("Shop")
+                .marker(picture("coin")).from(Way.of(BotConstants.screen("HOME"), q))
+                .inputs(List.of(Input.click(picture("close")), Input.click(picture("coin"))))));
+        host.set("screen_map").put("MINE", TestContexts.row(Object.class, "").withValue(GameScreen.named("Mine")
+                .from(Way.of(BotConstants.screen("HOME"), gem))
+                .alsoFrom(List.of(Way.of(BotConstants.screen("SHOP"), Input.click(picture("coin")))))));
+
+        assertTrue(text(run("edit_map", "screen", "Home", "action", "fly")).contains("rename, delete"));
+        assertTrue(run("edit_map", "screen", "Nowhere", "action", "delete").isRefused());
+
+        // An input: its result, kind, never, lock, coming and going, and when it is there.
+        run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "did", "in_place", "kind", "info");
+        assertEquals(Did.IN_PLACE, screen("HOME").inputs().get(2).did());
+        assertEquals(Kind.INFO, screen("HOME").inputs().get(2).kind());
+        run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "never", "spends gems");
+        assertEquals("spends gems", screen("HOME").inputs().get(2).never());
+        assertNull(screen("HOME").inputs().get(2).did(), "never replaces the result");
+        assertEquals(Kind.INFO, screen("HOME").inputs().get(2).kind(), "the kind stays");
+        assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "did", "none",
+                "never", "x").isRefused(), "one of did, never and locked");
+        assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab").isRefused());
+        assertTrue(text(run("edit_map", "screen", "Home", "action", "set_input", "picture", "nope", "did", "none"))
+                .contains("its inputs: click gem, key Q, click tab"));
+        run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "locked", "lock");
+        assertEquals("lock", screen("HOME").inputs().get(2).lock().id());
+        assertNull(screen("HOME").inputs().get(2).never());
+        run("edit_map", "screen", "Home", "action", "reset_input", "picture", "tab");
+        assertFalse(screen("HOME").inputs().get(2).settled(), "untried again");
+        run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "sometimes", true);
+        assertTrue(screen("HOME").inputs().get(2).comesAndGoes());
+        run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method", "Bot::eventOn");
+        assertEquals("Bot::eventOn", ScreenTypes.sourceOf(screen("HOME").inputs().get(2).when()));
+        run("edit_map", "screen", "Home", "action", "look_when", "look", "event", "method", "Bot::eventOn");
+        assertEquals("Bot::eventOn", ScreenTypes.sourceOf(screen("HOME").variants().getFirst().when()));
+
+        // Ways in: a condition, the tree's way taken off (the next one is the tree's), the only one kept.
+        AgentReply noWay = run("edit_map", "screen", "Mine", "action", "way_when", "from", "Home", "key", "Q");
+        assertTrue(noWay.isRefused() && text(noWay).contains("its ways in: from Home by click gem, from Shop by "
+                + "click coin"), text(noWay));
+        assertTrue(run("edit_map", "screen", "Home", "action", "look_when", "look", "night").isRefused());
+        run("edit_map", "screen", "Mine", "action", "way_when", "from", "Shop", "picture", "coin", "method",
+                "Bot::eventOn");
+        assertEquals("Bot::eventOn", ScreenTypes.sourceOf(screen("MINE").alsoFrom().getFirst().when()));
+        assertTrue(text(run("edit_map", "screen", "Mine", "action", "remove_way", "from", "Home", "picture", "gem"))
+                .startsWith("Took Mine's way in from Home by click gem off the map."));
+        assertEquals("coin", screen("MINE").from().via().picture().id());
+        assertTrue(screen("MINE").alsoFrom().isEmpty());
+        AgentReply only = run("edit_map", "screen", "Mine", "action", "remove_way", "from", "Shop", "picture", "coin");
+        assertTrue(only.isRefused() && text(only).contains("only way in"), text(only));
+        assertEquals("coin", screen("MINE").from().via().picture().id(), "the only way in stays");
+
+        // The way back: an input made it, then taken off, the input untried on the screen again.
+        run("edit_map", "screen", "Shop", "action", "use_as_back", "picture", "close");
+        assertEquals("close", screen("SHOP").back().picture().id());
+        assertEquals(List.of("click coin"), screen("SHOP").inputs().stream().map(Input::label).toList());
+        assertTrue(text(run("edit_map", "screen", "Shop", "action", "remove_back")).contains("click close is "
+                + "untried on it again"));
+        assertNull(screen("SHOP").back());
+        assertEquals(List.of("click coin", "click close"), screen("SHOP").inputs().stream().map(Input::label)
+                .toList());
+        assertTrue(run("edit_map", "screen", "Shop", "action", "remove_back").isRefused(), "it has none now");
+        run("edit_map", "screen", "Shop", "action", "use_as_back", "picture", "close");
+        run("edit_map", "screen", "Shop", "action", "use_as_back", "picture", "coin");
+        assertEquals("coin", screen("SHOP").back().picture().id());
+        assertEquals(List.of("click close"), screen("SHOP").inputs().stream().map(Input::label).toList(),
+                "the way back it had is an input again");
+        assertTrue(run("edit_map", "screen", "Shop", "action", "rename", "name", "home").isRefused(),
+                "a name another screen has");
+        assertTrue(run("edit_map", "screen", "Home", "action", "delete").isRefused(), "screens are reached from it");
+
+        // A new screen, by an input the parent has or one put on it; renamed, made a popup, deleted.
+        assertTrue(text(run("edit_map", "screen", "Home", "action", "new_screen", "name", "Forge", "picture", "tab"))
+                .startsWith("Added Forge as Screens.FORGE"));
+        assertEquals("tab", screen("FORGE").from().via().picture().id());
+        assertEquals(3, screen("HOME").inputs().size(), "tab was on Home already");
+        run("edit_map", "screen", "Home", "action", "new_screen", "name", "World", "key", "W");
+        assertEquals("key W", screen("HOME").inputs().getLast().label());
+        assertTrue(run("edit_map", "screen", "Home", "action", "new_screen", "name", "Cave", "picture", "nothing")
+                .isRefused());
+        run("edit_map", "screen", "Forge", "action", "rename", "name", "Big forge");
+        run("edit_map", "screen", "Big forge", "action", "popup", "popup", true);
+        assertTrue(screen("FORGE").isPopup());
+        assertEquals("Deleted Big forge.", text(run("edit_map", "screen", "FORGE", "action", "delete")));
+        assertFalse(host.set("screen_map").containsKey("FORGE"));
+        run("edit_map", "screen", "Home", "action", "remove_input", "picture", "tab");
+        assertEquals(List.of("click gem", "key Q", "key W"), screen("HOME").inputs().stream().map(Input::label)
+                .toList());
+    }
+
+    private static ImageTemplate picture(String name) {
+        return new ImageTemplate(TemplateLibrary.pathForName(name));
     }
 
     /** The bot's screen {@code constant}, as try_input and crop_picture last wrote it. */

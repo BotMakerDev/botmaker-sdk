@@ -74,6 +74,10 @@ final class Protocol {
                   branch begun is not finished. What cannot be cut yet the screen owes (write_notes with its
                   screen and owes); Discovery is not done while anything is owed or untried; a debt paid by
                   hand is taken out of owes with write_notes.
+                - A record try_input got wrong is fixed with edit_map; trying the input again does not undo it: a
+                  panel taken for a screen's way back (remove_back, then try_input it as an input), a result
+                  (set_input, reset_input), a way in that is no way (remove_way), a screen opened by an input that
+                  cannot be tried here (new_screen), a name (rename).
                 - On each screen, as it is explored: read its help (an i or ? button) first, then give every
                   input a kind as try_input tries it (kind): a chore (work that repeats), a shortcut the game
                   ships for a chore (Auto, x10, Max, Claim all, Skip), a choice (spending the player decides),
@@ -149,6 +153,8 @@ final class Protocol {
         UPKEEP("Stage 5, Upkeep: when the game changes", """
                 - The bot targets the game as it is now. When a marker or an entrance stops being found, survey
                   that screen again (stage 1), recut with replace_picture, and run its trial again.
+                - A screen the game renamed, moved or removed is moved on the map with edit_map (rename,
+                  remove_way, new_screen, delete): the screens and inputs it still has stay as they were tried.
                 """);
 
         private final String title;

@@ -24,7 +24,7 @@ public final class SdkAssist {
 
     /** Every tool, by group, each reply ending with how long it took ({@link ToolTiming}). */
     public static final List<AssistantTool<?>> ALL = join(LookTools.TOOLS, ActTools.TOOLS, PictureTools.TOOLS,
-            TagTools.TOOLS, FlowTools.TOOLS, SetupTools.TOOLS, NotesTools.TOOLS, MapTools.TOOLS);
+            TagTools.TOOLS, FlowTools.TOOLS, SetupTools.TOOLS, NotesTools.TOOLS, MapTools.TOOLS, MapEdits.TOOLS);
 
     /**
      * How a bot on the SDK is laid out, said to the assistant beside these tools: a bot is its activities, and a
@@ -50,13 +50,15 @@ public final class SdkAssist {
               changes its look is one input (crop_picture variantOf + state); the same screen dressed otherwise
               (an event's theme) is one of its looks (screenLook), never a screen of its own; a list whose
               entries change by day is one screen whose entries come and go. When a method of the bot can say
-              when one is there, name it as crop_picture's when (Firestone::eventOn).
+              when one is there, name it as crop_picture's when (Firestone::eventOn). What try_input recorded
+              wrong (a panel taken for a way back, a result, a way in) is fixed with edit_map: trying the
+              input again does not undo it.
             - Stage 2, Build: one chore at a time, through the game's own shortcuts, each step proved by a
               picture.
             - Stage 3, Trial: each activity from three states (work to do, nothing to do, interrupted), then
               the whole flow.
             - Stage 4, Tuning: faster, once it is right.
-            - Stage 5, Upkeep: a marker or an entrance stops being found.
+            - Stage 5, Upkeep: a marker or an entrance stops being found; edit_map moves the map with the game.
 
             The bot's shape
             - One activity per chore (collect the loot, claim the quests, fight the boss). add_activity adds
