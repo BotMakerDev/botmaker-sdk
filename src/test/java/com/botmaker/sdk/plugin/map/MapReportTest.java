@@ -68,7 +68,7 @@ class MapReportTest {
         List<String> problems = MapReport.problems(map(), NAMED::contains, id -> !id.equals("market_title"), null);
         assertEquals(List.of(
                 "Home: click event comes and goes and was never seen, and no method says when it is there "
-                        + "(crop_picture's when).",
+                        + "(a crop_pictures box's when).",
                 "Market: the picture market_title has no file.",
                 "Reward: the picture claim_inline is written inline in Screens.java, not as one of the bot's Pictures."),
                 problems);

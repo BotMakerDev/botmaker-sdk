@@ -45,12 +45,12 @@ public final class SdkAssist {
             - Stage 0, Setup: the game in view, a home method and a popups method.
             - Stage 1, Discovery: every screen the same way, from home: cut its marker and every input on it,
               try each (every list scrolled to both ends), and finish a screen an input opens before the next
-              input. crop_picture and try_input write the map, the bot's Screens class; go_to_screen walks it;
+              input. crop_pictures and try_input write the map, the bot's Screens class; go_to_screen walks it;
               read_map reads it as the user's 🗺 Screens window shows it, and what it cannot do. A button that
-              changes its look is one input (crop_picture variantOf + state); the same screen dressed otherwise
+              changes its look is one input (a box's variantOf + state); the same screen dressed otherwise
               (an event's theme) is one of its looks (screenLook), never a screen of its own; a list whose
               entries change by day is one screen whose entries come and go. When a method of the bot can say
-              when one is there, name it as crop_picture's when (Firestone::eventOn). What try_input recorded
+              when one is there, name it as a box's when (Firestone::eventOn). What try_input recorded
               wrong (a panel taken for a way back, a result, a way in) is fixed with edit_map: trying the
               input again does not undo it.
             - Stage 2, Build: one chore at a time, through the game's own shortcuts, each step proved by a
@@ -78,7 +78,7 @@ public final class SdkAssist {
             - Pictures, points and regions are the bot's constants (Pictures.CLAIM_RESEARCH): one per idea and
               place, named <idea>_<where>; the same idea on another screen is another picture. Tag each
               picture with the activity that uses it, or a custom tag (declare_tag) for home and popups:
-              crop_picture takes tags, list_tags shows them.
+              crop_pictures takes tags, list_tags shows them.
             - A run's choices (which flow, which activity is on) are @Param fields, never run properties.
             """;
 

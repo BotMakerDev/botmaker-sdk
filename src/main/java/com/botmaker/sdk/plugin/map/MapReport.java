@@ -200,7 +200,7 @@ public final class MapReport {
             for (Input input : graph.unseen(c)) {
                 if (input.when() != null) continue;    // its method says when to look
                 problems.add(name + ": " + input.label() + " comes and goes and was never seen, and no method says "
-                        + "when it is there (crop_picture's when).");
+                        + "when it is there (a crop_pictures box's when).");
             }
             Set<String> told = new HashSet<>();
             for (String id : graph.pictures(c)) {

@@ -44,7 +44,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -72,68 +71,77 @@ final class PictureTools {
             Pattern.compile("\\p{javaJavaIdentifierStart}[\\p{javaJavaIdentifierPart}.]*::\\p{javaJavaIdentifierStart}"
                     + "\\p{javaJavaIdentifierPart}*");
 
-    record Crop(@Describe("the picture's name, lowercase with underscores: collect_button") String name,
-                @Describe("left edge, in the screenshot's pixels") int x,
-                @Describe("top edge, in the screenshot's pixels") int y,
-                @Describe("width in pixels") int width,
-                @Describe("height in pixels") int height,
-                @Describe(value = "tags to file it under, each declared (list_tags)", optional = true)
-                List<String> tags,
-                @Describe(value = IGNORE, optional = true) Integer ignoreX,
-                @Describe(value = "top edge of the part to skip", optional = true) Integer ignoreY,
-                @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
-                @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight,
-                @Describe(value = "the screen it is on, as the bot's Screens names it: noted there as an input, "
-                        + "untried until try_input tries it; 🖼 Manage Pictures groups it under that screen",
-                        optional = true)
-                String screen,
-                @Describe(value = "true when it is that screen's marker, a part no other screen shows: pays the "
-                        + "marker try_input left owed, or starts the map's first screen", optional = true)
-                Boolean marker,
-                @Describe(value = "true when it is that screen's close button, its way back", optional = true)
-                Boolean back,
-                @Describe(value = "true when the input shows only at times (a Claim when loot is ready, an event's "
-                        + "icon): it holds the screen back only while it shows", optional = true) Boolean sometimes,
-                @Describe(value = "true, with marker, when the screen is a popup the game opens on its own (a "
-                        + "reward, an offer): it starts it apart from the map's tree", optional = true)
-                Boolean popup,
-                @Describe(value = "the input this is another look of, by its picture: the same button with a badge, "
-                        + "greyed out or picked. It stays one input; with state", optional = true)
-                String variantOf,
-                @Describe(value = "with variantOf, what the look means: badge, disabled (never pressed) or selected",
-                        optional = true)
-                String state,
-                @Describe(value = "for an input that comes and goes, the bot's or a plugin's method saying when it is "
-                        + "there, as a method reference: Firestone::eventOn; with screenLook and marker, when that look "
-                        + "shows. It must exist; add_method makes one", optional = true)
-                String when,
-                @Describe(value = "the look of the screen this belongs to, in plain words (Halloween): the same screen, "
-                        + "reached and left the same way, dressed otherwise. With marker, what tells that look apart; "
-                        + "else an input only that look has", optional = true)
-                String screenLook) {
+    /** One picture cut: a box of crop_pictures with the call's tags and screen. */
+    private record Crop(String name, int x, int y, int width, int height, List<String> tags, Skip ignore,
+                        String screen, Boolean marker, Boolean back, Boolean sometimes, Boolean popup,
+                        String variantOf, State state, String when, String screenLook) {
 
-        /** The part to skip, when all four of its edges are given. */
-        Optional<Rect> ignore() {
-            return PictureTools.ignore(ignoreX, ignoreY, ignoreWidth, ignoreHeight);
+        static Crop of(Box box, List<String> tags, String screen) {
+            return new Crop(box.name(), box.x(), box.y(), box.width(), box.height(), tags, box.ignore(), screen,
+                    box.marker(), box.back(), box.sometimes(), box.popup(), box.variantOf(), box.state(), box.when(),
+                    box.screenLook());
+        }
+
+        /** Whether it is noted on its screen by itself, as its own call would: a marker, a popup, a look or a when. */
+        boolean alone() {
+            return Boolean.TRUE.equals(marker) || Boolean.TRUE.equals(popup) || variantOf != null || when != null
+                    || screenLook != null;
+        }
+
+        /** This cut, noted on no screen: crop_pictures notes such boxes together. */
+        Crop unplaced() {
+            return new Crop(name, x, y, width, height, tags, ignore, null, null, null, null, null, null, null, null,
+                    null);
         }
     }
 
-    record Crops(@Describe("one line per picture, in the last screenshot's pixels: \"name x y width height\", then "
-                         + "optionally \"ignore x y width height\" for a part matching skips") List<String> boxes,
+    /** A part of a box that matching skips. */
+    record Skip(@Describe("left edge, in the screenshot's pixels") int x,
+                @Describe("top edge, in the screenshot's pixels") int y,
+                @Describe("width in pixels") int width,
+                @Describe("height in pixels") int height) {
+    }
+
+    record Box(@Describe("the picture's name, lowercase with underscores: collect_button") String name,
+               @Describe("left edge, in the screenshot's pixels") int x,
+               @Describe("top edge, in the screenshot's pixels") int y,
+               @Describe("width in pixels") int width,
+               @Describe("height in pixels") int height,
+               @Describe(value = IGNORE, optional = true) Skip ignore,
+               @Describe(value = "true when it is the screen's marker, a part no other screen shows: pays the "
+                       + "marker try_input left owed, or starts the map's first screen", optional = true)
+               Boolean marker,
+               @Describe(value = "true when it is the screen's close button, its way back", optional = true)
+               Boolean back,
+               @Describe(value = "true when the input shows only at times (a Claim when loot is ready, an event's "
+                       + "icon): it holds the screen back only while it shows", optional = true) Boolean sometimes,
+               @Describe(value = "true, with marker, when the screen is a popup the game opens on its own (a "
+                       + "reward, an offer): it starts it apart from the map's tree", optional = true)
+               Boolean popup,
+               @Describe(value = "the input this is another look of, by its picture: the same button with a badge, "
+                       + "greyed out or picked. It stays one input; with state", optional = true)
+               String variantOf,
+               @Describe(value = "with variantOf, what the look means: badge, disabled (never pressed) or selected",
+                       optional = true)
+               State state,
+               @Describe(value = "for an input that comes and goes, the bot's or a plugin's method saying when it is "
+                       + "there, as a method reference: Firestone::eventOn; with screenLook and marker, when that look "
+                       + "shows. It must exist; add_method makes one", optional = true)
+               String when,
+               @Describe(value = "the look of the screen this belongs to, in plain words (Halloween): the same screen, "
+                       + "reached and left the same way, dressed otherwise. With marker, what tells that look apart; "
+                       + "else an input only that look has", optional = true)
+               String screenLook) {
+    }
+
+    record Crops(@Describe("the boxes to cut, in the last screenshot's pixels; one picture is a list of one")
+                 List<Box> boxes,
                  @Describe(value = "the screen they are on, as the bot's Screens names it: each noted there as an input, "
                          + "untried until try_input tries it; 🖼 Manage Pictures groups them under that screen",
                          optional = true)
                  String screen,
-                 @Describe(value = "the name of the one box that is that screen's marker", optional = true)
-                 String marker,
                  @Describe(value = "tags to file every one under, each declared (list_tags)", optional = true)
-                 List<String> tags,
-                 @Describe(value = "the name of the one box that is that screen's close button, its way back",
-                         optional = true)
-                 String back,
-                 @Describe(value = "the names of the boxes that show only at times on that screen (a Claim when "
-                         + "loot is ready): each held back only while it shows", optional = true)
-                 List<String> sometimes) {
+                 List<String> tags) {
     }
 
     record PictureName(@Describe("a picture's name, as list_pictures gives it") String picture) {
@@ -153,7 +161,7 @@ final class PictureTools {
                    @Describe("top edge") int y,
                    @Describe("width in pixels") int width,
                    @Describe("height in pixels") int height,
-                   @Describe(value = IGNORE, optional = true) Integer ignoreX,
+                   @Describe(value = IGNORE_X, optional = true) Integer ignoreX,
                    @Describe(value = "top edge of the part to skip", optional = true) Integer ignoreY,
                    @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
                    @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight) {
@@ -164,8 +172,11 @@ final class PictureTools {
         }
     }
 
-    private static final String IGNORE = "left edge of a part inside the box a run skips (a timer's digits, a count "
-            + "that differs from copy to copy), in the screenshot's pixels; with ignoreY, ignoreWidth and ignoreHeight";
+    private static final String IGNORE = "a part inside the box a run skips (a timer's digits, a count that "
+            + "differs from copy to copy)";
+    private static final String IGNORE_X = "left edge of a part inside the box a run skips (a timer's digits, a "
+            + "count that differs from copy to copy), in the screenshot's pixels; with ignoreY, ignoreWidth and "
+            + "ignoreHeight";
 
     private static Optional<Rect> ignore(Integer x, Integer y, Integer width, Integer height) {
         if (x == null || y == null || width == null || height == null) return Optional.empty();
@@ -197,14 +208,11 @@ final class PictureTools {
             AssistantTool.named("list_pictures")
                     .describedAs("The pictures the bot can look for, each with the Pictures constant a block uses")
                     .takesNothing().handledBy(PictureTools::listPictures),
-            AssistantTool.named("crop_picture")
-                    .describedAs("Cuts a box out of the last screenshot you took and saves it as a picture the "
-                            + "bot can find and click, declared as a Pictures constant; a part given to ignore "
-                            + "is left out of matching, so copies that differ only there all match")
-                    .takes(Crop.class).handledBy(PictureTools::cropPicture),
             AssistantTool.named("crop_pictures")
-                    .describedAs("crop_picture for several boxes of the last screenshot in one call: every input "
-                            + "of a screen at once, its marker among them")
+                    .describedAs("Cuts boxes out of the last screenshot you took and saves each as a picture the "
+                            + "bot can find and click, declared as a Pictures constant: every input of a screen at "
+                            + "once, its marker among them. A part given to ignore is left out of matching, so "
+                            + "copies that differ only there all match")
                     .takes(Crops.class).handledBy(PictureTools::cropPictures),
             AssistantTool.named("show_picture")
                     .describedAs("A picture's image, its size, its constant and how many places use it")
@@ -221,7 +229,7 @@ final class PictureTools {
                     .takes(Delete.class).handledBy(PictureTools::deletePicture),
             AssistantTool.named("replace_picture")
                     .describedAs("Gives a picture a new image cut from the last screenshot, keeping its name and "
-                            + "every use; a part given to ignore is left out of matching, as crop_picture's")
+                            + "every use; a part given to ignore is left out of matching, as crop_pictures'")
                     .takes(Replace.class).handledBy(PictureTools::replacePicture),
             AssistantTool.named("save_region")
                     .describedAs("Names an area of the game as a Zones constant, in the bot's pixels, for a block to "
@@ -251,61 +259,36 @@ final class PictureTools {
                     + TemplateNames.CLASS_NAME + "." + constant) + (tags.isEmpty() ? "" : " [" + String.join(", ", tags)
                     + "]"));
         }
-        return AgentReply.text(lines.isEmpty() ? "No pictures yet; crop_picture makes one." : String.join("\n", lines));
+        return AgentReply.text(lines.isEmpty() ? "No pictures yet; crop_pictures makes one." : String.join("\n", lines));
     }
 
     /**
-     * Each box as crop_picture cuts it, all from the same screenshot. Every line is read before any is cut, so a
-     * line that does not read saves nothing; a box crop_picture refuses is said and the rest are cut.
+     * Each box cut, all from the same screenshot. One box is cut as a call of its own; of several, a box crop_pictures
+     * refuses is said and the rest are cut, and the plain inputs and the way back are noted on the screen together.
      */
     static AgentReply cropPictures(Crops crops, AgentContext context) {
-        List<String> lines = crops.boxes() == null ? List.of() : crops.boxes().stream().filter(l -> !l.isBlank())
-                .toList();
-        if (lines.isEmpty()) return AgentReply.refused("Give one line per picture: name x y width height.");
-        List<Crop> cuts = new ArrayList<>();
-        for (String line : lines) {
-            Optional<Crop> crop = box(line, crops);
-            if (crop.isEmpty()) {
-                return AgentReply.refused("\"" + line + "\" does not read as name x y width height [ignore x y "
-                        + "width height]. Nothing was saved.");
-            }
-            cuts.add(crop.get());
-        }
-        String marker = crops.marker() == null || crops.marker().isBlank() ? null : crops.marker().strip();
-        if (marker != null && cuts.stream().noneMatch(c -> c.name().equals(marker))) {
-            return AgentReply.refused("No box is called " + marker + ", the marker named. Nothing was saved.");
-        }
-        String back = crops.back() == null || crops.back().isBlank() ? null : crops.back().strip();
-        if (back != null && (back.equals(marker) || cuts.stream().noneMatch(c -> c.name().equals(back)))) {
-            return AgentReply.refused("No box other than the marker is called " + back + ", the way back named. "
-                    + "Nothing was saved.");
-        }
-        String screen = crops.screen() == null || crops.screen().isBlank() ? null : crops.screen().strip();
-        if (back != null && screen == null) return AgentReply.refused("A way back is a screen's: give screen too.");
-        List<String> comes = crops.sometimes() == null ? List.of() : crops.sometimes().stream()
-                .filter(s -> s != null && !s.isBlank()).map(String::strip).toList();
-        Optional<String> stray = comes.stream().filter(s -> s.equals(marker) || s.equals(back)
-                || cuts.stream().noneMatch(c -> c.name().equals(s))).findFirst();
-        if (stray.isPresent()) {
-            return AgentReply.refused("No box other than the marker and the way back is called " + stray.get()
-                    + ", named in sometimes. Nothing was saved.");
-        }
-        if (!comes.isEmpty() && screen == null) {
-            return AgentReply.refused("An input that comes and goes is a screen's: give screen too.");
-        }
-        AgentReply all = null;
-        // The marker first: it may start the screen the other boxes are noted on.
-        cuts.sort(Comparator.comparing((Crop c) -> !Boolean.TRUE.equals(c.marker())));
+        List<Box> boxes = crops.boxes() == null ? List.of() : crops.boxes();
+        if (boxes.isEmpty()) return AgentReply.refused("Give the boxes to cut: name, x, y, width and height each.");
+        String screen = blankless(crops.screen());
+        List<Crop> cuts = new ArrayList<>(boxes.stream().map(b -> Crop.of(b, crops.tags(), screen)).toList());
+        if (cuts.size() == 1) return cropPicture(cuts.getFirst(), context);
+        Optional<String> wrong = refusal(cuts, screen);
+        if (wrong.isPresent()) return AgentReply.refused(wrong.get() + " Nothing was saved.");
         // One watch of the screen for every box: each box watched alone took a second (2026-10-14).
         Supplier<List<BufferedImage>> live = liveLooks(context);
-        // The others noted on the screen together after they are cut: a write of it per box was 0.5 s each.
+        // The markers first: one may start the screen the other boxes are noted on.
+        AgentReply all = null;
+        for (Crop crop : cuts) {
+            if (crop.alone() && Boolean.TRUE.equals(crop.marker())) all = joined(all, crop, cropPicture(crop, context, live));
+        }
+        // The plain inputs and the way back noted on the screen together: a write of it per box was 0.5 s each.
         MapTools.Placing at = null;
         List<String> inputs = new ArrayList<>();
         List<String> sometimes = new ArrayList<>();
         String backCut = null;
         for (Crop crop : cuts) {
-            boolean isMarker = Boolean.TRUE.equals(crop.marker());
-            if (!isMarker && screen != null && at == null) {
+            if (crop.alone()) continue;
+            if (screen != null && at == null) {
                 if (context.services().projectDir() == null) return AgentReply.refused(Frames.noProject());
                 try {
                     at = MapTools.placing(context.services(), screen, false, false);
@@ -314,30 +297,65 @@ final class PictureTools {
                 }
                 if (at.refusal() != null) return or(all, at.refusal());
             }
-            AgentReply one = cropPicture(isMarker ? crop : unplaced(crop), context, live);
-            if (one.isRefused()) {
-                one = AgentReply.text("Not saved, " + crop.name() + ": " + one.parts().getFirst().text());
-            } else if (!isMarker && at != null) {
+            AgentReply one = cropPicture(crop.unplaced(), context, live);
+            if (!one.isRefused() && at != null) {
                 String name = TemplateLibrary.sanitizeName(crop.name());
-                if (crop.name().equals(back)) backCut = name;
-                else if (comes.contains(crop.name())) sometimes.add(name);
+                if (Boolean.TRUE.equals(crop.back())) backCut = name;
+                else if (Boolean.TRUE.equals(crop.sometimes())) sometimes.add(name);
                 else inputs.add(name);
             }
-            all = all == null ? one : all.and(one);
+            all = joined(all, crop, one);
         }
-        if (at == null) return all;
-        List<String> noted = new ArrayList<>();
-        Optional<String> failed = MapTools.noteAll(context.services(), at, backCut, inputs, sometimes, noted);
-        String name = at.name();
-        return all.and(AgentReply.text(failed.map(why -> "\nNot noted in " + name + ": " + why)
-                .orElse(MapTools.noted(name, noted, !inputs.isEmpty() || !sometimes.isEmpty()))));
+        if (at != null) {
+            List<String> noted = new ArrayList<>();
+            Optional<String> failed = MapTools.noteAll(context.services(), at, backCut, inputs, sometimes, noted);
+            String name = at.name();
+            all = all.and(AgentReply.text(failed.map(why -> "\nNot noted in " + name + ": " + why)
+                    .orElse(MapTools.noted(name, noted, !inputs.isEmpty() || !sometimes.isEmpty()))));
+        }
+        // Then another look of an input, or one with a when: what it belongs to is noted by now.
+        for (Crop crop : cuts) {
+            if (crop.alone() && !Boolean.TRUE.equals(crop.marker())) all = joined(all, crop, cropPicture(crop, context, live));
+        }
+        return all;
     }
 
-    /** {@code crop} cut without noting it on its screen: crop_pictures notes the boxes together. */
-    private static Crop unplaced(Crop crop) {
-        return new Crop(crop.name(), crop.x(), crop.y(), crop.width(), crop.height(), crop.tags(), crop.ignoreX(),
-                crop.ignoreY(), crop.ignoreWidth(), crop.ignoreHeight(), null, null, null, null, null, null, null,
-                null, null);
+    /** {@code one}, the reply to {@code crop}, after {@code all}; a refusal is said, and the rest goes on. */
+    private static AgentReply joined(AgentReply all, Crop crop, AgentReply one) {
+        AgentReply said = one.isRefused()
+                ? AgentReply.text("Not saved, " + crop.name() + ": " + one.parts().getFirst().text()) : one;
+        return all == null ? said : all.and(said);
+    }
+
+    /** Why several boxes cannot be cut together, checked before any is cut; empty when they can. */
+    private static Optional<String> refusal(List<Crop> cuts, String screen) {
+        if (cuts.stream().filter(c -> Boolean.TRUE.equals(c.marker()) && c.screenLook() == null).count() > 1) {
+            return Optional.of("One box is the screen's marker, not several.");
+        }
+        if (cuts.stream().filter(c -> Boolean.TRUE.equals(c.back())).count() > 1) {
+            return Optional.of("One box is the screen's way back, not several.");
+        }
+        for (Crop c : cuts) {
+            boolean marker = Boolean.TRUE.equals(c.marker());
+            boolean back = Boolean.TRUE.equals(c.back());
+            boolean sometimes = Boolean.TRUE.equals(c.sometimes()) || c.when() != null && !(marker
+                    && c.screenLook() != null);
+            boolean popup = Boolean.TRUE.equals(c.popup());
+            if (screen == null && (marker || back || sometimes || popup || c.variantOf() != null
+                    || c.screenLook() != null)) {
+                return Optional.of(c.name() + ": a marker, a way back, an input that comes and goes, another look of "
+                        + "an input and a popup are a screen's: give screen too.");
+            }
+            if (Stream.of(marker, back, sometimes, c.variantOf() != null).filter(b -> b).count() > 1
+                    || popup && !marker) {
+                return Optional.of(c.name() + ": a cut is one of a marker, a way back, an input or another look of "
+                        + "one; popup goes with marker.");
+            }
+            if (c.variantOf() != null && (c.state() == null || c.state() == State.NORMAL)) {
+                return Optional.of(c.name() + ": say what the look means, state: badge, disabled or selected.");
+            }
+        }
+        return Optional.empty();
     }
 
     /** {@code why} refused when nothing was cut yet; else what was, and why the rest was not. */
@@ -347,35 +365,18 @@ final class PictureTools {
                 : cut.and(AgentReply.text("\nNothing else was saved: " + plain));
     }
 
-    /** One crop_pictures line as crop_picture's box, its screen, tags and marker from the call. */
-    static Optional<Crop> box(String line, Crops crops) {
-        String[] words = line.strip().split("[\\s,]+");
-        if (words.length != 5 && !(words.length == 10 && words[5].equalsIgnoreCase("ignore"))) return Optional.empty();
-        try {
-            int[] at = new int[words.length == 10 ? 8 : 4];
-            for (int i = 0; i < at.length; i++) at[i] = Integer.parseInt(words[i < 4 ? i + 1 : i + 2]);
-            boolean ignoring = at.length == 8;
-            String name = words[0];
-            return Optional.of(new Crop(name, at[0], at[1], at[2], at[3], crops.tags(),
-                    ignoring ? at[4] : null, ignoring ? at[5] : null, ignoring ? at[6] : null, ignoring ? at[7] : null,
-                    crops.screen(), crops.marker() != null && crops.marker().strip().equals(name) ? true : null,
-                    null, null, null, null, null, null, null));
-        } catch (NumberFormatException e) {
-            return Optional.empty();
-        }
-    }
-
-    static AgentReply cropPicture(Crop crop, AgentContext context) {
+    private static AgentReply cropPicture(Crop crop, AgentContext context) {
         return cropPicture(crop, context, liveLooks(context));
     }
 
-    /** crop_picture, the box checked still on {@code live}, the screen watched once for every box of a call. */
+    /** One box cut, checked still on {@code live}, the screen watched once for every box of a call. */
     private static AgentReply cropPicture(Crop crop, AgentContext context, Supplier<List<BufferedImage>> live) {
         Optional<BufferedImage> frame = Frames.shown();
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
         Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), null,
                 new Area(crop.x(), crop.y(), crop.width(), crop.height()))
-                .map(piece -> crop.ignore().map(part -> PictureCuts.masked(piece, part)).orElse(piece));
+                .map(piece -> crop.ignore() == null ? piece : PictureCuts.masked(piece, new Rect(crop.ignore().x(),
+                        crop.ignore().y(), crop.ignore().width(), crop.ignore().height())));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
         List<String> typed = crop.tags() == null ? List.of() : crop.tags();
@@ -403,7 +404,7 @@ final class PictureTools {
         }
         // What says when an input is there says it comes and goes; with a screen look's marker, when the look shows.
         sometimes = sometimes || when != null && !(screenLook != null && marker);
-        Optional<State> state = Optional.ofNullable(blankless(crop.state())).flatMap(PictureTools::stateNamed);
+        Optional<State> state = Optional.ofNullable(crop.state());
         if ((marker || back || sometimes || popup || variantOf != null || screenLook != null) && screen == null) {
             return AgentReply.refused("A marker, a way back, an input that comes and goes, another look of an input "
                     + "and a popup are a screen's: give screen too.");
@@ -456,12 +457,6 @@ final class PictureTools {
 
     private static String blankless(String text) {
         return text == null || text.isBlank() ? null : text.strip();
-    }
-
-    /** The look {@code typed} names, by its constant's name in any case: badge, disabled, selected. */
-    static Optional<State> stateNamed(String typed) {
-        for (State state : State.values()) if (state.id().equalsIgnoreCase(typed.strip())) return Optional.of(state);
-        return Optional.empty();
     }
 
     /** How far from its own box a match still counts as the cut itself, in pixels. */

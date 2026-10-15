@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -39,13 +40,11 @@ public final class ScreenDesk {
      * waits for it. Acting on the user's own desktop is allowed, since they pressed ▶ Try.
      */
     public static String tryInput(AgentContext context, String constant, Input input, String opens) {
-        MapTools.Try asked = new MapTools.Try(constant,
+        MapTools.Try asked = new MapTools.Try(constant, List.of(new MapTools.Step(
                 input.picture() == null ? null : input.picture().id(),
                 input.act() == Input.Act.SCROLL ? input.notches() : null,
                 input.key() == null ? null : input.key().label(),
-                opens, null, null,
-                input.kind() == null ? null : input.kind().name().toLowerCase(Locale.ROOT),
-                null, true, true);
+                opens, null, null, input.kind())), null, true, true);
         return text(MapTools.tryInput(asked, context));
     }
 

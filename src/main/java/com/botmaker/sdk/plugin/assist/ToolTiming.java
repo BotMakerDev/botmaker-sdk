@@ -1,7 +1,9 @@
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
+import com.botmaker.plugin.api.assist.Key;
 import com.botmaker.sdk.internal.trace.MissFrames;
 
 import java.io.IOException;
@@ -14,6 +16,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -69,11 +72,27 @@ final class ToolTiming {
 
     private ToolTiming() {}
 
-    /** {@code tool}, its reply ending with how long it took, and the call a row of the project's {@link #FILE}. */
+    /**
+     * {@code tool}, its reply ending with how long it took, and the call a row of the project's {@link #FILE}. An
+     * action tool cannot be declared again from its record, so it is returned as it is: {@link #actions} times it
+     * where it is declared.
+     */
     static <P extends Record> AssistantTool<P> timed(AssistantTool<P> tool) {
+        if (tool.paramsType() == AssistantTool.OneOf.class) return tool;
         return AssistantTool.named(tool.name()).describedAs(tool.description()).takes(tool.paramsType())
-                .handledBy((params, context) -> time(tool.name(), context == null || context.services() == null
-                        ? null : context.services().projectDir(), () -> tool.invoke(arguments(params), context)));
+                .handledBy((params, context) -> time(tool.name(), projectOf(context),
+                        () -> tool.invoke(arguments(params), context)));
+    }
+
+    /** An action tool ({@link AssistantTool.Taking#takesOneOf}), each call timed as {@link #timed} times one. */
+    static <S> AssistantTool<AssistantTool.OneOf<S>> actions(String name, String description, Class<S> actions,
+                                                            AssistantTool.ActionHandler<S> handler) {
+        return AssistantTool.named(name).describedAs(description).takesOneOf(actions).handledBy(
+                (action, context) -> time(name, projectOf(context), () -> handler.handle(action, context)));
+    }
+
+    private static Path projectOf(AgentContext context) {
+        return context == null || context.services() == null ? null : context.services().projectDir();
     }
 
     /** Runs {@code call} and adds the line saying how long it took and on what. */
@@ -165,7 +184,8 @@ final class ToolTiming {
 
     /**
      * {@code params} as the arguments that build it again: what the timed tool hands the tool it wraps, whose
-     * handler takes only what {@link AssistantTool#invoke} builds. A choice goes back as its constant's name.
+     * handler takes only what {@link AssistantTool#invoke} builds. A choice goes back as its constant's name, a
+     * nested record as its own arguments, a list element by element.
      */
     static Map<String, Object> arguments(Record params) {
         Map<String, Object> arguments = new LinkedHashMap<>();
@@ -179,8 +199,16 @@ final class ToolTiming {
                 throw new IllegalStateException("Cannot read " + component.getName(), e);
             }
             if (value == null) continue;
-            arguments.put(component.getName(), value instanceof Enum<?> choice ? choice.name() : value);
+            Key sentAs = component.getAnnotation(Key.class);
+            arguments.put(sentAs == null ? component.getName() : sentAs.value(), argument(value));
         }
         return arguments;
+    }
+
+    private static Object argument(Object value) {
+        if (value instanceof Enum<?> choice) return choice.name();
+        if (value instanceof Record nested) return arguments(nested);
+        if (value instanceof List<?> list) return list.stream().map(ToolTiming::argument).toList();
+        return value;
     }
 }

@@ -32,12 +32,21 @@ final class NotesTools {
             + "notes and every screen's", optional = true) String screen) {
     }
 
+    /** How far a screen got, as write_notes takes it: a {@link Reached}, or none for not surveyed. */
+    enum Reach {
+        SURVEYED, BUILT, TRIED, TUNED, LOCKED, NONE;
+
+        /** The stage it names; null for none. */
+        Reached reached() {
+            return this == NONE ? null : Reached.valueOf(name());
+        }
+    }
+
     record Note(@Describe(value = "the screen they are about, as the map names it; empty for what holds across the "
             + "game (hotkeys, currencies, what never to press)", optional = true) String screen,
                 @Describe(value = "the whole new notes, plain lines, one fact each; replaces what was there; empty "
                         + "removes them; left out keeps them", optional = true) String text,
-                @Describe(value = "how far the screen got: surveyed, built, tried, tuned, locked; none for not "
-                        + "surveyed", optional = true) String reached,
+                @Describe(value = "how far the screen got; none for not surveyed", optional = true) Reach reached,
                 @Describe(value = "what the screen still owes, one thing each (marker — every icon here animates); "
                         + "replaces the list; empty clears it", optional = true) List<String> owes) {
     }
@@ -104,11 +113,6 @@ final class NotesTools {
         if (note.text() == null && note.reached() == null && note.owes() == null) {
             return AgentReply.refused("Give text, reached or owes: nothing was written.");
         }
-        Optional<Reached> reached = Protocol.reached(note.reached());
-        if (note.reached() != null && reached.isEmpty() && !note.reached().strip().equalsIgnoreCase("none")) {
-            return AgentReply.refused("reached is one of surveyed, built, tried, tuned, locked, or none. Nothing was "
-                    + "written.");
-        }
         try {
             if (note.screen() == null || note.screen().isBlank()) {
                 if (note.reached() != null || note.owes() != null) {
@@ -129,7 +133,7 @@ final class NotesTools {
             Optional<String> failed = FxCall.call(() -> ScreenBook.update(services, constant.get(), s -> {
                 GameScreen now = s;
                 if (note.text() != null) now = now.notes(note.text().strip());
-                if (note.reached() != null) now = now.reached(reached.orElse(null));
+                if (note.reached() != null) now = now.reached(note.reached().reached());
                 if (note.owes() != null) now = now.owes(note.owes().stream().map(String::strip)
                         .filter(w -> !w.isEmpty()).toList());
                 return now;

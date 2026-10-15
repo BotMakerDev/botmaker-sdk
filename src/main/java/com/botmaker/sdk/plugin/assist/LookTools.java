@@ -243,7 +243,7 @@ final class LookTools {
         // Near each picture's place by default: 170 full-frame matches took 27 s on Firestone (2026-10-15).
         List<Scored> scored = Boolean.TRUE.equals(shown.everywhere()) ? scores(resources.get(), frame.get(),
                 cuts(context)) : scoresNear(resources.get(), frame.get(), cuts(context));
-        if (scored.isEmpty()) return AgentReply.text(onMap + "No picture matched at all; crop_picture makes one.");
+        if (scored.isEmpty()) return AgentReply.text(onMap + "No picture matched at all; crop_pictures makes one.");
         double needs = Frames.confidence(context.services());
         List<String> lines = new ArrayList<>();
         List<Rect> found = new ArrayList<>();

@@ -21,6 +21,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The assistant's tools take real types**, so a wrong value is refused before the tool runs, naming the right
+  ones:
+  - `crop_pictures` cuts one picture or many: each box is an object (`name`, `x`, `y`, `width`, `height`, an
+    `ignore` part, and `marker`, `back`, `sometimes`, `popup`, `variantOf` with `state`, `when`, `screenLook`), in
+    place of `"name x y w h"` lines. `crop_picture` is gone; one picture is a list of one.
+  - `try_input` tries one input or several: `inputs` is a list, each a picture (with `scroll`) or a key and its
+    `opens`, `never`, `locked` and `kind`. Several stop at the first that leaves the screen, as `try_inputs` did;
+    `try_inputs` is gone.
+  - `edit_map` takes one action and only that action's fields; `did` and `kind` are choices.
+  - `kind`, a look's `state` and `write_notes`' `reached` are choices too.
+
 - **edit_map: the assistant fixes the map by hand**, as 🗺 Screens' menus do and by the same code, clicking
   nothing. One tool, an action per edit: `rename`, `delete`, `popup`, `set_input` (its result, kind, never, lock,
   coming and going), `reset_input`, `remove_input`, `use_as_back`, `remove_back`, `remove_way`, `way_when`,

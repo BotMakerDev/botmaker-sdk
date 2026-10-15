@@ -41,24 +41,24 @@ final class Protocol {
                 """),
         DISCOVERY("Stage 1, Discovery: know the game before writing any body", """
                 - Every screen is explored the same way, Home first. The map is the bot's Screens class, one
-                  constant per screen, written by crop_picture with a screen and by try_input; write_notes keeps
+                  constant per screen, written by crop_pictures with a screen and by try_input; write_notes keeps
                   what a screen taught on its constant, and what holds across the game on the run. The chores are
                   chosen after Discovery, from what each screen holds.
-                  1. Cut the whole screen: one screenshot, then crop_picture with that screen every input on it,
+                  1. Cut the whole screen: one screenshot, then crop_pictures with that screen every input on it,
                      each untried until tried: every button, icon, tab, toggle, arrow, "+" of a counter and list
                      item, and every list or panel that scrolls (cut a still part of it). An icon with no
                      picture is one the bot cannot take. The first screen starts the map: its marker cut with
                      screen Home and marker true. Its close button: back true. An input that shows only at
                      times (a Claim when loot is ready, an event's icon): sometimes true. A popup the game opens
                      on its own: its marker with popup true, then its close button with back true.
-                  2. try_input each one, by its picture or its hotkey (try_inputs clicks a screen's plain
-                     buttons in one call, stopping at the first that leaves it); try_input with scroll every list and
+                  2. try_input each one, by its picture or its hotkey (several in one call, stopping at the first
+                     that leaves the screen); try_input with scroll every list and
                      panel to its end both ways. Claim buttons and other free spends are clicked; an input that
                      spends premium currency or real money is tried with never and its reason, never clicked; one
                      proved locked (a padlock on it) with locked, the lock's picture. What a tab, toggle, arrow or
                      scroll brings into view is cut, and untried in turn.
                   3. An input that opens a screen (give opens the name it shows) adds it to the map, owing a
-                     marker, and the answer brings its screenshot: crop_picture its marker (marker true, a part
+                     marker, and the answer brings its screenshot: crop_pictures its marker (marker true, a part
                      only that screen shows), then explore it by these same steps, to its end, before the next
                      input of the screen it was opened from. One that leads to a screen mapped already is a way
                      into it, or this screen's way back.
@@ -92,9 +92,9 @@ final class Protocol {
                 - Cut every button and marker a chore will need from that one screenshot, not one per trip. Cut
                   a button's image, not its label: a label's text changes with the game's language and shows
                   through to a moving background; leave out the corner a badge (a red count or bell) comes and
-                  goes on, and any part that moves (crop_picture refuses a box that changes within a second: cut
+                  goes on, and any part that moves (crop_pictures refuses a box that changes within a second: cut
                   a still part). Matching ignores colour: a lit button and its greyed-out twin both match
-                  (crop_picture says where else a cut is found), so cut the twin too.
+                  (crop_pictures says where else a cut is found), so cut the twin too.
                 - Done when every input on the screen is tried and has its kind, and no Appeared word is left
                   unexplained: write_notes the screen with what it taught and reached surveyed, or reached locked
                   for a feature this account has not opened (its lock picture and unlock condition in its notes).
@@ -194,13 +194,6 @@ final class Protocol {
         };
     }
 
-    /** The {@link Reached} {@code typed} names, in any case; {@code none} or blank is not surveyed (empty). */
-    static Optional<Reached> reached(String typed) {
-        String id = typed == null ? "" : typed.strip().toUpperCase(Locale.ROOT);
-        for (Reached reached : Reached.values()) if (reached.name().equals(id)) return Optional.of(reached);
-        return Optional.empty();
-    }
-
     /** Where the bot is: the stage to work in, why, and each screen the notes know with the stage it is at. */
     record Where(Stage stage, String why, Map<String, String> screens, List<String> owed) {
 
@@ -256,7 +249,7 @@ final class Protocol {
         List<String> owed = new ArrayList<>(graph.owed());
         if (graph.screens().isEmpty()) {
             return new Where(Stage.DISCOVERY, "the bot has no map of the game's screens yet (its Screens class): "
-                    + "crop_picture the first screen's marker with its screen and marker true to start it.", screens,
+                    + "crop_pictures the first screen's marker with its screen and marker true to start it.", screens,
                     owed);
         }
         if (!owed.isEmpty()) {

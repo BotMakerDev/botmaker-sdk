@@ -58,35 +58,51 @@ final class MapTools {
     /** The screen the game was last seen on, by go_to_screen or which_screen: a walk looks near it first. */
     private static volatile String lastSeen;
 
-    record Try(@Describe("the screen the input is on, as the map names it: Home, or its constant HOME") String screen,
-               @Describe(value = "a picture cut on that screen, clicked at its best match", optional = true)
-               String picture,
-               @Describe(value = "notches to scroll over the picture instead of clicking it, for a list or a panel "
-                       + "that scrolls: positive up or away, negative down or toward you", optional = true)
-               Integer scroll,
-               @Describe(value = "a hotkey instead of a picture, as printed on it: Q", optional = true) String key,
-               @Describe(value = "the name the screen it opens shows, when it opens one; left out, the picture's "
-                       + "name names it, and a hotkey's is tried again with it when it opened one", optional = true)
-               String opens,
-               @Describe(value = "why it is never clicked (it spends premium currency or real money): recorded "
-                       + "as tried, not clicked", optional = true) String never,
-               @Describe(value = "the picture proving it locked on this account (a padlock on it): recorded as "
-                       + "tried, not clicked", optional = true) String locked,
-               @Describe(value = "what it is for: chore, shortcut, choice or info", optional = true) String kind,
-               @Describe(value = "the longest the input is given to answer, in milliseconds; 5000 when left out",
+    /** One input try_input tries: a picture to click or scroll over, or a hotkey. */
+    record Step(@Describe(value = "a picture cut on that screen, clicked at its best match", optional = true)
+                String picture,
+                @Describe(value = "notches to scroll over the picture instead of clicking it, for a list or a panel "
+                        + "that scrolls: positive up or away, negative down or toward you", optional = true)
+                Integer scroll,
+                @Describe(value = "a hotkey instead of a picture, as printed on it: Q", optional = true) String key,
+                @Describe(value = "the name the screen it opens shows, when it opens one; left out, the picture's "
+                        + "name names it, and a hotkey's is tried again with it when it opened one", optional = true)
+                String opens,
+                @Describe(value = "why it is never clicked (it spends premium currency or real money): recorded "
+                        + "as tried, not clicked", optional = true) String never,
+                @Describe(value = "the picture proving it locked on this account (a padlock on it): recorded as "
+                        + "tried, not clicked", optional = true) String locked,
+                @Describe(value = "what it is for", optional = true) Kind kind) {
+    }
+
+    record Try(@Describe("the screen the inputs are on, as the map names it: Home, or its constant HOME") String screen,
+               @Describe("the inputs, tried in this order; the call stops at the first that leaves the screen (opens "
+                       + "one, leads to one mapped already, or shows a popup) or is refused. One input is a list of "
+                       + "one") List<Step> inputs,
+               @Describe(value = "the longest each is given to answer, in milliseconds; 5000 when left out",
                        optional = true) Integer settleMs,
                @Describe(value = STAY, optional = true) Boolean stay,
                @Describe(value = "true to act on the user's own desktop, taking their mouse; refused there "
                        + "otherwise", optional = true) Boolean desktop) {
     }
 
-    record Tries(@Describe("the screen the inputs are on, as the map names it: Home, or its constant HOME") String screen,
-                 @Describe("pictures cut on that screen, clicked in this order, each at its best match") List<String> pictures,
-                 @Describe(value = "the longest each is given to answer, in milliseconds; 5000 when left out",
-                         optional = true) Integer settleMs,
-                 @Describe(value = STAY, optional = true) Boolean stay,
-                 @Describe(value = "true to act on the user's own desktop, taking their mouse; refused there "
-                         + "otherwise", optional = true) Boolean desktop) {
+    /** One input of a try_input call, with the call's screen and settings: what {@link #tried} tries. */
+    private record One(String screen, String picture, Integer scroll, String key, String opens, String never,
+                       String locked, Kind kind, Integer settleMs, Boolean stay, Boolean desktop) {
+        static One of(Try call, Step step, Boolean stay) {
+            return new One(call.screen(), step.picture(), step.scroll(), step.key(), step.opens(), step.never(),
+                    step.locked(), step.kind(), call.settleMs(), stay, call.desktop());
+        }
+
+        /** The input that walks the game up from {@code call}'s screen once every input of it was tried. */
+        static One after(Try call) {
+            return new One(call.screen(), null, null, null, null, null, null, null, null, call.stay(), call.desktop());
+        }
+
+        String label() {
+            return picture != null && !picture.isBlank() ? picture.strip() + (scroll == null ? "" : " " + scroll)
+                    : key == null ? "?" : key.strip();
+        }
     }
 
     private static final String STAY = "true stays on the screen when this leaves it finished; left out, the game is "
@@ -121,28 +137,20 @@ final class MapTools {
                             + "Refused once anything is reached from it")
                     .takes(Mistake.class).handledBy(MapTools::notAScreen),
             AssistantTool.named("place_pictures")
-                    .describedAs("crop_picture's map half for pictures the bot has already: notes them on a screen "
+                    .describedAs("crop_pictures' map half for pictures the bot has already: notes them on a screen "
                             + "of the bot's Screens as its marker, its way back, or inputs untried until try_input "
-                            + "tries them, without cutting them again. A marker starts the screen as crop_picture's "
-                            + "does")
+                            + "tries them, without cutting them again. A marker starts the screen as a cut one does")
                     .takes(Places.class).handledBy(MapTools::placePictures),
             AssistantTool.named("try_input")
-                    .describedAs("Discovery's one way to act on a screen: clicks an input cut on it (scrolls over "
-                            + "it, or taps a hotkey) and records in the bot's Screens what that did: opened a screen "
+                    .describedAs("Discovery's one way to act on a screen: clicks inputs cut on it (scrolls over "
+                            + "one, or taps a hotkey) and records in the bot's Screens what each did: opened a screen "
                             + "(a new one, owing its marker, with its screenshot), led to one mapped already, changed "
-                            + "this one in place, or nothing. Every picture crop_picture cut with a screen is untried "
+                            + "this one in place, or nothing. Every picture crop_pictures cut with a screen is untried "
                             + "until this tries it. A screen opened is finished before the next input of the screen "
                             + "it was opened from: refused while a screen owes its marker, while a screen opened from "
                             + "this one has an input left to try, and while another branch begun is not finished. "
                             + "Once nothing on the screen is left to try, it goes back up by itself (stay keeps it)")
                     .takes(Try.class).handledBy(MapTools::tryInput),
-            AssistantTool.named("try_inputs")
-                    .describedAs("try_input for several pictures of one screen in one call, in order: each is "
-                            + "clicked and recorded as try_input does, and the call stops at the first that leaves "
-                            + "the screen (opens one, leads to one mapped already, or shows a popup) or is refused. "
-                            + "For the plain "
-                            + "buttons of a screen; scrolls, hotkeys, never and locked go through try_input")
-                    .takes(Tries.class).handledBy(MapTools::tryInputs),
             AssistantTool.named("go_to_screen")
                     .describedAs("Walks the game to a screen of the bot's Screens as a run does: finds where it is "
                             + "by the markers, then does each input on the way and waits for each screen; a popup "
@@ -151,7 +159,7 @@ final class MapTools {
 
     private MapTools() {}
 
-    /** What one try did: its reply, and whether the game is still on the screen tried, for try_inputs to go on. */
+    /** What one try did: its reply, and whether the game is still on the screen tried, for the next input. */
     private record Tried(AgentReply reply, boolean stays) {
         static Tried left(AgentReply reply) {
             return new Tried(reply, false);
@@ -162,49 +170,47 @@ final class MapTools {
         }
     }
 
-    /** try_input; Studio busy at any read or write of the bot (each on its thread) is said, never thrown. */
-    static AgentReply tryInput(Try input, AgentContext context) {
-        return attempt(input, context).reply();
+    /**
+     * try_input; Studio busy at any read or write of the bot (each on its thread) is said, never thrown. One input is
+     * tried as it is, walking up when it finished the screen; several each stay on the screen, until one is refused
+     * or leaves it (it opened a screen, led to one mapped already or showed a popup), then the walk up, once, when
+     * the screen is finished.
+     */
+    static AgentReply tryInput(Try call, AgentContext context) {
+        List<Step> steps = call.inputs() == null ? List.of() : call.inputs();
+        if (steps.isEmpty()) return AgentReply.refused("Give the inputs to try, in order. Nothing was done.");
+        if (steps.size() == 1) return attempt(One.of(call, steps.getFirst(), call.stay()), context).reply();
+        AgentReply all = null;
+        for (int i = 0; i < steps.size(); i++) {
+            One one = One.of(call, steps.get(i), true);
+            Tried tried = attempt(one, context);
+            if (tried.reply().isRefused()) {
+                if (all == null) return tried.reply();
+                return all.and(AgentReply.text("Stopped before " + one.label() + ": " + tried.reply().parts()
+                        .getFirst().text() + " Not tried: " + labels(call, steps.subList(i, steps.size())) + "."));
+            }
+            all = all == null ? tried.reply() : all.and(tried.reply());
+            if (!tried.stays()) {
+                return i + 1 == steps.size() ? all : all.and(AgentReply.text("Stopped: " + one.label()
+                        + " left the screen, or covered it. Not tried: " + labels(call, steps.subList(i + 1,
+                        steps.size())) + "."));
+            }
+        }
+        Optional<String> screen = readScreen(context, call.screen());
+        return screen.isEmpty() ? all : up(context, all, screen.get(), One.after(call));
     }
 
-    private static Tried attempt(Try input, AgentContext context) {
+    private static String labels(Try call, List<Step> steps) {
+        return String.join(", ", steps.stream().map(s -> One.of(call, s, true).label()).toList());
+    }
+
+    private static Tried attempt(One input, AgentContext context) {
         try {
             return tried(input, context);
         } catch (IllegalStateException busy) {
             return Tried.refused("Studio did not answer while reading or writing the bot's Screens: "
                     + busy.getMessage() + " Look where the game is and read the map (read_guide) before trying again.");
         }
-    }
-
-    /**
-     * try_inputs: each picture as try_input tries it, staying on the screen, until one is refused or leaves it (it
-     * opened a screen, led to one mapped already or showed a popup); then the walk up, once, when the screen is
-     * finished.
-     */
-    static AgentReply tryInputs(Tries tries, AgentContext context) {
-        List<String> pictures = tries.pictures() == null ? List.of()
-                : tries.pictures().stream().filter(p -> p != null && !p.isBlank()).map(String::strip).toList();
-        if (pictures.isEmpty()) return AgentReply.refused("Give the pictures to try, in order. Nothing was done.");
-        AgentReply all = null;
-        for (int i = 0; i < pictures.size(); i++) {
-            Tried one = attempt(new Try(tries.screen(), pictures.get(i), null, null, null, null, null, null,
-                    tries.settleMs(), true, tries.desktop()), context);
-            if (one.reply().isRefused()) {
-                if (all == null) return one.reply();
-                return all.and(AgentReply.text("Stopped before " + pictures.get(i) + ": " + one.reply().parts()
-                        .getFirst().text() + " Not tried: " + String.join(", ", pictures.subList(i, pictures.size()))
-                        + "."));
-            }
-            all = all == null ? one.reply() : all.and(one.reply());
-            if (!one.stays()) {
-                return i + 1 == pictures.size() ? all : all.and(AgentReply.text("Stopped: " + pictures.get(i)
-                        + " left the screen, or covered it. Not tried: " + String.join(", ",
-                        pictures.subList(i + 1, pictures.size())) + "."));
-            }
-        }
-        Optional<String> screen = readScreen(context, tries.screen());
-        return screen.isEmpty() ? all : up(context, all, screen.get(), new Try(tries.screen(), null, null, null, null,
-                null, null, null, null, tries.stay(), tries.desktop()));
     }
 
     /** The constant {@code typed} names in the map; empty when none or Studio is busy. */
@@ -216,14 +222,14 @@ final class MapTools {
         }
     }
 
-    private static Tried tried(Try input, AgentContext context) {
+    private static Tried tried(One input, AgentContext context) {
         StudioServices services = context.services();
         if (services.projectDir() == null) return Tried.refused(Frames.noProject());
         boolean byPicture = input.picture() != null && !input.picture().isBlank();
         boolean byKey = input.key() != null && !input.key().isBlank();
         if (byPicture == byKey) {
             return Tried.refused("An input is a picture to click or a hotkey, one of them: the bot can take no "
-                    + "other. A button with no picture yet: screenshot, crop_picture it with its screen, then "
+                    + "other. A button with no picture yet: screenshot, crop_pictures it with its screen, then "
                     + "try_input it. Nothing was done.");
         }
         Optional<Key> key = byKey ? Key.named(input.key()) : Optional.empty();
@@ -237,13 +243,7 @@ final class MapTools {
         }
         boolean locked = input.locked() != null && !input.locked().isBlank();
         if (never && locked) return Tried.refused("An input is never done or locked, not both. Nothing was done.");
-        Optional<Kind> kind = Optional.empty();
-        if (input.kind() != null && !input.kind().isBlank()) {
-            kind = kindNamed(input.kind());
-            if (kind.isEmpty()) {
-                return Tried.refused("No kind \"" + input.kind().strip() + "\": chore, shortcut, choice or info.");
-            }
-        }
+        Optional<Kind> kind = Optional.ofNullable(input.kind());
         int notches = input.scroll() == null ? 0 : input.scroll();
         if (input.scroll() != null && (notches == 0 || !byPicture || never || locked)) {
             return Tried.refused(notches == 0 ? "Scroll by at least one notch." : !byPicture ? "A scroll is over "
@@ -255,7 +255,7 @@ final class MapTools {
         Optional<String> found = ScreenBook.find(graph, asked);
         if (found.isEmpty()) {
             return Tried.refused("No screen " + asked + " in the bot's Screens" + (graph.screens().isEmpty()
-                    ? ": crop_picture the first screen's marker with screen " + asked + " and marker true; that "
+                    ? ": crop_pictures the first screen's marker with screen " + asked + ", its box marker true; that "
                     + "starts the map." : ": try_input adds a screen when an input opens it.") + " Nothing was done.");
         }
         String screen = found.get();
@@ -267,7 +267,7 @@ final class MapTools {
             String child = graph.shown(below.get());
             List<Input> waiting = graph.untried(below.get());
             String why = !waiting.isEmpty() ? "it still has untried inputs (" + ScreenGraph.labels(waiting) + ")"
-                    : "nothing on it is cut yet: crop_picture every input on it with screen " + child
+                    : "nothing on it is cut yet: crop_pictures every input on it with screen " + child
                     + ", then try each; its close button too";
             return Tried.refused("Finish " + child + " first: " + why + ", and it is below " + name
                     + ". A screen opened is finished, every button, tab, toggle and arrow tried and every "
@@ -292,7 +292,7 @@ final class MapTools {
                     + "clicked.")), true);
         }
         if ((never || locked) && byPicture && !untried) {
-            return Tried.refused(what + " is not an untried input of " + name + ": crop_picture it with screen "
+            return Tried.refused(what + " is not an untried input of " + name + ": crop_pictures it with screen "
                     + name + " first. Nothing was done.");
         }
         if (locked && !ActTools.exists(context, input.locked().strip())) {
@@ -439,7 +439,7 @@ final class MapTools {
      * {@code said}, and when the try left {@code screen} finished, the game walked back up to the nearest screen above
      * it with work left ({@link ScreenGraph#upTo}), checked by that screen's marker; {@code input}'s {@code stay} keeps it.
      */
-    private static AgentReply up(AgentContext context, AgentReply said, String screen, Try input) {
+    private static AgentReply up(AgentContext context, AgentReply said, String screen, One input) {
         if (said.isRefused() || Boolean.TRUE.equals(input.stay())) return said;
         ScreenGraph graph;
         try {
@@ -501,7 +501,7 @@ final class MapTools {
         return AgentReply.text("Opened " + child + ", added to the map as Screens." + constant + ", reached from "
                         + from + " by " + base.label() + "; it owes its marker. 🖼 Manage Pictures groups the "
                         + "pictures it names under it. Before leaving it, "
-                        + "from the screenshot below: crop_picture with screen " + child + " and marker true a part "
+                        + "from the screenshot below: crop_pictures with screen " + child + " and marker true a part "
                         + "only this screen shows, then with screen " + child + " every input on it (each button, "
                         + "icon, tab, toggle, arrow and list, and its close button); what cannot be cut now, "
                         + "write_notes with screen " + child + " and owes. Then try each of them, and finish " + child
@@ -585,11 +585,11 @@ final class MapTools {
                 ? ": a menu." : ": an activity.").orElse(".")
                 + (ask ? " Before leaving " + name + ": was every list and panel on it scrolled to both ends "
                 + "(try_input with scroll), every tab opened, every toggle flipped, every arrow paged? Each one "
-                + "that was not: crop_picture it with screen " + name + " and try it." : "")
+                + "that was not: crop_pictures it with screen " + name + " and try it." : "")
                 : " Untried: " + ScreenGraph.labels(left) + "."));
     }
 
-    /** Where crop_picture notes a cut: a screen of the map, or the one it starts; else why it cannot. */
+    /** Where crop_pictures notes a cut: a screen of the map, or the one it starts; else why it cannot. */
     record Placing(String constant, String name, boolean starts, boolean popup, String refusal) {
         static Placing refused(String why) {
             return new Placing(null, null, false, false, why);
@@ -868,7 +868,7 @@ final class MapTools {
         try {
             List<String> missing = FxCall.call(() -> all.stream().filter(p -> !ScreenBook.exists(services, p)).toList());
             if (!missing.isEmpty()) {
-                return AgentReply.refused("The bot has no picture " + String.join(", ", missing) + "; crop_picture "
+                return AgentReply.refused("The bot has no picture " + String.join(", ", missing) + "; crop_pictures "
                         + "cuts a new one. Nothing was noted.");
             }
             StringBuilder said = new StringBuilder();
@@ -1078,12 +1078,6 @@ final class MapTools {
         return all;
     }
 
-    static Optional<Kind> kindNamed(String typed) {
-        String id = typed.strip().toUpperCase(Locale.ROOT);
-        for (Kind kind : Kind.values()) if (kind.name().equals(id)) return Optional.of(kind);
-        return Optional.empty();
-    }
-
     /** A write's failure, Studio's own refusal or its being busy; empty when written. */
     private static Optional<String> write(Supplier<Optional<String>> write) {
         try {
@@ -1102,7 +1096,7 @@ final class MapTools {
     }
 
     static String owes(String screen) {
-        return screen + " still owes its marker: screenshot it, then crop_picture with screen " + screen + " and "
+        return screen + " still owes its marker: screenshot it, then crop_pictures with screen " + screen + " and "
                 + "marker true a part only that screen shows; or, when none can be cut, write_notes with screen "
                 + screen + " and owes \"marker — <why>\". Nothing was done.";
     }
