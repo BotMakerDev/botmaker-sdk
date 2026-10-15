@@ -42,9 +42,9 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 
 - **`ScreenBook`** reads and writes `Screens.java` through the host, on the FX thread; `plugin/pictures/ScreenMapRead`
   is the one safe read the editors, picture groups and the constant view share.
-- **Discovery** (`MapTools`): `crop_picture(s)` cuts a screen's inputs, marker, back, looks (`variantOf`,
+- **Discovery** (`MapTools`): `crop_pictures` cuts a screen's inputs, marker, back, looks (`variantOf`,
   `screenLook`, `when`), `sometimes` and `popup`; `place_pictures` puts pictures the bot already has on a screen;
-  `try_input(s)` clicks one and records what it did — opened a new screen (owing its marker), led to a mapped one
+  `try_input` clicks each input of its list and records what it did — opened a new screen (owing its marker), led to a mapped one
   (a way in or its way back, found with `whereOn`), changed it in place, or nothing — and stops at a popup;
   `not_a_screen` turns a screen back into an IN_PLACE result on each of its ways in; `go_to_screen` and
   `which_screen` walk the map as a run does; `read_map` prints it (`plugin/map/MapReport`). The tool refuses a

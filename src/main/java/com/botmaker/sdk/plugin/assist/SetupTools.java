@@ -57,7 +57,7 @@ final class SetupTools {
     private static final ManagedHandle<BotSettings> SETTINGS = ManagedHandle.of(SdkValues.SETTINGS);
 
     /**
-     * One of the bot's settings, as {@code set_setting} names it: how it is read off a {@link BotSettings} and
+     * One of the bot's settings, as setup's {@code set_setting} names it: how it is read off a {@link BotSettings} and
      * how a typed value makes a new one. A closed set the assistant picks from by name.
      */
     enum Setting {

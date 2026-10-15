@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
  * Discovery's map, kept by a tool rather than by the assistant's memory (the user's call, 2026-10-14: mapping
  * Firestone, the assistant clicked through a dozen screens, cut nothing and wrote nothing until asked; then cut a
  * screen's buttons and left without trying one). The map is the bot's {@code Screens} class ({@link ScreenBook}):
- * every input cut on a screen with crop_picture is untried until try_input clicks it (or scrolls over it, a list's),
+ * every input cut on a screen with crop_pictures is untried until try_input clicks it (or scrolls over it, a list's),
  * and try_input records what it did — opened a screen (a new constant, owing its marker), led to one mapped already
  * (a way into it, or this one's way back), changed this one in place, or nothing. A screen opened is finished before
  * the next input of the one it was opened from: the tool refuses a screen while one reached from it has an untried

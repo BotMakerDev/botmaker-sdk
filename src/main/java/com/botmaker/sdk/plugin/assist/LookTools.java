@@ -44,7 +44,7 @@ import java.util.Optional;
 /**
  * The assistant's eyes: what the bot sees, which pictures are on it, its text and its colours. Each reads a
  * fresh frame of the screen the bot watches, except {@code screenshot}, which also keeps it for
- * {@code crop_picture}; {@code missed_frames} reads what a run saved instead. Nothing here writes or clicks;
+ * {@code crop_pictures}; {@code missed_frames} reads what a run saved instead. Nothing here writes or clicks;
  * {@link ActTools} acts and says what changed.
  */
 final class LookTools {

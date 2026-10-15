@@ -42,7 +42,7 @@ final class Frames {
     static final Color NOTE = new Color(0xe3, 0xa0, 0x08);
 
     /**
-     * The last screenshot the assistant was shown. {@code crop_picture}'s coordinates are that image's pixels,
+     * The last screenshot the assistant was shown. {@code crop_pictures}' coordinates are that image's pixels,
      * and the screen may have changed since, so a crop is cut from this, not from a fresh capture.
      */
     private static volatile BufferedImage shown;

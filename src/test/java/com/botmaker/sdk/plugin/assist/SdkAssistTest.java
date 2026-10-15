@@ -144,7 +144,7 @@ class SdkAssistTest {
                 "scale", 0.5);
         assertEquals(new java.awt.Dimension(100, 50), size(part));
         assertTrue(text(part).contains("Showing 100,50 (200×100)"), text(part));
-        assertTrue(Frames.shown().isPresent(), "the whole frame is kept for crop_picture");
+        assertTrue(Frames.shown().isPresent(), "the whole frame is kept for crop_pictures");
 
         Frames.forget();
         assertTrue(run("screenshot", "x", 10).isRefused(), "a part needs all four numbers");
@@ -1045,7 +1045,7 @@ class SdkAssistTest {
     /**
      * try_input reads where each input left the game on the frame the game shows after it (2026-10-15): a panel
      * closed to the screen under it, whose marker showed under the panel too, is that screen's way back and no new
-     * screen; a popup stops try_inputs; a scroll keeps what was said of its input; a hotkey needs a name only once it
+     * screen; a popup stops try_input's list; a scroll keeps what was said of its input; a hotkey needs a name only once it
      * opened a screen; a button's usual look names no look on the way it opens.
      */
     @Test
@@ -1315,7 +1315,7 @@ class SdkAssistTest {
         return new ImageTemplate(TemplateLibrary.pathForName(name));
     }
 
-    /** The bot's screen {@code constant}, as try_input and crop_picture last wrote it. */
+    /** The bot's screen {@code constant}, as try_input and crop_pictures last wrote it. */
     private GameScreen screen(String constant) {
         return (GameScreen) host.set("screen_map").get(constant).value();
     }

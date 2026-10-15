@@ -498,7 +498,7 @@ final class ScreenCanvas {
         // Kept for a picture not there yet too: cut later, it is drawn then.
         drawnTimes.put(PICTURE_KEY + id, time);
         if (time == 0) return null;
-        // Keyed by the file's time: a picture recut by the assistant's crop_picture reads afresh, not from the cache.
+        // Keyed by the file's time: a picture recut by the assistant's crop_pictures reads afresh, not from the cache.
         return thumbs.computeIfAbsent(id + "@" + time, key -> new Image(file.toUri().toString(), 96, 96, true, true,
                 !loadNow));
     }
@@ -633,7 +633,7 @@ final class ScreenCanvas {
 
     /**
      * Whether a shot or a picture the cards draw came or changed since they were drawn: try_input, which_screen or a
-     * retake saved a shot meanwhile, or crop_picture recut a marker.
+     * retake saved a shot meanwhile, or crop_pictures recut a marker.
      */
     boolean filesChanged() {
         if (resources == null) return false;

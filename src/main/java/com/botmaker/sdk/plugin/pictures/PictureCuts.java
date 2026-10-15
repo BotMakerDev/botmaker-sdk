@@ -12,7 +12,7 @@ import java.util.Optional;
 
 /**
  * A picture cut out of a frame the caller already holds, saved and declared as a {@code Pictures} constant.
- * This is what the overlay's Picture tab and the assistant's {@code crop_picture} do, without ✂ Capture
+ * This is what the overlay's Picture tab and the assistant's {@code crop_pictures} do, without ✂ Capture
  * Templates' window.
  *
  * <p>It is the same save the capture tool makes: the PNG, then {@code Pictures.<NAME>} written with where it was

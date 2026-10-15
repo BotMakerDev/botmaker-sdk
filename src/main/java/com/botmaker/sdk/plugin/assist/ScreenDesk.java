@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 
 /**
  * What 🗺 Screens does with the map, by the very code the assistant's tools run: its ▶ Try is try_input, its Go here
- * go_to_screen, its ✂ Cut crop_picture's note, so the window and the assistant cannot record an input two ways.
+ * go_to_screen, its ✂ Cut crop_pictures' note, so the window and the assistant cannot record an input two ways.
  */
 public final class ScreenDesk {
 
