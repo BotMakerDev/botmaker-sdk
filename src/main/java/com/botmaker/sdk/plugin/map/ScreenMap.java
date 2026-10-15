@@ -249,7 +249,7 @@ public final class ScreenMap {
         fit.setTooltip(new Tooltip("Zoom to show the whole map"));
         fit.setOnAction(e -> canvas.graph().fit());
         Button out = new Button("−");
-        out.setTooltip(new Tooltip("Zoom out (Ctrl+scroll zooms about the pointer)"));
+        out.setTooltip(new Tooltip("Zoom out (the wheel zooms about the pointer; a right drag pans)"));
         out.setOnAction(e -> canvas.graph().zoomOut());
         Button in = new Button("+");
         in.setTooltip(new Tooltip("Zoom in"));

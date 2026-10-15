@@ -398,6 +398,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - A popup with nothing cut is finished on its card as Discovery counts it: its default way back is its way out.
   - The card, the panel, the constant view and read_map say a screen's pills from one list; an input's row counts it
     tried as the card's ring does.
+- **🗺 Screens by hand** (the toolkit's `GraphCanvas`): the wheel zooms without Ctrl; Fit centres the map in a
+  wide window; cards are dragged, one or several (Ctrl+click, or a box drawn on the empty map); a card's menu closes
+  on a click elsewhere. Moved cards are not yet saved: they return to the layout on the next redraw.
 - **🗺 Screens' small gains.** The Result and Kind menus tick what the input is now; New screen from here offers the
   screen's looks' inputs too; a link shows the look its button must have; the hand menus are off while a try or a
   walk runs.
