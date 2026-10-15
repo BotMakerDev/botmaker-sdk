@@ -38,7 +38,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * 🗺 Screens: the bot's screen map, its {@code Screens} class, drawn as a graph — the SDK plugin's own window, and a
@@ -204,16 +203,12 @@ public final class ScreenMap {
             return;
         }
         if (!(event instanceof TelemetryEvent.Step step)) return;
-        ScreenStep.screen(step.action()).ifPresent(name -> Platform.runLater(() -> constantNamed(name)
-                .ifPresent(constant -> {
-                    canvas.setHere(constant);
-                    // Followed only while the user looks at no screen of their own.
-                    if (selected == null) canvas.graph().centreOn(constant);
-                })));
-    }
-
-    private Optional<String> constantNamed(String name) {
-        return graph.screens().keySet().stream().filter(c -> graph.shown(c).equals(name)).findFirst();
+        ScreenStep.screen(step.action()).ifPresent(shown -> Platform.runLater(() -> {
+            if (!graph.screens().containsKey(shown.constant())) return;
+            canvas.setHere(shown.constant());
+            // Followed only while the user looks at no screen of their own.
+            if (selected == null) canvas.graph().centreOn(shown.constant());
+        }));
     }
 
     private Node toolbar(boolean full) {

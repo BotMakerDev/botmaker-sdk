@@ -23,8 +23,8 @@ record RunStatus(String activity, String screen, String action, int line) {
     RunStatus after(TelemetryEvent event) {
         return switch (event) {
             case TelemetryEvent.Step s -> ScreenStep.screen(s.action())
-                    .map(reached -> new RunStatus(s.activity().isEmpty() ? activity : s.activity(), reached, action,
-                            line))
+                    .map(reached -> new RunStatus(s.activity().isEmpty() ? activity : s.activity(), reached.name(),
+                            action, line))
                     .orElseGet(() -> new RunStatus(s.activity(), screen, s.action(), s.line()));
             case TelemetryEvent.Match m -> new RunStatus(activity, screen,
                     m.found() ? "found (" + percent(m.confidence()) + ")" : "looked, not found", m.line());

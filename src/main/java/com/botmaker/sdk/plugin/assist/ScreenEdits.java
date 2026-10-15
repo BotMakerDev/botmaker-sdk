@@ -124,7 +124,8 @@ public final class ScreenEdits {
         if (ScreenBook.find(graph, name.strip()).isPresent()) return "The map has " + name.strip() + " already.";
         String constant = ScreenBook.constantFor(graph, name.strip());
         Input entrance = untried(via);
-        GameScreen made = GameScreen.named(name.strip()).from(Way.of(BotConstants.screen(parent), entrance));
+        GameScreen made = GameScreen.named(name.strip()).from(Way.of(BotConstants.screen(parent),
+                ScreenGraph.bare(entrance)));
         GameScreen on = graph.screens().get(parent);
         Optional<Input> had = on == null ? Optional.empty()
                 : on.inputs().stream().filter(i -> i.sameAs(via)).findFirst();

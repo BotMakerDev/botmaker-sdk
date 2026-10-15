@@ -5,6 +5,7 @@ import com.botmaker.shared.ipc.TelemetryEvent;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,17 +41,25 @@ class RunOverlayModelTest {
     void theBarNamesTheScreenAWalkReachedUntilAnother() {
         RunStatus status = RunStatus.START.after(new TelemetryEvent.Step("Collect", "", -1))
                 .after(new TelemetryEvent.Click(SCREEN, 5, 6, 1, 42))
-                .after(new TelemetryEvent.Step("Collect", ScreenStep.action("Campaign"), -1));
+                .after(new TelemetryEvent.Step("Collect", ScreenStep.action("CAMPAIGN", "Campaign"), -1));
         assertEquals("Collect · 🗺 Campaign · clicked · line 42", status.text(), "reaching a screen undoes nothing");
 
         status = status.after(new TelemetryEvent.Step("Upgrade", "", -1));
         assertEquals("Upgrade · 🗺 Campaign", status.text(), "the game is still on it in the next activity");
 
-        status = status.after(new TelemetryEvent.Step("", ScreenStep.action("Home"), -1));
+        status = status.after(new TelemetryEvent.Step("", ScreenStep.action("HOME", "Home"), -1));
         assertEquals("Upgrade · 🗺 Home", status.text(), "a step with no activity keeps the activity");
-        assertEquals("on screen Home", ScreenStep.action("Home"));
+    }
+
+    /** The step carries the constant, which a window finds the screen by, and the name the bar shows (2026-10-15). */
+    @Test
+    void aScreenStepCarriesTheConstantAndTheName() {
+        assertEquals("on screen ARENA_INFO Arena info", ScreenStep.action("ARENA_INFO", "Arena info"));
+        assertEquals(Optional.of(new ScreenStep.Shown("ARENA_INFO", "Arena info")),
+                ScreenStep.screen(ScreenStep.action("ARENA_INFO", "Arena info")));
+        assertEquals(Optional.of(new ScreenStep.Shown("HOME", "HOME")), ScreenStep.screen(ScreenStep.action("HOME", null)));
         assertTrue(ScreenStep.screen("clicked").isEmpty());
-        assertTrue(ScreenStep.screen(ScreenStep.action("")).isEmpty());
+        assertTrue(ScreenStep.screen(ScreenStep.action("", "")).isEmpty());
     }
 
     @Test

@@ -222,6 +222,22 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The screen map walks more surely.**
+  - **A way does what its screen's input says now.** A way into a screen keeps a copy of the input it was found
+    by. A look, a lock or a `when` put on that input later now applies to the way too: the walk reads the
+    screen's own input. New ways store only what is done and on what (`Input.click(Pictures.X)`).
+  - **A panel over the screen it was opened from is the screen shown.** This now also holds for a panel opened
+    through an `alsoFrom` way, not only for the screen it was first found from.
+  - **A way back arrives wherever it lands.** Closing a screen opened from another screen than its first one
+    goes back to that other screen. The walk now goes on from there instead of waiting out the step.
+  - **A popup's inputs are tried whenever it shows.** They no longer wait for a branch of the tree.
+  - **A marker the screen says it cannot have is owed no more.** With `owes("marker — every icon here
+    animates")`, Discovery can end.
+  - **The run bar and 🗺 Screens follow the run's screen by its constant.** Two screens with the same name no
+    longer light the wrong card. The screen a walk starts on is told too, and so is the screen `where` finds.
+  - **A screen with no marker, over the screen it was opened from, is reached.** Before, the walk read the
+    screen under it and did the same input again.
+
 - **Discovery is faster.** These changes are to the assistant's map-building tools:
   - **Goes back up by itself.** Once nothing on a screen is left to try, try_input walks the game back up to the
     nearest screen that still has inputs to try. It uses the screen's way back first, then the bot's `close_x`

@@ -26,6 +26,7 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 /**
  * The bot's {@code Screens} read as a graph, keyed by constant name ({@code HOME}): each screen's {@code from} is
@@ -115,6 +116,38 @@ public final class ScreenGraph {
         return screen(constant).map(GameScreen::from).flatMap(way -> constantOf(way.from()));
     }
 
+    /** Every screen a way into {@code constant} is on: its {@code from}'s, then each {@code alsoFrom}'s. */
+    public Set<String> opensFrom(String constant) {
+        Set<String> from = new LinkedHashSet<>();
+        screen(constant).ifPresent(screen -> ways(screen).forEach(way -> constantOf(way.from()).ifPresent(from::add)));
+        return from;
+    }
+
+    /**
+     * The input {@code way} does, as the screen it is on holds it now. A way keeps its own copy of the input, written
+     * when it was found, and a look, a lock or a condition put on the screen's input later is not on that copy: the
+     * screen's input is the one that says (2026-10-15). The copy stands for one the screen no longer holds. The
+     * screen's own inputs are looked through before its looks', so a look's input of the same picture never wins.
+     */
+    public Input via(Way way) {
+        if (way.via() == null) return null;
+        return constantOf(way.from()).stream().flatMap(from -> inputs(from).stream()).filter(way.via()::sameAs)
+                .findFirst().orElse(way.via());
+    }
+
+    /**
+     * {@code input} as a way names it: what is done and on what, nothing else. Its kind, result, looks and conditions
+     * are the screen's input's to say ({@link #via}).
+     */
+    public static Input bare(Input input) {
+        if (input == null) return null;
+        return switch (input.act()) {
+            case CLICK -> Input.click(input.picture());
+            case KEY -> Input.key(input.key());
+            case SCROLL -> Input.scroll(input.picture(), input.notches());
+        };
+    }
+
     /**
      * The screens {@code constant}'s ways in name, and theirs in turn: each must be declared above it, since Java reads
      * a constant only once it is declared.
@@ -201,10 +234,44 @@ public final class ScreenGraph {
         return inputs(constant).isEmpty() && (screen == null || screen.back() == null);
     }
 
-    /** The first screen, popups included, with no marker yet. */
+    /**
+     * The first screen, popups included, with no marker that does not say why it has none ({@code marker — every
+     * icon here animates} among its {@link GameScreen#owes}): one with a reason holds no other screen back.
+     */
     public Optional<String> owingMarker() {
-        return screens.entrySet().stream().filter(e -> e.getValue().marker() == null).map(Map.Entry::getKey)
-                .findFirst();
+        return screens.entrySet().stream().filter(e -> e.getValue().marker() == null && !markerExplained(e.getValue()))
+                .map(Map.Entry::getKey).findFirst();
+    }
+
+    /** Whether a thing owed is the marker, with why: {@code marker — every icon here animates}. */
+    public static boolean markerWithReason(String owed) {
+        return MARKER_REASON.matcher(owed).matches();
+    }
+
+    private static final Pattern MARKER_REASON = Pattern.compile("(?i)marker[ \\t]+[—–-][ \\t]+\\S.*");
+
+    private static boolean markerExplained(GameScreen screen) {
+        return screen.owes().stream().anyMatch(ScreenGraph::markerWithReason);
+    }
+
+    /** Whether {@code constant}, or a screen below it, still has an input to try. */
+    public boolean workLeft(String constant) {
+        return unfinished(constant) || unfinishedBelow(constant).isPresent();
+    }
+
+    /**
+     * Where Discovery goes once {@code screen} is finished: up its parents to the first with work left on or below it,
+     * else the top one. Empty while it has work left, and for a popup or the top screen.
+     */
+    public Optional<String> upTo(String screen) {
+        if (workLeft(screen) || screen(screen).filter(GameScreen::isPopup).isPresent()) return Optional.empty();
+        Set<String> seen = new HashSet<>(Set.of(screen));
+        Optional<String> up = parent(screen);
+        while (up.isPresent() && !workLeft(up.get()) && parent(up.get()).isPresent()) {
+            if (!seen.add(up.get())) return Optional.empty();    // a map whose ways in loop has no top to go to
+            up = parent(up.get());
+        }
+        return up.filter(c -> !c.equals(screen));
     }
 
     /**
@@ -228,9 +295,11 @@ public final class ScreenGraph {
 
     /**
      * A screen begun (something on it tried) whose branch is not finished, off {@code constant}'s own path to the
-     * first screen: it is finished first, so one branch is explored to its end before the next is begun.
+     * first screen: it is finished first, so one branch is explored to its end before the next is begun. A popup is
+     * on no branch: it shows over any screen, and its inputs are tried whenever it does.
      */
     public Optional<String> branchBegun(String constant) {
+        if (screen(constant).filter(GameScreen::isPopup).isPresent()) return Optional.empty();
         Set<String> above = new HashSet<>();
         String at = constant;
         while (at != null && above.add(at) && above.size() < DEEPEST) at = parent(at).orElse(null);
@@ -298,7 +367,7 @@ public final class ScreenGraph {
                 for (Way way : ways(e.getValue())) {
                     Optional<String> from = constantOf(way.from());
                     if (from.isEmpty()) continue;
-                    Presence through = worst(of(way.via()), known.get(from.get()));
+                    Presence through = worst(of(via(way)), known.get(from.get()));
                     if (through.ordinal() < known.get(e.getKey()).ordinal()) {
                         known.put(e.getKey(), through);
                         changed = true;
@@ -324,7 +393,8 @@ public final class ScreenGraph {
         screens.forEach((c, screen) -> {
             for (Way way : ways(screen)) {
                 if (way.via() == null) continue;    // a way in names what is done; only a way back has a default
-                constantOf(way.from()).ifPresent(from -> edges.add(new Edge(from, c, way.via(), false, way.state(),
+                Input via = via(way);
+                constantOf(way.from()).ifPresent(from -> edges.add(new Edge(from, c, via, false, way.state(),
                         way.when())));
             }
             if (!screen.isPopup()) parent(c).ifPresent(p -> edges.add(new Edge(c, p, screen.back(), true)));
@@ -361,19 +431,20 @@ public final class ScreenGraph {
     /**
      * What Discovery still owes, one line each as {@code Campaign: untried click campaign_claim}: a marker, the
      * inputs left to try, a screen with none cut, the ones that come and go never seen, and what each screen says it
-     * {@link GameScreen#owes}.
+     * {@link GameScreen#owes}. A marker the screen says why it has none ({@code marker — <why>}) is owed no more:
+     * Discovery can end without it, and a walk takes that screen as reached once its way in is done.
      */
     public List<String> owed() {
         List<String> owed = new ArrayList<>();
         for (String c : screens.keySet()) {
             String name = shown(c);
-            if (screens.get(c).marker() == null) owed.add(name + ": marker");
+            if (screens.get(c).marker() == null && !markerExplained(screens.get(c))) owed.add(name + ": marker");
             List<Input> untried = untried(c);
             if (!untried.isEmpty()) owed.add(name + ": untried " + labels(untried));
             else if (noneCut(c) && !screens.get(c).isPopup()) owed.add(name + ": no input cut yet");
             List<Input> unseen = unseen(c);
             if (!unseen.isEmpty()) owed.add(name + ": never seen to try " + labels(unseen) + " (comes and goes)");
-            for (String what : screens.get(c).owes()) owed.add(name + ": " + what);
+            for (String what : screens.get(c).owes()) if (!markerWithReason(what)) owed.add(name + ": " + what);
         }
         return owed;
     }

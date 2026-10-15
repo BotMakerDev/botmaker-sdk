@@ -56,7 +56,7 @@ public final class ScreenWalk {
 
     /**
      * A walk over {@code graph} by {@code reach}, giving each step {@code stepMs} to show the next screen's marker,
-     * and telling {@code reached} each screen it reaches by constant.
+     * and telling {@code reached} each screen it is on by constant, the one it starts on first.
      */
     public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached) {
         this(graph, reach, stepMs, reached, null);
@@ -79,7 +79,9 @@ public final class ScreenWalk {
     /**
      * The same, on {@code frame}: a look taken already. A screen opened over another (a panel, a dialog) leaves the
      * one under it in view, so of the screens whose markers show, one another shown screen was opened from is not
-     * the answer: Info luck over Tavern is Info luck (2026-10-15).
+     * the answer: Info luck over Tavern is Info luck (2026-10-15). That is every screen a way into it is on, and the
+     * screens above those in the tree; when ways loop so that every screen shown is under another, the nearest
+     * shown is the answer.
      */
     public Optional<String> whereOn(BufferedImage frame, String near) {
         Set<String> order = new LinkedHashSet<>();
@@ -93,11 +95,14 @@ public final class ScreenWalk {
         List<String> shown = shown(told, frame);
         Set<String> under = new HashSet<>();
         for (String c : shown) {
-            for (Optional<String> up = graph.parent(c); up.isPresent() && under.add(up.get()); ) {
-                up = graph.parent(up.get());
+            for (String from : graph.opensFrom(c)) {
+                if (from.equals(c)) continue;
+                for (Optional<String> up = Optional.of(from); up.isPresent() && under.add(up.get()); ) {
+                    up = graph.parent(up.get());
+                }
             }
         }
-        return shown.stream().filter(c -> !under.contains(c)).findFirst();
+        return shown.stream().filter(c -> !under.contains(c)).findFirst().or(() -> shown.stream().findFirst());
     }
 
     /** Walks to {@code target} from where the game is, {@code near} the screen it was last seen on, or null. */
@@ -114,20 +119,30 @@ public final class ScreenWalk {
         Set<ScreenGraph.Edge> missed = new HashSet<>();     // its picture was not on the screen
         Set<ScreenGraph.Edge> strayed = new HashSet<>();    // done, and the game showed another screen
         String at = near;
+        String told = null;        // the screen the walk last said it is on
         String unmarked = null;    // a screen reached that has no marker to tell it by
+        String left = null;        // the screen the step to it was done on
         int most = graph.screens().size() * 2 + MOST_REPLANS;
         for (int step = 0; step < most; step++) {
             if (Thread.currentThread().isInterrupted()) return new Result(Outcome.STOPPED, at, walked, "Stopped.");
             Optional<BufferedImage> frame = closePopups(reach.look());
             if (frame.isEmpty()) return new Result(Outcome.STUCK, at, walked, "The screen could not be captured.");
             Optional<String> here = whereOn(frame.get(), at);
-            if (here.isEmpty() && unmarked != null) here = Optional.of(unmarked);
+            // A screen with no marker, just reached, is where the game is while the one it was opened from shows
+            // under it, or none shows.
+            if (unmarked != null && (here.isEmpty() || here.get().equals(left))) here = Optional.of(unmarked);
             unmarked = null;
             if (here.isEmpty()) {
                 return new Result(Outcome.STUCK, at, walked, "The game shows no screen of the bot's map"
                         + (at == null ? "." : "; it was last on " + graph.shown(at) + "."));
             }
             at = here.get();
+            if (!at.equals(told)) {
+                // The screen it starts on is told too, so whoever shows where the run is knows from the first step.
+                if (told != null) walked.add(at);
+                reached.accept(at);
+                told = at;
+            }
             if (at.equals(target)) return new Result(Outcome.ARRIVED, at, walked, "On " + graph.shown(at) + ".");
             String from = at;
             BufferedImage seen = frame.get();
@@ -140,10 +155,12 @@ public final class ScreenWalk {
                 continue;
             }
             if (arrives(next)) {
-                walked.add(next.to());
-                reached.accept(next.to());
+                // Read again from the next look: a way back may land on another screen than the map's parent.
                 at = next.to();
-                if (graph.screens().get(at).marker() == null) unmarked = at;
+                if (graph.screens().get(at).marker() == null) {
+                    unmarked = at;
+                    left = from;
+                }
                 continue;
             }
             strayed.add(next);
@@ -211,22 +228,26 @@ public final class ScreenWalk {
     }
 
     /**
-     * Whether {@code edge}'s screen shows within a step's time, a popup that shows meanwhile closed: its marker, and
-     * after a way back the screen left gone too, since a panel's parent stays in view under it.
+     * Whether {@code edge} got somewhere within a step's time, a popup that shows meanwhile closed. A way in arrives
+     * once its screen's marker shows. A way back arrives once the screen left is gone and another of the map shows:
+     * a panel's parent stays in view under it, and a screen opened from another than its parent in the tree (an
+     * {@code alsoFrom}) closes back to that one, which the walk reads from the next look (2026-10-15).
      */
     private boolean arrives(ScreenGraph.Edge edge) {
         GameScreen screen = graph.screens().get(edge.to());
-        if (screen.marker() == null) {
-            reach.pause(POLL_MS);
-            return true;    // a screen with no marker cannot be told: the walk takes it as reached
-        }
         ImageTemplate left = edge.back() ? graph.screens().get(edge.from()).marker() : null;
+        ImageTemplate shows = edge.back() ? left : screen.marker();
+        if (shows == null) {
+            reach.pause(POLL_MS);
+            return true;    // a screen with no marker cannot be told: the walk takes it as reached, or left
+        }
         long deadline = reach.nowMs() + stepMs;
         do {
             reach.pause(POLL_MS);
             Optional<BufferedImage> frame = closePopups(reach.look());
-            if (frame.isPresent() && reach.find(screen.marker(), frame.get()).isPresent()
-                    && (left == null || reach.find(left, frame.get()).isEmpty())) {
+            if (frame.isPresent() && (edge.back() ? reach.find(left, frame.get()).isEmpty() && (screen.marker() == null
+                    || whereOn(frame.get(), edge.to()).filter(c -> !c.equals(edge.from())).isPresent())
+                    : reach.find(screen.marker(), frame.get()).isPresent())) {
                 return true;
             }
         } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());

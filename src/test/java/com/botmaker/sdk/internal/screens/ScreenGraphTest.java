@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Kind;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Variant;
@@ -262,5 +263,100 @@ class ScreenGraphTest {
         assertEquals(List.of("HOME", "CAMPAIGN"), List.copyOf(graph.screens().keySet()));
         assertEquals(Optional.of("HOME"), graph.parent("CAMPAIGN"), "a constant named inside another is itself");
         assertEquals(Optional.empty(), ScreenMaps.beside(String.class));
+    }
+
+    /**
+     * A way keeps a copy of the input it was found by; a lock, a look or a condition put on the screen's input later
+     * is read off the screen's input, not off that copy (2026-10-15).
+     */
+    @Test
+    void aWayDoesTheInputAsItsScreenHoldsItNow() {
+        Map<String, GameScreen> screens = firestone();
+        Input badged = click("campaign").variants(List.of(Variant.of(picture("campaign_badge"), State.BADGE)));
+        screens.put("HOME", screens.get("HOME").inputs(List.of(badged, click("engineer").locked(picture("padlock")))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        ScreenGraph.Edge campaign = graph.edges().stream().filter(e -> e.to().equals("CAMPAIGN")).findFirst().orElseThrow();
+        assertEquals(badged, campaign.via(), "the screen's input, with its look");
+        assertEquals(ScreenGraph.Presence.LOCKED, graph.presence("ENGINEER"), "locked on Home, not on the way's copy");
+        Way gone = Way.of(BotConstants.screen("HOME"), click("nowhere"));
+        assertEquals(click("nowhere"), graph.via(gone), "a copy of an input the screen lost stands for itself");
+        assertEquals(click("campaign"), ScreenGraph.bare(badged.did(Did.IN_PLACE).kind(Kind.CHORE)));
+        assertEquals(Input.scroll(picture("list"), -3), ScreenGraph.bare(Input.scroll(picture("list"), -3).sometimes()));
+    }
+
+    @Test
+    void theScreensAWayIntoAScreenIsOnAreItsFromAndAlsoFrom() {
+        Map<String, GameScreen> screens = firestone();
+        screens.put("MAP", screens.get("MAP").alsoFrom(List.of(Way.of(BotConstants.screen("HOME"), click("map")))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(List.of("CAMPAIGN", "HOME"), List.copyOf(graph.opensFrom("MAP")));
+        assertEquals(List.of(), List.copyOf(graph.opensFrom("HOME")));
+    }
+
+    /** A popup shows over any screen: its inputs wait for no branch of the tree (2026-10-15). */
+    @Test
+    void aPopupIsOnNoBranch() {
+        Map<String, GameScreen> screens = firestone();
+        screens.put("CAMPAIGN", screens.get("CAMPAIGN").inputs(List.of(click("claim").did(Did.IN_PLACE), click("map"),
+                click("loot"))));
+        screens.put("OFFER", GameScreen.named("Offer").marker(picture("offer")).inputs(List.of(click("buy"))).popup());
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(Optional.of("CAMPAIGN"), graph.branchBegun("ENGINEER"), "a tree screen waits for Campaign");
+        assertEquals(Optional.empty(), graph.branchBegun("OFFER"), "the popup does not");
+    }
+
+    /** A screen that says why it has no marker owes it no more, and holds no other screen back. */
+    @Test
+    void aMarkerTheScreenSaysWhyItLacksIsOwedNoMore() {
+        assertTrue(ScreenGraph.markerWithReason("marker — every icon here animates"));
+        assertTrue(ScreenGraph.markerWithReason("Marker - it scrolls"));
+        assertFalse(ScreenGraph.markerWithReason("marker"));
+        assertFalse(ScreenGraph.markerWithReason("marker-less icons"));
+        assertFalse(ScreenGraph.markerWithReason("weekly tab picture"));
+
+        Map<String, GameScreen> screens = firestone();
+        assertEquals(Optional.of("ENGINEER"), ScreenGraph.of(screens).owingMarker());
+        screens.put("ENGINEER", screens.get("ENGINEER").owes(List.of("marker — every icon animates", "its timer")));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(Optional.empty(), graph.owingMarker());
+        assertTrue(graph.owed().contains("Engineer: its timer"), graph.owed().toString());
+        assertTrue(graph.owed().stream().noneMatch(line -> line.startsWith("Engineer: marker")), graph.owed().toString());
+    }
+
+    /**
+     * A screen finished sends the game up to the nearest screen above with work left, past finished ones; a screen
+     * with work left, or below which some is left, goes nowhere (2026-10-14).
+     */
+    @Test
+    void aFinishedScreenGoesUpToTheNearestScreenWithWorkLeft() {
+        ScreenGraph open = upMap(click("mail"));
+        assertEquals(Optional.of("HOME"), open.upTo("MAP"), "past Campaign, finished, to Home's mail");
+        assertEquals(Optional.of("HOME"), open.upTo("CAMPAIGN"));
+        assertEquals(Optional.empty(), open.upTo("HOME"), "Home has work left");
+
+        ScreenGraph done = upMap(click("mail").did(Did.NONE));
+        assertEquals(Optional.of("HOME"), done.upTo("MAP"), "all finished: the top screen");
+        assertEquals(Optional.empty(), done.upTo("HOME"), "the top screen goes nowhere");
+
+        Map<String, GameScreen> screens = new LinkedHashMap<>(open.screens());
+        screens.put("MAP", screens.get("MAP").inputs(List.of(click("zoom"))));
+        assertEquals(Optional.empty(), ScreenGraph.of(screens).upTo("MAP"), "Map's zoom is untried");
+        assertEquals(Optional.empty(), ScreenGraph.of(screens).upTo("CAMPAIGN"), "Map, below it, is not done");
+    }
+
+    /** Home ▸ Campaign ▸ Map, each tried out but Home's {@code mail}. */
+    private static ScreenGraph upMap(Input mail) {
+        Map<String, GameScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", GameScreen.named("Home").marker(picture("home")).inputs(List.of(click("campaign"), mail)));
+        screens.put("CAMPAIGN", GameScreen.named("Campaign").marker(picture("campaign_title"))
+                .from(Way.of(BotConstants.screen("HOME"), click("campaign")))
+                .inputs(List.of(click("map"), click("claim").did(Did.IN_PLACE))));
+        screens.put("MAP", GameScreen.named("Map").marker(picture("map_title"))
+                .from(Way.of(BotConstants.screen("CAMPAIGN"), click("map"))).inputs(List.of(click("x").did(Did.NONE))));
+        return ScreenGraph.of(screens);
     }
 }

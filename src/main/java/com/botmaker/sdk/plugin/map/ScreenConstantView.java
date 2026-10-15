@@ -124,15 +124,19 @@ public final class ScreenConstantView {
         return Optional.of(view);
     }
 
-    /** The constant whose value {@code ctx} holds; empty for none. */
+    /** The constant whose value {@code ctx} holds; empty for none, and when the map cannot be read. */
     private static Optional<String> constantOf(ValueContext ctx) {
-        PluginValues values = ctx.services().pluginValues();
+        PluginValues values = ctx.services() == null ? null : ctx.services().pluginValues();
         Optional<GameScreen> held = ctx.value(GameScreen.class);
         if (values == null || held.isEmpty()) return Optional.empty();
-        for (Member member : SCREENS.members(values)) {
-            if (SCREENS.read(values, member).filter(s -> Objects.equals(s, held.get())).isPresent()) {
-                return Optional.of(member.name());
+        try {
+            for (Member member : SCREENS.members(values)) {
+                if (SCREENS.read(values, member).filter(s -> Objects.equals(s, held.get())).isPresent()) {
+                    return Optional.of(member.name());
+                }
             }
+        } catch (RuntimeException unreadable) {
+            // A map being written reads as no constant: the slot draws as written, never a broken editor.
         }
         return Optional.empty();
     }

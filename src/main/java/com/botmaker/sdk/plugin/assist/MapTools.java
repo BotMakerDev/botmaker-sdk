@@ -23,11 +23,9 @@ import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -262,7 +260,7 @@ final class MapTools {
         }
         String screen = found.get();
         String name = graph.shown(screen);
-        Optional<String> owing = owingMarker(graph);
+        Optional<String> owing = graph.owingMarker();
         if (owing.isPresent()) return AgentReply.refused(owes(graph.shown(owing.get())));
         Optional<String> below = graph.unfinishedBelow(screen);
         if (below.isPresent()) {
@@ -390,7 +388,7 @@ final class MapTools {
 
     /**
      * {@code said}, and when the try left {@code screen} finished, the game walked back up to the nearest screen above
-     * it with work left ({@link #upTo}), checked by that screen's marker; {@code input}'s {@code stay} keeps it.
+     * it with work left ({@link ScreenGraph#upTo}), checked by that screen's marker; {@code input}'s {@code stay} keeps it.
      */
     private static AgentReply up(AgentContext context, AgentReply said, String screen, Try input) {
         if (said.isRefused() || Boolean.TRUE.equals(input.stay())) return said;
@@ -400,7 +398,7 @@ final class MapTools {
         } catch (IllegalStateException busy) {
             return said;
         }
-        Optional<String> to = upTo(graph, screen);
+        Optional<String> to = graph.upTo(screen);
         Optional<ToolReach> reach = ToolReach.of(context);
         if (to.isEmpty() || reach.isEmpty()
                 || ActTools.desktopRefusal(context, reach.get().hands(), input.desktop()).isPresent()) {
@@ -420,28 +418,6 @@ final class MapTools {
                 + " Look where the game is (which_screen)."));
     }
 
-    /**
-     * Where the game goes once {@code screen} is finished: up its parents to the first with work left on or below it,
-     * else the top one. Empty while it has work left, and for a popup or the top screen.
-     */
-    static Optional<String> upTo(ScreenGraph graph, String screen) {
-        if (workLeft(graph, screen) || graph.screen(screen).filter(GameScreen::isPopup).isPresent()) {
-            return Optional.empty();
-        }
-        Set<String> seen = new HashSet<>(Set.of(screen));
-        Optional<String> up = graph.parent(screen);
-        while (up.isPresent() && !workLeft(graph, up.get()) && graph.parent(up.get()).isPresent()) {
-            if (!seen.add(up.get())) return Optional.empty();    // a map whose ways in loop has no top to go to
-            up = graph.parent(up.get());
-        }
-        return up.filter(c -> !c.equals(screen));
-    }
-
-    /** Whether {@code constant}, or a screen below it, still has an input to try. */
-    private static boolean workLeft(ScreenGraph graph, String constant) {
-        return graph.unfinished(constant) || graph.unfinishedBelow(constant).isPresent();
-    }
-
     /** The game's usual close button, the bot's picture {@value #CLOSE}, as a way back with none tries it first. */
     private static Input close(AgentContext context) {
         if (!ActTools.exists(context, CLOSE)) return null;
@@ -454,7 +430,7 @@ final class MapTools {
 
     /** {@code via} on {@code screen} as a way in, needing the look {@code look} of its button (null: any). */
     private static Way way(String screen, Input via, State look) {
-        Way way = Way.of(BotConstants.screen(screen), via);
+        Way way = Way.of(BotConstants.screen(screen), ScreenGraph.bare(via));
         return look == null ? way : way.whenLooks(look);
     }
 
@@ -1052,23 +1028,6 @@ final class MapTools {
         return "Name screens in plain words on one line, as the game shows them: no colon, no markdown "
                 + "(* _ ` [ ] # \\ < > ›).";
     }
-
-    /**
-     * The first screen with no marker that does not say why it owes one ({@code marker — every icon here animates}
-     * among its {@link GameScreen#owes}): one with a reason holds no other screen back, and stays owed.
-     */
-    static Optional<String> owingMarker(ScreenGraph graph) {
-        return graph.screens().keySet().stream().filter(c -> graph.screens().get(c).marker() == null)
-                .filter(c -> graph.screens().get(c).owes().stream().noneMatch(MapTools::markerWithReason))
-                .findFirst();
-    }
-
-    /** Whether a thing owed is the marker, with why: {@code marker — every icon here animates}. */
-    static boolean markerWithReason(String owed) {
-        return MARKER_REASON.matcher(owed).matches();
-    }
-
-    private static final Pattern MARKER_REASON = Pattern.compile("(?i)marker[ \\t]+[—–-][ \\t]+\\S.*");
 
     static String owes(String screen) {
         return screen + " still owes its marker: screenshot it, then crop_picture with screen " + screen + " and "

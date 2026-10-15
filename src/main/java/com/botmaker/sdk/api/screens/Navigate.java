@@ -22,7 +22,10 @@ import java.util.Optional;
 @Palette(category = "interaction", categoryLabel = "Interaction", icon = "🗺")
 public final class Navigate {
 
-    /** How long one step is given for the next screen's marker to show. */
+    /**
+     * How long one step is given for the next screen's marker to show: fixed, not the bot's timeouts, since a screen
+     * slow to draw is the game's pace, not the bot's.
+     */
     private static final long STEP_MS = 10_000;
 
     private Navigate() {}
@@ -42,8 +45,8 @@ public final class Navigate {
             Debug.log((screen == null ? "No screen" : screen.name()) + " is not in the bot's screen map.");
             return false;
         }
-        ScreenWalk.Result walked = new ScreenWalk(map, new RunReach(), STEP_MS,
-                constant -> Bots.fireScreen(map.shown(constant))).go(target.get(), ScreenMaps.lastSeen());
+        ScreenWalk.Result walked = new ScreenWalk(map, new RunReach(), STEP_MS, constant -> tell(map, constant))
+                .go(target.get(), ScreenMaps.lastSeen());
         ScreenMaps.seen(walked.at());
         return switch (walked.outcome()) {
             case ARRIVED -> true;
@@ -57,10 +60,12 @@ public final class Navigate {
 
     /** Whether the game shows {@code screen} now: its marker is on the screen. */
     public static boolean isOn(GameScreen screen) {
-        Optional<String> constant = ScreenMaps.installed().constantOf(screen);
+        ScreenGraph map = ScreenMaps.installed();
+        Optional<String> constant = map.constantOf(screen);
         if (constant.isEmpty() || screen.marker() == null) return false;
         RunReach reach = new RunReach();
         boolean on = reach.look().flatMap(frame -> reach.find(screen.marker(), frame)).isPresent();
+        // Remembered, not told: a screen's marker stays in view under a panel opened over it, so this may be its parent.
         if (on) ScreenMaps.seen(constant.get());
         return on;
     }
@@ -69,7 +74,13 @@ public final class Navigate {
     public static Optional<GameScreen> where() {
         ScreenGraph map = ScreenMaps.installed();
         Optional<String> here = new ScreenWalk(map, new RunReach(), STEP_MS, null).where(ScreenMaps.lastSeen());
-        here.ifPresent(ScreenMaps::seen);
+        here.ifPresent(constant -> tell(map, constant));
         return here.flatMap(map::screen);
+    }
+
+    /** Remembers the game is on {@code constant}, and tells whoever watches the run (the run bar, 🗺 Screens). */
+    private static void tell(ScreenGraph map, String constant) {
+        if (!constant.equals(ScreenMaps.lastSeen())) Bots.fireScreen(constant, map.shown(constant));
+        ScreenMaps.seen(constant);
     }
 }

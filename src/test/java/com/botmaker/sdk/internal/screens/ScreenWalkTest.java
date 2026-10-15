@@ -168,7 +168,35 @@ class ScreenWalkTest {
         assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome());
         assertEquals(List.of("click campaign", "click map"), game.done);
         assertEquals(List.of("CAMPAIGN", "MAP"), walked.walked());
-        assertEquals(walked.walked(), reached, "each screen reached is told");
+        assertEquals(List.of("HOME", "CAMPAIGN", "MAP"), reached, "the screen it starts on is told, then each reached");
+    }
+
+    /** A screen opened through an alsoFrom hides the screen it was opened from too, not only its tree parent. */
+    @Test
+    void aScreenOverTheOneAnotherWayOpenedItFromIsTheScreenShown() {
+        Game game = new Game("CAMPAIGN");
+        game.shows.get("CAMPAIGN").add("mail_title");
+
+        assertEquals(Optional.of("CAMPAIGN"), new ScreenWalk(game.map, game, STEP_MS, null).where("MAIL"),
+                "Mail's marker under Campaign, Mail looked for first: still Campaign");
+    }
+
+    /**
+     * A screen opened from another than its tree parent closes back to that one: the way back arrives once the
+     * screen left is gone, and the walk goes on from where the game is, without waiting out the step (2026-10-15).
+     */
+    @Test
+    void aWayBackThatLandsOnAnotherScreenGoesOnFromThere() {
+        Game game = new Game("CAMPAIGN");
+        game.leads.put("CAMPAIGN key ESCAPE", "MAIL");
+        List<String> reached = new ArrayList<>();
+
+        ScreenWalk.Result walked = go(game, "ENGINEER", reached);
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
+        assertEquals(List.of("key ESCAPE", "key ESCAPE", "click engineer"), game.done);
+        assertEquals(List.of("CAMPAIGN", "MAIL", "HOME", "ENGINEER"), reached);
+        assertTrue(game.now < STEP_MS, "no step waited out its time: " + game.now);
     }
 
     @Test
@@ -276,7 +304,9 @@ class ScreenWalkTest {
         boolean[] open = {false};
         Map<String, GameScreen> screens = new LinkedHashMap<>(game.map.screens());
         screens.put("ENGINEER", screens.get("ENGINEER").from(from("HOME", click("engineer")).when(() -> open[0])));
-        screens.put("MAIL", screens.get("MAIL").from(from("HOME", click("mail").when(() -> open[0]))));
+        // An input's condition is on the screen's input, which the way does (2026-10-15).
+        screens.put("HOME", screens.get("HOME").inputs(screens.get("HOME").inputs().stream()
+                .map(i -> i.sameAs(click("mail")) ? i.when(() -> open[0]) : i).toList()));
         ScreenGraph conditioned = ScreenGraph.of(screens);
 
         ScreenWalk walk = new ScreenWalk(conditioned, game, STEP_MS, reached -> {});
@@ -329,6 +359,18 @@ class ScreenWalkTest {
         ScreenWalk.Result walked = go(game, "LOBBY", new ArrayList<>());
 
         assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome());
+        assertEquals(List.of("click lobby"), game.done);
+    }
+
+    /** A panel with no marker over the screen it was opened from is where the game is, not that screen again. */
+    @Test
+    void aScreenWithNoMarkerOverItsParentIsReachedNotClickedAgain() {
+        Game game = new Game("HOME");
+        game.shows.get("LOBBY").add("home");
+
+        ScreenWalk.Result walked = go(game, "LOBBY", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
         assertEquals(List.of("click lobby"), game.done);
     }
 

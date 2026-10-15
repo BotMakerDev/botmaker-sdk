@@ -98,8 +98,8 @@ public final class IpcObserver implements BotObserver {
 
     /** The screen a walk of the map reached, as a step of the activity it is in ({@link ScreenStep}). */
     @Override
-    public void onScreen(String name) {
-        client.send(new TelemetryEvent.Step(activity, ScreenStep.action(name), -1));
+    public void onScreen(String constant, String name) {
+        client.send(new TelemetryEvent.Step(activity, ScreenStep.action(constant, name), -1));
     }
 
     /**

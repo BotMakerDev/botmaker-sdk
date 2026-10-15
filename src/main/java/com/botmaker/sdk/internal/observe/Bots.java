@@ -73,11 +73,11 @@ public final class Bots {
         }
     }
 
-    /** Tells every observer a walk of the screen map reached the screen called {@code name}. */
-    public static void fireScreen(String name) {
+    /** Tells every observer the game shows the screen {@code constant} of the map, called {@code name}. */
+    public static void fireScreen(String constant, String name) {
         for (BotObserver observer : OBSERVERS) {
             try {
-                observer.onScreen(name);
+                observer.onScreen(constant, name);
             } catch (RuntimeException ignored) {
             }
         }
