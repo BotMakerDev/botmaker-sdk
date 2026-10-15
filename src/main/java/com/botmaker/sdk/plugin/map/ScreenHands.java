@@ -60,18 +60,27 @@ final class ScreenHands {
     /** The ⋯ menu of {@code row}, an input of {@code constant}. */
     MenuButton rowMenu(String constant, Row row) {
         Input input = row.input();
+        boolean opens = graph.get().opens(constant, input).isPresent();
+        // Each menu marks what the input is now.
+        ToggleGroup did = new ToggleGroup();
         Menu result = new Menu("Result");
         result.getItems().addAll(
-                item("Untried", () -> set(constant, input, ScreenEdits.untried(input))),
-                item("Changes this screen in place", () -> set(constant, input,
-                        ScreenEdits.untried(input).did(Did.IN_PLACE))),
-                item("No visible effect", () -> set(constant, input, ScreenEdits.untried(input).did(Did.NONE))),
-                item("Leaves this screen", () -> set(constant, input, ScreenEdits.untried(input).did(Did.LEAVES))),
-                item("Opens a new screen…", () -> newScreen(constant, input)));
+                pick("Untried", did, !opens && input.did() == null, () -> set(constant, input,
+                        ScreenEdits.untried(input))),
+                pick("Changes this screen in place", did, !opens && input.did() == Did.IN_PLACE, () -> set(constant,
+                        input, ScreenEdits.untried(input).did(Did.IN_PLACE))),
+                pick("No visible effect", did, !opens && input.did() == Did.NONE, () -> set(constant, input,
+                        ScreenEdits.untried(input).did(Did.NONE))),
+                pick("Leaves this screen", did, !opens && input.did() == Did.LEAVES, () -> set(constant, input,
+                        ScreenEdits.untried(input).did(Did.LEAVES))),
+                pick("Opens a new screen…", did, opens, () -> newScreen(constant, input)));
+        ToggleGroup kinds = new ToggleGroup();
         Menu kind = new Menu("Kind");
-        kind.getItems().add(item("None", () -> set(constant, input, ScreenEdits.unkinded(input))));
+        kind.getItems().add(pick("None", kinds, input.kind() == null, () -> set(constant, input,
+                ScreenEdits.unkinded(input))));
         for (Kind k : Kind.values()) {
-            kind.getItems().add(item(label(k.name()), () -> set(constant, input, input.kind(k))));
+            kind.getItems().add(pick(label(k.name()), kinds, input.kind() == k, () -> set(constant, input,
+                    input.kind(k))));
         }
         CheckMenuItem sometimes = new CheckMenuItem("Comes and goes");
         sometimes.setSelected(input.comesAndGoes());
@@ -106,7 +115,8 @@ final class ScreenHands {
      * method it is open only while. A way back has no condition: it is the screen's own.
      */
     ContextMenu linkMenu(Link link, Runnable show) {
-        ContextMenu menu = new ContextMenu(item("Show " + link.via().label(), show));
+        ContextMenu menu = new ContextMenu(item(link.via() == null ? "About " + link.label() : "Show "
+                + link.label(), show));
         if (!link.back()) {
             menu.getItems().add(whileMenu("Open only while", link.when(), method -> done.accept(
                     ScreenEdits.setWayWhen(services, link.to(), link.from(), link.via(), method))));
@@ -224,8 +234,9 @@ final class ScreenHands {
         TextField name = new TextField();
         name.setPromptText("its name, as the game shows it");
         GameScreen on = graph.get().screens().get(parent);
+        // Its looks' inputs too: a button only one look of the screen has opens screens as well.
         ComboBox<Input> input = new ComboBox<>(FXCollections.observableArrayList(on == null ? List.of()
-                : on.inputs()));
+                : on.allInputs()));
         input.setValue(via);
         input.setDisable(via != null);
         input.setConverter(new StringConverter<>() {
@@ -275,6 +286,15 @@ final class ScreenHands {
         Label said = new Label(question);
         said.setWrapText(true);
         Modals.form(services, title, new VBox(said), yes);
+    }
+
+    /** A choice of {@code group}, ticked when it is what the input is now. */
+    private static RadioMenuItem pick(String text, ToggleGroup group, boolean now, Runnable onPress) {
+        RadioMenuItem item = new RadioMenuItem(text);
+        item.setToggleGroup(group);
+        item.setSelected(now);
+        item.setOnAction(e -> onPress.run());
+        return item;
     }
 
     private static MenuItem item(String text, Runnable onPress) {

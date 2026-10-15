@@ -20,6 +20,7 @@ import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
+import javafx.application.Platform;
 import javafx.css.PseudoClass;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
@@ -46,10 +47,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -82,17 +85,28 @@ final class ScreenCanvas {
     private static final int TRAIL = 4;
     private static final Gaps GAPS = new Gaps(90, 28);
 
+    private static final String SHOT_KEY = "screen:";
+    private static final String PICTURE_KEY = "picture:";
+
     private static final PseudoClass HERE = PseudoClass.getPseudoClass("here");
     private static final PseudoClass WALKED = PseudoClass.getPseudoClass("walked");
     private static final PseudoClass TRYING = PseudoClass.getPseudoClass("trying");
 
+    /** The most pictures and shots kept read: a long session's retakes and recuts drop the oldest. */
+    private static final int MOST_IMAGES = 400;
+
     private final Path resources;
     private final GraphCanvas<Card, Link> graph;
-    private final Map<String, StackPane> views = new HashMap<>();
     private final Map<String, FadeTransition> pulses = new HashMap<>();
-    private final Map<String, Image> thumbs = new HashMap<>();
-    /** When each card's shot was written, as last drawn: a newer one draws the cards again. */
-    private final Map<String, Long> shotTimes = new HashMap<>();
+    /** Each picture and shot read, by its file's name and time: a recut or a retake is a new key. */
+    private final Map<String, Image> thumbs = new LinkedHashMap<>(64, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Image> eldest) {
+            return size() > MOST_IMAGES;
+        }
+    };
+    /** When each card's shot and each picture drawn was written, as the cards last drew them: a newer one redraws. */
+    private final Map<String, Long> drawnTimes = new HashMap<>();
     private final Set<String> folded = new HashSet<>();
     private final Deque<String> trail = new ArrayDeque<>();
     private List<Card> cards = List.of();
@@ -117,8 +131,20 @@ final class ScreenCanvas {
         graph.getStylesheets().add(SHEET);
         graph.getStyleClass().add("screen-map");
         graph.setOnOpen(card -> {
-            if (!folded.remove(card.constant())) folded.add(card.constant());
+            // A screen with nothing below it has nothing to fold.
+            if (!folded.remove(card.constant()) && !below(card.constant()).isEmpty()) folded.add(card.constant());
             redraw();
+        });
+        // A card picked while folded away (by Find, a run, an input opening it): the folds above it open.
+        graph.selectedProperty().addListener((o, was, is) -> {
+            // Only a new pick: a redraw handing back the same screen's new card leaves a fold the user just made.
+            boolean picked = is != null && (was == null || !was.constant().equals(is.constant()));
+            if (picked && reveal(is.constant())) {
+                Platform.runLater(() -> {
+                    redraw();
+                    graph.centreOn(is.constant());
+                });
+            }
         });
         // A window made wide or tall: the tree is laid out the other way when that way now fits it better.
         graph.viewportProperty().addListener((o, was, is) -> {
@@ -226,11 +252,35 @@ final class ScreenCanvas {
     }
 
     void redraw() {
-        views.clear();
         pulses.values().forEach(Animation::stop);
         pulses.clear();
+        drawnTimes.clear();
         graph.show(cards, links);
         light();
+    }
+
+    /** The screens the tree opens from {@code constant}: its entrances' ends. */
+    private List<String> below(String constant) {
+        return links.stream().filter(l -> l.entrance() && l.from().equals(constant)).map(Link::to).toList();
+    }
+
+    /** Opens every fold above {@code constant} on the tree; whether one was folded. */
+    private boolean reveal(String constant) {
+        boolean opened = false;
+        Set<String> seen = new HashSet<>();
+        for (String at = constant; at != null && seen.add(at); ) {
+            String now = at;
+            at = links.stream().filter(l -> l.entrance() && l.to().equals(now)).map(Link::from).findFirst()
+                    .orElse(null);
+            if (at != null) opened |= folded.remove(at);
+        }
+        return opened;
+    }
+
+    /** Brings {@code constant}'s card into view, opening the folds above it: a run reached it. */
+    void centreOn(String constant) {
+        if (reveal(constant)) redraw();
+        graph.centreOn(constant);
     }
 
     /** Lights {@code constant} as the screen a run is on, the ones before it as its trail; null clears it all. */
@@ -252,11 +302,14 @@ final class ScreenCanvas {
     }
 
     private void light() {
-        views.forEach(this::light);
+        for (Card card : cards) {
+            Node view = graph.cardOf(card.constant());
+            if (view != null && pulses.containsKey(card.constant())) light(card.constant(), view);
+        }
     }
 
     /** Lights one card as the run and the tries say. */
-    private void light(String constant, StackPane view) {
+    private void light(String constant, Node view) {
         String here = trail.peekFirst();
         view.pseudoClassStateChanged(HERE, constant.equals(here));
         view.pseudoClassStateChanged(WALKED, !constant.equals(here) && trail.contains(constant));
@@ -278,16 +331,7 @@ final class ScreenCanvas {
         name.getStyleClass().add("screen-card-name");
         name.setMinWidth(0);
 
-        FlowPane pills = new FlowPane(4, 4);
-        pills.getChildren().add(pill(card.said(), "screen-pill-" + card.state().name().toLowerCase(Locale.ROOT)));
-        if (!card.shape().isEmpty()) pills.getChildren().add(pill(card.shape(), "screen-pill-plain"));
-        if (card.popup()) pills.getChildren().add(pill("popup", "screen-pill-plain"));
-        if (card.presence() == Presence.SOMETIMES) {
-            pills.getChildren().add(pill("sometimes", "screen-pill-plain"));
-        }
-        if (!card.stage().isEmpty()) pills.getChildren().add(pill(card.stage(), "screen-pill-stage"));
-
-        VBox middle = new VBox(5, name, pills);
+        VBox middle = new VBox(5, name, pills(card));
         middle.setMinWidth(0);
         HBox.setHgrow(middle, Priority.ALWAYS);
 
@@ -299,6 +343,8 @@ final class ScreenCanvas {
         bar.getStyleClass().add("screen-card-bar");
         bar.setMinHeight(4);
         VBox face = new VBox(bar);
+        // What the card draws is what a newer file is checked against: the panel's own shots leave it be.
+        if (resources != null) drawnTimes.put(SHOT_KEY + card.constant(), shotTime(card.constant()));
         shot(card.constant(), CARD_SHOT).ifPresent(face.getChildren()::add);
         face.getChildren().add(body);
         face.getStyleClass().add("screen-card");
@@ -340,15 +386,19 @@ final class ScreenCanvas {
         // stopped and the new one lit at once.
         FadeTransition was = pulses.put(card.constant(), pulse);
         if (was != null) was.stop();
-        views.put(card.constant(), view);
         light(card.constant(), view);
         return view;
     }
 
-    private static Label pill(String text, String style) {
-        Label pill = new Label(text);
-        pill.getStyleClass().addAll("screen-pill", style);
-        return pill;
+    /** {@code card}'s pills ({@link ScreenCards#pills}), as the card and the side panel show them. */
+    static FlowPane pills(Card card) {
+        FlowPane pills = new FlowPane(4, 4);
+        for (ScreenCards.Pill one : ScreenCards.pills(card)) {
+            Label pill = new Label(one.text());
+            pill.getStyleClass().addAll("screen-pill", one.style());
+            pills.getChildren().add(pill);
+        }
+        return pills;
     }
 
     private static Label badge(String text, String tip) {
@@ -403,33 +453,42 @@ final class ScreenCanvas {
 
     private Image image(String id) {
         if (resources == null) return null;
-        return thumbs.computeIfAbsent(id, name -> {
-            Path file = TemplateLibrary.fileForName(resources, name);
-            return Files.isRegularFile(file) ? new Image(file.toUri().toString(), 96, 96, true, true, !loadNow) : null;
-        });
+        Path file = TemplateLibrary.fileForName(resources, id);
+        long time = modified(file);
+        // Kept for a picture not there yet too: cut later, it is drawn then.
+        drawnTimes.put(PICTURE_KEY + id, time);
+        if (time == 0) return null;
+        // Keyed by the file's time: a picture recut by the assistant's crop_picture reads afresh, not from the cache.
+        return thumbs.computeIfAbsent(id + "@" + time, key -> new Image(file.toUri().toString(), 96, 96, true, true,
+                !loadNow));
     }
 
-    /** Pictures are read once per window: reads them again and draws the cards with them, after a recut. */
+    /** Draws the cards again with their pictures read afresh, after a recut here. */
     void forgetPictures() {
         thumbs.clear();
         redraw();
     }
 
+    /** When the picture {@code id} was written, 0 for none: a recut changes it. */
+    long pictureTime(String id) {
+        return resources == null ? 0 : modified(TemplateLibrary.fileForName(resources, id));
+    }
+
+    /** When {@code constant}'s shot was written, 0 for none: a retake changes it. */
+    long shotTime(String constant) {
+        return resources == null ? 0 : modified(ScreenShots.file(resources, constant));
+    }
+
     /**
-     * {@code constant}'s whole-screen shot ({@link ScreenShots}) at {@code width}, in a box of the game's shape so a
-     * card measures the same before and after it loads; empty while the screen has none.
+     * {@code constant}'s whole-screen shot ({@link ScreenShots}) at {@code width}, in a box of the shot's own shape so
+     * a card measures the same before and after it loads; empty while the screen has none.
      */
     Optional<Node> shot(String constant, double width) {
-        if (resources == null) return Optional.empty();
-        Path file = ScreenShots.file(resources, constant);
-        long time = modified(file);
-        if (time == 0) return Optional.empty();
-        shotTimes.put(constant, time);
-        // A card loads the game's frame at twice its width, crisp and small; the viewer loads it whole.
-        double loaded = width < CARD_LOAD_LIMIT ? width * 2 : 0;
-        Image image = thumbs.computeIfAbsent("screen:" + constant + "@" + time + ":" + loaded,
-                key -> new Image(file.toUri().toString(), loaded, 0, true, true));
-        double height = Math.round(width * 9 / 16);
+        return image(constant, width).map(image -> shot(image, width));
+    }
+
+    private static Node shot(Image image, double width) {
+        double height = heightAt(image, width);
         ImageView view = new ImageView(image);
         view.setPreserveRatio(true);
         view.setFitWidth(width);
@@ -440,7 +499,43 @@ final class ScreenCanvas {
         box.setMinSize(width, height);
         box.setPrefSize(width, height);
         box.setMaxSize(width, height);
-        return Optional.of(box);
+        return box;
+    }
+
+    /** {@code constant}'s shot read for drawing at {@code width}; empty while it has none. */
+    private Optional<Image> image(String constant, double width) {
+        if (resources == null) return Optional.empty();
+        Path file = ScreenShots.file(resources, constant);
+        long time = modified(file);
+        if (time == 0) return Optional.empty();
+        // A card loads the game's frame at twice its width, crisp and small; the viewer loads it whole.
+        double loaded = width < CARD_LOAD_LIMIT ? width * 2 : 0;
+        // A whole frame is megabytes: read for the viewer each time, never kept.
+        if (loaded == 0) return Optional.of(new Image(file.toUri().toString(), 0, 0, true, true));
+        return Optional.of(thumbs.computeIfAbsent(SHOT_KEY + constant + "@" + time + ":" + loaded,
+                key -> new Image(file.toUri().toString(), loaded, 0, true, true)));
+    }
+
+    /** How tall {@code image} draws at {@code width}: its own shape; a game's usual 16:9 until it has read. */
+    private static double heightAt(Image image, double width) {
+        boolean read = image.getWidth() > 0 && image.getHeight() > 0;
+        return Math.round(width * (read ? image.getHeight() / image.getWidth() : 9.0 / 16));
+    }
+
+    /** A box on a drawn shot, in the drawing's pixels. */
+    record Box(double x, double y, double width, double height) {}
+
+    /**
+     * Where {@code place}, cut on a {@code frameWidth} × {@code frameHeight} frame, is on a shot drawn
+     * {@code width} × {@code height}: the frame fitted into the shot whole and centred, as a frame of another shape
+     * (the game's window resized since the cut) would show on it. At least 4 pixels a side, to be clicked.
+     */
+    static Box boxOn(Rect place, double frameWidth, double frameHeight, double width, double height) {
+        double scale = Math.min(width / frameWidth, height / frameHeight);
+        double left = (width - frameWidth * scale) / 2;
+        double top = (height - frameHeight * scale) / 2;
+        return new Box(left + place.x() * scale, top + place.y() * scale, Math.max(4, place.width() * scale),
+                Math.max(4, place.height() * scale));
     }
 
     /**
@@ -450,8 +545,12 @@ final class ScreenCanvas {
     Optional<Node> shotWithInputs(String constant, double width, List<Row> rows, Map<String, FrameCut> cuts,
                                   Consumer<Row> onPick, Runnable onShot) {
         int shotWidth = resources == null ? 0 : ScreenShots.width(ScreenShots.file(resources, constant));
-        return shot(constant, width).map(shot -> {
-            double height = Math.round(width * 9 / 16);
+        // One read: the shot and its boxes are of the same file, rewritten meanwhile or not.
+        return image(constant, width).map(image -> {
+            Node shot = shot(image, width);
+            double height = heightAt(image, width);
+            // The shot is the game's frame: its height is its width in the shot's own shape.
+            double shotHeight = shotWidth * height / width;
             Pane boxes = new Pane();
             boxes.setPrefSize(width, height);
             boxes.setMaxSize(width, height);
@@ -459,12 +558,12 @@ final class ScreenCanvas {
                 FrameCut cut = row.picture() == null ? null : cuts.get(row.picture());
                 if (cut == null || cut.place() == null) continue;
                 // A picture that names no frame was cut on the game's frame, which the shot is, pixel for pixel.
-                int frame = cut.frame() != null && cut.frame().width() > 0 ? cut.frame().width() : shotWidth;
-                if (frame <= 0) continue;
-                double scale = width / frame;
-                Rect place = cut.place();
-                Rectangle box = new Rectangle(place.x() * scale, place.y() * scale,
-                        Math.max(4, place.width() * scale), Math.max(4, place.height() * scale));
+                boolean framed = cut.frame() != null && cut.frame().width() > 0 && cut.frame().height() > 0;
+                double frameWidth = framed ? cut.frame().width() : shotWidth;
+                double frameHeight = framed ? cut.frame().height() : shotHeight;
+                if (frameWidth <= 0 || frameHeight <= 0) continue;
+                Box at = boxOn(cut.place(), frameWidth, frameHeight, width, height);
+                Rectangle box = new Rectangle(at.x(), at.y(), at.width(), at.height());
                 box.getStyleClass().addAll("screen-shot-box", "screen-shot-box-" + row.state().name()
                         .toLowerCase(Locale.ROOT));
                 Tooltip.install(box, new Tooltip(row.label() + ": " + row.result()));
@@ -492,10 +591,19 @@ final class ScreenCanvas {
         });
     }
 
-    /** Whether a shot came or changed since the cards were drawn: try_input or which_screen saved one meanwhile. */
-    boolean shotsChanged() {
-        return resources != null && cards.stream().anyMatch(c -> modified(ScreenShots.file(resources, c.constant()))
-                != shotTimes.getOrDefault(c.constant(), 0L));
+    /**
+     * Whether a shot or a picture the cards draw came or changed since they were drawn: try_input, which_screen or a
+     * retake saved a shot meanwhile, or crop_picture recut a marker.
+     */
+    boolean filesChanged() {
+        if (resources == null) return false;
+        if (cards.stream().anyMatch(c -> shotTime(c.constant()) != drawnTimes.getOrDefault(SHOT_KEY + c.constant(),
+                0L))) {
+            return true;
+        }
+        return drawnTimes.entrySet().stream().filter(e -> e.getKey().startsWith(PICTURE_KEY)).anyMatch(e ->
+                modified(TemplateLibrary.fileForName(resources, e.getKey().substring(PICTURE_KEY.length())))
+                        != e.getValue());
     }
 
     private static long modified(Path file) {
@@ -510,28 +618,33 @@ final class ScreenCanvas {
 
     private Arrow arrow(Link link) {
         Arrow arrow = link.entrance() ? Arrow.solid(link.from(), link.to()) : Arrow.dashed(link.from(), link.to());
-        return link.entrance() || !link.when().isEmpty() ? arrow.withLabel(chip(link)) : arrow;
+        return link.entrance() || !link.when().isEmpty() || !link.look().isEmpty() ? arrow.withLabel(chip(link))
+                : arrow;
     }
 
     /**
-     * What an entrance does, on its arrow: the picture clicked or scrolled, or the key pressed; and the method a way
-     * is open only while, on any arrow that has one.
+     * What an entrance does, on its arrow: the picture clicked or scrolled, or the key pressed; and, on any arrow,
+     * the look its button must have and the method a way is open only while.
      */
     private Node chip(Link link) {
         Input via = link.via();
         HBox chip = new HBox(4);
-        if (link.entrance()) {
+        if (link.entrance() && via != null) {
             chip.getChildren().add(via.picture() != null ? thumb(via.picture().id(), EDGE_THUMB, "screen-edge-thumb")
                     : new Label(via.key() == null ? "?" : via.key().label()));
         }
-        if (!link.when().isEmpty()) {
-            Label when = new Label("while " + link.when());
+        List<String> needs = new ArrayList<>();
+        if (!link.look().isEmpty()) needs.add(link.look());
+        if (!link.when().isEmpty()) needs.add("while " + link.when());
+        if (!needs.isEmpty()) {
+            Label when = new Label(String.join(", ", needs));
             when.getStyleClass().add("screen-edge-when");
             chip.getChildren().add(when);
         }
         chip.setAlignment(Pos.CENTER_LEFT);
         chip.getStyleClass().add("screen-edge-chip");
-        Tooltip.install(chip, new Tooltip(via.label() + (link.when().isEmpty() ? "" : ", only while " + link.when())
+        Tooltip.install(chip, new Tooltip(link.label() + (link.look().isEmpty() ? "" : ", while it looks "
+                + link.look()) + (link.when().isEmpty() ? "" : ", only while " + link.when())
                 + "\nClick to show its picture; right-click to change when it is open."));
         return chip;
     }

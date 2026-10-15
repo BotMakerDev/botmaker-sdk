@@ -11,10 +11,9 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 
-import java.util.LinkedHashMap;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 
@@ -33,14 +32,7 @@ final class ScreenBook {
 
     /** The map, in the order the bot declares its screens; a constant the grammar cannot read is left out. */
     static ScreenGraph read(StudioServices services) {
-        PluginValues values = services.pluginValues();
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        if (values != null) {
-            for (Member member : SCREENS.members(values)) {
-                SCREENS.read(values, member).ifPresent(screen -> screens.put(member.name(), screen));
-            }
-        }
-        return ScreenGraph.of(screens);
+        return ScreenMapRead.of(services.pluginValues());
     }
 
     /** The constant {@code typed} names: the constant itself, or the name the game shows, in any case. */

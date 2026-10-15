@@ -132,22 +132,22 @@ public final class MapReport {
                                Predicate<String> shot, String constant, String indent) {
         Card card = ScreenCards.card(graph, constant, stages.getOrDefault(constant, ""));
         GameScreen screen = graph.screens().get(constant);
-        out.append(indent).append(card.name()).append(" [").append(constant).append("] ").append(card.said());
-        if (!card.shape().isEmpty()) out.append(", ").append(card.shape());
-        if (card.conditional()) out.append(", ").append(card.presence().name().toLowerCase()).append(" reached");
-        if (!card.stage().isEmpty()) out.append(", stage ").append(card.stage());
-        out.append('\n');
+        // The card's pills, in the card's words.
+        out.append(indent).append(card.name()).append(" [").append(constant).append("] ")
+                .append(String.join(", ", ScreenCards.pills(card).stream().map(ScreenCards.Pill::text).toList()))
+                .append('\n');
         out.append(indent).append("  marker ").append(card.marker() == null ? "none" : card.marker())
                 .append(" · back ").append(screen.back() == null ? "the default (a close button, then Escape)"
                         : screen.back().label())
                 .append(" · shot ").append(shot.test(constant) ? "yes" : "none").append('\n');
+        // The tree's way in, then every other: a first screen has no tree's way in and may have others.
+        List<String> ins = new ArrayList<>();
         if (screen.from() != null && screen.from().via() != null) {
-            out.append(indent).append("  in from ").append(graph.parent(constant).map(graph::shown).orElse("?"))
-                    .append(" by ").append(way(screen.from()));
-            screen.alsoFrom().forEach(way -> out.append("; also from ").append(graph.constantOf(way.from())
-                    .map(graph::shown).orElse("?")).append(" by ").append(way(way)));
-            out.append('\n');
+            ins.add("in from " + graph.parent(constant).map(graph::shown).orElse("?") + " by " + way(screen.from()));
         }
+        screen.alsoFrom().forEach(way -> ins.add("also from " + graph.constantOf(way.from()).map(graph::shown)
+                .orElse("?") + " by " + way(way)));
+        if (!ins.isEmpty()) out.append(indent).append("  ").append(String.join("; ", ins)).append('\n');
         for (ScreenVariant look : screen.variants()) {
             String when = ScreenTypes.sourceOf(look.when());
             out.append(indent).append("  look ").append(look.name()).append(": marker ")

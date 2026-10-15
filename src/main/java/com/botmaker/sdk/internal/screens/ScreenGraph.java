@@ -229,9 +229,13 @@ public final class ScreenGraph {
         return noneCut(constant) || !untried(constant).isEmpty();
     }
 
-    private boolean noneCut(String constant) {
+    /**
+     * Whether {@code constant} has nothing cut on it: no input and no way back. A popup is never so: the game opens
+     * it, and its default way back (a close button, then Escape) is its way out.
+     */
+    public boolean noneCut(String constant) {
         GameScreen screen = screens.get(constant);
-        return inputs(constant).isEmpty() && (screen == null || screen.back() == null);
+        return inputs(constant).isEmpty() && (screen == null || screen.back() == null && !screen.isPopup());
     }
 
     /**
@@ -441,7 +445,7 @@ public final class ScreenGraph {
             if (screens.get(c).marker() == null && !markerExplained(screens.get(c))) owed.add(name + ": marker");
             List<Input> untried = untried(c);
             if (!untried.isEmpty()) owed.add(name + ": untried " + labels(untried));
-            else if (noneCut(c) && !screens.get(c).isPopup()) owed.add(name + ": no input cut yet");
+            else if (noneCut(c)) owed.add(name + ": no input cut yet");
             List<Input> unseen = unseen(c);
             if (!unseen.isEmpty()) owed.add(name + ": never seen to try " + labels(unseen) + " (comes and goes)");
             for (String what : screens.get(c).owes()) if (!markerWithReason(what)) owed.add(name + ": " + what);

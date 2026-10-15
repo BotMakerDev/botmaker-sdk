@@ -377,6 +377,31 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **🗺 Screens' window, fixed throughout.**
+  - A way back of no input of its own (a close button, then Escape) no longer breaks a click or a right-click on
+    its link: it says it is the default way back.
+  - A card's shot follows a retake: the side panel drawing the new shot no longer hides it from the cards.
+  - The boxes on a shot sit on their inputs on any screen shape (16:10, portrait), a cut on a frame of another
+    shape letterboxed, not only on 16:9.
+  - ▶ Try and a box clicked on a shot shown big act on that shot's screen, not on the one picked since.
+  - Deleting the last screen clears the map (an empty read twice running); one that will not read keeps the last
+    drawing.
+  - 🗺 Screens opened again, from the toolbar or a `Screens` constant, brings the project's open window to the front.
+  - Notes being typed survive a redraw, and the panel draws again when a shot, a cut, the way back or a look
+    changed, at the panel's own width. The panel says the stage the notes reached, as the card does.
+  - The `Screens` constant view reads the map once, and a map that will not read draws the slot as written.
+  - A double-click on a screen with nothing below it no longer folds it; a screen picked by Find, a run or an input
+    opening it opens the folds above it.
+  - Pictures and shots read are kept to 400, and a picture recut by crop_picture is read again.
+  - After another project opens, the old window's panel is off.
+  - read_map says a first screen's other ways in.
+  - A popup with nothing cut is finished on its card as Discovery counts it: its default way back is its way out.
+  - The card, the panel, the constant view and read_map say a screen's pills from one list; an input's row counts it
+    tried as the card's ring does.
+- **🗺 Screens' small gains.** The Result and Kind menus tick what the input is now; New screen from here offers the
+  screen's looks' inputs too; a link shows the look its button must have; the hand menus are off while a try or a
+  walk runs.
+
 - **try_input waits for a screen slow to draw.** A small first change (a button's press, the background swaying)
   ended the wait before the screen it opens showed, and the input was noted as changing the screen in place.
   While the screen's marker still shows, the tool now reads on for up to 2.5 s more.

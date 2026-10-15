@@ -34,10 +34,10 @@ import javafx.stage.Window;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -53,9 +53,9 @@ final class ScreenPanel {
 
     private static final double ROW_THUMB = 48;
     private static final double HEAD_THUMB = 60;
-    /** The selected screen's whole-screen shot, the panel's width less its padding. */
-    /** The selected screen's shot, wide enough to click its boxed inputs. */
-    private static final double HEAD_SHOT = 400;
+    /** The selected screen's shot is the panel's width less its padding, and never narrower than this. */
+    private static final double LEAST_SHOT = 200;
+    private static final double PADDING = 14;
 
     private final StudioServices services;
     private final ScreenCanvas canvas;
@@ -74,6 +74,11 @@ final class ScreenPanel {
     /** What the panel last drew, so a poll that changed nothing redraws nothing. */
     private Object drawn;
     private boolean busy;
+    /** The notes box, kept over redraws while it shows the same screen: what is being typed is not lost to a poll. */
+    private TextArea notesEdit;
+    private String notesOf;
+    /** The notes as the map held them when the box was filled: a box still holding them takes newer ones. */
+    private String notesRead;
 
     /**
      * @param changed run once an action wrote the map, so the window reads it at once rather than at its next poll
@@ -90,17 +95,29 @@ final class ScreenPanel {
             changed.run();
         });
         content.getStyleClass().add("screen-panel");
-        content.setPadding(new Insets(14));
+        content.setPadding(new Insets(PADDING));
         content.setFillWidth(true);
         root.setFitToWidth(true);
         root.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        // Always there: a scrollbar coming and going with the shot's height would change the width the shot is drawn
+        // at, and so its height, again and again.
+        root.setVbarPolicy(ScrollPane.ScrollBarPolicy.ALWAYS);
         root.getStyleClass().addAll("screen-map", "screen-panel-scroller");
         root.getStylesheets().add(ScreenCanvas.SHEET);
         root.setPrefWidth(440);
         root.setMinWidth(260);
         status.setWrapText(true);
         status.getStyleClass().add("screen-panel-status");
+        // The panel made wider or narrower: its shot is drawn again at the new width.
+        root.viewportBoundsProperty().addListener((o, was, is) -> {
+            if (was == null || Math.abs(was.getWidth() - is.getWidth()) >= 8) draw();
+        });
         draw();
+    }
+
+    /** The project this panel was of is closed: nothing on it acts any more. */
+    void closed() {
+        root.setDisable(true);
     }
 
     Node node() {
@@ -117,13 +134,45 @@ final class ScreenPanel {
     private void draw() {
         GameScreen at = selected == null ? null : graph.screens().get(selected);
         String notes = at == null || at.notes() == null ? "" : at.notes();
+        Map<String, FrameCut> cuts = selected == null || services.pluginValues() == null ? Map.of()
+                : TemplateUses.cuts(services.pluginValues());
+        double width = shotWidth();
+        // Everything the panel shows: the screen itself (its back, looks, notes and debts), its card and rows, where
+        // its inputs were cut, when its shot was taken and how wide it is drawn.
         Object now = selected == null ? List.of(graph.screens().values().stream().allMatch(GameScreen::isPopup), busy)
-                : List.of(ScreenCards.card(graph, selected, ""), ScreenCards.rows(graph, selected),
-                ScreenCards.path(graph, selected), notes, at.owes(), busy);
+                : List.of(at, card(selected), ScreenCards.rows(graph, selected), ScreenCards.path(graph, selected),
+                cutsOf(at, cuts), canvas.shotTime(selected), pictureTimes(), width, busy);
         if (now.equals(drawn)) return;
         drawn = now;
-        content.getChildren().setAll(selected == null ? none() : screen(notes));
+        content.getChildren().setAll(selected == null ? none() : screen(notes, cuts, width));
         content.getChildren().add(status);
+    }
+
+    /** {@code constant}'s card, the stage its notes say it reached on it. */
+    private Card card(String constant) {
+        return ScreenCards.card(graph, constant, ScreenDesk.stages(graph).getOrDefault(constant, ""));
+    }
+
+    /** Where each picture {@code screen} uses was cut: what its shot's boxes are drawn from. */
+    private Map<String, FrameCut> cutsOf(GameScreen screen, Map<String, FrameCut> cuts) {
+        if (screen == null) return Map.of();
+        Map<String, FrameCut> used = new TreeMap<>();
+        for (String id : graph.pictures(selected)) {
+            FrameCut cut = cuts.get(id);
+            if (cut != null) used.put(id, cut);
+        }
+        return used;
+    }
+
+    /** When each picture the selected screen uses was written: a recut draws its thumbs again. */
+    private List<Long> pictureTimes() {
+        return graph.pictures(selected).stream().map(canvas::pictureTime).toList();
+    }
+
+    /** How wide the selected screen's shot is drawn: the panel's width less its padding. */
+    private double shotWidth() {
+        double seen = root.getViewportBounds() == null ? 0 : root.getViewportBounds().getWidth();
+        return Math.max(LEAST_SHOT, Math.floor((seen > 0 ? seen : root.getPrefWidth()) - 2 * PADDING));
     }
 
     private List<Node> none() {
@@ -142,9 +191,10 @@ final class ScreenPanel {
                 + "Discovery fills in the rest, or cut and try each input here."), first, cut);
     }
 
-    private List<Node> screen(String notes) {
-        Card card = ScreenCards.card(graph, selected, "");
+    private List<Node> screen(String notes, Map<String, FrameCut> cuts, double shotWidth) {
+        Card card = card(selected);
         GameScreen screen = graph.screens().get(selected);
+        String shown = selected;
 
         Label name = new Label(card.name());
         name.getStyleClass().add("screen-panel-name");
@@ -161,62 +211,72 @@ final class ScreenPanel {
         HBox head = new HBox(12, canvas.thumb(card.marker(), HEAD_THUMB, "screen-card-thumb"), titles);
         head.setAlignment(Pos.CENTER_LEFT);
 
-        FlowPane pills = new FlowPane(4, 4, pill(card.said(), "screen-pill-" + card.state().name()
-                .toLowerCase(Locale.ROOT)));
-        if (!card.shape().isEmpty()) pills.getChildren().add(pill(card.shape(), "screen-pill-plain"));
-        if (card.conditional()) {
-            pills.getChildren().add(pill(card.presence() == ScreenGraph.Presence.LOCKED ? "locked" : "sometimes",
-                    "screen-pill-plain"));
-        }
+        FlowPane pills = ScreenCanvas.pills(card);
 
-        List<Row> rows = ScreenCards.rows(graph, selected);
+        List<Row> rows = ScreenCards.rows(graph, shown);
         Optional<Row> next = rows.stream().filter(r -> r.state() == ScreenCards.RowState.UNTRIED).findFirst();
         Button tryNext = action("▶ Try next", next.map(r -> "Try " + r.label() + " as the assistant's try_input does")
-                .orElse("Nothing on it is left to try"), () -> next.ifPresent(r -> tryRow(r)));
+                .orElse("Nothing on it is left to try"), () -> next.ifPresent(r -> tryRow(shown, r)));
         tryNext.setDisable(busy || next.isEmpty());
         tryNext.getStyleClass().add("screen-panel-primary");
         Button cutInputs = action("✂ Cut inputs", "Draw boxes around more of its buttons: each is noted untried",
-                () -> cut(selected, false));
+                () -> cut(shown, false));
         Button cutMarker = action(screen.marker() == null ? "✂ Cut marker" : "✂ Recut marker",
-                "Draw a box around a part only this screen shows", () -> cut(selected, true));
+                "Draw a box around a part only this screen shows", () -> cut(shown, true));
         Button go = action("🧭 Go here", "Walk the game here by the map, as Navigate.to does in a run",
-                this::goHere);
+                () -> goHere(shown));
         go.setDisable(busy || card.popup());
-        String shownNow = selected;
-        FlowPane actions = new FlowPane(8, 8, tryNext, go, cutInputs, cutMarker,
-                hands.screenMenu(shownNow, this::retake));
+        cutInputs.setDisable(busy);
+        cutMarker.setDisable(busy);
+        // No hand edit while a try or a walk writes the map: the two would race for Screens.java.
+        Node screenMenu = hands.screenMenu(shown, this::retake);
+        screenMenu.setDisable(busy);
+        FlowPane actions = new FlowPane(8, 8, tryNext, go, cutInputs, cutMarker, screenMenu);
 
         VBox inputs = new VBox(6);
         if (rows.isEmpty()) inputs.getChildren().add(text("No input cut yet."));
-        for (Row row : rows) inputs.getChildren().add(row(row));
+        for (Row row : rows) inputs.getChildren().add(row(shown, row));
 
         VBox all = new VBox(12, head, pills, actions, heading("Inputs"), inputs);
-        Map<String, FrameCut> cuts = services.pluginValues() == null ? Map.of()
-                : TemplateUses.cuts(services.pluginValues());
-        String shown = selected;
-        canvas.shotWithInputs(shown, HEAD_SHOT, rows, cuts, this::pick, () -> showScreen(shown))
+        canvas.shotWithInputs(shown, shotWidth, rows, cuts, row -> pick(shown, row), () -> showScreen(shown))
                 .ifPresent(shot -> all.getChildren().addFirst(shot));
-        if (screen.back() != null) all.getChildren().add(text("Way back: " + screen.back().label() + "."));
+        all.getChildren().add(text("Way back: " + (screen.back() == null ? "the default one, a close button, then "
+                + "Escape" : screen.back().label()) + "."));
         if (!screen.owes().isEmpty()) {
             all.getChildren().addAll(heading("Owes"), text("• " + String.join("\n• ", screen.owes())));
         }
         // The notes live on the screen's constant: edited here, written as the assistant's write_notes writes them.
-        TextArea edit = new TextArea(notes);
-        edit.setWrapText(true);
-        edit.setPrefRowCount(6);
-        edit.setPromptText("What this screen spends and earns, its timers, badges and quirks");
-        edit.getStyleClass().add("screen-panel-notes");
-        String noted = selected;
-        Button save = action("Save notes", "Keep these notes on " + graph.shown(noted) + ", in the bot's Screens",
+        TextArea edit = notesBox(shown, notes);
+        Button save = action("Save notes", "Keep these notes on " + graph.shown(shown) + ", in the bot's Screens",
                 () -> {
-                    say(ScreenEdits.setNotes(services, noted, edit.getText()));
+                    notesRead = edit.getText();
+                    say(ScreenEdits.setNotes(services, shown, edit.getText()));
                     changed.run();
                 });
         all.getChildren().addAll(heading("Notes"), edit, save);
         return List.of(all);
     }
 
-    private Node row(Row row) {
+    /**
+     * The notes box for {@code constant}: the one shown already while it is the same screen's, so a poll that draws
+     * the panel again keeps what is being typed; it takes {@code notes} only while it still holds what was read.
+     */
+    private TextArea notesBox(String constant, String notes) {
+        if (notesEdit == null || !constant.equals(notesOf)) {
+            notesEdit = new TextArea(notes);
+            notesEdit.setWrapText(true);
+            notesEdit.setPrefRowCount(6);
+            notesEdit.setPromptText("What this screen spends and earns, its timers, badges and quirks");
+            notesEdit.getStyleClass().add("screen-panel-notes");
+            notesOf = constant;
+        } else if (notesEdit.getText().equals(notesRead)) {
+            notesEdit.setText(notes);
+        }
+        notesRead = notes;
+        return notesEdit;
+    }
+
+    private Node row(String constant, Row row) {
         Label label = new Label(row.label());
         label.getStyleClass().add("screen-row-label");
         label.setMinWidth(0);
@@ -242,7 +302,7 @@ final class ScreenPanel {
             Node one = canvas.thumb(picture, ROW_THUMB, "screen-row-thumb");
             if (picture != null) {
                 Tooltip.install(one, new Tooltip("Show " + picture + " at its own size"));
-                one.setOnMouseClicked(e -> showPicture(row));
+                one.setOnMouseClicked(e -> showPicture(constant, row));
             }
             return one;
         }, result, row.result());
@@ -251,26 +311,31 @@ final class ScreenPanel {
         line.setAlignment(Pos.CENTER_LEFT);
         line.getStyleClass().add("screen-row");
         if (untried) {
-            Button play = action("▶", "Try " + row.label(), () -> tryRow(row));
+            Button play = action("▶", "Try " + row.label(), () -> tryRow(constant, row));
             play.setDisable(busy);
             line.getChildren().add(play);
         }
-        line.getChildren().add(hands.rowMenu(selected, row));
+        Node menu = hands.rowMenu(constant, row);
+        menu.setDisable(busy);
+        line.getChildren().add(menu);
         return line;
     }
 
     // --- actions ---
 
-    /** A boxed input clicked on a shot: the screen it opens, selected on the map; else its picture. */
-    private void pick(ScreenCards.Row row) {
-        Optional<String> opens = selected == null ? Optional.empty() : graph.opens(selected, row.input());
+    /**
+     * A boxed input of {@code constant} clicked on a shot: the screen it opens, selected on the map; else its
+     * picture. The shot's own screen, not the one picked since: the big view stays open on it.
+     */
+    private void pick(String constant, ScreenCards.Row row) {
+        Optional<String> opens = graph.opens(constant, row.input());
         if (opens.isPresent()) canvas.select(opens.get());
-        else showPicture(row);
+        else showPicture(constant, row);
     }
 
-    private void showPicture(ScreenCards.Row row) {
+    private void showPicture(String constant, ScreenCards.Row row) {
         boolean untried = row.state() == ScreenCards.RowState.UNTRIED || row.state() == ScreenCards.RowState.UNSEEN;
-        viewer.showPicture(row, untried && !busy ? () -> tryRow(row) : null, () -> {
+        viewer.showPicture(row, untried && !busy ? () -> tryRow(constant, row) : null, () -> {
             drawn = null;
             canvas.forgetPictures();
             changed.run();
@@ -280,6 +345,8 @@ final class ScreenPanel {
     /** The right-click menu of {@code constant}'s card: its shot shown big, then the ⋯ Screen menu's edits. */
     ContextMenu menuFor(String constant) {
         ContextMenu menu = new ContextMenu(hands.screenItems(constant, this::retake).toArray(MenuItem[]::new));
+        // No hand edit while a try or a walk writes the map.
+        menu.getItems().forEach(item -> item.setDisable(busy));
         MenuItem big = new MenuItem("🔍 Show the screen big");
         big.setOnAction(e -> showScreen(constant));
         menu.getItems().addAll(0, List.of(big, new SeparatorMenuItem()));
@@ -288,15 +355,21 @@ final class ScreenPanel {
 
     /** The right-click menu of {@code link}: its picture, and when its way is open. */
     ContextMenu linkMenu(ScreenCards.Link link) {
-        return hands.linkMenu(link, () -> showLink(link));
+        ContextMenu menu = hands.linkMenu(link, () -> showLink(link));
+        menu.getItems().stream().skip(1).forEach(item -> item.setDisable(busy));
+        return menu;
     }
 
     /** A link clicked on the map: the screen it leaves picked, and the picture clicked on it shown. */
     void showLink(ScreenCards.Link link) {
         canvas.select(link.from());
-        ScreenCards.rows(graph, link.from()).stream().filter(r -> r.input().sameAs(link.via())).findFirst()
-                .ifPresentOrElse(this::showPicture, () -> say(link.via().label() + " is " + graph.shown(link.from())
-                        + "'s way back, not one of its inputs: its picture shows in 🖼 Manage Pictures."));
+        Optional<Row> row = link.via() == null ? Optional.empty() : ScreenCards.rows(graph, link.from()).stream()
+                .filter(r -> r.input().sameAs(link.via())).findFirst();
+        row.ifPresentOrElse(r -> showPicture(link.from(), r), () -> say(link.via() == null
+                ? graph.shown(link.from()) + " has no way back of its own: a walk closes it by its close button, "
+                + "else Escape."
+                : link.via().label() + " is " + graph.shown(link.from()) + "'s way back, not one of its inputs: its "
+                + "picture shows in 🖼 Manage Pictures."));
     }
 
     /** {@code constant}'s shot in the picture window, big, its inputs boxed: Ctrl+scroll or the wheel zooms it. */
@@ -305,7 +378,7 @@ final class ScreenPanel {
                 : TemplateUses.cuts(services.pluginValues());
         List<Row> rows = ScreenCards.rows(graph, constant);
         if (!viewer.showScreen(graph.shown(constant), width -> canvas.shotWithInputs(constant, width, rows, cuts,
-                this::pick, null))) {
+                row -> pick(constant, row), null))) {
             say(graph.shown(constant) + " has no shot yet: ⋯ Screen ▸ take it again while the game shows it.");
         }
     }
@@ -321,8 +394,7 @@ final class ScreenPanel {
         viewer.close();
     }
 
-    private void tryRow(Row row) {
-        String constant = selected;
+    private void tryRow(String constant, Row row) {
         if (!ScreenDesk.asksWhatItOpens(graph, constant, row.input())) {
             tryRow(row, constant, null);
             return;
@@ -340,8 +412,7 @@ final class ScreenPanel {
                 opens));
     }
 
-    private void goHere() {
-        String constant = selected;
+    private void goHere(String constant) {
         PanelContext context = new PanelContext(services, CaptureValue.current(services));
         run("Going to " + graph.shown(constant) + "…", constant, () -> ScreenDesk.goTo(context, constant));
     }

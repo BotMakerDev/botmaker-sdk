@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -151,6 +152,72 @@ class ScreenCardsTest {
                 .filter(l -> l.to().equals("CAMPAIGN") && !l.back()).findFirst().orElseThrow();
         assertEquals("Firestone::eventOn", campaign.when());
         assertTrue(ScreenCards.links(map()).stream().allMatch(l -> l.when().isEmpty()), "no method, nothing said");
+    }
+
+    @Test
+    void aWayBackOfNoInputReadsAsTheDefaultOne() {
+        Link back = ScreenCards.links(map()).stream().filter(l -> l.back() && l.from().equals("CAMPAIGN"))
+                .findFirst().orElseThrow();
+        assertEquals(null, back.via(), "Campaign has no back of its own");
+        assertEquals("the default way back (a close button, then Escape)", back.label());
+    }
+
+    @Test
+    void aPopupWithNothingCutIsFinishedAsTheGraphCountsIt() {
+        Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.put("OFFER", GameScreen.named("Offer").marker(picture("offer")).popup());
+        ScreenGraph graph = ScreenGraph.of(screens);
+        assertFalse(graph.noneCut("OFFER"), "its default way back is its way out");
+        assertFalse(graph.unfinished("OFFER"));
+        assertEquals(State.FINISHED, ScreenCards.card(graph, "OFFER", "").state());
+        assertTrue(graph.owed().stream().noneMatch(o -> o.startsWith("Offer")));
+        assertTrue(graph.noneCut("ENGINEER"));
+    }
+
+    @Test
+    void theCardsPillsAreOneListForEveryView() {
+        assertEquals(List.of("finished", "activity", "surveyed"),
+                ScreenCards.pills(card("CAMPAIGN")).stream().map(ScreenCards.Pill::text).toList());
+        assertEquals(List.of("screen-pill-finished", "screen-pill-plain", "screen-pill-stage"),
+                ScreenCards.pills(card("CAMPAIGN")).stream().map(ScreenCards.Pill::style).toList());
+        assertEquals(List.of("nothing cut", "locked"),
+                ScreenCards.pills(card("ARENA")).stream().map(ScreenCards.Pill::text).toList());
+        assertEquals(List.of("finished", "popup"),
+                ScreenCards.pills(card("REWARD")).stream().map(ScreenCards.Pill::text).toList());
+    }
+
+    @Test
+    void aLinkSaysTheLookItsButtonMustHave() {
+        Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.put("CAMPAIGN", screens.get("CAMPAIGN").from(Way.of(BotConstants.screen("HOME"), click("campaign"))
+                .whenLooks(com.botmaker.sdk.api.screens.State.BADGE)));
+        Link campaign = ScreenCards.links(ScreenGraph.of(screens)).stream()
+                .filter(l -> l.to().equals("CAMPAIGN") && !l.back()).findFirst().orElseThrow();
+        assertEquals("badge", campaign.look());
+        assertTrue(ScreenCards.links(map()).stream().allMatch(l -> l.look().isEmpty()));
+    }
+
+    @Test
+    void anInputsBoxIsPlacedOnAShotOfAnyShape() {
+        Rect centre = new Rect(960, 540, 192, 108);
+        assertEquals(new ScreenCanvas.Box(200, 112.5, 40, 22.5),
+                ScreenCanvas.boxOn(centre, 1920, 1080, 400, 225), "16:9");
+        assertEquals(new ScreenCanvas.Box(200, 112.5, 40, 22.5),
+                ScreenCanvas.boxOn(centre, 1920, 1200, 400, 250), "16:10, no 9/16 assumed");
+        assertEquals(new ScreenCanvas.Box(100, 200, 20, 20),
+                ScreenCanvas.boxOn(new Rect(540, 1080, 108, 108), 1080, 2160, 200, 400), "portrait");
+        assertEquals(new ScreenCanvas.Box(0, 12.5, 4, 4),
+                ScreenCanvas.boxOn(new Rect(0, 0, 1, 1), 1920, 1080, 400, 250),
+                "a 16:9 cut on a 16:10 shot: letterboxed, and never smaller than 4 pixels");
+    }
+
+    @Test
+    void theConstantViewFindsItsScreenOnlyOnAMapThatRead() {
+        GameScreen campaign = map().screens().get("CAMPAIGN");
+        assertEquals(Optional.of("CAMPAIGN"), ScreenConstantView.constantOf(map(), Optional.of(campaign)));
+        assertEquals(Optional.empty(), ScreenConstantView.constantOf(ScreenGraph.of(Map.of()),
+                Optional.of(campaign)), "a map that did not read: the slot draws as written");
+        assertEquals(Optional.empty(), ScreenConstantView.constantOf(map(), Optional.empty()));
     }
 
     @Test

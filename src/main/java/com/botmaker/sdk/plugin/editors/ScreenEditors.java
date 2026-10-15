@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import javafx.geometry.Side;
 import javafx.scene.Node;
@@ -24,9 +25,7 @@ import javafx.scene.image.ImageView;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -84,18 +83,8 @@ public final class ScreenEditors {
 
     /** The bot's map as it is now; empty when there is none or it will not read. */
     private static ScreenGraph graph(PluginValues values) {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        try {
-            if (values != null) {
-                for (Member member : SCREENS.members(values)) {
-                    SCREENS.read(values, member).ifPresent(screen -> screens.put(member.name(), screen));
-                }
-            }
-        } catch (RuntimeException unreadable) {
-            // A map that will not read leaves the picker empty, never the block undrawn.
-            return ScreenGraph.of(Map.of());
-        }
-        return ScreenGraph.of(screens);
+        // A map that will not read leaves the picker empty, never the block undrawn.
+        return ScreenMapRead.orEmpty(values);
     }
 
     /** The picker. The map is read again each time the list opens: a screen mapped since then is offered. */

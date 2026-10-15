@@ -35,6 +35,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -52,6 +53,9 @@ public final class ScreenMap {
     /** How often the map is read again while shown. */
     static final Duration POLL = Duration.seconds(1.5);
 
+    /** The window open on each project, by its folder. On the FX thread. */
+    private static final Map<Path, ScreenMap> OPEN = new HashMap<>();
+
     private final StudioServices services;
     private final ScreenCanvas canvas;
     private final ScreenPanel panel;
@@ -68,6 +72,8 @@ public final class ScreenMap {
     private final Path project;
     /** Set when a message is shown that the next read's summary must not replace at once. */
     private boolean saidOnce;
+    /** Set when a read found no screen while some were drawn: the next one says whether the map is really empty. */
+    private boolean emptyOnce;
 
     /** The map with its side panel ({@code withPanel}) or without, for the overlay editor's narrow pane. */
     ScreenMap(StudioServices services, boolean withPanel) {
@@ -103,13 +109,28 @@ public final class ScreenMap {
         open(context.services(), null);
     }
 
-    /** The map in its window with {@code constant} picked: a {@code Screens} constant in the editor asked for it. */
+    /**
+     * The map in its window with {@code constant} picked: a {@code Screens} constant in the editor asked for it. A
+     * project has one such window: asked again, the open one comes to the front.
+     */
     public static void open(StudioServices services, String constant) {
+        Path project = services.projectDir();
+        ScreenMap open = project == null ? null : OPEN.get(project);
+        if (open != null && open.window instanceof Stage shown) {
+            shown.toFront();
+            shown.requestFocus();
+            if (constant != null) open.canvas.select(constant);
+            return;
+        }
         ScreenMap map = new ScreenMap(services, true);
         Stage stage = Modals.window(services, Modals.owner(services),
                 Modals.Frame.modeless("Screens", 1180, 720, 760, 460), (BorderPane) map.node());
         map.window = stage;
-        stage.setOnHidden(e -> map.stop());
+        if (project != null) OPEN.put(project, map);
+        stage.setOnHidden(e -> {
+            map.stop();
+            if (project != null) OPEN.remove(project, map);
+        });
         stage.show();
         map.start();
         // After start's first read, so the card is drawn to be picked.
@@ -154,6 +175,9 @@ public final class ScreenMap {
         if (!Objects.equals(project, services.projectDir())) {
             // Another project is open now: this map is of the one that closed.
             stop();
+            // The window stays as it was, but is no longer the one its project opens again.
+            OPEN.remove(project, this);
+            if (panel != null) panel.closed();
             said.setText("The project this map was of is closed.");
             return;
         }
@@ -167,11 +191,13 @@ public final class ScreenMap {
                     + Objects.requireNonNullElse(unreadable.getMessage(), unreadable.toString()));
             return;
         }
-        if (read.screens().isEmpty() && cards != null && !cards.isEmpty()) {
-            // Read while Screens.java was being written, the canvas went blank for a poll (2026-10-15): a map is
-            // never emptied by Discovery, so the last drawing stays until the next read.
+        if (read.screens().isEmpty() && cards != null && !cards.isEmpty() && !emptyOnce) {
+            // Read while Screens.java was being written, the canvas went blank for a poll (2026-10-15): the last
+            // drawing stays for one read. Empty twice running, it is empty: its last screen was deleted.
+            emptyOnce = true;
             return;
         }
+        emptyOnce = false;
         graph = read;
         List<Card> nowCards = ScreenCards.cards(read, stages);
         List<Link> nowLinks = ScreenCards.links(read);
@@ -179,7 +205,7 @@ public final class ScreenMap {
             cards = nowCards;
             links = nowLinks;
             canvas.show(cards, links, ScreenCards.root(read).orElse(null));
-        } else if (canvas.shotsChanged()) {
+        } else if (canvas.filesChanged()) {
             canvas.redraw();
         }
         if (!saidOnce) said.setText(summary(nowCards));
@@ -207,7 +233,7 @@ public final class ScreenMap {
             if (!graph.screens().containsKey(shown.constant())) return;
             canvas.setHere(shown.constant());
             // Followed only while the user looks at no screen of their own.
-            if (selected == null) canvas.graph().centreOn(shown.constant());
+            if (selected == null) canvas.centreOn(shown.constant());
         }));
     }
 

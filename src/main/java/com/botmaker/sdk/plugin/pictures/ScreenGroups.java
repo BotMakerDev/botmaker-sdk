@@ -1,11 +1,6 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.source.PluginValues;
-import com.botmaker.plugin.api.source.PluginValues.Member;
-import com.botmaker.plugin.toolkit.ManagedSet;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
 import java.nio.file.Path;
@@ -22,25 +17,12 @@ import java.util.stream.Stream;
  */
 final class ScreenGroups {
 
-    private static final ManagedSet<GameScreen> SCREENS = ManagedSet.of(SdkValues.SCREEN_MAP);
-
     private ScreenGroups() {}
 
     /** Each screen's group of {@code files}, keyed by {@link TemplateGalleryModel#screenKey}. On the FX thread. */
     static Map<String, List<Path>> of(StudioServices services, List<Path> files) {
-        PluginValues values = services.pluginValues();
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        try {
-            if (values != null) {
-                for (Member member : SCREENS.members(values)) {
-                    SCREENS.read(values, member).ifPresent(screen -> screens.put(member.name(), screen));
-                }
-            }
-        } catch (RuntimeException unreadable) {
-            // A map that will not read costs its groups, never the pictures window.
-            return Map.of();
-        }
-        return groups(ScreenGraph.of(screens), files);
+        // A map that will not read costs its groups, never the pictures window.
+        return groups(ScreenMapRead.orEmpty(services.pluginValues()), files);
     }
 
     /**

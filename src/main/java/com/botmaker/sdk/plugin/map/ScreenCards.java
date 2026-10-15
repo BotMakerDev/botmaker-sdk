@@ -64,7 +64,16 @@ final class ScreenCards {
      * One edge: {@code via} on {@code from} reaches {@code to}. The entrance (the screen's {@code from}) is solid and
      * places the cards; another way in and a way back are dashed.
      */
-    record Link(String from, String to, Input via, boolean entrance, boolean back, String when) {}
+    record Link(String from, String to, Input via, boolean entrance, boolean back, String when, String look) {
+
+        /** How the link's input reads; a way back with none of its own reads as the default one. */
+        String label() {
+            return via == null ? "the default way back (a close button, then Escape)" : via.label();
+        }
+    }
+
+    /** One of a card's pills: its words and its style class ({@code screen-pill-untried}). */
+    record Pill(String text, String style) {}
 
     /**
      * One input in the side panel.
@@ -105,13 +114,12 @@ final class ScreenCards {
         int chores = (int) inputs.stream().filter(i -> i.kind() == Kind.CHORE).count();
         int untried = graph.untried(constant).size();
         int unseen = graph.unseen(constant).size();
-        boolean noneCut = inputs.isEmpty() && screen.back() == null && !screen.isPopup();
         State state;
         String said;
         if (screen.marker() == null) {
             state = State.OWES;
             said = "owes its marker";
-        } else if (noneCut) {
+        } else if (graph.noneCut(constant)) {
             state = State.OWES;
             said = "nothing cut";
         } else if (untried > 0) {
@@ -128,6 +136,20 @@ final class ScreenCards {
                 stage == null ? "" : stage);
     }
 
+    /**
+     * {@code card}'s pills, as its card, the side panel, the constant view and read_map all say them: how far it got,
+     * its shape, popup, whether it is reached only at times or is locked, and the stage its notes say it reached.
+     */
+    static List<Pill> pills(Card card) {
+        List<Pill> pills = new ArrayList<>();
+        pills.add(new Pill(card.said(), "screen-pill-" + card.state().name().toLowerCase(Locale.ROOT)));
+        if (!card.shape().isEmpty()) pills.add(new Pill(card.shape(), "screen-pill-plain"));
+        if (card.popup()) pills.add(new Pill("popup", "screen-pill-plain"));
+        if (card.conditional()) pills.add(new Pill(card.presence().name().toLowerCase(Locale.ROOT), "screen-pill-plain"));
+        if (!card.stage().isEmpty()) pills.add(new Pill(card.stage(), "screen-pill-stage"));
+        return pills;
+    }
+
     /** Every edge, each entrance marked: the one the screen it reaches was made known by. */
     static List<Link> links(ScreenGraph graph) {
         List<Link> links = new ArrayList<>();
@@ -139,7 +161,8 @@ final class ScreenCards {
                     && graph.parent(edge.to()).filter(edge.from()::equals).isPresent()
                     && entered.add(edge.to());
             links.add(new Link(edge.from(), edge.to(), edge.via(), entrance, edge.back(),
-                    edge.when() == null ? "" : ScreenTypes.sourceOf(edge.when())));
+                    edge.when() == null ? "" : ScreenTypes.sourceOf(edge.when()),
+                    edge.state() == null ? "" : edge.state().displayName().toLowerCase(Locale.ROOT)));
         }
         return links;
     }
@@ -179,17 +202,16 @@ final class ScreenCards {
         } else if (input.lock() != null) {
             state = RowState.LOCKED;
             result = "locked";
-        } else if (opens.isPresent()) {
+        } else if (graph.tried(constant, input)) {
+            // As the graph counts a tried input, so the card's ring and the rows never disagree.
             state = RowState.TRIED;
-            result = "→ " + String.join(" / ", graph.leads(constant, input).stream().map(lead -> graph.shown(lead.to())
-                    + said(lead.state(), lead.when())).distinct().toList());
-        } else if (input.did() != null) {
-            state = RowState.TRIED;
-            result = switch (input.did()) {
-                case IN_PLACE -> "in place";
-                case NONE -> "no effect";
-                case LEAVES -> "leaves";
-            };
+            result = opens.isPresent() ? "→ " + String.join(" / ", graph.leads(constant, input).stream()
+                    .map(lead -> graph.shown(lead.to()) + said(lead.state(), lead.when())).distinct().toList())
+                    : input.did() == null ? "tried" : switch (input.did()) {
+                        case IN_PLACE -> "in place";
+                        case NONE -> "no effect";
+                        case LEAVES -> "leaves";
+                    };
         } else if (input.comesAndGoes()) {
             state = RowState.UNSEEN;
             result = "not seen yet";

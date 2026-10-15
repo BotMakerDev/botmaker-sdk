@@ -2,9 +2,6 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.plugin.api.source.PluginValues;
-import com.botmaker.plugin.api.source.PluginValues.Member;
-import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.internal.bot.SdkValues;
@@ -13,6 +10,7 @@ import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
+import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import javafx.geometry.Insets;
@@ -28,7 +26,7 @@ import javafx.scene.layout.VBox;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Objects;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -39,7 +37,6 @@ import java.util.Optional;
  */
 public final class ScreenConstantView {
 
-    private static final ManagedSet<GameScreen> SCREENS = ManagedSet.of(SdkValues.SCREEN_MAP);
     private static final double THUMB = 40;
     private static final double SHOT = 360;
 
@@ -48,24 +45,24 @@ public final class ScreenConstantView {
     /** Whether {@code ctx} is a {@code Screens} constant's own value, not a reference to one. */
     public static boolean isScreenConstant(ValueContext ctx) {
         return ctx.type().is(GameScreen.class) && ctx.member(SdkValues.SCREEN_MAP).isEmpty()
-                && constantOf(ctx).isPresent();
+                && constantOf(read(ctx), ctx.value(GameScreen.class)).isPresent();
     }
 
     /** The screen's card, shot, inputs, debts and notes, under the button opening the map on it. */
     public static Node node(ValueContext ctx) {
         StudioServices services = ctx.services();
-        Optional<String> found = constantOf(ctx);
+        // The map read once, and safely: a map being written draws the slot as written, never a broken editor.
+        ScreenGraph graph = read(ctx);
+        Optional<String> found = constantOf(graph, ctx.value(GameScreen.class));
         if (found.isEmpty()) return new Label(ctx.source());
         String constant = found.get();
-        ScreenGraph graph = ScreenDesk.read(services);
         GameScreen screen = graph.screens().get(constant);
         Card card = ScreenCards.card(graph, constant, ScreenDesk.stages(graph).getOrDefault(constant, ""));
 
         Label name = new Label(card.name());
         name.setStyle("-fx-font-weight: bold; -fx-font-size: 1.15em;");
-        Label state = new Label(card.said() + (card.shape().isEmpty() ? "" : " · " + card.shape())
-                + (card.popup() ? " · popup" : "") + (card.stage().isEmpty() ? "" : " · " + card.stage())
-                + "  (" + card.tried() + "/" + card.inputs() + " tried)");
+        Label state = new Label(String.join(" · ", ScreenCards.pills(card).stream().map(ScreenCards.Pill::text)
+                .toList()) + "  (" + card.tried() + "/" + card.inputs() + " tried)");
         Button open = new Button("Open in 🗺 Screens");
         open.setOnAction(e -> ScreenMap.open(services, constant));
         HBox head = new HBox(10);
@@ -124,20 +121,13 @@ public final class ScreenConstantView {
         return Optional.of(view);
     }
 
-    /** The constant whose value {@code ctx} holds; empty for none, and when the map cannot be read. */
-    private static Optional<String> constantOf(ValueContext ctx) {
-        PluginValues values = ctx.services() == null ? null : ctx.services().pluginValues();
-        Optional<GameScreen> held = ctx.value(GameScreen.class);
-        if (values == null || held.isEmpty()) return Optional.empty();
-        try {
-            for (Member member : SCREENS.members(values)) {
-                if (SCREENS.read(values, member).filter(s -> Objects.equals(s, held.get())).isPresent()) {
-                    return Optional.of(member.name());
-                }
-            }
-        } catch (RuntimeException unreadable) {
-            // A map being written reads as no constant: the slot draws as written, never a broken editor.
-        }
-        return Optional.empty();
+    private static ScreenGraph read(ValueContext ctx) {
+        return ScreenMapRead.orEmpty(ctx.services() == null ? null : ctx.services().pluginValues());
+    }
+
+    /** The constant of {@code graph} holding {@code held}; empty for none, and when the map could not be read. */
+    static Optional<String> constantOf(ScreenGraph graph, Optional<GameScreen> held) {
+        return held.flatMap(screen -> graph.screens().entrySet().stream().filter(e -> e.getValue().equals(screen))
+                .map(Map.Entry::getKey).findFirst());
     }
 }

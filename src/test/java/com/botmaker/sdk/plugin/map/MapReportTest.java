@@ -99,6 +99,15 @@ class MapReportTest {
     }
 
     @Test
+    void theFirstScreensOtherWaysInAreSaidToo() {
+        Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.put("HOME", screens.get("HOME").alsoFrom(List.of(Way.of(BotConstants.screen("TAVERN"),
+                click("home_button")))));
+        String text = MapReport.text(ScreenGraph.of(screens), Map.of(), id -> true, id -> true, id -> true, "HOME");
+        assertTrue(text.contains("\n  also from Tavern by click home_button\n"), text);
+    }
+
+    @Test
     void aScreenNoWayReachesIsSaid() {
         Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
         screens.put("LOST", GameScreen.named("Lost").marker(picture("home"))

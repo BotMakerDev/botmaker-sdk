@@ -12,6 +12,8 @@
     -bm-screen-finished: -bm-severity-ok-text;
     -bm-screen-plain: -bm-muted;
     -bm-screen-here: -bm-accent;
+    /* A see-through grey lightens a dark shot and darkens a light one alike, in either theme. */
+    -bm-screen-box-hover: rgba(128, 128, 128, 0.3);
 }
 
 .screen-map-bar {
@@ -99,7 +101,7 @@
 }
 
 .screen-shot-box:hover {
-    -fx-fill: rgba(255, 255, 255, 0.18);
+    -fx-fill: -bm-screen-box-hover;
     -fx-stroke-width: 3;
 }
 
