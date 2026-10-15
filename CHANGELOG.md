@@ -374,6 +374,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   that title (no nearest title any more: "Firestone" found Discord's channel), and `list_windows` prints classes. A bot's old `window("Firestone")` now names a class nothing has:
   pick the window again. Why: on 2026-10-13 Studio's "BotMaker Blocks - Firestone" was taken for the closed game,
   the launch was skipped and the bot clicked in Studio.
+- **🔀 Activity Flow undoes through Studio.** Each action on the canvas (a link, an unlink, a switch, a start, an
+  add, a delete, an arrange, a drop after a drag) saves at once, with its enums, the run and the card positions, as
+  one step of Studio's undo named for it (*Link Collect to Sell*, *Move 3 cards*). The 400 ms autosave delay and
+  the window's own undo are gone. ↶, ↷, Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z take back the last step whoever made it,
+  the code editor's too, and the window then reads the flow again, keeping the flow shown, the card picked and the
+  view. A rename of a card or an outcome is undone like any other step: it no longer greys the arrows out. A
+  description is saved when its field is left or Enter is pressed, one step per description.
 
 ### Fixed
 

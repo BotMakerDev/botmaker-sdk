@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.flow;
 
+import com.botmaker.plugin.api.History;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
@@ -9,6 +10,7 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
+import com.botmaker.sdk.plugin.HistoryKeys;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
@@ -96,7 +98,7 @@ public final class ActivityFlowDialog {
 
     private final BorderPane root = new BorderPane();
 
-    /** The canvas of the flow shown: a new one per flow picked, so undo never reaches into another flow. */
+    /** The canvas of the flow shown: a new one per flow picked, and per read of the flow after an undo. */
     private FlowCanvas canvas;
 
     /**
@@ -140,8 +142,8 @@ public final class ActivityFlowDialog {
      * Canvas renames not yet saved, label at last save → label now; an outcome's keyed first by its activity's
      * label now. A save renames the enum or constant holding the first, and every use of it, before writing the
      * flow under the second; without this a rename would read as a removal plus an addition, and the code
-     * naming the old one would stop matching the canvas. Renames clear the canvas's undo history, so nothing
-     * here has to be taken back.
+     * naming the old one would stop matching the canvas. Each action saves at once, so these hold one rename at
+     * most, and what an undo takes back is the rename the save made of it.
      */
     private final Map<String, String> activityRenames = new LinkedHashMap<>();
     private final Map<String, Map<String, String>> outcomeRenames = new LinkedHashMap<>();
@@ -168,20 +170,38 @@ public final class ActivityFlowDialog {
     private final ProgressIndicator progress = new ProgressIndicator();
     private final VBox sidePanel = new VBox(10);
 
-    /**
-     * Autosave, coalesced. Every edit on the canvas asks to be written, which is far too much work to do per
-     * pixel of a card drag. So an edit restarts this timer instead, and the save happens once the user stops.
-     */
-    private final javafx.animation.PauseTransition autosaveDelay =
-            new javafx.animation.PauseTransition(javafx.util.Duration.millis(400));
-
-    /** What autosave has to say for itself: "Saving…", "Saved", or "Not saved" when the write was refused. */
+    /** What the save has to say for itself: "Saving…", "Saved", or "Not saved" when the write was refused. */
     private final Label savedLabel = new Label();
 
-    /** There are edits not yet written. */
+    /** There are edits not yet written: a save was refused, and the next action or Close tries again. */
     private boolean dirty;
     /** A write is in flight; the next one waits for it rather than racing it. */
     private boolean saving;
+
+    /**
+     * True while {@link #save} runs its batch, so the history change that batch announces is known as this
+     * window's own and does not read the flow back over the canvas that wrote it.
+     */
+    private boolean ownStep;
+
+    /**
+     * Studio's history changed under the window — an undo, a redo, an edit in the code editor — so the flow is read
+     * again: at once while the window has the focus, else when it gets it back.
+     */
+    private boolean stale;
+
+    /**
+     * True while the flow is read again over the canvas: a field of the old side panel committing as it leaves
+     * the scene would save the old canvas over the undo that was just made.
+     */
+    private boolean reading;
+
+    /** ↶ and ↷, Studio's own: rebuilt with the top bar, named for the step each would take. */
+    private Button undo;
+    private Button redo;
+
+    /** The listener on Studio's history, closed with the window. */
+    private AutoCloseable historyListener;
     /** Close was pressed with edits outstanding — close as soon as they are safely on disk. */
     private boolean closeWhenSaved;
 
@@ -252,7 +272,6 @@ public final class ActivityFlowDialog {
     public void show() {
         root.setRight(buildSidePanel());
         root.setBottom(buildBottomBar());
-        autosaveDelay.setOnFinished(e -> flush());
         showFlow(startOn);
 
         // The window's own ✕ is the same door as the Close button, and it must not be the one that loses the
@@ -265,15 +284,86 @@ public final class ActivityFlowDialog {
             }
         });
         FlowStyles.apply(stage.getScene());
+        stage.addEventHandler(javafx.scene.input.KeyEvent.KEY_PRESSED, key -> HistoryKeys.handle(key, this::step));
+        stage.focusedProperty().addListener((o, was, is) -> {
+            if (is) readIfStale();
+        });
+        historyListener = services.history().onChanged(() -> {
+            // Asked here, not in the runLater: Studio announces a batch's step before the batch returns.
+            boolean ours = ownStep;
+            Platform.runLater(() -> {
+                showHistory();
+                if (ours) return;
+                stale = true;
+                if (stage.isFocused()) readIfStale();
+            });
+        });
+        stage.setOnHidden(e -> {
+            try {
+                historyListener.close();
+            } catch (Exception ignored) {
+                // A listener that cannot be closed belongs to a project already gone.
+            }
+        });
         stage.show();
         layOut();
     }
 
     /**
-     * Shows the flow {@code name} names — {@link FlowValue#defaultName} when null — on a fresh canvas: its own
-     * cards, arrows and undo history. The caller has saved the flow it leaves.
+     * One step of Studio's history back ({@code back}) or again, whoever made it; the listener reads the flow
+     * again once the files are back. An edit whose save was refused is dropped: the user asked for the bot as it
+     * was.
+     */
+    private void step(boolean back) {
+        History history = services.history();
+        if (back ? !history.canUndo() : !history.canRedo()) return;
+        dirty = false;
+        if (back) history.undo();
+        else history.redo();
+    }
+
+    /**
+     * Reads the flow shown again when Studio's history moved under it, keeping the flow, the selection and the
+     * view. Not while an edit waits to be saved: reading would drop it.
+     */
+    private void readIfStale() {
+        if (!stale || dirty || saving || stage == null) return;
+        stale = false;
+        ActivityDraft picked = canvas.selectedProperty().get();
+        String keep = picked == null ? null : picked.name();
+        reading = true;
+        try {
+            showFlow(target.name(), canvas.view());
+        } finally {
+            reading = false;
+        }
+        if (keep != null) {
+            canvas.drafts().stream().filter(d -> d.name().equals(keep)).findFirst().ifPresent(canvas::select);
+        }
+    }
+
+    /** ↶ and ↷ named for the step each takes, as 🗺 Screens names them. On the FX thread. */
+    private void showHistory() {
+        if (undo == null) return;
+        History history = services.history();
+        undo.setDisable(!history.canUndo());
+        redo.setDisable(!history.canRedo());
+        undo.setTooltip(new javafx.scene.control.Tooltip(history.canUndo()
+                ? "Undo: " + history.undoLabel() + " (Ctrl+Z)" : "Nothing to undo"));
+        redo.setTooltip(new javafx.scene.control.Tooltip(history.canRedo()
+                ? "Redo: " + history.redoLabel() + " (Ctrl+Y)" : "Nothing to redo"));
+    }
+
+    /**
+     * Shows the flow {@code name} names — {@link FlowValue#defaultName} when null — on a fresh canvas, framed to
+     * show every card. The caller has saved the flow it leaves.
      */
     private void showFlow(String name) {
+        showFlow(name, null);
+    }
+
+    /** {@link #showFlow(String)}, the view put back to {@code view} rather than framed, when one is given. */
+    private void showFlow(String name, FlowCanvas.View view) {
         canvas = new FlowCanvas();
         activityRenames.clear();
         outcomeRenames.clear();
@@ -290,14 +380,15 @@ public final class ActivityFlowDialog {
         canvas.setOnChainChanged(this::refreshOrderLabel);
         canvas.setOnCanvasDoubleClick(this::createActivityAt);
         canvas.setOnOpenSubflow(this::openSubflow);
-        // Arrowd *after* loadCurrent, so seeding the canvas doesn't read as a dozen edits by the user; and the
-        // history is cleared for the same reason — the flow as it was loaded is the state undo bottoms out at.
-        canvas.setOnFlowMutated(this::markDirty);
-        canvas.history().clear();
+        // Set *after* loadCurrent, so seeding the canvas doesn't read as a dozen edits by the user.
+        canvas.setOnStep(this::save);
         canvas.selectedProperty().addListener((o, was, is) -> showInSidePanel(is));
         showInSidePanel(null);
         refreshOrderLabel();
-        if (stage != null) layOut();
+        showHistory();
+        if (stage == null) return;
+        if (view == null) layOut();
+        else canvas.show(view);
     }
 
     /**
@@ -559,8 +650,7 @@ public final class ActivityFlowDialog {
 
     /** {@link #afterSave(java.util.function.Supplier, String)}, the breadcrumb then {@code path}. */
     private void afterSave(java.util.function.Supplier<String> change, String then, List<String> path) {
-        autosaveDelay.stop();
-        if (readOnlyReason == null && dirty) flush();
+        if (readOnlyReason == null && dirty) save("Edit Flows." + target.name());
         String refused = readOnlyReason == null && (dirty || saving)
                 ? "Flows." + target.name() + " isn't saved, so nothing else changed: " + statusLabel.getText()
                 : change.get();
@@ -700,36 +790,24 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * The two arrows that make autosave bearable. With no Save button there is no "close without saving" to
-     * retreat to, so every mutation has to be reversible in the editor itself; these are that. They are
-     * flow-local by design — the code editor has its own undo, and one stack spanning both would let ↶ in a
-     * dialog take back a block edit behind it.
+     * The two arrows that make saving every action bearable. With no Save button there is no "close without
+     * saving" to retreat to, so every action has to be reversible; these are Studio's own ↶ and ↷ (2026-10-15),
+     * so a step taken here and an edit in the code editor are one history in the order they happened, and a
+     * rename is taken back like any other step.
      *
      * <p>Disabled when there is nothing to take back, and captioned with what that would be, so ↶ is never a
-     * guess. The arrows go grey after a rename for a reason {@code FlowCanvas.invalidateHistory} explains.
+     * guess.
      */
     private Button undoButton() {
-        Button undo = new Button("↶");
-        undo.disableProperty().bind(canvas.history().canUndoProperty().not());
-        undo.tooltipProperty().bind(javafx.beans.binding.Bindings.createObjectBinding(
-                () -> new javafx.scene.control.Tooltip(labelled("Undo", canvas.history().undoLabelProperty().get())),
-                canvas.history().undoLabelProperty()));
-        undo.setOnAction(e -> canvas.history().undo());
+        undo = new Button("↶");
+        undo.setOnAction(e -> step(true));
         return undo;
     }
 
     private Button redoButton() {
-        Button redo = new Button("↷");
-        redo.disableProperty().bind(canvas.history().canRedoProperty().not());
-        redo.tooltipProperty().bind(javafx.beans.binding.Bindings.createObjectBinding(
-                () -> new javafx.scene.control.Tooltip(labelled("Redo", canvas.history().redoLabelProperty().get())),
-                canvas.history().redoLabelProperty()));
-        redo.setOnAction(e -> canvas.history().redo());
+        redo = new Button("↷");
+        redo.setOnAction(e -> step(false));
         return redo;
-    }
-
-    private static String labelled(String verb, String step) {
-        return step == null || step.isBlank() ? verb + " — nothing to " + verb.toLowerCase() : verb + " " + step;
     }
 
     /**
@@ -887,25 +965,35 @@ public final class ActivityFlowDialog {
                 heading("Exits"), exits, new Separator(), delete);
     }
 
-    /** The draft's description, saved as it is typed. */
+    /**
+     * The draft's description, saved when the field is left or Enter is pressed: one step of Studio's undo per
+     * description, not one per key.
+     */
     private TextField descriptionField(ActivityDraft draft) {
         TextField description = new TextField(draft.description());
-        description.textProperty().addListener((o, was, is) -> {
-            draft.descriptionProperty().set(is);
-            markDirty();
+        Runnable commit = () -> {
+            if (description.getText().equals(draft.description())) return;
+            draft.descriptionProperty().set(description.getText());
+            save("Describe " + draft.name());
+        };
+        description.focusedProperty().addListener((o, was, is) -> {
+            if (!is) commit.run();
+        });
+        description.setOnAction(e -> {
+            commit.run();
+            e.consume();
         });
         return description;
     }
 
     /**
-     * A tick bound to one of the draft's switches. The canvas records what it owns — position, wiring, the enable
-     * switch. These live on the draft and nowhere else, so they ask for the save themselves. They are not undoable,
-     * which is the honest answer for a text field and a tick you can simply set back.
+     * A tick bound to one of the draft's switches. The canvas saves what it owns — position, wiring, the enable
+     * switch. These live on the draft and nowhere else, so they ask for the save themselves, one step each.
      */
     private CheckBox tick(String caption, BooleanProperty value, String tip) {
         CheckBox box = new CheckBox(caption);
         box.selectedProperty().bindBidirectional(value);
-        box.selectedProperty().addListener((o, was, is) -> markDirty());
+        box.selectedProperty().addListener((o, was, is) -> save((is ? "Tick " : "Untick ") + caption));
         box.setTooltip(new javafx.scene.control.Tooltip(tip));
         return box;
     }
@@ -998,14 +1086,15 @@ public final class ActivityFlowDialog {
             field.setText(oldName);
             return oldName;
         }
+        // The rename before the list changes: the card saves the moment it does, and that save renames the constant.
         int at = draft.outcomes().indexOf(oldName);
         if (at >= 0) {
+            renamed(outcomeRenames.computeIfAbsent(draft.name(), activity -> new LinkedHashMap<>()), oldName, candidate);
             // The arrow first, then the outcome. The card drops every arrow whose port has gone the moment the
             // list changes, so renaming the outcome first would drop its arrow before it could be carried across.
             canvas.edges().setAll(rewiredOutcome(canvas.edges(), draft.name(), oldName, candidate));
             draft.outcomes().set(at, candidate);
         }
-        renamed(outcomeRenames.computeIfAbsent(draft.name(), activity -> new LinkedHashMap<>()), oldName, candidate);
         field.setText(candidate);
         error("");
         canvas.refresh();
@@ -1149,7 +1238,7 @@ public final class ActivityFlowDialog {
                 (className, method) -> FlowConstants.createMethod(values, null, className, method),
                 () -> null, reference -> {
                     picked.accept(com.botmaker.sdk.plugin.types.FlowTypes.method(reference));
-                    markDirty();
+                    save("Set the run's " + link);
                 });
     }
 
@@ -1215,7 +1304,7 @@ public final class ActivityFlowDialog {
                         + "individually on its card."));
         goHome.selectedProperty().addListener((o, was, is) -> {
             goHomeByDefault = is;
-            markDirty();
+            save(is ? "New activities go home first" : "New activities don't go home first");
         });
 
         box.getChildren().addAll(explain, row, delayExplain, delayRow, goHome);
@@ -1230,7 +1319,7 @@ public final class ActivityFlowDialog {
             if (parsed < 0) throw new NumberFormatException();
             stepDelayMs = parsed;
             error("");
-            markDirty();
+            save("Pause " + parsed + " ms between activities");
         } catch (NumberFormatException bad) {
             error("The pause must be a whole number of milliseconds, 0 or more.");
             field.setText(String.valueOf(stepDelayMs));
@@ -1243,7 +1332,7 @@ public final class ActivityFlowDialog {
             if (parsed <= 0) throw new NumberFormatException();
             maxSteps = parsed;
             error("");
-            markDirty();
+            save("Stop after " + parsed + " steps");
         } catch (NumberFormatException bad) {
             // A zero or negative budget generates a driver that stops before running anything at all.
             error("The step limit must be a whole number above zero.");
@@ -1272,7 +1361,7 @@ public final class ActivityFlowDialog {
         if (reference.equals(draft.body())) return;
         draft.setBody(reference);
         error("");
-        markDirty();
+        save("Set " + draft.name() + "'s method");
     }
 
     private void renameDraft(ActivityDraft draft, String candidate, TextField field) {
@@ -1388,11 +1477,22 @@ public final class ActivityFlowDialog {
         orderLabel.setText(summary.toString());
     }
 
-    /** Notes that something changed and asks for a save — coalesced, so a drag writes once, not per frame. */
-    private void markDirty() {
+    /**
+     * Saves the flow now, at the end of the action {@code label} names: the enums, the flow, the run and the layout
+     * in one batch, so one ↶ takes the whole action back under that name (2026-10-15; a 400 ms timer gathered the
+     * edits before, and an undo of its own took them back).
+     */
+    private void save(String label) {
+        // A field losing the focus while the flow is read again is the old canvas's: what it held is not saved.
+        if (reading) return;
         dirty = true;
-        savedLabel.setText("Saving…");
-        autosaveDelay.playFromStart();
+        boolean outer = ownStep;
+        ownStep = true;
+        try {
+            services.history().batch(label, this::flush);
+        } finally {
+            ownStep = outer;
+        }
     }
 
     /** The flow as it currently stands, with each card's outcomes, ready to be written into the bot's Java. */
@@ -1569,14 +1669,15 @@ public final class ActivityFlowDialog {
 
     /** Close was pressed: write anything outstanding first, then close — never the other way round. */
     private void closeRequested() {
-        autosaveDelay.stop();
+        // A description still being typed is committed by losing the focus, so it is saved before the close.
+        root.requestFocus();
         if (!dirty && !saving) {
             stage.close();
             return;
         }
         closeWhenSaved = true;
         closeButton.setDisable(true);
-        flush();
+        save("Edit Flows." + target.name());
     }
 
     /**
@@ -1588,16 +1689,20 @@ public final class ActivityFlowDialog {
         boolean closing = closeWhenSaved;
         releaseClose();
         if (!closing) return;
-        Alert confirm = services.theme().alert(Alert.AlertType.CONFIRMATION,
-                reason + "\n\nClosing now drops the changes made in this window.",
-                ButtonType.CANCEL, ButtonType.OK);
-        confirm.initOwner(stage);
-        confirm.setTitle("Close without saving");
-        confirm.setHeaderText("The flow could not be saved. Close anyway?");
-        if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
-            dirty = false;
-            stage.close();
-        }
+        // Asked once the save's batch has ended: a dialog's own event loop inside it would let any write made
+        // meanwhile join this step.
+        Platform.runLater(() -> {
+            Alert confirm = services.theme().alert(Alert.AlertType.CONFIRMATION,
+                    reason + "\n\nClosing now drops the changes made in this window.",
+                    ButtonType.CANCEL, ButtonType.OK);
+            confirm.initOwner(stage);
+            confirm.setTitle("Close without saving");
+            confirm.setHeaderText("The flow could not be saved. Close anyway?");
+            if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+                dirty = false;
+                stage.close();
+            }
+        });
     }
 
     /** Gives the Close button back after a save that didn't land, so the window is never sealed shut. */

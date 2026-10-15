@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenStep;
+import com.botmaker.sdk.plugin.HistoryKeys;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
@@ -21,14 +22,9 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBoxBase;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -120,22 +116,6 @@ public final class ScreenMap {
         poll.setCycleCount(Timeline.INDEFINITE);
     }
 
-    private static final KeyCombination UNDO = new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN);
-    private static final KeyCombination REDO = new KeyCodeCombination(KeyCode.Y, KeyCombination.SHORTCUT_DOWN);
-    private static final KeyCombination REDO_SHIFT = new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN,
-            KeyCombination.SHIFT_DOWN);
-
-    /** Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z, but in a field the user types in, whose own undo they are. */
-    private void historyKey(KeyEvent key) {
-        for (Object at = key.getTarget(); at instanceof Node node; at = node.getParent()) {
-            if (node instanceof TextInputControl || node instanceof ComboBoxBase<?> box && box.isEditable()) return;
-        }
-        if (UNDO.match(key)) step(true);
-        else if (REDO.match(key) || REDO_SHIFT.match(key)) step(false);
-        else return;
-        key.consume();
-    }
-
     /**
      * One step of Studio's history back ({@code back}) or again — whoever made it — then the map read at once, so
      * a card's corner or a renamed screen shows as the Java has it now.
@@ -190,7 +170,7 @@ public final class ScreenMap {
                 Modals.Frame.modeless("Screens", 1180, 720, 760, 460), (BorderPane) map.node());
         map.window = stage;
         // On the window, so the keys work wherever its focus is; the overlay's pane leaves them to Studio's.
-        stage.addEventHandler(KeyEvent.KEY_PRESSED, map::historyKey);
+        stage.addEventHandler(KeyEvent.KEY_PRESSED, key -> HistoryKeys.handle(key, map::step));
         if (project != null) OPEN.put(project, map);
         stage.setOnHidden(e -> {
             map.stop();

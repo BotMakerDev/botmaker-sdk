@@ -5,13 +5,12 @@ import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.Labels;
 
 /**
- * One arrow on the canvas, between two cards by label: what the canvas draws, moves and undoes, and what a
- * save turns into a {@link Flow.Edge} on one of the activity's outcomes — or, for {@link #DISABLED}, the step's
+ * One arrow on the canvas, between two cards by label: what the canvas draws and moves, and what a save turns
+ * into a {@link Flow.Edge} on one of the activity's outcomes — or, for {@link #DISABLED}, the step's
  * {@code .whenOff(…)}.
  *
- * <p>Labels and not constants on purpose. A rename on the canvas is undoable until the save, and a
- * snapshot of the arrows has to survive one: kept as labels, the canvas renames an arrow by rewriting two
- * strings. The constants are the save's to resolve, by binding, once.
+ * <p>Labels and not constants on purpose: kept as labels, the canvas renames an arrow by rewriting two strings.
+ * The constants are the save's to resolve, by binding, once.
  *
  * @param outcome the outcome's label, as {@link FlowNames#label} keeps it — "next" is {@link #NEXT} — or
  *                {@link #DISABLED} for the switched-off arrow

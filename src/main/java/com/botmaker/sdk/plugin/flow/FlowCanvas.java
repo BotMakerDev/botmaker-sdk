@@ -155,17 +155,15 @@ public final class FlowCanvas extends StackPane {
     private final Region gridInk = new Region();
 
     /**
-     * Undo/redo for this canvas, over whole-canvas snapshots. Every mutation below goes through it, which is
-     * what makes autosave and click-to-delete safe to have: nothing is lost, because everything can be taken
-     * back. See {@link SnapshotHistory} for why snapshots rather than per-mutation inverses.
+     * Fired once at the end of each action on the canvas — a link, an unlink, a switch, a start, an add, a delete,
+     * an arrange, a drop after a drag — with its name. The dialog saves on it, as one step of Studio's undo under
+     * that name, which is what makes click-to-delete safe to have: ↶ takes it back (2026-10-15; the canvas kept
+     * its own snapshot history before, which a rename cleared and the code editor's undo never saw).
      */
-    private final SnapshotHistory<FlowSnapshot> history = new SnapshotHistory<>(this::capture, this::restore);
+    private Consumer<String> onStep = label -> {};
 
-    /** True while the history is putting a snapshot back: the mutations it performs must not record themselves. */
-    private boolean restoring;
-
-    /** Fired after any recorded mutation, undo or redo — the dialog saves on it. */
-    private Runnable onFlowMutated = () -> {};
+    /** True while an action runs, so one that provokes another — a switch moving the start — is one step. */
+    private boolean stepping;
 
     private CubicCurve pendingArrow;
     private ActivityDraft pendingFrom;
@@ -231,8 +229,6 @@ public final class FlowCanvas extends StackPane {
                     (javafx.collections.ListChangeListener<String>) c -> paintGrid());
             paintGrid();
         });
-
-        history.setOnChanged(() -> onFlowMutated.run());
 
         content.setOnMousePressed(this::beginCanvasGesture);
         content.setOnMouseDragged(this::continueCanvasGesture);
@@ -313,68 +309,50 @@ public final class FlowCanvas extends StackPane {
 
     public void setOnChainChanged(Runnable onChainChanged) { this.onChainChanged = onChainChanged; }
 
-    /** Undo/redo for the flow: the dialog drives its arrows and, on every step, saves. */
-    public SnapshotHistory<FlowSnapshot> history() { return history; }
-
-    /** Called after every recorded mutation, undo and redo. */
-    public void setOnFlowMutated(Runnable onFlowMutated) { this.onFlowMutated = onFlowMutated; }
+    /** Called once at the end of each action on the canvas, with its name: the dialog saves it as one step. */
+    public void setOnStep(Consumer<String> onStep) { this.onStep = onStep; }
 
     /**
-     * Runs {@code change} as a single undoable step. For a caller outside the canvas that changes several
+     * Runs {@code change} as one action, named {@code label}. For a caller outside the canvas that changes several
      * things at once — flipping a dozen switches together, say — taking that back should be one ↶, not twelve.
+     * Inside another action it is part of that one.
      */
-    public void mutate(String label, Runnable change) { history.mutate(label, change); }
-
-    /**
-     * Drops the undo history and reports the change anyway — for an edit no snapshot describes.
-     *
-     * <p>A rename and an outcome edit both rewrite the names every stored snapshot's wires are expressed in,
-     * so undoing across one would restore wires between activities that no longer answer to those names.
-     * Forgetting is the honest answer: the arrows go grey, which says plainly that this edit is not one you
-     * can take back, rather than offering an undo that quietly loses wiring.
-     */
-    private void invalidateHistory() {
-        history.clear();
-        onFlowMutated.run();   // clear() is silent by design, but the edit that caused it still has to save
-    }
-
-    /** Everything undo restores, right now. */
-    private FlowSnapshot capture() {
-        List<FlowSnapshot.CardState> states = new ArrayList<>(drafts.size());
-        for (ActivityDraft d : drafts) {
-            states.add(new FlowSnapshot.CardState(d, d.x(), d.y(), d.enabled()));
+    public void mutate(String label, Runnable change) {
+        if (stepping) {
+            change.run();
+            return;
         }
-        return new FlowSnapshot(states, edges, start);
-    }
-
-    /**
-     * Puts a snapshot back. Cards the snapshot doesn't have are detached, ones it has that aren't here are
-     * re-attached — so an undone delete brings back the same {@link ActivityDraft} object, still bound to
-     * whatever was editing it.
-     */
-    private void restore(FlowSnapshot snapshot) {
-        restoring = true;
+        stepping = true;
         try {
-            List<ActivityDraft> wanted = snapshot.drafts();
-            for (ActivityDraft d : new ArrayList<>(drafts)) {
-                if (!wanted.contains(d)) detach(d);
-            }
-            for (FlowSnapshot.CardState state : snapshot.cards()) {
-                if (!drafts.contains(state.draft())) attach(state.draft());
-                NodeCard card = cards.get(state.draft().name());
-                if (card != null) placeAt(card, state.x(), state.y());
-                state.draft().enabledProperty().set(state.enabled());
-            }
-            drafts.setAll(wanted);   // the canvas order is the order activities are written back in
-            edges.setAll(snapshot.edges());
-            start = snapshot.start();
-            selection.removeIf(d -> !wanted.contains(d));
-            syncSelection();
-            onMessage.accept("");
-            refresh();
+            change.run();
         } finally {
-            restoring = false;
+            stepping = false;
         }
+        onStep.accept(label);
+    }
+
+    /** An action that has already happened — a rename, a tick bound straight to its property — named {@code label}. */
+    private void changed(String label) {
+        mutate(label, () -> {});
+    }
+
+    /** Where the view is: its zoom and scroll, kept across the flow read again after an undo. */
+    public record View(double zoom, double h, double v) {}
+
+    public View view() {
+        return new View(zoom.getX(), scroller.getHvalue(), scroller.getVvalue());
+    }
+
+    /** Puts the view back where {@link #view()} found it, once the cards are laid out. */
+    public void show(View view) {
+        zoom.setX(view.zoom());
+        zoom.setY(view.zoom());
+        refresh();
+        Platform.runLater(() -> {
+            scroller.setHvalue(view.h());
+            scroller.setVvalue(view.v());
+            drawMinimap();
+        });
     }
 
     /** Where a double-click on empty canvas goes — the dialog opens its "new activity" prompt there. */
@@ -406,7 +384,7 @@ public final class FlowCanvas extends StackPane {
 
     /** Adds a card for {@code draft} at its stored position and selects it. */
     public void add(ActivityDraft draft) {
-        history.mutate("add " + draft.name(), () -> {
+        mutate("Add " + draft.name(), () -> {
             attach(draft);
             select(draft);
             refresh();
@@ -415,7 +393,7 @@ public final class FlowCanvas extends StackPane {
 
     /** Removes the activity and every wire touching it. */
     public void remove(ActivityDraft draft) {
-        history.mutate("delete " + draft.name(), () -> {
+        mutate("Delete " + draft.name(), () -> {
             detach(draft);
             edges.removeIf(e -> e.from().equals(draft.name()) || e.to().equals(draft.name()));
             if (draft.name().equals(start)) start = "";
@@ -665,7 +643,7 @@ public final class FlowCanvas extends StackPane {
      * reads only the cards' sizes and the wiring, so a second click moves nothing.
      */
     public void autoArrange() {
-        history.mutate("auto-arrange", this::arrangeNow);
+        mutate("Auto-arrange the flow", this::arrangeNow);
     }
 
     private void arrangeNow() {
@@ -852,9 +830,9 @@ public final class FlowCanvas extends StackPane {
             redrawArrows();
             return;
         }
-        String label = old.isPresent() ? "move the wire from " + from.name() + " to " + to
-                : "wire " + from.name() + " to " + to;
-        history.mutate(label, () -> {
+        String label = old.isPresent() ? "Move the arrow from " + from.name() + " to " + to
+                : "Link " + from.name() + " to " + to;
+        mutate(label, () -> {
             List<Arrow> next = FlowRules.rewired(edges, from.name(), outcome, to);
             edges.clear();
             edges.addAll(next);
@@ -937,7 +915,7 @@ public final class FlowCanvas extends StackPane {
     }
 
     private void removeEdge(Arrow edge) {
-        history.mutate("remove the wire from " + edge.from(), () -> {
+        mutate("Remove the arrow from " + edge.from(), () -> {
             edges.remove(edge);
             onMessage.accept("Arrow removed: " + edge.from() + " — " + edge.outcome() + " → " + edge.to()
                     + ". ↶ puts it back.");
@@ -1050,7 +1028,6 @@ public final class FlowCanvas extends StackPane {
 
         private boolean selectedNow;
         private Point2D dragAnchor;
-        private FlowSnapshot dragBefore;
         private Map<ActivityDraft, Point2D> dragStartPositions = Map.of();
 
         NodeCard(ActivityDraft draft) {
@@ -1090,6 +1067,9 @@ public final class FlowCanvas extends StackPane {
             goHome.getStyleClass().add("flow-toggle-home");
             goHome.selectedProperty().bindBidirectional(draft.goHomeProperty());
             goHome.setTooltip(new Tooltip("Go back to the home screen before running this activity"));
+            // Saved from here, not only from the side panel's tick: the ⌂ on a card the panel doesn't show is an action too.
+            draft.goHomeProperty().addListener((o, was, is) ->
+                    changed((is ? "Go home before " : "Don't go home before ") + draft.name()));
 
             startBadge.getStyleClass().add("flow-start-badge");
             startBadge.setManaged(false);
@@ -1143,7 +1123,7 @@ public final class FlowCanvas extends StackPane {
                 rebuildPorts();
                 dropArrowsForRemovedOutcomes();
                 refresh();
-                if (!restoring) invalidateHistory();
+                changed("Change " + draft.name() + "'s outcomes");
             });
 
             // The input port is decoration only — a wire's endpoint is computed from the card's geometry
@@ -1154,14 +1134,12 @@ public final class FlowCanvas extends StackPane {
             draft.enabledProperty().addListener((o, was, is) -> {
                 restyle();
                 drawMinimap();
-                if (restoring) return;
-                // The tick is bound straight to the property, so by the time this runs the change has already
-                // happened — the "before" is this state with the flag put back, which is exactly what
-                // withEnabled builds. Whatever the start move below does then lands in the same undo step.
-                FlowSnapshot before = capture().withEnabled(draft, was);
-                if (!is) startAwayFrom(draft);
-                refresh();
-                history.commit((is ? "switch on " : "switch off ") + draft.name(), before);
+                // The tick is bound straight to the property, so the switch has happened by now; the start move
+                // below lands in the same step, and inside another action (a start switching its card on) in that one.
+                mutate((is ? "Switch on " : "Switch off ") + draft.name(), () -> {
+                    if (!is) startAwayFrom(draft);
+                    refresh();
+                });
             });
             draft.nameProperty().addListener((o, was, is) -> renamed(was, is));
 
@@ -1249,17 +1227,15 @@ public final class FlowCanvas extends StackPane {
             }
             edges.setAll(rewired);
             refresh();
-            if (!restoring) invalidateHistory();
+            changed("Rename " + oldName + " to " + newName);
         }
 
         private void beginDrag(MouseEvent e) {
             if (e.getButton() != MouseButton.PRIMARY) return;   // let a right-drag bubble up and pan
             // Dragging an unselected card selects it first, so a drag never moves something you can't see.
             if (!selection.contains(draft)) select(draft);
-            // A drag is one undo step, so the snapshot is taken here and committed on release — a per-frame
-            // step for every pixel of the drag would be unusable, and the intermediate positions are not
-            // states anybody wants back.
-            dragBefore = history.mark();
+            // A drag is one step, saved on release — a step for every pixel of the drag would be unusable, and
+            // the positions on the way are not states anybody wants back.
             dragAnchor = new Point2D(e.getSceneX(), e.getSceneY());
             Map<ActivityDraft, Point2D> starts = new HashMap<>();
             for (ActivityDraft d : selection) starts.put(d, new Point2D(d.x(), d.y()));
@@ -1285,11 +1261,10 @@ public final class FlowCanvas extends StackPane {
         private void endDrag(MouseEvent e) {
             if (dragAnchor == null) return;
             dragAnchor = null;
-            FlowSnapshot before = dragBefore;
-            dragBefore = null;
-            if (before != null) {
-                history.commit(dragStartPositions.size() > 1 ? "move the cards" : "move " + draft.name(), before);
-            }
+            boolean moved = dragStartPositions.entrySet().stream().anyMatch(was ->
+                    was.getKey().x() != was.getValue().getX() || was.getKey().y() != was.getValue().getY());
+            if (moved) changed(dragStartPositions.size() > 1 ? "Move " + dragStartPositions.size() + " cards"
+                    : "Move " + draft.name());
             e.consume();
         }
 
@@ -1376,7 +1351,7 @@ public final class FlowCanvas extends StackPane {
      * start activity off moves the start rather than leaving it pointing at a card that won't run.
      */
     private void setStartTo(String activity) {
-        history.mutate("start at " + activity, () -> {
+        mutate("Start at " + activity, () -> {
             start = activity;
             ActivityDraft draft = draftNamed(activity);
             boolean wasOff = draft != null && !draft.enabled();
