@@ -30,6 +30,7 @@ The architecture is in `docs/architecture/`, one file per section (moved there u
 | an `org.opencv` type, `ImageTemplate`, matching | `opencv.md` |
 | `api.capture`, desktop capture, `Mouse.click` under Wayland | `screen-capture.md`, `../docs/display-pipeline.md` |
 | `internal.emulator` (`Emulator`, `Emulators`) | `emulator.md` |
+| `api/screens`, `internal/screens`, `plugin/map`, Discovery's tools (`MapTools`, `ScreenEdits`, `MapEdits`) | `screens.md` |
 
 ## Planning
 
