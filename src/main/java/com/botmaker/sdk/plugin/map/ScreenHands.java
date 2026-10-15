@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -8,20 +9,25 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
+import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 import javafx.collections.FXCollections;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Menu;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
@@ -87,8 +93,80 @@ final class ScreenHands {
                 input, null)));
         MenuButton menu = new MenuButton("⋯");
         menu.setTooltip(new Tooltip("Set what " + row.label() + " does by hand"));
-        menu.getItems().addAll(result, kind, sometimes, never, locked, new SeparatorMenuItem(), back, remove);
+        Menu when = whileMenu("Only there while", ScreenTypes.sourceOf(input.when()),
+                method -> done.accept(ScreenEdits.setInputWhen(services, constant, input, method)));
+        menu.getItems().addAll(result, kind, sometimes, when, never, locked, new SeparatorMenuItem(), back, remove);
         return menu;
+    }
+
+    // --- a link ---
+
+    /**
+     * The right-click menu of {@code link} on the map: its picture shown ({@code show}), and for a way in, the
+     * method it is open only while. A way back has no condition: it is the screen's own.
+     */
+    ContextMenu linkMenu(Link link, Runnable show) {
+        ContextMenu menu = new ContextMenu(item("Show " + link.via().label(), show));
+        if (!link.back()) {
+            menu.getItems().add(whileMenu("Open only while", link.when(), method -> done.accept(
+                    ScreenEdits.setWayWhen(services, link.to(), link.from(), link.via(), method))));
+        }
+        return menu;
+    }
+
+    /**
+     * A menu of the bot's {@code boolean} methods, {@code current} ticked: picking one hands {@code set} its
+     * reference, Always hands it blank, and New method… writes one returning false for the author to fill in.
+     */
+    private Menu whileMenu(String title, String current, Consumer<String> set) {
+        Menu menu = new Menu(title + (current.isEmpty() ? "…" : ": " + current));
+        ToggleGroup group = new ToggleGroup();
+        RadioMenuItem always = new RadioMenuItem("Always (no method)");
+        always.setToggleGroup(group);
+        always.setSelected(current.isEmpty());
+        always.setOnAction(e -> set.accept(""));
+        menu.getItems().add(always);
+        List<String> methods = services.pluginValues() == null ? List.of() : services.pluginValues().booleanMethods();
+        if (!methods.isEmpty()) menu.getItems().add(new SeparatorMenuItem());
+        for (String method : methods) {
+            RadioMenuItem one = new RadioMenuItem(method);
+            one.setToggleGroup(group);
+            one.setSelected(method.equals(current));
+            one.setOnAction(e -> set.accept(method));
+            menu.getItems().add(one);
+        }
+        if (!current.isEmpty() && !methods.contains(current)) {
+            // Written by hand, or its method since renamed: shown, so the user sees what the Java says.
+            RadioMenuItem kept = new RadioMenuItem(current + " (not found)");
+            kept.setToggleGroup(group);
+            kept.setSelected(true);
+            kept.setDisable(true);
+            menu.getItems().add(kept);
+        }
+        menu.getItems().addAll(new SeparatorMenuItem(), item("New method…", () -> newMethod(set)));
+        return menu;
+    }
+
+    /** Asks for a class and a name, writes {@code public static boolean name() { return false; }} and sets it. */
+    private void newMethod(Consumer<String> set) {
+        if (services.pluginValues() == null) return;
+        List<String> classes = services.pluginValues().classes();
+        ComboBox<String> holder = new ComboBox<>(FXCollections.observableArrayList(classes));
+        holder.setEditable(true);
+        if (!classes.isEmpty()) holder.setValue(classes.getFirst());
+        TextField name = new TextField();
+        name.setPromptText("eventOn");
+        Modals.form(services, "New method", new VBox(8, new Label("The class it goes in"), holder,
+                new Label("Its name: it answers true while the way is open"), name), () -> {
+            String className = holder.getValue() == null ? "" : holder.getValue().strip();
+            PluginValues.MethodWrite wrote = services.pluginValues().createBooleanMethod(className,
+                    name.getText().strip());
+            if (!wrote.written()) {
+                done.accept("Not written: " + wrote.refusal());
+                return;
+            }
+            set.accept(wrote.reference());
+        });
     }
 
     // --- a screen ---

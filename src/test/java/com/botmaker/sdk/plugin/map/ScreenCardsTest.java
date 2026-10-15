@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -13,6 +14,7 @@ import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.sdk.plugin.map.ScreenCards.RowState;
 import com.botmaker.sdk.plugin.map.ScreenCards.State;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -138,5 +140,33 @@ class ScreenCardsTest {
     void anUnchangedMapReadsAsEqualCardsSoNothingIsRedrawn() {
         assertEquals(ScreenCards.cards(map(), Map.of()), ScreenCards.cards(map(), Map.of()));
         assertEquals(ScreenCards.links(map()), ScreenCards.links(map()));
+    }
+
+    @Test
+    void aWayOpenOnlyWhileAMethodSaysSoCarriesItOnItsLink() {
+        Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.put("CAMPAIGN", screens.get("CAMPAIGN").from(Way.of(BotConstants.screen("HOME"), click("campaign"))
+                .when(ScreenTypes.condition("Firestone::eventOn"))));
+        Link campaign = ScreenCards.links(ScreenGraph.of(screens)).stream()
+                .filter(l -> l.to().equals("CAMPAIGN") && !l.back()).findFirst().orElseThrow();
+        assertEquals("Firestone::eventOn", campaign.when());
+        assertTrue(ScreenCards.links(map()).stream().allMatch(l -> l.when().isEmpty()), "no method, nothing said");
+    }
+
+    @Test
+    void theTreeIsLaidOutTheWayAWindowShowsBigger() {
+        Map<Direction, ScreenCanvas.Shape> column = Map.of(Direction.RIGHT, new ScreenCanvas.Shape(600, 3000),
+                Direction.DOWN, new ScreenCanvas.Shape(3000, 600));
+        assertEquals(Direction.DOWN, ScreenCanvas.better(column, 1600, 800), "a wide window: Home's children in a row");
+        assertEquals(Direction.RIGHT, ScreenCanvas.better(column, 500, 1400), "a tall window: in a column");
+        assertEquals(Direction.DOWN, ScreenCanvas.better(column, 0, 0), "not measured yet: as the window opens");
+        Map<Direction, ScreenCanvas.Shape> square = Map.of(Direction.RIGHT, new ScreenCanvas.Shape(800, 800),
+                Direction.DOWN, new ScreenCanvas.Shape(800, 800));
+        assertEquals(Direction.RIGHT, ScreenCanvas.better(square, 1600, 800), "a tie stays rightward");
+        assertTrue(ScreenCanvas.turns(column, Direction.RIGHT, 1600, 800));
+        Map<Direction, ScreenCanvas.Shape> near = Map.of(Direction.RIGHT, new ScreenCanvas.Shape(1000, 1000),
+                Direction.DOWN, new ScreenCanvas.Shape(950, 950));
+        assertEquals(Direction.DOWN, ScreenCanvas.better(near, 900, 900));
+        assertFalse(ScreenCanvas.turns(near, Direction.RIGHT, 900, 900), "a little bigger: the tree stays as it is");
     }
 }

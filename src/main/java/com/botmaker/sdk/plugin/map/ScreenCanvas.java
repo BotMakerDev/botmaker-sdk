@@ -2,8 +2,11 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.toolkit.graph.GraphCanvas;
 import com.botmaker.plugin.toolkit.graph.GraphCanvas.Arrow;
+import com.botmaker.plugin.toolkit.graph.GraphLayout;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Gaps;
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Placement;
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 import com.botmaker.plugin.toolkit.graph.LayeredLayout;
 import com.botmaker.plugin.toolkit.graph.TreeLayout;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -18,6 +21,7 @@ import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
 import javafx.css.PseudoClass;
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -26,7 +30,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.input.MouseButton;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -44,6 +47,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -95,23 +99,107 @@ final class ScreenCanvas {
     private List<Link> links = List.of();
     private String root;
     private String trying;
-    /** Each card's right-click menu, by constant; null: none (the overlay editor's narrow pane). */
-    private Function<String, ContextMenu> menus;
     /** Pictures read before a card is drawn, not after: a drawing made off screen is taken at once. */
     private boolean loadNow;
+    /** The tree's size laid out each way, at the last layout: a resize asks again which fits the window. */
+    private Map<Direction, Shape> shapes = Map.of();
+    private Direction direction = Direction.RIGHT;
+    /** How much bigger the other way must show the map before the tree turns. */
+    private static final double TURN = 1.15;
+
+    /** How big a whole layout is. */
+    record Shape(double width, double height) {}
 
     /** A canvas drawing the pictures in {@code resources}, the project's resources folder (null for none). */
     ScreenCanvas(Path resources) {
         this.resources = resources;
-        graph = new GraphCanvas<>(Card::constant, this::view, this::arrow, (cards, links) -> root == null
-                ? LayeredLayout.arrange(cards, links, List.of())
-                : TreeLayout.arrange(cards, links, root, Direction.RIGHT, GAPS, Set.copyOf(folded)));
+        graph = new GraphCanvas<>(Card::constant, this::view, this::arrow, this::arrange);
         graph.getStylesheets().add(SHEET);
         graph.getStyleClass().add("screen-map");
         graph.setOnOpen(card -> {
             if (!folded.remove(card.constant())) folded.add(card.constant());
             redraw();
         });
+        // A window made wide or tall: the tree is laid out the other way when that way now fits it better.
+        graph.viewportProperty().addListener((o, was, is) -> {
+            if (!shapes.isEmpty() && turns(shapes, direction, is.getWidth(), is.getHeight())) redraw();
+        });
+    }
+
+    /**
+     * The tree laid out rightward and downward, keeping whichever shows bigger in the window (the user's call,
+     * 2026-10-15: Home's twenty screens made a column a wide window showed small); a map with no tree, layered.
+     */
+    private Placement arrange(List<GraphLayout.Card> cards, List<GraphLayout.Link> links) {
+        if (root == null) {
+            shapes = Map.of();
+            direction = Direction.RIGHT;
+            graph.setDirection(direction);
+            return LayeredLayout.arrange(cards, links, List.of());
+        }
+        Map<Direction, Placement> each = new EnumMap<>(Direction.class);
+        Map<Direction, Shape> sized = new EnumMap<>(Direction.class);
+        for (Direction way : Direction.values()) {
+            Placement placed = TreeLayout.arrange(cards, links, root, way, GAPS, Set.copyOf(folded));
+            each.put(way, placed);
+            sized.put(way, shape(placed, cards));
+        }
+        boolean first = shapes.isEmpty();
+        shapes = Map.copyOf(sized);
+        Bounds view = graph.viewportProperty().get();
+        double w = view == null ? 0 : view.getWidth(), h = view == null ? 0 : view.getHeight();
+        if (first || turns(shapes, direction, w, h)) direction = better(shapes, w, h);
+        graph.setDirection(direction);
+        return each.get(direction);
+    }
+
+    /** How big {@code placed} is: the box round its shown cards. */
+    static Shape shape(Placement placed, List<GraphLayout.Card> cards) {
+        double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+        for (GraphLayout.Card card : cards) {
+            Pt at = placed.at().get(card.id());
+            if (at == null || placed.hidden().contains(card.id())) continue;
+            minX = Math.min(minX, at.x());
+            minY = Math.min(minY, at.y());
+            maxX = Math.max(maxX, at.x() + card.width());
+            maxY = Math.max(maxY, at.y() + card.height());
+        }
+        return minX > maxX ? new Shape(0, 0) : new Shape(maxX - minX, maxY - minY);
+    }
+
+    /**
+     * The way whose layout a {@code width} × {@code height} window shows at the bigger zoom; rightward on a tie, and
+     * for a window not measured yet, as the map's window opens wider than tall.
+     */
+    static Direction better(Map<Direction, Shape> shapes, double width, double height) {
+        Direction best = Direction.RIGHT;
+        double bestZoom = -1;
+        for (Direction way : Direction.values()) {
+            double zoom = zoom(shapes, way, width, height);
+            if (zoom > bestZoom + 1e-9) {
+                best = way;
+                bestZoom = zoom;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Whether the window now shows the other way's layout clearly bigger than {@code current}'s: by {@link #TURN} at
+     * least, so a window near the tie, or one whose scrollbars come and go with the layout, does not flip it back.
+     */
+    static boolean turns(Map<Direction, Shape> shapes, Direction current, double width, double height) {
+        Direction best = better(shapes, width, height);
+        return best != current && zoom(shapes, best, width, height) > TURN * zoom(shapes, current, width, height);
+    }
+
+    /** The zoom a {@code width} × {@code height} window shows {@code way}'s whole layout at; -1 for no layout. */
+    private static double zoom(Map<Direction, Shape> shapes, Direction way, double width, double height) {
+        Shape shape = shapes.get(way);
+        if (shape == null) return -1;
+        double w = width > 0 ? width : 16;
+        double h = height > 0 ? height : 9;
+        return Math.min(w / Math.max(1, shape.width()), h / Math.max(1, shape.height()));
     }
 
     GraphCanvas<Card, Link> graph() {
@@ -123,9 +211,9 @@ final class ScreenCanvas {
         loadNow = true;
     }
 
-    /** Gives each card the right-click menu {@code menus} makes for its constant. */
-    void setMenus(Function<String, ContextMenu> menus) {
-        this.menus = menus;
+    /** Gives each card the right-click menu {@code cardMenus} makes for its constant, each link {@code linkMenus}'. */
+    void setMenus(Function<String, ContextMenu> cardMenus, Function<Link, ContextMenu> linkMenus) {
+        graph.setMenus(card -> cardMenus.apply(card.constant()), linkMenus);
     }
 
     /** Shows {@code cards} joined by {@code links}, the tree grown from {@code root} (null: no tree). */
@@ -219,14 +307,6 @@ final class ScreenCanvas {
         face.pseudoClassStateChanged(PseudoClass.getPseudoClass("popup"), card.popup());
         face.setPrefWidth(250);
         face.setMaxWidth(250);
-        // A right click that did not drag (a right drag pans the map): the card picked, then its menu.
-        face.setOnMouseReleased(e -> {
-            if (e.getButton() != MouseButton.SECONDARY || !e.isStillSincePress() || menus == null) return;
-            graph.selectedProperty().set(card);
-            ContextMenu menu = menus.apply(card.constant());
-            if (menu != null) menu.show(face, e.getScreenX(), e.getScreenY());
-            e.consume();
-        });
 
         Region halo = new Region();
         halo.getStyleClass().add("screen-card-halo");
@@ -430,16 +510,29 @@ final class ScreenCanvas {
 
     private Arrow arrow(Link link) {
         Arrow arrow = link.entrance() ? Arrow.solid(link.from(), link.to()) : Arrow.dashed(link.from(), link.to());
-        return link.entrance() ? arrow.withLabel(chip(link.via())) : arrow;
+        return link.entrance() || !link.when().isEmpty() ? arrow.withLabel(chip(link)) : arrow;
     }
 
-    /** What an entrance does, on its arrow: the picture clicked or scrolled, or the key pressed. */
-    private Node chip(Input via) {
-        Node face = via.picture() != null ? thumb(via.picture().id(), EDGE_THUMB, "screen-edge-thumb")
-                : new Label(via.key() == null ? "?" : via.key().label());
-        HBox chip = new HBox(face);
+    /**
+     * What an entrance does, on its arrow: the picture clicked or scrolled, or the key pressed; and the method a way
+     * is open only while, on any arrow that has one.
+     */
+    private Node chip(Link link) {
+        Input via = link.via();
+        HBox chip = new HBox(4);
+        if (link.entrance()) {
+            chip.getChildren().add(via.picture() != null ? thumb(via.picture().id(), EDGE_THUMB, "screen-edge-thumb")
+                    : new Label(via.key() == null ? "?" : via.key().label()));
+        }
+        if (!link.when().isEmpty()) {
+            Label when = new Label("while " + link.when());
+            when.getStyleClass().add("screen-edge-when");
+            chip.getChildren().add(when);
+        }
+        chip.setAlignment(Pos.CENTER_LEFT);
         chip.getStyleClass().add("screen-edge-chip");
-        Tooltip.install(chip, new Tooltip(via.label()));
+        Tooltip.install(chip, new Tooltip(via.label() + (link.when().isEmpty() ? "" : ", only while " + link.when())
+                + "\nClick to show its picture; right-click to change when it is open."));
         return chip;
     }
 }

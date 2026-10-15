@@ -306,7 +306,8 @@ final class MapTools {
         }
         if (on.marker() != null) {
             Optional<AgentReply> away = ActTools.notOn(context, on.marker().id(), name);
-            if (away.isPresent()) return away.get();
+            // Left on a screen below it, finished with nothing to try (a rules panel): walked back to it first.
+            if (away.isPresent() && !walkedTo(context, graph, screen, input.desktop())) return away.get();
         }
         Input base = kinded(made(services, held, what, key.orElse(null), notches), kind);
         Input old = held.orElse(null);
@@ -342,9 +343,21 @@ final class MapTools {
         if (!flashed && entered.share() >= SCREEN_SHARE) {
             // Back, close, or another way to a screen mapped already: its marker came into view. A marker on screen
             // before the click proves nothing: a panel opens over it.
-            // The screen opens names first, when the map has it; else the first whose marker came into view.
-            Optional<String> known = (opens == null ? Optional.<String>empty() : ScreenBook.find(graph, opens)
-                    .filter(c -> !c.equals(screen)))
+            // The screen opens names first, when the map has it and its marker shows; else the first whose marker
+            // came into view.
+            Optional<String> named = opens == null ? Optional.empty() : ScreenBook.find(graph, opens)
+                    .filter(c -> !c.equals(screen));
+            if (named.isPresent()) {
+                GameScreen to = graph.screens().get(named.get());
+                if (to.marker() != null && !ActTools.shows(context, to.marker().id(), entered.after())) {
+                    // Taken at its word, a fight's start panel was recorded as the fight (2026-10-15).
+                    return entered.reply().and(AgentReply.text("Nothing was written: " + graph.shown(named.get())
+                            + "'s marker " + to.marker().id() + " does not show, so this is not "
+                            + graph.shown(named.get()) + ". Look at it (describe); give opens the name it shows, "
+                            + "and try " + what + " again from " + name + "."));
+                }
+            }
+            Optional<String> known = named
                     .or(() -> graph.screens().keySet().stream().filter(c -> !c.equals(screen))
                             .filter(c -> graph.screens().get(c).marker() != null)
                             .filter(c -> ActTools.shows(context, graph.screens().get(c).marker().id(), entered.after())
@@ -362,6 +375,17 @@ final class MapTools {
         return up(context, entered.reply().and(changed ? said.and(AgentReply.text("Cut, with screen " + name
                 + ", each new input it shows (another state of a toggle, a tab's buttons): they are untried in turn."))
                 : said), screen, input);
+    }
+
+    /** Walks the game to {@code screen} by the map, as go_to_screen does; whether it got there. */
+    private static boolean walkedTo(AgentContext context, ScreenGraph graph, String screen, Boolean desktop) {
+        Optional<ToolReach> reach = ToolReach.of(context);
+        if (reach.isEmpty() || ActTools.desktopRefusal(context, reach.get().hands(), desktop).isPresent()) {
+            return false;
+        }
+        ScreenWalk.Result walked = new ScreenWalk(graph, reach.get(), STEP_MS, null, close(context)).go(screen, null);
+        seen(graph, walked.at());
+        return walked.arrived();
     }
 
     /**

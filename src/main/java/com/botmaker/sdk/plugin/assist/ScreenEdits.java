@@ -10,12 +10,14 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 /**
@@ -130,6 +132,39 @@ public final class ScreenEdits {
                         entrance))
                 .or(() -> ScreenBook.add(services, constant, made));
         return said(failed, "Added " + name.strip() + " as Screens." + constant + ": it owes its marker.");
+    }
+
+    /**
+     * Makes {@code to}'s way in from {@code from} by {@code via} open only while {@code method} answers true — a
+     * method reference, {@code Firestone::eventOn} — or always, {@code method} blank.
+     */
+    public static String setWayWhen(StudioServices services, String to, String from, Input via, String method) {
+        BooleanSupplier when = ScreenTypes.condition(method);
+        ScreenGraph graph = ScreenBook.read(services);
+        return said(ScreenBook.update(services, to, s -> withWayWhen(graph, s, from, via, when)),
+                when == null ? "That way is always open now." : "That way is open only while " + method.strip() + ".");
+    }
+
+    /** {@code screen} with its way in from {@code from} by {@code via} taken only while {@code when}; null: always. */
+    static GameScreen withWayWhen(ScreenGraph graph, GameScreen screen, String from, Input via, BooleanSupplier when) {
+        GameScreen now = screen.from() != null && wayFrom(graph, screen.from(), from, via)
+                ? screen.from(screen.from().when(when)) : screen;
+        return now.alsoFrom(now.alsoFrom().stream()
+                .map(way -> wayFrom(graph, way, from, via) ? way.when(when) : way).toList());
+    }
+
+    private static boolean wayFrom(ScreenGraph graph, Way way, String from, Input via) {
+        return way.via() != null && way.via().sameAs(via) && graph.constantOf(way.from()).filter(from::equals)
+                .isPresent();
+    }
+
+    /** {@code input} of {@code constant} there only while {@code method} answers true; blank: no method says. */
+    public static String setInputWhen(StudioServices services, String constant, Input input, String method) {
+        BooleanSupplier when = ScreenTypes.condition(method);
+        Input now = input.when(when);
+        return said(ScreenBook.update(services, constant, s -> MapTools.replaced(s, input, now)),
+                when == null ? "No method says when " + input.label() + " is there."
+                        : input.label() + " is there only while " + method.strip() + ".");
     }
 
     /** The bot's picture {@code name}, as its constant holds it. */

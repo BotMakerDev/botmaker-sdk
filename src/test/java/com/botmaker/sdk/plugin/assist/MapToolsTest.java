@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -136,6 +137,30 @@ class MapToolsTest {
         ActTools.Ambient seen = new ActTools.Ambient("HOME", moving, 0);
         assertTrue(seen.fits("HOME", 0, 320, 180));
         assertFalse(seen.fits("HOME", 0, 640, 360), "a frame of another size is read again");
+    }
+
+    /** Only the way in from that screen by that input is made conditional, whether it is the entrance or not. */
+    @Test
+    void aWayIsOpenOnlyWhileAMethodSaysSoAndTheOthersStayAlwaysOpen() {
+        Input map = Input.click(new ImageTemplate("images/map.png"));
+        Input hotkey = Input.click(new ImageTemplate("images/m_key.png"));
+        Map<String, GameScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", GameScreen.named("Home"));
+        screens.put("CAMPAIGN", GameScreen.named("Campaign"));
+        screens.put("MAP", GameScreen.named("Map").from(Way.of(BotConstants.screen("CAMPAIGN"), map))
+                .alsoFrom(List.of(Way.of(BotConstants.screen("HOME"), hotkey))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        BooleanSupplier eventOn = () -> true;
+
+        GameScreen entrance = ScreenEdits.withWayWhen(graph, screens.get("MAP"), "CAMPAIGN", map, eventOn);
+        assertSame(eventOn, entrance.from().when());
+        assertEquals(null, entrance.alsoFrom().getFirst().when(), "the hotkey stays always open");
+
+        GameScreen other = ScreenEdits.withWayWhen(graph, entrance, "HOME", hotkey, eventOn);
+        assertSame(eventOn, other.alsoFrom().getFirst().when());
+        assertEquals(null, ScreenEdits.withWayWhen(graph, other, "CAMPAIGN", map, null).from().when(), "always again");
+        assertSame(screens.get("MAP").from(), ScreenEdits.withWayWhen(graph, screens.get("MAP"), "HOME", map, eventOn)
+                .from(), "no way from Home by the map: nothing changes");
     }
 
     /** A {@code color} frame with its top-left {@code corner}×{@code corner} square white. */

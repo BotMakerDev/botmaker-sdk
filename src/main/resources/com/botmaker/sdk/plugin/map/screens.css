@@ -195,6 +195,17 @@
     -fx-padding: 2;
 }
 
+.screen-edge-chip:hover {
+    -fx-border-color: -bm-accent;
+}
+
+/* The method a way is open only while, on its arrow. */
+.screen-edge-when {
+    -fx-font-size: 0.8em;
+    -fx-text-fill: -bm-screen-plain;
+    -fx-padding: 0 4 0 2;
+}
+
 /* --- the side panel --- */
 
 .screen-panel-scroller,

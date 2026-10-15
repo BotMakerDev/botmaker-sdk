@@ -64,7 +64,7 @@ final class ScreenCards {
      * One edge: {@code via} on {@code from} reaches {@code to}. The entrance (the screen's {@code from}) is solid and
      * places the cards; another way in and a way back are dashed.
      */
-    record Link(String from, String to, Input via, boolean entrance, boolean back) {}
+    record Link(String from, String to, Input via, boolean entrance, boolean back, String when) {}
 
     /**
      * One input in the side panel.
@@ -138,7 +138,8 @@ final class ScreenCards {
                     && edge.via().sameAs(to.from().via())
                     && graph.parent(edge.to()).filter(edge.from()::equals).isPresent()
                     && entered.add(edge.to());
-            links.add(new Link(edge.from(), edge.to(), edge.via(), entrance, edge.back()));
+            links.add(new Link(edge.from(), edge.to(), edge.via(), entrance, edge.back(),
+                    edge.when() == null ? "" : ScreenTypes.sourceOf(edge.when())));
         }
         return links;
     }

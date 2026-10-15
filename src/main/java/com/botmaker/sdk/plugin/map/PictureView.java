@@ -14,11 +14,14 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -26,6 +29,8 @@ import javafx.stage.Window;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -38,6 +43,13 @@ final class PictureView {
     /** The most a picture is drawn at; a bigger one is shrunk to fit. */
     private static final double MOST_WIDTH = 720;
     private static final double MOST_HEIGHT = 420;
+    /** How wide a screen's shot opens, and how far the wheel takes it each way, a step at a time. */
+    private static final double SCREEN_WIDTH = 880;
+    private static final double SCREEN_LEAST = 320;
+    private static final double SCREEN_MOST = 3840;
+    private static final double SCREEN_STEP = 1.2;
+    /** A wheel's notch, in scroll pixels: a touchpad's many small scrolls add up to a step, not a step each. */
+    private static final double NOTCH = 40;
 
     private final StudioServices services;
     private final Supplier<Window> owner;
@@ -112,6 +124,33 @@ final class PictureView {
         show(name, picture, new VBox(10, title(name), said, actions, status));
     }
 
+    /**
+     * A screen's shot, big: {@code shotAt} draws it at a width with its inputs boxed, again at each zoom, so the boxes
+     * stay on their buttons. The wheel zooms it, Ctrl or not. False when there is no shot to draw.
+     */
+    boolean showScreen(String name, Function<Double, Optional<Node>> shotAt) {
+        double[] width = {SCREEN_WIDTH};
+        Optional<Node> first = shotAt.apply(width[0]);
+        if (first.isEmpty()) return false;
+        StackPane holder = new StackPane(first.get());
+        holder.setPadding(new Insets(12));
+        ScrollPane scroller = new ScrollPane(holder);
+        scroller.setPannable(true);
+        scroller.getStyleClass().add("screen-panel-scroller");
+        scroller.addEventFilter(ScrollEvent.SCROLL, e -> {
+            if (e.getDeltaY() == 0) return;
+            e.consume();
+            double next = Math.clamp(width[0] * Math.pow(SCREEN_STEP, e.getDeltaY() / NOTCH), SCREEN_LEAST,
+                    SCREEN_MOST);
+            if (Math.abs(next - width[0]) < 1) return;
+            width[0] = next;
+            shotAt.apply(next).ifPresent(shot -> holder.getChildren().setAll(shot));
+        });
+        show(name, scroller, new VBox(6, title(name), text("The wheel zooms, a drag moves it; click a box for what "
+                + "that input opens.")));
+        return true;
+    }
+
     /** Closes the window; what the map's window does when it closes. */
     void close() {
         if (stage != null) stage.close();
@@ -123,7 +162,11 @@ final class PictureView {
         body.setBottom(side);
         if (stage == null) {
             stage = Modals.window(services, owner.get(), Modals.Frame.modeless("Picture", 920, 700, 380, 300), body);
-            stage.setOnHidden(e -> stage = null);
+            stage.setOnHidden(e -> {
+                // The body is shown again in the next window: a node is the root of one scene at a time.
+                stage.getScene().setRoot(new Pane());
+                stage = null;
+            });
         }
         stage.setTitle(title);
         stage.show();

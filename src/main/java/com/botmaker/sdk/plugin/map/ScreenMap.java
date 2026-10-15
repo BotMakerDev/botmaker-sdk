@@ -87,7 +87,10 @@ public final class ScreenMap {
             // A screen picked, on the map or through an input that opens it: the panel shows its shot, inputs boxed.
             if (panel != null) panel.show(graph, selected);
         });
-        if (panel != null) canvas.setMenus(panel::menuFor);
+        if (panel != null) {
+            canvas.setMenus(panel::menuFor, panel::linkMenu);
+            canvas.graph().setOnEdgeClicked(panel::showLink);
+        }
         poll = new Timeline(new KeyFrame(POLL, e -> refresh()));
         poll.setCycleCount(Timeline.INDEFINITE);
     }
@@ -224,10 +227,16 @@ public final class ScreenMap {
         Button fit = new Button("Fit");
         fit.setTooltip(new Tooltip("Zoom to show the whole map"));
         fit.setOnAction(e -> canvas.graph().fit());
+        Button out = new Button("−");
+        out.setTooltip(new Tooltip("Zoom out (Ctrl+scroll zooms about the pointer)"));
+        out.setOnAction(e -> canvas.graph().zoomOut());
+        Button in = new Button("+");
+        in.setTooltip(new Tooltip("Zoom in"));
+        in.setOnAction(e -> canvas.graph().zoomIn());
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
         said.getStyleClass().add("screen-panel-path");
-        HBox bar = new HBox(8, search, others, fit);
+        HBox bar = new HBox(8, search, others, out, fit, in);
         if (full) {
             Button png = new Button("⤓ PNG");
             png.setTooltip(new Tooltip("Save the whole map as a picture, at full size"));

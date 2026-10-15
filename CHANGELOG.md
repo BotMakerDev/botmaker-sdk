@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Screens fills the window and answers clicks.** The tree lays out rightward or downward, whichever the window
+  shows bigger, and picks again on resize. The toolbar has − Fit +. A click on a link shows the input that takes
+  it; a right-click on a card or a link opens its menu. A link's menu sets "Open only while" to one of the bot's
+  boolean methods, a new one, or Always, and an input's row does the same for when it is there. The link shows
+  the method. A click on a screen's shot opens it big, its inputs boxed, the wheel zooming. The picture window
+  reopens after it is closed.
+- **try_input walks to the screen first** when the game is elsewhere, and refuses an `opens` whose marker does not
+  show on what the input opened: nothing is written.
+
 - **A button's looks, a screen's looks, and conditions on the map.** A button that changes its look stays one
   input: `Input.variants(List.of(Variant.of(Pictures.SHOP_BADGE, State.BADGE)))`. Any look finds it, and a
   `State.DISABLED` look is never pressed. `Way.whenLooks(State)` takes a way only while the button looks so. A

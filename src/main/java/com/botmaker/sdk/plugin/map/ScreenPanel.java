@@ -20,6 +20,7 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
@@ -192,7 +193,7 @@ final class ScreenPanel {
         Map<String, FrameCut> cuts = services.pluginValues() == null ? Map.of()
                 : TemplateUses.cuts(services.pluginValues());
         String shown = selected;
-        canvas.shotWithInputs(shown, HEAD_SHOT, rows, cuts, this::pick, null)
+        canvas.shotWithInputs(shown, HEAD_SHOT, rows, cuts, this::pick, () -> showScreen(shown))
                 .ifPresent(shot -> all.getChildren().addFirst(shot));
         if (screen.back() != null) all.getChildren().add(text("Way back: " + screen.back().label() + "."));
         if (!screen.owes().isEmpty()) {
@@ -275,9 +276,37 @@ final class ScreenPanel {
         });
     }
 
-    /** The right-click menu of {@code constant}'s card: the ⋯ Screen menu's edits. */
+    /** The right-click menu of {@code constant}'s card: its shot shown big, then the ⋯ Screen menu's edits. */
     ContextMenu menuFor(String constant) {
-        return new ContextMenu(hands.screenItems(constant, this::retake).toArray(MenuItem[]::new));
+        ContextMenu menu = new ContextMenu(hands.screenItems(constant, this::retake).toArray(MenuItem[]::new));
+        MenuItem big = new MenuItem("🔍 Show the screen big");
+        big.setOnAction(e -> showScreen(constant));
+        menu.getItems().addAll(0, List.of(big, new SeparatorMenuItem()));
+        return menu;
+    }
+
+    /** The right-click menu of {@code link}: its picture, and when its way is open. */
+    ContextMenu linkMenu(ScreenCards.Link link) {
+        return hands.linkMenu(link, () -> showLink(link));
+    }
+
+    /** A link clicked on the map: the screen it leaves picked, and the picture clicked on it shown. */
+    void showLink(ScreenCards.Link link) {
+        canvas.select(link.from());
+        ScreenCards.rows(graph, link.from()).stream().filter(r -> r.input().sameAs(link.via())).findFirst()
+                .ifPresentOrElse(this::showPicture, () -> say(link.via().label() + " is " + graph.shown(link.from())
+                        + "'s way back, not one of its inputs: its picture shows in 🖼 Manage Pictures."));
+    }
+
+    /** {@code constant}'s shot in the picture window, big, its inputs boxed: Ctrl+scroll or the wheel zooms it. */
+    void showScreen(String constant) {
+        Map<String, FrameCut> cuts = services.pluginValues() == null ? Map.of()
+                : TemplateUses.cuts(services.pluginValues());
+        List<Row> rows = ScreenCards.rows(graph, constant);
+        if (!viewer.showScreen(graph.shown(constant), width -> canvas.shotWithInputs(constant, width, rows, cuts,
+                this::pick, null))) {
+            say(graph.shown(constant) + " has no shot yet: ⋯ Screen ▸ take it again while the game shows it.");
+        }
     }
 
     /** Takes {@code constant}'s shot again from the game, off the FX thread. */
