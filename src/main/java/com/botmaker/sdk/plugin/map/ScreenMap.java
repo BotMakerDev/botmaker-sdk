@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.plugin.api.History;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.overlay.OverlayToolContext;
 import com.botmaker.plugin.api.toolbar.ActionContext;
@@ -20,9 +21,15 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBoxBase;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -63,6 +70,9 @@ public final class ScreenMap {
     private final ScreenPanel panel;
     private final BorderPane root = new BorderPane();
     private final Label said = new Label();
+    /** Studio's own ↶ and ↷, in the full window: a map edit and a code edit are one history. */
+    private final Button undo = new Button("↶");
+    private final Button redo = new Button("↷");
     private final Timeline poll;
     private final List<AutoCloseable> subscriptions = new ArrayList<>();
     private Window window;
@@ -110,6 +120,49 @@ public final class ScreenMap {
         poll.setCycleCount(Timeline.INDEFINITE);
     }
 
+    private static final KeyCombination UNDO = new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN);
+    private static final KeyCombination REDO = new KeyCodeCombination(KeyCode.Y, KeyCombination.SHORTCUT_DOWN);
+    private static final KeyCombination REDO_SHIFT = new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN,
+            KeyCombination.SHIFT_DOWN);
+
+    /** Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z, but in a field the user types in, whose own undo they are. */
+    private void historyKey(KeyEvent key) {
+        for (Object at = key.getTarget(); at instanceof Node node; at = node.getParent()) {
+            if (node instanceof TextInputControl || node instanceof ComboBoxBase<?> box && box.isEditable()) return;
+        }
+        if (UNDO.match(key)) step(true);
+        else if (REDO.match(key) || REDO_SHIFT.match(key)) step(false);
+        else return;
+        key.consume();
+    }
+
+    /**
+     * One step of Studio's history back ({@code back}) or again — whoever made it — then the map read at once, so
+     * a card's corner or a renamed screen shows as the Java has it now.
+     */
+    private void step(boolean back) {
+        History history = services.history();
+        if (back ? !history.canUndo() : !history.canRedo()) return;
+        if (panel != null && panel.busy()) {
+            tell("A try runs: undo once it ends.");
+            return;
+        }
+        String label = back ? history.undoLabel() : history.redoLabel();
+        if (back) history.undo();
+        else history.redo();
+        refresh();
+        tell((back ? "Took back: " : "Did again: ") + label + ".");
+    }
+
+    /** ↶ and ↷ named for the step each takes. On the FX thread. */
+    private void showHistory() {
+        History history = services.history();
+        undo.setDisable(!history.canUndo());
+        redo.setDisable(!history.canRedo());
+        undo.setTooltip(new Tooltip(history.canUndo() ? "Undo: " + history.undoLabel() + " (Ctrl+Z)" : "Nothing to undo"));
+        redo.setTooltip(new Tooltip(history.canRedo() ? "Redo: " + history.redoLabel() + " (Ctrl+Y)" : "Nothing to redo"));
+    }
+
     Node node() {
         return root;
     }
@@ -136,6 +189,8 @@ public final class ScreenMap {
         Stage stage = Modals.window(services, Modals.owner(services),
                 Modals.Frame.modeless("Screens", 1180, 720, 760, 460), (BorderPane) map.node());
         map.window = stage;
+        // On the window, so the keys work wherever its focus is; the overlay's pane leaves them to Studio's.
+        stage.addEventHandler(KeyEvent.KEY_PRESSED, map::historyKey);
         if (project != null) OPEN.put(project, map);
         stage.setOnHidden(e -> {
             map.stop();
@@ -163,6 +218,10 @@ public final class ScreenMap {
         subscriptions.add(services.runs().onTelemetry(this::telemetry));
         // A run starting or ending leaves no screen known to be on the game.
         subscriptions.add(services.runs().onStateChanged(running -> Platform.runLater(() -> canvas.setHere(null))));
+        if (panel != null) {
+            showHistory();
+            subscriptions.add(services.history().onChanged(() -> Platform.runLater(this::showHistory)));
+        }
     }
 
     /** Stops following; what the window or pane does when it closes. */
@@ -269,6 +328,9 @@ public final class ScreenMap {
         said.getStyleClass().add("screen-panel-path");
         HBox bar = new HBox(8, search, others, out, fit, in);
         if (full) {
+            undo.setOnAction(e -> step(true));
+            redo.setOnAction(e -> step(false));
+            bar.getChildren().addAll(undo, redo);
             Button tidy = new Button("Tidy");
             tidy.setTooltip(new Tooltip("Put every card you moved back where the layout puts it"));
             tidy.setOnAction(e -> tidy());

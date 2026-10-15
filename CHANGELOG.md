@@ -403,7 +403,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   on a click elsewhere. A moved card keeps its place in `Screens.java`: `GameScreen.at(Point)`, the corner of its
   card, which no run reads. The first move pins every card where it is, so the map reopens as it was left whatever
   the window's shape; a screen added later is placed by the layout until moved. **Tidy** (after a confirm) takes
-  every corner out. Each moved screen is one undo step in Studio for now.
+  every corner out. A drag, however many cards it pinned, and Tidy are each one step of Studio's undo.
+- **↶ and ↷ in 🗺 Screens** are Studio's own undo (`StudioServices.history()`): the toolbar buttons, Ctrl+Z, Ctrl+Y
+  and Ctrl+Shift+Z take back or do again the last step whoever made it, a map edit or a code edit, and each button's
+  tooltip names that step (*Undo: Move 3 cards*). A map edit is named for its screen (*Edit Shop*, *Add Shop*,
+  *Delete Shop*); a new screen and its entrance on the parent are one step.
 - **🗺 Screens' small gains.** The Result and Kind menus tick what the input is now; New screen from here offers the
   screen's looks' inputs too; a link shows the look its button must have; the hand menus are off while a try or a
   walk runs.

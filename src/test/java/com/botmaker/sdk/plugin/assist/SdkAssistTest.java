@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.Dialogs;
+import com.botmaker.plugin.api.History;
 import com.botmaker.plugin.api.Runs;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.Theme;
@@ -1189,6 +1190,10 @@ class SdkAssistTest {
         assertEquals("Every card is where the layout puts it.", ScreenEdits.tidy(host));
         assertNull(screen("HOME").at());
         assertNull(screen("SHOP").at());
+        assertEquals(List.of("Move 2 cards", "Move Shop", "Tidy the map"), host.steps,
+                "each drag and Tidy is one step of Studio's undo, however many screens it wrote");
+        ScreenEdits.rename(host, "SHOP", "Store");
+        assertEquals("Edit Shop", host.steps.getLast(), "a lone edit is named for its screen");
     }
 
     /** edit_map does what 🗺 Screens' hand tools do, each input named as try_input names it (2026-10-15). */
@@ -1456,6 +1461,33 @@ class SdkAssistTest {
         @Override public Theme theme() { return null; }
         @Override public Dialogs dialogs() { return null; }
         @Override public PluginValues pluginValues() { return this; }
+
+        /** Each outermost batch's label, as Studio's undo would name the step. */
+        final List<String> steps = new ArrayList<>();
+        private int batching;
+
+        @Override
+        public History history() {
+            return new History() {
+                @Override public boolean canUndo() { return false; }
+                @Override public boolean canRedo() { return false; }
+                @Override public String undoLabel() { return ""; }
+                @Override public String redoLabel() { return ""; }
+                @Override public void undo() { }
+                @Override public void redo() { }
+                @Override public AutoCloseable onChanged(Runnable listener) { return () -> { }; }
+
+                @Override
+                public void batch(String label, Runnable writes) {
+                    if (batching++ == 0) steps.add(label);
+                    try {
+                        writes.run();
+                    } finally {
+                        batching--;
+                    }
+                }
+            };
+        }
 
         @Override
         public Runs runs() {

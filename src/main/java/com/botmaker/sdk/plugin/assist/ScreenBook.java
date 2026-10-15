@@ -13,8 +13,11 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 /**
@@ -60,9 +63,8 @@ final class ScreenBook {
     static Optional<String> add(StudioServices services, String constant, GameScreen screen) {
         PluginValues values = services.pluginValues();
         if (values == null) return Optional.of("Studio has no source tree open.");
-        Optional<String> missing = values.create(SCREENS.value());
-        if (missing.isPresent()) return missing;
-        return SCREENS.add(values, Member.of(constant), screen);
+        return step(services, "Add " + screen.name(), () -> values.create(SCREENS.value())
+                .or(() -> SCREENS.add(values, Member.of(constant), screen)));
     }
 
     /** {@code constant} as {@code change} makes it, read again first. Empty when written, else why not. */
@@ -71,21 +73,30 @@ final class ScreenBook {
         Optional<ValueContext> held = values == null ? Optional.empty() : SCREENS.open(values, Member.of(constant));
         Optional<GameScreen> now = held.flatMap(SCREENS::read);
         if (now.isEmpty()) return Optional.of(HOLDER + "." + constant + " is gone or written by hand, so it is left as it is.");
-        return held.get().write(change.apply(now.get()));
+        // Named for Studio's ↶; a drag or a new screen around it is one step under its own name instead.
+        return step(services, "Edit " + now.get().name(), () -> held.get().write(change.apply(now.get())));
+    }
+
+    /** {@code write} as one step of Studio's undo named {@code label}, or part of the batch already open. */
+    static Optional<String> step(StudioServices services, String label, Supplier<Optional<String>> write) {
+        List<Optional<String>> answer = new ArrayList<>(List.of(Optional.empty()));
+        services.history().batch(label, () -> answer.set(0, write.get()));
+        return answer.getFirst();
     }
 
     /** Declares {@code constant} just above {@code before}, so {@code before} may name it. Empty when done. */
     static Optional<String> moveBefore(StudioServices services, String constant, String before) {
         PluginValues values = services.pluginValues();
         if (values == null) return Optional.of("Studio has no source tree open.");
-        return SCREENS.moveBefore(values, Member.of(constant), Member.of(before));
+        return step(services, "Reorder the map", () -> SCREENS.moveBefore(values, Member.of(constant),
+                Member.of(before)));
     }
 
     /** Takes {@code constant} out of the map. Empty when done, else why not. */
     static Optional<String> remove(StudioServices services, String constant) {
         PluginValues values = services.pluginValues();
         if (values == null) return Optional.of("Studio has no source tree open.");
-        return SCREENS.remove(values, Member.of(constant));
+        return step(services, "Delete Screens." + constant, () -> SCREENS.remove(values, Member.of(constant)));
     }
 
     /** Whether the bot's Pictures declare {@code name}. */

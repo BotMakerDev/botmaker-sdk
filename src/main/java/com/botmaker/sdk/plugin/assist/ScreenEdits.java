@@ -16,6 +16,7 @@ import com.botmaker.sdk.plugin.types.ScreenTypes;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -111,7 +112,8 @@ public final class ScreenEdits {
         List<String> after = graph.screens().keySet().stream()
                 .filter(c -> !c.equals(constant) && graph.dependsOn(c).contains(constant)).map(graph::shown).toList();
         if (!after.isEmpty()) return String.join(", ", after) + " is reached from it: delete those first.";
-        Optional<String> failed = ScreenBook.remove(services, constant);
+        Optional<String> failed = ScreenBook.step(services, "Delete " + graph.shown(constant),
+                () -> ScreenBook.remove(services, constant));
         if (failed.isEmpty()) ScreenShots.remove(services.resourcesDir(), constant);
         return said(failed, "Deleted " + graph.shown(constant) + ".");
     }
@@ -146,9 +148,10 @@ public final class ScreenEdits {
         GameScreen on = graph.screens().get(parent);
         Optional<Input> had = on == null ? Optional.empty()
                 : on.allInputs().stream().filter(i -> i.sameAs(via)).findFirst();
-        Optional<String> failed = ScreenBook.update(services, parent, s -> MapTools.replaced(s, had.orElse(null),
-                        entrance))
-                .or(() -> ScreenBook.add(services, constant, made));
+        // The entrance on the parent and the new screen: one step of Studio's undo.
+        Optional<String> failed = ScreenBook.step(services, "Add " + name.strip(), () -> ScreenBook.update(services,
+                parent, s -> MapTools.replaced(s, had.orElse(null), entrance))
+                .or(() -> ScreenBook.add(services, constant, made)));
         return said(failed, "Added " + name.strip() + " as Screens." + constant + ": it owes its marker.");
     }
 
@@ -266,26 +269,43 @@ public final class ScreenEdits {
      */
     public static String move(StudioServices services, Map<String, Point> corners) {
         ScreenGraph graph = ScreenBook.read(services);
-        int moved = 0;
-        for (Map.Entry<String, Point> corner : corners.entrySet()) {
-            GameScreen screen = graph.screens().get(corner.getKey());
-            if (screen == null || Objects.equals(screen.at(), corner.getValue())) continue;
-            Optional<String> failed = ScreenBook.update(services, corner.getKey(), s -> s.at(corner.getValue()));
-            if (failed.isPresent()) return said(failed, "");
-            moved++;
-        }
-        return moved == 0 ? "Nothing moved." : moved == 1 ? "Moved 1 screen." : "Moved " + moved + " screens.";
+        Map<String, Point> moving = new LinkedHashMap<>();
+        corners.forEach((constant, corner) -> {
+            GameScreen screen = graph.screens().get(constant);
+            if (screen != null && !Objects.equals(screen.at(), corner)) moving.put(constant, corner);
+        });
+        if (moving.isEmpty()) return "Nothing moved.";
+        // One step of Studio's undo for the whole drag, however many cards it pinned.
+        String label = moving.size() == 1 ? "Move " + graph.shown(moving.keySet().iterator().next())
+                : "Move " + moving.size() + " cards";
+        String[] answer = {moving.size() == 1 ? "Moved 1 screen." : "Moved " + moving.size() + " screens."};
+        services.history().batch(label, () -> {
+            for (Map.Entry<String, Point> corner : moving.entrySet()) {
+                Optional<String> failed = ScreenBook.update(services, corner.getKey(), s -> s.at(corner.getValue()));
+                if (failed.isPresent()) {
+                    answer[0] = said(failed, "");
+                    return;
+                }
+            }
+        });
+        return answer[0];
     }
 
     /** Puts every card of 🗺 Screens' map back where the layout puts it: no screen keeps a corner of its own. */
     public static String tidy(StudioServices services) {
         ScreenGraph graph = ScreenBook.read(services);
-        for (Map.Entry<String, GameScreen> screen : graph.screens().entrySet()) {
-            if (screen.getValue().at() == null) continue;
-            Optional<String> failed = ScreenBook.update(services, screen.getKey(), s -> s.at(null));
-            if (failed.isPresent()) return said(failed, "");
-        }
-        return "Every card is where the layout puts it.";
+        String[] answer = {"Every card is where the layout puts it."};
+        services.history().batch("Tidy the map", () -> {
+            for (Map.Entry<String, GameScreen> screen : graph.screens().entrySet()) {
+                if (screen.getValue().at() == null) continue;
+                Optional<String> failed = ScreenBook.update(services, screen.getKey(), s -> s.at(null));
+                if (failed.isPresent()) {
+                    answer[0] = said(failed, "");
+                    return;
+                }
+            }
+        });
+        return answer[0];
     }
 
     /** The bot's picture {@code name}, as its constant holds it. */

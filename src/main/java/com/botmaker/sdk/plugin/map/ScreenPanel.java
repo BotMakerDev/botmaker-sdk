@@ -463,6 +463,11 @@ final class ScreenPanel {
         CaptureTemplates.open(services, window, null, null, saved);
     }
 
+    /** Whether a try or a walk runs now: the map is not edited, by hand or by ↶/↷, until it ends. */
+    boolean busy() {
+        return busy;
+    }
+
     private void setBusy(boolean busy, String said) {
         this.busy = busy;
         drawn = null;
