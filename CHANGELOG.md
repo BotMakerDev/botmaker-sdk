@@ -36,6 +36,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - An edit that left the map as it was (a name taken, no such way) is a refusal, not a success.
   - Use as the way back keeps the way back it replaces as an untried input, and a rename refuses a name another
     screen has (in the window too).
+  - A condition ("open only while", "there only while", a look's, crop_picture's `when`) must be a method
+    reference such as `Firestone::eventOn`: it is written into `Screens.java` as given, so other text is refused.
 - **🗺 Screens fills the window and answers clicks.** The tree lays out rightward or downward, whichever the window
   shows bigger, and picks again on resize. The toolbar has − Fit +. A click on a link shows the input that takes
   it; a right-click on a card or a link opens its menu. A link's menu sets "Open only while" to one of the bot's

@@ -18,6 +18,7 @@ import com.botmaker.sdk.internal.flow.BotConstants;
 
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.regex.Pattern;
 
 /**
  * The shapes of the {@code SCREEN_MAP} value, {@code Screens.java}: a screen, its ways in and its inputs, as the
@@ -117,6 +118,16 @@ public final class ScreenTypes {
     /** A condition that only knows what it is written as — {@code Firestone::eventOn} — or {@code null}. */
     public static BooleanSupplier condition(String source) {
         return source == null || source.isBlank() ? null : new NamedCondition(source);
+    }
+
+    private static final Pattern METHOD = Pattern.compile("[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*::[A-Za-z_$][\\w$]*");
+
+    /**
+     * Whether {@code source} is a method reference, {@code Firestone::eventOn}, or blank: what an edit may write as a
+     * condition. The source goes into the bot's Java as written, so anything else is refused before it is.
+     */
+    public static boolean isMethod(String source) {
+        return source == null || source.isBlank() || METHOD.matcher(source.strip()).matches();
     }
 
     /** How {@code condition} is written, or {@code ""} for none or a live one. */

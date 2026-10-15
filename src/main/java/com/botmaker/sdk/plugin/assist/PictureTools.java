@@ -37,6 +37,7 @@ import com.botmaker.sdk.plugin.pictures.TagCatalog;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateManifest;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -393,6 +394,9 @@ final class PictureTools {
         String variantOf = blankless(crop.variantOf());
         String when = blankless(crop.when());
         String screenLook = blankless(crop.screenLook());
+        if (!ScreenTypes.isMethod(when)) {
+            return AgentReply.refused("when is a method reference, Firestone::eventOn. Nothing was saved.");
+        }
         if (screenLook != null && (back || popup || variantOf != null || !MapTools.isName(screenLook))) {
             return AgentReply.refused("A screen's look is named in plain words, on one line, and holds a marker or "
                     + "inputs only. Nothing was saved.");

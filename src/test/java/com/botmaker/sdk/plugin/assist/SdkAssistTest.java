@@ -1216,6 +1216,10 @@ class SdkAssistTest {
         assertTrue(screen("HOME").inputs().get(2).comesAndGoes());
         run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method", "Bot::eventOn");
         assertEquals("Bot::eventOn", ScreenTypes.sourceOf(screen("HOME").inputs().get(2).when()));
+        // The method goes into Screens.java as written: anything but a method reference is refused.
+        assertTrue(run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method",
+                "Bot::eventOn) ; System.exit(0); (").isRefused());
+        assertEquals("Bot::eventOn", ScreenTypes.sourceOf(screen("HOME").inputs().get(2).when()));
         run("edit_map", "screen", "Home", "action", "look_when", "look", "event", "method", "Bot::eventOn");
         assertEquals("Bot::eventOn", ScreenTypes.sourceOf(screen("HOME").variants().getFirst().when()));
 

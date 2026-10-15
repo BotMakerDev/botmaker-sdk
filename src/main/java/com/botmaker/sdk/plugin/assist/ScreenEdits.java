@@ -151,6 +151,7 @@ public final class ScreenEdits {
      * method reference, {@code Firestone::eventOn} — or always, {@code method} blank.
      */
     public static String setWayWhen(StudioServices services, String to, String from, Input via, String method) {
+        if (!ScreenTypes.isMethod(method)) return notMethod(method);
         BooleanSupplier when = ScreenTypes.condition(method);
         ScreenGraph graph = ScreenBook.read(services);
         if (ways(graph.screens().get(to)).stream().noneMatch(way -> wayFrom(graph, way, from, via))) {
@@ -228,6 +229,7 @@ public final class ScreenEdits {
 
     /** {@code constant}'s look {@code look} shown only while {@code method} answers true; blank: no method says. */
     public static String setLookWhen(StudioServices services, String constant, String look, String method) {
+        if (!ScreenTypes.isMethod(method)) return notMethod(method);
         BooleanSupplier when = ScreenTypes.condition(method);
         GameScreen screen = ScreenBook.read(services).screens().get(constant);
         Optional<ScreenVariant> had = screen == null || look == null ? Optional.empty() : screen.variants().stream()
@@ -244,6 +246,7 @@ public final class ScreenEdits {
 
     /** {@code input} of {@code constant} there only while {@code method} answers true; blank: no method says. */
     public static String setInputWhen(StudioServices services, String constant, Input input, String method) {
+        if (!ScreenTypes.isMethod(method)) return notMethod(method);
         BooleanSupplier when = ScreenTypes.condition(method);
         Input now = input.when(when);
         return said(ScreenBook.update(services, constant, s -> MapTools.replaced(s, input, now)),
@@ -266,6 +269,10 @@ public final class ScreenEdits {
         }
         names.sort(String::compareTo);
         return names;
+    }
+
+    private static String notMethod(String method) {
+        return "\"" + method.strip() + "\" is no method reference (Firestone::eventOn): nothing was written.";
     }
 
     private static String said(Optional<String> failed, String done) {
