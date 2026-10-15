@@ -238,6 +238,11 @@
     -fx-padding: 4 0 0 0;
 }
 
+/* A sign the guide explains, where it is a word or a symbol rather than a pill (MapGuide). */
+.screen-guide-sign {
+    -fx-font-weight: bold;
+}
+
 .screen-panel-primary {
     -fx-font-weight: bold;
 }

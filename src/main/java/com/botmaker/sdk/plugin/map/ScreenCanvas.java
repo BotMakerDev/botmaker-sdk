@@ -412,9 +412,9 @@ final class ScreenCanvas {
         if (card.chores() > 0) badges.getChildren().add(badge("✓" + card.chores(), card.chores() + " chore"
                 + (card.chores() == 1 ? "" : "s")));
         if (card.presence() == Presence.LOCKED) {
-            badges.getChildren().add(badge("🔒", "Every way in is locked on this account"));
+            badges.getChildren().add(badge("🔒", MapGuide.LOCKED));
         }
-        if (folded.contains(card.constant())) badges.getChildren().add(badge("⊕", "Folded: double-click to unfold"));
+        if (folded.contains(card.constant())) badges.getChildren().add(badge("⊕", MapGuide.FOLDED));
 
         StackPane view = new StackPane(halo, face, badges);
         view.getStyleClass().add("screen-card-view");

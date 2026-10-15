@@ -72,6 +72,7 @@ public final class ScreenMap {
     private final Timeline poll;
     private final List<AutoCloseable> subscriptions = new ArrayList<>();
     private Window window;
+    private Stage guide;
     private ScreenGraph graph = ScreenGraph.of(Map.of());
     private List<Card> cards;
     private List<Link> links;
@@ -217,6 +218,19 @@ public final class ScreenMap {
         subscriptions.clear();
         canvas.setTrying(null);
         if (panel != null) panel.close();
+        if (guide != null) guide.close();
+    }
+
+    /** The legend of the map's signs, one window: asked again, it comes to the front. */
+    private void showGuide(Node from) {
+        if (guide != null) {
+            guide.setIconified(false);
+            guide.toFront();
+            return;
+        }
+        guide = MapGuide.open(services, from.getScene() == null ? null : from.getScene().getWindow());
+        guide.setOnHidden(e -> guide = null);
+        guide.show();
     }
 
     /** Reads the map again and draws what changed. On the FX thread. */
@@ -292,17 +306,20 @@ public final class ScreenMap {
         search.setPrefColumnCount(full ? 16 : 10);
         CheckBox others = new CheckBox("Other ways");
         others.setSelected(true);
-        others.setTooltip(new Tooltip("Show the dashed arrows: other ways into a screen, and ways back"));
+        others.setTooltip(new Tooltip(MapGuide.OTHER_WAYS));
         others.selectedProperty().addListener((o, was, is) -> canvas.graph().setShowDashed(is));
         Button fit = new Button("Fit");
-        fit.setTooltip(new Tooltip("Zoom to show the whole map"));
+        fit.setTooltip(new Tooltip(MapGuide.FIT));
         fit.setOnAction(e -> canvas.graph().fit());
         Button out = new Button("−");
-        out.setTooltip(new Tooltip("Zoom out (the wheel zooms about the pointer; a right drag pans)"));
+        out.setTooltip(new Tooltip(MapGuide.ZOOM_OUT));
         out.setOnAction(e -> canvas.graph().zoomOut());
         Button in = new Button("+");
-        in.setTooltip(new Tooltip("Zoom in"));
+        in.setTooltip(new Tooltip(MapGuide.ZOOM_IN));
         in.setOnAction(e -> canvas.graph().zoomIn());
+        Button help = new Button("?");
+        help.setTooltip(new Tooltip(MapGuide.GUIDE));
+        help.setOnAction(e -> showGuide(help));
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
         said.getStyleClass().add("screen-panel-path");
@@ -312,19 +329,19 @@ public final class ScreenMap {
             redo.setOnAction(e -> step(false));
             bar.getChildren().addAll(undo, redo);
             Button tidy = new Button("Tidy");
-            tidy.setTooltip(new Tooltip("Put every card you moved back where the layout puts it"));
+            tidy.setTooltip(new Tooltip(MapGuide.TIDY));
             tidy.setOnAction(e -> tidy());
             Button png = new Button("⤓ PNG");
-            png.setTooltip(new Tooltip("Save the whole map as a picture, at full size"));
+            png.setTooltip(new Tooltip(MapGuide.PNG));
             png.setOnAction(e -> savePng());
             bar.getChildren().addAll(tidy, png);
         } else {
             Button open = new Button("🗺 Open");
-            open.setTooltip(new Tooltip("Open 🗺 Screens, with each screen's inputs and actions"));
+            open.setTooltip(new Tooltip(MapGuide.OPEN));
             open.setOnAction(e -> open(() -> services));
             bar.getChildren().add(open);
         }
-        bar.getChildren().addAll(gap, said);
+        bar.getChildren().addAll(help, gap, said);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(8, 10, 8, 10));
         bar.getStyleClass().add("screen-map-bar");

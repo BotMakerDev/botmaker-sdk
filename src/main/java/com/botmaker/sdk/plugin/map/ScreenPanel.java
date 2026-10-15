@@ -184,7 +184,7 @@ final class ScreenPanel {
         }
         TextField first = new TextField("Home");
         first.setPromptText("the first screen's name, as the game shows it");
-        Button cut = action("✂ Cut its marker", "Draw a box around a part only this screen shows",
+        Button cut = action("✂ Cut its marker", MapGuide.CUT_MARKER,
                 () -> cut(first.getText().strip(), true));
         return List.of(heading("No map yet"), text("The map is the bot's Screens class, one constant per screen. "
                 + "Start it with the first screen's marker: a part only that screen shows. The assistant's "
@@ -219,12 +219,10 @@ final class ScreenPanel {
                 .orElse("Nothing on it is left to try"), () -> next.ifPresent(r -> tryRow(shown, r)));
         tryNext.setDisable(busy || next.isEmpty());
         tryNext.getStyleClass().add("screen-panel-primary");
-        Button cutInputs = action("✂ Cut inputs", "Draw boxes around more of its buttons: each is noted untried",
-                () -> cut(shown, false));
+        Button cutInputs = action("✂ Cut inputs", MapGuide.CUT_INPUTS, () -> cut(shown, false));
         Button cutMarker = action(screen.marker() == null ? "✂ Cut marker" : "✂ Recut marker",
-                "Draw a box around a part only this screen shows", () -> cut(shown, true));
-        Button go = action("🧭 Go here", "Walk the game here by the map, as Navigate.to does in a run",
-                () -> goHere(shown));
+                MapGuide.CUT_MARKER, () -> cut(shown, true));
+        Button go = action("🧭 Go here", MapGuide.GO_HERE, () -> goHere(shown));
         go.setDisable(busy || card.popup());
         cutInputs.setDisable(busy);
         cutMarker.setDisable(busy);
@@ -335,7 +333,8 @@ final class ScreenPanel {
 
     private void showPicture(String constant, ScreenCards.Row row) {
         boolean untried = row.state() == ScreenCards.RowState.UNTRIED || row.state() == ScreenCards.RowState.UNSEEN;
-        viewer.showPicture(row, untried && !busy ? () -> tryRow(constant, row) : null, () -> {
+        PictureView.Back back = new PictureView.Back(graph.shown(constant), () -> bigShot(constant));
+        viewer.showPicture(row, back, untried && !busy ? () -> tryRow(constant, row) : null, () -> {
             drawn = null;
             canvas.forgetPictures();
             changed.run();
@@ -372,15 +371,20 @@ final class ScreenPanel {
                 + "picture shows in 🖼 Manage Pictures."));
     }
 
-    /** {@code constant}'s shot in the picture window, big, its inputs boxed: Ctrl+scroll or the wheel zooms it. */
+    /** {@code constant}'s shot in the picture window, big, its inputs boxed: the wheel zooms it. */
     void showScreen(String constant) {
+        if (!bigShot(constant)) {
+            say(graph.shown(constant) + " has no shot yet: ⋯ Screen ▸ take it again while the game shows it.");
+        }
+    }
+
+    /** {@code constant}'s shot in the picture window; false, and nothing shown, when it has none. */
+    private boolean bigShot(String constant) {
         Map<String, FrameCut> cuts = services.pluginValues() == null ? Map.of()
                 : TemplateUses.cuts(services.pluginValues());
         List<Row> rows = ScreenCards.rows(graph, constant);
-        if (!viewer.showScreen(graph.shown(constant), width -> canvas.shotWithInputs(constant, width, rows, cuts,
-                row -> pick(constant, row), null))) {
-            say(graph.shown(constant) + " has no shot yet: ⋯ Screen ▸ take it again while the game shows it.");
-        }
+        return viewer.showScreen(graph.shown(constant), width -> canvas.shotWithInputs(constant, width, rows, cuts,
+                row -> pick(constant, row), null));
     }
 
     /** Takes {@code constant}'s shot again from the game, off the FX thread. */

@@ -16,6 +16,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.ScrollEvent;
@@ -30,6 +31,7 @@ import javafx.stage.Window;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -43,6 +45,10 @@ final class PictureView {
     /** The most a picture is drawn at; a bigger one is shrunk to fit. */
     private static final double MOST_WIDTH = 720;
     private static final double MOST_HEIGHT = 420;
+    /** The most the wheel grows a picture: each of its pixels as a square this many screen pixels wide. */
+    static final double MOST_ZOOM = 32;
+    /** The widest a zoomed picture is drawn, in screen pixels. */
+    private static final double MOST_SIDE = 8192;
     /** How wide a screen's shot opens, and how far the wheel takes it each way, a step at a time. */
     private static final double SCREEN_WIDTH = 880;
     private static final double SCREEN_LEAST = 320;
@@ -64,37 +70,33 @@ final class PictureView {
     }
 
     /**
-     * Shows {@code row}'s picture; {@code tryIt} is ▶ Try, null when the row is tried; {@code renamed} runs after a
-     * rename wrote the bot.
+     * The way back from a picture to the screen it was opened from: {@code screen} names it on the button, and
+     * {@code show} shows its big shot, false when it has none.
      */
-    void showPicture(Row row, Runnable tryIt, Runnable renamed) {
+    record Back(String screen, BooleanSupplier show) {}
+
+    /**
+     * Shows {@code row}'s picture; {@code back} is the "← screen" button, null for none; {@code tryIt} is ▶ Try, null
+     * when the row is tried; {@code renamed} runs after a rename wrote the bot.
+     */
+    void showPicture(Row row, Back back, Runnable tryIt, Runnable renamed) {
         String name = row.picture();
         if (name == null || services.resourcesDir() == null) return;
         Path file = TemplateLibrary.fileForName(services.resourcesDir(), name);
 
-        StackPane picture = new StackPane();
-        picture.getStyleClass().add("screen-card-shot");
-        picture.setPadding(new Insets(12));
+        Node picture;
         if (Files.isRegularFile(file)) {
-            ImageView view = new ImageView(new Image(file.toUri().toString()));
-            view.setPreserveRatio(true);
-            view.setSmooth(false);    // a picture is matched pixel for pixel: shown as it is, not blurred
-            Image image = view.getImage();
-            double scale = Math.min(1, Math.min(MOST_WIDTH / Math.max(1, image.getWidth()),
-                    MOST_HEIGHT / Math.max(1, image.getHeight())));
-            // Small pictures shown larger, whole pixels, so a 30-pixel icon is still readable.
-            double grow = scale < 1 ? scale : Math.max(1, Math.floor(Math.min(240 / Math.max(1, image.getWidth()),
-                    160 / Math.max(1, image.getHeight()))));
-            view.setFitWidth(image.getWidth() * grow);
-            view.setFitHeight(image.getHeight() * grow);
-            picture.getChildren().add(view);
+            picture = zoomable(new Image(file.toUri().toString()));
         } else {
-            picture.getChildren().add(new Label("No file for " + name + "."));
+            StackPane none = new StackPane(new Label("No file for " + name + "."));
+            none.setPadding(new Insets(12));
+            picture = none;
         }
 
         String constant = TemplateNames.constantFor(name);
         Label said = text((constant == null ? "" : "Pictures." + constant + "\n") + where(name) + row.label() + ": "
-                + row.result() + (row.kind().isEmpty() ? "" : " (" + row.kind() + ")"));
+                + row.result() + (row.kind().isEmpty() ? "" : " (" + row.kind() + ")")
+                + "\nThe wheel zooms it, a drag moves it.");
 
         Label status = new Label();
         status.setWrapText(true);
@@ -121,7 +123,68 @@ final class PictureView {
             });
             actions.getChildren().addFirst(play);
         }
-        show(name, picture, new VBox(10, title(name), said, actions, status));
+        VBox side = new VBox(10, title(name), said, actions, status);
+        if (back != null) {
+            Button screen = new Button("← " + back.screen());
+            screen.setTooltip(new Tooltip("Show " + back.screen() + "'s shot again"));
+            screen.setOnAction(e -> {
+                if (!back.show().getAsBoolean()) status.setText(back.screen() + " has no shot yet.");
+            });
+            side.getChildren().addFirst(screen);
+        }
+        show(name, picture, side);
+    }
+
+    /**
+     * {@code image} at whole pixels, never blurred, as it opens: shrunk to fit when big, a small one grown so a
+     * 30-pixel icon is still readable. The wheel zooms it a step at a time and a drag moves it.
+     */
+    private static Node zoomable(Image image) {
+        ImageView view = new ImageView(image);
+        view.setPreserveRatio(true);
+        view.setSmooth(false);    // a picture is matched pixel for pixel: shown as it is, not blurred
+        double width = Math.max(1, image.getWidth());
+        double height = Math.max(1, image.getHeight());
+        double fit = Math.min(1, Math.min(MOST_WIDTH / width, MOST_HEIGHT / height));
+        // Never past what a texture can hold: a big shot stops growing sooner than an icon.
+        double most = Math.max(1, Math.min(MOST_ZOOM, Math.floor(MOST_SIDE / Math.max(width, height))));
+        double[] zoom = {fit < 1 ? fit : Math.max(1, Math.floor(Math.min(240 / width, 160 / height)))};
+        Runnable size = () -> {
+            view.setFitWidth(width * zoom[0]);
+            view.setFitHeight(height * zoom[0]);
+        };
+        size.run();
+        StackPane holder = new StackPane(view);
+        holder.getStyleClass().add("screen-card-shot");
+        holder.setPadding(new Insets(12));
+        ScrollPane scroller = new ScrollPane(holder);
+        scroller.setPannable(true);
+        // Centred while it is smaller than the window; scrolled once it is bigger.
+        scroller.setFitToWidth(true);
+        scroller.setFitToHeight(true);
+        scroller.getStyleClass().add("screen-panel-scroller");
+        double[] turned = {0};
+        scroller.addEventFilter(ScrollEvent.SCROLL, e -> {
+            if (e.getDeltaY() == 0) return;
+            e.consume();
+            turned[0] += e.getDeltaY();
+            if (Math.abs(turned[0]) < NOTCH) return;
+            zoom[0] = zoomStep(zoom[0], turned[0] > 0, fit, most);
+            turned[0] = 0;
+            size.run();
+        });
+        return scroller;
+    }
+
+    /**
+     * The zoom one wheel notch takes a picture to from {@code zoom}: up, the next whole multiple (below 1, twice as
+     * big, up to 1), never past {@code most}; down, the one before, then half as big, never under {@code least}. A whole
+     * multiple draws each of
+     * the picture's pixels as a square of the screen's, so none is blurred or dropped.
+     */
+    static double zoomStep(double zoom, boolean in, double least, double most) {
+        if (in) return zoom < 1 ? Math.min(1, zoom * 2) : Math.max(zoom, Math.min(most, Math.floor(zoom) + 1));
+        return zoom > 1 ? Math.max(1, Math.ceil(zoom) - 1) : Math.max(least, zoom / 2);
     }
 
     /**

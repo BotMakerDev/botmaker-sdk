@@ -44,6 +44,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   boolean methods, a new one, or Always, and an input's row does the same for when it is there. The link shows
   the method. A click on a screen's shot opens it big, its inputs boxed, the wheel zooming. The picture window
   reopens after it is closed.
+- **🗺 Screens' picture window goes back, zooms, and the map has a guide.** A picture opened from a screen (its
+  row, a box on its shot, a link) has "← <screen>", which shows that screen's shot again in the same window. A
+  picture zooms with the wheel in whole-pixel steps, never blurred, and a drag moves it. The toolbar's **?** opens a
+  legend of the map's signs: the toolbar, a card's ring, pills and badges, solid and dashed arrows, the panel's
+  buttons and an input's ⋯ menu.
 - **try_input walks to the screen first** when the game is elsewhere, and refuses an `opens` whose marker does not
   show on what the input opened: nothing is written.
 
