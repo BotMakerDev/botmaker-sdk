@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.ScreenVariant;
@@ -16,6 +17,8 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
@@ -24,11 +27,14 @@ import java.util.function.BooleanSupplier;
  * instead (the user's call, 2026-10-15): an input's result, kind, never, lock or coming and going, an input removed or
  * made the way back, a screen renamed, made a popup, taken back, deleted or given a new shot, pictures the bot has put
  * on a screen, a screen added under another without trying its way in, a way in or a way back taken off, and when a
- * way, an input or a look is there. The assistant's edit_map does each by the same method ({@link MapEdits}). Each
- * answers in a sentence what it wrote, or why it did not. On the FX thread, except {@link #retakeShot}, which reads
- * the game.
+ * way, an input or a look is there, and where a card sits on the map. The assistant's edit_map does each by the same
+ * method ({@link MapEdits}). Each answers in a sentence what it wrote, or why it did not. On the FX thread, except
+ * {@link #retakeShot}, which reads the game.
  */
 public final class ScreenEdits {
+
+    /** How an answer begins when nothing was written. */
+    public static final String NOT_WRITTEN = "Not written: ";
 
     private ScreenEdits() {}
 
@@ -254,6 +260,34 @@ public final class ScreenEdits {
                         : input.label() + " is there only while " + method.strip() + ".");
     }
 
+    /**
+     * Puts each screen {@code corners} names at its card's corner on 🗺 Screens' map; a screen already there is not
+     * written. Nothing a run reads changes.
+     */
+    public static String move(StudioServices services, Map<String, Point> corners) {
+        ScreenGraph graph = ScreenBook.read(services);
+        int moved = 0;
+        for (Map.Entry<String, Point> corner : corners.entrySet()) {
+            GameScreen screen = graph.screens().get(corner.getKey());
+            if (screen == null || Objects.equals(screen.at(), corner.getValue())) continue;
+            Optional<String> failed = ScreenBook.update(services, corner.getKey(), s -> s.at(corner.getValue()));
+            if (failed.isPresent()) return said(failed, "");
+            moved++;
+        }
+        return moved == 0 ? "Nothing moved." : moved == 1 ? "Moved 1 screen." : "Moved " + moved + " screens.";
+    }
+
+    /** Puts every card of 🗺 Screens' map back where the layout puts it: no screen keeps a corner of its own. */
+    public static String tidy(StudioServices services) {
+        ScreenGraph graph = ScreenBook.read(services);
+        for (Map.Entry<String, GameScreen> screen : graph.screens().entrySet()) {
+            if (screen.getValue().at() == null) continue;
+            Optional<String> failed = ScreenBook.update(services, screen.getKey(), s -> s.at(null));
+            if (failed.isPresent()) return said(failed, "");
+        }
+        return "Every card is where the layout puts it.";
+    }
+
     /** The bot's picture {@code name}, as its constant holds it. */
     public static ImageTemplate picture(StudioServices services, String name) {
         return ScreenBook.picture(services, name);
@@ -276,6 +310,6 @@ public final class ScreenEdits {
     }
 
     private static String said(Optional<String> failed, String done) {
-        return failed.map(why -> "Not written: " + why).orElse(done);
+        return failed.map(why -> NOT_WRITTEN + why).orElse(done);
     }
 }

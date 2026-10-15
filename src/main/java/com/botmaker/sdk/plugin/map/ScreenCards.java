@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
@@ -50,9 +51,10 @@ final class ScreenCards {
      * @param inputs    its inputs
      * @param chores    its inputs named a chore
      * @param stage     what its notes say it reached ({@code surveyed}), empty when nothing
+     * @param at        where its card was moved to, null for where the layout puts it
      */
     record Card(String constant, String name, String marker, State state, String said, String shape, boolean popup,
-                ScreenGraph.Presence presence, int tried, int inputs, int chores, String stage) {
+                ScreenGraph.Presence presence, int tried, int inputs, int chores, String stage, Point at) {
 
         /** Whether it shows only at times, or is locked: drawn dashed. */
         boolean conditional() {
@@ -133,7 +135,7 @@ final class ScreenCards {
                 ? graph.shape(constant).map(s -> s.name().toLowerCase(Locale.ROOT)).orElse("") : "";
         return new Card(constant, graph.shown(constant), screen.marker() == null ? null : screen.marker().id(), state,
                 said, shape, screen.isPopup(), graph.presence(constant), tried, inputs.size(), chores,
-                stage == null ? "" : stage);
+                stage == null ? "" : stage, screen.at());
     }
 
     /**

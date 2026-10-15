@@ -22,6 +22,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.Run;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Zone;
@@ -1170,6 +1171,24 @@ class SdkAssistTest {
         ScreenEdits.useAsBack(host, "HOME", screen("HOME").inputs().getFirst());
         assertEquals("ore", screen("HOME").back().picture().id());
         assertTrue(screen("HOME").inputs().isEmpty(), "the way back is no input to try");
+    }
+
+    /** A card moved on 🗺 Screens keeps its corner in Screens.java; Tidy takes every corner out (2026-10-15). */
+    @Test
+    void cardsMovedByHandKeepTheirPlace() {
+        host.set("screen_map").put("HOME", TestContexts.row(Object.class, "").withValue(GameScreen.named("Home")));
+        host.set("screen_map").put("SHOP", TestContexts.row(Object.class, "").withValue(GameScreen.named("Shop")));
+
+        assertEquals("Moved 2 screens.", ScreenEdits.move(host, Map.of("HOME", new Point(0, 0),
+                "SHOP", new Point(320, 40))));
+        assertEquals(new Point(320, 40), screen("SHOP").at());
+        assertEquals("Moved 1 screen.", ScreenEdits.move(host, Map.of("HOME", new Point(0, 0),
+                "SHOP", new Point(300, 60))), "a screen already there is not written again");
+        assertEquals("Nothing moved.", ScreenEdits.move(host, Map.of("GONE", new Point(1, 1))));
+
+        assertEquals("Every card is where the layout puts it.", ScreenEdits.tidy(host));
+        assertNull(screen("HOME").at());
+        assertNull(screen("SHOP").at());
     }
 
     /** edit_map does what 🗺 Screens' hand tools do, each input named as try_input names it (2026-10-15). */

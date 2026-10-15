@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -57,6 +58,9 @@ class ScreenTypesTest {
         GameScreen noted = campaign().notes("Loot fills over 8 h.\nIts badge shows on Home.")
                 .reached(Reached.SURVEYED).owes(List.of("marker — every icon here animates"));
         assertEquals(noted, roundTrip(ScreenTypes.SCREEN_SHAPE, noted), "its notes, stage and debts go with it");
+        GameScreen moved = campaign().at(new Point(420, -36));
+        assertEquals(moved, roundTrip(ScreenTypes.SCREEN_SHAPE, moved), "where its card was moved to goes with it");
+        assertNull(roundTrip(ScreenTypes.SCREEN_SHAPE, campaign()).at(), "a card never moved has no corner");
     }
 
     @Test

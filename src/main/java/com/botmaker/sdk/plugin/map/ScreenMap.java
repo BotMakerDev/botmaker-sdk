@@ -7,6 +7,7 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenStep;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
+import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.shared.ipc.TelemetryEvent;
@@ -26,6 +27,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -96,6 +98,14 @@ public final class ScreenMap {
             canvas.setMenus(panel::menuFor, panel::linkMenu);
             canvas.graph().setOnEdgeClicked(panel::showLink);
         }
+        // A card moved by hand keeps its corner in Screens.java, read back at once so the next drag or redraw starts
+        // from it; refused, the map is drawn again as the Java has it.
+        canvas.setOnMoved(corners -> {
+            String result = ScreenEdits.move(services, corners);
+            refresh();
+            if (result.startsWith(ScreenEdits.NOT_WRITTEN)) canvas.redraw();
+            tell(result);
+        });
         poll = new Timeline(new KeyFrame(POLL, e -> refresh()));
         poll.setCycleCount(Timeline.INDEFINITE);
     }
@@ -259,10 +269,13 @@ public final class ScreenMap {
         said.getStyleClass().add("screen-panel-path");
         HBox bar = new HBox(8, search, others, out, fit, in);
         if (full) {
+            Button tidy = new Button("Tidy");
+            tidy.setTooltip(new Tooltip("Put every card you moved back where the layout puts it"));
+            tidy.setOnAction(e -> tidy());
             Button png = new Button("⤓ PNG");
             png.setTooltip(new Tooltip("Save the whole map as a picture, at full size"));
             png.setOnAction(e -> savePng());
-            bar.getChildren().add(png);
+            bar.getChildren().addAll(tidy, png);
         } else {
             Button open = new Button("🗺 Open");
             open.setTooltip(new Tooltip("Open 🗺 Screens, with each screen's inputs and actions"));
@@ -274,6 +287,27 @@ public final class ScreenMap {
         bar.setPadding(new Insets(8, 10, 8, 10));
         bar.getStyleClass().add("screen-map-bar");
         return bar;
+    }
+
+    /** Tidy, after asking: no card keeps a corner of its own. */
+    private void tidy() {
+        if (cards == null || cards.stream().allMatch(card -> card.at() == null)) {
+            tell("No card was moved: each is where the layout puts it.");
+            return;
+        }
+        Label question = new Label("Put every card back where the layout puts it? The places you moved them to are "
+                + "taken out of Screens.java.");
+        question.setWrapText(true);
+        Modals.form(services, "Tidy the map", new VBox(question), () -> {
+            tell(ScreenEdits.tidy(services));
+            refresh();
+        });
+    }
+
+    /** {@code text} in the toolbar, kept over the next read's summary. */
+    private void tell(String text) {
+        said.setText(text);
+        saidOnce = true;
     }
 
     private void savePng() {

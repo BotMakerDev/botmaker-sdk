@@ -9,6 +9,7 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Placement;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 import com.botmaker.plugin.toolkit.graph.LayeredLayout;
 import com.botmaker.plugin.toolkit.graph.TreeLayout;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Presence;
@@ -118,6 +119,9 @@ final class ScreenCanvas {
     /** The tree's size laid out each way, at the last layout: a resize asks again which fits the window. */
     private Map<Direction, Shape> shapes = Map.of();
     private Direction direction = Direction.RIGHT;
+    /** Where the last layout put each card, before any was moved by hand. */
+    private Placement laid = new Placement(Map.of(), Set.of(), 0);
+    private Consumer<Map<String, Point>> onMoved = moved -> {};
     /** How much bigger the other way must show the map before the tree turns. */
     private static final double TURN = 1.15;
 
@@ -146,10 +150,42 @@ final class ScreenCanvas {
                 });
             }
         });
-        // A window made wide or tall: the tree is laid out the other way when that way now fits it better.
+        // A window made wide or tall: the tree is laid out the other way when that way now fits it better. Not while
+        // cards are moved by hand: they stay where they were put.
         graph.viewportProperty().addListener((o, was, is) -> {
-            if (!shapes.isEmpty() && turns(shapes, direction, is.getWidth(), is.getHeight())) redraw();
+            if (!shapes.isEmpty() && pins().isEmpty() && turns(shapes, direction, is.getWidth(), is.getHeight())) {
+                redraw();
+            }
         });
+        graph.setOnMoved(moved -> onMoved.accept(corners(moved)));
+    }
+
+    /**
+     * Gives each card move to {@code onMoved}, as the corners to keep: the first move pins every card shown where it
+     * is, so the map comes back as it was left whatever shape the window has then; a later one only the moved cards.
+     */
+    void setOnMoved(Consumer<Map<String, Point>> onMoved) {
+        this.onMoved = onMoved;
+    }
+
+    private Map<String, Point> corners(Map<String, Pt> moved) {
+        Map<String, Pt> kept = new LinkedHashMap<>();
+        if (pins().isEmpty()) {
+            laid.at().forEach((id, at) -> {
+                if (!laid.hidden().contains(id)) kept.put(id, at);
+            });
+        }
+        kept.putAll(moved);
+        Map<String, Point> corners = new LinkedHashMap<>();
+        kept.forEach((id, at) -> corners.put(id, new Point((int) Math.round(at.x()), (int) Math.round(at.y()))));
+        return corners;
+    }
+
+    /** The corners the cards were moved to, by constant. */
+    private Map<String, Pt> pins() {
+        Map<String, Pt> pins = new LinkedHashMap<>();
+        for (Card card : cards) if (card.at() != null) pins.put(card.constant(), new Pt(card.at().x(), card.at().y()));
+        return pins;
     }
 
     /**
@@ -161,7 +197,8 @@ final class ScreenCanvas {
             shapes = Map.of();
             direction = Direction.RIGHT;
             graph.setDirection(direction);
-            return LayeredLayout.arrange(cards, links, List.of());
+            laid = LayeredLayout.arrange(cards, links, List.of());
+            return laid;
         }
         Map<Direction, Placement> each = new EnumMap<>(Direction.class);
         Map<Direction, Shape> sized = new EnumMap<>(Direction.class);
@@ -174,9 +211,10 @@ final class ScreenCanvas {
         shapes = Map.copyOf(sized);
         Bounds view = graph.viewportProperty().get();
         double w = view == null ? 0 : view.getWidth(), h = view == null ? 0 : view.getHeight();
-        if (first || turns(shapes, direction, w, h)) direction = better(shapes, w, h);
+        if (first || pins().isEmpty() && turns(shapes, direction, w, h)) direction = better(shapes, w, h);
         graph.setDirection(direction);
-        return each.get(direction);
+        laid = each.get(direction);
+        return laid;
     }
 
     /** How big {@code placed} is: the box round its shown cards. */
@@ -255,6 +293,8 @@ final class ScreenCanvas {
         pulses.values().forEach(Animation::stop);
         pulses.clear();
         drawnTimes.clear();
+        // Before the cards, so they are laid out once with their corners.
+        graph.setPinned(pins());
         graph.show(cards, links);
         light();
     }

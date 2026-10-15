@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.types;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Held;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -34,7 +35,7 @@ public final class ScreenTypes {
     /**
      * {@code GameScreen.named(String)} and its links, each written only when the screen has it: {@code .marker(…)},
      * {@code .from(…)}, {@code .alsoFrom(List.of(…))}, {@code .back(…)}, {@code .inputs(List.of(…))},
-     * {@code .popup()}.
+     * {@code .popup()}, … and {@code .at(new Point(…))} once its card was moved on 🗺 Screens' map.
      */
     public static final DeclaredCall<GameScreen> SCREEN_SHAPE = ComponentType.part(GameScreen.class)
             .<String, GameScreen>writtenAs(GameScreen::named, GameScreen::name)
@@ -48,6 +49,7 @@ public final class ScreenTypes {
             .<String>with(GameScreen::notes, GameScreen::notes)
             .<Reached>with(GameScreen::reached, GameScreen::reached)
             .<List<String>>with(GameScreen::owes, GameScreen::owes)
+            .<Point>with(GameScreen::at, GameScreen::at)
             // A reference to a screen is written only as that constant.
             .when(screen -> BotConstants.screenName(screen) == null);
 

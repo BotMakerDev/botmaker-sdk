@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.util.ArrayList;
@@ -27,7 +28,8 @@ import java.util.List;
  *
  * <p>Discovery fills it in (the assistant's try_input, or ▶ Try in 🗺 Screens); a run walks it to reach a screen.
  * The notes live here, with the screen, rather than in a file of their own (the user's call, 2026-10-15): a rename
- * or a delete takes them along.
+ * or a delete takes them along. So does where its card was moved to on 🗺 Screens' map ({@link #at}), which a run
+ * never reads.
  *
  * @param name     the name the game shows for it, in plain words
  * @param marker   a picture only this screen shows; null until one is cut
@@ -42,10 +44,12 @@ import java.util.List;
  *                 null for none
  * @param reached  how far automating it got; null while it is not surveyed
  * @param owes     what is still to cut or find on it, one thing each: {@code marker — every icon here animates}
+ * @param at       the top-left corner of its card on 🗺 Screens' map, in the map's own units; null for wherever the
+ *                 map's layout puts it
  */
 public record GameScreen(String name, ImageTemplate marker, Way from, List<Way> alsoFrom, Input back,
                          List<Input> inputs, List<ScreenVariant> variants, boolean isPopup, String notes,
-                         Reached reached, List<String> owes) {
+                         Reached reached, List<String> owes, Point at) {
 
     public GameScreen {
         alsoFrom = alsoFrom == null ? List.of() : List.copyOf(alsoFrom);
@@ -57,37 +61,38 @@ public record GameScreen(String name, ImageTemplate marker, Way from, List<Way> 
 
     /** A screen called {@code name}, nothing known of it yet. */
     public static GameScreen named(String name) {
-        return new GameScreen(name, null, null, List.of(), null, List.of(), List.of(), false, null, null, List.of());
+        return new GameScreen(name, null, null, List.of(), null, List.of(), List.of(), false, null, null, List.of(),
+                null);
     }
 
     /** This screen, told apart by {@code marker}. */
     public GameScreen marker(ImageTemplate marker) {
-        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes);
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes, at);
     }
 
     /** This screen, made known by {@code way}. */
     public GameScreen from(Way way) {
-        return new GameScreen(name, marker, way, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes);
+        return new GameScreen(name, marker, way, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes, at);
     }
 
     /** This screen, reached by {@code ways} too. */
     public GameScreen alsoFrom(List<Way> ways) {
-        return new GameScreen(name, marker, from, ways, back, inputs, variants, isPopup, notes, reached, owes);
+        return new GameScreen(name, marker, from, ways, back, inputs, variants, isPopup, notes, reached, owes, at);
     }
 
     /** This screen, left by {@code back}. */
     public GameScreen back(Input back) {
-        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes);
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes, at);
     }
 
     /** This screen, holding {@code inputs}. */
     public GameScreen inputs(List<Input> inputs) {
-        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes);
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes, at);
     }
 
     /** This screen, looking as each of {@code variants} at times. */
     public GameScreen variants(List<ScreenVariant> variants) {
-        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes);
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes, at);
     }
 
     /** This screen with {@code variant} put in place of the one of the same name, or added last. */
@@ -108,31 +113,36 @@ public record GameScreen(String name, ImageTemplate marker, Way from, List<Way> 
 
     /** This screen, opening on its own: a reward, a level up, an offer. */
     public GameScreen popup() {
-        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, true, notes, reached, owes);
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, true, notes, reached, owes, at);
     }
 
     /** This screen, a screen of the tree again: opened by an input, not on its own. */
     public GameScreen notPopup() {
-        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, false, notes, reached, owes);
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, false, notes, reached, owes, at);
     }
 
     /** This screen, the game showing it as {@code name}. */
     public GameScreen name(String name) {
-        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes);
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes, at);
     }
 
     /** This screen, with {@code notes} on it; blank for none. */
     public GameScreen notes(String notes) {
-        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes);
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes, at);
     }
 
     /** This screen, automated as far as {@code reached}; null while it is not surveyed. */
     public GameScreen reached(Reached reached) {
-        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes);
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes, at);
     }
 
     /** This screen, still owing {@code owes}. */
     public GameScreen owes(List<String> owes) {
-        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes);
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes, at);
+    }
+
+    /** This screen, its card on 🗺 Screens' map with its top-left corner at {@code at}; null: where the layout puts it. */
+    public GameScreen at(Point at) {
+        return new GameScreen(name, marker, from, alsoFrom, back, inputs, variants, isPopup, notes, reached, owes, at);
     }
 }
