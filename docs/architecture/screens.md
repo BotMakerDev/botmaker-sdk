@@ -8,7 +8,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 
 - **`GameScreen`**: a name, a `marker` (a picture only this screen shows), a `from` way (the tree), `alsoFrom`
   ways, a `back` input (null: a close button, then Escape), `inputs`, looks (`ScreenVariant`), `popup`, `notes`,
-  `reached` (SURVEYED → BUILT → TRIED → TUNED, or LOCKED) and `owes`. A screen names the one it is reached from,
+  `reached` (SURVEYED → BUILT → TRIED → TUNED, or LOCKED), `owes`, and `at(Point)`, the corner its card was
+  moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a
   way out only.
 - **`Input`**: a picture click, a key or a scroll, with `did` (IN_PLACE, NONE, LEAVES; null while untried),
@@ -64,5 +65,17 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **`ScreenPanel`** is the picked screen: its shot with boxes, ▶ Try, 🧭 Go here, ✂ Cut, notes, and the hand
   edits of `ScreenHands`, all off while a try or a walk runs. **`ScreenDesk`** runs Try and Go here by the
   assistant's own code, so the window and the assistant cannot record an input two ways.
+- **Gestures** are `GraphCanvas`'s (the toolkit): the wheel zooms about the pointer, a right drag pans, a left
+  drag moves a card or the selected ones (Ctrl/Shift+click, a box drag). A move is written as each moved card's
+  `at(new Point(x, y))` in `Screens.java` (`ScreenEdits.move`), so the map looks the same on the next open and on
+  another computer; the first move pins every card shown, so the others stay put. **Tidy** (`ScreenEdits.tidy`)
+  drops every `at`.
+- **Undo** is Studio's own, through the contract's `StudioServices.history()`: each hand edit, move and Tidy is one
+  `History.batch` step beside the user's code edits. ↶/↷ and Ctrl+Z/Ctrl+Y (`plugin/HistoryKeys`, shared with the
+  Activity Flow) walk that history, and the assistant's MCP `undo`/`redo` walk it too. Nothing in the window
+  keeps an undo of its own.
+- **`PictureView`** is one window beside the map: a screen's shot big (its inputs boxed, the wheel zooming), or an
+  input's picture at whole-pixel zoom, never blurred, with "← <screen>" back to the shot it was opened from.
+- **`MapGuide`** is the toolbar's **?** legend, and holds the tooltips it repeats.
 - Around it: the `Navigate` screen picker (`plugin/editors/ScreenEditors`), the `Screens` constant preview
   (`ScreenConstantView`), Manage Pictures' groups by screen (`plugin/pictures/ScreenGroups`).
