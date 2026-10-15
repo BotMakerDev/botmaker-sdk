@@ -28,8 +28,9 @@ public final class Navigate {
     private Navigate() {}
 
     /**
-     * Goes to {@code screen}. False when the way there is not open now (through an input that comes and goes, or one
-     * that is locked), when {@code screen} is a popup or not in the map, or when the run was stopped.
+     * Goes to {@code screen}. False when the way there is not open now (through an input that comes and goes, one
+     * that is locked, or a way or input whose method says no), when {@code screen} is a popup or not in the map, or
+     * when the run was stopped.
      *
      * @throws BotStuckException when the game is on no screen of the map, steps keep landing elsewhere, or the map's
      *                           way is no longer on the game: the run's recovery takes over

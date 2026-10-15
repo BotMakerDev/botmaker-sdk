@@ -22,10 +22,8 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.Run;
-import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -73,6 +71,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -420,31 +419,24 @@ class SdkAssistTest {
     void aPlaceIsSavedInTheBotsPixelsFromTheGamesCorner() {
         host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(0, 0)));
         agent.frame = withPatchAt(120, 80);
-        AgentReply point = run("save_point", "name", "claim button", "x", 10, "y", 20);
-        assertTrue(text(point).startsWith("Saved Spots.CLAIM_BUTTON = 10,20 of the bot's 400×300 screen"), text(point));
-        assertEquals(new Spot(10, 20), host.set("spots").get("CLAIM_BUTTON").value());
-        assertEquals(new Size(400, 300), host.values.get("screen").value(),
-                "a bot naming no size takes the screenshot's");
-        assertTrue(text(run("save_point", "name", "CLAIM_BUTTON", "x", 30, "y", 40, "anchor", "top_left"))
-                .startsWith("Moved Spots.CLAIM_BUTTON = 30,40"), "the same name moves it");
-        assertEquals(new Spot(30, 40).anchored(Anchor.TOP_LEFT), host.set("spots").get("CLAIM_BUTTON").value());
-        assertTrue(run("save_point", "name", "2nd", "x", 10, "y", 20).isRefused(), "no constant starts with a digit");
-        assertTrue(run("save_point", "name", "far", "x", 500, "y", 20).isRefused());
-
         AgentReply region = run("save_region", "name", "bag", "x", 300, "y", 200, "width", 200, "height", 200);
         assertTrue(text(region).startsWith("Saved Zones.BAG = 300,200 (100×100)"), "clipped: " + text(region));
         assertEquals(new Zone(300, 200, 100, 100), host.set("zones").get("BAG").value());
-        assertEquals(List.of("create spots", "add spots CLAIM_BUTTON", "create zones", "add zones BAG"),
-                host.calls);
+        assertEquals(new Size(400, 300), host.values.get("screen").value(),
+                "a bot naming no size takes the screenshot's");
+        assertTrue(run("save_region", "name", "2nd", "x", 10, "y", 20, "width", 5, "height", 5).isRefused(),
+                "no constant starts with a digit");
+        assertEquals(List.of("create zones", "add zones BAG"), host.calls);
     }
 
     @Test
     void aPlaceOnAGameShowingAnotherSizeIsWrittenAtTheBotsSize() {
         host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(200, 150)));
         agent.frame = withPatchAt(120, 80);
-        assertTrue(text(run("save_point", "name", "claim", "x", 100, "y", 60))
-                .startsWith("Saved Spots.CLAIM = 50,30 of the bot's 200×150 screen"), "the 400×300 game is twice it");
-        assertEquals(new Spot(50, 30), host.set("spots").get("CLAIM").value());
+        assertTrue(text(run("save_region", "name", "claim", "x", 100, "y", 60, "width", 40, "height", 20))
+                .startsWith("Saved Zones.CLAIM = 50,30 (20×10) of the bot's 200×150 screen"),
+                "the 400×300 game is twice it");
+        assertEquals(new Zone(50, 30, 20, 10), host.set("zones").get("CLAIM").value());
     }
 
     @Test
@@ -846,7 +838,7 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(60, names.size());
+        assertEquals(61, names.size(), "save_point went on 2026-10-15");
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
@@ -859,8 +851,8 @@ class SdkAssistTest {
         for (String word : List.of("describe", "click", "key", "scroll", "connect")) {
             assertTrue(SdkAssist.ALL.stream().anyMatch(t -> t.name().equals(word)), word + " is no tool");
         }
-        java.util.Set<String> names = SdkAssist.ALL.stream().map(AssistantTool::name)
-                .collect(java.util.stream.Collectors.toSet());
+        java.util.Set<String> names = SdkAssist.and(com.botmaker.sdk.plugin.map.MapReport.TOOLS).stream()
+                .map(AssistantTool::name).collect(java.util.stream.Collectors.toSet());
         StringBuilder said = new StringBuilder(SdkAssist.GUIDE);
         for (Protocol.Stage stage : Protocol.Stage.values()) said.append('\n').append(stage.section());
         java.util.regex.Matcher named = java.util.regex.Pattern.compile("\\b[a-z]+_[a-z_]+\\b").matcher(said);
@@ -881,11 +873,11 @@ class SdkAssistTest {
         assertEquals(Protocol.Stage.BUILD.section(), text(run("read_guide", "stage", "2")));
         assertTrue(run("read_guide", "stage", "Polish").isRefused());
 
-        assertEquals("Added Map to GAME.md.", text(run("write_notes", "section", "Map", "text", "- Quests: Q.")));
-        assertTrue(text(run("read_notes", "section", "map")).endsWith("## Map\n\n- Quests: Q."));
-        assertTrue(run("read_notes", "section", "Boss").isRefused());
-        assertTrue(run("write_notes", "section", "Map").isRefused(), "a text left out removes nothing");
-        assertTrue(text(run("read_notes")).contains("- Quests: Q."));
+        assertEquals("Kept the game's notes, on the run in Sdk.", text(run("write_notes", "text", "Q opens Quests.")));
+        assertTrue(text(run("read_notes")).contains("The game:\nQ opens Quests."), text(run("read_notes")));
+        assertTrue(run("read_notes", "screen", "Boss").isRefused(), "no such screen");
+        assertTrue(run("write_notes").isRefused(), "nothing given, nothing written");
+        assertTrue(run("write_notes", "reached", "built").isRefused(), "reached is a screen's");
     }
 
     @Test
@@ -963,22 +955,74 @@ class SdkAssistTest {
 
         assertTrue(run("go_to_screen", "screen", "Guild").isRefused());
         String walked = text(run("go_to_screen", "screen", "Engineer", "desktop", true));
-        assertTrue(walked.startsWith("On Engineer.") && walked.contains("Walked: Engineer."), walked);
+        assertEquals("On Engineer.", walked.lines().findFirst().orElse(""),
+                "both markers show on the still frame: Engineer, opened from Home, is the one over it");
         assertTrue(text(run("which_screen")).startsWith("On Engineer (Screens.ENGINEER): its marker shows."),
                 "the last screen seen is looked for first");
+
+        assertTrue(run("place_pictures", "screen", "Engineer", "pictures", List.of("nosuch")).isRefused(),
+                "only a picture the bot has");
+        assertTrue(run("place_pictures", "screen", "Guild", "pictures", List.of("gold")).isRefused(),
+                "an input goes on a screen the map has");
+        String placed = text(run("place_pictures", "screen", "Engineer", "back", "gold"));
+        assertTrue(placed.startsWith("Noted in Engineer: gold: its way back."), placed);
+        assertEquals("gold", screen("ENGINEER").back().picture().id());
 
         assertTrue(run("crop_pictures", "boxes", List.of("pick 120 80 " + SIZE + " " + SIZE, "drop 1 2 3"))
                 .isRefused(), "a line that does not read");
         assertFalse(TemplateLibrary.exists(resources, "pick"), "nothing saved when one line does not read");
         assertTrue(run("crop_pictures", "boxes", List.of("pick 120 80 4 4"), "marker", "plan").isRefused());
-        AgentReply both = run("crop_pictures", "screen", "Engineer", "marker", "pick", "boxes", List.of(
+        assertTrue(run("crop_pictures", "screen", "Engineer", "marker", "pick", "back", "pick", "boxes",
+                List.of("pick 120 80 4 4")).isRefused(), "the marker is no way back");
+        AgentReply both = run("crop_pictures", "screen", "Engineer", "marker", "pick", "back", "hoe", "boxes", List.of(
                 "pick 120 80 " + SIZE + " " + SIZE, "spade 120, 80, " + SIZE + ", " + SIZE + " ignore 120 80 2 2",
-                "far 5000 5000 4 4"));
+                "hoe 120 80 " + SIZE + " " + SIZE, "far 5000 5000 4 4"));
         assertTrue(text(both).contains("Noted in Engineer as its marker, in place of coin.")
-                && text(both).contains("Saved spade") && text(both).contains("Not saved, far: "), text(both));
+                && text(both).contains("Saved spade") && text(both).contains("Not saved, far: ")
+                && text(both).contains("Noted in Engineer: hoe: its way back; spade: untried."), text(both));
         assertEquals("pick", screen("ENGINEER").marker().id());
+        assertEquals("hoe", screen("ENGINEER").back().picture().id(), "the way back noted with the inputs");
         assertEquals(Set.of(), TemplateLibrary.manifest(host).tagsOf("spade"), "grouped by the map, not tagged");
         assertTrue(screen("ENGINEER").inputs().stream().anyMatch(i -> i.label().equals("click spade")));
+
+        assertTrue(run("not_a_screen", "screen", "Home").isRefused(), "the first screen was opened by nothing");
+        String taken = text(run("not_a_screen", "screen", "Engineer"));
+        assertTrue(taken.startsWith("Engineer is off the map; ") && taken.endsWith(" is noted in Home as changing it "
+                + "in place."), taken);
+        assertFalse(host.set("screen_map").containsKey("ENGINEER"));
+        assertTrue(screen("HOME").inputs().stream().anyMatch(i -> i.did() == Did.IN_PLACE));
+    }
+
+    /** 🗺 Screens' hand tools set what try_input records, and add and remove screens (2026-10-15). */
+    @Test
+    void theMapIsEditedByHand() {
+        ImageTemplate ore = new ImageTemplate(TemplateLibrary.pathForName("ore"));
+        Input click = Input.click(ore);
+        host.set("screen_map").put("HOME", TestContexts.row(Object.class, "").withValue(GameScreen.named("Home")
+                .marker(ore).inputs(List.of(click))));
+
+        assertEquals("Noted: click ore.", ScreenEdits.setInput(host, "HOME", click, click.did(Did.IN_PLACE)));
+        assertEquals(Did.IN_PLACE, screen("HOME").inputs().getFirst().did());
+        Input inPlace = screen("HOME").inputs().getFirst();
+        ScreenEdits.setInput(host, "HOME", inPlace, ScreenEdits.untried(inPlace).never("spends gems"));
+        assertEquals("spends gems", screen("HOME").inputs().getFirst().never());
+        assertNull(screen("HOME").inputs().getFirst().did(), "never replaces the result");
+
+        assertTrue(ScreenEdits.newScreen(host, "HOME", "Mine", screen("HOME").inputs().getFirst())
+                .startsWith("Added Mine as Screens.MINE"));
+        assertEquals("Mine", screen("MINE").name());
+        assertNull(screen("HOME").inputs().getFirst().never(), "the input that opens it is untried again");
+        assertTrue(ScreenEdits.delete(host, "HOME").contains("Mine is reached from it"), "a parent stays");
+        assertEquals("Renamed Deep mine.", ScreenEdits.rename(host, "MINE", "Deep mine"));
+        assertEquals("Deep mine", screen("MINE").name());
+        ScreenEdits.setPopup(host, "MINE", true);
+        assertTrue(screen("MINE").isPopup());
+        assertEquals("Deleted Deep mine.", ScreenEdits.delete(host, "MINE"));
+        assertFalse(host.set("screen_map").containsKey("MINE"));
+
+        ScreenEdits.useAsBack(host, "HOME", screen("HOME").inputs().getFirst());
+        assertEquals("ore", screen("HOME").back().picture().id());
+        assertTrue(screen("HOME").inputs().isEmpty(), "the way back is no input to try");
     }
 
     /** The bot's screen {@code constant}, as try_input and crop_picture last wrote it. */

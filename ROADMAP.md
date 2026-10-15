@@ -13,6 +13,10 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   overwritten by that window's next save (it holds its own drafts). Dragging from a wired port refuses
   ("remove that wire first") instead of moving the arrow — a gesture change, waiting for a decision. A
   hand-chained flow is shown read-only.
+- **A screen map's conditions as expressions** (the user's call, 2026-10-15): `Input.when`, `Way.when` and
+  `ScreenVariant.when` take only a method reference, since no plugin value carries Java text. An inline
+  `() -> …` needs a contract capability first, a held part that is code which Studio edits as blocks, at the next
+  contract release (`/contract-change`).
 - **Launch targets**: `Target.set(String spec)` has no editor (a `@LaunchTargetSpec` could reuse the
   🎮 game dialog).
 - **Waydroid on the desktop**: a bot reads Android's frame through `adb screencap`, which writes nothing on a

@@ -6,7 +6,6 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
-import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -25,30 +24,13 @@ public final class ScreenDesk {
         return ScreenBook.read(services);
     }
 
-    /**
-     * Each screen's stage as its section of the notes says it ({@code surveyed}, {@code built}), by constant; a screen
-     * whose section says none is left out. Reads {@code GAME.md}.
-     */
-    public static Map<String, String> stages(StudioServices services, ScreenGraph graph) {
-        Path project = services.projectDir();
-        Map<String, String> byName = new LinkedHashMap<>();
-        if (project != null) {
-            GameNotes.sections(project).forEach((name, text) -> byName.putIfAbsent(name.toLowerCase(Locale.ROOT), text));
-        }
+    /** How far each screen got ({@code surveyed}, {@code built}), by constant; a screen not surveyed is left out. */
+    public static Map<String, String> stages(ScreenGraph graph) {
         Map<String, String> stages = new LinkedHashMap<>();
-        for (String constant : graph.screens().keySet()) {
-            Protocol.reached(byName.get(graph.shown(constant).toLowerCase(Locale.ROOT)))
-                    .ifPresent(r -> stages.put(constant, r.name().toLowerCase(Locale.ROOT)));
-        }
+        graph.screens().forEach((constant, screen) -> {
+            if (screen.reached() != null) stages.put(constant, screen.reached().name().toLowerCase(Locale.ROOT));
+        });
         return stages;
-    }
-
-    /** What the notes say of the screen the game calls {@code name}, without its heading; empty when nothing. */
-    public static String notes(StudioServices services, String name) {
-        Path project = services.projectDir();
-        if (project == null) return "";
-        return GameNotes.sections(project).entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(name))
-                .map(Map.Entry::getValue).findFirst().orElse("");
     }
 
     /**

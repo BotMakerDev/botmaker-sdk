@@ -6,10 +6,14 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Gaps;
 import com.botmaker.plugin.toolkit.graph.LayeredLayout;
 import com.botmaker.plugin.toolkit.graph.TreeLayout;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Presence;
+import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
+import com.botmaker.sdk.plugin.map.ScreenCards.Row;
+import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
@@ -17,10 +21,12 @@ import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -30,8 +36,10 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Arc;
 import javafx.scene.shape.ArcType;
+import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -42,7 +50,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * The map drawn: one card per screen on the toolkit's {@link GraphCanvas}, laid out as a tree from the first screen,
@@ -58,6 +69,10 @@ final class ScreenCanvas {
     static final String SHEET = Objects.requireNonNull(ScreenCanvas.class.getResource("screens.css")).toExternalForm();
 
     private static final double THUMB = 52;
+    /** A card's whole-screen shot: the card's width less its border. */
+    private static final double CARD_SHOT = 246;
+    /** A shot drawn narrower than this is loaded at twice its width; a wider one whole. */
+    private static final double CARD_LOAD_LIMIT = 600;
     private static final double EDGE_THUMB = 22;
     private static final double RING = 15;
     private static final int TRAIL = 4;
@@ -72,12 +87,18 @@ final class ScreenCanvas {
     private final Map<String, StackPane> views = new HashMap<>();
     private final Map<String, FadeTransition> pulses = new HashMap<>();
     private final Map<String, Image> thumbs = new HashMap<>();
+    /** When each card's shot was written, as last drawn: a newer one draws the cards again. */
+    private final Map<String, Long> shotTimes = new HashMap<>();
     private final Set<String> folded = new HashSet<>();
     private final Deque<String> trail = new ArrayDeque<>();
     private List<Card> cards = List.of();
     private List<Link> links = List.of();
     private String root;
     private String trying;
+    /** Each card's right-click menu, by constant; null: none (the overlay editor's narrow pane). */
+    private Function<String, ContextMenu> menus;
+    /** Pictures read before a card is drawn, not after: a drawing made off screen is taken at once. */
+    private boolean loadNow;
 
     /** A canvas drawing the pictures in {@code resources}, the project's resources folder (null for none). */
     ScreenCanvas(Path resources) {
@@ -97,6 +118,16 @@ final class ScreenCanvas {
         return graph;
     }
 
+    /** Reads each picture before its card is drawn, for a drawing taken at once ({@link MapDrawing}). */
+    void loadNow() {
+        loadNow = true;
+    }
+
+    /** Gives each card the right-click menu {@code menus} makes for its constant. */
+    void setMenus(Function<String, ContextMenu> menus) {
+        this.menus = menus;
+    }
+
     /** Shows {@code cards} joined by {@code links}, the tree grown from {@code root} (null: no tree). */
     void show(List<Card> cards, List<Link> links, String root) {
         this.cards = List.copyOf(cards);
@@ -106,7 +137,7 @@ final class ScreenCanvas {
         redraw();
     }
 
-    private void redraw() {
+    void redraw() {
         views.clear();
         pulses.values().forEach(Animation::stop);
         pulses.clear();
@@ -179,13 +210,23 @@ final class ScreenCanvas {
         Region bar = new Region();
         bar.getStyleClass().add("screen-card-bar");
         bar.setMinHeight(4);
-        VBox face = new VBox(bar, body);
+        VBox face = new VBox(bar);
+        shot(card.constant(), CARD_SHOT).ifPresent(face.getChildren()::add);
+        face.getChildren().add(body);
         face.getStyleClass().add("screen-card");
         face.pseudoClassStateChanged(PseudoClass.getPseudoClass(card.state().name().toLowerCase(Locale.ROOT)), true);
         face.pseudoClassStateChanged(PseudoClass.getPseudoClass("conditional"), card.conditional());
         face.pseudoClassStateChanged(PseudoClass.getPseudoClass("popup"), card.popup());
         face.setPrefWidth(250);
         face.setMaxWidth(250);
+        // A right click that did not drag (a right drag pans the map): the card picked, then its menu.
+        face.setOnMouseReleased(e -> {
+            if (e.getButton() != MouseButton.SECONDARY || !e.isStillSincePress() || menus == null) return;
+            graph.selectedProperty().set(card);
+            ContextMenu menu = menus.apply(card.constant());
+            if (menu != null) menu.show(face, e.getScreenX(), e.getScreenY());
+            e.consume();
+        });
 
         Region halo = new Region();
         halo.getStyleClass().add("screen-card-halo");
@@ -284,7 +325,7 @@ final class ScreenCanvas {
         if (resources == null) return null;
         return thumbs.computeIfAbsent(id, name -> {
             Path file = TemplateLibrary.fileForName(resources, name);
-            return Files.isRegularFile(file) ? new Image(file.toUri().toString(), 96, 96, true, true, true) : null;
+            return Files.isRegularFile(file) ? new Image(file.toUri().toString(), 96, 96, true, true, !loadNow) : null;
         });
     }
 
@@ -292,6 +333,97 @@ final class ScreenCanvas {
     void forgetPictures() {
         thumbs.clear();
         redraw();
+    }
+
+    /**
+     * {@code constant}'s whole-screen shot ({@link ScreenShots}) at {@code width}, in a box of the game's shape so a
+     * card measures the same before and after it loads; empty while the screen has none.
+     */
+    Optional<Node> shot(String constant, double width) {
+        if (resources == null) return Optional.empty();
+        Path file = ScreenShots.file(resources, constant);
+        long time = modified(file);
+        if (time == 0) return Optional.empty();
+        shotTimes.put(constant, time);
+        // A card loads the game's frame at twice its width, crisp and small; the viewer loads it whole.
+        double loaded = width < CARD_LOAD_LIMIT ? width * 2 : 0;
+        Image image = thumbs.computeIfAbsent("screen:" + constant + "@" + time + ":" + loaded,
+                key -> new Image(file.toUri().toString(), loaded, 0, true, true));
+        double height = Math.round(width * 9 / 16);
+        ImageView view = new ImageView(image);
+        view.setPreserveRatio(true);
+        view.setFitWidth(width);
+        view.setFitHeight(height);
+        view.setSmooth(true);
+        StackPane box = new StackPane(view);
+        box.getStyleClass().add("screen-card-shot");
+        box.setMinSize(width, height);
+        box.setPrefSize(width, height);
+        box.setMaxSize(width, height);
+        return Optional.of(box);
+    }
+
+    /**
+     * {@link #shot} with each of {@code rows} boxed where its picture was cut ({@code cuts}, by picture), each box
+     * handing its row to {@code onPick} when clicked; {@code onShot} runs on a click elsewhere on the shot (null: none).
+     */
+    Optional<Node> shotWithInputs(String constant, double width, List<Row> rows, Map<String, FrameCut> cuts,
+                                  Consumer<Row> onPick, Runnable onShot) {
+        int shotWidth = resources == null ? 0 : ScreenShots.width(ScreenShots.file(resources, constant));
+        return shot(constant, width).map(shot -> {
+            double height = Math.round(width * 9 / 16);
+            Pane boxes = new Pane();
+            boxes.setPrefSize(width, height);
+            boxes.setMaxSize(width, height);
+            for (Row row : rows) {
+                FrameCut cut = row.picture() == null ? null : cuts.get(row.picture());
+                if (cut == null || cut.place() == null) continue;
+                // A picture that names no frame was cut on the game's frame, which the shot is, pixel for pixel.
+                int frame = cut.frame() != null && cut.frame().width() > 0 ? cut.frame().width() : shotWidth;
+                if (frame <= 0) continue;
+                double scale = width / frame;
+                Rect place = cut.place();
+                Rectangle box = new Rectangle(place.x() * scale, place.y() * scale,
+                        Math.max(4, place.width() * scale), Math.max(4, place.height() * scale));
+                box.getStyleClass().addAll("screen-shot-box", "screen-shot-box-" + row.state().name()
+                        .toLowerCase(Locale.ROOT));
+                Tooltip.install(box, new Tooltip(row.label() + ": " + row.result()));
+                box.setOnMouseClicked(e -> {
+                    onPick.accept(row);
+                    e.consume();
+                });
+                boxes.getChildren().add(box);
+            }
+            StackPane layered = new StackPane(shot, boxes);
+            layered.setMaxSize(width, height);
+            if (onShot != null) {
+                layered.setOnMouseClicked(e -> onShot.run());
+                layered.getStyleClass().add("screen-shot-open");
+            }
+            return layered;
+        });
+    }
+
+    /** Selects {@code constant}'s card and brings it into view. */
+    void select(String constant) {
+        cards.stream().filter(c -> c.constant().equals(constant)).findFirst().ifPresent(card -> {
+            graph.selectedProperty().set(card);
+            graph.centreOn(constant);
+        });
+    }
+
+    /** Whether a shot came or changed since the cards were drawn: try_input or which_screen saved one meanwhile. */
+    boolean shotsChanged() {
+        return resources != null && cards.stream().anyMatch(c -> modified(ScreenShots.file(resources, c.constant()))
+                != shotTimes.getOrDefault(c.constant(), 0L));
+    }
+
+    private static long modified(Path file) {
+        try {
+            return Files.isRegularFile(file) ? Files.getLastModifiedTime(file).toMillis() : 0;
+        } catch (IOException gone) {
+            return 0;
+        }
     }
 
     // --- one edge ---

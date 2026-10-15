@@ -5,6 +5,7 @@ import com.botmaker.sdk.internal.emulator.EmulatorName;
 import com.botmaker.sdk.api.flow.ActivityClass;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.emulator.EmulatorEditors;
+import com.botmaker.sdk.plugin.map.ScreenConstantView;
 
 import java.awt.Color;
 import java.util.List;
@@ -43,6 +44,12 @@ public final class SdkEditors {
             // The bot's run choices, @Params Bot.runFlow reads: which flow, and the activities it skips. Only a
             // value with no call site, a parameter's: a Flows constant's own Flow.of(…) is the flow editor's.
             SlotEditor.when(ActivityEditors::isFlowChoice).draw(() -> ActivityEditors::flow),
+            // A constant of Flows.java or Screens.java, shown as its window shows it (the user's call, 2026-10-15):
+            // the file is the plugin's, so the editor asks for a preview, and the view is both; the windows edit them.
+            SlotEditor.when(FlowConstantView::isFlowConstant)
+                    .draw(() -> FlowConstantView::node, () -> FlowConstantView::node),
+            SlotEditor.when(ScreenConstantView::isScreenConstant)
+                    .draw(() -> ScreenConstantView::node, () -> ScreenConstantView::node),
             SlotEditor.when(ActivityEditors::isSkippedActivity).draw(() -> ActivityEditors::switchable),
             // A screen of the bot's map in a block, Navigate.to(Screens.HOME). GameScreen is only parts, like Flow:
             // no type of this plugin's holds it, so no type's editor can draw it.

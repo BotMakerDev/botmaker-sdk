@@ -3,7 +3,9 @@ package com.botmaker.sdk.plugin.map;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -12,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 
 /**
  * What 🗺 Screens draws of the map, decided apart from JavaFX: each screen's card (its state, progress and badges),
@@ -72,8 +75,19 @@ final class ScreenCards {
      * @param state   how it stands
      * @param result  what it did, in words: {@code → Campaign}, {@code in place}, {@code never: spends gems}
      * @param kind    what it is for, lower case; empty when not named
+     * @param look    the screen's look only it is on ({@code Halloween}); empty for one on every look
+     * @param when    the method saying when it is there, {@code Firestone::eventOn}; empty for none
+     * @param looks   each look of its button, the usual one first, with where it leads in that look: one entry for
+     *                a button with one look
      */
-    record Row(Input input, String label, String picture, RowState state, String result, String kind) {}
+    record Row(Input input, String label, String picture, RowState state, String result, String kind, String look,
+               String when, List<ButtonLook> looks) {}
+
+    /**
+     * One look of an input's button as the side panel steps through it: its picture, what it means, and where it
+     * leads while it looks so; {@code leads} empty when the ways do not tell the looks apart.
+     */
+    record ButtonLook(String picture, com.botmaker.sdk.api.screens.State state, String leads) {}
 
     private ScreenCards() {}
 
@@ -86,7 +100,7 @@ final class ScreenCards {
 
     static Card card(ScreenGraph graph, String constant, String stage) {
         GameScreen screen = graph.screens().get(constant);
-        List<Input> inputs = screen.inputs();
+        List<Input> inputs = screen.allInputs();
         int tried = (int) inputs.stream().filter(i -> graph.tried(constant, i)).count();
         int chores = (int) inputs.stream().filter(i -> i.kind() == Kind.CHORE).count();
         int untried = graph.untried(constant).size();
@@ -150,7 +164,7 @@ final class ScreenCards {
         GameScreen screen = graph.screens().get(constant);
         if (screen == null) return List.of();
         List<Row> rows = new ArrayList<>();
-        for (Input input : screen.inputs()) rows.add(row(graph, constant, input));
+        for (Input input : screen.allInputs()) rows.add(row(graph, constant, input));
         return rows;
     }
 
@@ -166,7 +180,8 @@ final class ScreenCards {
             result = "locked";
         } else if (opens.isPresent()) {
             state = RowState.TRIED;
-            result = "→ " + graph.shown(opens.get());
+            result = "→ " + String.join(" / ", graph.leads(constant, input).stream().map(lead -> graph.shown(lead.to())
+                    + said(lead.state(), lead.when())).distinct().toList());
         } else if (input.did() != null) {
             state = RowState.TRIED;
             result = switch (input.did()) {
@@ -183,7 +198,23 @@ final class ScreenCards {
         }
         String kind = input.kind() != null ? input.kind().name().toLowerCase(Locale.ROOT)
                 : input.comesAndGoes() ? "comes and goes" : "";
+        GameScreen screen = graph.screens().get(constant);
+        String look = screen == null ? "" : screen.variants().stream().filter(v -> v.inputs().contains(input))
+                .map(ScreenVariant::name).findFirst().orElse("");
+        List<ScreenGraph.Lead> leads = graph.leads(constant, input);
+        List<ButtonLook> looks = input.looks().stream().map(v -> new ButtonLook(v.picture().id(), v.state(),
+                String.join(" / ", leads.stream().filter(l -> l.state() == null || l.state() == v.state())
+                        .map(l -> graph.shown(l.to()) + said(null, l.when())).distinct().toList()))).toList();
         return new Row(input, input.label(), input.picture() == null ? null : input.picture().id(), state, result,
-                kind);
+                kind, look, ScreenTypes.sourceOf(input.when()), looks);
+    }
+
+    /** What a way needs, in words after the screen it leads to: {@code  (disabled, while Firestone::eventOn)}. */
+    private static String said(com.botmaker.sdk.api.screens.State state, BooleanSupplier when) {
+        List<String> needs = new ArrayList<>();
+        if (state != null) needs.add(state.displayName().toLowerCase(Locale.ROOT));
+        String method = ScreenTypes.sourceOf(when);
+        if (!method.isEmpty()) needs.add("while " + method);
+        return needs.isEmpty() ? "" : " (" + String.join(", ", needs) + ")";
     }
 }

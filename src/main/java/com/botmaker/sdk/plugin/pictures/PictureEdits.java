@@ -61,7 +61,7 @@ public final class PictureEdits {
         Path resources = services.resourcesDir();
         Path file = TemplateLibrary.fileForName(resources, name);
         if (TemplateLibrary.isDefaultTemplate(file)) return Done.refused("The default picture cannot be deleted.");
-        TemplateUses.Scan scan = TemplateUses.find(services.pluginValues(), name);
+        TemplateUses.Scan scan = TemplateUses.offTheMap(services.pluginValues(), name);
         if (!scan.isEmpty()) {
             if (pointUsesAt == null || pointUsesAt.isBlank()) {
                 StringBuilder where = new StringBuilder(name + " is still used: " + scan.describe() + ".");

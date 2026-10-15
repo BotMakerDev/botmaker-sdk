@@ -68,8 +68,6 @@ public @interface SdkValue {
         TAGS,
         /** The cards of the Activity Flow — a class of enums, one per activity, whose {@link Outcome} constants are its exits. */
         ACTIVITIES,
-        /** Named spots of the game, in the bot's pixels — a class of {@code Spot} constants. */
-        SPOTS,
         /** Named areas of the game, in the bot's pixels — a class of {@code Zone} constants. */
         ZONES,
         /** A game font's digits as pictures, for {@code Text.readDigits} — a class of {@code DigitSet} constants. */

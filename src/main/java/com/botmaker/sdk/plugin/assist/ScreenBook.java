@@ -89,6 +89,20 @@ final class ScreenBook {
         return SCREENS.moveBefore(values, Member.of(constant), Member.of(before));
     }
 
+    /** Takes {@code constant} out of the map. Empty when done, else why not. */
+    static Optional<String> remove(StudioServices services, String constant) {
+        PluginValues values = services.pluginValues();
+        if (values == null) return Optional.of("Studio has no source tree open.");
+        return SCREENS.remove(values, Member.of(constant));
+    }
+
+    /** Whether the bot's Pictures declare {@code name}. */
+    static boolean exists(StudioServices services, String name) {
+        String constant = TemplateNames.constantFor(name.toLowerCase(Locale.ROOT));
+        PluginValues values = services.pluginValues();
+        return constant != null && values != null && PICTURES.read(values, Member.of(constant)).isPresent();
+    }
+
     /**
      * The bot's picture {@code name} as its {@code Pictures} constant holds it, so the host writes the constant; the
      * file's own when there is none.

@@ -4,17 +4,23 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
+import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
 import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
+import com.botmaker.sdk.plugin.pictures.FrameCut;
+import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.FlowPane;
@@ -32,6 +38,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * The side of 🗺 Screens: the selected screen's way from the first screen, its inputs and what each did, what the
@@ -42,8 +49,11 @@ import java.util.function.Supplier;
  */
 final class ScreenPanel {
 
-    private static final double ROW_THUMB = 26;
+    private static final double ROW_THUMB = 48;
     private static final double HEAD_THUMB = 60;
+    /** The selected screen's whole-screen shot, the panel's width less its padding. */
+    /** The selected screen's shot, wide enough to click its boxed inputs. */
+    private static final double HEAD_SHOT = 400;
 
     private final StudioServices services;
     private final ScreenCanvas canvas;
@@ -52,6 +62,10 @@ final class ScreenPanel {
     private final VBox content = new VBox(12);
     private final ScrollPane root = new ScrollPane(content);
     private final Label status = new Label();
+    /** The one window a picture or a screen's shot is shown in, each show replacing the last. */
+    private final PictureView viewer;
+    /** The ⋯ menus that edit the map by hand. */
+    private final ScreenHands hands;
 
     private ScreenGraph graph = ScreenGraph.of(Map.of());
     private String selected;
@@ -67,6 +81,12 @@ final class ScreenPanel {
         this.canvas = canvas;
         this.owner = owner;
         this.changed = changed;
+        viewer = new PictureView(services, owner);
+        hands = new ScreenHands(services, () -> graph, said -> {
+            drawn = null;
+            say(said);
+            changed.run();
+        });
         content.getStyleClass().add("screen-panel");
         content.setPadding(new Insets(14));
         content.setFillWidth(true);
@@ -74,7 +94,7 @@ final class ScreenPanel {
         root.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         root.getStyleClass().addAll("screen-map", "screen-panel-scroller");
         root.getStylesheets().add(ScreenCanvas.SHEET);
-        root.setPrefWidth(330);
+        root.setPrefWidth(440);
         root.setMinWidth(260);
         status.setWrapText(true);
         status.getStyleClass().add("screen-panel-status");
@@ -93,10 +113,11 @@ final class ScreenPanel {
     }
 
     private void draw() {
-        String notes = selected == null ? "" : ScreenDesk.notes(services, graph.shown(selected));
+        GameScreen at = selected == null ? null : graph.screens().get(selected);
+        String notes = at == null || at.notes() == null ? "" : at.notes();
         Object now = selected == null ? List.of(graph.screens().values().stream().allMatch(GameScreen::isPopup), busy)
                 : List.of(ScreenCards.card(graph, selected, ""), ScreenCards.rows(graph, selected),
-                ScreenCards.path(graph, selected), notes, busy);
+                ScreenCards.path(graph, selected), notes, at.owes(), busy);
         if (now.equals(drawn)) return;
         drawn = now;
         content.getChildren().setAll(selected == null ? none() : screen(notes));
@@ -159,19 +180,37 @@ final class ScreenPanel {
         Button go = action("🧭 Go here", "Walk the game here by the map, as Navigate.to does in a run",
                 this::goHere);
         go.setDisable(busy || card.popup());
-        FlowPane actions = new FlowPane(8, 8, tryNext, go, cutInputs, cutMarker);
+        String shownNow = selected;
+        FlowPane actions = new FlowPane(8, 8, tryNext, go, cutInputs, cutMarker,
+                hands.screenMenu(shownNow, this::retake));
 
         VBox inputs = new VBox(6);
         if (rows.isEmpty()) inputs.getChildren().add(text("No input cut yet."));
         for (Row row : rows) inputs.getChildren().add(row(row));
 
         VBox all = new VBox(12, head, pills, actions, heading("Inputs"), inputs);
+        Map<String, FrameCut> cuts = services.pluginValues() == null ? Map.of()
+                : TemplateUses.cuts(services.pluginValues());
+        String shown = selected;
+        canvas.shotWithInputs(shown, HEAD_SHOT, rows, cuts, this::pick, null)
+                .ifPresent(shot -> all.getChildren().addFirst(shot));
         if (screen.back() != null) all.getChildren().add(text("Way back: " + screen.back().label() + "."));
-        if (!notes.isBlank()) {
-            Label prose = text(notes);
-            prose.getStyleClass().add("screen-panel-notes");
-            all.getChildren().addAll(heading("From the notes (GAME.md)"), prose);
+        if (!screen.owes().isEmpty()) {
+            all.getChildren().addAll(heading("Owes"), text("• " + String.join("\n• ", screen.owes())));
         }
+        // The notes live on the screen's constant: edited here, written as the assistant's write_notes writes them.
+        TextArea edit = new TextArea(notes);
+        edit.setWrapText(true);
+        edit.setPrefRowCount(6);
+        edit.setPromptText("What this screen spends and earns, its timers, badges and quirks");
+        edit.getStyleClass().add("screen-panel-notes");
+        String noted = selected;
+        Button save = action("Save notes", "Keep these notes on " + graph.shown(noted) + ", in the bot's Screens",
+                () -> {
+                    say(ScreenEdits.setNotes(services, noted, edit.getText()));
+                    changed.run();
+                });
+        all.getChildren().addAll(heading("Notes"), edit, save);
         return List.of(all);
     }
 
@@ -180,8 +219,11 @@ final class ScreenPanel {
         label.getStyleClass().add("screen-row-label");
         label.setMinWidth(0);
         VBox words = new VBox(1, label);
-        if (!row.kind().isEmpty()) {
-            Label kind = new Label(row.kind());
+        String about = String.join(" · ", Stream.of(row.kind(),
+                row.look().isEmpty() ? "" : "look " + row.look(), row.when().isEmpty() ? "" : "while " + row.when())
+                .filter(s -> !s.isEmpty()).toList());
+        if (!about.isEmpty()) {
+            Label kind = new Label(about);
             kind.getStyleClass().add("screen-row-kind");
             words.getChildren().add(kind);
         }
@@ -193,18 +235,61 @@ final class ScreenPanel {
             case NEVER, LOCKED -> "plain";
         });
         result.setMaxWidth(130);
-        HBox line = new HBox(8, canvas.thumb(row.picture(), ROW_THUMB, "screen-row-thumb"), words, result);
+        // A button with several looks steps through them; any look's thumb shows the input's picture.
+        Node thumb = LookToggle.of(row.looks(), picture -> {
+            Node one = canvas.thumb(picture, ROW_THUMB, "screen-row-thumb");
+            if (picture != null) {
+                Tooltip.install(one, new Tooltip("Show " + picture + " at its own size"));
+                one.setOnMouseClicked(e -> showPicture(row));
+            }
+            return one;
+        }, result, row.result());
+        boolean untried = row.state() == ScreenCards.RowState.UNTRIED || row.state() == ScreenCards.RowState.UNSEEN;
+        HBox line = new HBox(8, thumb, words, result);
         line.setAlignment(Pos.CENTER_LEFT);
         line.getStyleClass().add("screen-row");
-        if (row.state() == ScreenCards.RowState.UNTRIED || row.state() == ScreenCards.RowState.UNSEEN) {
+        if (untried) {
             Button play = action("▶", "Try " + row.label(), () -> tryRow(row));
             play.setDisable(busy);
             line.getChildren().add(play);
         }
+        line.getChildren().add(hands.rowMenu(selected, row));
         return line;
     }
 
     // --- actions ---
+
+    /** A boxed input clicked on a shot: the screen it opens, selected on the map; else its picture. */
+    private void pick(ScreenCards.Row row) {
+        Optional<String> opens = selected == null ? Optional.empty() : graph.opens(selected, row.input());
+        if (opens.isPresent()) canvas.select(opens.get());
+        else showPicture(row);
+    }
+
+    private void showPicture(ScreenCards.Row row) {
+        boolean untried = row.state() == ScreenCards.RowState.UNTRIED || row.state() == ScreenCards.RowState.UNSEEN;
+        viewer.showPicture(row, untried && !busy ? () -> tryRow(row) : null, () -> {
+            drawn = null;
+            canvas.forgetPictures();
+            changed.run();
+        });
+    }
+
+    /** The right-click menu of {@code constant}'s card: the ⋯ Screen menu's edits. */
+    ContextMenu menuFor(String constant) {
+        return new ContextMenu(hands.screenItems(constant, this::retake).toArray(MenuItem[]::new));
+    }
+
+    /** Takes {@code constant}'s shot again from the game, off the FX thread. */
+    private void retake(String constant) {
+        run("Taking the shot of " + graph.shown(constant) + "…", constant, () -> ScreenEdits.retakeShot(
+                new PanelContext(services, CaptureValue.current(services)), constant));
+    }
+
+    /** Closes the picture window; what the map's window does when it closes. */
+    void close() {
+        viewer.close();
+    }
 
     private void tryRow(Row row) {
         String constant = selected;

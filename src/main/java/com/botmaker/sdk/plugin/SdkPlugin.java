@@ -7,6 +7,7 @@ import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
+import com.botmaker.sdk.plugin.map.MapReport;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
@@ -73,7 +74,7 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .toolbar(() -> SdkToolbarItems.ALL)
                 .runOverlay(() -> SdkRunOverlay.ALL)
                 .overlay(() -> SdkOverlay.PART)
-                .assistant(() -> SdkAssist.ALL)
+                .assistant(() -> SdkAssist.and(MapReport.TOOLS))
                 .assistantGuide(SdkAssist.GUIDE)
                 .trial(Bot::trial)
                 .recorded(() -> PictureAt.ALL));

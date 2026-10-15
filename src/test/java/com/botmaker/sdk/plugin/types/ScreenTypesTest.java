@@ -6,6 +6,10 @@ import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.Reached;
+import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.Variant;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -15,6 +19,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -49,6 +54,9 @@ class ScreenTypesTest {
         assertEquals(campaign(), roundTrip(ScreenTypes.SCREEN_SHAPE, campaign()));
         GameScreen offer = GameScreen.named("Offer").marker(picture("offer")).popup();
         assertEquals(offer, roundTrip(ScreenTypes.SCREEN_SHAPE, offer));
+        GameScreen noted = campaign().notes("Loot fills over 8 h.\nIts badge shows on Home.")
+                .reached(Reached.SURVEYED).owes(List.of("marker — every icon here animates"));
+        assertEquals(noted, roundTrip(ScreenTypes.SCREEN_SHAPE, noted), "its notes, stage and debts go with it");
     }
 
     @Test
@@ -72,6 +80,26 @@ class ScreenTypesTest {
         assertEquals("HOME", BotConstants.screenName(BotConstants.screen("HOME")));
         Way way = Way.of(BotConstants.screen("HOME"), Input.click(picture("campaign")));
         assertEquals(way, roundTrip(ScreenTypes.WAY_SHAPE, way));
+    }
+
+    @Test
+    void looksAndConditionsGoBackTogetherAsTheMethodsTheyName() {
+        Input shop = Input.click(picture("shop")).variants(List.of(Variant.of(picture("shop_badge"), State.BADGE)))
+                .when(ScreenTypes.condition("Firestone::shopOpen"));
+        assertEquals(shop, roundTrip(ScreenTypes.CLICK_SHAPE, shop));
+        assertEquals("Firestone::shopOpen", ScreenTypes.sourceOf(roundTrip(ScreenTypes.CLICK_SHAPE, shop).when()));
+
+        Way way = Way.of(BotConstants.screen("HOME"), Input.click(picture("event"))).whenLooks(State.BADGE)
+                .when(ScreenTypes.condition("Firestone::eventOn"));
+        assertEquals(way, roundTrip(ScreenTypes.WAY_SHAPE, way));
+
+        GameScreen event = GameScreen.named("Event").marker(picture("event_title"))
+                .variants(List.of(ScreenVariant.named("Halloween").marker(picture("pumpkin"))
+                        .inputs(List.of(Input.click(picture("candy")).sometimes()))
+                        .when(ScreenTypes.condition("Firestone::halloween"))));
+        assertEquals(event, roundTrip(ScreenTypes.SCREEN_SHAPE, event));
+        assertEquals("", ScreenTypes.sourceOf(() -> true), "a live method has nothing to be written as");
+        assertNull(ScreenTypes.condition(" "));
     }
 
     @Test

@@ -27,8 +27,8 @@ import java.util.stream.Collectors;
  * <p>A call's parts are timed on the thread that runs it, at the few places all of them go through:
  * {@link Frames#look} (capturing), {@link ActTools#ambient} (watching motion: the screen read before acting, to
  * learn what moves on its own), {@link ActTools#answered} (settling: the game given time to answer),
- * {@link LookTools#best} (matching a picture), {@link LookTools#recognise} (reading text) and wait_for_picture's
- * pauses between looks (waiting). A part run inside another counts toward the outer one only, so the parts never
+ * {@link LookTools#best} (matching a picture), {@link LookTools#recognise} (reading text), wait_for_picture's
+ * pauses between looks (waiting) and {@link FxCall#call} (reading and writing the bot through Studio). A part run inside another counts toward the outer one only, so the parts never
  * add up past the total: settling's own captures are settling. Work handed to another thread is not counted.
  */
 final class ToolTiming {
@@ -40,7 +40,8 @@ final class ToolTiming {
         SETTLE("settling"),
         MATCH("matching"),
         TEXT("reading text"),
-        WAIT("waiting");
+        WAIT("waiting"),
+        STUDIO("reading and writing the bot");
 
         private final String label;
 

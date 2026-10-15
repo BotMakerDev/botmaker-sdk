@@ -14,8 +14,8 @@ import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -50,22 +50,26 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
- * The assistant's pictures and places: each picture a {@code Pictures} constant, each named spot a
- * {@code Spots} constant, each named area a {@code Zones} constant and each game font's digits a {@code Digits}
+ * The assistant's pictures and places: each picture a {@code Pictures} constant, each named area a {@code Zones}
+ * constant and each game font's digits a {@code Digits}
  * constant, written through the host as the
  * SDK's own windows write them. A box is in the pixels of the last screenshot, as {@code crop_picture}'s is; a
  * place is written in the bot's pixels, which the screenshot's are once the game shows the bot's screen size.
  */
 final class PictureTools {
 
-    private static final ManagedSet<Spot> SPOTS = ManagedSet.of(SdkValues.SPOTS);
     private static final ManagedSet<Zone> ZONES = ManagedSet.of(SdkValues.ZONES);
     private static final ManagedSet<DigitSet> DIGITS = ManagedSet.of(SdkValues.DIGITS);
+    /** A method reference, {@code Firestone::eventOn}: the only way a condition is written. */
+    private static final Pattern METHOD_REFERENCE =
+            Pattern.compile("\\p{javaJavaIdentifierStart}[\\p{javaJavaIdentifierPart}.]*::\\p{javaJavaIdentifierStart}"
+                    + "\\p{javaJavaIdentifierPart}*");
 
     record Crop(@Describe("the picture's name, lowercase with underscores: collect_button") String name,
                 @Describe("left edge, in the screenshot's pixels") int x,
@@ -91,7 +95,21 @@ final class PictureTools {
                         + "icon): it holds the screen back only while it shows", optional = true) Boolean sometimes,
                 @Describe(value = "true, with marker, when the screen is a popup the game opens on its own (a "
                         + "reward, an offer): it starts it apart from the map's tree", optional = true)
-                Boolean popup) {
+                Boolean popup,
+                @Describe(value = "the input this is another look of, by its picture: the same button with a badge, "
+                        + "greyed out or picked. It stays one input; with state", optional = true)
+                String variantOf,
+                @Describe(value = "with variantOf, what the look means: badge, disabled (never pressed) or selected",
+                        optional = true)
+                String state,
+                @Describe(value = "for an input that comes and goes, the bot's or a plugin's method saying when it is "
+                        + "there, as a method reference: Firestone::eventOn. It must exist; add_method makes one",
+                        optional = true)
+                String when,
+                @Describe(value = "the look of the screen this belongs to, in plain words (Halloween): the same screen, "
+                        + "reached and left the same way, dressed otherwise. With marker, what tells that look apart; "
+                        + "else an input only that look has", optional = true)
+                String screenLook) {
 
         /** The part to skip, when all four of its edges are given. */
         Optional<Rect> ignore() {
@@ -108,7 +126,10 @@ final class PictureTools {
                  @Describe(value = "the name of the one box that is that screen's marker", optional = true)
                  String marker,
                  @Describe(value = "tags to file every one under, each declared (list_tags)", optional = true)
-                 List<String> tags) {
+                 List<String> tags,
+                 @Describe(value = "the name of the one box that is that screen's close button, its way back",
+                         optional = true)
+                 String back) {
     }
 
     record PictureName(@Describe("a picture's name, as list_pictures gives it") String picture) {
@@ -145,12 +166,6 @@ final class PictureTools {
     private static Optional<Rect> ignore(Integer x, Integer y, Integer width, Integer height) {
         if (x == null || y == null || width == null || height == null) return Optional.empty();
         return Optional.of(new Rect(x, y, width, height));
-    }
-
-    record NamedPoint(@Describe("the spot's name: claim button") String name,
-                      @Describe("x, in the screenshot's pixels") int x,
-                      @Describe("y, in the screenshot's pixels") int y,
-                      @Describe(value = ANCHOR, optional = true) Anchor anchor) {
     }
 
     record NamedRegion(@Describe("the area's name: bag") String name,
@@ -202,10 +217,6 @@ final class PictureTools {
                     .describedAs("Gives a picture a new image cut from the last screenshot, keeping its name and "
                             + "every use; a part given to ignore is left out of matching, as crop_picture's")
                     .takes(Replace.class).handledBy(PictureTools::replacePicture),
-            AssistantTool.named("save_point")
-                    .describedAs("Names a spot of the game as a Spots constant, in the bot's pixels, for a block to "
-                            + "click by name with Mouse.click(Spots.…), wherever the window sits and at any size")
-                    .takes(NamedPoint.class).handledBy(PictureTools::savePoint),
             AssistantTool.named("save_region")
                     .describedAs("Names an area of the game as a Zones constant, in the bot's pixels, for a block to "
                             + "narrow a search to with .region(Zones.…), wherever the window sits and at any size")
@@ -258,19 +269,63 @@ final class PictureTools {
         if (marker != null && cuts.stream().noneMatch(c -> c.name().equals(marker))) {
             return AgentReply.refused("No box is called " + marker + ", the marker named. Nothing was saved.");
         }
+        String back = crops.back() == null || crops.back().isBlank() ? null : crops.back().strip();
+        if (back != null && (back.equals(marker) || cuts.stream().noneMatch(c -> c.name().equals(back)))) {
+            return AgentReply.refused("No box other than the marker is called " + back + ", the way back named. "
+                    + "Nothing was saved.");
+        }
+        String screen = crops.screen() == null || crops.screen().isBlank() ? null : crops.screen().strip();
+        if (back != null && screen == null) return AgentReply.refused("A way back is a screen's: give screen too.");
         AgentReply all = null;
         // The marker first: it may start the screen the other boxes are noted on.
         cuts.sort(Comparator.comparing((Crop c) -> !Boolean.TRUE.equals(c.marker())));
         // One watch of the screen for every box: each box watched alone took a second (2026-10-14).
         Supplier<List<BufferedImage>> live = liveLooks(context);
+        // The others noted on the screen together after they are cut: a write of it per box was 0.5 s each.
+        MapTools.Placing at = null;
+        List<String> inputs = new ArrayList<>();
+        String backCut = null;
         for (Crop crop : cuts) {
-            AgentReply one = cropPicture(crop, context, live);
+            boolean isMarker = Boolean.TRUE.equals(crop.marker());
+            if (!isMarker && screen != null && at == null) {
+                if (context.services().projectDir() == null) return AgentReply.refused(Frames.noProject());
+                try {
+                    at = MapTools.placing(context.services(), screen, false, false);
+                } catch (IllegalStateException busy) {
+                    return or(all, "Studio did not hand over the bot's Screens: " + busy.getMessage());
+                }
+                if (at.refusal() != null) return or(all, at.refusal());
+            }
+            AgentReply one = cropPicture(isMarker ? crop : unplaced(crop), context, live);
             if (one.isRefused()) {
                 one = AgentReply.text("Not saved, " + crop.name() + ": " + one.parts().getFirst().text());
+            } else if (!isMarker && at != null) {
+                String name = TemplateLibrary.sanitizeName(crop.name());
+                if (crop.name().equals(back)) backCut = name;
+                else inputs.add(name);
             }
             all = all == null ? one : all.and(one);
         }
-        return all;
+        if (at == null) return all;
+        List<String> noted = new ArrayList<>();
+        Optional<String> failed = MapTools.noteAll(context.services(), at, backCut, inputs, List.of(), noted);
+        String name = at.name();
+        return all.and(AgentReply.text(failed.map(why -> "\nNot noted in " + name + ": " + why)
+                .orElse(MapTools.noted(name, noted, !inputs.isEmpty()))));
+    }
+
+    /** {@code crop} cut without noting it on its screen: crop_pictures notes the boxes together. */
+    private static Crop unplaced(Crop crop) {
+        return new Crop(crop.name(), crop.x(), crop.y(), crop.width(), crop.height(), crop.tags(), crop.ignoreX(),
+                crop.ignoreY(), crop.ignoreWidth(), crop.ignoreHeight(), null, null, null, null, null, null, null,
+                null, null);
+    }
+
+    /** {@code why} refused when nothing was cut yet; else what was, and why the rest was not. */
+    private static AgentReply or(AgentReply cut, String why) {
+        String plain = why.replace(" Nothing was saved.", "");
+        return cut == null ? AgentReply.refused(plain + " Nothing was saved.")
+                : cut.and(AgentReply.text("\nNothing else was saved: " + plain));
     }
 
     /** One crop_pictures line as crop_picture's box, its screen, tags and marker from the call. */
@@ -285,7 +340,7 @@ final class PictureTools {
             return Optional.of(new Crop(name, at[0], at[1], at[2], at[3], crops.tags(),
                     ignoring ? at[4] : null, ignoring ? at[5] : null, ignoring ? at[6] : null, ignoring ? at[7] : null,
                     crops.screen(), crops.marker() != null && crops.marker().strip().equals(name) ? true : null,
-                    null, null, null));
+                    null, null, null, null, null, null, null));
         } catch (NumberFormatException e) {
             return Optional.empty();
         }
@@ -317,12 +372,31 @@ final class PictureTools {
         boolean back = Boolean.TRUE.equals(crop.back());
         boolean sometimes = Boolean.TRUE.equals(crop.sometimes());
         boolean popup = Boolean.TRUE.equals(crop.popup());
-        if ((marker || back || sometimes || popup) && screen == null) {
-            return AgentReply.refused("A marker, a way back, an input that comes and goes and a popup are a screen's: "
-                    + "give screen too.");
+        String variantOf = blankless(crop.variantOf());
+        String when = blankless(crop.when());
+        String screenLook = blankless(crop.screenLook());
+        if (screenLook != null && (back || popup || variantOf != null || !MapTools.isName(screenLook))) {
+            return AgentReply.refused("A screen's look is named in plain words, on one line, and holds a marker or "
+                    + "inputs only. Nothing was saved.");
         }
-        if (Stream.of(marker, back, sometimes).filter(b -> b).count() > 1 || popup && !marker) {
-            return AgentReply.refused("A cut is one of a marker, a way back or an input; popup goes with marker.");
+        // What says when an input is there says it comes and goes.
+        sometimes = sometimes || when != null;
+        Optional<State> state = Optional.ofNullable(blankless(crop.state())).flatMap(PictureTools::stateNamed);
+        if ((marker || back || sometimes || popup || variantOf != null || screenLook != null) && screen == null) {
+            return AgentReply.refused("A marker, a way back, an input that comes and goes, another look of an input "
+                    + "and a popup are a screen's: give screen too.");
+        }
+        if (Stream.of(marker, back, sometimes, variantOf != null).filter(b -> b).count() > 1 || popup && !marker) {
+            return AgentReply.refused("A cut is one of a marker, a way back, an input or another look of one; popup "
+                    + "goes with marker.");
+        }
+        if (variantOf != null && (state.isEmpty() || state.get() == State.NORMAL)) {
+            return AgentReply.refused("Say what the look means, state: badge, disabled or selected. Nothing was "
+                    + "saved.");
+        }
+        if (when != null && !METHOD_REFERENCE.matcher(when).matches()) {
+            return AgentReply.refused("when is a method reference, Firestone::eventOn: put an expression in a "
+                    + "method of the bot with add_method first. Nothing was saved.");
         }
         Optional<MapTools.Placing> section = Optional.empty();
         if (screen != null) {
@@ -347,13 +421,25 @@ final class PictureTools {
         });
         Frames.mark(context, new Rect(crop.x(), crop.y(), crop.width(), crop.height()), Marks.Kind.NOTE, saved.name());
         String constant = TemplateNames.constantFor(saved.name());
+        boolean comes = sometimes;
+        MapTools.Look look = new MapTools.Look(variantOf, state.orElse(null), when, screenLook);
         String noted = section.map(s -> MapTools.noteCut(context.services(), s, saved.name(), marker, back,
-                sometimes)).orElse("");
+                comes, look)).orElse("");
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
                         + "." + constant) + (tags.isEmpty() || !untagged.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
                         + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike
                         + (untagged.isEmpty() ? "" : " Not tagged: " + String.join(" ", untagged)))
                 .and(AgentReply.image(picture.get().image()));
+    }
+
+    private static String blankless(String text) {
+        return text == null || text.isBlank() ? null : text.strip();
+    }
+
+    /** The look {@code typed} names, by its constant's name in any case: badge, disabled, selected. */
+    static Optional<State> stateNamed(String typed) {
+        for (State state : State.values()) if (state.id().equalsIgnoreCase(typed.strip())) return Optional.of(state);
+        return Optional.empty();
     }
 
     /** How far from its own box a match still counts as the cut itself, in pixels. */
@@ -372,7 +458,7 @@ final class PictureTools {
         Rect box = inside.get();
         double needs = Frames.confidence(context.services());
         try (ImageTemplate template = ImageTemplate.of("alike", cut)) {
-            ImageFinder.findAll(template, new StillSource(shown));
+            ToolTiming.timed(ToolTiming.Phase.MATCH, () -> ImageFinder.findAll(template, new StillSource(shown)));
             List<String> elsewhere = Vision.lastMatchList().stream()
                     .filter(m -> m.confidence() >= needs)
                     .filter(m -> Math.abs(m.rect().x() - box.x()) > SELF_SLACK
@@ -443,24 +529,6 @@ final class PictureTools {
                         picture.get().place())));
         return done.ok() ? AgentReply.text(done.said()).and(AgentReply.image(picture.get().image()))
                 : AgentReply.refused(done.said());
-    }
-
-    static AgentReply savePoint(NamedPoint point, AgentContext context) {
-        String constant = FlowNames.constantFor(point.name());
-        if (constant == null) return AgentReply.refused("\"" + point.name() + "\" cannot be a constant's name.");
-        Optional<BufferedImage> frame = Frames.look(context);
-        if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
-        if (Frames.within(frame.get(), point.x(), point.y(), 1, 1).isEmpty()) {
-            return AgentReply.refused(Frames.outside(frame.get()));
-        }
-        Size live = new Size(frame.get().getWidth(), frame.get().getHeight());
-        Placed<Spot> placed = FxCall.call(() -> place(context.services(), SPOTS, constant, live,
-                bot -> Places.inBot(point.x(), point.y(), point.anchor(), bot, live)));
-        if (!placed.saved().ok()) return AgentReply.refused(placed.saved().done());
-        Frames.mark(context, new Rect(point.x() - 4, point.y() - 4, 9, 9), Marks.Kind.CLICK, constant);
-        Spot spot = placed.value();
-        return AgentReply.text(placed.saved().done() + " Spots." + constant + " = " + spot.x() + "," + spot.y()
-                + placed.of() + "; a block clicks it with Mouse.click(Spots." + constant + ").");
     }
 
     static AgentReply saveRegion(NamedRegion region, AgentContext context) {

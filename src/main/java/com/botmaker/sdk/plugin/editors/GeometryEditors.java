@@ -11,7 +11,6 @@ import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
 import javafx.scene.Node;
 import javafx.scene.control.MenuButton;
@@ -75,15 +74,10 @@ public final class GeometryEditors {
     }
 
     /**
-     * A {@code Spot}: its numbers, and the part of the screen it stays with, which the pill's menu changes. The
-     * numbers are the bot's pixels, which a pick off the live screen is not, so they are moved by naming the spot
-     * again ({@code save_point}) or in its Java.
+     * A {@code Zone}: its numbers, and the part of the screen it stays with, which the pill's menu changes. The
+     * numbers are the bot's pixels, which a pick off the live screen is not, so they are moved by naming the zone
+     * again ({@code save_region}) or in its Java.
      */
-    public static Node spot(ValueContext ctx) {
-        return anchorPill(ctx, Spot.class, GeometryEditors::spotLabel, Spot::anchor, Spot::anchored);
-    }
-
-    /** A {@code Zone}, as {@link #spot} draws a spot. */
     public static Node zone(ValueContext ctx) {
         return anchorPill(ctx, Zone.class, GeometryEditors::zoneLabel, Zone::anchor, Zone::anchored);
     }
@@ -110,10 +104,6 @@ public final class GeometryEditors {
             return items;
         });
         return pill;
-    }
-
-    static String spotLabel(Spot spot) {
-        return spot.x() + ", " + spot.y() + kept(spot.anchor());
     }
 
     static String zoneLabel(Zone zone) {

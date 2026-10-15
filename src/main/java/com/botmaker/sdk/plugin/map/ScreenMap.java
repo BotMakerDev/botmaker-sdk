@@ -84,8 +84,10 @@ public final class ScreenMap {
         canvas.graph().selectedProperty().addListener((o, was, is) -> {
             if (is != null) selected = is.constant();
             else if (was != null) selected = null;
+            // A screen picked, on the map or through an input that opens it: the panel shows its shot, inputs boxed.
             if (panel != null) panel.show(graph, selected);
         });
+        if (panel != null) canvas.setMenus(panel::menuFor);
         poll = new Timeline(new KeyFrame(POLL, e -> refresh()));
         poll.setCycleCount(Timeline.INDEFINITE);
     }
@@ -96,7 +98,11 @@ public final class ScreenMap {
 
     /** The 🗺 Screens press: the map in a window of its own, beside the editor. */
     public static void open(ActionContext context) {
-        StudioServices services = context.services();
+        open(context.services(), null);
+    }
+
+    /** The map in its window with {@code constant} picked: a {@code Screens} constant in the editor asked for it. */
+    public static void open(StudioServices services, String constant) {
         ScreenMap map = new ScreenMap(services, true);
         Stage stage = Modals.window(services, Modals.owner(services),
                 Modals.Frame.modeless("Screens", 1180, 720, 760, 460), (BorderPane) map.node());
@@ -104,6 +110,8 @@ public final class ScreenMap {
         stage.setOnHidden(e -> map.stop());
         stage.show();
         map.start();
+        // After start's first read, so the card is drawn to be picked.
+        if (constant != null) Platform.runLater(() -> map.canvas.select(constant));
     }
 
     /** The overlay editor's tab: the map without its side, and a button opening the window. */
@@ -136,6 +144,7 @@ public final class ScreenMap {
         }
         subscriptions.clear();
         canvas.setTrying(null);
+        if (panel != null) panel.close();
     }
 
     /** Reads the map again and draws what changed. On the FX thread. */
@@ -150,10 +159,15 @@ public final class ScreenMap {
         Map<String, String> stages;
         try {
             read = ScreenDesk.read(services);
-            stages = ScreenDesk.stages(services, read);
+            stages = ScreenDesk.stages(read);
         } catch (RuntimeException unreadable) {
             said.setText("The map could not be read: "
                     + Objects.requireNonNullElse(unreadable.getMessage(), unreadable.toString()));
+            return;
+        }
+        if (read.screens().isEmpty() && cards != null && !cards.isEmpty()) {
+            // Read while Screens.java was being written, the canvas went blank for a poll (2026-10-15): a map is
+            // never emptied by Discovery, so the last drawing stays until the next read.
             return;
         }
         graph = read;
@@ -163,6 +177,8 @@ public final class ScreenMap {
             cards = nowCards;
             links = nowLinks;
             canvas.show(cards, links, ScreenCards.root(read).orElse(null));
+        } else if (canvas.shotsChanged()) {
+            canvas.redraw();
         }
         if (!saidOnce) said.setText(summary(nowCards));
         saidOnce = false;

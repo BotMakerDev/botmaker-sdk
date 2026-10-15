@@ -79,7 +79,7 @@ class ToolTimingTest {
 
         List<String> lines = Files.readAllLines(project.resolve(ToolTiming.FILE));
         assertEquals(List.of("started", "tool", "total_ms", "capture_ms", "motion_ms", "settle_ms", "match_ms",
-                "text_ms", "wait_ms"), List.of(lines.getFirst().split("\t")));
+                "text_ms", "wait_ms", "studio_ms"), List.of(lines.getFirst().split("\t")));
         assertEquals(3, lines.size(), "one header, then a row a call");
         String[] row = lines.get(1).split("\t");
         assertEquals("try_input", row[1]);

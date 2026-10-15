@@ -162,6 +162,7 @@ public final class FlowTypes {
             .<Runnable>with(Run::home, Parts.HOME.part(FlowTypes::method))
             .<Runnable>with(Run::setup, Parts.SETUP.part(FlowTypes::method))
             .<Runnable>with(Run::popups, Parts.POPUPS.part(FlowTypes::method))
+            .<String>with(Run::notes, Run::notes)
             .constants(Run.NONE);
 
     /**

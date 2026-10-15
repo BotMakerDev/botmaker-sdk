@@ -14,7 +14,7 @@ import java.util.function.Supplier;
  * host calls off that thread. The bot's Java is only written on the FX thread. The one class of this package
  * that links JavaFX, so declaring the tools links none.
  */
-final class FxCall {
+public final class FxCall {
 
     private static final long TIMEOUT_SECONDS = 30;
 
@@ -25,8 +25,13 @@ final class FxCall {
      * before the FX thread took it is cancelled, so it does not run late and a retry does not write twice; one
      * already running is said to be. A host with no FX thread at all — a headless one, a test — runs it here.
      */
-    static <T> T call(Supplier<T> work) {
+    public static <T> T call(Supplier<T> work) {
         if (Platform.isFxApplicationThread()) return work.get();
+        // Reading and writing the bot through Studio is a call's part of its own (2026-10-15).
+        return ToolTiming.timed(ToolTiming.Phase.STUDIO, () -> handed(work));
+    }
+
+    private static <T> T handed(Supplier<T> work) {
         CompletableFuture<T> answer = new CompletableFuture<>();
         // PENDING until the FX thread takes it; the waiter may cancel only work that has not started.
         AtomicInteger state = new AtomicInteger(PENDING);

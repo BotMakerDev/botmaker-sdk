@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -217,6 +218,46 @@ class ScreenWalkTest {
         assertEquals(List.of("click close_x", "click campaign"), game.done);
     }
 
+    /** A panel over its parent leaves the parent's marker in view: the panel is where the game is (2026-10-15). */
+    @Test
+    void aScreenOverTheOneItWasOpenedFromIsTheScreenShown() {
+        Game game = new Game("ENGINEER");
+        game.shows.get("ENGINEER").add("home");
+        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+
+        assertEquals(Optional.of("ENGINEER"), walk.where("HOME"));
+
+        ScreenWalk.Result walked = walk.go("MAIL", "HOME");
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome());
+        assertEquals(List.of("key ESCAPE", "click mail"), game.done, "the panel closed before Home's input");
+    }
+
+    /** A way back that left the panel open has not arrived, though the parent's marker shows under it. */
+    @Test
+    void aWayBackArrivesOnlyOnceTheScreenLeftIsGone() {
+        Game game = new Game("ENGINEER");
+        game.shows.get("ENGINEER").add("home");
+        game.leads.remove("ENGINEER key ESCAPE");
+
+        ScreenWalk.Result walked = go(game, "MAIL", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.STUCK, walked.outcome(), walked.why());
+        assertFalse(game.done.contains("click mail"), "Home's input never clicked under the panel");
+    }
+
+    @Test
+    void aPopupShowingIsSaidApartFromTheScreen() {
+        Game game = new Game("HOME");
+        BufferedImage frame = game.look().orElseThrow();
+        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+        assertEquals(Optional.empty(), walk.popupOn(frame));
+
+        game.popup = "OFFER";
+
+        assertEquals(Optional.of("OFFER"), walk.popupOn(frame));
+        assertEquals(Optional.empty(), walk.whereOn(frame, null), "a popup is no place on the map");
+    }
+
     @Test
     void aWayThroughWhatComesAndGoesIsTakenOnlyWhileItShows() {
         Game game = new Game("HOME");
@@ -227,6 +268,26 @@ class ScreenWalkTest {
 
         game.shows.get("HOME").add("event");
         assertEquals(ScreenWalk.Outcome.ARRIVED, go(game, "EVENT", new ArrayList<>()).outcome());
+    }
+
+    @Test
+    void aWayOrAnInputWhoseMethodSaysNoIsNotTakenAndANameIsUnknown() {
+        Game game = new Game("HOME");
+        boolean[] open = {false};
+        Map<String, GameScreen> screens = new LinkedHashMap<>(game.map.screens());
+        screens.put("ENGINEER", screens.get("ENGINEER").from(from("HOME", click("engineer")).when(() -> open[0])));
+        screens.put("MAIL", screens.get("MAIL").from(from("HOME", click("mail").when(() -> open[0]))));
+        ScreenGraph conditioned = ScreenGraph.of(screens);
+
+        ScreenWalk walk = new ScreenWalk(conditioned, game, STEP_MS, reached -> {});
+        assertEquals(ScreenWalk.Outcome.NOT_NOW, walk.go("ENGINEER", null).outcome());
+        assertEquals(ScreenWalk.Outcome.NOT_NOW, walk.go("MAIL", null).outcome());
+        assertEquals(List.of(), game.done);
+
+        open[0] = true;
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walk.go("ENGINEER", null).outcome());
+        assertTrue(Conditions.holds(() -> { throw new UnsupportedOperationException("a name"); }),
+                "a condition that cannot answer never closes a way");
     }
 
     @Test

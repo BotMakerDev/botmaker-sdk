@@ -4,9 +4,12 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.Variant;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,19 +48,41 @@ public interface Reach {
         return place.center();
     }
 
+    /** An input's button as {@code frame} shows it: which of its looks, and where. */
+    record Seen(State state, Rect place) {}
+
     /**
-     * Does {@code input} on {@code frame}: its key pressed, or its picture found and clicked or scrolled over. False
-     * when the picture is not there, and nothing was done.
+     * How {@code input}'s button looks on {@code frame}: its variants looked for before its usual picture, since a
+     * badge or a grey copy of a button also passes for the button itself. Empty for a key, or a button not there.
+     */
+    default Optional<Seen> seen(Input input, BufferedImage frame) {
+        List<Variant> looks = input.looks();
+        if (looks.isEmpty()) return Optional.empty();
+        List<Variant> order = new ArrayList<>(looks.subList(1, looks.size()));
+        order.add(looks.getFirst());
+        List<Optional<Rect>> found = findEach(order.stream().map(Variant::picture).toList(), frame);
+        for (int i = 0; i < order.size(); i++) {
+            if (found.get(i).isPresent()) return Optional.of(new Seen(order.get(i).state(), found.get(i).get()));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Does {@code input} on {@code frame}: its key pressed, or its button found, in any look but a disabled one, and
+     * clicked or scrolled over. False when the button is not there or greyed out, and nothing was done.
      */
     default boolean perform(Input input, BufferedImage frame) {
         if (input.act() == Input.Act.KEY) {
             key(input.key());
             return true;
         }
-        Optional<Rect> place = input.picture() == null ? Optional.empty() : find(input.picture(), frame);
-        if (place.isEmpty()) return false;
-        if (input.act() == Input.Act.SCROLL) scroll(place.get().center(), input.notches());
-        else click(pointOn(place.get()));
+        Optional<Seen> button = input.variants().isEmpty()
+                ? Optional.ofNullable(input.picture()).flatMap(p -> find(p, frame)).map(at -> new Seen(State.NORMAL, at))
+                : seen(input, frame);
+        if (button.isEmpty() || button.get().state() == State.DISABLED) return false;
+        Rect place = button.get().place();
+        if (input.act() == Input.Act.SCROLL) scroll(place.center(), input.notches());
+        else click(pointOn(place));
         return true;
     }
 }

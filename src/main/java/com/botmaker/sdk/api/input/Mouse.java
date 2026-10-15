@@ -6,8 +6,6 @@ import com.botmaker.plugin.api.record.Gesture;
 import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.geometry.Spot;
-import com.botmaker.sdk.internal.vision.Places;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.Surface;
 import com.botmaker.sdk.internal.observe.SwipeEvent;
@@ -23,8 +21,8 @@ import java.time.Duration;
 /**
  * Real pointer input — clicks, moves, drags and the wheel.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): twenty of the twenty-one are offered, the four taking
- * a named {@link Spot} and {@code hold} (2026-10-11) included. The one hidden is
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): all but one are offered, {@code hold} (2026-10-11)
+ * included. There is no named spot to click (gone 2026-10-15): a bot clicks pictures, never places. The one hidden is
  * {@link #scroll(int)}, and the reason was already written down before this sweep existed — its own javadoc ends
  * <em>"Prefer the clearer {@link #scrollUp(int)} / {@link #scrollDown(int)}"</em>. Until now the menu offered all
  * three as equals and quietly contradicted that sentence; the annotation is what makes the author's preference
@@ -33,8 +31,7 @@ import java.time.Duration;
  *
  * <p>Nothing else here is a duplicate spelling. {@code click(Point)} and {@code click(int, int)} differ in what
  * the user is holding — a {@link Point} out of a match, or two literals — and the {@code CaptureSource} form
- * asks a genuinely different question (coordinates within a source, not on the screen). A {@code Spot} is a
- * place of the game in the bot's pixels, not a desktop pixel, so its four are not second spellings either. {@code drag}'s
+ * asks a genuinely different question (coordinates within a source, not on the screen). {@code drag}'s
  * {@code durationMs} has no property home, unlike {@code ImageClicker}'s {@code delayMs}, so both drag shapes
  * stay.
  */
@@ -89,29 +86,6 @@ public class Mouse {
         if (source == null) return;
         Point o = source.origin();
         click(o.x() + x, o.y() + y);
-    }
-
-    /**
-     * Left-clicks a named spot of the game — {@code Mouse.click(Spots.CLAIM)}: placed on the run's capture source,
-     * and scaled when the game shows another size than the bot's screen (2026-10-11).
-     */
-    public static void click(Spot spot) {
-        if (spot != null) click(Places.onScreen(spot));
-    }
-
-    /** Right-clicks a named spot of the game, placed as {@link #click(Spot)} places it. */
-    public static void rightClick(Spot spot) {
-        if (spot != null) rightClick(Places.onScreen(spot));
-    }
-
-    /** Double-clicks a named spot of the game, placed as {@link #click(Spot)} places it. */
-    public static void doubleClick(Spot spot) {
-        if (spot != null) doubleClick(Places.onScreen(spot));
-    }
-
-    /** Moves the cursor to a named spot of the game, placed as {@link #click(Spot)} places it. */
-    public static void move(Spot spot) {
-        if (spot != null) move(Places.onScreen(spot));
     }
 
     // --- Movement ---

@@ -1,18 +1,15 @@
 package com.botmaker.sdk.internal.vision;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Anchor;
-import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
 
 import java.util.Optional;
 
 /**
- * Where a {@link Spot} or a {@link Zone}, written in the bot's pixels, is on the game as it shows now, and back
+ * Where a {@link Zone}, written in the bot's pixels, is on the game as it shows now, and back
  * (2026-10-11).
  *
  * <p>The bot's screen is {@link BotScreen#size()}; the game is the run's capture source, whole ({@code base()}).
@@ -28,24 +25,9 @@ public final class Places {
 
     private Places() {}
 
-    /** {@code spot} on the desktop, as {@code Mouse} takes it, through the run's capture source. */
-    public static Point onScreen(Spot spot) {
-        CaptureSource whole = whole(Source.current());
-        Point origin = whole == null ? new Point(0, 0) : whole.origin();
-        Point in = inSource(spot, BotScreen.size().orElse(null), liveSize(whole).orElse(null));
-        return new Point(origin.x() + in.x(), origin.y() + in.y());
-    }
-
     /** {@code zone} in the pixels of {@code source}'s whole surface, as {@code region(Rect)} takes them. */
     public static Rect inSource(Zone zone, CaptureSource source) {
         return inSource(zone, BotScreen.size().orElse(null), liveSize(whole(source)).orElse(null));
-    }
-
-    /** {@code spot} in the pixels of a surface showing {@code live}, for a bot whose screen is {@code bot}. */
-    public static Point inSource(Spot spot, Size bot, Size live) {
-        if (!scales(bot, live)) return new Point(spot.x(), spot.y());
-        Scale scale = Scale.of(bot, live);
-        return new Point(scale.x(spot.x(), across(spot.anchor())), scale.y(spot.y(), down(spot.anchor())));
     }
 
     /** {@code zone} in the pixels of a surface showing {@code live}, for a bot whose screen is {@code bot}. */
@@ -57,18 +39,9 @@ public final class Places {
     }
 
     /**
-     * The spot of the bot's screen that shows at {@code x, y} of a surface showing {@code live}: what
-     * {@code save_point} writes for a pixel of a screenshot. The way back from {@link #inSource(Spot, Size, Size)}.
+     * The area of the bot's screen that shows as {@code area} of a surface showing {@code live}: what
+     * {@code save_region} writes for a box of a screenshot. The way back from {@link #inSource(Zone, Size, Size)}.
      */
-    public static Spot inBot(int x, int y, Anchor anchor, Size bot, Size live) {
-        Spot spot = new Spot(x, y).anchored(anchor);
-        if (!scales(bot, live)) return spot;
-        Scale scale = Scale.of(bot, live);
-        return new Spot(scale.backX(x, across(spot.anchor())), scale.backY(y, down(spot.anchor())))
-                .anchored(spot.anchor());
-    }
-
-    /** {@link #inBot(int, int, Anchor, Size, Size)} for an area. */
     public static Zone inBot(Rect area, Anchor anchor, Size bot, Size live) {
         Zone zone = new Zone(area.x(), area.y(), area.width(), area.height()).anchored(anchor);
         if (!scales(bot, live)) return zone;

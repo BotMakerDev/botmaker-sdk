@@ -116,6 +116,8 @@ public final class FlowCanvas extends StackPane {
     private final Group wires = new Group();
     private final Scale zoom = new Scale(1, 1);
     private final ScrollPane scroller;
+    /** The zoomed canvas inside the scroller: moved off the corner when it is smaller than the view. */
+    private final Group zoomed;
     private final Pane minimap = new Pane();
     private final Rectangle minimapViewport = new Rectangle();
     private final Rectangle rubberBand = new Rectangle();
@@ -200,7 +202,8 @@ public final class FlowCanvas extends StackPane {
         content.getChildren().addAll(grid, gridInk, wires, rubberBand());
         paintGrid();
 
-        scroller = new ScrollPane(new Group(content));
+        zoomed = new Group(content);
+        scroller = new ScrollPane(new Pane(zoomed));
         // Deliberately NOT pannable: ScrollPane pans on any button, which would steal the left drag from
         // rubber-band selection. Panning is done below, on the secondary/middle button only.
         scroller.setPannable(false);
@@ -603,6 +606,9 @@ public final class FlowCanvas extends StackPane {
                 centre = new Point2D(first.getLayoutX() + widthOf(first) / 2, first.getLayoutY() + heightOf(first) / 2);
                 onMessage.accept("Too big to fit: use the minimap to move around.");
             }
+            // A canvas smaller than the view sits in the scroller's corner whatever the scroll: it is moved instead.
+            zoomed.setLayoutX(offset(centre.getX() * zoom.getX(), view.getWidth(), canvasW * zoom.getX()));
+            zoomed.setLayoutY(offset(centre.getY() * zoom.getY(), view.getHeight(), canvasH * zoom.getY()));
             scroller.setHvalue(scrollFraction(centre.getX() * zoom.getX(), view.getWidth(), canvasW * zoom.getX()));
             scroller.setVvalue(scrollFraction(centre.getY() * zoom.getY(), view.getHeight(), canvasH * zoom.getY()));
             drawMinimap();
@@ -612,6 +618,13 @@ public final class FlowCanvas extends StackPane {
     private void setZoom(double factor) {
         zoom.setX(factor);
         zoom.setY(factor);
+    }
+
+    /** How far a canvas of {@code contentLength}, shorter than the view, moves so {@code center} sits mid-view. */
+    private static double offset(double center, double viewLength, double contentLength) {
+        double room = viewLength - contentLength;
+        if (room <= 0) return 0;   // it scrolls instead
+        return Math.clamp(viewLength / 2 - center, 0, room);
     }
 
     /** The h/v value that centres {@code center} in a viewport of {@code viewLength} over {@code contentLength}. */

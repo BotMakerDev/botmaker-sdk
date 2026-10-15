@@ -381,6 +381,12 @@ final class ActTools {
                 entered.done());
     }
 
+    /** {@code entered} read again on {@code after}, a later look: its answer said anew from that frame. */
+    static Entered again(AgentContext context, Entered entered, BufferedImage after) {
+        return new Entered(answer(context, entered.done(), entered.before(), after, entered.motion(), false),
+                entered.before(), after, entered.motion(), entered.how(), entered.done());
+    }
+
     /** What changed from {@code before} to {@code after}, in text, with the changed part's image when asked. */
     private static AgentReply answer(AgentContext context, String done, BufferedImage before, BufferedImage after,
                                      Motion motion, boolean show) {
@@ -426,7 +432,7 @@ final class ActTools {
         if (!on.isEmpty()) return String.join(", ", on) + ".";
         return scored.isEmpty() ? "no picture matches at all." : "none of the pictures where they were cut"
                 + " (best " + scored.getFirst().name() + " " + Frames.score(scored.getFirst().match().confidence())
-                + ", a run needs " + Frames.score(needs) + "; which_screen looks everywhere).";
+                + ", a run needs " + Frames.score(needs) + "; which_screen with everywhere true looks all over).";
     }
 
     /** Every line the OCR reads in {@code area} of {@code frame}, in the frame's pixels. */

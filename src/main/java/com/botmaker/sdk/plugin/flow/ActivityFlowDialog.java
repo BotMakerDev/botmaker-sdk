@@ -198,6 +198,9 @@ public final class ActivityFlowDialog {
     private final VBox treePane = new VBox(6);
     private boolean treeShown = true;
 
+    /** The flow the window opens on; null for the default one. */
+    private String startOn;
+
     public ActivityFlowDialog(StudioServices services, Window owner) {
         this.services = services;
         this.owner = owner;
@@ -216,11 +219,41 @@ public final class ActivityFlowDialog {
         new ActivityFlowDialog(services, Modals.owner(services)).show();
     }
 
+    /** Opens the window on the flow {@code name}: its {@code Flows} constant, shown in the editor, asked for it. */
+    public static void open(StudioServices services, String name) {
+        ActivityFlowDialog dialog = new ActivityFlowDialog(services, Modals.owner(services));
+        dialog.startOn = name;
+        dialog.show();
+    }
+
+    /**
+     * The flow {@code name} drawn as this window draws it, for its {@code Flows} constant in the editor: looked at,
+     * never edited there (this window edits it, so nothing it draws is saved). On the FX thread.
+     */
+    public static FlowCanvas preview(StudioServices services, String name) {
+        ActivityFlowDialog view = new ActivityFlowDialog(services, null);
+        view.canvas = new FlowCanvas();
+        view.loadCurrent(name);
+        FlowCanvas drawn = view.canvas;
+        drawn.setMouseTransparent(true);
+        boolean arrange = view.arrangeOnOpen;
+        drawn.sceneProperty().addListener((o, was, scene) -> {
+            if (scene == null) return;
+            FlowStyles.apply(scene);
+            // Cards measure only once they are in a scene: the arrows are drawn, or the cards arranged, after.
+            Platform.runLater(() -> {
+                if (arrange) drawn.autoArrange();
+                else showAll(drawn);
+            });
+        });
+        return drawn;
+    }
+
     public void show() {
         root.setRight(buildSidePanel());
         root.setBottom(buildBottomBar());
         autosaveDelay.setOnFinished(e -> flush());
-        showFlow(null);
+        showFlow(startOn);
 
         // The window's own ✕ is the same door as the Close button, and it must not be the one that loses the
         // last edit: both go through closeRequested, which flushes anything outstanding first.
@@ -276,8 +309,14 @@ public final class ActivityFlowDialog {
         FlowCanvas shown = canvas;
         Platform.runLater(() -> {
             if (arrangeOnOpen) shown.autoArrange();
-            else shown.refresh();
+            else showAll(shown);
         });
+    }
+
+    /** Redraws {@code canvas} and frames every card: a flow laid out before opens centred, not at the top-left. */
+    private static void showAll(FlowCanvas canvas) {
+        canvas.refresh();
+        canvas.recenter();
     }
 
     /**
@@ -1481,7 +1520,9 @@ public final class ActivityFlowDialog {
             // Read again: the first save of a project with no flow wrote Flows.MAIN, which the next save edits.
             target = FlowValue.target(services, target.name());
             // After the flow, so the run names the flow as just written; nothing when home and setup are as read.
-            refused = FlowValue.writeRun(services, target, new Run(home, setup, popups));
+            // The game's notes are the assistant's, kept as read.
+            refused = FlowValue.writeRun(services, target, new Run(home, setup, popups,
+                    target.run() == null ? null : target.run().notes()));
         }
         Throwable failure = null;
         FlowLayout layout = currentLayout(renamedTypes);

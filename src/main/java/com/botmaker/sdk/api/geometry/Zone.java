@@ -3,7 +3,7 @@ package com.botmaker.sdk.api.geometry;
 import java.util.Objects;
 
 /**
- * A named area of the game, in the bot's own pixels: a {@link Spot} with a size (2026-10-11).
+ * A named area of the game, in the bot's own pixels (2026-10-11).
  *
  * <p>{@code source.region(Zones.BAG)} narrows a search to it at run time: placed on the source's whole surface,
  * scaled when the game shows another size than the bot's screen, and kept with its {@link Anchor} when it shows

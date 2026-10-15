@@ -72,7 +72,10 @@ final class LookTools {
                        @Describe(value = SHOW, optional = true) Boolean show) {
     }
 
-    record Shown(@Describe(value = SHOW, optional = true) Boolean show) {
+    record Shown(@Describe(value = SHOW, optional = true) Boolean show,
+                 @Describe(value = "true looks for every picture all over the frame, slow (a second per ten "
+                         + "pictures); left out, each is looked for near where it was cut", optional = true)
+                 Boolean everywhere) {
     }
 
     record Wait(@Describe("a picture's name, as list_pictures gives it") String picture,
@@ -123,7 +126,8 @@ final class LookTools {
                     .takes(PictureName.class).handledBy(LookTools::findPicture),
             AssistantTool.named("which_screen")
                     .describedAs("Which screen of the bot's Screens the game shows, by their markers, then every "
-                            + "picture scored on that frame, best first, the ones a run would find ticked")
+                            + "picture scored near where it was cut on that frame, best first, the ones a run would "
+                            + "find ticked; everywhere true scores each all over the frame")
                     .takes(Shown.class).handledBy(LookTools::whichScreen),
             AssistantTool.named("wait_for_picture")
                     .describedAs("Waits until a picture is on the screen, as ImageFinder.waitFor would, and says "
@@ -236,7 +240,9 @@ final class LookTools {
         Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         String onMap = MapTools.where(context, frame.get()).map(line -> line + "\n").orElse("");
-        List<Scored> scored = scores(resources.get(), frame.get(), cuts(context));
+        // Near each picture's place by default: 170 full-frame matches took 27 s on Firestone (2026-10-15).
+        List<Scored> scored = Boolean.TRUE.equals(shown.everywhere()) ? scores(resources.get(), frame.get(),
+                cuts(context)) : scoresNear(resources.get(), frame.get(), cuts(context));
         if (scored.isEmpty()) return AgentReply.text(onMap + "No picture matched at all; crop_picture makes one.");
         double needs = Frames.confidence(context.services());
         List<String> lines = new ArrayList<>();

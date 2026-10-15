@@ -572,7 +572,8 @@ public final class ResourceManagerDialog {
         Map<String, TemplateUses.Scan> used = new LinkedHashMap<>();
         for (Path file : files) {
             String name = TemplateLibrary.baseName(file);
-            TemplateUses.Scan scan = TemplateUses.find(values(), name);
+            // Only the screen map using it: it leaves the map with its file.
+            TemplateUses.Scan scan = TemplateUses.offTheMap(values(), name);
             if (!scan.isEmpty()) used.put(name, scan);
         }
         if (used.isEmpty()) {

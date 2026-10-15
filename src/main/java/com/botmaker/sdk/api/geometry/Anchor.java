@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.geometry;
 
 /**
- * Which part of the screen a {@link Spot} or a {@link Zone} stays with when the game shows another shape than the
+ * Which part of the screen a {@link Zone} stays with when the game shows another shape than the
  * bot's screen (2026-10-11).
  *
  * <p>At the bot's own aspect ratio every anchor gives the same place: the whole picture scales. At another one — a

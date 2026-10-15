@@ -4,6 +4,8 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
@@ -74,7 +76,11 @@ public final class ScreenWalk {
         return reach.look().flatMap(frame -> whereOn(frame, near));
     }
 
-    /** The same, on {@code frame}: a look taken already. */
+    /**
+     * The same, on {@code frame}: a look taken already. A screen opened over another (a panel, a dialog) leaves the
+     * one under it in view, so of the screens whose markers show, one another shown screen was opened from is not
+     * the answer: Info luck over Tavern is Info luck (2026-10-15).
+     */
     public Optional<String> whereOn(BufferedImage frame, String near) {
         Set<String> order = new LinkedHashSet<>();
         if (near != null && graph.screens().containsKey(near)) {
@@ -84,7 +90,14 @@ public final class ScreenWalk {
         order.addAll(graph.screens().keySet());
         List<String> told = order.stream().filter(c -> !graph.screens().get(c).isPopup()
                 && graph.screens().get(c).marker() != null).toList();
-        return first(told, frame);
+        List<String> shown = shown(told, frame);
+        Set<String> under = new HashSet<>();
+        for (String c : shown) {
+            for (Optional<String> up = graph.parent(c); up.isPresent() && under.add(up.get()); ) {
+                up = graph.parent(up.get());
+            }
+        }
+        return shown.stream().filter(c -> !under.contains(c)).findFirst();
     }
 
     /** Walks to {@code target} from where the game is, {@code near} the screen it was last seen on, or null. */
@@ -126,7 +139,7 @@ public final class ScreenWalk {
                 missed.add(next);    // another way, or why none
                 continue;
             }
-            if (arrives(next.to())) {
+            if (arrives(next)) {
                 walked.add(next.to());
                 reached.accept(next.to());
                 at = next.to();
@@ -143,15 +156,25 @@ public final class ScreenWalk {
     }
 
     /**
-     * Whether {@code edge} can be taken: never through a lock, and through what comes and goes, on the screen the
-     * game is on, only while it shows; further on it is looked for when the walk gets there.
+     * Whether {@code edge} can be taken: never through a lock. On the screen the game is on, what comes and goes only
+     * while it shows, a button with looks only while it is not greyed out, and a way needing one look only while the
+     * button has it. Anywhere, a way or an input whose condition answers false; the rest is looked for when the walk
+     * gets there.
      */
     private boolean open(ScreenGraph.Edge edge, String at, BufferedImage frame) {
         Input via = edge.via();
         if (via == null) return true;
         if (via.lock() != null) return false;
-        if (!via.comesAndGoes() || !edge.from().equals(at)) return true;
-        return via.picture() != null && reach.find(via.picture(), frame).isPresent();
+        if (!Conditions.holds(edge.when()) || !Conditions.holds(via.when())) return false;
+        if (!edge.from().equals(at)) return true;
+        if (via.act() == Input.Act.KEY) return true;
+        if (edge.state() == null && via.variants().isEmpty()) {
+            return !via.comesAndGoes() || via.picture() != null && reach.find(via.picture(), frame).isPresent();
+        }
+        Optional<Reach.Seen> seen = reach.seen(via, frame);
+        if (seen.isEmpty()) return !via.comesAndGoes() && edge.state() == null;
+        if (seen.get().state() == State.DISABLED) return false;
+        return edge.state() == null || edge.state() == seen.get().state();
     }
 
     /** Why no way is open from {@code at} to {@code target}: what the ways there would take. */
@@ -187,26 +210,51 @@ public final class ScreenWalk {
         return reach.perform(edge.via(), frame);
     }
 
-    /** Whether {@code constant}'s marker shows within a step's time, a popup that shows meanwhile closed. */
-    private boolean arrives(String constant) {
-        GameScreen screen = graph.screens().get(constant);
+    /**
+     * Whether {@code edge}'s screen shows within a step's time, a popup that shows meanwhile closed: its marker, and
+     * after a way back the screen left gone too, since a panel's parent stays in view under it.
+     */
+    private boolean arrives(ScreenGraph.Edge edge) {
+        GameScreen screen = graph.screens().get(edge.to());
         if (screen.marker() == null) {
             reach.pause(POLL_MS);
             return true;    // a screen with no marker cannot be told: the walk takes it as reached
         }
+        ImageTemplate left = edge.back() ? graph.screens().get(edge.from()).marker() : null;
         long deadline = reach.nowMs() + stepMs;
         do {
             reach.pause(POLL_MS);
             Optional<BufferedImage> frame = closePopups(reach.look());
-            if (frame.isPresent() && reach.find(screen.marker(), frame.get()).isPresent()) return true;
+            if (frame.isPresent() && reach.find(screen.marker(), frame.get()).isPresent()
+                    && (left == null || reach.find(left, frame.get()).isEmpty())) {
+                return true;
+            }
         } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
         return false;
     }
 
+    /** The popup whose marker {@code frame} shows, if any: what {@link #whereOn} leaves out. */
+    public Optional<String> popupOn(BufferedImage frame) {
+        List<String> popups = popups();
+        return popups.isEmpty() ? Optional.empty() : first(popups, frame);
+    }
+
+    /** Which look of {@code constant} {@code frame} shows: the first whose marker is found; empty for none. */
+    public Optional<ScreenVariant> lookOn(String constant, BufferedImage frame) {
+        GameScreen screen = graph.screens().get(constant);
+        if (screen == null) return Optional.empty();
+        return screen.variants().stream().filter(v -> v.marker() != null && reach.find(v.marker(), frame).isPresent())
+                .findFirst();
+    }
+
+    private List<String> popups() {
+        return graph.screens().entrySet().stream()
+                .filter(e -> e.getValue().isPopup() && e.getValue().marker() != null).map(e -> e.getKey()).toList();
+    }
+
     /** {@code frame}, or the one after closing each popup it shows, up to {@link #MOST_POPUPS}. */
     private Optional<BufferedImage> closePopups(Optional<BufferedImage> frame) {
-        List<String> popups = graph.screens().entrySet().stream()
-                .filter(e -> e.getValue().isPopup() && e.getValue().marker() != null).map(e -> e.getKey()).toList();
+        List<String> popups = popups();
         for (int i = 0; i < MOST_POPUPS && frame.isPresent() && !popups.isEmpty(); i++) {
             Optional<String> popup = first(popups, frame.get());
             if (popup.isEmpty()) return frame;
@@ -220,10 +268,16 @@ public final class ScreenWalk {
 
     /** The first of {@code constants} whose marker is on {@code frame}, all looked for on that one frame. */
     private Optional<String> first(List<String> constants, BufferedImage frame) {
+        return shown(constants, frame).stream().findFirst();
+    }
+
+    /** Those of {@code constants} whose marker is on {@code frame}, in their order, all looked for on that frame. */
+    private List<String> shown(List<String> constants, BufferedImage frame) {
         List<ImageTemplate> markers = constants.stream().map(c -> graph.screens().get(c).marker()).toList();
         List<Optional<Rect>> found = reach.findEach(markers, frame);
-        for (int i = 0; i < constants.size(); i++) if (found.get(i).isPresent()) return Optional.of(constants.get(i));
-        return Optional.empty();
+        List<String> shown = new ArrayList<>();
+        for (int i = 0; i < constants.size(); i++) if (found.get(i).isPresent()) shown.add(constants.get(i));
+        return shown;
     }
 
     private static String label(ScreenGraph.Edge edge) {

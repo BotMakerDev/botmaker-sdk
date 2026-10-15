@@ -14,7 +14,6 @@ import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.text.DigitSet;
@@ -37,7 +36,7 @@ import java.util.Set;
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOWS} are the activity
  * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
  * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
- * size its pictures were cut at, and {@code PICTURES}, {@code TAGS}, {@code ACTIVITIES}, {@code SPOTS},
+ * size its pictures were cut at, and {@code PICTURES}, {@code TAGS}, {@code ACTIVITIES},
  * {@code ZONES}, {@code DIGITS} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the
  * run's {@code @Param} fields in {@code Sdk.java}, which {@code Bot.runFlow} reads by their marks and nothing
  * claims; {@code LAUNCH_TARGETS}, {@code CAPTURE} (where pixels are read from) and {@code VM} the game's,
@@ -116,17 +115,6 @@ public final class SdkValues {
             .in("Activities")
             .because("Activities and their outcomes are managed in 🔀 Activity Flow, which renames the card or the"
                     + " exit and every use of it together.");
-
-    /**
-     * The named spots — {@code static final Spot CLAIM = new Spot(412, 230)}, in the bot's pixels, which
-     * {@code Mouse.click(Spot)} places on the game as it shows. The assistant's {@code save_point} adds one, or
-     * moves one it names again.
-     */
-    public static final ManagedValue<Spot> SPOTS = ManagedValue.openSet(SdkValue.Id.SPOTS)
-            .of(Spot.class)
-            .in("Spots")
-            .because("Spots.java holds the bot's named spots. Ask Claude to save_point a spot again, under its"
-                    + " name, to move it.");
 
     /**
      * The named areas — {@code static final Zone BAG = new Zone(10, 20, 200, 120)}, in the bot's pixels, which
@@ -249,7 +237,7 @@ public final class SdkValues {
 
     /** All eighteen, in the order the plugin declares them. */
     public static final List<ManagedValue<?>> ALL = List.of(FLOWS, RUN, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            TAGS, ACTIVITIES, SPOTS, ZONES, DIGITS, SCREEN_MAP, SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, VM);
+            TAGS, ACTIVITIES, ZONES, DIGITS, SCREEN_MAP, SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, VM);
 
     private static boolean claimed;
 

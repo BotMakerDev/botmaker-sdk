@@ -21,6 +21,19 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A button's looks, a screen's looks, and conditions on the map.** A button that changes its look stays one
+  input: `Input.variants(List.of(Variant.of(Pictures.SHOP_BADGE, State.BADGE)))`. Any look finds it, and a
+  `State.DISABLED` look is never pressed. `Way.whenLooks(State)` takes a way only while the button looks so. A
+  screen dressed otherwise (an event's theme) is one of its looks, not a screen of its own:
+  `GameScreen.variants(List.of(ScreenVariant.named("Halloween").marker(…).inputs(…)))`. A look has its own marker
+  and the inputs only it has. `Input.when`, `Way.when` and `ScreenVariant.when` take a method of the bot or of a
+  plugin, `Firestone::eventOn`. A run asks the method before walking that way. Studio's tools hold only its name,
+  so they read it as unknown, which never closes a way. An expression goes in a bot method of its own.
+  crop_picture takes `variantOf` + `state`, `when` and `screenLook`, and which_screen names the screen's look
+  that shows. read_map, 🗺 Screens' panel and a `Screens` constant's view show each button's looks with a ◀ look ▶
+  toggle and where each look leads. Deleting a picture that only `Screens` uses takes it out of the screen instead
+  of refusing.
+
 - **🗺 Navigate in the palette.** `Navigate.to`, `isOn` and `where` are blocks under Interaction. A block's screen
   is picked from the bot's map: a button showing the screen's marker and name lists the map's screens (popups only for
   `isOn`), and the pick is written as the `Screens` constant. A block dropped before a pick holds `null`, which `Navigate`

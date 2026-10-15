@@ -24,11 +24,17 @@ package com.botmaker.sdk.api.flow;
  *              {@code null} for nothing
  * @param popups what clears a popup the game opened on its own (an offer, a mail, a level-up): run before every
  *              vision call of every activity, so no body has to expect one; {@code null} for nothing
+ * @param notes what automating the game taught that holds across its screens, in plain lines; {@code null} for none.
+ *              A run ignores it: the assistant reads it (read_notes) and keeps it (write_notes)
  */
-public record Run(Runnable home, Runnable setup, Runnable popups) {
+public record Run(Runnable home, Runnable setup, Runnable popups, String notes) {
+
+    public Run {
+        notes = notes == null || notes.isBlank() ? null : notes;
+    }
 
     /** No home, no setup and no popups: what a project with nothing drawn has. */
-    public static final Run NONE = new Run(null, null, null);
+    public static final Run NONE = new Run(null, null, null, null);
 
     /** A run with no {@link #home} or {@link #setup} yet. */
     public static Run of() {
@@ -37,7 +43,15 @@ public record Run(Runnable home, Runnable setup, Runnable popups) {
 
     /** This run, getting the game back to a known screen with {@code home} — {@code Gamebot::goHome}. */
     public Run home(Runnable home) {
-        return new Run(home, setup, popups);
+        return new Run(home, setup, popups, notes);
+    }
+
+    /**
+     * This run, with {@code notes} on the game as a whole: what holds across its screens (hotkeys, currencies, what
+     * never to press). A screen's own notes are on its {@code GameScreen}. Blank for none.
+     */
+    public Run notes(String notes) {
+        return new Run(home, setup, popups, notes);
     }
 
     /**
@@ -47,7 +61,7 @@ public record Run(Runnable home, Runnable setup, Runnable popups) {
      * by hand.
      */
     public Run setup(Runnable setup) {
-        return new Run(home, setup, popups);
+        return new Run(home, setup, popups, notes);
     }
 
     /**
@@ -56,6 +70,6 @@ public record Run(Runnable home, Runnable setup, Runnable popups) {
      * click them. A vision call made inside it does not run it again.
      */
     public Run popups(Runnable popups) {
-        return new Run(home, setup, popups);
+        return new Run(home, setup, popups, notes);
     }
 }

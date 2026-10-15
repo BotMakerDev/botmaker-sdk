@@ -65,6 +65,48 @@
     -fx-border-radius: 7;
 }
 
+.screen-card-shot {
+    -fx-background-color: derive(-bm-screen-card, -10%);
+}
+
+.screen-row-thumb {
+    -fx-cursor: hand;
+}
+
+.screen-row-thumb:hover {
+    -fx-border-color: -bm-screen-untried;
+    -fx-border-width: 2;
+}
+
+.screen-shot-open {
+    -fx-cursor: hand;
+}
+
+.screen-shot-box {
+    -fx-fill: transparent;
+    -fx-stroke: -bm-screen-untried;
+    -fx-stroke-width: 1.5;
+    -fx-cursor: hand;
+}
+
+.screen-shot-box-tried {
+    -fx-stroke: -bm-screen-finished;
+}
+
+.screen-shot-box-never,
+.screen-shot-box-locked {
+    -fx-stroke: -bm-screen-plain;
+}
+
+.screen-shot-box:hover {
+    -fx-fill: rgba(255, 255, 255, 0.18);
+    -fx-stroke-width: 3;
+}
+
+.screen-picture-view {
+    -fx-background-color: -bm-screen-card;
+}
+
 .screen-thumb-none {
     -fx-text-fill: -bm-screen-plain;
     -fx-font-weight: bold;
@@ -205,6 +247,14 @@
     -fx-font-family: monospace;
     -fx-font-size: 0.9em;
     -fx-text-overrun: ellipsis;
+}
+
+.screen-look-step {
+    -fx-padding: 0 4 0 4;
+    -fx-font-size: 0.75em;
+    -fx-background-color: transparent;
+    -fx-text-fill: -bm-screen-plain;
+    -fx-cursor: hand;
 }
 
 .screen-row-kind {

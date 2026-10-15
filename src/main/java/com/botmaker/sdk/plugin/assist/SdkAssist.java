@@ -37,14 +37,20 @@ public final class SdkAssist {
             its trial passed; Upkeep when the game changes. Never write a body for a screen not yet surveyed:
             it would miss the game's own controls.
             - read_guide gives the steps of the stage the bot is at, worked out from its home and popups
-              methods and its notes (read_notes, write_notes), and where each screen stands; read_guide with a
-              stage gives another's. Read it before starting, and again whenever a stage's check passes.
-            - When a stage's check passes for a screen, write_notes that screen's section with its new Stage
-              line, and what the stage taught about the game, before going on.
+              methods and its Screens, and where each screen stands; read_guide with a stage gives another's.
+              Read it before starting, and again whenever a stage's check passes.
+            - The notes are the bot's Java (read_notes, write_notes): each screen's on its Screens constant, what
+              holds across the game on the run. When a stage's check passes for a screen, write_notes it with
+              reached (its new stage) and what the stage taught about the game, before going on.
             - Stage 0, Setup: the game in view, a home method and a popups method.
             - Stage 1, Discovery: every screen the same way, from home: cut its marker and every input on it,
               try each (every list scrolled to both ends), and finish a screen an input opens before the next
-              input. crop_picture and try_input write the map, the bot's Screens class; go_to_screen walks it.
+              input. crop_picture and try_input write the map, the bot's Screens class; go_to_screen walks it;
+              read_map reads it as the user's 🗺 Screens window shows it, and what it cannot do. A button that
+              changes its look is one input (crop_picture variantOf + state); the same screen dressed otherwise
+              (an event's theme) is one of its looks (screenLook), never a screen of its own; a list whose
+              entries change by day is one screen whose entries come and go. When a method of the bot can say
+              when one is there, name it as crop_picture's when (Firestone::eventOn).
             - Stage 2, Build: one chore at a time, through the game's own shortcuts, each step proved by a
               picture.
             - Stage 3, Trial: each activity from three states (work to do, nothing to do, interrupted), then
@@ -75,6 +81,13 @@ public final class SdkAssist {
             """;
 
     private SdkAssist() {}
+
+    /** {@link #ALL} and {@code more}, tools of a package this one cannot name (the map's), each timed alike. */
+    public static List<AssistantTool<?>> and(List<AssistantTool<?>> more) {
+        List<AssistantTool<?>> all = new ArrayList<>(ALL);
+        all.addAll(join(more));
+        return List.copyOf(all);
+    }
 
     @SafeVarargs
     private static List<AssistantTool<?>> join(List<AssistantTool<?>>... groups) {

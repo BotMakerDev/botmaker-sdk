@@ -4,6 +4,9 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.Variant;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -66,6 +69,45 @@ class ScreenGraphTest {
         assertEquals(List.of("campaign_title", "claim", "arena", "padlock", "close_x"), graph.pictures("CAMPAIGN"));
         assertEquals(List.of(), graph.pictures("ENGINEER"), "no marker yet, nothing cut");
         assertEquals(List.of(), graph.pictures("NOWHERE"));
+    }
+
+    @Test
+    void aScreensLooksAreItsToo_andAPictureGoingTakesItOffTheScreenButNotOffAWayIn() {
+        Map<String, GameScreen> screens = firestone();
+        Input claim = click("claim").variants(List.of(Variant.of(picture("claim_badge"), State.BADGE)));
+        screens.put("CAMPAIGN", screens.get("CAMPAIGN").inputs(List.of(claim, click("map")))
+                .variants(List.of(ScreenVariant.named("Halloween").marker(picture("pumpkin"))
+                        .inputs(List.of(click("candy"))))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(List.of("campaign_title", "pumpkin", "claim", "claim_badge", "map", "candy"),
+                graph.pictures("CAMPAIGN"));
+        assertTrue(graph.untried("CAMPAIGN").contains(click("candy")), "a look's input is tried like the screen's");
+
+        GameScreen campaign = screens.get("CAMPAIGN");
+        assertEquals(List.of(click("claim"), click("map")),
+                ScreenGraph.without(campaign, "claim_badge").inputs(), "a button's look goes, the button stays");
+        assertEquals(List.of(), ScreenGraph.without(campaign, "candy").variants().getFirst().inputs());
+        assertEquals(null, ScreenGraph.without(campaign, "pumpkin").variants().getFirst().marker());
+        assertEquals(campaign.from(), ScreenGraph.without(campaign, "campaign").from(), "a way in is kept");
+        assertTrue(ScreenGraph.enteredBy(campaign, "campaign"), "so the picture it opens by stays used");
+        assertFalse(ScreenGraph.enteredBy(campaign, "candy"));
+        GameScreen withLooks = campaign.withVariant(ScreenVariant.named("Winter"))
+                .withVariant(ScreenVariant.named("Halloween").marker(picture("bat")));
+        assertEquals(List.of("Halloween", "Winter"), withLooks.variants().stream().map(ScreenVariant::name).toList(),
+                "a look edited keeps its place");
+    }
+
+    @Test
+    void aButtonLeadsWhereItsLookAndItsMethodSay() {
+        Map<String, GameScreen> screens = firestone();
+        screens.put("ENGINEER", screens.get("ENGINEER").alsoFrom(List.of(Way.of(BotConstants.screen("HOME"),
+                click("campaign")).whenLooks(State.DISABLED))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        List<ScreenGraph.Lead> leads = graph.leads("HOME", click("campaign"));
+        assertEquals(List.of("CAMPAIGN", "ENGINEER"), leads.stream().map(ScreenGraph.Lead::to).toList());
+        assertEquals(State.DISABLED, leads.get(1).state());
     }
 
     @Test

@@ -14,10 +14,10 @@ activities by its own chain (`.tags(List.of(Tags.UI)).activities(List.of(Activit
 **`Tags.java`** (`TAGS`: one `PictureTag.named("UI")` per custom tag 🖼 Manage Pictures groups pictures under,
 which a picture refers to by its constant), and
 **`Activities.java`** (`ACTIVITIES`: one nested `enum Collect implements Outcome { NEXT, NOTHING_LEFT }` per
-activity, each name's label its words). Beside them the host writes **`Spots.java`** and
-**`Zones.java`** (`SPOTS`, `ZONES`, 2026-10-11): named `Spot`s and `Zone`s in the bot's pixels from the game's
-corner, which the assistant's `save_point` and `save_region` add and a run places on the live game
-(`internal/vision/Places`); they replaced `POINTS`/`REGIONS` (desktop `Point`s, source `Rect`s, 2026-10-06),
+activity, each name's label its words). Beside them the host writes **`Zones.java`** (`ZONES`, 2026-10-11):
+named `Zone`s in the bot's pixels from the game's corner, which the assistant's `save_region` adds and a run
+places on the live game (`internal/vision/Places`). `Spots.java` (`SPOTS`) went on 2026-10-15: a bot clicks
+pictures, never places. They replaced `POINTS`/`REGIONS` (desktop `Point`s, source `Rect`s, 2026-10-06),
 which nothing converts. **`Digits.java`** (`DIGITS`,
 2026-10-11) holds a `DigitSet` per game font, a folder of `0.png`–`9.png` under `src/main/resources/digits/`
 that the assistant's `save_digits` cuts (`plugin/pictures/DigitCuts`) and `Text.readDigits` reads with

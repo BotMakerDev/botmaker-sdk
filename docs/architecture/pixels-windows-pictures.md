@@ -7,10 +7,11 @@
   is not the bot's screen size, and the matcher rescales against that). A blank per-window
   grab on Wayland falls through to a desktop capture cropped to the window. `EditorFrame.Failure` tells *no
   target* from *the grab came back blank*, because they send a user to two different places.
-- **A named place is in the bot's pixels** (`Spot`, `Zone`, 2026-10-11): from the game's top-left corner at
+- **A named place is in the bot's pixels** (`Zone`, 2026-10-11; `Spot` went 2026-10-15, a bot clicks pictures,
+  never places): from the game's top-left corner at
   `Sdk.screen()`. `internal/vision/Places` puts it on the run's capture source, whole: its origin, then each
   axis' ratio at the same shape, or the smaller ratio around the place's `Anchor` point at another one, the
-  rule shared's `ResolutionScaler` follows for pictures. `save_point`/`save_region` run it backwards from a
+  rule shared's `ResolutionScaler` follows for pictures. `save_region` runs it backwards from a
   screenshot pixel, setting `screen()` first when the bot names none.
 - **The whole desktop is read through shared's `ScreenCapture`**, the grab a bot uses too (Robot, or under
   Wayland the first installed of Spectacle, grim, gnome-screenshot). There is no second desktop grab here.

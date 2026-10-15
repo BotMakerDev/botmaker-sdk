@@ -5,11 +5,14 @@ import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.ManagedSet;
+import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +40,9 @@ public final class TemplateUses {
 
     /** The open set the pictures are: {@code Pictures.java}. */
     static final ManagedSet<ImageTemplate> SET = ManagedSet.of(SdkValues.PICTURES);
+    /** The bot's screen map, {@code Screens.java}, whose pictures go with them. */
+    private static final ManagedSet<GameScreen> MAP = ManagedSet.of(SdkValues.SCREEN_MAP);
+    private static final String SCREENS_FILE = "Screens.java";
 
     private TemplateUses() {}
 
@@ -68,6 +74,34 @@ public final class TemplateUses {
     public static Scan find(PluginValues values, String baseName) {
         Member constant = declared(values, baseName);
         return new Scan(baseName, constant == null ? List.of() : List.copyOf(SET.uses(values, constant)));
+    }
+
+    /**
+     * {@link #find}, after taking {@code baseName} out of the bot's {@code Screens} when only they use it: a screen's
+     * marker, an input, a look of a button or of a screen, a lock or a way back goes with its picture rather than
+     * keeping it (the user's call, 2026-10-15). A way into a screen stays, so a picture one opens by keeps it used;
+     * then nothing is written, and the scan is as {@link #find} gives it. On the FX thread.
+     */
+    public static Scan offTheMap(PluginValues values, String baseName) {
+        Scan scan = find(values, baseName);
+        boolean mapOnly = scan.uses().stream().allMatch(use -> use.file().getFileName().toString()
+                .equals(SCREENS_FILE));
+        if (scan.isEmpty() || !mapOnly) return scan;
+        record Held(ValueContext at, GameScreen screen) {}
+        List<Held> screens = new ArrayList<>();
+        for (Member member : MAP.members(values)) {
+            Optional<ValueContext> at = MAP.open(values, member);
+            Optional<GameScreen> screen = at.flatMap(MAP::read);
+            if (screen.isEmpty()) return scan;    // a screen written by hand may name it: leave the map alone
+            if (ScreenGraph.enteredBy(screen.get(), baseName)) return scan;
+            screens.add(new Held(at.get(), screen.get()));
+        }
+        // Every use goes with the map's own: only then is the map written.
+        for (Held held : screens) {
+            GameScreen without = ScreenGraph.without(held.screen(), baseName);
+            if (!without.equals(held.screen())) held.at().set(without);
+        }
+        return find(values, baseName);
     }
 
     /**

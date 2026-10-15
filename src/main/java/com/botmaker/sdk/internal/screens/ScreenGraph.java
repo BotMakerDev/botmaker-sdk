@@ -3,7 +3,11 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.Variant;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 
 import java.util.ArrayDeque;
@@ -16,9 +20,11 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 
 /**
@@ -48,9 +54,22 @@ public final class ScreenGraph {
 
     /**
      * One edge a walk can take: {@code via} done on {@code from} reaches {@code to}. A {@code back} edge with no
-     * input is the default way out: a close button, then Escape.
+     * input is the default way out: a close button, then Escape. {@code state} is the look of {@code via}'s button
+     * the edge needs ({@link Way#whenLooks}), null for any; {@code when} the method answering whether it leads there
+     * now ({@link Way#when}), null for always.
      */
-    public record Edge(String from, String to, Input via, boolean back) {}
+    public record Edge(String from, String to, Input via, boolean back, State state, BooleanSupplier when) {
+
+        public Edge(String from, String to, Input via, boolean back) {
+            this(from, to, via, back, null, null);
+        }
+    }
+
+    /**
+     * Where an input leads while its button looks as {@code state} says and {@code when} answers true; {@code state}
+     * null for any look, {@code when} null for always.
+     */
+    public record Lead(State state, BooleanSupplier when, String to) {}
 
     private final Map<String, GameScreen> screens;
 
@@ -130,6 +149,23 @@ public final class ScreenGraph {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Every screen {@code input} on {@code constant} opens, each with the look of its button the way needs, in
+     * declared order: one for most inputs, one per look for a button that leads where its look says.
+     */
+    public List<Lead> leads(String constant, Input input) {
+        List<Lead> leads = new ArrayList<>();
+        for (String c : screens.keySet()) {
+            for (Way way : ways(screens.get(c))) {
+                if (way.via() != null && way.via().sameAs(input)
+                        && constantOf(way.from()).filter(constant::equals).isPresent()) {
+                    leads.add(new Lead(way.state(), way.when(), c));
+                }
+            }
+        }
+        return leads;
     }
 
     /** Whether {@code input} on {@code constant} was tried: settled, or it opened a screen. */
@@ -288,7 +324,8 @@ public final class ScreenGraph {
         screens.forEach((c, screen) -> {
             for (Way way : ways(screen)) {
                 if (way.via() == null) continue;    // a way in names what is done; only a way back has a default
-                constantOf(way.from()).ifPresent(from -> edges.add(new Edge(from, c, way.via(), false)));
+                constantOf(way.from()).ifPresent(from -> edges.add(new Edge(from, c, way.via(), false, way.state(),
+                        way.when())));
             }
             if (!screen.isPopup()) parent(c).ifPresent(p -> edges.add(new Edge(c, p, screen.back(), true)));
         });
@@ -323,7 +360,8 @@ public final class ScreenGraph {
 
     /**
      * What Discovery still owes, one line each as {@code Campaign: untried click campaign_claim}: a marker, the
-     * inputs left to try, a screen with none cut, and the ones that come and go never seen.
+     * inputs left to try, a screen with none cut, the ones that come and go never seen, and what each screen says it
+     * {@link GameScreen#owes}.
      */
     public List<String> owed() {
         List<String> owed = new ArrayList<>();
@@ -335,26 +373,72 @@ public final class ScreenGraph {
             else if (noneCut(c) && !screens.get(c).isPopup()) owed.add(name + ": no input cut yet");
             List<Input> unseen = unseen(c);
             if (!unseen.isEmpty()) owed.add(name + ": never seen to try " + labels(unseen) + " (comes and goes)");
+            for (String what : screens.get(c).owes()) owed.add(name + ": " + what);
         }
         return owed;
     }
 
     /**
      * The pictures {@code constant} names, each once by its id, in the order they are met: its marker, each input's
-     * picture and lock, its way back's. Manage Pictures groups the bot's pictures by them.
+     * picture, variants and lock, each look's marker and inputs, its way back's. Manage Pictures groups the bot's
+     * pictures by them.
      */
     public List<String> pictures(String constant) {
         GameScreen screen = screens.get(constant);
         if (screen == null) return List.of();
         Set<String> ids = new LinkedHashSet<>();
         if (screen.marker() != null) ids.add(screen.marker().id());
-        List<Input> named = new ArrayList<>(screen.inputs());
+        for (ScreenVariant look : screen.variants()) {
+            if (look.marker() != null) ids.add(look.marker().id());
+        }
+        List<Input> named = new ArrayList<>(screen.allInputs());
         if (screen.back() != null) named.add(screen.back());
         for (Input input : named) {
-            if (input.picture() != null) ids.add(input.picture().id());
+            for (Variant look : input.looks()) ids.add(look.picture().id());
             if (input.lock() != null) ids.add(input.lock().id());
         }
         return List.copyOf(ids);
+    }
+
+    /**
+     * {@code screen} with the picture {@code id} taken out: its marker or a look's, an input clicking it, a button's
+     * look, a lock, its way back. Its ways in are kept: a screen is not cut off by a picture going.
+     */
+    public static GameScreen without(GameScreen screen, String id) {
+        GameScreen now = screen;
+        if (is(now.marker(), id)) now = now.marker(null);
+        if (now.back() != null) {
+            List<Input> back = without(List.of(now.back()), id);
+            now = now.back(back.isEmpty() ? null : back.getFirst());
+        }
+        now = now.inputs(without(now.inputs(), id));
+        List<ScreenVariant> looks = new ArrayList<>();
+        for (ScreenVariant look : now.variants()) {
+            looks.add((is(look.marker(), id) ? look.marker(null) : look).inputs(without(look.inputs(), id)));
+        }
+        return now.variants(looks);
+    }
+
+    /** Whether a way into {@code screen} still clicks the picture {@code id}, by any look or lock: what keeps it. */
+    public static boolean enteredBy(GameScreen screen, String id) {
+        List<Way> ways = new ArrayList<>(screen.alsoFrom());
+        if (screen.from() != null) ways.add(screen.from());
+        return ways.stream().map(Way::via).filter(Objects::nonNull).anyMatch(via -> is(via.lock(), id)
+                || via.looks().stream().anyMatch(v -> is(v.picture(), id)));
+    }
+
+    private static List<Input> without(List<Input> inputs, String id) {
+        List<Input> kept = new ArrayList<>();
+        for (Input input : inputs) {
+            if (is(input.picture(), id)) continue;
+            Input now = input.variants(input.variants().stream().filter(v -> !is(v.picture(), id)).toList());
+            kept.add(is(now.lock(), id) ? now.locked(null) : now);
+        }
+        return kept;
+    }
+
+    private static boolean is(ImageTemplate picture, String id) {
+        return picture != null && picture.id().equals(id);
     }
 
     private static String labels(List<Input> inputs) {
@@ -363,7 +447,7 @@ public final class ScreenGraph {
 
     private List<Input> inputs(String constant) {
         GameScreen screen = screens.get(constant);
-        return screen == null ? List.of() : screen.inputs();
+        return screen == null ? List.of() : screen.allInputs();
     }
 
     private static List<Way> ways(GameScreen screen) {

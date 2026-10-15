@@ -13,7 +13,6 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Spot;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
@@ -163,16 +162,9 @@ public final class SdkTypes {
             .writtenAsRecord();
 
     /**
-     * A named spot of the game, in the bot's pixels: {@code new Spot(412, 230)}, and {@code .anchored(Anchor.…)}
-     * only when it stays with another part of the screen than its centre (2026-10-11).
+     * A named area of the game, in the bot's pixels: {@code new Zone(10, 20, 200, 120)}, and
+     * {@code .anchored(Anchor.…)} only when it stays with another part of the screen than its centre (2026-10-11).
      */
-    public static final DeclaredCallType<Spot> SPOT = PluginType.value(Spot.class)
-            .fresh(() -> new Spot(0, 0))
-            .editor(() -> GeometryEditors::spot)
-            .writtenAs(Spot::new, Spot::x, Spot::y)
-            .with(Spot::anchored, Spot::anchor);
-
-    /** A named area of the game, in the bot's pixels, written as {@link #SPOT} is. */
     public static final DeclaredCallType<Zone> ZONE = PluginType.value(Zone.class)
             .fresh(() -> new Zone(0, 0, 0, 0))
             .editor(() -> GeometryEditors::zone)
@@ -330,7 +322,7 @@ public final class SdkTypes {
      */
     public static final List<PluginType<?>> ALL = List.of(
             IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET,
-            POINT, RECT, SIZE, SPOT, ZONE,
+            POINT, RECT, SIZE, ZONE,
             KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE,
             CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER,
             ACTIVITY, OUTCOME,
