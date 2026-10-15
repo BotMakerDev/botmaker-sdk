@@ -63,7 +63,7 @@ final class Frames {
     }
 
     static String noScreen() {
-        return "The screen the bot watches cannot be captured — set_capture_source names a window.";
+        return "The screen the bot watches cannot be captured — setup's set_capture_source names a window.";
     }
 
     static String noProject() {

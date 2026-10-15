@@ -23,9 +23,10 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * How long one assistant tool call took, and where the time went. Every SDK tool's reply ends with a line saying it
- * ("Took 18.6 s: matching 9.2, reading text 5.0, settling 4.1."), so a slow tool shows itself on every call and
- * the next session knows which part to make faster.
+ * How long one assistant tool call took, and where the time went. An SDK tool's reply that took
+ * {@link #SAID_NANOS} or more ends with a line saying it ("Took 18.6 s: matching 9.2, reading text 5.0, settling
+ * 4.1."), so a slow tool shows itself and the next session knows which part to make faster; every call is a row of
+ * {@link #FILE}.
  *
  * <p>A call's parts are timed on the thread that runs it, at the few places all of them go through:
  * {@link Frames#look} (capturing), {@link ActTools#ambient} (watching motion: the screen read before acting, to
@@ -66,6 +67,11 @@ final class ToolTiming {
     private static final ThreadLocal<ToolTiming> CURRENT = new ThreadLocal<>();
     /** A part shorter than this is not named: noise beside the call's total. */
     private static final long SHOWN_NANOS = 50_000_000L;
+    /**
+     * A call quicker than this answers without its line: the line is paid on every reply, and {@link #FILE} keeps
+     * every call's times anyway (2026-10-15).
+     */
+    static final long SAID_NANOS = 3_000_000_000L;
 
     private final long[] spent = new long[Phase.values().length];
     private boolean inside;
@@ -84,24 +90,37 @@ final class ToolTiming {
                         () -> tool.invoke(arguments(params), context)));
     }
 
-    /** An action tool ({@link AssistantTool.Taking#takesOneOf}), each call timed as {@link #timed} times one. */
+    /**
+     * An action tool ({@link AssistantTool.Taking#takesOneOf}), each call timed as {@link #timed} times one, its row
+     * of {@link #FILE} named by the tool and the action ("edit_pictures replace"): one action may be slow where the
+     * others are not.
+     */
     static <S> AssistantTool<AssistantTool.OneOf<S>> actions(String name, String description, Class<S> actions,
                                                             AssistantTool.ActionHandler<S> handler) {
         return AssistantTool.named(name).describedAs(description).takesOneOf(actions).handledBy(
-                (action, context) -> time(name, projectOf(context), () -> handler.handle(action, context)));
+                (action, context) -> time(name + " " + actionId(action), projectOf(context),
+                        () -> handler.handle(action, context)));
+    }
+
+    /** The action's id as the wire names it: its record's simple name in snake_case, SetFlowMethod set_flow_method. */
+    static String actionId(Object action) {
+        return action.getClass().getSimpleName().replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(Locale.ROOT);
     }
 
     private static Path projectOf(AgentContext context) {
         return context == null || context.services() == null ? null : context.services().projectDir();
     }
 
-    /** Runs {@code call} and adds the line saying how long it took and on what. */
-    static AgentReply time(Supplier<AgentReply> call) {
-        return time(null, null, call);
+    /**
+     * Runs {@code call}, a row of {@code project}'s {@link #FILE} for {@code tool} when both are given, and adds the
+     * line saying how long it took and on what when that was {@link #SAID_NANOS} or more.
+     */
+    static AgentReply time(String tool, Path project, Supplier<AgentReply> call) {
+        return time(tool, project, SAID_NANOS, call);
     }
 
-    /** As {@link #time(Supplier)}, and a row of {@code project}'s {@link #FILE} for {@code tool}, when both are given. */
-    static AgentReply time(String tool, Path project, Supplier<AgentReply> call) {
+    /** As {@link #time(String, Path, Supplier)}, the line added to a call that took {@code saidNanos} or more. */
+    static AgentReply time(String tool, Path project, long saidNanos, Supplier<AgentReply> call) {
         if (CURRENT.get() != null) return call.get();
         ToolTiming timing = new ToolTiming();
         CURRENT.set(timing);
@@ -111,6 +130,7 @@ final class ToolTiming {
             AgentReply reply = call.get();
             long total = System.nanoTime() - start;
             if (tool != null && project != null) timing.write(project.resolve(FILE), tool, started, total);
+            if (total < saidNanos) return reply;
             // On a line of its own: a client may run the reply's text parts together.
             return reply.and(AgentReply.text("\n" + timing.line(total)));
         } finally {

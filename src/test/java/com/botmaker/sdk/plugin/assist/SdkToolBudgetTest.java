@@ -29,7 +29,8 @@ class SdkToolBudgetTest {
     /**
      * Characters, the tools and the guide together; about four to a token. 44,939 on 2026-10-15, before the tools
      * were typed and merged; 44,060 once typed, measured with the nested schema Studio writes (crop_pictures takes
-     * boxes, try_input inputs, edit_map one of its actions), 61 tools where there were 63.
+     * boxes, try_input inputs, edit_map one of its actions), 61 tools where there were 63; 39,778 once the flow,
+     * picture, tag and setup tools were merged, 37 tools.
      */
     static final int CEILING = 45_000;
 

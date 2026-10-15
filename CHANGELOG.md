@@ -32,6 +32,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - `edit_map` takes one action and only that action's fields; `did` and `kind` are choices.
   - `kind`, a look's `state` and `write_notes`' `reached` are choices too.
 
+- **Fewer assistant tools, each taking an action**: 37 where there were 63, about 10% fewer characters for a client
+  that loads every schema on every request.
+  - `edit_flow` makes every flow change: `add_activity`, `set_activity`, `rename_activity`, `remove_activity`,
+    `connect`, `disconnect`, `set_start`, `add_subflow`, `add_flow`, `rename_flow`, `remove_flow` and
+    `set_flow_method`, each once its own tool. `read_flow` stays.
+  - `edit_pictures` renames, deletes, re-cuts (`replace`, its `ignore` part an object as `crop_pictures`') and tags
+    pictures (`tag`, `untag`, `set_tags`); `edit_tags` declares, renames and deletes a custom tag.
+  - `setup` reads where the bot looks, what it launches and its settings in one answer, and sets each
+    (`set_capture_source`, `set_setting`, `use_emulator`, `set_launch_target`).
+  - A reply says how long its call took only when that was 3 s or more; `tool-times.tsv` still keeps every call.
+
 - **edit_map: the assistant fixes the map by hand**, as 🗺 Screens' menus do and by the same code, clicking
   nothing. One tool, an action per edit: `rename`, `delete`, `popup`, `set_input` (its result, kind, never, lock,
   coming and going), `reset_input`, `remove_input`, `use_as_back`, `remove_back`, `remove_way`, `way_when`,

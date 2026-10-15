@@ -59,7 +59,7 @@ import java.util.stream.Stream;
  * The assistant's pictures and places: each picture a {@code Pictures} constant, each named area a {@code Zones}
  * constant and each game font's digits a {@code Digits}
  * constant, written through the host as the
- * SDK's own windows write them. A box is in the pixels of the last screenshot, as {@code crop_picture}'s is; a
+ * SDK's own windows write them. A box is in the pixels of the last screenshot, as {@code crop_pictures}' is; a
  * place is written in the bot's pixels, which the screenshot's are once the game shows the bot's screen size.
  */
 final class PictureTools {
@@ -100,6 +100,10 @@ final class PictureTools {
                 @Describe("top edge, in the screenshot's pixels") int y,
                 @Describe("width in pixels") int width,
                 @Describe("height in pixels") int height) {
+
+        Rect rect() {
+            return new Rect(x, y, width, height);
+        }
     }
 
     record Box(@Describe("the picture's name, lowercase with underscores: collect_button") String name,
@@ -147,41 +151,48 @@ final class PictureTools {
     record PictureName(@Describe("a picture's name, as list_pictures gives it") String picture) {
     }
 
-    record Rename(@Describe("the picture's name now") String picture,
-                  @Describe("its new name, lowercase with underscores") String to) {
+    /** One edit of the bot's pictures, as 🖼 Manage Pictures makes it. */
+    sealed interface Edit {
     }
 
-    record Delete(@Describe("the picture's name") String picture,
-                  @Describe(value = "another picture its uses should look for instead, when it is still used",
-                          optional = true) String pointUsesAt) {
+    @Describe("rename a picture's file, its constant and every use of it together")
+    record Rename(@Describe("the picture's name, as list_pictures gives it") String picture,
+                  @Describe("its new name, lowercase with underscores") String to) implements Edit {
     }
 
-    record Replace(@Describe("the picture's name") String picture,
-                   @Describe("left edge of its new image, in the last screenshot's pixels") int x,
+    @Describe("delete a picture and its constant. One only the bot's Screens use leaves them with it (unless a way "
+            + "into a screen needs it); one still in use is refused with where, unless pointUsesAt")
+    record Delete(String picture,
+                  @Describe(value = "another picture its uses, the map's too, look for instead", optional = true)
+                  String pointUsesAt) implements Edit {
+    }
+
+    @Describe("give a picture a new image cut from the last screenshot, keeping its name and every use")
+    record Replace(String picture,
+                   @Describe("left edge of the new image, in the last screenshot's pixels") int x,
                    @Describe("top edge") int y,
                    @Describe("width in pixels") int width,
                    @Describe("height in pixels") int height,
-                   @Describe(value = IGNORE_X, optional = true) Integer ignoreX,
-                   @Describe(value = "top edge of the part to skip", optional = true) Integer ignoreY,
-                   @Describe(value = "width of the part to skip", optional = true) Integer ignoreWidth,
-                   @Describe(value = "height of the part to skip", optional = true) Integer ignoreHeight) {
+                   @Describe(value = IGNORE, optional = true) Skip ignore) implements Edit {
+    }
 
-        /** The part to skip, when all four of its edges are given. */
-        Optional<Rect> ignore() {
-            return PictureTools.ignore(ignoreX, ignoreY, ignoreWidth, ignoreHeight);
-        }
+    @Describe("add a declared tag to pictures, keeping the tags they have")
+    record Tag(@Describe("a declared tag, as list_tags names it") String tag,
+               @Describe("the pictures' names") List<String> pictures) implements Edit {
+    }
+
+    @Describe("take a tag off pictures; the tag stays declared")
+    record Untag(String tag, List<String> pictures) implements Edit {
+    }
+
+    @Describe("give one picture exactly these tags, replacing the ones it has")
+    record SetTags(String picture,
+                   @Describe("every tag it should carry, each declared; empty leaves it untagged") List<String> tags)
+            implements Edit {
     }
 
     private static final String IGNORE = "a part inside the box a run skips (a timer's digits, a count that "
             + "differs from copy to copy)";
-    private static final String IGNORE_X = "left edge of a part inside the box a run skips (a timer's digits, a "
-            + "count that differs from copy to copy), in the screenshot's pixels; with ignoreY, ignoreWidth and "
-            + "ignoreHeight";
-
-    private static Optional<Rect> ignore(Integer x, Integer y, Integer width, Integer height) {
-        if (x == null || y == null || width == null || height == null) return Optional.empty();
-        return Optional.of(new Rect(x, y, width, height));
-    }
 
     record NamedRegion(@Describe("the area's name: bag") String name,
                        @Describe("left edge, in the screenshot's pixels") int x,
@@ -217,20 +228,8 @@ final class PictureTools {
             AssistantTool.named("show_picture")
                     .describedAs("A picture's image, its size, its constant and how many places use it")
                     .takes(PictureName.class).handledBy(PictureTools::showPicture),
-            AssistantTool.named("rename_picture")
-                    .describedAs("Renames a picture's file, its constant and every use of it together, as "
-                            + "🖼 Manage Pictures does")
-                    .takes(Rename.class).handledBy(PictureTools::renamePicture),
-            AssistantTool.named("delete_picture")
-                    .describedAs("Deletes a picture and its constant. One only the bot's Screens use leaves the "
-                            + "screens with it (unless a way into a screen needs it). One still in use is refused "
-                            + "with where, unless pointUsesAt names another picture its uses, the map's too, look "
-                            + "for instead")
-                    .takes(Delete.class).handledBy(PictureTools::deletePicture),
-            AssistantTool.named("replace_picture")
-                    .describedAs("Gives a picture a new image cut from the last screenshot, keeping its name and "
-                            + "every use; a part given to ignore is left out of matching, as crop_pictures'")
-                    .takes(Replace.class).handledBy(PictureTools::replacePicture),
+            ToolTiming.actions("edit_pictures", "Renames, deletes, re-cuts or tags the bot's pictures, as 🖼 Manage "
+                    + "Pictures does", Edit.class, PictureTools::edit),
             AssistantTool.named("save_region")
                     .describedAs("Names an area of the game as a Zones constant, in the bot's pixels, for a block to "
                             + "narrow a search to with .region(Zones.…), wherever the window sits and at any size")
@@ -375,8 +374,7 @@ final class PictureTools {
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
         Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), null,
                 new Area(crop.x(), crop.y(), crop.width(), crop.height()))
-                .map(piece -> crop.ignore() == null ? piece : PictureCuts.masked(piece, new Rect(crop.ignore().x(),
-                        crop.ignore().y(), crop.ignore().width(), crop.ignore().height())));
+                .map(piece -> crop.ignore() == null ? piece : PictureCuts.masked(piece, crop.ignore().rect()));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
         List<String> typed = crop.tags() == null ? List.of() : crop.tags();
@@ -384,7 +382,7 @@ final class PictureTools {
         Optional<String> undeclared = typed.stream().filter(t -> !catalog.isDeclared(t)).findFirst();
         if (undeclared.isPresent()) {
             return AgentReply.refused("No tag called \"" + undeclared.get() + "\"; list_tags names them and "
-                    + "declare_tag makes one. Nothing was saved.");
+                    + "edit_tags' declare makes one. Nothing was saved.");
         }
         List<String> tags = catalog == null ? List.of() : catalog.declaredOnly(typed);
         boolean marker = Boolean.TRUE.equals(crop.marker());
@@ -510,6 +508,17 @@ final class PictureTools {
                 .and(AgentReply.image(image));
     }
 
+    static AgentReply edit(Edit edit, AgentContext context) {
+        return switch (edit) {
+            case Rename rename -> renamePicture(rename, context);
+            case Delete delete -> deletePicture(delete, context);
+            case Replace replace -> replacePicture(replace, context);
+            case Tag tag -> TagTools.onPictures(tag.tag(), tag.pictures(), context, true);
+            case Untag untag -> TagTools.onPictures(untag.tag(), untag.pictures(), context, false);
+            case SetTags set -> TagTools.setTags(set.picture(), set.tags(), context);
+        };
+    }
+
     static AgentReply renamePicture(Rename rename, AgentContext context) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
@@ -535,7 +544,7 @@ final class PictureTools {
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
         Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), null,
                 new Area(replace.x(), replace.y(), replace.width(), replace.height()))
-                .map(piece -> replace.ignore().map(part -> PictureCuts.masked(piece, part)).orElse(piece));
+                .map(piece -> replace.ignore() == null ? piece : PictureCuts.masked(piece, replace.ignore().rect()));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
         Optional<String> moving = moving(context, frame.get(), new Rect(replace.x(), replace.y(), replace.width(),

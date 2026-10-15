@@ -18,26 +18,28 @@ import java.util.Optional;
 
 /**
  * The assistant's picture tags, each edit the one 🖼 Manage Pictures and its tag manager make: a picture tagged,
- * untagged or given its whole set, a custom tag declared, renamed or deleted. A tag is offered from the
- * project's catalog and nothing else — an activity's own tag and the custom ones — so a typo is refused with the
- * names there are rather than becoming a group. An activity's tag follows its activity: it is not renamed or
- * deleted here.
+ * untagged or given its whole set (edit_pictures' tag, untag and set_tags), a custom tag declared, renamed or deleted
+ * (edit_tags). A tag is offered from the project's catalog and nothing else — an activity's own tag and the custom
+ * ones — so a typo is refused with the names there are rather than becoming a group. An activity's tag follows its
+ * activity: it is not renamed or deleted here.
  */
 final class TagTools {
 
-    record Tagging(@Describe("a declared tag, as list_tags names it") String tag,
-                   @Describe("the pictures' names, as list_pictures gives them") List<String> pictures) {
+    /** One edit of the project's custom tags. */
+    sealed interface Edit {
     }
 
-    record SetTags(@Describe("a picture's name, as list_pictures gives it") String picture,
-                   @Describe("every tag it should carry, each declared; empty leaves it untagged") List<String> tags) {
+    @Describe("declare a custom tag, for grouping pictures no activity owns (home, popups)")
+    record Declare(@Describe("the tag: a label, spaces allowed; rename and delete take a custom one, as list_tags "
+            + "names it") String tag) implements Edit {
     }
 
-    record TagName(@Describe("the tag's name: a label, spaces allowed") String tag) {
+    @Describe("rename a custom tag; the pictures carrying it follow")
+    record Rename(String tag, @Describe("its new name") String to) implements Edit {
     }
 
-    record RenameTag(@Describe("a custom tag, as list_tags names it") String tag,
-                     @Describe("its new name") String to) {
+    @Describe("delete a custom tag and take it off every picture; the pictures stay")
+    record Delete(String tag) implements Edit {
     }
 
     static final List<AssistantTool<?>> TOOLS = List.of(
@@ -45,26 +47,18 @@ final class TagTools {
                     .describedAs("The project's picture tags, an activity's own first, then the custom ones, each "
                             + "with the pictures it groups, then the untagged pictures")
                     .takesNothing().handledBy(TagTools::listTags),
-            AssistantTool.named("tag_pictures")
-                    .describedAs("Adds a declared tag to pictures, keeping the tags they have")
-                    .takes(Tagging.class).handledBy(TagTools::tagPictures),
-            AssistantTool.named("untag_pictures")
-                    .describedAs("Takes a tag off pictures; the tag stays declared")
-                    .takes(Tagging.class).handledBy(TagTools::untagPictures),
-            AssistantTool.named("set_tags")
-                    .describedAs("Gives one picture exactly these tags, replacing the ones it has")
-                    .takes(SetTags.class).handledBy(TagTools::setTags),
-            AssistantTool.named("declare_tag")
-                    .describedAs("Declares a custom tag, for grouping pictures that no activity owns (home, popups)")
-                    .takes(TagName.class).handledBy(TagTools::declareTag),
-            AssistantTool.named("rename_tag")
-                    .describedAs("Renames a custom tag; the pictures carrying it follow")
-                    .takes(RenameTag.class).handledBy(TagTools::renameTag),
-            AssistantTool.named("delete_tag")
-                    .describedAs("Deletes a custom tag and takes it off every picture; the pictures stay")
-                    .takes(TagName.class).handledBy(TagTools::deleteTag));
+            ToolTiming.actions("edit_tags", "Declares, renames or deletes a custom picture tag, as 🖼 Manage "
+                    + "Pictures' tag manager does", Edit.class, TagTools::edit));
 
     private TagTools() {}
+
+    static AgentReply edit(Edit edit, AgentContext context) {
+        return switch (edit) {
+            case Declare declare -> declareTag(declare, context);
+            case Rename rename -> renameTag(rename, context);
+            case Delete delete -> deleteTag(delete, context);
+        };
+    }
 
     static AgentReply listTags(AssistantTool.None none, AgentContext context) {
         Optional<Path> resources = Frames.resources(context);
@@ -77,27 +71,20 @@ final class TagTools {
             lines.add(tag.name() + (tag.isManaged() ? " (activity)" : "") + ": "
                     + names(grouped.getOrDefault(tag.name(), List.of())));
         }
-        if (lines.isEmpty()) lines.add("No tags yet: declare_tag makes one, and each activity has its own.");
+        if (lines.isEmpty()) lines.add("No tags yet: edit_tags' declare makes one, and each activity has its own.");
         List<Path> untagged = grouped.getOrDefault(TemplateManifest.UNTAGGED, List.of());
         if (!untagged.isEmpty()) lines.add("untagged: " + names(untagged));
         return AgentReply.text(String.join("\n", lines));
     }
 
-    static AgentReply tagPictures(Tagging tagging, AgentContext context) {
-        return onPictures(tagging, context, true);
-    }
-
-    static AgentReply untagPictures(Tagging tagging, AgentContext context) {
-        return onPictures(tagging, context, false);
-    }
-
-    private static AgentReply onPictures(Tagging tagging, AgentContext context, boolean add) {
+    /** {@code typed} pictures given the declared tag {@code typedTag}, or ({@code add} false) it taken off them. */
+    static AgentReply onPictures(String typedTag, List<String> typed, AgentContext context, boolean add) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         TagCatalog catalog = FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
-        TagCatalog.Tag tag = catalog.find(tagging.tag());
-        if (tag == null) return AgentReply.refused(undeclared(tagging.tag(), catalog));
-        Picked picked = pictures(resources.get(), tagging.pictures());
+        TagCatalog.Tag tag = catalog.find(typedTag);
+        if (tag == null) return AgentReply.refused(undeclared(typedTag, catalog));
+        Picked picked = pictures(resources.get(), typed);
         if (picked.refusal() != null) return AgentReply.refused(picked.refusal());
         if (add) {
             List<String> refused = FxCall.call(() -> TemplateLibrary.addTag(context.services(), picked.names(),
@@ -114,13 +101,14 @@ final class TagTools {
         return AgentReply.text("Took " + tag.name() + " off " + String.join(", ", had) + ".");
     }
 
-    static AgentReply setTags(SetTags set, AgentContext context) {
+    /** {@code picture} given exactly {@code typedTags}, each declared. */
+    static AgentReply setTags(String picture, List<String> typedTags, AgentContext context) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
-        Optional<String> base = Frames.picture(resources.get(), set.picture());
-        if (base.isEmpty()) return AgentReply.refused(Frames.noPicture(set.picture()));
+        Optional<String> base = Frames.picture(resources.get(), picture);
+        if (base.isEmpty()) return AgentReply.refused(Frames.noPicture(picture));
         TagCatalog catalog = FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
-        List<String> tags = set.tags() == null ? List.of() : set.tags();
+        List<String> tags = typedTags == null ? List.of() : typedTags;
         for (String tag : tags) {
             if (!catalog.isDeclared(tag)) return AgentReply.refused(undeclared(tag, catalog));
         }
@@ -132,19 +120,19 @@ final class TagTools {
                 + "."));
     }
 
-    static AgentReply declareTag(TagName name, AgentContext context) {
+    static AgentReply declareTag(Declare declare, AgentContext context) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
-        String tag = TemplateManifest.sanitizeTag(name.tag());
+        String tag = TemplateManifest.sanitizeTag(declare.tag());
         TagCatalog catalog = FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
         String problem = catalog.nameProblem(tag, null);
         if (problem != null) return AgentReply.refused(problem);
         Optional<String> refused = FxCall.call(() -> PictureTags.declare(context.services(), tag));
         if (refused.isPresent()) return AgentReply.refused(refused.get());
-        return AgentReply.text("Declared " + tag + " in Tags; tag_pictures puts it on pictures.");
+        return AgentReply.text("Declared " + tag + " in Tags; edit_pictures' tag puts it on pictures.");
     }
 
-    static AgentReply renameTag(RenameTag rename, AgentContext context) {
+    static AgentReply renameTag(Rename rename, AgentContext context) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         TagCatalog catalog = FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
@@ -161,12 +149,12 @@ final class TagTools {
         return AgentReply.text("Renamed " + tag.name() + " to " + to + ".");
     }
 
-    static AgentReply deleteTag(TagName name, AgentContext context) {
+    static AgentReply deleteTag(Delete delete, AgentContext context) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         TagCatalog catalog = FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
-        TagCatalog.Tag tag = catalog.find(name.tag());
-        if (tag == null) return AgentReply.refused(undeclared(name.tag(), catalog));
+        TagCatalog.Tag tag = catalog.find(delete.tag());
+        if (tag == null) return AgentReply.refused(undeclared(delete.tag(), catalog));
         if (tag.isManaged()) {
             return AgentReply.refused(tag.name() + " belongs to its activity: remove the activity to remove it.");
         }
@@ -191,8 +179,8 @@ final class TagTools {
     }
 
     private static String undeclared(String tag, TagCatalog catalog) {
-        return "No tag called \"" + tag + "\"" + (catalog.names().isEmpty() ? "; declare_tag makes one."
-                : "; there are " + String.join(", ", catalog.names()) + ", and declare_tag makes another.");
+        return "No tag called \"" + tag + "\"" + (catalog.names().isEmpty() ? "; edit_tags' declare makes one."
+                : "; there are " + String.join(", ", catalog.names()) + ", and edit_tags' declare makes another.");
     }
 
     /** {@code a, b} by base name, or {@code none}. */

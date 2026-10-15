@@ -134,21 +134,35 @@ final class SetupTools {
         }
     }
 
-    record WindowTitle(@Describe("the window's title, as list_windows gives it") String window) {
+    /** One of setup's actions: the bot's setup read, or one part of it set. Nothing starts. */
+    sealed interface Step {
     }
 
-    record SetSetting(@Describe("which setting; get_settings lists them") Setting setting,
+    @Describe("where the bot looks and clicks, what this computer launches, and the bot's own settings")
+    record Read() implements Step {
+    }
+
+    @Describe("point the bot at an open window; it finds it again by its class (and its title when the class is "
+            + "shared), never by title alone")
+    record SetCaptureSource(@Describe("the window's title, as list_windows gives it") String window) implements Step {
+    }
+
+    @Describe("change one of the bot's own settings in Sdk.settings(), as ⚙ Bot Settings does")
+    record SetSetting(@Describe("which setting; read lists them") Setting setting,
                       @Describe("its new value: a number, true or false, or a place's or backend's id")
-                      String value) {
+                      String value) implements Step {
     }
 
+    @Describe("point the bot at an emulator, and with app make this computer launch that app on it")
     record UseEmulator(@Describe("the emulator's name, as list_emulators gives it") String name,
-                       @Describe(value = "an app's package on it, com.example.game; this computer then launches it",
-                               optional = true) String app) {
+                       @Describe(value = "an app's package on it, com.example.game", optional = true) String app)
+            implements Step {
     }
 
-    record Target(@Describe("what to launch: steam:<appId>, epic:<appName>, heroic:<appName>, faugus:<gameId> or "
-            + "emu-app:<package>@<emulator>; a command line or an executable is the user's to set") String target) {
+    @Describe("make a launcher the bot's first in Sdk.launchTargets: each computer starts the first its system can")
+    record SetLaunchTarget(@Describe("what to launch: steam:<appId>, epic:<appName>, heroic:<appName>, "
+            + "faugus:<gameId> or emu-app:<package>@<emulator>; a command line or an executable is the user's to set")
+                           String target) implements Step {
     }
 
     record Launch(@Describe(value = "seconds to wait for the window the bot looks at to open, up to "
@@ -159,41 +173,18 @@ final class SetupTools {
     static final int MAX_LAUNCH_WAIT = 50;
 
     static final List<AssistantTool<?>> TOOLS = List.of(
-            AssistantTool.named("get_capture_source")
-                    .describedAs("Where the bot looks and clicks: Sdk.captureSource, in words")
-                    .takesNothing().handledBy(SetupTools::getCaptureSource),
-            AssistantTool.named("set_capture_source")
-                    .describedAs("Points the bot at an open window, so it looks at and clicks in that window; the bot "
-                            + "finds it again by its class (and its title when the class is shared), never by title alone")
-                    .takes(WindowTitle.class).handledBy(SetupTools::setCaptureSource),
+            ToolTiming.actions("setup", "Reads or sets where the bot looks, what it launches and its own settings, "
+                    + "all in the bot's Java; starts nothing", Step.class, SetupTools::setup),
             AssistantTool.named("list_windows")
                     .describedAs("The windows open on the desktop now, each with its class and size, for "
-                            + "set_capture_source")
+                            + "setup's set_capture_source")
                     .takesNothing().handledBy(SetupTools::listWindows),
-            AssistantTool.named("get_settings")
-                    .describedAs("The bot's own settings, Sdk.settings(): its pauses, match confidence, input and "
-                            + "private display")
-                    .takesNothing().handledBy(SetupTools::getSettings),
-            AssistantTool.named("set_setting")
-                    .describedAs("Changes one of the bot's own settings in Sdk.settings(), as ⚙ Bot Settings does")
-                    .takes(SetSetting.class).handledBy(SetupTools::setSetting),
             AssistantTool.named("list_emulators")
                     .describedAs("The Android emulators set up on this computer, each with whether it is running")
                     .takesNothing().handledBy(SetupTools::listEmulators),
-            AssistantTool.named("use_emulator")
-                    .describedAs("Points the bot at an emulator, and with an app makes this computer launch that "
-                            + "app on it. Starts nothing")
-                    .takes(UseEmulator.class).handledBy(SetupTools::useEmulator),
-            AssistantTool.named("get_launch_target")
-                    .describedAs("What this computer launches when the bot starts, if anything")
-                    .takesNothing().handledBy(SetupTools::getLaunchTarget),
-            AssistantTool.named("set_launch_target")
-                    .describedAs("Makes a launcher the bot's first in Sdk.launchTargets: each computer starts the "
-                            + "first its system can. Starts nothing")
-                    .takes(Target.class).handledBy(SetupTools::setLaunchTarget),
             AssistantTool.named("list_games")
                     .describedAs("The games this computer's launchers have installed, each with the target "
-                            + "set_launch_target takes, as the launch chooser lists them")
+                            + "setup's set_launch_target takes, as the launch chooser lists them")
                     .takesNothing().handledBy(SetupTools::listGames),
             AssistantTool.named("launch_game")
                     .describedAs("Starts the bot's launch target now, without running the bot, unless it is running "
@@ -204,13 +195,28 @@ final class SetupTools {
 
     private SetupTools() {}
 
-    static AgentReply getCaptureSource(AssistantTool.None none, AgentContext context) {
-        CaptureSource source = FxCall.call(() -> CaptureValue.current(context.services()));
-        return AgentReply.text(source == null ? "Sdk.captureSource names nothing BotMaker can read: the bot looks "
-                + "at the whole desktop, or at what the code says." : CaptureLabels.longLabel(source) + ".");
+    static AgentReply setup(Step step, AgentContext context) {
+        return switch (step) {
+            case Read read -> read(context);
+            case SetCaptureSource window -> setCaptureSource(window, context);
+            case SetSetting setting -> setSetting(setting, context);
+            case UseEmulator emulator -> useEmulator(emulator, context);
+            case SetLaunchTarget target -> setLaunchTarget(target, context);
+        };
     }
 
-    static AgentReply setCaptureSource(WindowTitle title, AgentContext context) {
+    /** The capture source, the launch target and every setting, in one answer. */
+    static AgentReply read(AgentContext context) {
+        CaptureSource source = FxCall.call(() -> CaptureValue.current(context.services()));
+        String looks = "Looks at: " + (source == null ? "nothing BotMaker can read in Sdk.captureSource: the whole "
+                + "desktop, or what the code says." : CaptureLabels.longLabel(source) + ".");
+        String current = LaunchTargetValue.current(context.services());
+        String launches = "Launches: " + (current == null ? "nothing; the bot runs against what is already open."
+                : current + " — " + LaunchSpec.describe(current) + ".");
+        return AgentReply.text(looks + "\n" + launches + "\nSettings:\n" + settings(context));
+    }
+
+    static AgentReply setCaptureSource(SetCaptureSource title, AgentContext context) {
         if (title.window() == null || title.window().isBlank()) return AgentReply.refused("Name a window.");
         Optional<CaptureSource> window = CaptureValue.windowTitled(title.window());
         if (window.isEmpty()) {
@@ -243,7 +249,8 @@ final class SetupTools {
         return AgentReply.text(lines.isEmpty() ? "No named window is open." : String.join("\n", lines));
     }
 
-    static AgentReply getSettings(AssistantTool.None none, AgentContext context) {
+    /** One line a setting, its id, value and label, then the choices the choice settings take. */
+    private static String settings(AgentContext context) {
         BotSettings settings = FxCall.call(() -> SETTINGS.read(context.services()).orElse(BotSettings.DEFAULTS));
         List<String> lines = new ArrayList<>();
         for (Setting setting : Setting.values()) {
@@ -253,7 +260,7 @@ final class SetupTools {
                 + "; input_backend one of " + ids(BotSettings.InputBackend.values(), BotSettings.InputBackend::id)
                 + "; display_backend one of " + ids(BotSettings.DisplayBackend.values(),
                 BotSettings.DisplayBackend::id) + ". take_over only applies to my-desktop.");
-        return AgentReply.text(String.join("\n", lines));
+        return String.join("\n", lines);
     }
 
     static AgentReply setSetting(SetSetting change, AgentContext context) {
@@ -326,14 +333,7 @@ final class SetupTools {
                 : ", and this computer launches " + app + " on it when the bot starts."));
     }
 
-    static AgentReply getLaunchTarget(AssistantTool.None none, AgentContext context) {
-        String current = LaunchTargetValue.current(context.services());
-        if (current == null) return AgentReply.text("This computer launches nothing for the bot: it runs against what "
-                + "is already open.");
-        return AgentReply.text(current + " — " + LaunchSpec.describe(current) + ".");
-    }
-
-    static AgentReply setLaunchTarget(Target target, AgentContext context) {
+    static AgentReply setLaunchTarget(SetLaunchTarget target, AgentContext context) {
         LaunchSpec spec = LaunchSpec.parse(target.target());
         if (spec == null || !ASSISTANT_KINDS.contains(spec.kind())) {
             return AgentReply.refused("\"" + target.target() + "\" is not a launch target the assistant may set: it "
@@ -351,7 +351,7 @@ final class SetupTools {
         List<GameCatalog.Section> sections = GameCatalog.scan();
         List<String> lines = new ArrayList<>();
         for (GameCatalog.Section section : sections) {
-            // Folded sections are every other app in the menu: not games, and set_launch_target takes no
+            // Folded sections are every other app in the menu: not games, and setup's set_launch_target takes no
             // desktop entry anyway.
             if (section.folded() || section.items().isEmpty()) continue;
             lines.add(section.title() + (section.stopped() ? " (not running)" : "") + ":");
@@ -368,18 +368,18 @@ final class SetupTools {
         StudioServices services = context.services();
         String current = FxCall.call(() -> LaunchTargetValue.current(services));
         if (current == null) {
-            return AgentReply.refused("The bot launches nothing on this computer. list_games and set_launch_target "
-                    + "pick what it starts.");
+            return AgentReply.refused("The bot launches nothing on this computer. list_games and setup's "
+                    + "set_launch_target pick what it starts.");
         }
         BotSettings settings = FxCall.call(() -> SETTINGS.read(services).orElse(BotSettings.DEFAULTS));
         if (settings.where() == BotSettings.Where.VM) {
             return AgentReply.refused("The game runs in a game VM: a run starts it there, and a game on this desktop "
-                    + "would not be the one the bot sees. run_bot launches it; set_setting run_the_game_in "
+                    + "would not be the one the bot sees. run_bot launches it; setup's set_setting run_the_game_in "
                     + "my-desktop launches it here.");
         }
         LaunchSpec spec = LaunchSpec.parse(current);
         if (spec == null) return AgentReply.refused("\"" + current + "\" is not a launch target BotMaker reads.");
-        // The same line set_launch_target draws: a command line or an executable the user set runs on their Run,
+        // The same line setup's set_launch_target draws: a command line or an executable the user set runs on their Run,
         // never because text read off a screen asked the assistant to start it now.
         String unsafe = ASSISTANT_KINDS.contains(spec.kind()) ? unsafe(spec) : spec.describe() + " is a command "
                 + "line or an executable: it starts when you run the bot, not from the assistant.";

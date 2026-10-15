@@ -23,8 +23,8 @@ final class Protocol {
     /** A stage, in the order a screen goes through them, its steps as the assistant reads them. */
     enum Stage {
         SETUP("Stage 0, Setup: the game in view and a way home", """
-                - set_launch_target and launch_game, then screenshot.
-                - Make the home method (add_method, then set_flow_method home). Its marker is a picture no other
+                - setup's set_launch_target and launch_game, then screenshot.
+                - Make the home method (add_method, then edit_flow's set_flow_method home). Its marker is a picture no other
                   screen shows (a sidebar icon shown everywhere is not one), and it stays visible under a popup.
                   untilFind(marker, action) presses Escape and gives the game the bot's patience
                   (BotSettings.patience, 3 s) to show the marker before it presses again; untilFind(marker,
@@ -32,7 +32,7 @@ final class Protocol {
                   whileFindAny(the group of close and claim buttons) clears what still covers home; each round
                   waits for what it acted on to change before it looks again. An Escape too many on home may open
                   the game's exit dialog; its close button belongs in that group.
-                - Make the popups method (set_flow_method popups): ImageFinder.whileFindAny of the close buttons
+                - Make the popups method (edit_flow's set_flow_method popups): ImageFinder.whileFindAny of the close buttons
                   of what the game opens on its own, clickLast.
                 - Done when a run started from three different screens reaches home each time.
                 - Once Discovery has mapped Home, the home method can be Navigate.to(Screens.HOME): it walks the
@@ -144,7 +144,7 @@ final class Protocol {
                 """),
         TUNING("Stage 4, Tuning: faster, once it is right", """
                 - Every click pauses the bot's found delay (500 ms unless set): once every step proves itself by
-                  a picture, set it to 150 (set_setting).
+                  a picture, set it to 150 (setup's set_setting).
                 - read_trace says where a run spends its time. Use the game's shortcuts at their widest (x50,
                   Auto), order the flow so chores on one screen run together, and let a body that reads its
                   chore's timer still running (read_text on the timer) return at once.
@@ -152,7 +152,7 @@ final class Protocol {
                 """),
         UPKEEP("Stage 5, Upkeep: when the game changes", """
                 - The bot targets the game as it is now. When a marker or an entrance stops being found, survey
-                  that screen again (stage 1), recut with replace_picture, and run its trial again.
+                  that screen again (stage 1), recut with edit_pictures' replace, and run its trial again.
                 - A screen the game renamed, moved or removed is moved on the map with edit_map (rename,
                   remove_way, new_screen, delete): the screens and inputs it still has stay as they were tried.
                 """);

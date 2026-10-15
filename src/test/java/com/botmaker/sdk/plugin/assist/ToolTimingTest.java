@@ -26,8 +26,9 @@ class ToolTimingTest {
                   @Describe(value = "z", optional = true) Double zoom) {
     }
 
+    /** A quick call answers without its time: the line is paid on every reply (2026-10-15). */
     @Test
-    void theTimedToolGetsTheParametersItWasSentAndEndsWithItsTime() {
+    void theTimedToolGetsTheParametersItWasSentAndAQuickOneNoTime() {
         AtomicReference<Sample> got = new AtomicReference<>();
         AssistantTool<Sample> tool = AssistantTool.named("sample").describedAs("a sample").takes(Sample.class)
                 .handledBy((params, context) -> {
@@ -40,23 +41,19 @@ class ToolTimingTest {
 
         assertEquals(new Sample("a", null, true, Side.RIGHT, List.of("x 1 2 3 4"), null), got.get());
         assertEquals(tool.params(), timed.params());
-        List<AgentReply.Part> parts = reply.parts();
-        assertEquals("done", parts.getFirst().text());
-        assertTrue(parts.getLast().text().matches("\nTook \\d+\\.\\d s\\."), parts.getLast().text());
+        assertEquals(List.of("done"), reply.parts().stream().map(AgentReply.Part::text).toList());
     }
 
     @Test
-    void aRefusalKeepsItsRefusalAndItsTime() {
-        AssistantTool<AssistantTool.None> tool = AssistantTool.named("no").describedAs("refuses").takesNothing()
-                .handledBy((params, context) -> AgentReply.refused("not now"));
-        AgentReply reply = ToolTiming.timed(tool).invoke(Map.of(), null);
+    void aSlowCallEndsWithItsTimeAndARefusalStaysARefusal() {
+        AgentReply reply = ToolTiming.time(null, null, 0, () -> AgentReply.refused("not now"));
         assertTrue(reply.isRefused());
-        assertTrue(reply.parts().getLast().text().startsWith("\nTook "));
+        assertTrue(reply.parts().getLast().text().matches("\nTook \\d+\\.\\d s\\."), reply.parts().getLast().text());
     }
 
     @Test
     void aPartInsideAnotherCountsTowardTheOuterOnly() {
-        AgentReply reply = ToolTiming.time(() -> ToolTiming.timed(ToolTiming.Phase.MATCH, () -> {
+        AgentReply reply = ToolTiming.time(null, null, 0, () -> ToolTiming.timed(ToolTiming.Phase.MATCH, () -> {
             pause();
             return ToolTiming.timed(ToolTiming.Phase.TEXT, () -> {
                 pause();
@@ -86,6 +83,15 @@ class ToolTimingTest {
         assertTrue(Long.parseLong(row[5]) >= 50 && Long.parseLong(row[2]) >= Long.parseLong(row[5]),
                 "settling counted, within the total: " + lines.get(1));
         assertEquals("screenshot", lines.get(2).split("\t")[1]);
+    }
+
+    /** An action is named as the wire names it, so its row in tool-times.tsv says which action was slow. */
+    @Test
+    void anActionIsNamedInSnakeCase() {
+        assertEquals("set_flow_method", ToolTiming.actionId(new SetFlowMethod()));
+    }
+
+    record SetFlowMethod() {
     }
 
     @Test

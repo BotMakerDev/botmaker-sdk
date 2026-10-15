@@ -22,7 +22,7 @@ import java.util.List;
  */
 public final class SdkAssist {
 
-    /** Every tool, by group, each reply ending with how long it took ({@link ToolTiming}). */
+    /** Every tool, by group, each timed ({@link ToolTiming}). */
     public static final List<AssistantTool<?>> ALL = join(LookTools.TOOLS, ActTools.TOOLS, PictureTools.TOOLS,
             TagTools.TOOLS, FlowTools.TOOLS, SetupTools.TOOLS, NotesTools.TOOLS, MapTools.TOOLS, MapEdits.TOOLS);
 
@@ -61,24 +61,25 @@ public final class SdkAssist {
             - Stage 5, Upkeep: a marker or an entrance stops being found; edit_map moves the map with the game.
 
             The bot's shape
-            - One activity per chore (collect the loot, claim the quests, fight the boss). add_activity adds
-              its card and its enum in Activities, whose constants are the outcomes it can report (NEXT to
-              start with; connect on an outcome it has not got yet adds it). Its work is a public static
-              body() in a class of its own, returning that enum. A body does one unit of work, returns, and
-              never loops forever: the flow repeats it.
-            - The flow (read_flow, connect, set_start, add_flow) wires each outcome to the next activity. Put
-              the order of chores there, never in a body calling another body.
+            - One activity per chore (collect the loot, claim the quests, fight the boss). edit_flow's
+              add_activity adds its card and its enum in Activities, whose constants are the outcomes it can
+              report (NEXT to start with; connect on an outcome it has not got yet adds it). Its work is a
+              public static body() in a class of its own, returning that enum. A body does one unit of work,
+              returns, and never loops forever: the flow repeats it.
+            - The flow (read_flow; edit_flow's connect, set_start, add_flow) wires each outcome to the next
+              activity. Put the order of chores there, never in a body calling another body.
             - Navigation lives in one place: the home method takes the game back to the screen every
               activity starts from, safe to call at any moment. Make it with add_method, then name it with
-              set_flow_method. An activity that needs another screen opens it from there in its own body.
+              edit_flow's set_flow_method. An activity that needs another screen opens it from there in its
+              own body.
             - Popups the game opens on its own (an offer, a mail, a level-up) are no body's business: one
-              popups method clears them, named with set_flow_method popups, and the run calls it before every
+              popups method clears them, named with edit_flow's set_flow_method popups, and the run calls it before every
               look at the screen of every activity. A body that works through a popup-shaped screen itself
               switches it off around that step with PopupGuard.enabled(false), and back on after.
             - Pictures, points and regions are the bot's constants (Pictures.CLAIM_RESEARCH): one per idea and
               place, named <idea>_<where>; the same idea on another screen is another picture. Tag each
-              picture with the activity that uses it, or a custom tag (declare_tag) for home and popups:
-              crop_pictures takes tags, list_tags shows them.
+              picture with the activity that uses it, or a custom tag (edit_tags) for home and popups:
+              crop_pictures takes tags, list_tags shows them, edit_pictures changes them.
             - A run's choices (which flow, which activity is on) are @Param fields, never run properties.
             """;
 
