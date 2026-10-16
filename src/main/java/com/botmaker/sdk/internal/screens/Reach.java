@@ -54,6 +54,18 @@ public interface Reach {
         return pictures.stream().map(picture -> find(picture, frame)).toList();
     }
 
+    /** How far from its cut place a marker is looked for, in the frame's pixels: a title moves a few pixels at most. */
+    int MARKER_MARGIN = 60;
+
+    /**
+     * {@link #findEach}, each picture looked for only within {@link #MARKER_MARGIN} of its place (anywhere when it has
+     * none): what tells a screen sits where it was cut. A look for every marker over the whole frame took Firestone's
+     * walk 11 s at each poll (2026-10-16).
+     */
+    default List<Optional<Rect>> findEachNear(List<ImageTemplate> pictures, BufferedImage frame) {
+        return findEach(pictures, frame);
+    }
+
     void click(Point at);
 
     void key(Key key);

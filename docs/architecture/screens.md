@@ -40,7 +40,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   or help, rules, a leaderboard by name) or a way in that comes and goes last; `untried` lists information inputs
   last. Popups are never gone to.
 - **`ScreenWalk`** finds where the game is (`whereOn`: a screen opened from another, by any way in, hides it; of two
-  shown that neither hides, the one told by more markers wins) and
+  shown that neither hides, the one told by more markers wins; the screens one step from where the game was first,
+  every screen only when none of them shows; markers looked for near their cut place, `Reach.findEachNear`) and
   walks one edge at a time: do the input, wait up to `STEP_MS` (10 s) for the next marker, close a popup that
   shows, plan again from where a stray step landed. A way back is done once the left screen's marker is gone,
   wherever it lands. Ends: ARRIVED, NOT_NOW, LOCKED, MISSING (the map names a picture the game no longer shows:
@@ -62,6 +63,7 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `ScreenList.SCROLLS` each way. After each scroll the list is looked at until two looks agree (`Reach.settled`, up
   to `SCROLL_SETTLE_MAX_MS`; members still where they were are watched to the limit, as a game may glide late); a
   scroll after which every member that shows sits where it was (`Reach.still`, 4 px) met the end and turns back once.
+  A walk plans with a list member that comes and goes, out of view, only when no other way is open.
 - **Telemetry**: Navigate fires `on screen <CONSTANT>` (`ScreenStep`); the run bar and 🗺 Screens show its name.
 
 ## The assistant's tools (`plugin/assist`)

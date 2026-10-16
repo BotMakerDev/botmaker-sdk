@@ -3,6 +3,7 @@ package com.botmaker.sdk.api.capture;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.capture.Desktop;
+import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.SessionSource;
 import com.botmaker.sdk.internal.session.BotSession;
 import com.botmaker.session.DesktopSession;
@@ -39,7 +40,28 @@ public final class Source {
      */
     private static volatile boolean pinned;
 
+    /** How long whether the pinned window is open is trusted: each check lists the display's windows. */
+    private static final long WINDOW_CHECK_MS = 1_000;
+
+    private static volatile long lackedAt;
+    private static volatile boolean lacked;
+
     private Source() {}
+
+    /** Whether the private display lacks {@code named}, checked at most once a {@link #WINDOW_CHECK_MS}; said on a change. */
+    private static boolean lacks(NamedWindow named) {
+        long now = System.currentTimeMillis();
+        if (now - lackedAt >= WINDOW_CHECK_MS) {
+            boolean lacking = !named.isPresent();
+            if (lackedAt == 0 || lacking != lacked) {
+                Debug.log(named + (lacking ? " is not in the private display: its game window is captured"
+                        : " is in the private display: captured"));
+            }
+            lacked = lacking;
+            lackedAt = now;
+        }
+        return lacked;
+    }
 
     /**
      * The current global capture source. When a bot drives a private {@link DesktopSession} (a nested
@@ -48,8 +70,14 @@ public final class Source {
      * lazily to the whole {@link Desktop}. Never {@code null}.
      */
     public static CaptureSource current() {
+        DesktopSession session = BotSession.get();
+        if (pinned && session != null && session.x11Capturable() && current instanceof NamedWindow named
+                && lacks(named)) {
+            // The window the bot names is not in the private display it runs in: gamescope's own window, named
+            // on the desktop, is the display itself there. The display's game window is the one meant.
+            return new SessionSource(session);
+        }
         if (!pinned) {
-            DesktopSession session = BotSession.get();
             // A session whose pixels are not on X11 (gamescope hosting a Wayland-only client such as Waydroid)
             // would hand back a valid frame of an empty root — black, no error, and every find silently missing.
             // Falling through to the project default reaches the source that *can* see those pixels, which for a
@@ -77,6 +105,7 @@ public final class Source {
      * is running, else the whole {@link Desktop}.
      */
     public static void set(CaptureSource source) {
+        lackedAt = 0;
         if (source == null) {
             pinned = false;
             current = resolveDefault();

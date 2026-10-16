@@ -42,8 +42,17 @@ public final class RunReach implements Reach {
     /** One frame read into the matcher once for all of {@code pictures}: a walk looks for every marker at each poll. */
     @Override
     public List<Optional<Rect>> findEach(List<ImageTemplate> pictures, BufferedImage frame) {
+        return cleared(ImageFinder.bestMatches(pictures, new StillSource(frame)));
+    }
+
+    @Override
+    public List<Optional<Rect>> findEachNear(List<ImageTemplate> pictures, BufferedImage frame) {
+        return cleared(ImageFinder.bestMatchesNear(pictures, MARKER_MARGIN, new StillSource(frame)));
+    }
+
+    private static List<Optional<Rect>> cleared(List<MatchResult> bests) {
         double needs = BotSettings.current().confidence();
-        return ImageFinder.bestMatches(pictures, new StillSource(frame)).stream()
+        return bests.stream()
                 .map(best -> best.isFound() && best.confidence() >= needs ? Optional.of(best.rect()) : Optional.<Rect>empty())
                 .toList();
     }

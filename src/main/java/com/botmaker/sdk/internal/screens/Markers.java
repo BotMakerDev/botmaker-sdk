@@ -81,15 +81,28 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent) {
 
     /**
      * For each of {@code sets}, whether {@code frame} shows it: every picture of them looked for once, all on that one
-     * frame ({@link Reach#findEach}), so a picture shared by several sets costs one match.
+     * frame, so a picture shared by several sets costs one match. A marker is looked for near its place
+     * ({@link Reach#findEachNear}); an absent picture anywhere, as one shown elsewhere still tells the screens apart.
      */
     public static List<Boolean> onEach(Reach reach, List<Markers> sets, BufferedImage frame) {
-        Map<String, ImageTemplate> pictures = new LinkedHashMap<>();
-        for (Markers set : sets) for (ImageTemplate p : set.pictures()) pictures.putIfAbsent(p.id(), p);
+        Map<String, ImageTemplate> markers = new LinkedHashMap<>();
+        Map<String, ImageTemplate> absents = new LinkedHashMap<>();
+        for (Markers set : sets) {
+            for (ImageTemplate p : set.shown) markers.putIfAbsent(p.id(), p);
+            for (ImageTemplate p : set.absent) absents.putIfAbsent(p.id(), p);
+        }
+        Map<String, Boolean> shownNear = seen(markers, reach.findEachNear(List.copyOf(markers.values()), frame));
+        Map<String, Boolean> anywhere = absents.isEmpty() ? Map.of()
+                : seen(absents, reach.findEach(List.copyOf(absents.values()), frame));
+        return sets.stream().map(set -> set.any()
+                && set.shown.stream().allMatch(p -> shownNear.getOrDefault(p.id(), false))
+                && set.absent.stream().noneMatch(p -> anywhere.getOrDefault(p.id(), false))).toList();
+    }
+
+    private static Map<String, Boolean> seen(Map<String, ImageTemplate> pictures, List<Optional<Rect>> found) {
         List<String> ids = new ArrayList<>(pictures.keySet());
-        List<Optional<Rect>> found = reach.findEach(List.copyOf(pictures.values()), frame);
         Map<String, Boolean> seen = new HashMap<>();
         for (int i = 0; i < ids.size(); i++) seen.put(ids.get(i), found.get(i).isPresent());
-        return sets.stream().map(set -> set.on(p -> seen.getOrDefault(p.id(), false))).toList();
+        return seen;
     }
 }

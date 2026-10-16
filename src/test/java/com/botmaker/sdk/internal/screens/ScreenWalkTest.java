@@ -231,6 +231,23 @@ class ScreenWalkTest {
         assertEquals(List.of("scroll campaign -1", "click engineer"), badged.done);
     }
 
+    /** A list member that comes and goes, out of view, is searched for only when no other way is open. */
+    @Test
+    void anotherWayIsTakenBeforeSearchingAListForWhatComesAndGoes() {
+        Game game = new Game("HOME");
+        game.shows.get("HOME").remove("campaign");
+        Map<String, GameScreen> screens = new LinkedHashMap<>(game.map.screens());
+        List<Input> inputs = new ArrayList<>(screens.get("HOME").inputs());
+        inputs.replaceAll(i -> i.picture() != null && i.picture().id().equals("campaign") ? i.sometimes() : i);
+        screens.put("HOME", screens.get("HOME").inputs(inputs).lists(List.of(
+                ScreenList.of(-1, List.of(picture("engineer"), picture("campaign"))))));
+
+        ScreenWalk.Result walked = new ScreenWalk(ScreenGraph.of(screens), game, STEP_MS, s -> {}).go("CAMPAIGN", null);
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.toString());
+        assertEquals(List.of("click mail", "click mail_campaign"), game.done, "Mail's way, the column never scrolled");
+    }
+
     /** A screen opened through an alsoFrom hides the screen it was opened from too, not only its tree parent. */
     @Test
     void aScreenOverTheOneAnotherWayOpenedItFromIsTheScreenShown() {
@@ -402,6 +419,35 @@ class ScreenWalkTest {
         ScreenWalk.Result walked = walk.go("MAIL", "HOME");
         assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome());
         assertEquals(List.of("key ESCAPE", "click mail"), game.done, "the panel closed before Home's input");
+    }
+
+    /** Where the game was, its neighbours are looked for first: a far screen's marker only when none of them shows. */
+    @Test
+    void theScreensNearWhereTheGameWasAreLookedForFirst() {
+        Game game = new Game("MAP");
+        List<String> looked = new ArrayList<>();
+        Reach counting = new Reach() {
+            @Override public Optional<BufferedImage> look() { return game.look(); }
+            @Override public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
+                looked.add(picture.id());
+                return game.find(picture, frame);
+            }
+            @Override public void click(Point at) { game.click(at); }
+            @Override public void key(Key key) { game.key(key); }
+            @Override public void scroll(Point at, int notches) { game.scroll(at, notches); }
+            @Override public long nowMs() { return game.nowMs(); }
+            @Override public void pause(long ms) { game.pause(ms); }
+        };
+        ScreenWalk walk = new ScreenWalk(game.map, counting, STEP_MS, null);
+        BufferedImage frame = game.look().orElseThrow();
+
+        assertEquals(Optional.of("MAP"), walk.whereOn(frame, "CAMPAIGN"));
+        assertFalse(looked.contains("engineer_title"), "Engineer is two steps from Campaign: " + looked);
+
+        looked.clear();
+        game.screen = "ENGINEER";
+        assertEquals(Optional.of("ENGINEER"), walk.whereOn(frame, "MAP"), "none near shows: every screen next");
+        assertTrue(looked.contains("engineer_title"), looked.toString());
     }
 
     /** A way back that left the panel open has not arrived, though the parent's marker shows under it. */
@@ -648,6 +694,7 @@ class ScreenWalkTest {
                 new Markers(marks("a"), marks("b")), new Markers(List.of(), List.of())), frame);
 
         assertEquals(List.of(true, false, false), on);
-        assertEquals(List.of("a", "b"), looked);
+        // Each marker once near its place, then each absent picture once anywhere.
+        assertEquals(List.of("a", "b", "b"), looked);
     }
 }

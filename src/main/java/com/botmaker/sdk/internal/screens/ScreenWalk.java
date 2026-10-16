@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -114,14 +115,63 @@ public final class ScreenWalk {
      */
     public Optional<String> whereOn(BufferedImage frame, String near) {
         Set<String> order = new LinkedHashSet<>();
+        Set<String> close = new HashSet<>();
         if (near != null && graph.screens().containsKey(near)) {
             order.add(near);
-            for (ScreenGraph.Edge edge : graph.edges()) if (edge.from().equals(near)) order.add(edge.to());
+            close.add(near);
+            for (ScreenGraph.Edge edge : graph.edges()) {
+                if (edge.from().equals(near)) order.add(edge.to());
+                if (edge.from().equals(near) || edge.to().equals(near)) {
+                    close.add(edge.from());
+                    close.add(edge.to());
+                }
+            }
+            for (Optional<String> up = graph.parent(near); up.isPresent() && close.add(up.get()); ) {
+                up = graph.parent(up.get());
+            }
         }
         order.addAll(graph.screens().keySet());
         List<String> told = order.stream().filter(c -> !graph.screens().get(c).isPopup()
                 && graph.screens().get(c).hasMarker()).toList();
-        List<String> shown = shown(told, frame);
+        // The screens one step from where the game was looked for first: every marker of the map is looked for only
+        // when none of them shows (the user's call, 2026-10-16: a walk knows where its last input led).
+        if (!close.isEmpty()) {
+            List<String> nearShown = shown(told.stream().filter(close::contains).toList(), frame);
+            Optional<String> nearby = shownTop(nearShown);
+            if (nearby.isPresent()) {
+                // A screen further off may stand above it, its markers still in view: looked for too.
+                List<String> above = told.stream()
+                        .filter(c -> !close.contains(c) && standsAbove(c, nearby.get())).toList();
+                if (above.isEmpty()) return nearby;
+                List<String> both = new ArrayList<>(nearShown);
+                both.addAll(shown(above, frame));
+                return shownTop(both);
+            }
+        }
+        return shownTop(shown(told, frame));
+    }
+
+    /**
+     * Whether {@code over}, shown, would be the answer in place of {@code under}: it is opened over it (from it or a
+     * screen opened from it), or its markers hold all of {@code under}'s and more (a tab of a window).
+     */
+    private boolean standsAbove(String over, String under) {
+        Set<String> marks = new HashSet<>(Markers.of(graph.screens().get(under)).shown().stream()
+                .map(ImageTemplate::id).toList());
+        List<String> its = Markers.of(graph.screens().get(over)).shown().stream().map(ImageTemplate::id).toList();
+        if (its.size() > marks.size() && its.containsAll(marks)) return true;
+        for (String from : graph.opensFrom(over)) {
+            if (from.equals(over)) continue;
+            for (Optional<String> up = Optional.of(from); up.isPresent(); up = graph.parent(up.get())) {
+                if (up.get().equals(under)) return true;
+                if (up.get().equals(over)) break;
+            }
+        }
+        return false;
+    }
+
+    /** Of {@code shown}, the screen nothing else shown hides, as {@link #whereOn} picks it. */
+    private Optional<String> shownTop(List<String> shown) {
         Set<String> under = new HashSet<>();
         for (String c : shown) {
             for (String from : graph.opensFrom(c)) {
@@ -208,8 +258,10 @@ public final class ScreenWalk {
             }
             String from = at;
             BufferedImage seen = frame.get();
+            Predicate<ScreenGraph.Edge> known = edge -> !missed.contains(edge) && !strayed.contains(edge);
             Optional<List<ScreenGraph.Edge>> path = graph.pathTo(at, target,
-                    edge -> !missed.contains(edge) && !strayed.contains(edge) && open(edge, from, seen));
+                            known.and(edge -> open(edge, from, seen, false)))
+                    .or(() -> graph.pathTo(from, target, known.and(edge -> open(edge, from, seen, true))));
             if (path.isEmpty()) return blocked(at, target, missed, strayed, walked);
             ScreenGraph.Edge next = path.get().getFirst();
             if (!perform(next, seen)) {
@@ -238,23 +290,27 @@ public final class ScreenWalk {
      * Whether {@code edge} can be taken: never through a lock. On the screen the game is on, what comes and goes only
      * while it shows, a button with looks only while it is not greyed out, and a way needing one look only while the
      * button has it. Anywhere, a way or an input whose condition answers false; the rest is looked for when the walk
-     * gets there.
+     * gets there. Without {@code search}, nothing that comes and goes but what shows now: a search of a list both
+     * ways that finds nothing took 35 s, so another way is planned first (Firestone's Tavern, 2026-10-16).
      */
-    private boolean open(ScreenGraph.Edge edge, String at, BufferedImage frame) {
+    private boolean open(ScreenGraph.Edge edge, String at, BufferedImage frame, boolean search) {
         Input via = edge.via();
         if (via == null) return true;
         if (via.lock() != null) return false;
         if (!Conditions.holds(edge.when()) || !Conditions.holds(via.when())) return false;
-        if (!edge.from().equals(at)) return true;
+        // Further on, what comes and goes is planned with only when nothing else is open: planned first, Home's
+        // Tavern icon pulled a walk on Town back to Home, which found it gone and went to Town again.
+        if (!edge.from().equals(at)) return search || !via.comesAndGoes();
         if (via.act() == Input.Act.KEY) return true;
+        boolean searched = listOf(edge).isPresent() && (search || !via.comesAndGoes());
         if (edge.state() == null && via.variants().isEmpty()) {
             // One a list scrolls to is looked for by the click, which scrolls first.
-            return !via.comesAndGoes() || listOf(edge).isPresent() || reach.seen(via, frame).isPresent();
+            return !via.comesAndGoes() || searched || reach.seen(via, frame).isPresent();
         }
         Optional<ScreenList> list = listOf(edge);
         Optional<Reach.Seen> seen = reach.seen(via, list.orElse(null), frame);
         // A member out of view is looked at once the click scrolls to it.
-        if (seen.isEmpty()) return list.isPresent() || !via.comesAndGoes() && edge.state() == null;
+        if (seen.isEmpty()) return searched || list.isEmpty() && !via.comesAndGoes() && edge.state() == null;
         if (seen.get().state() == State.DISABLED) return false;
         return edge.state() == null || edge.state() == seen.get().state();
     }

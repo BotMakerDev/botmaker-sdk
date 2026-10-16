@@ -61,14 +61,25 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
      */
     @Override
     public List<Optional<Rect>> findEach(List<ImageTemplate> pictures, BufferedImage frame) {
+        return matched(pictures, frame, false);
+    }
+
+    @Override
+    public List<Optional<Rect>> findEachNear(List<ImageTemplate> pictures, BufferedImage frame) {
+        return matched(pictures, frame, true);
+    }
+
+    /** {@link #findEach}, each picture looked for within {@link #MARKER_MARGIN} of its place when {@code near}. */
+    private List<Optional<Rect>> matched(List<ImageTemplate> pictures, BufferedImage frame, boolean near) {
         List<ImageTemplate> files = new ArrayList<>();
         try {
             for (ImageTemplate picture : pictures) {
                 files.add(Frames.picture(resources, picture.id()).map(name -> placed(name, picture)).orElse(null));
             }
             List<ImageTemplate> known = files.stream().filter(Objects::nonNull).toList();
-            List<MatchResult> bests = ToolTiming.timed(ToolTiming.Phase.MATCH,
-                    () -> ImageFinder.bestMatches(known, new StillSource(frame)));
+            List<MatchResult> bests = ToolTiming.timed(ToolTiming.Phase.MATCH, () -> near
+                    ? ImageFinder.bestMatchesNear(known, MARKER_MARGIN, new StillSource(frame))
+                    : ImageFinder.bestMatches(known, new StillSource(frame)));
             List<Optional<Rect>> found = new ArrayList<>();
             int next = 0;
             for (ImageTemplate file : files) {

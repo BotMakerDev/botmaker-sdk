@@ -89,6 +89,17 @@ class SessionRoutingTest {
         assertTrue(globalFake.events.isEmpty(), "nothing is looked for on this computer's desktop");
     }
 
+    /** Firestone: its window is gamescope's on the desktop, and gamescope is the private display itself. */
+    @Test
+    void aPinnedWindowTheSessionLacksIsTheSessionsGameWindow() {
+        BotSession.set(session);
+        Source.set(CaptureSource.window("gamescope", ""));
+        assertInstanceOf(SessionSource.class, Source.current());
+        CaptureSource game = CaptureSource.window("testgame.exe", "");
+        Source.set(game);
+        assertSame(game, Source.current(), "a pinned window the session shows stays the source");
+    }
+
     @Test
     void anExplicitPinWinsOverTheBotSession() {
         BotSession.set(session);

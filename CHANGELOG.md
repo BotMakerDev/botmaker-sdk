@@ -498,6 +498,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **A run in the private display found no game window.** A bot whose capture names gamescope's window
+  (`CaptureSource.window("gamescope", "")`, as on the desktop) looked for it inside the private display, where
+  gamescope is the display itself, and every capture failed. A pinned window the private display lacks now stands for
+  that display's game window.
+- **Walks tell screens in a few seconds.** Each look matched every screen's markers over the whole frame: 45 markers,
+  11 s per look on Firestone. Markers and popups are now looked for near the place they were cut (`Reach.findEachNear`,
+  60 px), and the screens one step from where the game was are looked for first; every screen only when none of them
+  shows. A walk step went from 11–22 s to about 4 s.
+- **A walk tries another way before searching a column.** A list member that comes and goes, out of view, was taken
+  as the way and the list searched both ways (about 35 s) before another way was tried. The walk now plans first with
+  the ways in view or always there, and searches a list only when no other way is open.
 - **A picture goes on a screen only where the game shows it.** A picture keeps one place, true on every screen that
   uses it:
   - `place_pictures` and a `crop_pictures` box with only a name look for the picture on the game first. Found away
