@@ -419,16 +419,35 @@ final class LookTools {
      * ({@link ImageFinder#bestMatchesNear}); one with no place is looked for everywhere.
      */
     static List<Scored> scoresNear(Path resources, BufferedImage frame, Map<String, FrameCut> cuts) {
-        return scores(resources, frame, cuts, true);
+        return scores(resources, frame, cuts, true, true);
+    }
+
+    /**
+     * {@link #scoresNear} of the pictures whose place is known only, for the line every act tool answers with. A
+     * picture with no place is matched over the whole frame, masked when it is transparent: three such placeholders
+     * took 1.1 s of the 1.2 s a Firestone screen's 128 pictures cost (2026-10-16), paid on each answer.
+     */
+    static List<Scored> scoresPlaced(Path resources, BufferedImage frame, Map<String, FrameCut> cuts) {
+        return scores(resources, frame, cuts, true, false);
+    }
+
+    private static boolean placed(FrameCut cut) {
+        return cut != null && cut.place() != null;
     }
 
     private static List<Scored> scores(Path resources, BufferedImage frame, Map<String, FrameCut> cuts, boolean near) {
+        return scores(resources, frame, cuts, near, true);
+    }
+
+    private static List<Scored> scores(Path resources, BufferedImage frame, Map<String, FrameCut> cuts, boolean near,
+                                       boolean unplaced) {
         List<String> names = new ArrayList<>();
         List<ImageTemplate> templates = new ArrayList<>();
         try {
             for (Path file : TemplateLibrary.list(resources)) {
                 if (TemplateLibrary.isUnmodifiedDefaultTemplate(file)) continue;
                 String name = TemplateLibrary.baseName(file);
+                if (!unplaced && !placed(cuts.get(name))) continue;
                 names.add(name);
                 templates.add(cutAt(new ImageTemplate(file.toString()), cuts.get(name)));
             }

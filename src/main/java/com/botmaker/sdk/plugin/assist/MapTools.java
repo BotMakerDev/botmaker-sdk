@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -22,10 +23,14 @@ import com.botmaker.sdk.internal.vision.FrameChange;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.awt.image.BufferedImage;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -263,6 +268,11 @@ final class MapTools {
         Optional<String> owing = graph.owingMarker();
         if (owing.isPresent()) return Tried.refused(owes(graph.shown(owing.get())));
         Optional<String> below = graph.unfinishedBelow(screen);
+        Set<String> hidden = Set.of();
+        if (below.isPresent()) {
+            hidden = hiddenWays(context, graph, screen);
+            below = graph.unfinishedBelow(screen, hidden);
+        }
         if (below.isPresent()) {
             String child = graph.shown(below.get());
             List<Input> waiting = graph.untried(below.get());
@@ -273,7 +283,7 @@ final class MapTools {
                     + ". A screen opened is finished, every button, tab, toggle and arrow tried and every "
                     + "list scrolled, before the next input of the screen it was opened from. Nothing was done.");
         }
-        Optional<String> begun = graph.branchBegun(screen);
+        Optional<String> begun = graph.branchBegun(screen, fickle(graph));
         if (begun.isPresent()) {
             return Tried.refused("Finish the branch begun at " + graph.shown(begun.get()) + " first: it, or a "
                     + "screen reached from it, still has inputs to try. One branch to its end before the next. "
@@ -510,6 +520,40 @@ final class MapTools {
     }
 
     /**
+     * The screens opened from {@code screen} by an input that comes and goes and is not on the game now: they cannot
+     * be finished until it shows, so they hold back none of {@code screen}'s other inputs. Empty when the game cannot
+     * be looked at.
+     */
+    private static Set<String> hiddenWays(AgentContext context, ScreenGraph graph, String screen) {
+        List<String> children = graph.children(screen).stream().filter(c -> comesAndGoes(graph, c)).toList();
+        Optional<ToolReach> reach = ToolReach.of(context);
+        Optional<BufferedImage> frame = children.isEmpty() || reach.isEmpty() ? Optional.empty() : Frames.look(context);
+        if (frame.isEmpty()) return Set.of();
+        List<Optional<Rect>> found = reach.get().findEach(children.stream()
+                .map(c -> graph.screens().get(c).from().via().picture()).toList(), frame.get());
+        Set<String> hidden = new HashSet<>();
+        for (int i = 0; i < children.size(); i++) if (found.get(i).isEmpty()) hidden.add(children.get(i));
+        return hidden;
+    }
+
+    /**
+     * The screens whose way in comes and goes: a branch begun at one cannot be finished on demand, so it holds back
+     * no other branch (Engineer, under a Home button shown only while tools wait, held Garage's, 2026-10-16).
+     */
+    private static Set<String> fickle(ScreenGraph graph) {
+        return Set.copyOf(graph.screens().keySet().stream().filter(c -> comesAndGoes(graph, c)).toList());
+    }
+
+    /** Whether {@code constant}'s way in is a button that shows only at times. */
+    private static boolean comesAndGoes(ScreenGraph graph, String constant) {
+        Way way = graph.screens().get(constant).from();
+        if (way == null || way.via() == null || way.via().picture() == null) return false;
+        // A way keeps its input bare: whether it comes and goes is said by the input on the screen it leaves.
+        Optional<GameScreen> from = graph.parent(constant).map(graph.screens()::get);
+        return from.isPresent() && from.get().inputs().stream().anyMatch(i -> i.comesAndGoes() && i.sameAs(way.via()));
+    }
+
+    /**
      * {@code base} on {@code screen} led to {@code known}, mapped already: a popup over it, its way back, or another
      * way into {@code known}, which names {@code screen} once it is declared below it; a screen reached through
      * {@code known} cannot be named from it, so the input says it leaves.
@@ -539,17 +583,19 @@ final class MapTools {
         }
         List<String> order = List.copyOf(graph.screens().keySet());
         int below = order.indexOf(known);
-        boolean nameable = order.indexOf(screen) < below || !graph.dependsOn(screen).contains(known)
-                && graph.dependsOn(screen).stream().allMatch(c -> order.indexOf(c) < below);
-        if (!nameable) {
+        if (graph.dependsOn(screen).contains(known)) {
             return noted(services, screen, old, base.did(Did.LEAVES), "leaves for " + to + ", which this screen is "
                     + "reached through, so the map cannot name it from here", false);
         }
+        // The screen and every screen it is reached through declared below known move above it, in their order, so
+        // known may name the screen (Squads under Engineer, both mapped after Arena squad, 2026-10-16).
+        List<String> moving = order.stream().filter(c -> order.indexOf(c) > below
+                && (c.equals(screen) || graph.dependsOn(screen).contains(c))).toList();
         // A way taken whatever the button looks covers each look; one needing a look covers only that look.
         boolean already = graph.leads(screen, base).stream().anyMatch(lead -> lead.to().equals(known)
                 && (lead.state() == null || lead.state() == look));
-        Optional<String> failed = write(() -> (order.indexOf(screen) < below ? Optional.<String>empty()
-                : ScreenBook.moveBefore(services, screen, known))
+        Optional<String> failed = write(() -> moving.stream()
+                .map(c -> ScreenBook.moveBefore(services, c, known)).flatMap(Optional::stream).findFirst()
                 .or(() -> ScreenBook.update(services, screen, s -> replaced(s, old, base.did(null))))
                 .or(() -> already ? Optional.empty() : ScreenBook.update(services, known, s -> {
                     List<Way> ways = new ArrayList<>(s.alsoFrom());
@@ -962,8 +1008,15 @@ final class MapTools {
      * 2026-10-15).
      */
     private static void retakeShot(AgentContext context, ToolReach reach, String constant) {
-        reach.look().ifPresent(frame -> ScreenShots.save(context.services().resourcesDir(), constant, frame));
+        Path resources = context.services().resourcesDir();
+        // Once a session: each arrival wrote a 1–3 MB shot of an animated game, a new file the next Project History
+        // snapshot hashed, compressed and kept, 2–3 s of every write and most of a 63 MB history (2026-10-16).
+        if (resources == null || !RETAKEN.add(resources.resolve(constant))) return;
+        reach.look().ifPresent(frame -> ScreenShots.save(resources, constant, frame));
     }
+
+    /** The shots a walk has taken again since the plugin loaded, by file. */
+    private static final Set<Path> RETAKEN = ConcurrentHashMap.newKeySet();
 
     private static void seen(ScreenGraph graph, String constant) {
         if (constant != null && graph.screen(constant).filter(s -> !s.isPopup()).isPresent()) lastSeen = constant;

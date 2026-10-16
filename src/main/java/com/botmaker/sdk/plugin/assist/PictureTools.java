@@ -72,7 +72,7 @@ final class PictureTools {
                     + "\\p{javaJavaIdentifierPart}*");
 
     /** One picture cut: a box of crop_pictures with the call's tags and screen. */
-    private record Crop(String name, int x, int y, int width, int height, List<String> tags, Skip ignore,
+    private record Crop(String name, Integer x, Integer y, Integer width, Integer height, List<String> tags, Skip ignore,
                         String screen, Boolean marker, Boolean back, Boolean sometimes, Boolean popup,
                         String variantOf, State state, String when, String screenLook) {
 
@@ -86,6 +86,16 @@ final class PictureTools {
         boolean alone() {
             return Boolean.TRUE.equals(marker) || Boolean.TRUE.equals(popup) || variantOf != null || when != null
                     || screenLook != null;
+        }
+
+        /** Whether it names a picture the bot has, to note as it is: no part of a box given. */
+        boolean kept() {
+            return x == null && y == null && width == null && height == null;
+        }
+
+        /** Whether only some of the box is given. */
+        boolean partial() {
+            return !kept() && (x == null || y == null || width == null || height == null);
         }
 
         /** This cut, noted on no screen: crop_pictures notes such boxes together. */
@@ -106,11 +116,12 @@ final class PictureTools {
         }
     }
 
-    record Box(@Describe("the picture's name, lowercase with underscores: collect_button") String name,
-               @Describe("left edge, in the screenshot's pixels") int x,
-               @Describe("top edge, in the screenshot's pixels") int y,
-               @Describe("width in pixels") int width,
-               @Describe("height in pixels") int height,
+    record Box(@Describe("the picture's name, lowercase with underscores: collect_button; with no box, a picture the "
+                       + "bot has, noted on the screen as it is") String name,
+               @Describe(value = "left edge, in the screenshot's pixels", optional = true) Integer x,
+               @Describe(value = "top edge, in the screenshot's pixels", optional = true) Integer y,
+               @Describe(value = "width in pixels", optional = true) Integer width,
+               @Describe(value = "height in pixels", optional = true) Integer height,
                @Describe(value = IGNORE, optional = true) Skip ignore,
                @Describe(value = "true when it is the screen's marker, a part no other screen shows: pays the "
                        + "marker try_input left owed, or starts the map's first screen", optional = true)
@@ -222,8 +233,8 @@ final class PictureTools {
             AssistantTool.named("crop_pictures")
                     .describedAs("Cuts boxes out of the last screenshot you took and saves each as a picture the "
                             + "bot can find and click, declared as a Pictures constant: every input of a screen at "
-                            + "once, its marker among them. A part given to ignore is left out of matching, so "
-                            + "copies that differ only there all match")
+                            + "once, its marker among them; a name with no box notes a picture the bot has. A part "
+                            + "given to ignore is left out of matching, so copies that differ only there all match")
                     .takes(Crops.class).handledBy(PictureTools::cropPictures),
             AssistantTool.named("show_picture")
                     .describedAs("A picture's image, its size, its constant and how many places use it")
@@ -335,6 +346,8 @@ final class PictureTools {
             return Optional.of("One box is the screen's way back, not several.");
         }
         for (Crop c : cuts) {
+            if (c.partial()) return Optional.of(c.name() + ": give x, y, width and height, or none of them for a picture "
+                    + "the bot has.");
             boolean marker = Boolean.TRUE.equals(c.marker());
             boolean back = Boolean.TRUE.equals(c.back());
             boolean sometimes = Boolean.TRUE.equals(c.sometimes()) || c.when() != null && !(marker
@@ -370,12 +383,26 @@ final class PictureTools {
 
     /** One box cut, checked still on {@code live}, the screen watched once for every box of a call. */
     private static AgentReply cropPicture(Crop crop, AgentContext context, Supplier<List<BufferedImage>> live) {
-        Optional<BufferedImage> frame = Frames.shown();
-        if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
-        Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), null,
-                new Area(crop.x(), crop.y(), crop.width(), crop.height()))
+        if (crop.partial()) {
+            return AgentReply.refused(crop.name() + ": give x, y, width and height, or none of them for a picture the "
+                    + "bot has. Nothing was saved.");
+        }
+        Optional<Path> resources = Frames.resources(context);
+        if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
+        Optional<String> had = Frames.picture(resources.get(), crop.name());
+        if (crop.kept() && had.isEmpty()) {
+            return AgentReply.refused(Frames.noPicture(crop.name()) + " A new one is cut with its box.");
+        }
+        if (!crop.kept() && had.isPresent()) {
+            return AgentReply.refused("A picture called \"" + had.get() + "\" already exists: give its name with no "
+                    + "box to note it on the screen as it is, edit_pictures' replace to cut it anew, or another name.");
+        }
+        Optional<BufferedImage> frame = crop.kept() ? Optional.empty() : Frames.shown();
+        if (!crop.kept() && frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
+        Optional<PictureCuts.Piece> picture = frame.flatMap(shown -> PictureCuts.crop(shown, null,
+                new Area(crop.x(), crop.y(), crop.width(), crop.height())))
                 .map(piece -> crop.ignore() == null ? piece : PictureCuts.masked(piece, crop.ignore().rect()));
-        if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
+        if (!crop.kept() && picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
         List<String> typed = crop.tags() == null ? List.of() : crop.tags();
         TagCatalog catalog = typed.isEmpty() ? null : FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
@@ -428,6 +455,18 @@ final class PictureTools {
                 return AgentReply.refused("Studio did not hand over the bot's Screens: " + busy.getMessage());
             }
             if (section.get().refusal() != null) return AgentReply.refused(section.get().refusal());
+        }
+        if (crop.kept()) {
+            String name = had.get();
+            List<String> untagged = tags.isEmpty() ? List.of()
+                    : FxCall.call(() -> TemplateLibrary.applyTags(context.services(), Map.of(name, tags)));
+            boolean comes = sometimes;
+            MapTools.Look look = new MapTools.Look(variantOf, state.orElse(null), when, screenLook);
+            String noted = section.map(s -> MapTools.noteCut(context.services(), s, name, marker, back, comes, look))
+                    .orElse("");
+            return AgentReply.text("Kept " + name + " as it is" + (tags.isEmpty() || !untagged.isEmpty() ? ""
+                    : ", tagged " + String.join(", ", tags)) + "." + noted
+                    + (untagged.isEmpty() ? "" : " Not tagged: " + String.join(" ", untagged)));
         }
         Optional<String> moving = moving(context, frame.get(), new Rect(crop.x(), crop.y(), crop.width(),
                 crop.height()), live);

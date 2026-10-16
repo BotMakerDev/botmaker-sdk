@@ -411,6 +411,19 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **Discovery no longer stalls or files a way wrong** (Firestone, 2026-10-16):
+  - A screen whose way in comes and goes (Engineer's Home button, shown only while tools wait) holds nothing back
+    while that button is hidden, and its branch never blocks another.
+  - Every screen with a way into a screen counts as its parent, not only the first.
+  - An input that opens a screen mapped earlier records the way in, its branch moved above the screen it opens,
+    instead of "leaves".
+- **`crop_pictures` takes a box with only a `name`**: it notes a picture cut earlier on the screen (marker, way back
+  or input) as it is. A box of some but not all of x, y, width and height refuses the whole call.
+- **The assistant's screen checks are faster**: markers are matched in one batch (`which_screen` 6.9 s → 5.8 s), and
+  a click's reply skips pictures with no place (1.3 s → 0.5 s).
+- **A walk takes a screen's shot once a session**, not on every arrival: each 1–3 MB shot was a new file that
+  Project History hashed and kept on every write.
+- **`launch_game`'s reply** no longer explains a resize gamescope does not do, and its wait is timed as waiting.
 - **🗺 Screens' window, fixed throughout.**
   - A way back of no input of its own (a close button, then Escape) no longer breaks a click or a right-click on
     its link: it says it is the default way back.

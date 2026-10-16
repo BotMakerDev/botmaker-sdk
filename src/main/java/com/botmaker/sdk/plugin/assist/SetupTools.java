@@ -27,6 +27,7 @@ import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
 import com.botmaker.session.PrivateSession;
+import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.launch.BackgroundLauncher;
 
 import java.awt.Rectangle;
@@ -455,7 +456,10 @@ final class SetupTools {
         });
         int wait = launch.seconds() == null ? 0 : Math.min(Math.max(launch.seconds(), 0), MAX_LAUNCH_WAIT);
         try {
-            return AgentReply.text(done.get(Math.max(wait, 2), TimeUnit.SECONDS));
+            // The waiting said as waiting, and the note on why a private display is not resized left to the windows
+            // that show one: an assistant drags nothing.
+            String up = ToolTiming.timed(ToolTiming.Phase.WAIT, () -> done.get(Math.max(wait, 2), TimeUnit.SECONDS));
+            return AgentReply.text(up.replace(" " + SessionBackends.FIXED_SIZE_NOTE, ""));
         } catch (ExecutionException refused) {
             return AgentReply.refused(spec.describe() + " could not be launched: " + refused.getCause().getMessage());
         } catch (TimeoutException starting) {
@@ -465,6 +469,8 @@ final class SetupTools {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return AgentReply.text("Launching " + spec.describe() + " in a private display.");
+        } catch (Exception unexpected) {
+            return AgentReply.refused(spec.describe() + " could not be launched: " + unexpected.getMessage());
         }
     }
 

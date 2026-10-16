@@ -423,7 +423,8 @@ final class ActTools {
     private static String screen(AgentContext context, BufferedImage frame) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return "no project is open.";
-        List<LookTools.Scored> scored = LookTools.scoresNear(resources.get(), frame, LookTools.cuts(context));
+        // The pictures with a known place only: one with none is a whole-frame match, too dear for every answer.
+        List<LookTools.Scored> scored = LookTools.scoresPlaced(resources.get(), frame, LookTools.cuts(context));
         double needs = Frames.confidence(context.services());
         List<String> on = new ArrayList<>();
         for (LookTools.Scored s : scored) {

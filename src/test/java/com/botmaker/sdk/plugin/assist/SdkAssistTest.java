@@ -937,6 +937,16 @@ class SdkAssistTest {
                 "screen", "home")).contains("Noted in Home as untried"));
         assertEquals("home", screen("HOME").marker().id());
         assertEquals(List.of("click gold"), screen("HOME").inputs().stream().map(Input::label).toList());
+        String twice = text(cropOne("name", "gold", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home"));
+        assertTrue(twice.contains("already exists: give its name with no box"), twice);
+        cropOne("name", "bag", "x", 10, "y", 10, "width", SIZE, "height", SIZE);
+        String kept = text(run("crop_pictures", "screen", "Home", "boxes", List.of(Map.of("name", "bag"))));
+        assertTrue(kept.contains("Kept bag as it is") && kept.contains("Noted in Home as untried"), kept);
+        assertEquals(List.of("click gold", "click bag"), screen("HOME").inputs().stream().map(Input::label).toList(),
+                "a picture cut earlier, on no screen, is noted as it is");
+        assertFalse(run("edit_map", "action", "remove_input", "screen", "Home", "picture", "bag").isRefused());
+        assertTrue(cropOne("name", "none_yet", "screen", "Home").isRefused(), "no box names a picture the bot has");
+        assertTrue(cropOne("name", "half", "x", 10, "screen", "Home").isRefused(), "a box is all four or none");
         assertEquals(Set.of(), TemplateLibrary.manifest(host).tagsOf("gold"),
                 "a screen's pictures are grouped by the map, never tagged");
 
@@ -1013,7 +1023,7 @@ class SdkAssistTest {
 
         AgentReply partial = run("crop_pictures", "boxes", List.of(box("pick", 120, 80, SIZE, SIZE),
                 Map.of("name", "drop", "x", 1, "y", 2, "width", 3)));
-        assertTrue(partial.isRefused() && text(partial).contains("'boxes[1].height' is required"), text(partial));
+        assertTrue(partial.isRefused() && text(partial).contains("drop: give x, y, width and height"), text(partial));
         assertFalse(TemplateLibrary.exists(resources, "pick"), "nothing saved when one box is short");
         assertTrue(run("crop_pictures", "boxes", List.of(box("pick", 120, 80, 4, 4, "marker", true),
                 box("plan", 120, 80, 4, 4, "marker", true)), "screen", "Engineer").isRefused(), "one marker");
@@ -1109,6 +1119,90 @@ class SdkAssistTest {
         game.then(noise(WATCHED.width(), WATCHED.height(), 24));
         String away = text(tryOne("screen", "Home", "key", "W", "desktop", true, "settleMs", 0));
         assertTrue(away.contains("Nothing was written: key W opened a screen the map does not have"), away);
+    }
+
+    /**
+     * An input deep in one branch that opens a screen mapped earlier in another is a way into it: the screens it is
+     * reached through move above that screen, so its constant may name them (Squads under Engineer, 2026-10-16).
+     */
+    @Test
+    void aWayIntoAScreenMappedEarlierMovesItsBranchAboveIt() {
+        Game game = new Game();
+        NativeControllerFactory.setForTesting(game);
+        BufferedImage home = noise(WATCHED.width(), WATCHED.height(), 31);
+        BufferedImage shop = covered(home, 150, 0, 250, 300, 32);
+        BufferedImage bag = covered(home, 0, 120, 140, 180, 33);
+        BufferedImage deep = covered(bag, 150, 0, 250, 300, 34);
+        agent.frame = home;
+        run("screenshot");
+        cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home", "marker", true);
+        run("crop_pictures", "screen", "Home", "boxes", List.of(box("shop_home", 200, 120, 48, 48),
+                box("bag_home", 80, 20, 48, 48)));
+        game.then(shop);
+        tryOne("screen", "Home", "picture", "shop_home", "desktop", true, "settleMs", 0);
+        run("crop_pictures", "screen", "Shop", "boxes", List.of(box("shop", 300, 40, 48, 48, "marker", true),
+                box("close_shop", 200, 200, 48, 48, "back", true)));
+        game.then(home);
+        tryOne("screen", "Shop", "picture", "close_shop", "desktop", true, "settleMs", 0);
+        game.then(bag);
+        tryOne("screen", "Home", "picture", "bag_home", "desktop", true, "settleMs", 0);
+        run("crop_pictures", "screen", "Bag", "boxes", List.of(box("bag_title", 30, 130, 48, 48, "marker", true),
+                box("deep_in", 60, 240, 48, 48)));
+        game.then(deep);
+        tryOne("screen", "Bag", "picture", "deep_in", "opens", "Deep", "desktop", true, "settleMs", 0);
+        run("crop_pictures", "screen", "Deep", "boxes", List.of(box("deep", 300, 40, 48, 48, "marker", true),
+                box("go", 200, 200, 48, 48), box("later", 320, 200, 48, 48)));
+        assertEquals(List.of("HOME", "SHOP", "BAG", "DEEP"), List.copyOf(host.set("screen_map").keySet()));
+
+        game.then(shop);
+        String way = text(tryOne("screen", "Deep", "picture", "go", "desktop", true, "settleMs", 0));
+        assertTrue(way.contains("opens Shop, mapped already: a way into it"), way);
+        assertEquals(List.of("HOME", "BAG", "DEEP", "SHOP"), List.copyOf(host.set("screen_map").keySet()),
+                "Deep and Bag, which it is reached through, are declared above Shop");
+        assertEquals(List.of("DEEP"), screen("SHOP").alsoFrom().stream()
+                .map(w -> BotConstants.screenName(w.from())).toList());
+
+        // Reached from Deep, whose branch is begun and not finished, Shop is part of that branch.
+        agent.frame = shop;
+        run("screenshot");
+        run("crop_pictures", "screen", "Shop", "boxes", List.of(box("shelf", 160, 250, 48, 48)));
+        String shelf = text(tryOne("screen", "Shop", "picture", "shelf", "desktop", true, "settleMs", 0));
+        assertTrue(shelf.contains("tried click shelf"), shelf);
+    }
+
+    /**
+     * A screen opened by an input that comes and goes holds back the next input of the screen it was opened from
+     * only while that input shows: gone, the screen cannot be finished now (Engineer, 2026-10-16).
+     */
+    @Test
+    void aScreenWhoseWayInIsGoneHoldsNothingBack() {
+        Game game = new Game();
+        NativeControllerFactory.setForTesting(game);
+        BufferedImage home = noise(WATCHED.width(), WATCHED.height(), 41);
+        BufferedImage gift = covered(home, 150, 0, 250, 300, 42);
+        BufferedImage giftless = covered(home, 200, 120, 48, 48, 43);
+        agent.frame = home;
+        run("screenshot");
+        cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home", "marker", true);
+        run("crop_pictures", "screen", "Home", "boxes", List.of(box("gift_home", 200, 120, 48, 48, "sometimes", true),
+                box("bag", 80, 20, 48, 48)));
+        game.then(gift);
+        tryOne("screen", "Home", "picture", "gift_home", "opens", "Gift", "desktop", true, "settleMs", 0);
+        run("crop_pictures", "screen", "Gift", "boxes", List.of(box("gift", 300, 40, 48, 48, "marker", true),
+                box("open_box", 200, 200, 48, 48)));
+
+        agent.frame = home;
+        String held = text(tryOne("screen", "Home", "picture", "bag", "desktop", true, "settleMs", 0));
+        assertTrue(held.contains("Finish Gift first"), "its way in shows, so Gift comes first: " + held);
+        agent.frame = giftless;
+        BufferedImage bag = covered(giftless, 0, 120, 140, 180, 44);
+        game.then(bag);
+        String tried = text(tryOne("screen", "Home", "picture", "bag", "opens", "Bag", "desktop", true, "settleMs", 0));
+        assertTrue(tried.contains("Opened Bag"), "Gift's way in is gone, so it waits: " + tried);
+        run("crop_pictures", "screen", "Bag", "boxes", List.of(box("bag_title", 30, 130, 48, 48, "marker", true),
+                box("sort", 60, 240, 48, 48)));
+        String branch = text(tryOne("screen", "Bag", "picture", "sort", "desktop", true, "settleMs", 0));
+        assertTrue(branch.contains("tried click sort"), "Gift's branch, begun, holds no other back: " + branch);
     }
 
     /** {@code frame} with the box at {@code x, y} drawn over by other pixels: a panel opened over it. */

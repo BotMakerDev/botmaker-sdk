@@ -283,15 +283,26 @@ public final class ScreenGraph {
      * own children. {@code constant}'s next input waits for it.
      */
     public Optional<String> unfinishedBelow(String constant) {
-        return unfinishedBelow(constant, new HashSet<>());
+        return unfinishedBelow(constant, Set.of());
     }
 
-    private Optional<String> unfinishedBelow(String constant, Set<String> seen) {
+    /**
+     * {@link #unfinishedBelow(String)}, leaving out the screens in {@code hidden} and everything under them: ones
+     * whose way in comes and goes and is not there now, so they cannot be finished yet (Engineer, whose Home button
+     * shows only while tools wait to be claimed, 2026-10-16).
+     */
+    public Optional<String> unfinishedBelow(String constant, Set<String> hidden) {
+        Set<String> seen = new HashSet<>(hidden);
+        seen.remove(constant);
+        return unfinishedUnder(constant, seen);
+    }
+
+    private Optional<String> unfinishedUnder(String constant, Set<String> seen) {
         if (!seen.add(constant) || seen.size() > DEEPEST * DEEPEST) return Optional.empty();
         for (String child : children(constant)) {
             if (seen.contains(child)) continue;
             if (unfinished(child)) return Optional.of(child);
-            Optional<String> deeper = unfinishedBelow(child, seen);
+            Optional<String> deeper = unfinishedUnder(child, seen);
             if (deeper.isPresent()) return deeper;
         }
         return Optional.empty();
@@ -303,14 +314,32 @@ public final class ScreenGraph {
      * on no branch: it shows over any screen, and its inputs are tried whenever it does.
      */
     public Optional<String> branchBegun(String constant) {
+        return branchBegun(constant, Set.of());
+    }
+
+    /** {@link #branchBegun(String)}, leaving out the screens in {@code hidden} and everything under them. */
+    public Optional<String> branchBegun(String constant, Set<String> hidden) {
         if (screen(constant).filter(GameScreen::isPopup).isPresent()) return Optional.empty();
         Set<String> above = new HashSet<>();
         String at = constant;
         while (at != null && above.add(at) && above.size() < DEEPEST) at = parent(at).orElse(null);
+        // Every screen a way into it leaves from, by any of its ways, is on its path: Engineer, opened from Home and
+        // also from Garage, is part of Garage's branch when reached from there (2026-10-16).
+        above.addAll(dependsOn(constant));
         return screens.keySet().stream()
                 .filter(c -> !above.contains(c) && depth(c).isPresent() && triedAny(c))
+                .filter(c -> !under(c, hidden))
                 .filter(c -> !branchDone(c, new HashSet<>()))
                 .findFirst();
+    }
+
+    /** Whether {@code constant} is one of {@code screens} or made known, directly or deeper, from one of them. */
+    private boolean under(String constant, Set<String> screens) {
+        Set<String> seen = new HashSet<>();
+        for (String at = constant; at != null && seen.add(at) && seen.size() < DEEPEST; at = parent(at).orElse(null)) {
+            if (screens.contains(at)) return true;
+        }
+        return false;
     }
 
     private boolean branchDone(String constant, Set<String> seen) {
