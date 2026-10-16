@@ -110,11 +110,11 @@ public class Bot {
         InstalledRun.skip(SkippedActivities.of(InstalledRun.flow(), skipped(values)));
         boolean doSetup = InstalledGame.marked(SdkValue.Id.DO_SETUP, values) instanceof Boolean on && on;
         Runnable goHome = () -> {
-            Runnable home = InstalledRun.installed().home();
+            Runnable home = InstalledRun.home();
             if (home != null) home.run();
         };
         PopupGuard.enabled(true);
-        lifecycle(() -> FlowWalker.run(InstalledRun.flow(), InstalledRun.installed().home()), goHome,
+        lifecycle(() -> FlowWalker.run(InstalledRun.flow(), InstalledRun.home()), goHome,
                 doSetup ? InstalledRun.installed().setup() : null);
     }
 
@@ -160,7 +160,7 @@ public class Bot {
         String target = System.getProperty(TrialEntry.TARGET, "");
         System.clearProperty(TrialEntry.TARGET);
         int hash = target.indexOf('#');
-        Runnable home = InstalledRun.installed().home();
+        Runnable home = InstalledRun.home();
         if (hash < 0 || home == null || !(InstalledGame.marked(SdkValue.Id.FLOW, values) instanceof Flow flow)) return;
         Class<?> returned;
         try {

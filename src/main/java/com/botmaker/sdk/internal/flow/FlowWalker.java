@@ -7,13 +7,17 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.Run;
+import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.api.time.Wait;
+import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.observe.Bots;
+import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.trace.Trace;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 
 /**
  * The walk over a {@link Flow}: hold a current activity, run its body, and follow the edge its outcome names.
@@ -49,7 +53,8 @@ public final class FlowWalker {
      * Walks {@code flow} to its end. Does not return: it ends by calling {@link Bot#stop()}, which unwinds to the
      * supervisor.
      *
-     * <p>{@code goHome}, the run's {@link Run#home()} or {@code null}, runs before each step that goes home.
+     * <p>{@code goHome}, {@link InstalledRun#home()} (the run's {@link Run#home()}, else a walk to the map's root) or
+     * {@code null}, runs before each step that goes home.
      *
      * <p>A sub-flow read before its declaration is null; the run refuses it before any step, naming the flow that
      * holds it, rather than ending at that card an hour in.
@@ -205,10 +210,11 @@ public final class FlowWalker {
         long startedAt = System.currentTimeMillis();
         Activity outer = CURRENT.get();
         CURRENT.set(step.activity());   // execute runs activities only: a sub-flow card is walked, not run
+        ScreenMaps.reached(null);
         Bots.fireActivity(step.label());
         Outcome outcome;
         try {
-            outcome = body.run();
+            outcome = runOrWalkBack(step, body);
         } catch (RuntimeException | Error e) {
             if (!isStop(e)) {
                 Debug.error("[Activity] " + step.label() + " threw " + e + " after "
@@ -221,6 +227,42 @@ public final class FlowWalker {
         Debug.log("[Activity] " + step.label() + " → " + (outcome == null ? "nothing" : outcome.label())
                 + " ("+ Trace.elapsed(System.currentTimeMillis() - startedAt) + ")");
         return outcome;
+    }
+
+    /**
+     * Runs {@code body}; when a step of it gets stuck after its {@code Navigate.to} arrived, walks back to that screen
+     * by the map and runs the body once more (2026-10-16). A stray step, a popup the map lacks or a slow screen then
+     * costs one walk, not the run's home recovery. A body that never reached a screen, a walk back that does not
+     * arrive, and a second stuck step go on to that recovery.
+     */
+    private static Outcome runOrWalkBack(Flow.Step step, ActivityBody<?> body) {
+        try {
+            return body.run();
+        } catch (BotStuckException stuck) {
+            String back = ScreenMaps.reached();
+            if (back == null) throw stuck;
+            String shown = ScreenMaps.installed().shown(back);
+            Debug.error("[Activity] " + step.label() + " got stuck (" + stuck.getMessage() + "): walking back to "
+                    + shown + " and running it once more.");
+            Watchdog.reset();
+            if (!walkBack.test(back)) {
+                Debug.error("[Activity] " + step.label() + " could not walk back to " + shown + ".");
+                throw stuck;
+            }
+            return body.run();
+        }
+    }
+
+    /** How the run walks back to a screen it reached: {@code Navigate.to} it; a test stands in for the game. */
+    private static volatile Predicate<String> walkBack = FlowWalker::navigate;
+
+    private static boolean navigate(String constant) {
+        return ScreenMaps.installed().screen(constant).map(Navigate::to).orElse(false);
+    }
+
+    /** Test-only: walks back with {@code by} instead of the game; {@code null} is the game again. */
+    static void walkBackBy(Predicate<String> by) {
+        walkBack = by == null ? FlowWalker::navigate : by;
     }
 
     /** {@code Bot.stop()}'s throw, which ends a run on purpose and is no failure. Its class is private to {@code Bot}. */

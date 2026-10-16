@@ -21,6 +21,11 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   it needs Java formatting, one call per line. Still open from the screen-map plan (`reactive-cooking-reef.md`):
   sub-states of a screen (phase 8) and chores kept as data (phase 9). Owed checks: the Discovery tools and
   `edit_map` live over MCP on Firestone, and the 🗺 Screens click-tests of the 2026-10-15 audit.
+- **A screen's chores in the picture picker**: a click's picture after `Navigate.to(Screens.X)` in the same body
+  could offer X's `Kind.CHORE` inputs first. The plugin reads no Java text, so the host would have to say which
+  screen the body walked to: a contract capability first (`/contract-change`).
+- **A timed-out find inside an activity** clears an unmapped overlay (`PopupGuard.uncover`) but does not walk back
+  to the activity's screen: only a thrown `BotStuckException` does.
 - **Launch targets**: `Target.set(String spec)` has no editor (a `@LaunchTargetSpec` could reuse the
   🎮 game dialog).
 - **Waydroid on the desktop**: a bot reads Android's frame through `adb screencap`, which writes nothing on a

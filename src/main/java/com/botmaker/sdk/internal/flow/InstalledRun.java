@@ -3,6 +3,10 @@ package com.botmaker.sdk.internal.flow;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.Run;
+import com.botmaker.sdk.api.screens.Navigate;
+import com.botmaker.sdk.internal.bot.BotStuckException;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.internal.screens.ScreenMaps;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -53,6 +57,19 @@ public final class InstalledRun {
     /** The installed run, or {@link Run#NONE} when nothing has been installed. Never {@code null}. */
     public static Run installed() {
         return current;
+    }
+
+    /**
+     * What gets the game home: the run's {@link Run#home()}, else a {@code Navigate.to} the map's root screen
+     * (2026-10-16), else {@code null} for nothing. Read at each call, so a map installed later counts. A walk to the
+     * root that does not arrive throws, so the run's recovery restarts the game rather than taking it as home.
+     */
+    public static Runnable home() {
+        if (current.home() != null) return current.home();
+        ScreenGraph map = ScreenMaps.installed();
+        return map.root().flatMap(map::screen).<Runnable>map(root -> () -> {
+            if (!Navigate.to(root)) throw new BotStuckException("The run could not walk home to " + root.name() + ".");
+        }).orElse(null);
     }
 
     /** The flow being walked, or {@link Flow#NONE}. Never {@code null}. */

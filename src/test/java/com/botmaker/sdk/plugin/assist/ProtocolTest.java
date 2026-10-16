@@ -61,9 +61,16 @@ class ProtocolTest {
 
     @Test
     void setupUntilTheBotHasAWayHome() {
-        Where where = Protocol.where(false, finished());
+        Where where = Protocol.where(false, ScreenGraph.of(Map.of()));
         assertEquals(Stage.SETUP, where.stage());
         assertTrue(where.said().contains("no home method"), where.said());
+    }
+
+    @Test
+    void aMapWithARootIsAWayHomeWithNoHomeMethod() {
+        assertEquals(Stage.DISCOVERY, Protocol.where(false, finished()).stage(),
+                "a run with no home method walks to the map's root, Home");
+        assertEquals(Optional.of("HOME"), finished().root(), "the first screen reached from none, popups aside");
     }
 
     @Test

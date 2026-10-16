@@ -21,7 +21,10 @@ package com.botmaker.sdk.api.flow;
  * }</pre>
  *
  * @param home  what gets the game back to a known screen: before a step that {@link Flow.Step#goHome() goes
- *              home}, at start-up and after anything unexpected; {@code null} for nothing
+ *              home}, at start-up and after anything unexpected; {@code null} walks to the root screen of the bot's
+ *              map ({@code Navigate.to} the first screen reached from none), or does nothing when it has no map.
+ *              It is the last resort: a step of an activity that gets stuck first walks back to the screen the
+ *              activity's {@code Navigate.to} reached and runs it once more
  * @param setup what makes the game ready for this bot, once it is started: its settings, such as the ones a
  *              user chose in the bot's {@code @Param}s. Run when the bot's {@code doSetup} parameter is ticked;
  *              {@code null} for nothing

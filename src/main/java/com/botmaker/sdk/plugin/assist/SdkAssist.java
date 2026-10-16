@@ -56,7 +56,8 @@ public final class SdkAssist {
               when one is there, name it as a box's when (Firestone::eventOn). What try_input recorded
               wrong (a panel taken for a way back, a result, a way in) is fixed with edit_map: trying the
               input again does not undo it.
-            - Stage 2, Build: one chore at a time, through the game's own shortcuts, each step proved by a
+            - Stage 2, Build: once the whole map is surveyed, one chore at a time, screen by screen, through
+              the game's own shortcuts, each body opening with Navigate.to its screen and each step proved by a
               picture.
             - Stage 3, Trial: each activity from three states (work to do, nothing to do, interrupted), then
               the whole flow.
@@ -71,10 +72,12 @@ public final class SdkAssist {
               returns, and never loops forever: the flow repeats it.
             - The flow (read_flow; edit_flow's connect, set_start, add_flow) wires each outcome to the next
               activity. Put the order of chores there, never in a body calling another body.
-            - Navigation lives in one place: the home method takes the game back to the screen every
-              activity starts from, safe to call at any moment. Make it with add_method, then name it with
-              edit_flow's set_flow_method. An activity that needs another screen opens it from there in its
-              own body.
+            - Navigation is the map's: an activity's body opens with Navigate.to(Screens.X), X the screen
+              its chore is on, returns its NOT_NOW (or LOCKED) outcome when that answers false, and then
+              clicks X's own inputs only. A chore that leaves X walks again with Navigate.to, never with hand
+              clicks. When a step gets stuck, the run walks back to the screen the body's Navigate.to reached
+              and runs the body once more; then the run's home, which with no home method walks to the map's
+              root screen.
             - Popups the game opens on its own (an offer, a mail, a level-up) are no body's business: each is a
               screen of the map (crop_pictures its marker with popup true, its way out with back true), and the
               run closes the ones it shows before every look at the screen of every activity. An overlay the

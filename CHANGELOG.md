@@ -266,6 +266,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **Activities run on the map.** An activity's body opens with `Navigate.to(Screens.X)` and does its chores on X;
+  the guide, `read_guide`'s Build stage and the gamebot template's Collect say so.
+  - When a step of an activity throws `BotStuckException` after its `Navigate.to` arrived, the run walks back to
+    that screen and runs the activity once more, before the run's home. A body that reached no screen, a walk back
+    that does not arrive, and a second stuck step go on to the home recovery as before.
+  - A run with no home method walks to the map's root screen, the first one reached from none (`Navigate.to`),
+    and the assistant's Setup stage counts such a map as a way home.
 - **Popups come from the map** (breaking). `Run.popups(…)` is gone, and with it the Activity Flow window's Popups
   section and `edit_flow`'s `set_flow_method popups`; `PopupGuard.install` and `uninstall` are gone too.
   - Before every vision step, the guard closes each popup screen of the bot's map (`GameScreen.popup()`) that

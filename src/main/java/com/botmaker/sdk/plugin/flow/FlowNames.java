@@ -250,6 +250,6 @@ public final class FlowNames {
             + "leave without an arrow ends the run.";
 
     /** The go-home tick's tooltip. */
-    public static final String GO_HOME_TIP = "Run the bot's home method (Run.home(…)) immediately before "
-            + "this activity, so it starts from a known screen.";
+    public static final String GO_HOME_TIP = "Run the bot's home method (Run.home(…)), or with none walk to the "
+            + "root screen of its map, immediately before this activity, so it starts from a known screen.";
 }

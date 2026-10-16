@@ -92,6 +92,15 @@ public final class ScreenGraph {
         return Optional.ofNullable(screens.get(constant));
     }
 
+    /**
+     * The map's root: the first screen declared that is reached from none and is no popup — the game's home, which a
+     * run with no home method of its own walks to (2026-10-16). Empty for a map with none.
+     */
+    public Optional<String> root() {
+        return screens.entrySet().stream().filter(e -> e.getValue().from() == null && !e.getValue().isPopup())
+                .map(Map.Entry::getKey).findFirst();
+    }
+
     /** The name the game shows for {@code constant}, or the constant when it has none. */
     public String shown(String constant) {
         GameScreen screen = screens.get(constant);

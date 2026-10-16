@@ -37,12 +37,14 @@ public final class ScreenMaps {
         }
         installed = found;
         last = null;
+        reached = null;
     }
 
     /** Walks {@code map} from now on, as {@link #install} would learn it; {@code null} is the empty map. */
     public static void use(ScreenGraph map) {
         installed = map == null ? ScreenGraph.of(Map.of()) : map;
         last = null;
+        reached = null;
     }
 
     /** The screen of the installed map the game was last seen on: a walk looks for its neighbours first. */
@@ -55,6 +57,21 @@ public final class ScreenMaps {
     /** Remembers {@code constant} as the screen the game was last seen on; a popup is never one. */
     public static void seen(String constant) {
         if (constant != null && installed.screen(constant).filter(s -> !s.isPopup()).isPresent()) last = constant;
+    }
+
+    /**
+     * The screen the running activity's last {@code Navigate.to} arrived on: where the run walks back to when a step of
+     * the activity gets stuck. Cleared as each activity starts.
+     */
+    private static volatile String reached;
+
+    public static String reached() {
+        return reached;
+    }
+
+    /** Remembers {@code constant} as the screen the running activity reached; {@code null} forgets it. */
+    public static void reached(String constant) {
+        reached = constant;
     }
 
     /** The running bot's map, as {@link #install} learned it. */

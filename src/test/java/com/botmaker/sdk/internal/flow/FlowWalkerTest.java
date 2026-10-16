@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import org.junit.jupiter.api.AfterEach;
@@ -370,5 +371,97 @@ class FlowWalkerTest {
                 Flow.edge(A.NEXT, A.class)));
 
         assertEquals(6, log.size());
+    }
+
+    // ---- walking back after a stuck step ----------------------------------------------------------------
+
+    /**
+     * A body that reaches {@code TAVERN} as its {@code Navigate.to} would, then gets stuck the first {@code stuck}
+     * times it runs.
+     */
+    private Flow.Step stuckOnTavern(int stuck) {
+        int[] runs = {0};
+        return Flow.activity(A.class, () -> {
+            log.add("A");
+            ScreenMaps.reached("TAVERN");
+            if (runs[0]++ < stuck) throw new BotStuckException("a stray step");
+            return A.LEFT;
+        });
+    }
+
+    @Test
+    void aStuckStepWalksBackToTheScreenItReachedAndRunsTheActivityOnceMore() {
+        List<String> walked = new ArrayList<>();
+        FlowWalker.walkBackBy(constant -> walked.add(constant));
+        try {
+            walk(flow(A.class, List.of(stuckOnTavern(1), on(B.class)), Flow.edge(A.LEFT, B.class)));
+        } finally {
+            FlowWalker.walkBackBy(null);
+        }
+
+        assertEquals(List.of("TAVERN"), walked);
+        assertEquals(List.of("A", "A", "B+popup"), log, "run again after the walk back, then on to B");
+    }
+
+    @Test
+    void aSecondStuckStepGoesOnToTheRunsRecovery() {
+        FlowWalker.walkBackBy(constant -> true);
+        try {
+            Flow flow = flow(A.class, List.of(stuckOnTavern(2)));
+            InstalledRun.walk(flow);
+            assertThrows(BotStuckException.class, () -> FlowWalker.run(flow, null));
+        } finally {
+            FlowWalker.walkBackBy(null);
+        }
+
+        assertEquals(List.of("A", "A"), log, "once more, not again and again");
+    }
+
+    @Test
+    void aStuckStepWithNoScreenReachedOrNoWayBackGoesOnToTheRunsRecovery() {
+        Flow never = flow(A.class, List.of(Flow.activity(A.class, () -> {
+            log.add("A");
+            throw new BotStuckException("stuck before any Navigate.to");
+        })));
+        InstalledRun.walk(never);
+        assertThrows(BotStuckException.class, () -> FlowWalker.run(never, null));
+        assertEquals(List.of("A"), log, "nothing reached: nothing to walk back to");
+
+        log.clear();
+        FlowWalker.walkBackBy(constant -> false);
+        try {
+            Flow flow = flow(A.class, List.of(stuckOnTavern(1)));
+            InstalledRun.walk(flow);
+            assertThrows(BotStuckException.class, () -> FlowWalker.run(flow, null));
+        } finally {
+            FlowWalker.walkBackBy(null);
+        }
+        assertEquals(List.of("A"), log, "a walk back that does not arrive runs nothing more");
+    }
+
+    @Test
+    void anActivityStartsWithNoScreenReached() {
+        ScreenMaps.reached("TAVERN");
+        walk(flow(A.class, List.of(Flow.activity(A.class, () -> {
+            log.add(String.valueOf(ScreenMaps.reached()));
+            return A.LEFT;
+        }))));
+
+        assertEquals(List.of("null"), log, "what the activity before reached is not this one's to walk back to");
+    }
+
+    // ---- the run's home ---------------------------------------------------------------------------------
+
+    @Test
+    void aRunWithNoHomeMethodWalksToTheMapsRoot() {
+        assertNull(InstalledRun.home(), "the map in this test has a popup only: no root, no home");
+
+        ScreenMaps.use(ScreenGraph.of(Map.of("HOME", GameScreen.named("Home")
+                .markers(List.of(new ImageTemplate("images/home.png"))))));
+        assertTrue(InstalledRun.home() != null, "a map's root is a way home");
+
+        Runnable own = () -> {};
+        InstalledRun.use(com.botmaker.sdk.api.flow.Run.of().home(own));
+        assertEquals(own, InstalledRun.home(), "the run's own home wins");
     }
 }

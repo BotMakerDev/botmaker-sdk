@@ -17,6 +17,12 @@ import java.util.Optional;
  * finds where the game is, then does each input on the way and waits for each screen's marker. A popup that shows is
  * closed on the way.
  *
+ * <p>An activity runs on the map (2026-10-16): its body opens with {@code if (!Navigate.to(Screens.TAVERN)) return
+ * Activities.Tavern.NOT_NOW;}, then does its chores on that screen only, clicking the screen's own input pictures. A
+ * chore that leaves the screen walks again with {@code Navigate.to}, never with hand clicks. When a step of the
+ * activity gets stuck, the run walks back to the screen its last {@code Navigate.to} reached and runs the activity
+ * once more, before the run's home.
+ *
  * <p>A block's screen is picked from the map ({@code ScreenEditors}); one dropped and not picked yet is {@code null},
  * which every method here reads as no screen.
  */
@@ -40,11 +46,17 @@ public final class Navigate {
             Debug.log((screen == null ? "No screen" : screen.name()) + " is not in the bot's screen map.");
             return false;
         }
+        // Forgotten while walking: a walk that gets stuck is no step to walk back from to where it set out.
+        ScreenMaps.reached(null);
         ScreenWalk.Result walked = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, constant -> tell(map, constant))
                 .uncovering().go(target.get(), ScreenMaps.lastSeen());
         ScreenMaps.seen(walked.at());
         return switch (walked.outcome()) {
-            case ARRIVED -> true;
+            case ARRIVED -> {
+                // Where the activity walks back to when one of its steps gets stuck.
+                ScreenMaps.reached(target.get());
+                yield true;
+            }
             case NOT_NOW, LOCKED, STOPPED -> {
                 Debug.log(walked.why());
                 yield false;

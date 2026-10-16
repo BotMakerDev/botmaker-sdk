@@ -44,6 +44,10 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   way back that clicks a picture), then Escape when asked. A `Navigate` walk (`uncovering()`) does that once,
   after a second look, and says so; the assistant's walks never do. A timed-out wait clicks only, through
   `PopupGuard.uncover`, which warns "an unmapped popup covered …: map it in Upkeep".
+- **Activities run on the map** (2026-10-16): a body opens with `Navigate.to(Screens.X)`, which on arrival sets
+  `ScreenMaps.reached`. `FlowWalker` clears it as each activity starts; a `BotStuckException` from the body walks back
+  there (`Navigate.to`) and runs the body once more, before the run's home. `InstalledRun.home()` is the run's home
+  method, else a walk to `ScreenGraph.root()` (the first screen reached from none, popups aside).
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
   `ToolReach` for the assistant. `perform` is the one place an input is done.
 - **Telemetry**: Navigate fires `on screen <CONSTANT>` (`ScreenStep`); the run bar and 🗺 Screens show its name.

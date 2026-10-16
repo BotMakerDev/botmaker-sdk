@@ -36,9 +36,9 @@ final class Protocol {
                   marker with popup true and its way out with back true (its close button, or the choice that
                   closes it: Offline progress' Claim). The run closes them before every look.
                 - Done when a run started from three different screens reaches home each time.
-                - Once Discovery has mapped Home, the home method can be Navigate.to(Screens.HOME): it walks the
-                  map's back inputs and closes the popups it knows on the way. A screen off the map throws, and
-                  the run recovers by restarting the game.
+                - Once Discovery has mapped Home, the home method can go: with none, the run walks to the map's
+                  root screen (Navigate.to(Screens.HOME)) by its back inputs, closing the popups it knows on the
+                  way. A screen off the map throws, and the run recovers by restarting the game.
                 """),
         DISCOVERY("Stage 1, Discovery: know the game before writing any body", """
                 - Every screen is explored the same way, Home first. The map is the bot's Screens class, one
@@ -111,10 +111,10 @@ final class Protocol {
                 - Use the game's shortcut for a chore before writing a loop that repeats a click.
                 - Before writing a step, find it: describe looks, click, key and scroll act. Then write it in the
                   activity's body and run_activity it.
-                - A body first proves its screen's entrance is there. When it sees the lock picture instead, it
-                  returns LOCKED: connect the activity on LOCKED to the activity after it in the lap, so the flow
-                  comes back to it next lap. When it sees neither, it does not guess: the step fails and the run
-                  reports it.
+                - A body opens with Navigate.to(Screens.X), X the screen its chore is on. False (the way there is
+                  locked or closed now) returns its LOCKED or NOT_NOW outcome: connect the activity on it to the
+                  activity after it in the lap, so the flow comes back to it next lap. Then it clicks X's own
+                  inputs only; a chore that leaves X walks again with Navigate.to, never with hand clicks.
                 - A click can be missed and a screen can be slow (lag, a dropped connection), so a step repeats
                   until the screen shows it worked, never clicks once and trusts it. Write a body out of the loop
                   methods that take a lambda: ImageFinder.whileFindAny, whileFindAll, ifFindAny (group, found ->
@@ -124,9 +124,10 @@ final class Protocol {
                   which pictures this frame shows, ImageClicker.click(found.get(X)) or clickLast() act on them
                   without looking again. A group is ImageTemplateGroup.of(…, …). No loop blocks, no chain of
                   separate find-then-click calls.
-                - A loop that runs BotSettings.maxRounds rounds (50) without ending throws BotStuckException, and
-                  the run recovers through the home method, restarting the game when that fails too: a body does
-                  not count its own tries.
+                - A loop that runs BotSettings.maxRounds rounds (50) without ending throws BotStuckException: the
+                  run walks back to the screen the body's Navigate.to reached and runs the body once more, then
+                  recovers through the home, restarting the game when that fails too. A body does not count its
+                  own tries.
                 - Click pictures, never places: no Mouse.click on x, y, which cannot tell whether
                   they landed. A tab or button gets a picture. Scroll and drag on pictures too:
                   ImageScroller.scrollAt(item, notches), drag(item, dx, dy) (fractions of the game's window) and
@@ -237,7 +238,8 @@ final class Protocol {
      */
     static Where where(boolean hasHome, ScreenGraph graph) {
         Map<String, String> screens = new LinkedHashMap<>();
-        if (!hasHome) return new Where(Stage.SETUP, "the bot has no home method.", screens);
+        // A map with a root is a way home of its own: a run with no home method walks there.
+        if (!hasHome && graph.root().isEmpty()) return new Where(Stage.SETUP, "the bot has no home method.", screens);
         Stage earliest = null;
         for (String constant : graph.screens().keySet()) {
             GameScreen at = graph.screens().get(constant);
