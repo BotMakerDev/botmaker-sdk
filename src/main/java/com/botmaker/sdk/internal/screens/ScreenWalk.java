@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 
@@ -248,10 +249,12 @@ public final class ScreenWalk {
         if (via.act() == Input.Act.KEY) return true;
         if (edge.state() == null && via.variants().isEmpty()) {
             // One a list scrolls to is looked for by the click, which scrolls first.
-            return !via.comesAndGoes() || via.scrollTo() != null || reach.seen(via, frame).isPresent();
+            return !via.comesAndGoes() || listOf(edge).isPresent() || reach.seen(via, frame).isPresent();
         }
-        Optional<Reach.Seen> seen = reach.seen(via, frame);
-        if (seen.isEmpty()) return !via.comesAndGoes() && edge.state() == null;
+        Optional<ScreenList> list = listOf(edge);
+        Optional<Reach.Seen> seen = reach.seen(via, list.orElse(null), frame);
+        // A member out of view is looked at once the click scrolls to it.
+        if (seen.isEmpty()) return list.isPresent() || !via.comesAndGoes() && edge.state() == null;
         if (seen.get().state() == State.DISABLED) return false;
         return edge.state() == null || edge.state() == seen.get().state();
     }
@@ -286,7 +289,13 @@ public final class ScreenWalk {
             if (close == null || !reach.perform(close, frame)) reach.key(Key.ESCAPE);
             return true;
         }
-        return reach.perform(edge.via(), frame);
+        return reach.perform(edge.via(), listOf(edge).orElse(null), frame);
+    }
+
+    /** The list of the screen {@code edge} leaves that its input is a member of; empty for one at its place. */
+    private Optional<ScreenList> listOf(ScreenGraph.Edge edge) {
+        GameScreen from = graph.screens().get(edge.from());
+        return from == null ? Optional.empty() : from.listOf(edge.via());
     }
 
     /**

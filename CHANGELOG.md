@@ -21,12 +21,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
-- **Inputs in a list that scrolls.** `Input.within(Rect)` says an input's button is anywhere in a list or column,
-  not at its picture's place: a run looks for it there, so a Home column whose icons shift as others come and go
-  still finds it. `Input.scrollTo(Input)` names the scroll done, up to `Input.SCROLLS` (8) times, while the button
-  is not in view.
-  - The assistant's edit_map `in_list` sets both; `read_map` and 🗺 Screens count anywhere in the list as its place,
-    and one scrolled out of the shot is only a note.
+- **Lists that scroll, named by their buttons.** `GameScreen.lists(List.of(ScreenList.of(-5, List.of(
+  Pictures.TAVERN_HOME, Pictures.ARENA_HOME, …))))` says some of a screen's buttons sit in one list or column. No
+  number places it: a member is looked for anywhere along the band its members were cut in, so a Home column whose
+  icons shift as others come and go still finds it.
+  - A member out of view is scrolled to with the wheel over a member that shows, up to `ScreenList.SCROLLS` (8)
+    times each way. A scroll after which no member moved met the list's end, and the scroll turns back once, so a
+    run finds the list scrolled anywhere. Where the members are says it, not the pixels: a list over a moving fight
+    is no longer taken for moving.
+  - The assistant's edit_map `in_list` takes the list's `members` and `notches`; `read_map` and 🗺 Screens count
+    anywhere along the list as a member's place, and one scrolled out of the shot is only a note.
 - **Round and free-shape pictures.** A picture can be cut as an oval or as a polygon you click corner by corner;
   what lies outside it is transparent, and a run skips it, so a round button or an odd-shaped icon matches over any
   background.

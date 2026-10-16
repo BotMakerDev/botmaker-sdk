@@ -2,13 +2,13 @@ package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
 import com.botmaker.sdk.api.screens.Reached;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Variant;
@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -84,9 +85,18 @@ class ScreenTypesTest {
         assertTrue(ScreenTypes.KEY_SHAPE.writes(key));
         assertFalse(ScreenTypes.CLICK_SHAPE.writes(key));
         assertFalse(ScreenTypes.SCROLL_SHAPE.writes(click));
-        Input listed = Input.click(picture("campaign")).within(new Rect(0, 180, 140, 760))
-                .scrollTo(Input.scroll(picture("column"), -3));
-        assertEquals(listed, roundTrip(ScreenTypes.CLICK_SHAPE, listed), "its list and its scroll go with it");
+    }
+
+    @Test
+    void aListIsWrittenByItsMembersAndGoesWithItsScreen() {
+        ScreenList column = ScreenList.of(-5, List.of(picture("tavern_home"), picture("campaign_home")));
+        assertEquals(column, roundTrip(ScreenTypes.LIST_SHAPE, column));
+        GameScreen home = GameScreen.named("Home").markers(List.of(picture("town")))
+                .inputs(List.of(Input.click(picture("tavern_home")), Input.click(picture("campaign_home"))))
+                .lists(List.of(column));
+        assertEquals(home, roundTrip(ScreenTypes.SCREEN_SHAPE, home), "its lists go with it");
+        assertEquals(Optional.of(column), home.listOf(Input.click(picture("campaign_home"))));
+        assertEquals(Optional.empty(), home.listOf(Input.click(picture("town"))));
     }
 
     @Test

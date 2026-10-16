@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
 import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
@@ -99,9 +100,13 @@ class MapAuditTest {
     @Test
     void anInputInItsListIsAtItsPlaceAnywhereInItAndScrolledOutIsANote() throws IOException {
         Map<String, FrameCut> cuts = home();
-        Rect column = new Rect(0, 0, WIDTH, HEIGHT);
-        GameScreen listed = GameScreen.named("Home").markers(marks("home")).inputs(List.of(
-                Input.click(picture("moved")).within(column), Input.click(picture("gone")).within(column)));
+        // The list runs along its members' places, grown by the largest: 400..600 by 200..290, grown by 40.
+        ImageTemplate moved = picture("moved").at(new Rect(400, 200, SIZE, SIZE));
+        ImageTemplate out = picture("gone").at(new Rect(560, 250, SIZE, SIZE));
+        Rect column = new Rect(360, 160, 280, 170);
+        GameScreen listed = GameScreen.named("Home").markers(marks("home"))
+                .inputs(List.of(Input.click(moved), Input.click(out)))
+                .lists(List.of(ScreenList.of(-3, List.of(moved, out))));
         Audit audit = MapAudit.of(resources, 0.9, cuts, "HOME", listed).orElseThrow();
         assertEquals(Where.AT_PLACE, audit.of("moved").orElseThrow().where(), "another slot of its list");
         Spot gone = audit.of("gone").orElseThrow();
@@ -109,8 +114,9 @@ class MapAuditTest {
         assertFalse(gone.sure(), "scrolled out of the shot's list is a note, not a fault");
         assertEquals(column, gone.area());
         // Out of a list that does not hold it, it sits elsewhere again.
-        GameScreen narrow = GameScreen.named("Home").markers(marks("home")).inputs(List.of(
-                Input.click(picture("moved")).within(new Rect(380, 180, 80, 80))));
+        ImageTemplate atHome = picture("moved").at(new Rect(20, 20, SIZE, SIZE));
+        GameScreen narrow = GameScreen.named("Home").markers(marks("home")).inputs(List.of(Input.click(atHome)))
+                .lists(List.of(ScreenList.of(-3, List.of(atHome))));
         assertEquals(Where.ELSEWHERE,
                 MapAudit.of(resources, 0.9, cuts, "HOME", narrow).orElseThrow().of("moved").orElseThrow().where());
     }

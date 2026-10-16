@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Variant;
@@ -333,6 +334,12 @@ final class MapTools {
                     : base.locked(FxCall.call(() -> ScreenBook.picture(services, input.locked().strip())));
             return new Tried(up(context, noted(services, screen, old, settled, never ? "never, " + input.never()
                     .strip() : "locked by " + input.locked().strip(), ask), screen, input), true);
+        }
+        Optional<ScreenList> list = notches == 0 ? on.listOf(base) : Optional.empty();
+        if (list.isPresent()) {
+            // A member of a list out of view is scrolled to first, as a run scrolls to it.
+            ToolReach.of(context).ifPresent(reach -> reach.look()
+                    .ifPresent(frame -> reach.inView(base, list.get(), frame)));
         }
         ActTools.Entered first = ActTools.enter(context, screen, byPicture ? what : null, notches, key.orElse(null),
                 input.desktop(), settle, FrameChange.ANSWER_SHARE);
@@ -1262,7 +1269,7 @@ final class MapTools {
         ImageTemplate cut = FxCall.call(() -> ScreenBook.picture(services, picture));
         if (notches == 0) return Input.click(cut);
         return held.map(click -> new Input(Input.Act.SCROLL, cut, null, notches, null, click.kind(), null,
-                click.comesAndGoes(), null, click.variants(), click.area(), click.scrollTo(), click.when())).orElse(Input.scroll(cut, notches));
+                click.comesAndGoes(), null, click.variants(), click.when())).orElse(Input.scroll(cut, notches));
     }
 
     private static Input kinded(Input input, Optional<Kind> kind) {
@@ -1282,8 +1289,12 @@ final class MapTools {
         }
         List<Input> inputs = new ArrayList<>(screen.inputs());
         int at = old == null ? -1 : inputs.indexOf(old);
-        if (at >= 0 && now == null) inputs.remove(at);
-        else if (at >= 0) inputs.set(at, now);
+        if (at >= 0 && now == null) {
+            inputs.remove(at);
+            // An input taken off is off its list too.
+            if (old.picture() != null) return screen.inputs(inputs)
+                    .lists(ScreenGraph.withoutMember(screen.lists(), old.picture().id()));
+        } else if (at >= 0) inputs.set(at, now);
         else if (now != null && inputs.stream().noneMatch(now::equals)) inputs.add(now);
         return screen.inputs(inputs);
     }

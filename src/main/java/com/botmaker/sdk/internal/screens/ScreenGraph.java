@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Variant;
@@ -524,7 +525,7 @@ public final class ScreenGraph {
             List<Input> back = without(List.of(now.back()), id);
             now = now.back(back.isEmpty() ? null : back.getFirst());
         }
-        now = now.inputs(without(now.inputs(), id));
+        now = now.inputs(without(now.inputs(), id)).lists(withoutMember(now.lists(), id));
         List<ScreenVariant> looks = new ArrayList<>();
         for (ScreenVariant look : now.variants()) {
             looks.add(look.markers(butPicture(look.markers(), id)).absent(butPicture(look.absent(), id))
@@ -547,6 +548,19 @@ public final class ScreenGraph {
             if (is(input.picture(), id)) continue;
             Input now = input.variants(input.variants().stream().filter(v -> !is(v.picture(), id)).toList());
             kept.add(is(now.lock(), id) ? now.locked(null) : now);
+        }
+        return kept;
+    }
+
+    /**
+     * {@code lists} with the member whose id is {@code id} gone, its input gone with it; a list left with one member
+     * or none is no list.
+     */
+    public static List<ScreenList> withoutMember(List<ScreenList> lists, String id) {
+        List<ScreenList> kept = new ArrayList<>();
+        for (ScreenList list : lists) {
+            List<ImageTemplate> members = butPicture(list.members(), id);
+            if (members.size() > 1) kept.add(ScreenList.of(list.notches(), members));
         }
         return kept;
     }

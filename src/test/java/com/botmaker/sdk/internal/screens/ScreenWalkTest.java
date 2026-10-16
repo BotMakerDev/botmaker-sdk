@@ -5,6 +5,9 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.ScreenList;
+import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.Variant;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -84,6 +87,8 @@ class ScreenWalkTest {
         final ScreenGraph map = map();
         final Map<String, Set<String>> shows = new HashMap<>();
         final Map<String, String> leads = new HashMap<>();
+        /** What an input brings into view on the screen it is done on: a list scrolled. */
+        final Map<String, String> reveals = new HashMap<>();
         final List<String> done = new ArrayList<>();
         final List<String> places = new ArrayList<>();
         String screen;
@@ -136,6 +141,8 @@ class ScreenWalkTest {
                 if (way || escape) popup = null;
                 return;
             }
+            String shown = reveals.get(key);
+            if (shown != null) shows.get(screen).add(shown);
             String next = leads.get(key);
             if (next != null) screen = next;
         }
@@ -193,6 +200,35 @@ class ScreenWalkTest {
         assertEquals(List.of("click campaign", "click map"), game.done);
         assertEquals(List.of("CAMPAIGN", "MAP"), walked.walked());
         assertEquals(List.of("HOME", "CAMPAIGN", "MAP"), reached, "the screen it starts on is told, then each reached");
+    }
+
+    /** A way in that is a list member out of view: the list is scrolled over a member that shows, then it is clicked. */
+    @Test
+    void aWayInThatIsAListMemberOutOfViewIsScrolledToFirst() {
+        Game game = new Game("HOME");
+        game.shows.get("HOME").remove("engineer");
+        game.reveals.put("HOME scroll campaign -1", "engineer");
+        Map<String, GameScreen> screens = new LinkedHashMap<>(game.map.screens());
+        screens.put("HOME", screens.get("HOME").lists(List.of(
+                ScreenList.of(-1, List.of(picture("campaign"), picture("engineer"))))));
+
+        ScreenWalk.Result walked = new ScreenWalk(ScreenGraph.of(screens), game, STEP_MS, s -> {}).go("ENGINEER", null);
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.toString());
+        assertEquals(List.of("scroll campaign -1", "click engineer"), game.done);
+
+        // A member with another look is taken too: out of view, it is open, and the click scrolls first.
+        Game badged = new Game("HOME");
+        badged.shows.get("HOME").remove("engineer");
+        badged.reveals.put("HOME scroll campaign -1", "engineer");
+        List<Input> inputs = new ArrayList<>(screens.get("HOME").inputs());
+        inputs.replaceAll(i -> i.picture() != null && i.picture().id().equals("engineer")
+                ? i.variants(List.of(Variant.of(picture("engineer_badge"), State.BADGE))) : i);
+        screens.put("HOME", screens.get("HOME").inputs(inputs));
+        ScreenWalk.Result badgedWalk = new ScreenWalk(ScreenGraph.of(screens), badged, STEP_MS, s -> {})
+                .go("ENGINEER", null);
+        assertEquals(ScreenWalk.Outcome.ARRIVED, badgedWalk.outcome(), badgedWalk.toString());
+        assertEquals(List.of("scroll campaign -1", "click engineer"), badged.done);
     }
 
     /** A screen opened through an alsoFrom hides the screen it was opened from too, not only its tree parent. */

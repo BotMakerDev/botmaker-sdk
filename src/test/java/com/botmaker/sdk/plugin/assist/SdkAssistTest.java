@@ -32,6 +32,7 @@ import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
@@ -1594,30 +1595,29 @@ class SdkAssistTest {
                 .toList());
     }
 
-    /** edit_map in_list: an input looked for anywhere in its list, and the scroll that brings it into view. */
+    /** edit_map in_list: a list named by the screen's inputs in it, scrolled over a member that shows. */
     @Test
-    void editMapPutsAnInputInAListThatScrolls() throws IOException {
-        for (String name : List.of("campaign", "column")) TemplateLibrary.saveTemplate(resources, patch(), name);
+    void editMapMakesAListOfTheScreensInputs() throws IOException {
+        for (String name : List.of("tavern", "campaign", "mail")) TemplateLibrary.saveTemplate(resources, patch(), name);
         host.set("screen_map").put("HOME", TestContexts.row(Object.class, "").withValue(GameScreen.named("Home")
-                .markers(marks("ore")).inputs(List.of(Input.click(picture("campaign")),
-                        Input.key(Key.named("Q").orElseThrow())))));
-        Map<String, Object> column = Map.of("x", 0, "y", 180, "width", 140, "height", 760, "scroll", "column",
-                "notches", -3);
+                .markers(marks("ore")).inputs(List.of(Input.click(picture("tavern")), Input.click(picture("campaign")),
+                        Input.click(picture("mail")), Input.key(Key.named("Q").orElseThrow())))));
 
-        AgentReply listed = run("edit_map", "screen", "Home", "action", "in_list", "picture", "campaign", "list", column);
+        AgentReply listed = run("edit_map", "screen", "Home", "action", "in_list", "members",
+                List.of("tavern", "campaign"), "notches", -5);
         assertFalse(listed.isRefused(), text(listed));
-        Input campaign = screen("HOME").inputs().getFirst();
-        assertEquals(new Rect(0, 180, 140, 760), campaign.area());
-        assertEquals("scroll column -3", campaign.scrollTo().label());
+        assertEquals(1, screen("HOME").lists().size());
+        ScreenList column = screen("HOME").lists().getFirst();
+        assertEquals(-5, column.notches());
+        assertEquals(List.of("tavern", "campaign"), column.members().stream().map(ImageTemplate::id).toList());
 
-        assertTrue(run("edit_map", "screen", "Home", "action", "in_list", "key", "Q", "list", column).isRefused(),
-                "a key is in no list");
-        Map<String, Object> noNotches = Map.of("x", 0, "y", 180, "width", 140, "height", 760, "scroll", "column");
-        assertTrue(run("edit_map", "screen", "Home", "action", "in_list", "picture", "campaign", "list", noNotches)
-                .isRefused(), "a scroll says how far");
-        run("edit_map", "screen", "Home", "action", "in_list", "picture", "campaign");
-        assertNull(screen("HOME").inputs().getFirst().area(), "no list: back at its place");
-        assertNull(screen("HOME").inputs().getFirst().scrollTo());
+        assertTrue(text(run("edit_map", "screen", "Home", "action", "in_list", "members", List.of("gem"),
+                "notches", -5)).startsWith(ScreenEdits.NOT_WRITTEN), "a member is one of the screen's inputs");
+        run("edit_map", "screen", "Home", "action", "in_list", "members", List.of("campaign", "mail"), "notches", -3);
+        assertEquals(List.of("campaign", "mail"), screen("HOME").lists().getFirst().members().stream()
+                .map(ImageTemplate::id).toList(), "a list holding a member is replaced");
+        run("edit_map", "screen", "Home", "action", "in_list", "members", List.of("mail"));
+        assertEquals(List.of(), screen("HOME").lists(), "no notches: the list is off");
     }
 
     private static ImageTemplate picture(String name) {

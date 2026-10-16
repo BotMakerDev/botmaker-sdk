@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Variant;
@@ -103,6 +104,12 @@ class ScreenGraphTest {
                 .withVariant(ScreenVariant.named("Halloween").markers(marks("bat")));
         assertEquals(List.of("Halloween", "Winter"), withLooks.variants().stream().map(ScreenVariant::name).toList(),
                 "a look edited keeps its place");
+        GameScreen listed = GameScreen.named("Home").lists(List.of(
+                ScreenList.of(-5, List.of(picture("tavern"), picture("arena"), picture("campaign")))));
+        assertEquals(List.of("tavern", "campaign"), ScreenGraph.without(listed, "arena").lists().getFirst().members()
+                .stream().map(ImageTemplate::id).toList(), "a picture gone is off its list");
+        assertEquals(List.of(), ScreenGraph.without(ScreenGraph.without(listed, "arena"), "tavern").lists(),
+                "a list of one is no list");
     }
 
     @Test

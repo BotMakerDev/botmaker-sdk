@@ -16,6 +16,10 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   way out only.
 - **`Input`**: a picture click, a key or a scroll, with `did` (IN_PLACE, NONE, LEAVES; null while untried),
   `kind` (CHORE, SHORTCUT, CHOICE, INFO), `never`, `sometimes`, `locked`, `when` and button looks (`variants`).
+- **`ScreenList`** (`GameScreen.lists`): some of a screen's inputs in one list that scrolls or column whose slots
+  shift, named by their pictures and its `notches` — never by a rectangle (the user's call, 2026-10-16, after Home's
+  left column over a moving fight). A member is looked for anywhere in the band its members were cut in
+  (`Reach.band`: their places, grown by the largest).
 - **`Way`**: a parent and the input that opens the screen. Its input is a bare copy; `ScreenGraph.via` reads the
   parent's current input that `sameAs` it, so a look, a lock or a `when` added later counts (2026-10-15).
 - **Conditions** (`Input.when`, `Way.when`, `ScreenVariant.when`) are method references only
@@ -49,7 +53,9 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   there (`Navigate.to`) and runs the body once more, before the run's home. `InstalledRun.home()` is the run's home
   method, else a walk to `ScreenGraph.root()` (the first screen reached from none, popups aside).
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
-  `ToolReach` for the assistant. `perform` is the one place an input is done.
+  `ToolReach` for the assistant. `perform` is the one place an input is done. A list member not in view is scrolled
+  to over a member that shows (past them all, where the last one showed), `ScreenList.SCROLLS` each way; a scroll
+  after which every member that shows sits where it was (`Reach.still`, 4 px) met the end and turns back once.
 - **Telemetry**: Navigate fires `on screen <CONSTANT>` (`ScreenStep`); the run bar and 🗺 Screens show its name.
 
 ## The assistant's tools (`plugin/assist`)

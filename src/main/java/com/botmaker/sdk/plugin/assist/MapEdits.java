@@ -5,16 +5,17 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
-import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -133,23 +134,13 @@ final class MapEdits {
                      @Describe(value = "", optional = true) String method) implements Edit, OfInput {
     }
 
-    /** A list or column an input is anywhere in, and the scroll that brings it into view. */
-    record Listed(int x, int y, int width, int height,
-                  @Describe(value = "a picture scrolled over to bring the input into view", optional = true)
-                  String scroll,
-                  @Describe(value = "each scroll's notches, negative down", optional = true) Integer notches) {
-
-        Rect area() {
-            return new Rect(x, y, width, height);
-        }
-    }
-
-    @Describe("an input anywhere in a list that scrolls or shifts, scrolled to; no list: at its place")
-    record InList(String screen, @Describe(value = "", optional = true) String picture,
-                  @Describe(value = "", optional = true) Integer scroll,
-                  @Describe(value = "", optional = true) String key,
-                  @Describe(value = "", optional = true) Listed list)
-            implements Edit, OfInput {
+    @Describe("a list that scrolls or whose slots shift, by its inputs: each found anywhere along it, scrolled to "
+            + "over another that shows; no notches: the list is off")
+    record InList(String screen,
+                  @Describe(value = "the pictures of the screen's inputs in it, in its order", optional = true)
+                  List<String> members,
+                  @Describe(value = "each scroll's notches, negative down", optional = true) Integer notches)
+            implements Edit {
     }
 
     @Describe("a look of the screen that shows only while method holds")
@@ -231,29 +222,31 @@ final class MapEdits {
                     in)));
             case InputWhen when -> onInput(when, graph, screen, on,
                     in -> said(ScreenEdits.setInputWhen(services, screen, in, method(when.method()))));
-            case InList listed -> onInput(listed, graph, screen, on,
-                    in -> said(listed(context, screen, in, listed.list())));
+            case InList listed -> said(listed(context, screen, on, listed));
         };
     }
 
     /**
-     * {@code in} of {@code screen} anywhere in {@code list}, scrolled to by its scroll; {@code list} null puts it back
-     * at its place. Said in a sentence, beginning {@link ScreenEdits#NOT_WRITTEN} when nothing was. On the FX thread.
+     * {@code screen}'s list of {@code listed}'s members, each one of its inputs' pictures, as the screen holds them (with
+     * the place each was cut at, which says where the list runs); no notches takes the lists holding them off. Said in
+     * a sentence, beginning {@link ScreenEdits#NOT_WRITTEN} when nothing was. On the FX thread.
      */
-    static String listed(AgentContext context, String screen, Input in, Listed list) {
-        if (in.act() == Input.Act.KEY) return ScreenEdits.NOT_WRITTEN + "a key is in no list.";
-        if (list == null) return ScreenEdits.setList(context.services(), screen, in, null, null);
-        if (list.width() <= 0 || list.height() <= 0) return ScreenEdits.NOT_WRITTEN + "a list has a width and a height.";
-        Input scroll = null;
-        if (has(list.scroll())) {
-            String over = list.scroll().strip();
-            if (!ActTools.exists(context, over)) return ScreenEdits.NOT_WRITTEN + Frames.noPicture(over);
-            if (list.notches() == null || list.notches() == 0) {
-                return ScreenEdits.NOT_WRITTEN + "give notches with scroll: negative down, positive up.";
+    static String listed(AgentContext context, String screen, GameScreen on, InList listed) {
+        List<String> names = listed.members() == null ? List.of()
+                : listed.members().stream().filter(MapEdits::has).map(String::strip).toList();
+        if (names.isEmpty()) return ScreenEdits.NOT_WRITTEN + "name the pictures of the inputs in the list (members).";
+        List<ImageTemplate> members = new ArrayList<>();
+        for (String name : names) {
+            Optional<ImageTemplate> member = on.allInputs().stream().filter(i -> i.act() != Input.Act.KEY)
+                    .map(Input::picture).filter(p -> p.id().equalsIgnoreCase(name)).findFirst();
+            if (member.isEmpty()) {
+                return ScreenEdits.NOT_WRITTEN + name + " is no input of " + on.name() + ": cut it there with "
+                        + "crop_pictures first.";
             }
-            scroll = Input.scroll(ScreenBook.picture(context.services(), over), list.notches());
+            members.add(member.get());
         }
-        return ScreenEdits.setList(context.services(), screen, in, list.area(), scroll);
+        int notches = listed.notches() == null ? 0 : listed.notches();
+        return ScreenEdits.setList(context.services(), screen, ScreenList.of(notches, members));
     }
 
     /**

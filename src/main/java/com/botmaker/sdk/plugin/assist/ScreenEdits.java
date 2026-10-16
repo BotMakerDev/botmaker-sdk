@@ -3,9 +3,9 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
 
 /**
  * The map edited by hand from 🗺 Screens' side panel: what the assistant's tools record by trying, set by the user
@@ -48,21 +49,19 @@ public final class ScreenEdits {
      */
     public static Input untried(Input input) {
         return new Input(input.act(), input.picture(), input.key(), input.notches(), null, input.kind(), null,
-                input.comesAndGoes(), null, input.variants(), input.area(), input.scrollTo(), input.when());
+                input.comesAndGoes(), null, input.variants(), input.when());
     }
 
     /** {@code input} shown only at times, or always ({@code sometimes} false: when it is there goes too). */
     public static Input sometimes(Input input, boolean sometimes) {
         return new Input(input.act(), input.picture(), input.key(), input.notches(), input.did(), input.kind(),
-                input.never(), sometimes, input.lock(), input.variants(), input.area(), input.scrollTo(),
-                sometimes ? input.when() : null);
+                input.never(), sometimes, input.lock(), input.variants(), sometimes ? input.when() : null);
     }
 
     /** {@code input}, with no kind named. */
     public static Input unkinded(Input input) {
         return new Input(input.act(), input.picture(), input.key(), input.notches(), input.did(), null,
-                input.never(), input.comesAndGoes(), input.lock(), input.variants(), input.area(), input.scrollTo(),
-                input.when());
+                input.never(), input.comesAndGoes(), input.lock(), input.variants(), input.when());
     }
 
     /** Puts {@code now} where {@code old} is on {@code constant}; {@code now} null removes it. */
@@ -72,15 +71,24 @@ public final class ScreenEdits {
     }
 
     /**
-     * Puts {@code input} of {@code constant} anywhere in {@code area} of its frame, brought into view by {@code scroll}
-     * (null: nothing scrolls it); {@code area} null puts it back at its picture's place, with no scroll.
+     * Makes {@code list} one of {@code constant}'s lists, in place of every list that holds one of its members; a list
+     * of no members (or 0 notches) takes those lists off, their inputs back at their places.
      */
-    public static String setList(StudioServices services, String constant, Input input, Rect area, Input scroll) {
-        Input now = input.within(area).scrollTo(area == null ? null : scroll);
-        String where = area == null ? input.label() + " is looked for at its picture's place."
-                : input.label() + " is looked for anywhere in " + area.x() + "," + area.y() + " " + area.width() + "×"
-                + area.height() + (now.scrollTo() == null ? "" : ", scrolled to by " + now.scrollTo().label()) + ".";
-        return said(ScreenBook.update(services, constant, s -> MapTools.replaced(s, input, now)), where);
+    public static String setList(StudioServices services, String constant, ScreenList list) {
+        boolean off = list.members().isEmpty() || list.notches() == 0;
+        String names = list.members().stream().map(ImageTemplate::id).collect(Collectors.joining(", "));
+        return said(ScreenBook.update(services, constant, s -> s.lists(listsWith(s.lists(), list, off))),
+                off ? "The list is off " + constant + ": its inputs are looked for at their places."
+                        : constant + " has a list of " + names + ", each found anywhere along it and scrolled to by "
+                        + list.notches() + " notches over another that shows.");
+    }
+
+    /** {@code lists} without any holding one of {@code list}'s members, and {@code list} last unless {@code off}. */
+    static List<ScreenList> listsWith(List<ScreenList> lists, ScreenList list, boolean off) {
+        List<ScreenList> now = new ArrayList<>(lists.stream()
+                .filter(l -> list.members().stream().noneMatch(l::has)).toList());
+        if (!off) now.add(list);
+        return now;
     }
 
     /** Makes {@code input} {@code constant}'s way back, off its inputs; the way back it had is an untried input again. */

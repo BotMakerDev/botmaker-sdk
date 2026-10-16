@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.screens.Markers;
+import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.Places;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
@@ -293,18 +294,18 @@ public final class MapAudit {
         List<Input> named = new ArrayList<>(screen.inputs());
         if (screen.back() != null) named.add(screen.back());
         for (Input input : named) {
-            // One in a list may be scrolled out of the shot.
+            // One in a list may be scrolled out of the shot, and is anywhere along it.
+            Rect band = Reach.band(screen.listOf(input).orElse(null));
             boolean sure = !input.comesAndGoes() && input.lock() == null && input.variants().isEmpty()
-                    && input.area() == null;
-            for (Variant look : input.looks()) add(checks, resources, look.picture(), false, sure, input.area());
+                    && band == null;
+            for (Variant look : input.looks()) add(checks, resources, look.picture(), false, sure, band);
             if (input.lock() != null) add(checks, resources, input.lock(), false, false, null);
         }
         for (ScreenVariant look : screen.variants()) {
             for (ImageTemplate marker : look.markers()) add(checks, resources, marker, false, false, null);
             for (Input input : look.inputs()) {
-                for (Variant button : input.looks()) {
-                    add(checks, resources, button.picture(), false, false, input.area());
-                }
+                Rect band = Reach.band(screen.listOf(input).orElse(null));
+                for (Variant button : input.looks()) add(checks, resources, button.picture(), false, false, band);
             }
         }
         return checks;

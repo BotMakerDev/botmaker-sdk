@@ -4,13 +4,13 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Held;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
 import com.botmaker.sdk.api.screens.Reached;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Variant;
@@ -47,6 +47,7 @@ public final class ScreenTypes {
             .<List<Way>>with(GameScreen::alsoFrom, GameScreen::alsoFrom)
             .<Input>with(GameScreen::back, GameScreen::back)
             .<List<Input>>with(GameScreen::inputs, GameScreen::inputs)
+            .<List<ScreenList>>with(GameScreen::lists, GameScreen::lists)
             .<List<ScreenVariant>>with(GameScreen::variants, GameScreen::variants)
             .flag(GameScreen::popup, GameScreen::isPopup)
             .<String>with(GameScreen::notes, GameScreen::notes)
@@ -105,6 +106,11 @@ public final class ScreenTypes {
             .<ImageTemplate, Integer, Input>writtenAs(Input::scroll, Input::picture, Input::notches))
             .when(input -> input.act() == Input.Act.SCROLL);
 
+    /** {@code ScreenList.of(int, List<ImageTemplate>)}: a list of a screen's inputs, by their pictures. */
+    public static final DeclaredCall<ScreenList> LIST_SHAPE = ComponentType.part(ScreenList.class)
+            .<Integer, List<ImageTemplate>, ScreenList>writtenAs(ScreenList::of, ScreenList::notches,
+                    ScreenList::members);
+
     /** {@code call} with every input's links, in the order they are written: one list for the three acts. */
     private static DeclaredCall<Input> inputLinks(DeclaredCall<Input> call) {
         return call
@@ -114,14 +120,12 @@ public final class ScreenTypes {
                 .flag(Input::sometimes, Input::comesAndGoes)
                 .<ImageTemplate>with(Input::locked, Input::lock)
                 .<List<Variant>>with(Input::variants, Input::variants)
-                .<Rect>with(Input::within, Input::area)
-                .<Input>with(Input::scrollTo, Input::scrollTo)
                 .<BooleanSupplier>with(Input::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
     }
 
     /** The screen map's shapes, which {@code SdkTypes.PARTS} hands the host. */
     public static final List<ComponentType<?>> ALL = List.of(SCREEN_SHAPE, WAY_SHAPE, SCREEN_VARIANT_SHAPE,
-            VARIANT_SHAPE, CLICK_SHAPE, KEY_SHAPE, SCROLL_SHAPE);
+            VARIANT_SHAPE, CLICK_SHAPE, KEY_SHAPE, SCROLL_SHAPE, LIST_SHAPE);
 
     /** A condition that only knows what it is written as — {@code Firestone::eventOn} — or {@code null}. */
     public static BooleanSupplier condition(String source) {

@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.screens;
 
-import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
@@ -22,9 +21,8 @@ import java.util.function.BooleanSupplier;
  * <p>A button that changes its look stays one input: each other look is one of its {@link #variants}, with what it
  * means (the user's call, 2026-10-15). Any of them finds it; a {@link State#DISABLED disabled} one is not pressed.
  *
- * <p>A button in a list that scrolls, or in a column whose slots shift as icons come and go, is looked for anywhere
- * {@link #within} the list rather than at its place, and {@link #scrollTo} says which scroll brings it into view.
- * Home's left column put Campaign 160 px below where it was cut (2026-10-16).
+ * <p>A button in a list that scrolls, or in a column whose slots shift, is a member of one of its screen's
+ * {@link GameScreen#lists lists}: the list says where it is looked for and how it is scrolled to.
  *
  * @param act          what is done
  * @param picture      the picture clicked or scrolled over, as the button usually looks; null for a key
@@ -36,19 +34,11 @@ import java.util.function.BooleanSupplier;
  * @param comesAndGoes whether it shows only at times: a Claim when loot is ready, an event's icon
  * @param lock         the picture proving it locked on this account; null when it is not
  * @param variants     the button's other looks, each with what it means
- * @param area         the list or column its button is anywhere in, in the frame its picture was cut from; null
- *                     when it sits at its picture's place
- * @param scrollTo     the scroll done, up to {@link #SCROLLS} times, while its button is not in its area; null when
- *                     nothing scrolls it into view
  * @param when         when it is there, for one that comes and goes: a method answering whether it is; null when
  *                     not known
  */
 public record Input(Act act, ImageTemplate picture, Key key, int notches, Did did, Kind kind, String never,
-                    boolean comesAndGoes, ImageTemplate lock, List<Variant> variants, Rect area, Input scrollTo,
-                    BooleanSupplier when) {
-
-    /** The most times {@link #scrollTo} is done looking for a button: a list longer than that is a screen's own. */
-    public static final int SCROLLS = 8;
+                    boolean comesAndGoes, ImageTemplate lock, List<Variant> variants, BooleanSupplier when) {
 
     /** What an input does. */
     public enum Act { CLICK, KEY, SCROLL }
@@ -61,76 +51,52 @@ public record Input(Act act, ImageTemplate picture, Key key, int notches, Did di
 
     /** {@code picture} clicked at its best match. */
     public static Input click(ImageTemplate picture) {
-        return new Input(Act.CLICK, picture, null, 0, null, null, null, false, null, null, null, null, null);
+        return new Input(Act.CLICK, picture, null, 0, null, null, null, false, null, null, null);
     }
 
     /** {@code key} pressed. */
     public static Input key(Key key) {
-        return new Input(Act.KEY, null, key, 0, null, null, null, false, null, null, null, null, null);
+        return new Input(Act.KEY, null, key, 0, null, null, null, false, null, null, null);
     }
 
     /** {@code notches} scrolled over {@code picture}'s best match: a list or a panel that scrolls. */
     public static Input scroll(ImageTemplate picture, int notches) {
-        return new Input(Act.SCROLL, picture, null, notches, null, null, null, false, null, null, null, null, null);
+        return new Input(Act.SCROLL, picture, null, notches, null, null, null, false, null, null, null);
     }
 
     /** This input, tried, having done {@code did}. */
     public Input did(Did did) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, area, scrollTo,
-                when);
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when);
     }
 
     /** This input, named a {@code kind}. */
     public Input kind(Kind kind) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, area, scrollTo,
-                when);
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when);
     }
 
     /** This input, never done because {@code why}: it spends premium currency or real money. */
     public Input never(String why) {
-        return new Input(act, picture, key, notches, did, kind, why, comesAndGoes, lock, variants, area, scrollTo,
-                when);
+        return new Input(act, picture, key, notches, did, kind, why, comesAndGoes, lock, variants, when);
     }
 
     /** This input, showing only at times. */
     public Input sometimes() {
-        return new Input(act, picture, key, notches, did, kind, never, true, lock, variants, area, scrollTo, when);
+        return new Input(act, picture, key, notches, did, kind, never, true, lock, variants, when);
     }
 
     /** This input, proved locked on this account by {@code lock} at its place. */
     public Input locked(ImageTemplate lock) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, area, scrollTo,
-                when);
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when);
     }
 
     /** This input, its button also looking as each of {@code variants} says. */
     public Input variants(List<Variant> variants) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, area, scrollTo,
-                when);
-    }
-
-    /**
-     * This input, its button anywhere in {@code area} rather than at its picture's place: a list that scrolls, or a
-     * column whose slots shift — {@code .within(new Rect(0, 180, 140, 760))}, in the frame its picture was cut from.
-     */
-    public Input within(Rect area) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, area, scrollTo,
-                when);
-    }
-
-    /**
-     * This input, {@code scroll} done while its button is not in its {@link #within area}, up to {@link #SCROLLS}
-     * times: {@code .scrollTo(Input.scroll(Pictures.HEROES_LIST, -3))}.
-     */
-    public Input scrollTo(Input scroll) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, area, scroll,
-                when);
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when);
     }
 
     /** This input, coming and going, there while {@code condition} answers true: {@code Firestone::eventOn}. */
     public Input when(BooleanSupplier condition) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, area, scrollTo,
-                condition);
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, condition);
     }
 
     /** This input with {@code variant} put in place of the one of the same picture, or added last. */
