@@ -79,6 +79,9 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `not_a_screen` turns a screen back into an IN_PLACE result on each of its ways in; `go_to_screen` and
   `which_screen` walk the map as a run does; `read_map` prints it (`plugin/map/MapReport`). The tool refuses while a
   screen owes its marker; a screen finished walks to `nextToExplore`.
+- **Cuts** are a box, a round or a free polygon (`plugin/screen/CutShape`, `PictureCuts.cut/ellipse/polygon`): outside
+  the shape is transparent and the matcher masks by alpha, so a small round icon over a moving background is cut
+  whole without it. `crop_pictures` and its replace take `shape`/`points`; the Capture window's ✎ toggles the shape.
 - **`edit_map`** (`MapEdits`) fixes a wrong record by hand, nothing clicked: rename, delete, popup, notes, an
   input's result or kind, reset or remove an input, use one as the way back, remove a way, a way's, input's or
   look's `when`, a new screen under another. Each action is the `ScreenEdits` method the window's menus call.

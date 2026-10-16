@@ -59,17 +59,14 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 - **`Sound.miaou()`**: tune by ear against Scratch's meow; `play(file)` or a beep would sit on the same
   facade.
 - **Screens, from the Firestone repair (2026-10-16)**:
-  - A scrolling column (Home's left icons in Firestone) moves its inputs by whole slots, and scrolls some out:
-    a copy per screen cannot hold it. An input needs a search area (the column) or a scroll to reach it, and
-    the audit should not flag it.
-  - A round or free-shape cut (outside the shape transparent; the matcher already masks by alpha), so a small
-    round icon is cut whole without its background.
   - `edit_map` rename keeps the constant (`FAVORED_WAR_MACHINES` now names "Select the favored war
     machines", the tab `FAVORED_WAR_MACHINES_2`); Studio's rename refuses `Screens.java`.
   - A crop call that sets a marker and notes inputs on a new screen leaves the inputs unchecked ("no marker
     yet"): check them after the marker is written.
-  - A marker that is a prefix of another screen's title matches both (`artifact_rarity_title` scored 0.80 on
-    Upgrade): `crop_pictures` could refuse a marker another screen's shot shows.
+- **Chores on the map** (the user's proposals, 2026-10-16, a later plan): `Navigate.press(screen, input)` does a
+  chore by the map (the list scroll, which copy, popups closed, where it leads), so a body stops chaining picture
+  clicks; and a first draft of a body generated from the map (`Navigate.to`, then one loop per chore, its disabled
+  look the stop), which the author orders and adds choices to.
 - **A screen's looks on 🗺 Screens** (the user's call, 2026-10-16, a later plan): a `ScreenVariant` (Halloween)
   cannot be shown; each screen keeps one shot and rows only say "look X". Wanted: one shot per look, saved when
   Discovery cuts the look; a look picker on the card and the panel; rows, boxes and list strips filtered to the
