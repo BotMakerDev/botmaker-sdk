@@ -20,7 +20,7 @@ The architecture is in `docs/architecture/`, one file per section (moved there u
 
 | Touching | Read (`docs/architecture/`) |
 |---|---|
-| what goes in `api` vs `internal` vs `plugin`, `@Palette`, `@Records`, `@ReplacedBy` | `api-vs-internal.md` |
+| what goes in `api` vs `internal` vs `plugin`, `@Palette`, `@Records`, renames and removals | `api-vs-internal.md` |
 | a class in `api.*` (`vision`, `text`, `bot`, `flow`, `capture`, `console.Ask`, `BotSettings`, activities/outcomes) | `what-the-api-holds.md` |
 | `internal/*` (`observe`, `config`, `ocr`, `trace`, …) | `internal.md` |
 | `Sdk.java`, `Pictures.java`, `SdkValues` | `plugin-values.md` |

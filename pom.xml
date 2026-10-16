@@ -225,8 +225,8 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- ClassGraph, test only: ApiPointersTest reads @ReplacedBy out of target/classes. Same version as
-             Studio, which reads the same annotations out of a resolved SDK jar. -->
+        <!-- ClassGraph, test only: ApiCatalogTest and PaletteFillabilityTest scan target/classes. Same
+             version as Studio, which scans a resolved SDK jar the same way. -->
         <dependency>
             <groupId>io.github.classgraph</groupId>
             <artifactId>classgraph</artifactId>

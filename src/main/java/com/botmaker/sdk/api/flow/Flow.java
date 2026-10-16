@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.flow;
 
-import com.botmaker.plugin.api.meta.ReplacedBy;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.InstalledRun;
@@ -272,7 +271,6 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
          * still reads; Studio no longer writes it.
          */
         @Deprecated
-        @ReplacedBy(note = "Popups are screens of the bot's map, closed in every activity.")
         public Step checksPopups() {
             return this;
         }

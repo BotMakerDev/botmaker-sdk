@@ -1,6 +1,5 @@
 package com.botmaker.sdk.api.bot;
 
-import com.botmaker.plugin.api.meta.ReplacedBy;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.shared.Diag;
@@ -286,8 +285,6 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
      * applies to a bot run from a terminal; Bot Settings no longer shows it.
      */
     @Deprecated
-    @ReplacedBy(note = "Debug output is chosen with Studio's Debug button (the botmaker.debug run property); "
-            + "this value only applies to a run no host started.")
     @Override
     public boolean debug() {
         return debug;
@@ -501,8 +498,6 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
      * back whole.
      */
     @Deprecated
-    @ReplacedBy(note = "Debug output is chosen with Studio's Debug button (the botmaker.debug run property); "
-            + "this value only applies to a run no host started.")
     public BotSettings debugOff() {
         return debug(false);
     }

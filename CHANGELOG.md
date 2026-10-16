@@ -281,6 +281,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **No `@ReplacedBy` pointers.** `BotSettings.debug()`/`debugOff()` and `Flow.Step.checksPopups()` stay
+  `@Deprecated` without one, and `ApiPointersTest` is gone: a bot carries a removed or reshaped SDK element over
+  with its own `@Migrate` rule (contract 0.10.0).
 - **Activities run on the map.** An activity's body opens with `Navigate.to(Screens.X)` and does its chores on X;
   the guide, `read_guide`'s Build stage and the gamebot template's Collect say so.
   - When a step of an activity throws `BotStuckException` after its `Navigate.to` arrived, the run walks back to

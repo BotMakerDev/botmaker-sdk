@@ -52,10 +52,7 @@
   statement whose method is gone, so the never-delete rule, its japicmp gate and the "2.0.0 is the one
   sanctioned break" wording are retired. Delete outright; no `@Deprecated` is owed.
 
-- **A rename may carry `@ReplacedBy`** (contract's `com.botmaker.plugin.api.meta`), a courtesy Studio's
-  upgrade follows: targets `fqn`, `fqn#member` or `fqn#<init>`; an empty value is an explicit "nothing takes
-  my place"; several values are a split, with a parallel `whens()` sentence per candidate; `note` is shown
-  verbatim; `behaviourChanged = true` forces a review mark and needs a `note`. **`ApiPointersTest`** is the gate
-  (four rules: every deprecated element has a pointer, every target resolves, a behaviour change has its
-  note, a split says when). It is not a coverage rule. `first(…)` filters with `directOnly()`, because these
-  annotations annotate each other.
+- **A rename or removal says nothing in the SDK** (2026-10-16): `@ReplacedBy` and `ApiPointersTest` went. A
+  bot's author carries a bot over with `@Migrate` rules in the bot (contract's `com.botmaker.plugin.api.meta`),
+  which Studio resolves against the jar the bot moves from, so an element may go in one release with no
+  deprecated overlap. Say what replaced what in `CHANGELOG.md`, which is what the author reads.
