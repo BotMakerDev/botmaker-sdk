@@ -70,6 +70,10 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
     yet"): check them after the marker is written.
   - A marker that is a prefix of another screen's title matches both (`artifact_rarity_title` scored 0.80 on
     Upgrade): `crop_pictures` could refuse a marker another screen's shot shows.
+- **A screen's looks on 🗺 Screens** (the user's call, 2026-10-16, a later plan): a `ScreenVariant` (Halloween)
+  cannot be shown; each screen keeps one shot and rows only say "look X". Wanted: one shot per look, saved when
+  Discovery cuts the look; a look picker on the card and the panel; rows, boxes and list strips filtered to the
+  picked look. A button's looks already step with ◀ ▶ (`LookToggle`).
 
 ## Deliberately not planned
 
