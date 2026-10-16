@@ -1,10 +1,13 @@
 package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
@@ -100,7 +103,53 @@ final class ScreenCards {
      */
     record ButtonLook(String picture, com.botmaker.sdk.api.screens.State state, String leads) {}
 
+    /**
+     * One list of a screen as its shot draws it: every member's picture in the list's order, in a strip over the
+     * place the members were cut in, scrolled by the wheel; a member that comes and goes is drawn dimmed.
+     *
+     * @param place   the members' places joined, in the game's frame
+     * @param down    whether the strip runs down (a column), not across
+     * @param members each member's row, in the list's order
+     */
+    record Strip(Rect place, boolean down, List<Row> members) {
+
+        /** Whether {@code row} is drawn in this strip, so the shot boxes it nowhere else. */
+        boolean has(Row row) {
+            return members.stream().anyMatch(m -> m.picture() != null && m.picture().equals(row.picture()));
+        }
+    }
+
     private ScreenCards() {}
+
+    /**
+     * {@code constant}'s lists as its shot draws them, from {@code rows} ({@link #rows}); a list none of whose members
+     * has a place it was cut at is not drawn.
+     */
+    static List<Strip> strips(ScreenGraph graph, String constant, List<Row> rows) {
+        GameScreen screen = graph.screens().get(constant);
+        if (screen == null) return List.of();
+        List<Strip> strips = new ArrayList<>();
+        for (ScreenList list : screen.lists()) {
+            Rect place = null;
+            List<Row> members = new ArrayList<>();
+            for (ImageTemplate member : list.members()) {
+                rows.stream().filter(r -> member.id().equals(r.picture())).findFirst().ifPresent(members::add);
+                Rect at = member.place();
+                if (at != null) place = place == null ? at : union(place, at);
+            }
+            if (place != null && !members.isEmpty()) {
+                strips.add(new Strip(place, place.height() >= place.width(), List.copyOf(members)));
+            }
+        }
+        return strips;
+    }
+
+    private static Rect union(Rect a, Rect b) {
+        int left = Math.min(a.x(), b.x());
+        int top = Math.min(a.y(), b.y());
+        return new Rect(left, top, Math.max(a.x() + a.width(), b.x() + b.width()) - left,
+                Math.max(a.y() + a.height(), b.y() + b.height()) - top);
+    }
 
     /** Every screen's card, in the order the bot declares them; {@code stages} by constant. */
     static List<Card> cards(ScreenGraph graph, Map<String, String> stages) {

@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -224,6 +225,34 @@ class ScreenCardsTest {
         assertEquals(Optional.empty(), ScreenConstantView.constantOf(ScreenGraph.of(Map.of()),
                 Optional.of(campaign)), "a map that did not read: the slot draws as written");
         assertEquals(Optional.empty(), ScreenConstantView.constantOf(map(), Optional.empty()));
+    }
+
+    /** Home's left column: drawn whole over where its members were cut, in the list's order, one with no place too. */
+    @Test
+    void aListIsDrawnAsAStripOfAllItsMembersOverWhereTheySit() {
+        ImageTemplate tavern = picture("tavern").at(new Rect(10, 240, 100, 100));
+        ImageTemplate arena = picture("arena").at(new Rect(12, 340, 100, 100));
+        ImageTemplate library = picture("library");
+        List<Input> inputs = List.of(Input.click(tavern), Input.click(arena), Input.click(library).sometimes(),
+                click("mail"));
+        GameScreen home = GameScreen.named("Home").markers(marks("home")).inputs(inputs)
+                .lists(List.of(ScreenList.of(-5, List.of(arena, tavern, library))));
+        ScreenGraph graph = ScreenGraph.of(Map.of("HOME", home));
+        List<ScreenCards.Row> rows = ScreenCards.rows(graph, "HOME");
+
+        List<ScreenCards.Strip> strips = ScreenCards.strips(graph, "HOME", rows);
+        assertEquals(1, strips.size());
+        ScreenCards.Strip column = strips.getFirst();
+        assertEquals(new Rect(10, 240, 102, 200), column.place());
+        assertTrue(column.down(), "taller than wide: a column");
+        assertEquals(List.of("arena", "tavern", "library"),
+                column.members().stream().map(ScreenCards.Row::picture).toList(), "the list's order, not the inputs'");
+        assertTrue(column.has(rows.get(0)));
+        assertFalse(column.has(rows.get(3)), "mail is boxed on the shot as before");
+
+        GameScreen nowhere = home.lists(List.of(ScreenList.of(-5, List.of(library, picture("mail")))));
+        assertEquals(List.of(), ScreenCards.strips(ScreenGraph.of(Map.of("HOME", nowhere)), "HOME", rows),
+                "no member has a place: no strip");
     }
 
     @Test

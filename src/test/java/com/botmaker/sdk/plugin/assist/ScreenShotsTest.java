@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.sdk.api.geometry.Size;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -15,13 +16,14 @@ class ScreenShotsTest {
     @Test
     void aShotIsKeptAtTheCapturesSizeAndOnlyTheFirstWhenMissing(@TempDir Path resources) {
         ScreenShots.save(resources, "HOME", new BufferedImage(1920, 1080, BufferedImage.TYPE_INT_RGB));
-        assertEquals(1920, ScreenShots.width(ScreenShots.file(resources, "HOME")), "the frame as captured");
+        assertEquals(new Size(1920, 1080), ScreenShots.size(ScreenShots.file(resources, "HOME")), "the frame as captured");
 
         ScreenShots.saveIfMissing(resources, "HOME", new BufferedImage(100, 50, BufferedImage.TYPE_INT_RGB));
-        assertEquals(1920, ScreenShots.width(ScreenShots.file(resources, "HOME")), "a screen with a shot keeps it");
+        assertEquals(new Size(1920, 1080), ScreenShots.size(ScreenShots.file(resources, "HOME")),
+                "a screen with a shot keeps it");
 
         ScreenShots.remove(resources, "HOME");
         assertFalse(Files.exists(ScreenShots.file(resources, "HOME")));
-        assertEquals(0, ScreenShots.width(ScreenShots.file(resources, "HOME")), "no shot, no width");
+        assertEquals(new Size(), ScreenShots.size(ScreenShots.file(resources, "HOME")), "no shot, no size");
     }
 }

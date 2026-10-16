@@ -83,6 +83,14 @@ public final class ScreenMap {
     private boolean saidOnce;
     /** Set when a read found no screen while some were drawn: the next one says whether the map is really empty. */
     private boolean emptyOnce;
+    /** Set while a read runs off the FX thread. */
+    private boolean reading;
+    /** Set once the window or pane closed: a read still running draws nothing. */
+    private boolean stopped;
+    /** Each read asked, counted: a read off the FX thread that another overtook draws nothing. */
+    private long reads;
+    /** What the first drawing with cards does, once: fit the map and pick the screen asked for. Null after. */
+    private Runnable firstDrawn;
 
     /** The map with its side panel ({@code withPanel}) or without, for the overlay editor's narrow pane. */
     ScreenMap(StudioServices services, boolean withPanel) {
@@ -113,7 +121,7 @@ public final class ScreenMap {
             if (result.startsWith(ScreenEdits.NOT_WRITTEN)) canvas.redraw();
             tell(result);
         });
-        poll = new Timeline(new KeyFrame(POLL, e -> refresh()));
+        poll = new Timeline(new KeyFrame(POLL, e -> readLater()));
         poll.setCycleCount(Timeline.INDEFINITE);
     }
 
@@ -178,23 +186,27 @@ public final class ScreenMap {
             if (project != null) OPEN.remove(project, map);
         });
         stage.show();
-        map.start();
-        // After start's first read, so the card is drawn to be picked.
-        if (constant != null) Platform.runLater(() -> map.canvas.select(constant));
+        map.start(constant);
     }
 
     /** The overlay editor's tab: the map without its side, and a button opening the window. */
     public static Node pane(OverlayToolContext context) {
         ScreenMap map = new ScreenMap(context.services(), false);
         context.onClosed(map::stop);
-        map.start();
+        map.start(null);
         return map.node();
     }
 
-    /** Reads the map, starts following it and the run's telemetry. */
-    void start() {
-        refresh();
-        Platform.runLater(canvas.graph()::fit);
+    /**
+     * Reads the map off the FX thread, so the window shows at once, then fits it and picks {@code constant} (null:
+     * none); starts following the map and the run's telemetry.
+     */
+    void start(String constant) {
+        firstDrawn = () -> {
+            canvas.graph().fit();
+            if (constant != null) canvas.select(constant);
+        };
+        readLater();
         poll.play();
         subscriptions.add(services.runs().onTelemetry(this::telemetry));
         // A run starting or ending leaves no screen known to be on the game.
@@ -207,6 +219,7 @@ public final class ScreenMap {
 
     /** Stops following; what the window or pane does when it closes. */
     void stop() {
+        stopped = true;
         poll.stop();
         for (AutoCloseable subscription : subscriptions) {
             try {
@@ -233,27 +246,71 @@ public final class ScreenMap {
         guide.show();
     }
 
-    /** Reads the map again and draws what changed. On the FX thread. */
-    void refresh() {
-        if (!Objects.equals(project, services.projectDir())) {
-            // Another project is open now: this map is of the one that closed.
-            stop();
-            // The window stays as it was, but is no longer the one its project opens again.
-            OPEN.remove(project, this);
-            if (panel != null) panel.closed();
-            said.setText("The project this map was of is closed.");
-            return;
-        }
-        ScreenGraph read;
-        Map<String, String> stages;
+    /** The map as one read found it, or why it could not be read ({@code failed} non-null). */
+    private record Read(ScreenGraph graph, Map<String, String> stages, String failed) {}
+
+    private Read read() {
         try {
-            read = ScreenDesk.read(services);
-            stages = ScreenDesk.stages(read);
+            ScreenGraph read = ScreenDesk.read(services);
+            return new Read(read, ScreenDesk.stages(read), null);
         } catch (RuntimeException unreadable) {
-            said.setText("The map could not be read: "
-                    + Objects.requireNonNullElse(unreadable.getMessage(), unreadable.toString()));
+            return new Read(null, null, Objects.requireNonNullElse(unreadable.getMessage(), unreadable.toString()));
+        }
+    }
+
+    /**
+     * Reads the map again and draws what changed, at once: after the user's own edit, so the next drag or redraw
+     * starts from it. On the FX thread.
+     */
+    void refresh() {
+        reads++;
+        if (stillOpen()) apply(read());
+    }
+
+    /**
+     * Reads the map on a thread of its own, as the poll does, then draws what changed on the FX thread. One read at a
+     * time; one overtaken by {@link #refresh} is dropped, being older than what it drew.
+     */
+    private void readLater() {
+        if (reading || !stillOpen()) return;
+        reading = true;
+        long asked = ++reads;
+        Thread.ofVirtual().name("screen-map-read").start(() -> {
+            Read read;
+            try {
+                read = read();
+            } catch (Throwable broken) {
+                // A half-built plugin jar fails with an Error, not an exception: said, and the next poll reads again.
+                read = new Read(null, null, Objects.requireNonNullElse(broken.getMessage(), broken.toString()));
+            }
+            Read done = read;
+            Platform.runLater(() -> {
+                reading = false;
+                if (stopped || !stillOpen()) return;
+                if (asked == reads) apply(done);
+            });
+        });
+    }
+
+    /** Whether the project this map is of is still open; when not, the map stops following it. On the FX thread. */
+    private boolean stillOpen() {
+        if (Objects.equals(project, services.projectDir())) return true;
+        // Another project is open now: this map is of the one that closed.
+        stop();
+        // The window stays as it was, but is no longer the one its project opens again.
+        OPEN.remove(project, this);
+        if (panel != null) panel.closed();
+        said.setText("The project this map was of is closed.");
+        return false;
+    }
+
+    private void apply(Read map) {
+        if (map.failed() != null) {
+            said.setText("The map could not be read: " + map.failed());
             return;
         }
+        ScreenGraph read = map.graph();
+        Map<String, String> stages = map.stages();
         if (read.screens().isEmpty() && cards != null && !cards.isEmpty() && !emptyOnce) {
             // Read while Screens.java was being written, the canvas went blank for a poll (2026-10-15): the last
             // drawing stays for one read. Empty twice running, it is empty: its last screen was deleted.
@@ -275,6 +332,12 @@ public final class ScreenMap {
         saidOnce = false;
         if (selected != null && !read.screens().containsKey(selected)) selected = null;
         if (panel != null) panel.show(read, selected);
+        if (firstDrawn != null && !cards.isEmpty()) {
+            // Once there are cards to fit and pick: a first read that failed or found none leaves it to the next.
+            Runnable first = firstDrawn;
+            firstDrawn = null;
+            first.run();
+        }
     }
 
     private static String summary(List<Card> cards) {

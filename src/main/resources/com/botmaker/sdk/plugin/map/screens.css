@@ -111,6 +111,41 @@
     -fx-stroke-dash-array: 6 4;
 }
 
+/* A list drawn whole over the place it sits on the shot: every member's picture, the wheel scrolling it. */
+.screen-strip,
+.screen-strip > .viewport {
+    -fx-background-color: -bm-screen-card;
+}
+
+.screen-strip {
+    -fx-border-color: -bm-screen-here;
+    -fx-border-width: 1.5;
+    -fx-padding: 1;
+}
+
+.screen-strip-member {
+    -fx-background-color: derive(-bm-screen-card, -6%);
+    -fx-background-radius: 5;
+    -fx-border-color: -bm-screen-untried;
+    -fx-border-radius: 5;
+    -fx-border-width: 1.5;
+    -fx-cursor: hand;
+}
+
+.screen-strip-member-tried {
+    -fx-border-color: -bm-screen-finished;
+}
+
+.screen-strip-member-never,
+.screen-strip-member-locked,
+.screen-strip-member-unseen {
+    -fx-border-color: -bm-screen-plain;
+}
+
+.screen-strip-member:hover {
+    -fx-background-color: -bm-screen-box-hover;
+}
+
 /* The inputs whose picture is not on the shot, listed under it. */
 .screen-shot-missing-title {
     -fx-text-fill: -bm-screen-plain;

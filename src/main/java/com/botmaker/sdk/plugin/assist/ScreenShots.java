@@ -1,5 +1,7 @@
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.sdk.api.geometry.Size;
+
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
@@ -25,21 +27,24 @@ public final class ScreenShots {
 
     private ScreenShots() {}
 
-    /** How wide the shot in {@code file} is, read off its header; 0 when there is none. */
-    public static int width(Path file) {
+    /**
+     * How big the shot in {@code file} is, read off its header without decoding it, so a card can be laid out at the
+     * shot's shape while the shot itself loads; {@code 0 × 0} when there is none.
+     */
+    public static Size size(Path file) {
         try (ImageInputStream in = ImageIO.createImageInputStream(file.toFile())) {
-            if (in == null) return 0;
+            if (in == null) return new Size();
             Iterator<ImageReader> readers = ImageIO.getImageReaders(in);
-            if (!readers.hasNext()) return 0;
+            if (!readers.hasNext()) return new Size();
             ImageReader reader = readers.next();
             try {
                 reader.setInput(in);
-                return reader.getWidth(0);
+                return new Size(reader.getWidth(0), reader.getHeight(0));
             } finally {
                 reader.dispose();
             }
         } catch (IOException | RuntimeException unread) {
-            return 0;
+            return new Size();
         }
     }
 

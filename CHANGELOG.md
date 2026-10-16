@@ -31,6 +31,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     is no longer taken for moving.
   - The assistant's edit_map `in_list` takes the list's `members` and `notches`; `read_map` and 🗺 Screens count
     anywhere along the list as a member's place, and one scrolled out of the shot is only a note.
+  - 🗺 Screens draws a list whole on a screen's shot: a strip over where the list sits with every member's picture,
+    in the list's order, the wheel scrolling it. A member that comes and goes is faint. A click picks the member's
+    input.
+- **🗺 Screens opens at once.** The cards' shots load after the window shows. Firestone's 36 shots took 1.7 s to read
+  before the first paint, and now cost the window under 10 ms. Reading the map every 1.5 s happens off the window's
+  thread too.
 - **Round and free-shape pictures.** A picture can be cut as an oval or as a polygon you click corner by corner;
   what lies outside it is transparent, and a run skips it, so a round button or an odd-shaped icon matches over any
   background.

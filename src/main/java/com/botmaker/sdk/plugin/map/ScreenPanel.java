@@ -275,7 +275,8 @@ final class ScreenPanel {
         screen.absent().forEach(m -> markers.getChildren().add(markerRow(shown, m.id(), "never shows", busy)));
 
         VBox all = new VBox(12, head, pills, actions, heading("Markers"), markers, heading("Inputs"), inputs);
-        canvas.shotWithInputs(shown, shotWidth, rows, cuts, audits.get(shown), row -> pick(shown, row),
+        canvas.shotWithInputs(shown, shotWidth, rows, ScreenCards.strips(graph, shown, rows), cuts, audits.get(shown),
+                        row -> pick(shown, row),
                         () -> showScreen(shown))
                 .ifPresent(shot -> all.getChildren().addFirst(shot));
         all.getChildren().add(text("Way back: " + (screen.back() == null ? "the default one, a close button, then "
@@ -477,8 +478,9 @@ final class ScreenPanel {
         Map<String, FrameCut> cuts = services.pluginValues() == null ? Map.of()
                 : TemplateUses.cuts(services.pluginValues());
         List<Row> rows = ScreenCards.rows(graph, constant);
+        List<ScreenCards.Strip> strips = ScreenCards.strips(graph, constant, rows);
         return viewer.showScreen(graph.shown(constant), back, width -> canvas.shotWithInputs(constant, width, rows,
-                cuts, audits.get(constant), row -> pickBig(constant, row, back), null));
+                strips, cuts, audits.get(constant), row -> pickBig(constant, row, back), null));
     }
 
     /** Takes {@code constant}'s shot again from the game, off the FX thread. */

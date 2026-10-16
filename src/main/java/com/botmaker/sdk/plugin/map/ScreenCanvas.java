@@ -11,6 +11,7 @@ import com.botmaker.plugin.toolkit.graph.LayeredLayout;
 import com.botmaker.plugin.toolkit.graph.TreeLayout;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Presence;
 import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
@@ -20,6 +21,7 @@ import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
+import com.botmaker.sdk.plugin.map.ScreenCards.Strip;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import javafx.animation.Animation;
@@ -32,9 +34,11 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -527,11 +531,15 @@ final class ScreenCanvas {
      * a card measures the same before and after it loads; empty while the screen has none.
      */
     Optional<Node> shot(String constant, double width) {
-        return image(constant, width).map(image -> shot(image, width));
+        if (resources == null) return Optional.empty();
+        // A frame takes ~50 ms to read: read with the window shown, not before (1.7 s for Firestone's 36, 2026-10-16),
+        // the card sized meanwhile by the file's header.
+        Size size = ScreenShots.size(ScreenShots.file(resources, constant));
+        return image(constant, width, !loadNow).map(image -> shot(image, width, size.width() > 0 && size.height() > 0
+                ? Math.round(width * size.height() / size.width()) : heightAt(image, width)));
     }
 
-    private static Node shot(Image image, double width) {
-        double height = heightAt(image, width);
+    private static Node shot(Image image, double width, double height) {
         ImageView view = new ImageView(image);
         view.setPreserveRatio(true);
         view.setFitWidth(width);
@@ -545,8 +553,11 @@ final class ScreenCanvas {
         return box;
     }
 
-    /** {@code constant}'s shot read for drawing at {@code width}; empty while it has none. */
-    private Optional<Image> image(String constant, double width) {
+    /**
+     * {@code constant}'s shot read for drawing at {@code width}, read on a thread of its own ({@code background}) or at
+     * once; empty while it has none.
+     */
+    private Optional<Image> image(String constant, double width, boolean background) {
         if (resources == null) return Optional.empty();
         Path file = ScreenShots.file(resources, constant);
         long time = modified(file);
@@ -555,8 +566,10 @@ final class ScreenCanvas {
         double loaded = width < CARD_LOAD_LIMIT ? width * 2 : 0;
         // A whole frame is megabytes: read for the viewer each time, never kept.
         if (loaded == 0) return Optional.of(new Image(file.toUri().toString(), 0, 0, true, true));
-        return Optional.of(thumbs.computeIfAbsent(SHOT_KEY + constant + "@" + time + ":" + loaded,
-                key -> new Image(file.toUri().toString(), loaded, 0, true, true)));
+        // Keyed by how it reads too: the panel's boxes need a shot read whole, not a card's still loading.
+        return Optional.of(thumbs.computeIfAbsent(SHOT_KEY + constant + "@" + time + ":" + loaded
+                        + (background ? "~" : ""),
+                key -> new Image(file.toUri().toString(), loaded, 0, true, true, background)));
     }
 
     /** How tall {@code image} draws at {@code width}: its own shape; a game's usual 16:9 until it has read. */
@@ -585,23 +598,26 @@ final class ScreenCanvas {
      * {@link #shot} with each of {@code rows} boxed where its picture is on the shot ({@code audit}), else, before the
      * audit is made or for a picture it has not checked, where it was cut ({@code cuts}, by picture); each box hands its
      * row to {@code onPick} when clicked. A box away from its picture's place is dashed; a picture not on the shot is
-     * listed under it. {@code onShot} runs on a click elsewhere on the shot (null: none).
+     * listed under it. A member of one of {@code strips} is drawn in its strip instead, every member of the list in
+     * it, over the place the list sits. {@code onShot} runs on a click elsewhere on the shot (null: none).
      */
-    Optional<Node> shotWithInputs(String constant, double width, List<Row> rows, Map<String, FrameCut> cuts,
-                                  Audit audit, Consumer<Row> onPick, Runnable onShot) {
-        int shotWidth = resources == null ? 0 : ScreenShots.width(ScreenShots.file(resources, constant));
+    Optional<Node> shotWithInputs(String constant, double width, List<Row> rows, List<Strip> strips,
+                                  Map<String, FrameCut> cuts, Audit audit, Consumer<Row> onPick, Runnable onShot) {
+        int shotWidth = resources == null ? 0 : ScreenShots.size(ScreenShots.file(resources, constant)).width();
         // One read: the shot and its boxes are of the same file, rewritten meanwhile or not.
-        return image(constant, width).map(image -> {
-            Node shot = shot(image, width);
+        return image(constant, width, false).map(image -> {
             double height = heightAt(image, width);
+            Node shot = shot(image, width, height);
             // The shot is the game's frame: its height is its width in the shot's own shape.
             double shotHeight = shotWidth * height / width;
             Pane boxes = new Pane();
             boxes.setPrefSize(width, height);
             boxes.setMaxSize(width, height);
             FlowPane missing = new FlowPane(6, 4);
+            // A shot whose size is unread has no place for a strip: its members are boxed one by one instead.
+            List<Strip> drawn = shotWidth > 0 && shotHeight > 0 ? strips : List.of();
             for (Row row : rows) {
-                if (row.picture() == null) continue;
+                if (row.picture() == null || drawn.stream().anyMatch(s -> s.has(row))) continue;
                 Optional<Spot> spot = audit == null ? Optional.empty() : audit.of(row.picture());
                 if (spot.isPresent() && spot.get().where() == Where.MISSING) {
                     Label gone = new Label(row.label());
@@ -644,6 +660,10 @@ final class ScreenCanvas {
                 });
                 boxes.getChildren().add(box);
             }
+            for (Strip strip : drawn) {
+                boxes.getChildren().add(strip(strip, boxOn(strip.place(), shotWidth, shotHeight, width, height),
+                        onPick));
+            }
             StackPane layered = new StackPane(shot, boxes);
             layered.setMaxSize(width, height);
             if (onShot != null) {
@@ -659,6 +679,48 @@ final class ScreenCanvas {
             shotAndMissing.setMaxWidth(width);
             return shotAndMissing;
         });
+    }
+
+    /**
+     * {@code strip} drawn {@code at} its place on a shot: each member's picture, the list's own order, as wide as the
+     * strip (tall, across), the wheel scrolling it; each picture hands its row to {@code onPick} when clicked.
+     */
+    private Node strip(Strip strip, Box at, Consumer<Row> onPick) {
+        double size = Math.max(16, (strip.down() ? at.width() : at.height()) - 4);
+        Pane line = strip.down() ? new VBox(2) : new HBox(2);
+        for (Row row : strip.members()) {
+            Node picture = thumb(row.picture(), size, "screen-strip-member");
+            picture.getStyleClass().add("screen-strip-member-" + row.state().name().toLowerCase(Locale.ROOT));
+            // Not on the screen at every time: drawn faint, as the game shows it only at times.
+            if (row.input().comesAndGoes()) picture.setOpacity(0.45);
+            Tooltip.install(picture, new Tooltip(row.label() + ": " + row.result()));
+            picture.setOnMouseClicked(e -> {
+                onPick.accept(row);
+                e.consume();
+            });
+            line.getChildren().add(picture);
+        }
+        ScrollPane scroll = new ScrollPane(line);
+        scroll.getStyleClass().add("screen-strip");
+        scroll.setFitToWidth(strip.down());
+        scroll.setFitToHeight(!strip.down());
+        scroll.setHbarPolicy(strip.down() ? ScrollPane.ScrollBarPolicy.NEVER : ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scroll.setVbarPolicy(strip.down() ? ScrollPane.ScrollBarPolicy.AS_NEEDED : ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setPrefSize(at.width(), at.height());
+        scroll.setMaxSize(at.width(), at.height());
+        scroll.relocate(at.x(), at.y());
+        // An across strip scrolls by the wheel too, which turns it down.
+        if (!strip.down()) {
+            scroll.addEventFilter(ScrollEvent.SCROLL, e -> {
+                if (e.getDeltaX() != 0 || line.getWidth() <= at.width()) return;
+                scroll.setHvalue(scroll.getHvalue() - e.getDeltaY() / (line.getWidth() - at.width()));
+                e.consume();
+            });
+        }
+        // The wheel over the strip scrolls it, not the view the shot is in.
+        scroll.addEventHandler(ScrollEvent.SCROLL, ScrollEvent::consume);
+        Tooltip.install(scroll, new Tooltip(strip.members().size() + " in this list: the wheel scrolls it."));
+        return scroll;
     }
 
     /** Selects {@code constant}'s card and brings it into view. */

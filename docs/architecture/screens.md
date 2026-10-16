@@ -77,11 +77,14 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 ## The window (`plugin/map`)
 
 - **`ScreenMap`**: one window per project (and a narrow copy in the overlay editor). It reads the map every
-  1.5 s and redraws only when a `ScreenCards` value or a picture's file time changed; an empty read is trusted on
-  the second in a row. The card a run is on is lit from telemetry.
+  1.5 s on a virtual thread, and at once after the user's own edit (a read the other overtook draws nothing). It
+  redraws only when a `ScreenCards` value or a picture's file time changed; an empty read is trusted on the second
+  in a row. The card a run is on is lit from telemetry.
 - **`ScreenCards`** decides, apart from JavaFX, each card (state, progress, `pills`), each link (`label()` names
-  the default way back) and each input's row. **`ScreenCanvas`** draws them, folds the tree, caches at most 400
-  images and places input boxes on any frame shape (`boxOn`, letterboxed).
+  the default way back), each input's row and each list's `Strip`. **`ScreenCanvas`** draws them, folds the tree,
+  caches at most 400 images and places input boxes on any frame shape (`boxOn`, letterboxed). A card's shot loads in
+  the background, sized by the file's header (`ScreenShots.size`); the panel's shot loads at once, since its boxes
+  need its shape. A list's members are drawn as one scrolling strip over where the list sits, not boxed one by one.
 - **`ScreenPanel`** is the picked screen: its shot with boxes, ▶ Try, 🧭 Go here, ✂ Cut, notes, and the hand
   edits of `ScreenHands`, all off while a try or a walk runs. Its boxes are where `MapAudit` (assist) finds each
   picture on the shot, made on a virtual thread and kept by file times and places; `read_map` lists the same audit:
