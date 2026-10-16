@@ -12,6 +12,8 @@ import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.capture.StillSource;
+import com.botmaker.sdk.internal.screens.Markers;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.Places;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
@@ -60,13 +62,14 @@ public final class MapAudit {
      * One picture a screen names, as its shot shows it.
      *
      * @param picture its file's name
-     * @param marker  whether it is the screen's marker
+     * @param marker  whether it is one of the screen's markers
+     * @param absent  whether it is one the screen never shows: found on the shot, the shot or the set is wrong
      * @param sure    whether the screen always shows it; one that comes and goes, a look's, a button's other look or a
      *                lock is not, and its absence is only a note
      * @param at      its box on the shot, in the shot's pixels; null when missing
      * @param place   where its place is on the shot, in the shot's pixels; null when it has none
      */
-    public record Spot(String picture, boolean marker, boolean sure, Where where, Rect at, Rect place) {
+    public record Spot(String picture, boolean marker, boolean absent, boolean sure, Where where, Rect at, Rect place) {
 
         /** How far it sits from its place, across: 0 at its place or when either is unknown. */
         public int dx() {
@@ -88,9 +91,13 @@ public final class MapAudit {
             return spots.stream().filter(s -> s.picture().equals(file)).findFirst();
         }
 
-        /** Whether the shot shows the screen's marker; true for a screen with none, which nothing tells apart. */
+        /**
+         * Whether the shot shows the screen as its markers tell it: each marker found, no absent picture found; true for
+         * a screen with none, which nothing tells apart.
+         */
         public boolean showsMarker() {
-            return spots.stream().filter(Spot::marker).allMatch(s -> s.where() != Where.MISSING);
+            return spots.stream().filter(Spot::marker).allMatch(s -> s.where() != Where.MISSING)
+                    && spots.stream().filter(Spot::absent).allMatch(s -> s.where() == Where.MISSING);
         }
     }
 
@@ -129,12 +136,76 @@ public final class MapAudit {
         List<Spot> spots = new ArrayList<>();
         for (Fit fit : fits) {
             Check check = checks.get(fit.picture());
-            spots.add(new Spot(fit.picture(), check.marker(), check.sure(), fit.where(), fit.at(),
+            spots.add(new Spot(fit.picture(), check.marker(), check.absent(), check.sure(), fit.where(), fit.at(),
                     placeOn(cuts.get(fit.picture()), live)));
         }
         Audit audit = new Audit(List.copyOf(spots));
         MADE.put(key.toString(), audit);
         return Optional.of(audit);
+    }
+
+    /**
+     * Another screen whose shot shows {@code set} as a run tells a screen, and what would tell {@code constant} apart
+     * from it.
+     *
+     * @param screen the other screen's constant
+     * @param apart  that screen's markers {@code constant}'s own shot does not show: each one, as {@code constant}'s
+     *               absent picture, tells the two apart
+     */
+    public record Clash(String screen, List<String> apart) {
+    }
+
+    /**
+     * The first screen of {@code graph} other than {@code constant} whose shot shows {@code set} (every marker found
+     * anywhere on it, no absent picture found): on that screen a run would take the game for {@code constant}. Rarity's
+     * title scored 0.80 on Upgrade (2026-10-16). Skipped: a popup, whose shot shows the screen under it, and a screen
+     * reached from {@code constant}, which a run finds over it first. Empty with no clash, or while a picture of
+     * {@code set} has no file. Off the FX thread: it reads and matches every other shot.
+     */
+    public static Optional<Clash> clash(Path resources, double confidence, ScreenGraph graph, String constant,
+                                        Markers set) {
+        if (resources == null || !set.any()) return Optional.empty();
+        List<String> shown = files(resources, set.shown());
+        List<String> absent = files(resources, set.absent());
+        if (shown.size() < set.shown().size()) return Optional.empty();
+        List<String> names = new ArrayList<>(shown);
+        names.addAll(absent);
+        for (Map.Entry<String, GameScreen> other : graph.screens().entrySet()) {
+            String c = other.getKey();
+            if (c.equals(constant) || other.getValue().isPopup() || graph.dependsOn(c).contains(constant)) continue;
+            Optional<BufferedImage> shot = shot(resources, c);
+            if (shot.isEmpty()) continue;
+            List<Fit> fits = fits(resources, confidence, Map.of(), names, shot.get());
+            boolean all = fits.subList(0, shown.size()).stream().allMatch(f -> f.where() != Where.MISSING);
+            boolean none = fits.subList(shown.size(), fits.size()).stream().allMatch(f -> f.where() == Where.MISSING);
+            if (all && none) return Optional.of(new Clash(c, apart(resources, confidence, constant, other.getValue())));
+        }
+        return Optional.empty();
+    }
+
+    /** {@code other}'s markers not on {@code constant}'s shot; empty while it has none. */
+    private static List<String> apart(Path resources, double confidence, String constant, GameScreen other) {
+        Optional<BufferedImage> own = shot(resources, constant);
+        List<String> theirs = files(resources, other.markers());
+        if (own.isEmpty() || theirs.isEmpty()) return List.of();
+        return fits(resources, confidence, Map.of(), theirs, own.get()).stream()
+                .filter(f -> f.where() == Where.MISSING).map(Fit::picture).toList();
+    }
+
+    /** The file names of {@code pictures} that have a file. */
+    private static List<String> files(Path resources, List<ImageTemplate> pictures) {
+        return pictures.stream().map(p -> Frames.picture(resources, p.id())).flatMap(Optional::stream).distinct()
+                .toList();
+    }
+
+    private static Optional<BufferedImage> shot(Path resources, String constant) {
+        Path file = ScreenShots.file(resources, constant);
+        if (!Files.isRegularFile(file)) return Optional.empty();
+        try {
+            return Optional.ofNullable(ImageIO.read(file.toFile()));
+        } catch (IOException unreadable) {
+            return Optional.empty();
+        }
     }
 
     /**
@@ -188,18 +259,24 @@ public final class MapAudit {
         }
     }
 
-    /** A picture to look for on a screen's shot: whether it is the marker, and whether the screen always shows it. */
-    private record Check(String picture, boolean marker, boolean sure) {
+    /**
+     * A picture to look for on a screen's shot: whether it is a marker, one the screen never shows, and whether the
+     * screen always shows it.
+     */
+    private record Check(String picture, boolean marker, boolean absent, boolean sure) {
     }
 
     /**
-     * Each picture {@code screen} names that has a file, by its file's name: its markers, its inputs' and its way
-     * back's, then its looks' markers and inputs. A picture named twice is sure when either is. An absent picture is
-     * not looked for: the shot not showing it is what it says.
+     * Each picture {@code screen} names that has a file, by its file's name: its markers and absent pictures, its
+     * inputs' and its way back's, then its looks' markers and inputs. A picture named twice is sure when either is.
      */
     private static Map<String, Check> checks(Path resources, GameScreen screen) {
         Map<String, Check> checks = new LinkedHashMap<>();
         for (ImageTemplate marker : screen.markers()) add(checks, resources, marker, true, true);
+        for (ImageTemplate absent : screen.absent()) {
+            Frames.picture(resources, absent.id()).filter(f -> !checks.containsKey(f))
+                    .ifPresent(f -> checks.put(f, new Check(f, false, true, false)));
+        }
         List<Input> named = new ArrayList<>(screen.inputs());
         if (screen.back() != null) named.add(screen.back());
         for (Input input : named) {
@@ -221,8 +298,8 @@ public final class MapAudit {
         Optional<String> file = Frames.picture(resources, picture.id());
         if (file.isEmpty()) return;
         Check was = checks.get(file.get());
-        checks.put(file.get(), was == null ? new Check(file.get(), marker, sure)
-                : new Check(file.get(), was.marker() || marker, was.sure() || sure));
+        checks.put(file.get(), was == null ? new Check(file.get(), marker, false, sure)
+                : new Check(file.get(), was.marker() || marker, was.absent(), was.sure() || sure));
     }
 
     /** {@code cut}'s place on a shot of {@code live}, scaled from the frame it was cut on; null when it has none. */

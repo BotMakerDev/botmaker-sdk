@@ -254,7 +254,7 @@ final class ScreenPanel {
         tryNext.setDisable(busy || next.isEmpty());
         tryNext.getStyleClass().add("screen-panel-primary");
         Button cutInputs = action("✂ Cut inputs", MapGuide.CUT_INPUTS, () -> cut(shown, false));
-        Button cutMarker = action(screen.hasMarker() ? "✂ Recut marker" : "✂ Cut marker",
+        Button cutMarker = action(screen.hasMarker() ? "✂ Add marker" : "✂ Cut marker",
                 MapGuide.CUT_MARKER, () -> cut(shown, true));
         Button go = action("🧭 Go here", MapGuide.GO_HERE, () -> goHere(shown));
         go.setDisable(busy || card.popup());
@@ -269,7 +269,12 @@ final class ScreenPanel {
         if (rows.isEmpty()) inputs.getChildren().add(text("No input cut yet."));
         for (Row row : rows) inputs.getChildren().add(row(shown, row));
 
-        VBox all = new VBox(12, head, pills, actions, heading("Inputs"), inputs);
+        VBox markers = new VBox(6);
+        if (!screen.hasMarker()) markers.getChildren().add(text("None yet: ✂ Cut marker."));
+        screen.markers().forEach(m -> markers.getChildren().add(markerRow(shown, m.id(), "shows", busy)));
+        screen.absent().forEach(m -> markers.getChildren().add(markerRow(shown, m.id(), "never shows", busy)));
+
+        VBox all = new VBox(12, head, pills, actions, heading("Markers"), markers, heading("Inputs"), inputs);
         canvas.shotWithInputs(shown, shotWidth, rows, cuts, audits.get(shown), row -> pick(shown, row),
                         () -> showScreen(shown))
                 .ifPresent(shot -> all.getChildren().addFirst(shot));
@@ -364,6 +369,28 @@ final class ScreenPanel {
         Node menu = hands.rowMenu(constant, row);
         menu.setDisable(busy);
         line.getChildren().add(menu);
+        return line;
+    }
+
+    /**
+     * One picture of what tells {@code constant} apart: a marker it {@code shows}, or one it never shows; ✕ takes it
+     * off, refused for its last marker or when another screen's shot then shows the rest.
+     */
+    private Node markerRow(String constant, String picture, String shows, boolean busy) {
+        Node thumb = canvas.thumb(picture, ROW_THUMB, "screen-row-thumb");
+        Label label = new Label(picture);
+        label.getStyleClass().add("screen-row-label");
+        label.setMinWidth(0);
+        HBox.setHgrow(label, Priority.ALWAYS);
+        Label kind = pill(shows, "screen-pill-plain");
+        // Off the FX thread: what is left is matched over every other screen's shot.
+        Button off = action("✕", "Remove " + picture + " from what tells " + graph.shown(constant) + " apart",
+                () -> run("Taking " + picture + " off…", constant,
+                        () -> ScreenEdits.removeMarker(services, constant, picture)));
+        off.setDisable(busy);
+        HBox line = new HBox(8, thumb, label, kind, off);
+        line.setAlignment(Pos.CENTER_LEFT);
+        line.getStyleClass().add("screen-row");
         return line;
     }
 
@@ -524,12 +551,11 @@ final class ScreenPanel {
             // before it are inputs, never orphans.
             List<String> order = new ArrayList<>(names);
             if (marker) order.addFirst(order.removeLast());
-            List<String> noted = order.stream().map(n -> n + ": " + ScreenDesk.noteCut(services, screen, n,
-                    marker && n.equals(order.getFirst()))).toList();
-            say(String.join("\n", noted));
-            drawn = null;
             canvas.forgetPictures();
-            changed.run();
+            // Off the FX thread: a marker's set is matched over every other screen's shot.
+            run("Noting " + String.join(", ", order) + "…", screen, () -> String.join("\n", order.stream()
+                    .map(n -> n + ": " + ScreenDesk.noteCut(services, screen, n, marker && n.equals(order.getFirst())))
+                    .toList()));
         };
         CaptureTemplates.open(services, window, null, null, saved);
     }

@@ -23,6 +23,7 @@ import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.StillSource;
+import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.vision.DigitReader;
 import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.internal.vision.Places;
@@ -37,6 +38,7 @@ import com.botmaker.sdk.plugin.pictures.TagCatalog;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateManifest;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
+import com.botmaker.sdk.plugin.assist.MapTools.Mark;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import javax.imageio.ImageIO;
@@ -44,7 +46,10 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -75,7 +80,7 @@ final class PictureTools {
 
     /** One picture cut: a box of crop_pictures with the call's tags and screen. */
     private record Crop(String name, Integer x, Integer y, Integer width, Integer height, List<String> tags, Skip ignore,
-                        String screen, Boolean marker, Boolean back, Boolean sometimes, Boolean popup,
+                        String screen, Mark marker, Boolean back, Boolean sometimes, Boolean popup,
                         String variantOf, State state, String when, String screenLook) {
 
         static Crop of(Box box, List<String> tags, String screen) {
@@ -86,8 +91,19 @@ final class PictureTools {
 
         /** Whether it is noted on its screen by itself, as its own call would: a marker, a popup, a look or a when. */
         boolean alone() {
-            return Boolean.TRUE.equals(marker) || Boolean.TRUE.equals(popup) || variantOf != null || when != null
+            return marker != null || Boolean.TRUE.equals(popup) || variantOf != null || when != null
                     || screenLook != null;
+        }
+
+        /** Whether it is one of the screen's own markers (not a look's): its shot and the check wait for it. */
+        boolean screenMarker() {
+            return marker != null && screenLook == null;
+        }
+
+        /** This cut as {@code mark} says instead. */
+        Crop marked(Mark mark) {
+            return new Crop(name, x, y, width, height, tags, ignore, screen, mark, back, sometimes, popup, variantOf,
+                    state, when, screenLook);
         }
 
         /** Whether it names a picture the bot has, to note as it is: no part of a box given. */
@@ -131,9 +147,13 @@ final class PictureTools {
                @Describe(value = "width in pixels", optional = true) Integer width,
                @Describe(value = "height in pixels", optional = true) Integer height,
                @Describe(value = IGNORE, optional = true) Skip ignore,
-               @Describe(value = "true when it is the screen's marker, a part no other screen shows: pays the "
-                       + "marker try_input left owed, or starts the map's first screen", optional = true)
-               Boolean marker,
+               @Describe(value = "what tells the screen apart; a screen shows where all its markers are found and none "
+                       + "of its absent pictures is. set: one marker when it is unique, several boxes when the screen "
+                       + "shares its title or frame (a tab, a dialog style), together replacing its markers; pays the "
+                       + "marker try_input left owed, or starts the map's first screen. add: one more marker, keeping "
+                       + "the ones it has. absent: a picture it never shows, where a screen like it does (a button only "
+                       + "the other has)", optional = true)
+               Mark marker,
                @Describe(value = "true when it is the screen's close button, its way back", optional = true)
                Boolean back,
                @Describe(value = "true when the input shows only at times (a Claim when loot is ready, an event's "
@@ -297,14 +317,41 @@ final class PictureTools {
             if (checked.refusal() != null) return AgentReply.refused(checked.refusal() + " Nothing was saved.");
             fitted = checked.said();
         }
-        if (cuts.size() == 1) return said(cropPicture(cuts.getFirst(), context), fitted);
+        // What told the screen apart before: a set another screen's shot shows too is put back to it.
+        Markers before = screen == null || cuts.stream().noneMatch(Crop::screenMarker)
+                || context.services().projectDir() == null ? null
+                : MapTools.markers(context.services(), screen).orElse(null);
+        if (cuts.size() == 1) {
+            AgentReply one = cropPicture(cuts.getFirst(), context);
+            return said(one.isRefused() || !cuts.getFirst().screenMarker() ? one
+                    : said(one, told(context, screen, before, cuts)), fitted);
+        }
         // One watch of the screen for every box: each box watched alone took a second (2026-10-14).
         Supplier<List<BufferedImage>> live = liveLooks(context);
-        // The markers first: one may start the screen the other boxes are noted on.
+        // The markers first: one may start the screen the other boxes are noted on. Of several cut with marker set, the
+        // first replaces the set and the rest join it; then the ones added, then the absent ones.
         AgentReply all = null;
-        for (Crop crop : cuts) {
-            if (crop.alone() && Boolean.TRUE.equals(crop.marker())) all = joined(all, crop, cropPicture(crop, context, live));
+        Set<String> started = new HashSet<>();
+        boolean marked = false;
+        List<Crop> marks = cuts.stream().filter(c -> c.marker() != null)
+                .sorted(Comparator.comparing(Crop::marker)).toList();
+        for (Crop crop : marks) {
+            String look = crop.screenLook() == null ? "" : crop.screenLook().strip().toLowerCase(Locale.ROOT);
+            boolean first = crop.marker() == Mark.SET && !started.contains(look);
+            Crop as = crop.marker() == Mark.SET && !first ? crop.marked(Mark.ADD) : crop;
+            // A note declined in words (a look of an input already) is no refusal: the set it was to start is read.
+            Markers prior = first && crop.screenMarker() ? MapTools.markers(context.services(), screen).orElse(null)
+                    : null;
+            AgentReply one = cropPicture(as, context, live);
+            if (!one.isRefused()) {
+                boolean wrote = !first || !crop.screenMarker() || MapTools.markers(context.services(), screen)
+                        .filter(now -> prior == null || !now.same(prior)).isPresent();
+                if (first && wrote) started.add(look);
+                marked |= crop.screenMarker();
+            }
+            all = joined(all, crop, one);
         }
+        if (marked) all = said(all, told(context, screen, before, cuts));
         // The plain inputs and the way back noted on the screen together: a write of it per box was 0.5 s each.
         MapTools.Placing at = null;
         List<String> inputs = new ArrayList<>();
@@ -339,9 +386,24 @@ final class PictureTools {
         }
         // Then another look of an input, or one with a when: what it belongs to is noted by now.
         for (Crop crop : cuts) {
-            if (crop.alone() && !Boolean.TRUE.equals(crop.marker())) all = joined(all, crop, cropPicture(crop, context, live));
+            if (crop.alone() && crop.marker() == null) all = joined(all, crop, cropPicture(crop, context, live));
         }
         return said(all, fitted);
+    }
+
+    /**
+     * Once {@code screen}'s markers are all written: put back as {@code before} when another screen's shot shows them
+     * too, else the frame they were cut from (the live game, for pictures the bot has) is its shot when it shows them.
+     * Said as sentences; blank when there is nothing to say.
+     */
+    private static String told(AgentContext context, String screen, Markers before, List<Crop> cuts) {
+        // Nothing written (each note declined): the shot stays as it is.
+        if (before != null && MapTools.markers(context.services(), screen).filter(before::same).isPresent()) return "";
+        String clash = before == null ? "" : MapTools.unique(context.services(), screen, before);
+        if (!clash.isEmpty()) return clash;
+        if (cuts.stream().noneMatch(c -> c.screenMarker() && c.marker().shown())) return "";
+        Optional<BufferedImage> frame = cuts.stream().allMatch(Crop::kept) ? Frames.look(context) : Frames.shown();
+        return MapTools.markerShot(context, screen, frame.orElse(null));
     }
 
     /** What checking a call's boxes against the game found: why it is refused (null: it is not), and what to add. */
@@ -356,7 +418,9 @@ final class PictureTools {
      * ({@link ScreenFit#fit}), one not there refuses the call.
      */
     private static Checked checked(AgentContext context, String screen, List<Crop> cuts) {
-        boolean recut = cuts.stream().anyMatch(c -> Boolean.TRUE.equals(c.marker()));
+        // A marker may be cut while another screen shows: the screen being started, its markers recut, or a picture
+        // only the screen like it shows, cut there as absent.
+        boolean recut = cuts.stream().anyMatch(c -> c.marker() != null);
         Optional<BufferedImage> boxed = Frames.shown();
         if (!recut && boxed.isPresent() && cuts.stream().anyMatch(c -> !c.kept())) {
             Optional<String> other = ScreenFit.otherScreen(context, screen, boxed.get());
@@ -365,12 +429,23 @@ final class PictureTools {
                         + screen + " and take a screenshot, or give screen " + other.get() + ".", "");
             }
         }
+        List<String> shownAbsent = ScreenFit.shownOn(context, screen, cuts.stream()
+                .filter(c -> c.kept() && c.marker() == Mark.ABSENT).map(Crop::name).toList());
+        if (!shownAbsent.isEmpty()) {
+            return new Checked(String.join(", ", shownAbsent) + (shownAbsent.size() == 1 ? " shows" : " show") + " on "
+                    + screen + " now, so it is no picture " + screen + " never shows.", "");
+        }
+        if (boxed.isPresent() && cuts.stream().anyMatch(c -> !c.kept() && c.marker() == Mark.ABSENT)
+                && ScreenFit.showsOn(context, screen, boxed.get())) {
+            return new Checked("The screenshot shows " + screen + ": a picture it never shows is cut where a screen "
+                    + "like it shows it, or named as one the bot has.", "");
+        }
         List<Integer> kept = new ArrayList<>();
-        for (int i = 0; i < cuts.size(); i++) if (cuts.get(i).kept()) kept.add(i);
+        for (int i = 0; i < cuts.size(); i++) if (cuts.get(i).kept() && cuts.get(i).marker() != Mark.ABSENT) kept.add(i);
         if (kept.isEmpty()) return new Checked(null, "");
         List<Crop> named = kept.stream().map(cuts::get).toList();
         ScreenFit.Fitted fitted = ScreenFit.fit(context, screen, named.stream().map(Crop::name).toList(),
-                names(named, c -> Boolean.TRUE.equals(c.marker()) || c.screenLook() != null),
+                names(named, c -> c.marker() != null || c.screenLook() != null),
                 names(named, c -> Boolean.TRUE.equals(c.sometimes()) || c.when() != null));
         if (!fitted.missing().isEmpty()) {
             return new Checked(String.join(", ", fitted.missing()) + (fitted.missing().size() == 1 ? " is" : " are")
@@ -401,16 +476,13 @@ final class PictureTools {
 
     /** Why several boxes cannot be cut together, checked before any is cut; empty when they can. */
     private static Optional<String> refusal(List<Crop> cuts, String screen) {
-        if (cuts.stream().filter(c -> Boolean.TRUE.equals(c.marker()) && c.screenLook() == null).count() > 1) {
-            return Optional.of("One box is the screen's marker, not several.");
-        }
         if (cuts.stream().filter(c -> Boolean.TRUE.equals(c.back())).count() > 1) {
             return Optional.of("One box is the screen's way back, not several.");
         }
         for (Crop c : cuts) {
             if (c.partial()) return Optional.of(c.name() + ": give x, y, width and height, or none of them for a picture "
                     + "the bot has.");
-            boolean marker = Boolean.TRUE.equals(c.marker());
+            boolean marker = c.marker() != null;
             boolean back = Boolean.TRUE.equals(c.back());
             boolean sometimes = Boolean.TRUE.equals(c.sometimes()) || c.when() != null && !(marker
                     && c.screenLook() != null);
@@ -421,9 +493,9 @@ final class PictureTools {
                         + "an input and a popup are a screen's: give screen too.");
             }
             if (Stream.of(marker, back, sometimes, c.variantOf() != null).filter(b -> b).count() > 1
-                    || popup && !marker) {
+                    || popup && !(marker && c.marker().shown())) {
                 return Optional.of(c.name() + ": a cut is one of a marker, a way back, an input or another look of "
-                        + "one; popup goes with marker.");
+                        + "one; popup goes with marker set or add.");
             }
             if (c.variantOf() != null && (c.state() == null || c.state() == State.NORMAL)) {
                 return Optional.of(c.name() + ": say what the look means, state: badge, disabled or selected.");
@@ -474,7 +546,8 @@ final class PictureTools {
                     + "edit_tags' declare makes one. Nothing was saved.");
         }
         List<String> tags = catalog == null ? List.of() : catalog.declaredOnly(typed);
-        boolean marker = Boolean.TRUE.equals(crop.marker());
+        Mark mark = crop.marker();
+        boolean marker = mark != null;
         String screen = crop.screen() == null || crop.screen().isBlank() ? null : crop.screen().strip();
         boolean back = Boolean.TRUE.equals(crop.back());
         boolean sometimes = Boolean.TRUE.equals(crop.sometimes());
@@ -496,9 +569,10 @@ final class PictureTools {
             return AgentReply.refused("A marker, a way back, an input that comes and goes, another look of an input "
                     + "and a popup are a screen's: give screen too.");
         }
-        if (Stream.of(marker, back, sometimes, variantOf != null).filter(b -> b).count() > 1 || popup && !marker) {
+        if (Stream.of(marker, back, sometimes, variantOf != null).filter(b -> b).count() > 1
+                || popup && !(marker && mark.shown())) {
             return AgentReply.refused("A cut is one of a marker, a way back, an input or another look of one; popup "
-                    + "goes with marker.");
+                    + "goes with marker set or add.");
         }
         if (variantOf != null && (state.isEmpty() || state.get() == State.NORMAL)) {
             return AgentReply.refused("Say what the look means, state: badge, disabled or selected. Nothing was "
@@ -512,7 +586,7 @@ final class PictureTools {
         if (screen != null) {
             if (context.services().projectDir() == null) return AgentReply.refused(Frames.noProject());
             try {
-                section = Optional.of(MapTools.placing(context.services(), screen, marker, popup));
+                section = Optional.of(MapTools.placing(context.services(), screen, marker && mark.shown(), popup));
             } catch (IllegalStateException busy) {
                 return AgentReply.refused("Studio did not hand over the bot's Screens: " + busy.getMessage());
             }
@@ -524,11 +598,8 @@ final class PictureTools {
                     : FxCall.call(() -> TemplateLibrary.applyTags(context.services(), Map.of(name, tags)));
             boolean comes = sometimes;
             MapTools.Look look = new MapTools.Look(variantOf, state.orElse(null), when, screenLook);
-            String noted = section.map(s -> MapTools.noteCut(context.services(), s, name, marker, back, comes, look))
+            String noted = section.map(s -> MapTools.noteCut(context.services(), s, name, mark, back, comes, look))
                     .orElse("");
-            if (marker && screenLook == null && screen != null) {
-                noted += MapTools.markerShot(context, screen, name, Frames.look(context).orElse(null));
-            }
             return AgentReply.text("Kept " + name + " as it is" + (tags.isEmpty() || !untagged.isEmpty() ? ""
                     : ", tagged " + String.join(", ", tags)) + "." + noted
                     + (untagged.isEmpty() ? "" : " Not tagged: " + String.join(" ", untagged)));
@@ -548,10 +619,8 @@ final class PictureTools {
         String constant = TemplateNames.constantFor(saved.name());
         boolean comes = sometimes;
         MapTools.Look look = new MapTools.Look(variantOf, state.orElse(null), when, screenLook);
-        String noted = section.map(s -> MapTools.noteCut(context.services(), s, saved.name(), marker, back,
+        String noted = section.map(s -> MapTools.noteCut(context.services(), s, saved.name(), mark, back,
                 comes, look)).orElse("");
-        // The frame a screen's marker is cut from shows the screen: its shot.
-        if (marker && screenLook == null && screen != null) noted += MapTools.markerShot(context, screen, saved.name(), frame.get());
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
                         + "." + constant) + (tags.isEmpty() || !untagged.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
                         + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike

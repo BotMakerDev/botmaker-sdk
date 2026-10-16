@@ -275,6 +275,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   marker is a list of one. When two shown screens neither hides, the one told by more markers wins. A map written
   with `.marker(X)` no longer compiles: Studio's upgrade resets it and marks it `@Refactor`, so cut its markers
   again.
+- **Discovery writes and checks marker sets.**
+  - `crop_pictures`' `marker` is `set`, `add` or `absent` (no longer `true`). Several boxes with `set` make the
+    screen's set together, `add` keeps the set and adds one, `absent` adds a picture the screen never shows; a set
+    replaced by one picture says what it replaced.
+  - A set another screen's shot shows too (every marker found, no absent picture) is put back, naming that screen and
+    its markers the screen's own shot lacks, to cut as absent. An absent picture the game shows on the screen now is
+    refused.
+  - The screen's shot is taken once its whole set is written.
+  - `edit_map` gains `add_marker` (with `absent`) and `remove_marker`, by the same `ScreenEdits` methods as
+    🗺 Screens. The panel lists the markers and the pictures a screen never shows, each with ✕; ✂ Cut marker adds one
+    to the set.
+  - `read_map` says when a screen's shot shows a picture it never shows.
 - **The screen map walks more surely.**
   - **A way does what its screen's input says now.** A way into a screen keeps a copy of the input it was found
     by. A look, a lock or a `when` put on that input later now applies to the way too: the walk reads the

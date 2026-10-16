@@ -46,6 +46,21 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent) {
         return String.join(" + ", shown.stream().map(ImageTemplate::id).toList());
     }
 
+    /** Whether {@code other} holds the same pictures, by id, in the same order. */
+    public boolean same(Markers other) {
+        return ids(shown).equals(ids(other.shown)) && ids(absent).equals(ids(other.absent));
+    }
+
+    private static List<String> ids(List<ImageTemplate> pictures) {
+        return pictures.stream().map(ImageTemplate::id).toList();
+    }
+
+    /** Its markers and its absent pictures as a reply names them: {@code shop_title + shop_tab, not gems}. */
+    public String said() {
+        return (shown.isEmpty() ? "no marker" : ids()) + (absent.isEmpty() ? ""
+                : ", not " + String.join(", ", absent.stream().map(ImageTemplate::id).toList()));
+    }
+
     /** Its markers and its absent pictures, each once. */
     public List<ImageTemplate> pictures() {
         Map<String, ImageTemplate> all = new LinkedHashMap<>();

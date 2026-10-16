@@ -38,7 +38,8 @@ final class MapGuide {
     // --- the side panel ---
     static final String TRY_NEXT = "Try the next untried input, as the assistant's try_input does";
     static final String CUT_INPUTS = "Draw boxes around more of its buttons: each is noted untried";
-    static final String CUT_MARKER = "Draw a box around a part only this screen shows";
+    static final String CUT_MARKER = "Draw a box around a part only this screen shows; on a screen with markers, one "
+            + "more of them: it shows where all of them are found";
     static final String GO_HERE = "Walk the game here by the map, as Navigate.to does in a run";
 
     /** One sign and what it means; {@code style} draws the sign as a pill of that class, null as plain text. */
@@ -83,7 +84,8 @@ final class MapGuide {
                     new Entry("▶ Try", null, "Clicks one input on the game and records what it did."),
                     new Entry("▶ Try next", null, TRY_NEXT + "."),
                     new Entry("✂ Cut inputs", null, CUT_INPUTS + "."),
-                    new Entry("✂ Cut marker", null, CUT_MARKER + "."),
+                    new Entry("✂ Cut marker", null, CUT_MARKER + ". Markers lists them, and the pictures it never "
+                            + "shows; ✕ takes one off."),
                     new Entry("🧭 Go here", null, GO_HERE + "."),
                     new Entry("⋯ Screen", null, "Rename; Popup, for a screen the game opens on its own; retake the "
                             + "shot; add pictures the bot has; a new screen from here; not a screen, when its way in "

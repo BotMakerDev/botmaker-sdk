@@ -4,12 +4,14 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -62,8 +64,8 @@ public final class ScreenDesk {
     }
 
     /**
-     * Notes the picture {@code picture}, just cut, on {@code constant}: its marker, or an input untried until tried.
-     * Says where.
+     * Notes the picture {@code picture}, just cut, on {@code constant}: one more of its markers (the first, for a
+     * screen with none), or an input untried until tried. Says where; a set another screen's shot shows too is put back.
      */
     public static String noteCut(StudioServices services, String constant, String picture, boolean marker) {
         MapTools.Placing at;
@@ -73,7 +75,9 @@ public final class ScreenDesk {
             return "Studio did not hand over the bot's Screens: " + busy.getMessage();
         }
         if (at.refusal() != null) return at.refusal();
-        return MapTools.noteCut(services, at, picture, marker, false, false).strip();
+        Optional<Markers> before = marker ? MapTools.markers(services, constant) : Optional.empty();
+        String noted = MapTools.noteCut(services, at, picture, marker ? MapTools.Mark.ADD : null, false, false);
+        return (noted + before.map(b -> MapTools.unique(services, constant, b)).orElse("")).strip();
     }
 
     /** A reply's text, its pictures aside: what the window says of a tool it ran. */

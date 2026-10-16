@@ -263,7 +263,7 @@ final class MapTools {
         Optional<String> found = ScreenBook.find(graph, asked);
         if (found.isEmpty()) {
             return Tried.refused("No screen " + asked + " in the bot's Screens" + (graph.screens().isEmpty()
-                    ? ": crop_pictures the first screen's marker with screen " + asked + ", its box marker true; that "
+                    ? ": crop_pictures the first screen's marker with screen " + asked + ", its box marker set; that "
                     + "starts the map." : ": try_input adds a screen when an input opens it.") + " Nothing was done.");
         }
         String screen = found.get();
@@ -529,7 +529,7 @@ final class MapTools {
         return AgentReply.text("Opened " + child + ", added to the map as Screens." + constant + ", reached from "
                         + from + " by " + base.label() + "; it owes its marker. 🖼 Manage Pictures groups the "
                         + "pictures it names under it. Before leaving it, "
-                        + "from the screenshot below: crop_pictures with screen " + child + " and marker true a part "
+                        + "from the screenshot below: crop_pictures with screen " + child + " and marker set a part "
                         + "only this screen shows, then with screen " + child + " every input on it (each button, "
                         + "icon, tab, toggle, arrow and list, and its close button); what cannot be cut now, "
                         + "write_notes with screen " + child + " and owes. Then try each of them, and finish " + child
@@ -685,7 +685,7 @@ final class MapTools {
             return new Placing(ScreenBook.constantFor(graph, typed), typed, true, popup, null);
         }
         return Placing.refused("No screen " + typed + " in the bot's Screens: " + (first ? "the first screen starts "
-                + "the map with its marker, marker true." : "try_input adds a screen when an input opens it; a popup "
+                + "the map with its marker, marker set." : "try_input adds a screen when an input opens it; a popup "
                 + "starts with its marker cut with popup true.") + " Nothing was saved.");
     }
 
@@ -694,9 +694,92 @@ final class MapTools {
      * its way back, or an input untried until try_input tries it ({@code sometimes}: one that comes and goes). Says
      * where.
      */
-    static String noteCut(StudioServices services, Placing at, String picture, boolean marker, boolean back,
+    static String noteCut(StudioServices services, Placing at, String picture, Mark marker, boolean back,
                           boolean sometimes) {
         return noteCut(services, at, picture, marker, back, sometimes, Look.NONE);
+    }
+
+    /**
+     * What a picture cut is to what tells its screen apart. A screen shows where all its markers are found and none of
+     * its absent pictures is: one picture is not always unique (Rarity's title scored 0.80 on Upgrade, tabs share
+     * their window, 2026-10-16).
+     */
+    enum Mark {
+        /** One of the markers this call cuts, which together replace the screen's set. */
+        SET,
+        /** A marker added to the set the screen has. */
+        ADD,
+        /** A picture the screen never shows, where another screen like it does. */
+        ABSENT;
+
+        /** Whether it is a marker, shown, not an absent picture. */
+        boolean shown() {
+            return this != ABSENT;
+        }
+    }
+
+    /** {@code list} with {@code cut}, which it holds once. */
+    private static List<ImageTemplate> with(List<ImageTemplate> list, ImageTemplate cut) {
+        if (list.stream().anyMatch(p -> p.id().equals(cut.id()))) return list;
+        List<ImageTemplate> more = new ArrayList<>(list);
+        more.add(cut);
+        return more;
+    }
+
+    /** {@code set} as {@code mark} changes it by {@code cut}: replaced, added to, or given an absent picture. */
+    private static Markers marked(Markers set, Mark mark, ImageTemplate cut) {
+        return switch (mark) {
+            case SET -> new Markers(List.of(cut), set.absent());
+            case ADD -> new Markers(with(set.shown(), cut), set.absent());
+            case ABSENT -> new Markers(set.shown(), with(set.absent(), cut));
+        };
+    }
+
+    /** {@code screen}'s markers and absent pictures, read from the map; empty while the map lacks it. */
+    static Optional<Markers> markers(StudioServices services, String typed) {
+        try {
+            ScreenGraph graph = FxCall.call(() -> ScreenBook.read(services));
+            return ScreenBook.find(graph, typed).map(c -> Markers.of(graph.screens().get(c)));
+        } catch (IllegalStateException busy) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * After {@code typed}'s markers were written: when another screen's shot shows them too, they are put back as
+     * {@code before} and said so, with what would tell the two apart; blank when they tell it alone. Checked once the
+     * whole set is written: two pictures that each show elsewhere may show together nowhere else.
+     */
+    static String unique(StudioServices services, String typed, Markers before) {
+        ScreenGraph graph;
+        try {
+            graph = FxCall.call(() -> ScreenBook.read(services));
+        } catch (IllegalStateException busy) {
+            return "";
+        }
+        Optional<String> constant = ScreenBook.find(graph, typed);
+        if (constant.isEmpty()) return "";
+        Markers now = Markers.of(graph.screens().get(constant.get()));
+        if (now.same(before)) return "";
+        Optional<MapAudit.Clash> clash = MapAudit.clash(services.resourcesDir(), MapAudit.confidence(services), graph,
+                constant.get(), now);
+        if (clash.isEmpty()) return "";
+        Optional<String> failed = FxCall.call(() -> ScreenBook.update(services, constant.get(),
+                s -> s.markers(before.shown()).absent(before.absent())));
+        String name = graph.shown(constant.get());
+        return " But " + clashSaid(graph, constant.get(), now, clash.get()) + (failed.isPresent() ? " Putting " + name
+                + "'s markers back failed: " + failed.get() : " " + name + " keeps " + before.said() + "; the "
+                + "pictures stay saved.");
+    }
+
+    /** That {@code set} of {@code constant} shows on {@code clash}'s screen too, and what would tell the two apart. */
+    static String clashSaid(ScreenGraph graph, String constant, Markers set, MapAudit.Clash clash) {
+        String other = graph.shown(clash.screen());
+        String name = graph.shown(constant);
+        return set.said() + " shows on " + other + "'s shot too, so a run would take " + other + " for " + name
+                + ". Add a marker only " + name + " shows (marker add), or " + (clash.apart().isEmpty() ? "one of "
+                + other + "'s that " + name + " never shows" : String.join(" or ", clash.apart()) + ", which " + name
+                + "'s shot does not show,") + " as absent (marker absent).";
     }
 
     /**
@@ -709,10 +792,11 @@ final class MapTools {
     }
 
     /** As above, the cut also noted as {@code look} says. */
-    static String noteCut(StudioServices services, Placing at, String picture, boolean marker, boolean back,
+    static String noteCut(StudioServices services, Placing at, String picture, Mark mark, boolean back,
                           boolean sometimes, Look look) {
         if (look.variantOf() != null) return noteVariant(services, at, picture, look);
-        if (look.screenLook() != null) return noteScreenLook(services, at, picture, marker, sometimes, look);
+        if (look.screenLook() != null) return noteScreenLook(services, at, picture, mark, sometimes, look);
+        boolean marker = mark != null;
         try {
             return FxCall.call(() -> {
                 ImageTemplate cut = ScreenBook.picture(services, picture);
@@ -727,9 +811,18 @@ final class MapTools {
                 ScreenGraph graph = ScreenBook.read(services);
                 GameScreen screen = graph.screens().get(at.constant());
                 if (screen == null) return " " + at.name() + " is no longer in the map, so it was not noted.";
-                String was = marker && screen.hasMarker()
-                        && !(screen.markers().size() == 1 && screen.firstMarker().id().equals(cut.id()))
-                        ? Markers.of(screen).ids() : null;
+                Markers set = Markers.of(screen);
+                if (mark == Mark.ABSENT && set.shown().stream().anyMatch(p -> p.id().equals(cut.id()))) {
+                    return " " + at.name() + " has " + cut.id() + " as a marker: it cannot be one it never shows too.";
+                }
+                if (mark == Mark.ADD && set.absent().stream().anyMatch(p -> p.id().equals(cut.id()))) {
+                    return " " + at.name() + " has " + cut.id() + " as a picture it never shows: edit_map remove_marker "
+                            + "it first.";
+                }
+                Markers now = marker ? marked(set, mark, cut) : set;
+                if (marker && now.same(set)) return " " + at.name() + " is told by " + set.said() + " already.";
+                // A set replaced by one picture is said: it loses what told the screen apart.
+                String was = mark == Mark.SET && set.any() ? set.ids() : null;
                 Optional<Input> lookOf = screen.allInputs().stream()
                         .filter(i -> i.variants().stream().anyMatch(v -> v.picture().id().equals(cut.id()))).findFirst();
                 if (lookOf.isPresent()) return " " + at.name() + " has it as a look of " + lookOf.get().label() + ".";
@@ -741,15 +834,19 @@ final class MapTools {
                 }
                 // A way back is no input to try, and an input seen to come and go is marked so in place.
                 Optional<String> failed = ScreenBook.update(services, at.constant(), s -> marker
-                        ? at.popup() ? s.markers(List.of(cut)).popup() : s.markers(List.of(cut))
+                        ? at.popup() ? s.markers(now.shown()).absent(now.absent()).popup()
+                        : s.markers(now.shown()).absent(now.absent())
                         : back ? replaced(s, had.orElse(null), null).back(Input.click(cut))
                         : had.isPresent() ? replaced(s, had.get(), brought(had.get().sometimes(), look))
                         : s.inputs(added(s.inputs(), sometimes ? brought(Input.click(cut).sometimes(), look)
                         : Input.click(cut))));
                 if (failed.isPresent()) return " It could not be noted in " + at.name() + ": " + failed.get();
-                return " Noted in " + at.name() + (marker ? " as its marker" + (was == null ? "" : ", in place of "
-                        + was) + (at.popup() ? "; a popup now, apart from the map's tree, closed on the way" : "")
-                        + "." : back ? " as its way back." : sometimes ? " as an input that comes and goes: "
+                String popup = at.popup() ? "; a popup now, apart from the map's tree, closed on the way" : "";
+                return " Noted in " + at.name() + (mark == Mark.SET ? " as its marker" + (was == null || was.equals(
+                        cut.id()) ? "" : ", in place of " + was + " (marker add adds to the set instead)") + popup + "."
+                        : mark == Mark.ADD ? " as one of its markers, told by " + now.said() + popup + "."
+                        : mark == Mark.ABSENT ? " as a picture it never shows, told by " + now.said() + "."
+                        : back ? " as its way back." : sometimes ? " as an input that comes and goes: "
                         + "try_input it while it shows." : " as untried: try_input it before leaving " + at.name() + ".");
             });
         } catch (IllegalStateException busy) {
@@ -795,8 +892,9 @@ final class MapTools {
      * an input only it has (one that comes and goes as {@code sometimes} says). The look is added when new. With a
      * marker, the method {@code look} names says when the screen looks so: {@code Firestone::halloween}.
      */
-    private static String noteScreenLook(StudioServices services, Placing at, String picture, boolean marker,
+    private static String noteScreenLook(StudioServices services, Placing at, String picture, Mark mark,
                                          boolean sometimes, Look look) {
+        boolean marker = mark != null;
         if (at.starts()) return " " + at.name() + " is not in the map yet: cut its own marker first, then its looks.";
         String name = look.screenLook().strip();
         try {
@@ -807,13 +905,14 @@ final class MapTools {
                 ScreenVariant was = screen.variants().stream().filter(v -> v.name().equalsIgnoreCase(name)).findFirst()
                         .orElse(ScreenVariant.named(name));
                 Input input = sometimes ? brought(Input.click(cut).sometimes(), look) : Input.click(cut);
-                ScreenVariant marked = look.when() == null ? was.markers(List.of(cut))
-                        : was.markers(List.of(cut)).when(ScreenTypes.condition(look.when()));
+                Markers set = marker ? marked(Markers.of(was), mark, cut) : Markers.of(was);
+                ScreenVariant told = was.markers(set.shown()).absent(set.absent());
+                ScreenVariant marked = look.when() == null ? told : told.when(ScreenTypes.condition(look.when()));
                 ScreenVariant now = marker ? marked : was.inputs(added(was.inputs(), input));
                 Optional<String> failed = ScreenBook.update(services, at.constant(), s -> s.withVariant(now));
                 if (failed.isPresent()) return " It could not be noted in " + at.name() + ": " + failed.get();
-                return " Noted in " + at.name() + "'s look " + was.name() + (marker ? " as what tells it apart"
-                        + (look.when() == null ? "." : ", shown while " + look.when() + " answers true.")
+                return " Noted in " + at.name() + "'s look " + was.name() + (marker ? " as what tells it apart, "
+                        + set.said() + (look.when() == null ? "." : ", shown while " + look.when() + " answers true.")
                         : " as an input only it has, untried: try_input it while " + was.name() + " shows.");
             });
         } catch (IllegalStateException busy) {
@@ -956,9 +1055,14 @@ final class MapTools {
             if (marker != null) {
                 Placing at = placing(services, screen, true, popup);
                 if (at.refusal() != null) return AgentReply.refused(at.refusal());
-                said.append(marker).append(':').append(noteCut(services, at, marker, true, false, false));
-                said.append(markerShot(context, screen, marker, fitted.frame() != null ? fitted.frame()
-                        : Frames.look(context).orElse(null)));
+                Optional<Markers> before = markers(services, screen);
+                said.append(marker).append(':').append(noteCut(services, at, marker, Mark.SET, false, false));
+                String clash = before.map(b -> unique(services, screen, b)).orElse("");
+                said.append(clash);
+                if (clash.isEmpty()) {
+                    said.append(markerShot(context, screen, fitted.frame() != null ? fitted.frame()
+                            : Frames.look(context).orElse(null)));
+                }
             }
             Placing at = placing(services, screen, false, false);
             if (at.refusal() != null) return said.isEmpty() ? AgentReply.refused(at.refusal())
@@ -1036,7 +1140,7 @@ final class MapTools {
         if (screen.variants().isEmpty()) return "";
         return walk.lookOn(constant, frame).map(v -> " It looks as " + v.name() + ".")
                 .orElse(" None of its looks' markers shows (" + String.join(", ", screen.variants().stream()
-                        .map(ScreenVariant::name).toList()) + "): a new look is cut with screenLook and marker true.");
+                        .map(ScreenVariant::name).toList()) + "): a new look is cut with screenLook and marker set.");
     }
 
     /**
@@ -1056,12 +1160,11 @@ final class MapTools {
     }
 
     /**
-     * After {@code picture} is noted as {@code typed}'s marker: {@code frame} becomes its shot when the map has that
-     * marker and it shows on the frame, said as a sentence; blank otherwise (the note failed, the screen is not in the
-     * map). The shot a screen got when it opened was the frame right after the click, a draft; and a recut marker means
-     * the screen changed.
+     * After {@code typed}'s markers are written, the whole set: {@code frame} becomes its shot when it shows them, said
+     * as a sentence; blank otherwise (no frame, the screen is not in the map). The shot a screen got when it opened was
+     * the frame right after the click, a draft; and a recut marker means the screen changed.
      */
-    static String markerShot(AgentContext context, String typed, String picture, BufferedImage frame) {
+    static String markerShot(AgentContext context, String typed, BufferedImage frame) {
         Optional<ToolReach> reach = ToolReach.of(context);
         Path resources = context.services().resourcesDir();
         if (frame == null || reach.isEmpty() || resources == null) return "";
@@ -1072,8 +1175,7 @@ final class MapTools {
             return "";
         }
         Optional<String> constant = ScreenBook.find(graph, typed);
-        List<ImageTemplate> markers = constant.map(c -> graph.screens().get(c).markers()).orElse(List.of());
-        if (markers.stream().noneMatch(m -> m.id().equals(picture))
+        if (constant.isEmpty() || !graph.screens().get(constant.get()).hasMarker()
                 || !ScreenFit.shows(reach.get(), graph, constant.get(), frame)) {
             return "";
         }
@@ -1217,7 +1319,7 @@ final class MapTools {
 
     static String owes(String screen) {
         return screen + " still owes its marker: screenshot it, then crop_pictures with screen " + screen + " and "
-                + "marker true a part only that screen shows; or, when none can be cut, write_notes with screen "
+                + "marker set a part only that screen shows; or, when none can be cut, write_notes with screen "
                 + screen + " and owes \"marker — <why>\". Nothing was done.";
     }
 

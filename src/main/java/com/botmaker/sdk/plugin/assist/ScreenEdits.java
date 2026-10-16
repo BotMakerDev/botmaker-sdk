@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
@@ -27,10 +28,11 @@ import java.util.function.BooleanSupplier;
  * The map edited by hand from 🗺 Screens' side panel: what the assistant's tools record by trying, set by the user
  * instead (the user's call, 2026-10-15): an input's result, kind, never, lock or coming and going, an input removed or
  * made the way back, a screen renamed, made a popup, taken back, deleted or given a new shot, pictures the bot has put
- * on a screen, a screen added under another without trying its way in, a way in or a way back taken off, and when a
+ * on a screen, a marker or a picture it never shows added or taken off, a screen added under another without trying
+ * its way in, a way in or a way back taken off, and when a
  * way, an input or a look is there, and where a card sits on the map. The assistant's edit_map does each by the same
  * method ({@link MapEdits}). Each answers in a sentence what it wrote, or why it did not. On the FX thread, except
- * {@link #retakeShot}, which reads the game.
+ * {@link #retakeShot}, which reads the game, and {@link #addMarker} and {@link #removeMarker}, which read every shot.
  */
 public final class ScreenEdits {
 
@@ -259,6 +261,67 @@ public final class ScreenEdits {
         return said(ScreenBook.update(services, constant, s -> withInput(s.back(null), s.back())),
                 "No way back of its own: a walk closes it by its close button, else Escape. " + was.label()
                         + " is untried on it again.");
+    }
+
+    /**
+     * Adds {@code picture} to what tells {@code constant} apart: one more marker, all of which show, or one it never
+     * shows ({@code absent}). Refused when another screen's shot shows the set too: a run would take that one for it.
+     * Off the FX thread, unlike the other edits: it matches the set over every other screen's shot.
+     */
+    public static String addMarker(StudioServices services, String constant, ImageTemplate picture, boolean absent) {
+        GameScreen screen = FxCall.call(() -> ScreenBook.read(services)).screens().get(constant);
+        if (screen == null) return NOT_WRITTEN + "no screen " + constant + " in the map.";
+        Markers was = Markers.of(screen);
+        String id = picture.id();
+        if (holds(absent ? was.shown() : was.absent(), id)) {
+            return NOT_WRITTEN + id + " is " + (absent ? "one of its markers" : "a picture it never shows")
+                    + ": remove it from there first.";
+        }
+        if (holds(absent ? was.absent() : was.shown(), id)) return "It is told by " + was.said() + " already.";
+        Markers now = absent ? new Markers(was.shown(), plus(was.absent(), picture))
+                : new Markers(plus(was.shown(), picture), was.absent());
+        return toldBy(services, constant, now);
+    }
+
+    /**
+     * Takes {@code picture} off what tells {@code constant} apart, its markers or the pictures it never shows. Refused
+     * for its last marker, and when another screen's shot shows what is left. Off the FX thread, as {@link #addMarker}.
+     */
+    public static String removeMarker(StudioServices services, String constant, String picture) {
+        GameScreen screen = FxCall.call(() -> ScreenBook.read(services)).screens().get(constant);
+        if (screen == null) return NOT_WRITTEN + "no screen " + constant + " in the map.";
+        Markers was = Markers.of(screen);
+        String id = picture == null ? "" : picture.strip();
+        if (!holds(was.shown(), id) && !holds(was.absent(), id)) {
+            return NOT_WRITTEN + "it is told by " + was.said() + ", not " + id + ".";
+        }
+        Markers now = new Markers(minus(was.shown(), id), minus(was.absent(), id));
+        if (!now.any()) return NOT_WRITTEN + id + " is its last marker: add another first.";
+        return toldBy(services, constant, now);
+    }
+
+    /** {@code constant} told by {@code now}, unless another screen's shot shows it too. */
+    private static String toldBy(StudioServices services, String constant, Markers now) {
+        ScreenGraph graph = FxCall.call(() -> ScreenBook.read(services));
+        Optional<MapAudit.Clash> clash = MapAudit.clash(services.resourcesDir(), MapAudit.confidence(services), graph,
+                constant, now);
+        if (clash.isPresent()) return NOT_WRITTEN + MapTools.clashSaid(graph, constant, now, clash.get());
+        return said(FxCall.call(() -> ScreenBook.update(services, constant,
+                s -> s.markers(now.shown()).absent(now.absent()))), "Told by " + now.said() + ".");
+    }
+
+    private static boolean holds(List<ImageTemplate> pictures, String id) {
+        return pictures.stream().anyMatch(p -> p.id().equalsIgnoreCase(id));
+    }
+
+    private static List<ImageTemplate> plus(List<ImageTemplate> pictures, ImageTemplate picture) {
+        List<ImageTemplate> more = new ArrayList<>(pictures);
+        more.add(picture);
+        return more;
+    }
+
+    private static List<ImageTemplate> minus(List<ImageTemplate> pictures, String id) {
+        return pictures.stream().filter(p -> !p.id().equalsIgnoreCase(id)).toList();
     }
 
     /** {@code constant}'s look {@code look} shown only while {@code method} answers true; blank: no method says. */

@@ -122,22 +122,28 @@ class MapReportTest {
     void whatAShotDoesNotShowIsSaid() {
         Rect close = new Rect(1800, 40, 40, 40);
         Audit tavern = new Audit(List.of(
-                new Spot("tavern_title", true, true, Where.AT_PLACE, new Rect(900, 30, 80, 30), null),
-                new Spot("market", false, true, Where.MISSING, null, new Rect(400, 500, 60, 60)),
-                new Spot("play", false, false, Where.MISSING, null, null),
-                new Spot("close", false, true, Where.ELSEWHERE, new Rect(1848, 40, 40, 40), close)));
+                new Spot("tavern_title", true, false, true, Where.AT_PLACE, new Rect(900, 30, 80, 30), null),
+                new Spot("market", false, false, true, Where.MISSING, null, new Rect(400, 500, 60, 60)),
+                new Spot("play", false, false, false, Where.MISSING, null, null),
+                new Spot("close", false, false, true, Where.ELSEWHERE, new Rect(1848, 40, 40, 40), close)));
         Audit market = new Audit(List.of(
-                new Spot("market_title", true, true, Where.MISSING, null, null),
-                new Spot("gems", false, true, Where.MISSING, null, null)));
+                new Spot("market_title", true, false, true, Where.MISSING, null, null),
+                new Spot("gems", false, false, true, Where.MISSING, null, null)));
+        // Home's shot shows the button Home is told apart from Tavern by never showing.
+        Audit home = new Audit(List.of(
+                new Spot("home", true, false, true, Where.AT_PLACE, new Rect(10, 10, 40, 40), null),
+                new Spot("upgrade", false, true, false, Where.AT_PLACE, new Rect(300, 300, 40, 40), null)));
         String text = MapReport.text(map(), Map.of(), NAMED::contains, id -> true, id -> true,
-                Map.of("TAVERN", tavern, "MARKET", market), null);
+                Map.of("TAVERN", tavern, "MARKET", market, "HOME", home), null);
+        assertTrue(text.contains("- Home: its shot shows upgrade, which Home never shows: take the shot again while "
+                + "the game shows Home, or cut its markers again."), text);
         assertTrue(text.contains("- Tavern: market is not on its shot.\n"), text);
         assertTrue(text.contains("- Tavern: close sits (+48,0) from its place on its shot: placed again while the "
                 + "game shows Tavern, it gets a copy of its own there.\n"), text);
         assertTrue(text.contains("- Tavern: its shot does not show play, which comes and goes or is another look "
                 + "(a note).\n"), text);
         assertTrue(text.contains("- Market: its shot does not show its marker market_title: take the shot again "
-                + "while the game shows Market, or cut its marker again."), text);
+                + "while the game shows Market, or cut its markers again."), text);
         assertFalse(text.contains("gems is not on"), "a shot of another moment says only that: " + text);
     }
 

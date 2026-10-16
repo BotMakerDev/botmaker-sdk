@@ -48,9 +48,14 @@ final class Protocol {
                      each untried until tried: every button, icon, tab, toggle, arrow, "+" of a counter and list
                      item, and every list or panel that scrolls (cut a still part of it). An icon with no
                      picture is one the bot cannot take. The first screen starts the map: its marker cut with
-                     screen Home and marker true. Its close button: back true. An input that shows only at
+                     screen Home and marker set. Its close button: back true. An input that shows only at
                      times (a Claim when loot is ready, an event's icon): sometimes true. A popup the game opens
                      on its own: its marker with popup true, then its close button with back true.
+                     A screen shows where all its markers are found and none of its absent pictures is. One
+                     marker (marker set) when one picture only it shows; several boxes with marker set when it
+                     shares its title or frame with others (a tab, a dialog style), or marker add for one more;
+                     marker absent for a picture only a screen like it shows (a button the other has). A set
+                     another screen's shot shows too is put back, naming that screen.
                   2. try_input each one, by its picture or its hotkey (several in one call, stopping at the first
                      that leaves the screen); try_input with scroll every list and
                      panel to its end both ways. Claim buttons and other free spends are clicked; an input that
@@ -60,7 +65,7 @@ final class Protocol {
                      inputs of its own opens a screen: try it with opens, the tab's title, and cut that content
                      on that screen, never on the one the tabs sit on.
                   3. An input that opens a screen (give opens the name it shows) adds it to the map, owing a
-                     marker, and the answer brings its screenshot: crop_pictures its marker (marker true, a part
+                     marker, and the answer brings its screenshot: crop_pictures its marker (marker set, a part
                      only that screen shows), then explore it by these same steps, to its end, before the next
                      input of the screen it was opened from. One that leads to a screen mapped already is a way
                      into it, or this screen's way back.
@@ -251,7 +256,7 @@ final class Protocol {
         List<String> owed = new ArrayList<>(graph.owed());
         if (graph.screens().isEmpty()) {
             return new Where(Stage.DISCOVERY, "the bot has no map of the game's screens yet (its Screens class): "
-                    + "crop_pictures the first screen's marker with its screen and marker true to start it.", screens,
+                    + "crop_pictures the first screen's marker with its screen and marker set to start it.", screens,
                     owed);
         }
         if (!owed.isEmpty()) {

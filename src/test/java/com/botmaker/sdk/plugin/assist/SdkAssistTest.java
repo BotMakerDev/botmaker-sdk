@@ -914,7 +914,7 @@ class SdkAssistTest {
     }
 
     @Test
-    void tryInputTakesAPictureOrAHotkeyAndEachScreensInputsBeforeTheScreensTheyOpen() {
+    void tryInputTakesAPictureOrAHotkeyAndEachScreensInputsBeforeTheScreensTheyOpen() throws IOException {
         Game game = new Game();
         NativeControllerFactory.setForTesting(game);
         agent.frame = withPatchAt(120, 80);
@@ -927,12 +927,12 @@ class SdkAssistTest {
 
         run("screenshot");
         assertTrue(cropOne("name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
-                "marker", true).isRefused(), "a marker without its screen");
+                "marker", "set").isRefused(), "a marker without its screen");
         assertTrue(cropOne("name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
                 "screen", "Guild").isRefused(), "only a marker starts the map");
         assertFalse(TemplateLibrary.exists(resources, "gold"), "a refused note saves nothing");
         String started = text(cropOne("name", "home", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
-                "screen", "Home", "marker", true));
+                "screen", "Home", "marker", "set"));
         assertTrue(started.contains("Added Home to the map as Screens.HOME"), started);
         assertTrue(text(cropOne("name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
                 "screen", "home")).contains("Noted in Home as untried"));
@@ -956,8 +956,10 @@ class SdkAssistTest {
                 .from(Way.of(BotConstants.screen("HOME"), Input.click(screen("HOME").firstMarker())))));
         AgentReply gated = tryOne("screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
         assertTrue(gated.isRefused() && text(gated).startsWith("Engineer still owes its marker"), text(gated));
+        // Home's shot is this very frame, coin and all: Engineer's marker would show on it, and be put back.
+        Files.delete(ScreenShots.file(resources, "HOME"));
         assertTrue(text(cropOne("name", "coin", "x", 300, "y", 200, "width", SIZE, "height", SIZE,
-                "screen", "engineer", "marker", true)).contains("Noted in Engineer as its marker."));
+                "screen", "engineer", "marker", "set")).contains("Noted in Engineer as its marker."));
         BufferedImage over = agent.frame;
         // Engineer closed: Home's marker alone shows.
         BufferedImage homeAlone = covered(over, 300, 200, SIZE, SIZE, 5);
@@ -1032,18 +1034,17 @@ class SdkAssistTest {
                 Map.of("name", "drop", "x", 1, "y", 2, "width", 3)));
         assertTrue(partial.isRefused() && text(partial).contains("drop: give x, y, width and height"), text(partial));
         assertFalse(TemplateLibrary.exists(resources, "pick"), "nothing saved when one box is short");
-        assertTrue(run("crop_pictures", "boxes", List.of(box("pick", 120, 80, 4, 4, "marker", true),
-                box("plan", 120, 80, 4, 4, "marker", true)), "screen", "Engineer").isRefused(), "one marker");
         assertTrue(run("crop_pictures", "screen", "Engineer", "boxes", List.of(box("pick", 120, 80, 4, 4,
-                "marker", true, "back", true))).isRefused(), "the marker is no way back");
+                "marker", "set", "back", true))).isRefused(), "the marker is no way back");
         AgentReply both = run("crop_pictures", "screen", "Engineer", "boxes", List.of(
-                box("pick", 120, 80, SIZE, SIZE, "marker", true),
+                box("pick", 120, 80, SIZE, SIZE, "marker", "set"),
                 box("spade", 120, 80, SIZE, SIZE, "ignore", Map.of("x", 120, "y", 80, "width", 2, "height", 2)),
                 box("hoe", 120, 80, SIZE, SIZE, "back", true), box("far", 5000, 5000, 4, 4),
                 box("spade_lit", 120, 80, SIZE, SIZE, "variantOf", "spade", "state", "badge")));
         assertTrue(text(both).contains("Saved spade_lit") && !text(both).contains("Not saved, spade_lit"),
                 "another look is cut after the input it is a look of: " + text(both));
-        assertTrue(text(both).contains("Noted in Engineer as its marker, in place of coin.")
+        assertTrue(text(both).contains("Noted in Engineer as its marker, in place of coin (marker add adds to the set "
+                + "instead).")
                 && text(both).contains("Saved spade") && text(both).contains("Not saved, far: ")
                 && text(both).contains("Noted in Engineer: hoe: its way back; spade: untried."), text(both));
         assertEquals("pick", screen("ENGINEER").firstMarker().id());
@@ -1075,7 +1076,7 @@ class SdkAssistTest {
         agent.frame = home;
         run("screenshot");
         cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home",
-                "marker", true);
+                "marker", "set");
         String cut = text(run("crop_pictures", "screen", "Home", "boxes", List.of(box("shop_home", 200, 120, 48, 48),
                 box("bag", 80, 20, 48, 48), box("feed", 90, 75, 40, 40, "sometimes", true))));
         assertTrue(cut.contains("feed: comes and goes"), cut);
@@ -1087,7 +1088,7 @@ class SdkAssistTest {
                 0));
         assertTrue(opened.contains("Opened Shop, added to the map as Screens.SHOP"), opened);
         assertNull(screen("SHOP").from().state(), "the button's usual look is no look the way needs");
-        run("crop_pictures", "screen", "Shop", "boxes", List.of(box("shop", 300, 40, 48, 48, "marker", true),
+        run("crop_pictures", "screen", "Shop", "boxes", List.of(box("shop", 300, 40, 48, 48, "marker", "set"),
                 box("close_shop", 200, 200, 48, 48)));
 
         game.then(home);
@@ -1101,7 +1102,7 @@ class SdkAssistTest {
         agent.frame = gift;
         run("screenshot");
         cropOne("name", "gift", "x", 30, "y", 200, "width", SIZE, "height", SIZE, "screen", "Gift",
-                "marker", true, "popup", true);
+                "marker", "set", "popup", true);
         agent.frame = home;
         game.then(gift);
         String covered = text(run("try_input", "screen", "Home", "inputs", List.of(Map.of("picture", "bag"),
@@ -1142,22 +1143,22 @@ class SdkAssistTest {
         BufferedImage deep = covered(bag, 150, 0, 250, 300, 34);
         agent.frame = home;
         run("screenshot");
-        cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home", "marker", true);
+        cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home", "marker", "set");
         run("crop_pictures", "screen", "Home", "boxes", List.of(box("shop_home", 200, 120, 48, 48),
                 box("bag_home", 80, 20, 48, 48)));
         game.then(shop);
         tryOne("screen", "Home", "picture", "shop_home", "desktop", true, "settleMs", 0);
-        run("crop_pictures", "screen", "Shop", "boxes", List.of(box("shop", 300, 40, 48, 48, "marker", true),
+        run("crop_pictures", "screen", "Shop", "boxes", List.of(box("shop", 300, 40, 48, 48, "marker", "set"),
                 box("close_shop", 200, 200, 48, 48, "back", true)));
         game.then(home);
         tryOne("screen", "Shop", "picture", "close_shop", "desktop", true, "settleMs", 0);
         game.then(bag);
         tryOne("screen", "Home", "picture", "bag_home", "desktop", true, "settleMs", 0);
-        run("crop_pictures", "screen", "Bag", "boxes", List.of(box("bag_title", 30, 130, 48, 48, "marker", true),
+        run("crop_pictures", "screen", "Bag", "boxes", List.of(box("bag_title", 30, 130, 48, 48, "marker", "set"),
                 box("deep_in", 60, 240, 48, 48)));
         game.then(deep);
         tryOne("screen", "Bag", "picture", "deep_in", "opens", "Deep", "desktop", true, "settleMs", 0);
-        run("crop_pictures", "screen", "Deep", "boxes", List.of(box("deep", 300, 40, 48, 48, "marker", true),
+        run("crop_pictures", "screen", "Deep", "boxes", List.of(box("deep", 300, 40, 48, 48, "marker", "set"),
                 box("go", 200, 200, 48, 48), box("later", 320, 200, 48, 48)));
         assertEquals(List.of("HOME", "SHOP", "BAG", "DEEP"), List.copyOf(host.set("screen_map").keySet()));
 
@@ -1190,12 +1191,12 @@ class SdkAssistTest {
         BufferedImage giftless = covered(home, 200, 120, 48, 48, 43);
         agent.frame = home;
         run("screenshot");
-        cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home", "marker", true);
+        cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home", "marker", "set");
         run("crop_pictures", "screen", "Home", "boxes", List.of(box("gift_home", 200, 120, 48, 48, "sometimes", true),
                 box("bag", 80, 20, 48, 48)));
         game.then(gift);
         tryOne("screen", "Home", "picture", "gift_home", "opens", "Gift", "desktop", true, "settleMs", 0);
-        run("crop_pictures", "screen", "Gift", "boxes", List.of(box("gift", 300, 40, 48, 48, "marker", true),
+        run("crop_pictures", "screen", "Gift", "boxes", List.of(box("gift", 300, 40, 48, 48, "marker", "set"),
                 box("open_box", 200, 200, 48, 48)));
 
         agent.frame = home;
@@ -1206,7 +1207,7 @@ class SdkAssistTest {
         game.then(bag);
         String tried = text(tryOne("screen", "Home", "picture", "bag", "opens", "Bag", "desktop", true, "settleMs", 0));
         assertTrue(tried.contains("Opened Bag"), "Gift's way in is gone, so it waits: " + tried);
-        run("crop_pictures", "screen", "Bag", "boxes", List.of(box("bag_title", 30, 130, 48, 48, "marker", true),
+        run("crop_pictures", "screen", "Bag", "boxes", List.of(box("bag_title", 30, 130, 48, 48, "marker", "set"),
                 box("sort", 60, 240, 48, 48)));
         String branch = text(tryOne("screen", "Bag", "picture", "sort", "desktop", true, "settleMs", 0));
         assertTrue(branch.contains("tried click sort"), "Gift's branch, begun, holds no other back: " + branch);
@@ -1217,7 +1218,7 @@ class SdkAssistTest {
         BufferedImage first = withPatchAt(120, 80);
         agent.frame = first;
         run("screenshot");
-        cropOne("name", "home", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Home", "marker", true);
+        cropOne("name", "home", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Home", "marker", "set");
         cropOne("name", "bell", "x", 300, "y", 200, "width", SIZE, "height", SIZE);
         cropOne("name", "lamp", "x", 200, "y", 230, "width", SIZE, "height", SIZE);
 
@@ -1273,7 +1274,7 @@ class SdkAssistTest {
         agent.frame = home;
         run("screenshot");
         String started = text(cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen",
-                "Home", "marker", true));
+                "Home", "marker", "set"));
         assertTrue(started.contains("Home's shot is this frame now."), started);
         assertEquals(home.getRGB(5, 5), shot("HOME").getRGB(5, 5));
         run("crop_pictures", "screen", "Home", "boxes", List.of(box("bag", 200, 20, 48, 48)));
@@ -1287,7 +1288,7 @@ class SdkAssistTest {
         agent.frame = bag;
         run("screenshot");
         String marked = text(cropOne("name", "bag_title", "x", 30, "y", 130, "width", SIZE, "height", SIZE,
-                "screen", "Bag", "marker", true));
+                "screen", "Bag", "marker", "set"));
         assertTrue(marked.contains("Bag's shot is this frame now."), marked);
         assertEquals(bag.getRGB(5, 150), shot("BAG").getRGB(5, 150), "the frame its marker is cut from");
 
@@ -1297,6 +1298,60 @@ class SdkAssistTest {
         assertEquals(bag.getRGB(5, 150), shot("BAG").getRGB(5, 150), "the shot is kept");
         agent.frame = bag;
         assertEquals("Shot taken.", ScreenEdits.retakeShot(agent, "BAG"));
+    }
+
+    /**
+     * A screen is told by a set of markers, all shown, and pictures it never shows: a set another screen's shot shows
+     * too is put back, naming that screen (Rarity's title scored 0.80 on Upgrade, 2026-10-16).
+     */
+    @Test
+    void aSetAnotherScreensShotShowsIsPutBack() {
+        Game game = new Game();
+        NativeControllerFactory.setForTesting(game);
+        BufferedImage home = noise(WATCHED.width(), WATCHED.height(), 61);
+        BufferedImage tab = covered(home, 0, 120, 400, 180, 62);
+        agent.frame = home;
+        run("screenshot");
+        cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home", "marker", "set");
+        run("crop_pictures", "screen", "Home", "boxes", List.of(box("tab", 200, 20, 48, 48)));
+        game.then(tab);
+        tryOne("screen", "Home", "picture", "tab", "opens", "Tab", "desktop", true, "settleMs", 0);
+
+        agent.frame = tab;
+        run("screenshot");
+        // Home's marker shows on Tab too: by itself it would take Home for Tab.
+        String alone = text(run("crop_pictures", "screen", "Tab", "boxes", List.of(Map.of("name", "home",
+                "marker", "set"))));
+        assertTrue(alone.contains("But home shows on Home's shot too, so a run would take Home for Tab.")
+                && alone.contains("Tab keeps no marker; the pictures stay saved."), alone);
+        assertFalse(screen("TAB").hasMarker(), "put back");
+
+        String set = text(run("crop_pictures", "screen", "Tab", "boxes", List.of(Map.of("name", "home",
+                "marker", "set"), box("tab_title", 30, 130, SIZE, SIZE, "marker", "set"))));
+        assertTrue(set.contains("Noted in Tab as one of its markers, told by home + tab_title.")
+                && set.contains("Tab's shot is this frame now."), set);
+        assertEquals(List.of("home", "tab_title"), screen("TAB").markers().stream().map(ImageTemplate::id).toList());
+
+        agent.frame = home;
+        String absent = text(run("crop_pictures", "screen", "Home", "boxes", List.of(Map.of("name", "tab_title",
+                "marker", "absent"))));
+        assertTrue(absent.contains("Noted in Home as a picture it never shows, told by home, not tab_title."), absent);
+        agent.frame = tab;
+        AgentReply shown = run("crop_pictures", "screen", "Tab", "boxes", List.of(Map.of("name", "tab",
+                "marker", "absent")));
+        assertTrue(shown.isRefused() && text(shown).contains("tab shows on Tab now"), text(shown));
+
+        assertEquals("Told by home.", text(run("edit_map", "action", "remove_marker", "screen", "Home",
+                "picture", "tab_title")));
+        assertTrue(run("edit_map", "action", "remove_marker", "screen", "Home", "picture", "home").isRefused(),
+                "its last marker");
+        AgentReply lone = run("edit_map", "action", "remove_marker", "screen", "Tab", "picture", "tab_title");
+        assertTrue(lone.isRefused() && text(lone).contains("home shows on Home's shot too"), text(lone));
+        assertTrue(run("edit_map", "action", "add_marker", "screen", "Home", "picture", "tab_title", "absent", true)
+                .isRefused(), "the game shows Tab, which Home's lone marker matches: tab_title shows there");
+        agent.frame = home;
+        assertEquals("Told by home, not tab_title.", text(run("edit_map", "action", "add_marker", "screen", "Home",
+                "picture", "tab_title", "absent", true)));
     }
 
     /** {@code constant}'s saved shot. */

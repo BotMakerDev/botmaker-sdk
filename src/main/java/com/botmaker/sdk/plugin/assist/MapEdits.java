@@ -137,6 +137,17 @@ final class MapEdits {
                     @Describe(value = "", optional = true) String method) implements Edit {
     }
 
+    @Describe("add a picture the bot has to what tells the screen apart: a marker, all of which show, or with absent "
+            + "true one it never shows; refused when another screen's shot shows the set too")
+    record AddMarker(String screen, @Describe("a picture the bot has") String picture,
+                     @Describe(value = "true for a picture the screen never shows, where a screen like it does",
+                             optional = true) Boolean absent) implements Edit {
+    }
+
+    @Describe("take a picture off what tells the screen apart, a marker or one it never shows")
+    record RemoveMarker(String screen, @Describe("the picture, by its name") String picture) implements Edit {
+    }
+
     @Describe("a screen the map lacks, named as the game shows it, opened by an input of screen (added untried)")
     record NewScreen(String screen, String name,
                      @Describe(value = "", optional = true) String picture,
@@ -154,6 +165,8 @@ final class MapEdits {
     static AgentReply edit(Edit edit, AgentContext context) {
         if (context.services().projectDir() == null) return AgentReply.refused(Frames.noProject());
         try {
+            // Off the FX thread: what tells a screen apart is matched over every other screen's shot first.
+            if (edit instanceof AddMarker || edit instanceof RemoveMarker) return marker(edit, context);
             return FxCall.call(() -> {
                 ScreenGraph before = ScreenBook.read(context.services());
                 AgentReply reply = edited(edit, context);
@@ -187,6 +200,8 @@ final class MapEdits {
             case RemoveWay way -> way(way, way.from(), null, graph, screen, services);
             case WayWhen way -> way(way, way.from(), method(way.method()), graph, screen, services);
             case NewScreen opened -> newScreen(opened, graph, screen, context);
+            case AddMarker ignored -> marker(edit, context);
+            case RemoveMarker ignored -> marker(edit, context);
             case SetInput set -> onInput(set, graph, screen, on, in -> setInput(context, screen, in, set));
             case ResetInput reset -> onInput(reset, graph, screen, on,
                     in -> said(ScreenEdits.setInput(services, screen, in, ScreenEdits.untried(in))));
@@ -197,6 +212,31 @@ final class MapEdits {
             case InputWhen when -> onInput(when, graph, screen, on,
                     in -> said(ScreenEdits.setInputWhen(services, screen, in, method(when.method()))));
         };
+    }
+
+    /**
+     * add_marker and remove_marker. An absent picture the game shows on the screen now is refused: it would not tell
+     * the screen apart, it would hide it.
+     */
+    private static AgentReply marker(Edit edit, AgentContext context) {
+        StudioServices services = context.services();
+        ScreenGraph graph = FxCall.call(() -> ScreenBook.read(services));
+        Optional<String> found = ScreenBook.find(graph, edit.screen());
+        if (found.isEmpty()) {
+            return AgentReply.refused("No screen " + edit.screen() + " in the bot's Screens. Nothing was written.");
+        }
+        String screen = found.get();
+        if (edit instanceof RemoveMarker remove) return said(ScreenEdits.removeMarker(services, screen, remove.picture()));
+        AddMarker add = (AddMarker) edit;
+        String picture = has(add.picture()) ? add.picture().strip() : "";
+        if (!ActTools.exists(context, picture)) return AgentReply.refused(Frames.noPicture(picture));
+        boolean absent = Boolean.TRUE.equals(add.absent());
+        if (absent && !ScreenFit.shownOn(context, screen, List.of(picture)).isEmpty()) {
+            return AgentReply.refused(picture + " shows on " + graph.shown(screen) + " now, so it is no picture "
+                    + graph.shown(screen) + " never shows. Nothing was written.");
+        }
+        return said(ScreenEdits.addMarker(services, screen, FxCall.call(() -> ScreenBook.picture(services, picture)),
+                absent));
     }
 
     /** {@code then} on the input of {@code on} that {@code named} names; refused when it names none. */

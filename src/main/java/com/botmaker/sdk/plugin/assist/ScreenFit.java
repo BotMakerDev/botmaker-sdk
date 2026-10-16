@@ -129,6 +129,37 @@ final class ScreenFit {
                 + ".", frame.get());
     }
 
+    /** Whether {@code frame} shows {@code typed} as its markers tell it; false for a screen with none yet. */
+    static boolean showsOn(AgentContext context, String typed, BufferedImage frame) {
+        ScreenGraph graph = FxCall.call(() -> ScreenBook.read(context.services()));
+        Optional<String> constant = ScreenBook.find(graph, typed);
+        Optional<ToolReach> reach = ToolReach.of(context);
+        return constant.isPresent() && reach.isPresent() && graph.screens().get(constant.get()).hasMarker()
+                && shows(reach.get(), graph, constant.get(), frame);
+    }
+
+    /**
+     * Of {@code pictures}, to put on {@code typed} as pictures it never shows, the ones the game shows on it now; empty
+     * too while the game does not show it, which nothing checks then.
+     */
+    static List<String> shownOn(AgentContext context, String typed, List<String> pictures) {
+        if (pictures.isEmpty()) return List.of();
+        ScreenGraph graph = FxCall.call(() -> ScreenBook.read(context.services()));
+        Optional<String> constant = ScreenBook.find(graph, typed);
+        Optional<ToolReach> reach = ToolReach.of(context);
+        Optional<BufferedImage> frame = Frames.look(context);
+        if (constant.isEmpty() || reach.isEmpty() || frame.isEmpty()
+                || !graph.screens().get(constant.get()).hasMarker()
+                || !shows(reach.get(), graph, constant.get(), frame.get())) {
+            return List.of();
+        }
+        Path resources = reach.get().resources();
+        List<String> known = pictures.stream().map(p -> Frames.picture(resources, p)).flatMap(Optional::stream)
+                .distinct().toList();
+        return fits(reach.get(), LookTools.cuts(context), known, frame.get()).stream()
+                .filter(f -> f.where() != Where.MISSING).map(Fit::picture).toList();
+    }
+
     /**
      * Whether {@code frame} shows {@code constant}: its markers, or one of its looks', are found. A screen with no
      * marker yet shows wherever it is asked for: nothing tells it apart.

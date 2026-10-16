@@ -260,13 +260,21 @@ public final class MapReport {
             if (audit == null || only != null && !only.equals(c)) continue;
             String name = graph.shown(c);
             if (!audit.showsMarker()) {
-                String marker = audit.spots().stream().filter(Spot::marker).map(Spot::picture).findFirst().orElse("?");
-                lines.add(name + ": its shot does not show its marker " + marker + ": take the shot again while the "
-                        + "game shows " + name + ", or cut its marker again.");
+                List<String> lost = audit.spots().stream().filter(s -> s.marker() && s.where() == Where.MISSING)
+                        .map(Spot::picture).toList();
+                List<String> there = audit.spots().stream().filter(s -> s.absent() && s.where() != Where.MISSING)
+                        .map(Spot::picture).toList();
+                lines.add(name + ": its shot " + (lost.isEmpty() ? "" : "does not show its marker "
+                        + String.join(" + ", lost)) + (lost.isEmpty() || there.isEmpty() ? "" : " and ")
+                        + (there.isEmpty() ? "" : "shows " + String.join(", ", there) + ", which " + name
+                        + " never shows") + ": take the shot again while the game shows " + name + ", or cut its "
+                        + "markers again.");
                 continue;
             }
             List<String> noted = new ArrayList<>();
             for (Spot spot : audit.spots()) {
+                // Missing is what an absent picture should be; one shown is said above.
+                if (spot.absent()) continue;
                 if (spot.where() == Where.ELSEWHERE) {
                     lines.add(name + ": " + spot.picture() + " sits " + offset(spot) + " from its place on its shot"
                             + (spot.marker() ? "." : ": placed again while the game shows " + name + ", it gets a "
