@@ -1594,6 +1594,32 @@ class SdkAssistTest {
                 .toList());
     }
 
+    /** edit_map in_list: an input looked for anywhere in its list, and the scroll that brings it into view. */
+    @Test
+    void editMapPutsAnInputInAListThatScrolls() throws IOException {
+        for (String name : List.of("campaign", "column")) TemplateLibrary.saveTemplate(resources, patch(), name);
+        host.set("screen_map").put("HOME", TestContexts.row(Object.class, "").withValue(GameScreen.named("Home")
+                .markers(marks("ore")).inputs(List.of(Input.click(picture("campaign")),
+                        Input.key(Key.named("Q").orElseThrow())))));
+        Map<String, Object> column = Map.of("x", 0, "y", 180, "width", 140, "height", 760, "scroll", "column",
+                "notches", -3);
+
+        AgentReply listed = run("edit_map", "screen", "Home", "action", "in_list", "picture", "campaign", "list", column);
+        assertFalse(listed.isRefused(), text(listed));
+        Input campaign = screen("HOME").inputs().getFirst();
+        assertEquals(new Rect(0, 180, 140, 760), campaign.area());
+        assertEquals("scroll column -3", campaign.scrollTo().label());
+
+        assertTrue(run("edit_map", "screen", "Home", "action", "in_list", "key", "Q", "list", column).isRefused(),
+                "a key is in no list");
+        Map<String, Object> noNotches = Map.of("x", 0, "y", 180, "width", 140, "height", 760, "scroll", "column");
+        assertTrue(run("edit_map", "screen", "Home", "action", "in_list", "picture", "campaign", "list", noNotches)
+                .isRefused(), "a scroll says how far");
+        run("edit_map", "screen", "Home", "action", "in_list", "picture", "campaign");
+        assertNull(screen("HOME").inputs().getFirst().area(), "no list: back at its place");
+        assertNull(screen("HOME").inputs().getFirst().scrollTo());
+    }
+
     private static ImageTemplate picture(String name) {
         return new ImageTemplate(TemplateLibrary.pathForName(name));
     }

@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Held;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -113,6 +114,8 @@ public final class ScreenTypes {
                 .flag(Input::sometimes, Input::comesAndGoes)
                 .<ImageTemplate>with(Input::locked, Input::lock)
                 .<List<Variant>>with(Input::variants, Input::variants)
+                .<Rect>with(Input::within, Input::area)
+                .<Input>with(Input::scrollTo, Input::scrollTo)
                 .<BooleanSupplier>with(Input::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
     }
 

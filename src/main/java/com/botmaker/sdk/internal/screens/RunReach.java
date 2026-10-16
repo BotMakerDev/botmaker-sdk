@@ -48,6 +48,20 @@ public final class RunReach implements Reach {
                 .toList();
     }
 
+    /** Looked for only in {@code area}, scaled to the frame as the picture is: its place there, with no margin. */
+    @Override
+    public Optional<Rect> findWithin(ImageTemplate picture, Rect area, BufferedImage frame) {
+        ImageTemplate inArea = picture.at(area);
+        try {
+            MatchResult best = ImageFinder.bestMatchesNear(List.of(inArea), 0, new StillSource(frame)).getFirst();
+            return best.isFound() && best.confidence() >= BotSettings.current().confidence()
+                    ? Optional.of(best.rect()) : Optional.empty();
+        } finally {
+            // A copy of its own loads its pixels anew: released after the match, as native memory.
+            inArea.close();
+        }
+    }
+
     @Override
     public Point pointOn(Rect place) {
         if (!BotSettings.current().randomizeClicks()) return place.center();

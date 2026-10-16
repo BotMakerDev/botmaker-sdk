@@ -1262,7 +1262,7 @@ final class MapTools {
         ImageTemplate cut = FxCall.call(() -> ScreenBook.picture(services, picture));
         if (notches == 0) return Input.click(cut);
         return held.map(click -> new Input(Input.Act.SCROLL, cut, null, notches, null, click.kind(), null,
-                click.comesAndGoes(), null, click.variants(), click.when())).orElse(Input.scroll(cut, notches));
+                click.comesAndGoes(), null, click.variants(), click.area(), click.scrollTo(), click.when())).orElse(Input.scroll(cut, notches));
     }
 
     private static Input kinded(Input input, Optional<Kind> kind) {

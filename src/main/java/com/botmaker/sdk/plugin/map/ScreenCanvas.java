@@ -607,7 +607,8 @@ final class ScreenCanvas {
                     Label gone = new Label(row.label());
                     gone.getStyleClass().addAll("screen-shot-missing", "screen-shot-open");
                     Tooltip.install(gone, new Tooltip(row.label() + ": its picture is not on this shot"
-                            + (spot.get().sure() ? "." : "; it comes and goes, or is another look.")));
+                            + (spot.get().area() != null ? "; it is scrolled out of its list."
+                            : spot.get().sure() ? "." : "; it comes and goes, or is another look.")));
                     gone.setOnMouseClicked(e -> onPick.accept(row));
                     missing.getChildren().add(gone);
                     continue;

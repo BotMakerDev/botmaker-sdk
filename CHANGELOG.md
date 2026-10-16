@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Inputs in a list that scrolls.** `Input.within(Rect)` says an input's button is anywhere in a list or column,
+  not at its picture's place: a run looks for it there, so a Home column whose icons shift as others come and go
+  still finds it. `Input.scrollTo(Input)` names the scroll done, up to `Input.SCROLLS` (8) times, while the button
+  is not in view.
+  - The assistant's edit_map `in_list` sets both; `read_map` and 🗺 Screens count anywhere in the list as its place,
+    and one scrolled out of the shot is only a note.
 - **Round and free-shape pictures.** A picture can be cut as an oval or as a polygon you click corner by corner;
   what lies outside it is transparent, and a run skips it, so a round button or an odd-shaped icon matches over any
   background.

@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -132,6 +133,25 @@ final class MapEdits {
                      @Describe(value = "", optional = true) String method) implements Edit, OfInput {
     }
 
+    /** A list or column an input is anywhere in, and the scroll that brings it into view. */
+    record Listed(int x, int y, int width, int height,
+                  @Describe(value = "a picture scrolled over to bring the input into view", optional = true)
+                  String scroll,
+                  @Describe(value = "each scroll's notches, negative down", optional = true) Integer notches) {
+
+        Rect area() {
+            return new Rect(x, y, width, height);
+        }
+    }
+
+    @Describe("an input anywhere in a list that scrolls or shifts, scrolled to; no list: at its place")
+    record InList(String screen, @Describe(value = "", optional = true) String picture,
+                  @Describe(value = "", optional = true) Integer scroll,
+                  @Describe(value = "", optional = true) String key,
+                  @Describe(value = "", optional = true) Listed list)
+            implements Edit, OfInput {
+    }
+
     @Describe("a look of the screen that shows only while method holds")
     record LookWhen(String screen, @Describe("the screen's look, by its name") String look,
                     @Describe(value = "", optional = true) String method) implements Edit {
@@ -211,7 +231,29 @@ final class MapEdits {
                     in)));
             case InputWhen when -> onInput(when, graph, screen, on,
                     in -> said(ScreenEdits.setInputWhen(services, screen, in, method(when.method()))));
+            case InList listed -> onInput(listed, graph, screen, on,
+                    in -> said(listed(context, screen, in, listed.list())));
         };
+    }
+
+    /**
+     * {@code in} of {@code screen} anywhere in {@code list}, scrolled to by its scroll; {@code list} null puts it back
+     * at its place. Said in a sentence, beginning {@link ScreenEdits#NOT_WRITTEN} when nothing was. On the FX thread.
+     */
+    static String listed(AgentContext context, String screen, Input in, Listed list) {
+        if (in.act() == Input.Act.KEY) return ScreenEdits.NOT_WRITTEN + "a key is in no list.";
+        if (list == null) return ScreenEdits.setList(context.services(), screen, in, null, null);
+        if (list.width() <= 0 || list.height() <= 0) return ScreenEdits.NOT_WRITTEN + "a list has a width and a height.";
+        Input scroll = null;
+        if (has(list.scroll())) {
+            String over = list.scroll().strip();
+            if (!ActTools.exists(context, over)) return ScreenEdits.NOT_WRITTEN + Frames.noPicture(over);
+            if (list.notches() == null || list.notches() == 0) {
+                return ScreenEdits.NOT_WRITTEN + "give notches with scroll: negative down, positive up.";
+            }
+            scroll = Input.scroll(ScreenBook.picture(context.services(), over), list.notches());
+        }
+        return ScreenEdits.setList(context.services(), screen, in, list.area(), scroll);
     }
 
     /**

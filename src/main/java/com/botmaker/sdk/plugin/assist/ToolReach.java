@@ -82,6 +82,20 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
         }
     }
 
+    /** Looked for only in {@code area}, scaled to the frame as the picture is: its place there, with no margin. */
+    @Override
+    public Optional<Rect> findWithin(ImageTemplate picture, Rect area, BufferedImage frame) {
+        Optional<ImageTemplate> file = Frames.picture(resources, picture.id()).map(name -> placed(name, picture.at(area)));
+        if (file.isEmpty()) return Optional.empty();
+        try {
+            MatchResult best = ToolTiming.timed(ToolTiming.Phase.MATCH,
+                    () -> ImageFinder.bestMatchesNear(List.of(file.get()), 0, new StillSource(frame))).getFirst();
+            return clears(best) ? Optional.of(best.rect()) : Optional.empty();
+        } finally {
+            file.get().close();
+        }
+    }
+
     /** The bot's picture file {@code name}, with the place and the frame size {@code picture}'s constant gives it. */
     private ImageTemplate placed(String name, ImageTemplate picture) {
         ImageTemplate file = new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString());

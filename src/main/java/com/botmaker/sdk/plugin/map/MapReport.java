@@ -272,6 +272,7 @@ public final class MapReport {
                 continue;
             }
             List<String> noted = new ArrayList<>();
+            List<String> scrolled = new ArrayList<>();
             for (Spot spot : audit.spots()) {
                 // Missing is what an absent picture should be; one shown is said above.
                 if (spot.absent()) continue;
@@ -280,9 +281,14 @@ public final class MapReport {
                             + (spot.marker() ? "." : ": placed again while the game shows " + name + ", it gets a "
                             + "copy of its own there."));
                 } else if (spot.where() == Where.MISSING) {
-                    if (spot.sure()) lines.add(name + ": " + spot.picture() + " is not on its shot.");
+                    if (spot.area() != null) scrolled.add(spot.picture());
+                    else if (spot.sure()) lines.add(name + ": " + spot.picture() + " is not on its shot.");
                     else noted.add(spot.picture());
                 }
+            }
+            if (!scrolled.isEmpty()) {
+                lines.add(name + ": " + String.join(", ", scrolled) + (scrolled.size() == 1 ? " is" : " are")
+                        + " scrolled out of its shot's list (a note).");
             }
             if (!noted.isEmpty()) {
                 lines.add(name + ": its shot does not show " + String.join(", ", noted) + (noted.size() == 1

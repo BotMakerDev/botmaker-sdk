@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -83,6 +84,9 @@ class ScreenTypesTest {
         assertTrue(ScreenTypes.KEY_SHAPE.writes(key));
         assertFalse(ScreenTypes.CLICK_SHAPE.writes(key));
         assertFalse(ScreenTypes.SCROLL_SHAPE.writes(click));
+        Input listed = Input.click(picture("campaign")).within(new Rect(0, 180, 140, 760))
+                .scrollTo(Input.scroll(picture("column"), -3));
+        assertEquals(listed, roundTrip(ScreenTypes.CLICK_SHAPE, listed), "its list and its scroll go with it");
     }
 
     @Test

@@ -68,8 +68,16 @@ public final class MapAudit {
      *                lock is not, and its absence is only a note
      * @param at      its box on the shot, in the shot's pixels; null when missing
      * @param place   where its place is on the shot, in the shot's pixels; null when it has none
+     * @param area    the list or column its input is anywhere in ({@code Input.within}), on the shot; null when it
+     *                sits at its place. Anywhere in it is at its place, and its absence is only a note: scrolled out
      */
-    public record Spot(String picture, boolean marker, boolean absent, boolean sure, Where where, Rect at, Rect place) {
+    public record Spot(String picture, boolean marker, boolean absent, boolean sure, Where where, Rect at, Rect place,
+                       Rect area) {
+
+        /** A spot with no list or column. */
+        public Spot(String picture, boolean marker, boolean absent, boolean sure, Where where, Rect at, Rect place) {
+            this(picture, marker, absent, sure, where, at, place, null);
+        }
 
         /** How far it sits from its place, across: 0 at its place or when either is unknown. */
         public int dx() {
@@ -136,8 +144,13 @@ public final class MapAudit {
         List<Spot> spots = new ArrayList<>();
         for (Fit fit : fits) {
             Check check = checks.get(fit.picture());
-            spots.add(new Spot(fit.picture(), check.marker(), check.absent(), check.sure(), fit.where(), fit.at(),
-                    placeOn(cuts.get(fit.picture()), live)));
+            FrameCut cut = cuts.get(fit.picture());
+            Rect area = check.area() == null ? null : onShot(check.area(), cut == null ? null : cut.frame(), live);
+            // Anywhere in its list is where it belongs.
+            Where where = fit.where() == Where.ELSEWHERE && area != null && area.contains(fit.at().center())
+                    ? Where.AT_PLACE : fit.where();
+            spots.add(new Spot(fit.picture(), check.marker(), check.absent(), check.sure(), where, fit.at(),
+                    placeOn(cut, live), area));
         }
         Audit audit = new Audit(List.copyOf(spots));
         MADE.put(key.toString(), audit);
@@ -261,9 +274,9 @@ public final class MapAudit {
 
     /**
      * A picture to look for on a screen's shot: whether it is a marker, one the screen never shows, and whether the
-     * screen always shows it.
+     * screen always shows it, and the list or column its input is anywhere in (null: none).
      */
-    private record Check(String picture, boolean marker, boolean absent, boolean sure) {
+    private record Check(String picture, boolean marker, boolean absent, boolean sure, Rect area) {
     }
 
     /**
@@ -275,19 +288,23 @@ public final class MapAudit {
         for (ImageTemplate marker : screen.markers()) add(checks, resources, marker, true, true);
         for (ImageTemplate absent : screen.absent()) {
             Frames.picture(resources, absent.id()).filter(f -> !checks.containsKey(f))
-                    .ifPresent(f -> checks.put(f, new Check(f, false, true, false)));
+                    .ifPresent(f -> checks.put(f, new Check(f, false, true, false, null)));
         }
         List<Input> named = new ArrayList<>(screen.inputs());
         if (screen.back() != null) named.add(screen.back());
         for (Input input : named) {
-            boolean sure = !input.comesAndGoes() && input.lock() == null && input.variants().isEmpty();
-            for (Variant look : input.looks()) add(checks, resources, look.picture(), false, sure);
-            if (input.lock() != null) add(checks, resources, input.lock(), false, false);
+            // One in a list may be scrolled out of the shot.
+            boolean sure = !input.comesAndGoes() && input.lock() == null && input.variants().isEmpty()
+                    && input.area() == null;
+            for (Variant look : input.looks()) add(checks, resources, look.picture(), false, sure, input.area());
+            if (input.lock() != null) add(checks, resources, input.lock(), false, false, null);
         }
         for (ScreenVariant look : screen.variants()) {
-            for (ImageTemplate marker : look.markers()) add(checks, resources, marker, false, false);
+            for (ImageTemplate marker : look.markers()) add(checks, resources, marker, false, false, null);
             for (Input input : look.inputs()) {
-                for (Variant button : input.looks()) add(checks, resources, button.picture(), false, false);
+                for (Variant button : input.looks()) {
+                    add(checks, resources, button.picture(), false, false, input.area());
+                }
             }
         }
         return checks;
@@ -295,19 +312,29 @@ public final class MapAudit {
 
     private static void add(Map<String, Check> checks, Path resources, ImageTemplate picture, boolean marker,
                             boolean sure) {
+        add(checks, resources, picture, marker, sure, null);
+    }
+
+    private static void add(Map<String, Check> checks, Path resources, ImageTemplate picture, boolean marker,
+                            boolean sure, Rect area) {
         Optional<String> file = Frames.picture(resources, picture.id());
         if (file.isEmpty()) return;
         Check was = checks.get(file.get());
-        checks.put(file.get(), was == null ? new Check(file.get(), marker, false, sure)
-                : new Check(file.get(), was.marker() || marker, was.absent(), was.sure() || sure));
+        checks.put(file.get(), was == null ? new Check(file.get(), marker, false, sure, area)
+                : new Check(file.get(), was.marker() || marker, was.absent(), was.sure() || sure,
+                was.area() == null ? area : was.area()));
     }
 
     /** {@code cut}'s place on a shot of {@code live}, scaled from the frame it was cut on; null when it has none. */
     private static Rect placeOn(FrameCut cut, Size live) {
         if (cut == null || cut.place() == null) return null;
-        Rect place = cut.place();
-        if (cut.frame() == null) return place;
-        return Places.inSource(new Zone(place.x(), place.y(), place.width(), place.height()), cut.frame(), live);
+        return onShot(cut.place(), cut.frame(), live);
+    }
+
+    /** {@code rect} of a frame of {@code frame} on a shot of {@code live}; as it is when {@code frame} is null. */
+    private static Rect onShot(Rect rect, Size frame, Size live) {
+        if (frame == null) return rect;
+        return Places.inSource(new Zone(rect.x(), rect.y(), rect.width(), rect.height()), frame, live);
     }
 
     private static long modified(Path file) {

@@ -20,6 +20,9 @@ import java.util.Optional;
  */
 public interface Reach {
 
+    /** How long a list is let settle after a scroll before it is looked at again. */
+    long SCROLL_SETTLE_MS = 400;
+
     /** The game's screen now; empty when it could not be captured. */
     Optional<BufferedImage> look();
 
@@ -52,15 +55,28 @@ public interface Reach {
     record Seen(State state, Rect place) {}
 
     /**
+     * Where {@code picture} is anywhere in {@code area} on {@code frame}, {@code area} in the frame the picture was cut
+     * from, when it clears this reach's confidence: an input {@link Input#within a list}. By default it is found
+     * anywhere and kept only when its centre is in {@code area}; a reach that matches through the SDK's matcher looks
+     * only there, scaled as the picture is.
+     */
+    default Optional<Rect> findWithin(ImageTemplate picture, Rect area, BufferedImage frame) {
+        return find(picture, frame).filter(at -> area.contains(at.center()));
+    }
+
+    /**
      * How {@code input}'s button looks on {@code frame}: its variants looked for before its usual picture, since a
-     * badge or a grey copy of a button also passes for the button itself. Empty for a key, or a button not there.
+     * badge or a grey copy of a button also passes for the button itself; for one {@link Input#within a list},
+     * anywhere in it. Empty for a key, or a button not there.
      */
     default Optional<Seen> seen(Input input, BufferedImage frame) {
         List<Variant> looks = input.looks();
         if (looks.isEmpty()) return Optional.empty();
         List<Variant> order = new ArrayList<>(looks.subList(1, looks.size()));
         order.add(looks.getFirst());
-        List<Optional<Rect>> found = findEach(order.stream().map(Variant::picture).toList(), frame);
+        List<Optional<Rect>> found = input.area() == null
+                ? findEach(order.stream().map(Variant::picture).toList(), frame)
+                : order.stream().map(look -> findWithin(look.picture(), input.area(), frame)).toList();
         for (int i = 0; i < order.size(); i++) {
             if (found.get(i).isPresent()) return Optional.of(new Seen(order.get(i).state(), found.get(i).get()));
         }
@@ -69,16 +85,25 @@ public interface Reach {
 
     /**
      * Does {@code input} on {@code frame}: its key pressed, or its button found, in any look but a disabled one, and
-     * clicked or scrolled over. False when the button is not there or greyed out, and nothing was done.
+     * clicked or scrolled over. A button not there is scrolled to first by the input's {@link Input#scrollTo}, up to
+     * {@link Input#SCROLLS} times, the game looked at again after each. False when the button is not there or greyed
+     * out, and nothing but those scrolls was done.
      */
     default boolean perform(Input input, BufferedImage frame) {
         if (input.act() == Input.Act.KEY) {
             key(input.key());
             return true;
         }
-        Optional<Seen> button = input.variants().isEmpty()
-                ? Optional.ofNullable(input.picture()).flatMap(p -> find(p, frame)).map(at -> new Seen(State.NORMAL, at))
-                : seen(input, frame);
+        Optional<Seen> button = seen(input, frame);
+        BufferedImage now = frame;
+        for (int i = 0; button.isEmpty() && input.scrollTo() != null && i < Input.SCROLLS; i++) {
+            if (!perform(input.scrollTo(), now)) break;
+            pause(SCROLL_SETTLE_MS);
+            Optional<BufferedImage> next = look();
+            if (next.isEmpty() || Thread.currentThread().isInterrupted()) break;
+            now = next.get();
+            button = seen(input, now);
+        }
         if (button.isEmpty() || button.get().state() == State.DISABLED) return false;
         Rect place = button.get().place();
         if (input.act() == Input.Act.SCROLL) scroll(place.center(), input.notches());

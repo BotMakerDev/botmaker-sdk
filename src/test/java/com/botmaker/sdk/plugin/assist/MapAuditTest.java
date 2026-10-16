@@ -95,6 +95,26 @@ class MapAuditTest {
         assertSame(audit, MapAudit.of(resources, 0.9, cuts, "HOME", screen()).orElseThrow());
     }
 
+    /** In a list, anywhere in it is its place, and one scrolled out of the shot is only a note. */
+    @Test
+    void anInputInItsListIsAtItsPlaceAnywhereInItAndScrolledOutIsANote() throws IOException {
+        Map<String, FrameCut> cuts = home();
+        Rect column = new Rect(0, 0, WIDTH, HEIGHT);
+        GameScreen listed = GameScreen.named("Home").markers(marks("home")).inputs(List.of(
+                Input.click(picture("moved")).within(column), Input.click(picture("gone")).within(column)));
+        Audit audit = MapAudit.of(resources, 0.9, cuts, "HOME", listed).orElseThrow();
+        assertEquals(Where.AT_PLACE, audit.of("moved").orElseThrow().where(), "another slot of its list");
+        Spot gone = audit.of("gone").orElseThrow();
+        assertEquals(Where.MISSING, gone.where());
+        assertFalse(gone.sure(), "scrolled out of the shot's list is a note, not a fault");
+        assertEquals(column, gone.area());
+        // Out of a list that does not hold it, it sits elsewhere again.
+        GameScreen narrow = GameScreen.named("Home").markers(marks("home")).inputs(List.of(
+                Input.click(picture("moved")).within(new Rect(380, 180, 80, 80))));
+        assertEquals(Where.ELSEWHERE,
+                MapAudit.of(resources, 0.9, cuts, "HOME", narrow).orElseThrow().of("moved").orElseThrow().where());
+    }
+
     @Test
     void aShotWithoutItsMarkerSaysSo() throws IOException {
         Map<String, FrameCut> cuts = home();

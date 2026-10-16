@@ -247,7 +247,8 @@ public final class ScreenWalk {
         if (!edge.from().equals(at)) return true;
         if (via.act() == Input.Act.KEY) return true;
         if (edge.state() == null && via.variants().isEmpty()) {
-            return !via.comesAndGoes() || via.picture() != null && reach.find(via.picture(), frame).isPresent();
+            // One a list scrolls to is looked for by the click, which scrolls first.
+            return !via.comesAndGoes() || via.scrollTo() != null || reach.seen(via, frame).isPresent();
         }
         Optional<Reach.Seen> seen = reach.seen(via, frame);
         if (seen.isEmpty()) return !via.comesAndGoes() && edge.state() == null;
