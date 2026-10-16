@@ -22,7 +22,7 @@ import java.util.Optional;
  * code — and get it right. This runs one project-wide check instead, at the only place that can't be
  * forgotten: inside the finder/clicker/waiter themselves.
  *
- * <p><b>Popups are screens of the map</b> (2026-10-16): each {@code GameScreen.popup()} of the bot's {@code Screens}
+ * <p><b>Popups are screens of the map</b> (2026-10-16): each screen of the bot's {@code Screens} whose setup is {@code .popup()}
  * says what tells it (its markers) and how it closes (its {@code back}: a close button, or the choice that closes it,
  * Offline progress' Claim). The check looks for every popup's markers on one frame and closes the one it finds by its
  * {@code back}, then waits for its markers to go; one still shown gets Escape once, and one that stays after that

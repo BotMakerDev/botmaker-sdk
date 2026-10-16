@@ -3,15 +3,19 @@ package com.botmaker.sdk.plugin.types;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Did;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.Hotkey;
+import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Order;
+import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.Reached;
-import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
-import com.botmaker.sdk.api.screens.Variant;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -19,7 +23,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -27,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A screen taken apart and put back together: {@code build(components(v))} equals {@code v}, as {@link FlowTypesTest}
- * asserts for a flow, over a screen with every link and the three acts.
+ * A screen's parts taken apart and put back together: {@code build(components(v))} equals {@code v}, as
+ * {@link FlowTypesTest} asserts for a flow, over a setup with every link and each kind of input.
  */
 class ScreenTypesTest {
 
@@ -45,96 +48,103 @@ class ScreenTypesTest {
         return shape.build(shape.components(value));
     }
 
-    private static GameScreen campaign() {
-        return GameScreen.named("Campaign").markers(marks("campaign_title"))
-                .from(Way.of(BotConstants.screen("HOME"), Input.click(picture("campaign"))))
-                .alsoFrom(List.of(Way.of(BotConstants.screen("MAP"), Input.key(Key.ESCAPE))))
-                .back(Input.click(picture("close_x")))
-                .inputs(List.of(
-                        Input.click(picture("claim")).did(Did.IN_PLACE).kind(Kind.CHORE),
-                        Input.scroll(picture("list"), -3).did(Did.NONE),
-                        Input.click(picture("gems")).never("spends gems"),
-                        Input.click(picture("loot")).sometimes(),
-                        Input.click(picture("guild")).locked(picture("padlock"))));
+    private static Setup campaign() {
+        return Setup.named("Campaign").markers(marks("campaign_title"))
+                .from(BotConstants.input("HOME", "campaign"))
+                .alsoFrom(List.of(Way.of(BotConstants.input("MAP", "keyEscape"))))
+                .back(BotConstants.input("CAMPAIGN", "close"));
     }
 
     @Test
-    void aScreenComesApartAndGoesBackTogetherWhole() {
-        assertEquals(campaign(), roundTrip(ScreenTypes.SCREEN_SHAPE, campaign()));
-        GameScreen offer = GameScreen.named("Offer").markers(marks("offer")).popup();
-        assertEquals(offer, roundTrip(ScreenTypes.SCREEN_SHAPE, offer));
-        GameScreen noted = campaign().notes("Loot fills over 8 h.\nIts badge shows on Home.")
+    void aSetupComesApartAndGoesBackTogetherWhole() {
+        assertEquals(campaign(), roundTrip(ScreenTypes.SETUP_SHAPE, campaign()));
+        Setup offer = Setup.named("Offer").markers(marks("offer")).popup();
+        assertEquals(offer, roundTrip(ScreenTypes.SETUP_SHAPE, offer));
+        Setup noted = campaign().notes("Loot fills over 8 h.\nIts badge shows on Home.")
                 .reached(Reached.SURVEYED).owes(List.of("marker — every icon here animates"));
-        assertEquals(noted, roundTrip(ScreenTypes.SCREEN_SHAPE, noted), "its notes, stage and debts go with it");
-        GameScreen moved = campaign().at(new Point(420, -36));
-        assertEquals(moved, roundTrip(ScreenTypes.SCREEN_SHAPE, moved), "where its card was moved to goes with it");
-        assertNull(roundTrip(ScreenTypes.SCREEN_SHAPE, campaign()).at(), "a card never moved has no corner");
-        GameScreen told = campaign().markers(marks("window_title", "campaign_tab")).absent(marks("gems"));
-        assertEquals(told, roundTrip(ScreenTypes.SCREEN_SHAPE, told), "a set of markers and an absent picture go with it");
+        assertEquals(noted, roundTrip(ScreenTypes.SETUP_SHAPE, noted), "its notes, stage and debts go with it");
+        Setup moved = campaign().at(new Point(420, -36));
+        assertEquals(moved, roundTrip(ScreenTypes.SETUP_SHAPE, moved), "where its card was moved to goes with it");
+        assertNull(roundTrip(ScreenTypes.SETUP_SHAPE, campaign()).at(), "a card never moved has no corner");
+        Setup told = campaign().markers(marks("window_title", "campaign_tab")).absent(marks("gems"));
+        assertEquals(told, roundTrip(ScreenTypes.SETUP_SHAPE, told), "a set of markers and an absent picture go with it");
+    }
+
+    /** The tree's way in is its input, then the copy, the look and the method it needs, each written after it. */
+    @Test
+    void theTreesWayInCarriesItsCopyItsLookAndItsMethod() {
+        Setup copy = campaign().fromPick(Pick.nth(2, Order.NORTH)).fromLooks(State.BADGE)
+                .fromWhen(ScreenTypes.condition("Firestone::eventOn"));
+        assertEquals(copy, roundTrip(ScreenTypes.SETUP_SHAPE, copy));
+        assertEquals(Pick.nth(2, Order.NORTH), copy.from().pick());
+        assertEquals("Firestone::eventOn", ScreenTypes.sourceOf(copy.from().when()));
+        assertEquals(Setup.named("Home"), Setup.named("Home").fromPick(Pick.first()), "no way in, nothing to pick");
     }
 
     @Test
-    void eachInputIsWrittenByItsOwnActsFactory() {
-        Input click = Input.click(picture("claim")).did(Did.IN_PLACE).sometimes();
-        Input key = Input.key(Key.ESCAPE).kind(Kind.SHORTCUT);
-        Input scroll = Input.scroll(picture("list"), 4).locked(picture("padlock"));
+    void eachInputIsWrittenByItsOwnFactory() {
+        Button click = Button.of(picture("claim")).did(Did.IN_PLACE).sometimes().purpose(Purpose.TASK);
+        Hotkey key = Hotkey.of(Key.ESCAPE).purpose(Purpose.SHORTCUT);
+        Strip strip = Strip.of(Scroll.wheel(4), marks("list")).locked(picture("padlock")).did(Did.NONE);
+        Button never = Button.of(picture("gems")).never("spends gems").repeated();
 
-        assertEquals(click, roundTrip(ScreenTypes.CLICK_SHAPE, click));
-        assertEquals(key, roundTrip(ScreenTypes.KEY_SHAPE, key));
-        assertEquals(scroll, roundTrip(ScreenTypes.SCROLL_SHAPE, scroll));
-        assertTrue(ScreenTypes.KEY_SHAPE.writes(key));
-        assertFalse(ScreenTypes.CLICK_SHAPE.writes(key));
-        assertFalse(ScreenTypes.SCROLL_SHAPE.writes(click));
+        assertEquals(click, roundTrip(ScreenTypes.BUTTON_SHAPE, click));
+        assertEquals(key, roundTrip(ScreenTypes.HOTKEY_SHAPE, key));
+        assertEquals(strip, roundTrip(ScreenTypes.STRIP_SHAPE, strip));
+        assertEquals(never, roundTrip(ScreenTypes.BUTTON_SHAPE, never));
+        assertTrue(never.repeats(), "a repeated button says so");
     }
 
     @Test
-    void aCopyOfARepeatedButtonAndEveryCopyGoBackTogether() {
-        Input second = Input.click(picture("mission_go")).nth(2).did(Did.IN_PLACE);
-        Input every = Input.click(picture("claim")).each().kind(Kind.CHORE);
-
-        assertEquals(second, roundTrip(ScreenTypes.CLICK_SHAPE, second));
-        assertEquals(every, roundTrip(ScreenTypes.CLICK_SHAPE, every));
-        assertEquals(0, every.nth(), "every copy is no one copy");
-        assertFalse(second.sameAs(Input.click(picture("mission_go"))), "each copy is an input of its own");
+    void aStripIsWrittenByItsScrollAndItsMembers() {
+        Strip column = Strip.of(Scroll.wheel(-5), marks("tavern_home", "campaign_home")).sometimes();
+        assertEquals(column, roundTrip(ScreenTypes.STRIP_SHAPE, column));
+        assertEquals(Scroll.wheel(-5), roundTrip(ScreenTypes.SCROLL_SHAPE, Scroll.wheel(-5)));
+        assertTrue(column.has(picture("campaign_home")));
+        assertFalse(column.has(picture("town")));
     }
 
     @Test
-    void aListIsWrittenByItsMembersAndGoesWithItsScreen() {
-        ScreenList column = ScreenList.of(-5, List.of(picture("tavern_home"), picture("campaign_home")));
-        assertEquals(column, roundTrip(ScreenTypes.LIST_SHAPE, column));
-        GameScreen home = GameScreen.named("Home").markers(List.of(picture("town")))
-                .inputs(List.of(Input.click(picture("tavern_home")), Input.click(picture("campaign_home"))))
-                .lists(List.of(column));
-        assertEquals(home, roundTrip(ScreenTypes.SCREEN_SHAPE, home), "its lists go with it");
-        assertEquals(Optional.of(column), home.listOf(Input.click(picture("campaign_home"))));
-        assertEquals(Optional.empty(), home.listOf(Input.click(picture("town"))));
-    }
-
-    @Test
-    void aReferenceToAScreenIsWrittenOnlyAsItsConstant() {
-        assertFalse(ScreenTypes.SCREEN_SHAPE.writes(BotConstants.screen("HOME")));
-        assertTrue(ScreenTypes.SCREEN_SHAPE.writes(campaign()));
-        assertEquals("HOME", BotConstants.screenName(BotConstants.screen("HOME")));
-        Way way = Way.of(BotConstants.screen("HOME"), Input.click(picture("campaign")));
+    void eachPickIsWrittenByItsOwnFactory() {
+        Pick nth = Pick.nth(3, Order.SOUTH_WEST);
+        assertEquals(nth, roundTrip(ScreenTypes.PICK_NTH_SHAPE, nth));
+        assertEquals(Pick.each(Order.EAST), roundTrip(ScreenTypes.PICK_EACH_SHAPE, Pick.each(Order.EAST)));
+        assertEquals(Pick.first(Order.CENTER), roundTrip(ScreenTypes.PICK_FIRST_SHAPE, Pick.first(Order.CENTER)));
+        assertEquals(Pick.untilNone(), roundTrip(ScreenTypes.PICK_UNTIL_NONE_SHAPE, Pick.untilNone()));
+        assertTrue(ScreenTypes.PICK_NTH_SHAPE.writes(nth));
+        assertFalse(ScreenTypes.PICK_EACH_SHAPE.writes(nth));
+        Way way = Way.of(BotConstants.input("MISSIONS", "go")).pick(nth);
         assertEquals(way, roundTrip(ScreenTypes.WAY_SHAPE, way));
+    }
+
+    @Test
+    void aReferenceToAFieldIsWrittenOnlyAsThatField() {
+        Button reference = BotConstants.input("HOME", "campaign");
+        assertFalse(ScreenTypes.BUTTON_SHAPE.writes(reference));
+        assertTrue(ScreenTypes.BUTTON_SHAPE.writes(Button.of(picture("campaign"))));
+        assertEquals(new BotConstants.InputName("HOME", "campaign"), BotConstants.inputName(reference));
+        assertNull(BotConstants.inputName(Button.of(picture("campaign"))));
+        assertNull(BotConstants.inputName(reference.sometimes()), "a reference with traits is a button of its own");
+        assertEquals("HOME", BotConstants.screenName(BotConstants.screen("HOME")));
+        assertEquals(BotConstants.screen("HOME"), BotConstants.screen("HOME"), "a reference equals one to the same");
     }
 
     @Test
     void looksAndConditionsGoBackTogetherAsTheMethodsTheyName() {
-        Input shop = Input.click(picture("shop")).variants(List.of(Variant.of(picture("shop_badge"), State.BADGE)))
+        Button shop = Button.of(picture("shop")).looks(List.of(Look.of(picture("shop_badge"), State.BADGE)))
                 .when(ScreenTypes.condition("Firestone::shopOpen"));
-        assertEquals(shop, roundTrip(ScreenTypes.CLICK_SHAPE, shop));
-        assertEquals("Firestone::shopOpen", ScreenTypes.sourceOf(roundTrip(ScreenTypes.CLICK_SHAPE, shop).when()));
+        assertEquals(shop, roundTrip(ScreenTypes.BUTTON_SHAPE, shop));
+        assertEquals("Firestone::shopOpen", ScreenTypes.sourceOf(roundTrip(ScreenTypes.BUTTON_SHAPE, shop).when()));
 
-        Way way = Way.of(BotConstants.screen("HOME"), Input.click(picture("event"))).whenLooks(State.BADGE)
+        Way way = Way.of(BotConstants.input("HOME", "event")).whenLooks(State.BADGE)
                 .when(ScreenTypes.condition("Firestone::eventOn"));
         assertEquals(way, roundTrip(ScreenTypes.WAY_SHAPE, way));
 
-        GameScreen event = GameScreen.named("Event").markers(marks("event_title"))
+        Setup event = Setup.named("Event").markers(marks("event_title"))
                 .variants(List.of(ScreenVariant.named("Halloween").markers(marks("pumpkin"))
-                        .inputs(List.of(Input.click(picture("candy")).sometimes()))
+                        .inputs(List.of(BotConstants.input("EVENT", "candy")))
                         .when(ScreenTypes.condition("Firestone::halloween"))));
-        assertEquals(event, roundTrip(ScreenTypes.SCREEN_SHAPE, event));
+        assertEquals(event, roundTrip(ScreenTypes.SETUP_SHAPE, event));
         assertEquals("", ScreenTypes.sourceOf(() -> true), "a live method has nothing to be written as");
         assertNull(ScreenTypes.condition(" "));
     }

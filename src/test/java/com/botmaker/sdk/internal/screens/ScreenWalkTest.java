@@ -3,11 +3,12 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.ScreenList;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
-import com.botmaker.sdk.api.screens.Variant;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -24,6 +24,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.botmaker.sdk.internal.screens.MapFixtures.click;
+import static com.botmaker.sdk.internal.screens.MapFixtures.marks;
+import static com.botmaker.sdk.internal.screens.MapFixtures.picture;
+import static com.botmaker.sdk.internal.screens.MapFixtures.ref;
+import static com.botmaker.sdk.internal.screens.MapFixtures.screen;
+import static com.botmaker.sdk.internal.screens.MapFixtures.with;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -37,46 +43,32 @@ class ScreenWalkTest {
 
     private static final long STEP_MS = 2_000;
 
-    private static ImageTemplate picture(String id) {
-        return new ImageTemplate("images/" + id + ".png");
+    private static Setup named(String name, String marker, String fromScreen, String fromField) {
+        Setup setup = Setup.named(name).markers(marker == null ? List.of() : marks(marker));
+        return fromScreen == null ? setup : setup.from(ref(fromScreen, fromField));
     }
 
-    /** A screen's markers: the pictures {@code ids}. */
-    private static List<ImageTemplate> marks(String... ids) {
-        return Arrays.stream(ids).map(ScreenWalkTest::picture).toList();
-    }
-
-    private static Input click(String id) {
-        return Input.click(picture(id));
-    }
-
-    private static Way from(String constant, Input via) {
-        return Way.of(BotConstants.screen(constant), via);
+    private static Map<String, MapScreen> screens() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(named("Home", "home", null, null), click("campaign"), click("engineer"),
+                click("mail"), click("event").sometimes(), click("arena").locked(picture("padlock")), click("lobby")));
+        screens.put("CAMPAIGN", screen(named("Campaign", "campaign_title", "HOME", "campaign")
+                        .alsoFrom(List.of(Way.of(ref("MAIL", "mail_campaign")))),
+                click("map"), click("bonus").sometimes()));
+        screens.put("BONUS", screen(named("Bonus", "bonus_title", "CAMPAIGN", "bonus")));
+        screens.put("LOBBY", screen(named("Lobby", null, "HOME", "lobby")));
+        screens.put("MAP", screen(named("Map", "map_title", "CAMPAIGN", "map")));
+        screens.put("ENGINEER", screen(named("Engineer", "engineer_title", "HOME", "engineer")));
+        screens.put("MAIL", screen(named("Mail", "mail_title", "HOME", "mail"), click("mail_campaign")));
+        screens.put("EVENT", screen(named("Event", "event_title", "HOME", "event")));
+        screens.put("ARENA", screen(named("Arena", "arena_title", "HOME", "arena")));
+        screens.put("OFFER", screen(Setup.named("Offer").markers(marks("offer")).back(click("close_x")).popup()));
+        screens.put("NEWS", screen(Setup.named("News").markers(marks("news")).popup()));
+        return screens;
     }
 
     private static ScreenGraph map() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
-                .inputs(List.of(click("campaign"), click("engineer"), click("mail"), click("event").sometimes(),
-                        click("arena").locked(picture("padlock")), click("lobby"))));
-        screens.put("CAMPAIGN", GameScreen.named("Campaign").markers(marks("campaign_title"))
-                .from(from("HOME", click("campaign"))).alsoFrom(List.of(from("MAIL", click("mail_campaign"))))
-                .inputs(List.of(click("map"), click("bonus").sometimes())));
-        screens.put("BONUS", GameScreen.named("Bonus").markers(marks("bonus_title"))
-                .from(from("CAMPAIGN", click("bonus").sometimes())));
-        screens.put("LOBBY", GameScreen.named("Lobby").from(from("HOME", click("lobby"))));
-        screens.put("MAP", GameScreen.named("Map").markers(marks("map_title")).from(from("CAMPAIGN", click("map"))));
-        screens.put("ENGINEER", GameScreen.named("Engineer").markers(marks("engineer_title"))
-                .from(from("HOME", click("engineer"))));
-        screens.put("MAIL", GameScreen.named("Mail").markers(marks("mail_title")).from(from("HOME", click("mail")))
-                .inputs(List.of(click("mail_campaign"))));
-        screens.put("EVENT", GameScreen.named("Event").markers(marks("event_title"))
-                .from(from("HOME", click("event").sometimes())));
-        screens.put("ARENA", GameScreen.named("Arena").markers(marks("arena_title"))
-                .from(from("HOME", click("arena").locked(picture("padlock")))));
-        screens.put("OFFER", GameScreen.named("Offer").markers(marks("offer")).back(click("close_x")).popup());
-        screens.put("NEWS", GameScreen.named("News").markers(marks("news")).popup());
-        return ScreenGraph.of(screens);
+        return ScreenGraph.of(screens());
     }
 
     /** What the game shows while an overlay the map lacks covers it. */
@@ -104,8 +96,11 @@ class ScreenWalkTest {
             map.screens().forEach((c, s) -> {
                 Set<String> on = new HashSet<>();
                 s.markers().forEach(m -> on.add(m.id()));
-                s.inputs().stream().filter(i -> i.picture() != null && !i.comesAndGoes()).forEach(i -> on.add(i.picture().id()));
-                if (s.back() != null) on.add(s.back().picture().id());
+                s.inputs().values().stream().filter(i -> i instanceof Button && !i.comesAndGoes())
+                        .forEach(i -> on.add(((Button) i).picture().id()));
+                if (s.back() instanceof Button back && BotConstants.inputName(back) == null) {
+                    on.add(back.picture().id());
+                }
                 shows.put(c, on);
             });
             shows.put(OVERLAY, new HashSet<>(Set.of("close_x")));
@@ -208,9 +203,8 @@ class ScreenWalkTest {
         Game game = new Game("HOME");
         game.shows.get("HOME").remove("engineer");
         game.reveals.put("HOME scroll campaign -1", "engineer");
-        Map<String, GameScreen> screens = new LinkedHashMap<>(game.map.screens());
-        screens.put("HOME", screens.get("HOME").lists(List.of(
-                ScreenList.of(-1, List.of(picture("campaign"), picture("engineer"))))));
+        Map<String, MapScreen> screens = screens();
+        screens.put("HOME", with(screens.get("HOME"), Strip.of(Scroll.wheel(-1), marks("campaign", "engineer"))));
 
         ScreenWalk.Result walked = new ScreenWalk(ScreenGraph.of(screens), game, STEP_MS, s -> {}).go("ENGINEER", null);
 
@@ -221,10 +215,8 @@ class ScreenWalkTest {
         Game badged = new Game("HOME");
         badged.shows.get("HOME").remove("engineer");
         badged.reveals.put("HOME scroll campaign -1", "engineer");
-        List<Input> inputs = new ArrayList<>(screens.get("HOME").inputs());
-        inputs.replaceAll(i -> i.picture() != null && i.picture().id().equals("engineer")
-                ? i.variants(List.of(Variant.of(picture("engineer_badge"), State.BADGE))) : i);
-        screens.put("HOME", screens.get("HOME").inputs(inputs));
+        screens.put("HOME", with(screens.get("HOME"),
+                click("engineer").looks(List.of(Look.of(picture("engineer_badge"), State.BADGE)))));
         ScreenWalk.Result badgedWalk = new ScreenWalk(ScreenGraph.of(screens), badged, STEP_MS, s -> {})
                 .go("ENGINEER", null);
         assertEquals(ScreenWalk.Outcome.ARRIVED, badgedWalk.outcome(), badgedWalk.toString());
@@ -236,11 +228,9 @@ class ScreenWalkTest {
     void anotherWayIsTakenBeforeSearchingAListForWhatComesAndGoes() {
         Game game = new Game("HOME");
         game.shows.get("HOME").remove("campaign");
-        Map<String, GameScreen> screens = new LinkedHashMap<>(game.map.screens());
-        List<Input> inputs = new ArrayList<>(screens.get("HOME").inputs());
-        inputs.replaceAll(i -> i.picture() != null && i.picture().id().equals("campaign") ? i.sometimes() : i);
-        screens.put("HOME", screens.get("HOME").inputs(inputs).lists(List.of(
-                ScreenList.of(-1, List.of(picture("engineer"), picture("campaign"))))));
+        Map<String, MapScreen> screens = screens();
+        screens.put("HOME", with(screens.get("HOME"), click("campaign").sometimes(),
+                Strip.of(Scroll.wheel(-1), marks("engineer", "campaign"))));
 
         ScreenWalk.Result walked = new ScreenWalk(ScreenGraph.of(screens), game, STEP_MS, s -> {}).go("CAMPAIGN", null);
 
@@ -492,11 +482,10 @@ class ScreenWalkTest {
     void aWayOrAnInputWhoseMethodSaysNoIsNotTakenAndANameIsUnknown() {
         Game game = new Game("HOME");
         boolean[] open = {false};
-        Map<String, GameScreen> screens = new LinkedHashMap<>(game.map.screens());
-        screens.put("ENGINEER", screens.get("ENGINEER").from(from("HOME", click("engineer")).when(() -> open[0])));
-        // An input's condition is on the screen's input, which the way does (2026-10-15).
-        screens.put("HOME", screens.get("HOME").inputs(screens.get("HOME").inputs().stream()
-                .map(i -> i.sameAs(click("mail")) ? i.when(() -> open[0]) : i).toList()));
+        Map<String, MapScreen> screens = screens();
+        screens.put("ENGINEER", screens.get("ENGINEER").setup(s -> s.fromWhen(() -> open[0])));
+        // An input's condition is on the screen's field, which the way names (2026-10-15).
+        screens.put("HOME", with(screens.get("HOME"), click("mail").when(() -> open[0])));
         ScreenGraph conditioned = ScreenGraph.of(screens);
 
         ScreenWalk walk = new ScreenWalk(conditioned, game, STEP_MS, reached -> {});
@@ -529,7 +518,7 @@ class ScreenWalkTest {
         ScreenWalk.Result walked = go(game, "ENGINEER", new ArrayList<>());
 
         assertEquals(ScreenWalk.Outcome.MISSING, walked.outcome());
-        assertTrue(walked.why().contains("click engineer"), walked.why());
+        assertTrue(walked.why().contains("engineer not found"), walked.why());
     }
 
     @Test
@@ -637,17 +626,14 @@ class ScreenWalkTest {
      * window's title and its own tab, lit. Two dialogs share a title; one shows no close button.
      */
     private static ScreenGraph tabs() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
-                .inputs(List.of(click("window"), click("tab_b"), click("dialog"), click("shop"))));
-        screens.put("WINDOW", GameScreen.named("Window").markers(marks("window_title"))
-                .from(from("HOME", click("window"))));
-        screens.put("TAB_B", GameScreen.named("Tab B").markers(marks("window_title", "tab_b_lit"))
-                .from(from("HOME", click("tab_b"))));
-        screens.put("DIALOG", GameScreen.named("Dialog").markers(marks("dialog_title")).absent(marks("close_x"))
-                .from(from("HOME", click("dialog"))));
-        screens.put("SHOP", GameScreen.named("Shop").markers(marks("dialog_title"))
-                .from(from("HOME", click("shop"))));
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(named("Home", "home", null, null), click("window"), click("tab_b"),
+                click("dialog"), click("shop")));
+        screens.put("WINDOW", screen(named("Window", "window_title", "HOME", "window")));
+        screens.put("TAB_B", screen(Setup.named("Tab B").markers(marks("window_title", "tab_b_lit"))
+                .from(ref("HOME", "tab_b"))));
+        screens.put("DIALOG", screen(named("Dialog", "dialog_title", "HOME", "dialog").absent(marks("close_x"))));
+        screens.put("SHOP", screen(named("Shop", "dialog_title", "HOME", "shop")));
         return ScreenGraph.of(screens);
     }
 

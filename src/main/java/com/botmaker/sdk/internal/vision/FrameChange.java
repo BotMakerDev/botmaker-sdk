@@ -10,8 +10,8 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * What changed between two frames of one source, by one rule: what {@code Screen.waitStable} and
- * {@code Screen.waitChange} ask between polls, and what the assistant's click, key and scroll wait on and report.
+ * What changed between two frames of one source, by one rule: what {@code ScreenWait.waitStable} and
+ * {@code ScreenWait.waitChange} ask between polls, and what the assistant's click, key and scroll wait on and report.
  *
  * <p>The tolerance is fixed so a bot writes no number. A pixel is the same while each of its channels moved by less
  * than {@link #SAME} of 255: capture noise, compression, a blended edge. A frame changed when more than

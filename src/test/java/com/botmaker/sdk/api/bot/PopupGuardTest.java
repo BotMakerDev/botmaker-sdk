@@ -4,8 +4,8 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.vision.ImageClicker;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.api.vision.ImageWaiter;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Matches;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import org.junit.jupiter.api.AfterEach;
@@ -145,9 +146,10 @@ class PopupGuardTest {
 
     /** Home, and the offer popup closed by its close button. */
     private ScreenGraph withOffer() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").markers(List.of(home)));
-        screens.put("OFFER", GameScreen.named("Offer").markers(List.of(offer)).back(Input.click(close)).popup());
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapScreen.of(Setup.named("Home").markers(List.of(home))));
+        screens.put("OFFER", MapScreen.of(Setup.named("Offer").markers(List.of(offer)).back(Button.of(close))
+                .popup()));
         return ScreenGraph.of(screens);
     }
 
@@ -235,9 +237,9 @@ class PopupGuardTest {
     /** A wait that timed out on no screen of the map: the map's close buttons clear the overlay, and say so. */
     @Test
     void anOverlayTheMapLacksIsClearedByTheMapsCloseButtons() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").markers(List.of(home)));
-        screens.put("SHOP", GameScreen.named("Shop").markers(List.of(absent)).back(Input.click(close)));
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapScreen.of(Setup.named("Home").markers(List.of(home))));
+        screens.put("SHOP", MapScreen.of(Setup.named("Shop").markers(List.of(absent)).back(Button.of(close))));
         BufferedImage overlay = frame(false);
         draw(overlay, "close", CLOSE_AT);
         Game game = play(ScreenGraph.of(screens), overlay, CLOSE_AT);

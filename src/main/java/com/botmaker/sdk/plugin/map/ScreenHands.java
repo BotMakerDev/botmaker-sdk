@@ -4,9 +4,9 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.screens.Did;
-import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Kind;
+import com.botmaker.sdk.api.screens.Purpose;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
@@ -30,7 +30,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.VBox;
-import javafx.util.StringConverter;
 
 import java.util.List;
 import java.util.Locale;
@@ -59,51 +58,52 @@ final class ScreenHands {
 
     /** The ⋯ menu of {@code row}, an input of {@code constant}. */
     MenuButton rowMenu(String constant, Row row) {
-        Input input = row.input();
-        boolean opens = graph.get().opens(constant, input).isPresent();
+        String field = row.field();
+        Input input = graph.get().screen(constant).flatMap(s -> s.input(field)).orElse(row.input());
+        boolean opens = graph.get().opens(constant, field).isPresent();
         // Each menu marks what the input is now.
         ToggleGroup did = new ToggleGroup();
         Menu result = new Menu("Result");
         result.getItems().addAll(
-                pick("Untried", did, !opens && input.did() == null, () -> set(constant, input,
+                pick("Untried", did, !opens && input.did() == null, () -> set(constant, field,
                         ScreenEdits.untried(input))),
                 pick("Changes this screen in place", did, !opens && input.did() == Did.IN_PLACE, () -> set(constant,
-                        input, ScreenEdits.untried(input).did(Did.IN_PLACE))),
-                pick("No visible effect", did, !opens && input.did() == Did.NONE, () -> set(constant, input,
+                        field, ScreenEdits.untried(input).did(Did.IN_PLACE))),
+                pick("No visible effect", did, !opens && input.did() == Did.NONE, () -> set(constant, field,
                         ScreenEdits.untried(input).did(Did.NONE))),
-                pick("Leaves this screen", did, !opens && input.did() == Did.LEAVES, () -> set(constant, input,
+                pick("Leaves this screen", did, !opens && input.did() == Did.LEAVES, () -> set(constant, field,
                         ScreenEdits.untried(input).did(Did.LEAVES))),
-                pick("Opens a new screen…", did, opens, () -> newScreen(constant, input)));
+                pick("Opens a new screen…", did, opens, () -> newScreen(constant, field)));
         ToggleGroup kinds = new ToggleGroup();
-        Menu kind = new Menu("Kind");
-        kind.getItems().add(pick("None", kinds, input.kind() == null, () -> set(constant, input,
+        Menu kind = new Menu("Purpose");
+        kind.getItems().add(pick("None", kinds, input.purpose() == null, () -> set(constant, field,
                 ScreenEdits.unkinded(input))));
-        for (Kind k : Kind.values()) {
-            kind.getItems().add(pick(label(k.name()), kinds, input.kind() == k, () -> set(constant, input,
-                    input.kind(k))));
+        for (Purpose p : Purpose.values()) {
+            kind.getItems().add(pick(label(p.name()), kinds, input.purpose() == p, () -> set(constant, field,
+                    input.purpose(p))));
         }
         CheckMenuItem sometimes = new CheckMenuItem("Comes and goes");
         sometimes.setSelected(input.comesAndGoes());
-        sometimes.setOnAction(e -> set(constant, input, ScreenEdits.sometimes(input, sometimes.isSelected())));
+        sometimes.setOnAction(e -> set(constant, field, ScreenEdits.sometimes(input, sometimes.isSelected())));
         MenuItem never = item(input.never() == null ? "Never…" : "Not never", () -> {
-            if (input.never() != null) set(constant, input, ScreenEdits.untried(input).kind(input.kind()));
+            if (input.never() != null) set(constant, field, ScreenEdits.untried(input));
             else askText("Never clicked", "Why it is never clicked (it spends gems, real money)", "spends gems",
-                    why -> set(constant, input, ScreenEdits.untried(input).never(why)));
+                    why -> set(constant, field, ScreenEdits.untried(input).never(why)));
         });
         MenuItem locked = item(input.lock() == null ? "Locked by…" : "Not locked", () -> {
-            if (input.lock() != null) set(constant, input, ScreenEdits.untried(input));
+            if (input.lock() != null) set(constant, field, ScreenEdits.untried(input));
             else askPicture("Locked by", "The picture proving it locked (a padlock on it)",
-                    lock -> set(constant, input, ScreenEdits.untried(input)
+                    lock -> set(constant, field, ScreenEdits.untried(input)
                             .locked(ScreenEdits.picture(services, lock))));
         });
         MenuItem back = item("Use as the way back", () -> done.accept(ScreenEdits.useAsBack(services, constant,
-                input)));
+                field)));
         MenuItem remove = item("Remove from this screen", () -> done.accept(ScreenEdits.setInput(services, constant,
-                input, null)));
+                field, null)));
         MenuButton menu = new MenuButton("⋯");
         menu.setTooltip(new Tooltip("Set what " + row.label() + " does by hand"));
         Menu when = whileMenu("Only there while", ScreenTypes.sourceOf(input.when()),
-                method -> done.accept(ScreenEdits.setInputWhen(services, constant, input, method)));
+                method -> done.accept(ScreenEdits.setInputWhen(services, constant, field, method)));
         menu.getItems().addAll(result, kind, sometimes, when, never, locked, new SeparatorMenuItem(), back, remove);
         return menu;
     }
@@ -117,9 +117,9 @@ final class ScreenHands {
     ContextMenu linkMenu(Link link, Runnable show) {
         ContextMenu menu = new ContextMenu(item(link.via() == null ? "About " + link.label() : "Show "
                 + link.label(), show));
-        if (!link.back()) {
+        if (!link.back() && link.field() != null) {
             menu.getItems().add(whileMenu("Open only while", link.when(), method -> done.accept(
-                    ScreenEdits.setWayWhen(services, link.to(), link.from(), link.via(), method))));
+                    ScreenEdits.setWayWhen(services, link.to(), link.from(), link.field(), method))));
         }
         return menu;
     }
@@ -191,7 +191,7 @@ final class ScreenHands {
 
     /** The ⋯ Screen menu's items, for it and for the card's right-click menu. */
     List<MenuItem> screenItems(String constant, Consumer<String> retake) {
-        GameScreen screen = graph.get().screens().get(constant);
+        MapScreen screen = graph.get().screens().get(constant);
         String shown = graph.get().shown(constant);
         MenuItem rename = item("Rename…", () -> askText("Rename " + shown, "The name the game shows", shown,
                 name -> done.accept(ScreenEdits.rename(services, constant, name))));
@@ -229,27 +229,14 @@ final class ScreenHands {
         });
     }
 
-    /** A screen under {@code parent}, opened by {@code via}, or by one of its inputs picked when null. */
-    private void newScreen(String parent, Input via) {
+    /** A screen under {@code parent}, opened by its field {@code via}, or by one of its inputs picked when null. */
+    private void newScreen(String parent, String via) {
         TextField name = new TextField();
         name.setPromptText("its name, as the game shows it");
-        GameScreen on = graph.get().screens().get(parent);
         // Its looks' inputs too: a button only one look of the screen has opens screens as well.
-        ComboBox<Input> input = new ComboBox<>(FXCollections.observableArrayList(on == null ? List.of()
-                : on.allInputs()));
+        ComboBox<String> input = new ComboBox<>(FXCollections.observableArrayList(graph.get().fields(parent)));
         input.setValue(via);
         input.setDisable(via != null);
-        input.setConverter(new StringConverter<>() {
-            @Override
-            public String toString(Input i) {
-                return i == null ? "" : i.label();
-            }
-
-            @Override
-            public Input fromString(String s) {
-                return null;
-            }
-        });
         VBox body = new VBox(8, new Label("Name"), name, new Label("Opened from " + graph.get().shown(parent)
                 + " by"), input);
         Modals.form(services, "New screen", body, () -> {
@@ -257,14 +244,14 @@ final class ScreenHands {
                 done.accept("Pick the input that opens it.");
                 return;
             }
-            done.accept(ScreenEdits.newScreen(services, parent, name.getText(), input.getValue()));
+            done.accept(ScreenEdits.newScreen(services, parent, name.getText(), input.getValue(), null));
         });
     }
 
     // --- pieces ---
 
-    private void set(String constant, Input old, Input now) {
-        done.accept(ScreenEdits.setInput(services, constant, old, now));
+    private void set(String constant, String field, Input now) {
+        done.accept(ScreenEdits.setInput(services, constant, field, now));
     }
 
     private void askText(String title, String prompt, String start, Consumer<String> answer) {

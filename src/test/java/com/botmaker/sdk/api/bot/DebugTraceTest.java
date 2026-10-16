@@ -4,13 +4,14 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import org.junit.jupiter.api.AfterEach;
@@ -176,9 +177,9 @@ class DebugTraceTest {
         }
         Path closeFile = dir.resolve("trace_close.png");
         ImageIO.write(patch, "png", closeFile.toFile());
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("OFFER", GameScreen.named("Offer").markers(List.of(offer))
-                .back(Input.click(new ImageTemplate(closeFile.toString()))).popup());
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("OFFER", MapScreen.of(Setup.named("Offer").markers(List.of(offer))
+                .back(Button.of(new ImageTemplate(closeFile.toString()))).popup()));
         ScreenMaps.use(ScreenGraph.of(screens));
         BufferedImage popup = noise();
         popup.getGraphics().drawImage(ImageIO.read(dir.resolve("trace_probe.png").toFile()), 40, 40, null);

@@ -1,7 +1,8 @@
 package com.botmaker.sdk.plugin.assist;
 
-import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Reached;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
 import java.util.ArrayList;
@@ -63,7 +64,7 @@ final class Protocol {
                      spends premium currency or real money is tried with never and its reason, never clicked; one
                      proved locked (a padlock on it) with locked, the lock's picture. What a tab, toggle, arrow or
                      scroll brings into view is cut, and untried in turn; one in a list that scrolls or whose
-                     slots shift then gets edit_map in_list. A tab whose content has a title and
+                     slots shift then gets edit_map in_strip. A tab whose content has a title and
                      inputs of its own opens a screen: try it with opens, the tab's title, and cut that content
                      on that screen, never on the one the tabs sit on.
                   3. An input that opens a screen (give opens the name it shows) adds it to the map, owing a
@@ -71,7 +72,7 @@ final class Protocol {
                      only that screen shows) and every input on it (step 1), then go back and try the next input
                      of the screen it was opened from. Breadth first: a screen's inputs are all tried before those
                      of any screen they opened, main screens before their panels; help, rules and leaderboards
-                     (kind info) last. One that leads to a screen mapped already is a way into it, or this
+                     (purpose info) last. One that leads to a screen mapped already is a way into it, or this
                      screen's way back.
                   4. A screen is finished when nothing on it is untried. try_input then walks by itself to the next
                      screen to explore, the shallowest with inputs left (read_guide names it), and checks that
@@ -88,9 +89,9 @@ final class Protocol {
                   (set_input, reset_input), a way in that is no way (remove_way), a screen opened by an input that
                   cannot be tried here (new_screen), a name (rename).
                 - On each screen, as it is explored: read its help (an i or ? button) first, then give every
-                  input a kind as try_input tries it (kind): a chore (work that repeats), a shortcut the game
-                  ships for a chore (Auto, x10, Max, Claim all, Skip), a choice (spending the player decides),
-                  information; never for one that spends real money or premium currency. Note what the screen
+                  input a purpose as try_input tries it (purpose): a task (work that repeats), a shortcut the game
+                  ships for a task (Auto, x10, Max, Claim all, Skip), a spend (spending the player decides),
+                  info; never for one that spends real money or premium currency. Note what the screen
                   spends and earns, what refills
                   it (a timer, a battle), the badge that says it has work, and the daily quests it feeds. describe
                   looks, click, key and scroll act, and all four answer in text; each new word in an answer's
@@ -106,7 +107,7 @@ final class Protocol {
                   (crop_pictures says where else a cut is found), so cut the twin too. A round button or an odd
                   icon over a moving background is cut with shape ellipse or polygon: a box's corners would carry
                   the background; the preview checkers what is left out, so check it clips none of the icon.
-                - Done when every input on the screen is tried and has its kind, and no Appeared word is left
+                - Done when every input on the screen is tried and has its purpose, and no Appeared word is left
                   unexplained: write_notes the screen with what it taught and reached surveyed, or reached locked
                   for a feature this account has not opened (its lock picture and unlock condition in its notes).
                 """),
@@ -138,7 +139,7 @@ final class Protocol {
                   untilFind(LIST_END, () -> ImageScroller.scrollAt(LIST_ITEM, -3)).
                 - Prove each step by a picture of its result, never by time: the loop's own picture coming or
                   going, or ImageWaiter.waitFor / waitUntilGone of a picture only that screen or state shows (a
-                  close button is on every screen: not a marker). Screen.waitStable and Wait guess, they prove
+                  close button is on every screen: not a marker). ScreenWait.waitStable and Wait guess, they prove
                   nothing.
                 - Act on a lit button and its greyed-out twin with the compare forms, the lit one as good and the
                   twin as bad: ImageFinder.whileFindCompare(good, bad, action), clickCompare.
@@ -235,7 +236,7 @@ final class Protocol {
 
     /**
      * The stage the bot is at: Setup while it lacks a home method, then Discovery while it has no screen
-     * map or anything is owed (an input untried, a marker, what a screen {@link GameScreen#owes}), or a screen of the
+     * map or anything is owed (an input untried, a marker, what a screen {@link Setup#owes}), or a screen of the
      * map has not reached anything yet; then the earliest stage any screen goes through next. Popups go through no
      * stage.
      */
@@ -245,7 +246,7 @@ final class Protocol {
         if (!hasHome && graph.root().isEmpty()) return new Where(Stage.SETUP, "the bot has no home method.", screens);
         Stage earliest = null;
         for (String constant : graph.screens().keySet()) {
-            GameScreen at = graph.screens().get(constant);
+            MapScreen at = graph.screens().get(constant);
             if (at.isPopup()) continue;
             Optional<Reached> reached = Optional.ofNullable(at.reached());
             screens.putIfAbsent(graph.shown(constant), reached.map(r -> r.name().toLowerCase(Locale.ROOT))

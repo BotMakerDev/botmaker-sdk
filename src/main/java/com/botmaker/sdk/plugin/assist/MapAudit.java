@@ -4,14 +4,17 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Zone;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.ScreenVariant;
-import com.botmaker.sdk.api.screens.Variant;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.capture.StillSource;
+import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -26,10 +29,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Whether each screen's shot shows what the screen names: its marker, and each input's and its way back's picture, at
@@ -69,7 +74,7 @@ public final class MapAudit {
      *                lock is not, and its absence is only a note
      * @param at      its box on the shot, in the shot's pixels; null when missing
      * @param place   where its place is on the shot, in the shot's pixels; null when it has none
-     * @param area    the list or column its input is anywhere in ({@code Input.within}), on the shot; null when it
+     * @param area    the strip its input is anywhere in, on the shot; null when it
      *                sits at its place. Anywhere in it is at its place, and its absence is only a note: scrolled out
      */
     public record Spot(String picture, boolean marker, boolean absent, boolean sure, Where where, Rect at, Rect place,
@@ -121,7 +126,7 @@ public final class MapAudit {
      * Off the FX thread: it matches every picture the screen names.
      */
     public static Optional<Audit> of(Path resources, double confidence, Map<String, FrameCut> cuts, String constant,
-                                     GameScreen screen) {
+                                     MapScreen screen) {
         if (resources == null || screen == null) return Optional.empty();
         Path shotFile = ScreenShots.file(resources, constant);
         long shotTime = modified(shotFile);
@@ -184,7 +189,7 @@ public final class MapAudit {
         if (shown.size() < set.shown().size()) return Optional.empty();
         List<String> names = new ArrayList<>(shown);
         names.addAll(absent);
-        for (Map.Entry<String, GameScreen> other : graph.screens().entrySet()) {
+        for (Map.Entry<String, MapScreen> other : graph.screens().entrySet()) {
             String c = other.getKey();
             if (c.equals(constant) || other.getValue().isPopup() || graph.dependsOn(c).contains(constant)) continue;
             Optional<BufferedImage> shot = shot(resources, c);
@@ -198,7 +203,7 @@ public final class MapAudit {
     }
 
     /** {@code other}'s markers not on {@code constant}'s shot; empty while it has none. */
-    private static List<String> apart(Path resources, double confidence, String constant, GameScreen other) {
+    private static List<String> apart(Path resources, double confidence, String constant, MapScreen other) {
         Optional<BufferedImage> own = shot(resources, constant);
         List<String> theirs = files(resources, other.markers());
         if (own.isEmpty() || theirs.isEmpty()) return List.of();
@@ -284,29 +289,43 @@ public final class MapAudit {
      * Each picture {@code screen} names that has a file, by its file's name: its markers and absent pictures, its
      * inputs' and its way back's, then its looks' markers and inputs. A picture named twice is sure when either is.
      */
-    private static Map<String, Check> checks(Path resources, GameScreen screen) {
+    private static Map<String, Check> checks(Path resources, MapScreen screen) {
         Map<String, Check> checks = new LinkedHashMap<>();
         for (ImageTemplate marker : screen.markers()) add(checks, resources, marker, true, true);
         for (ImageTemplate absent : screen.absent()) {
             Frames.picture(resources, absent.id()).filter(f -> !checks.containsKey(f))
                     .ifPresent(f -> checks.put(f, new Check(f, false, true, false, null)));
         }
-        List<Input> named = new ArrayList<>(screen.inputs());
-        if (screen.back() != null) named.add(screen.back());
-        for (Input input : named) {
-            // One in a list may be scrolled out of the shot, and is anywhere along it.
-            Rect band = Reach.band(screen.listOf(input).orElse(null));
-            boolean sure = !input.comesAndGoes() && input.lock() == null && input.variants().isEmpty()
-                    && band == null;
-            for (Variant look : input.looks()) add(checks, resources, look.picture(), false, sure, band);
-            if (input.lock() != null) add(checks, resources, input.lock(), false, false, null);
-        }
+        // The inputs only a look shows are no sure part of the shot.
+        Set<Input> looksOnly = Collections.newSetFromMap(new IdentityHashMap<>());
         for (ScreenVariant look : screen.variants()) {
             for (ImageTemplate marker : look.markers()) add(checks, resources, marker, false, false, null);
-            for (Input input : look.inputs()) {
-                Rect band = Reach.band(screen.listOf(input).orElse(null));
-                for (Variant button : input.looks()) add(checks, resources, button.picture(), false, false, band);
+            for (Input named : look.inputs()) {
+                Optional<String> field = Optional.ofNullable(BotConstants.inputName(named)).map(n -> n.field())
+                        .or(() -> screen.fieldOf(named));
+                field.flatMap(screen::input).ifPresent(looksOnly::add);
             }
+        }
+        List<Input> named = new ArrayList<>(screen.inputs().values());
+        if (screen.back() != null && BotConstants.inputName(screen.back()) == null
+                && screen.fieldOf(screen.back()).isEmpty()) {
+            named.add(screen.back());
+        }
+        for (Input input : named) {
+            // One in a strip may be scrolled out of the shot, and is anywhere along it.
+            Rect band = Reach.band(screen.stripOf(input).orElse(null));
+            Input its = screen.effective(input);
+            boolean sure = !looksOnly.contains(input) && !its.comesAndGoes() && its.lock() == null && band == null;
+            if (input instanceof Button button) {
+                for (Look look : button.allLooks()) {
+                    add(checks, resources, look.picture(), false, sure && button.looks().isEmpty(), band);
+                }
+            }
+            if (input instanceof Strip strip && strip.members().size() == 1) {
+                // A panel that scrolls: the picture it is scrolled over.
+                add(checks, resources, strip.members().getFirst(), false, sure, null);
+            }
+            if (its.lock() != null) add(checks, resources, its.lock(), false, false, null);
         }
         return checks;
     }

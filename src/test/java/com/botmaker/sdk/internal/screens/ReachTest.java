@@ -2,9 +2,14 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.input.Key;
-import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.ScreenList;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Hotkey;
+import com.botmaker.sdk.api.screens.Order;
+import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** A member of a list: found anywhere along it, and scrolled to over a sibling while it is not there. */
+/**
+ * A member of a strip: found anywhere along it, and scrolled to over a sibling while it is not there; the copies of a
+ * repeated button, picked along an order.
+ */
 class ReachTest {
 
     /** A picture cut at {@code slot} of the column: 100 px apart down from y 100. */
@@ -30,7 +38,7 @@ class ReachTest {
     private static final ImageTemplate ARENA = member("arena", 1);
     private static final ImageTemplate CAMPAIGN = member("campaign", 2);
     private static final ImageTemplate MACHINES = member("war_machines", 5);
-    private static final ScreenList COLUMN = ScreenList.of(-1, List.of(TAVERN, ARENA, CAMPAIGN, MACHINES));
+    private static final Strip COLUMN = Strip.of(Scroll.wheel(-1), List.of(TAVERN, ARENA, CAMPAIGN, MACHINES));
 
     /**
      * A column of icons, six slots in view: each icon at its slot less how far the column is scrolled, a notch down
@@ -87,20 +95,24 @@ class ReachTest {
         public void pause(long ms) {
             now += ms;
         }
+
+        boolean press(ImageTemplate picture, Strip strip) {
+            return perform(Button.of(picture), strip, null, look().orElseThrow());
+        }
     }
 
     @Test
-    void aMemberIsFoundAtAnotherSlotOfItsList() {
+    void aMemberIsFoundAtAnotherSlotOfItsStrip() {
         // Cut at the third slot; an icon above it came, so it shows at the fourth.
         Column column = new Column(Map.of("tavern", 0, "campaign", 3), 0);
-        assertTrue(column.perform(Input.click(CAMPAIGN), COLUMN, column.look().orElseThrow()));
+        assertTrue(column.press(CAMPAIGN, COLUMN));
         assertEquals(List.of("click 440"), column.done);
     }
 
     @Test
     void aMemberOutOfViewIsScrolledToOverASiblingThatShows() {
         Column column = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 8), 4);
-        assertTrue(column.perform(Input.click(MACHINES), COLUMN, column.look().orElseThrow()));
+        assertTrue(column.press(MACHINES, COLUMN));
         // Slot 8 is the sixth in view after three notches down: 100 + 100 * 5, centred.
         assertEquals(List.of("scroll -1", "scroll -1", "scroll -1", "click 640"), column.done);
         assertTrue(column.wheel.stream().allMatch(at -> at.x() == 50), "the wheel turns over a member");
@@ -109,7 +121,7 @@ class ReachTest {
 
     /** A column that glides on for a while after each notch is judged once it stops, never mid-way (Firestone). */
     @Test
-    void aListIsJudgedOnceItHoldsStill() {
+    void aStripIsJudgedOnceItHoldsStill() {
         Column gliding = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 8), 4) {
             int owed;
 
@@ -132,14 +144,13 @@ class ReachTest {
             }
         };
         gliding.scrolled = 4;
-        assertTrue(gliding.perform(Input.click(TAVERN), ScreenList.of(-3, COLUMN.members()),
-                gliding.look().orElseThrow()), gliding.done.toString());
+        assertTrue(gliding.press(TAVERN, COLUMN.scroll(Scroll.wheel(-3))), gliding.done.toString());
         assertEquals(List.of("scroll -3", "scroll 3", "scroll 3", "click 140"), gliding.done);
     }
 
     /** A column that starts moving only a second after the wheel turns is not taken for one at its end. */
     @Test
-    void aListThatMovesLateIsNotTakenForItsEnd() {
+    void aStripThatMovesLateIsNotTakenForItsEnd() {
         Column late = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 8), 4) {
             int owed;
             long at;
@@ -161,7 +172,7 @@ class ReachTest {
             }
         };
         late.scrolled = 2;
-        assertTrue(late.perform(Input.click(TAVERN), COLUMN, late.look().orElseThrow()), late.done.toString());
+        assertTrue(late.press(TAVERN, COLUMN), late.done.toString());
         // Down to the end (two slots), then up four to the top: no scroll is judged before the column moved.
         assertEquals(List.of("scroll -1", "scroll -1", "scroll -1", "scroll 1", "scroll 1", "scroll 1", "scroll 1",
                 "click 140"), late.done);
@@ -169,20 +180,20 @@ class ReachTest {
 
     /** Scrolled to its end before the run looked: no member moved, so the scroll turns back up (Home's column). */
     @Test
-    void aListAtItsEndIsScrolledTheOtherWay() {
+    void aStripAtItsEndIsScrolledTheOtherWay() {
         Column column = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 8), 4);
         column.scrolled = 4;
-        assertTrue(column.perform(Input.click(TAVERN), COLUMN, column.look().orElseThrow()));
+        assertTrue(column.press(TAVERN, COLUMN));
         assertEquals(List.of("scroll -1", "scroll 1", "scroll 1", "scroll 1", "scroll 1", "click 140"),
                 column.done);
     }
 
-    /** Scrolled to an end of icons the list does not name: no member shows, so the wheel turns over its band. */
+    /** Scrolled to an end of icons the strip does not name: no member shows, so the wheel turns over its band. */
     @Test
-    void aListShowingNoMemberIsScrolledOverItsBand() {
+    void aStripShowingNoMemberIsScrolledOverItsBand() {
         Column column = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2), 8);
         column.scrolled = 8;
-        assertTrue(column.perform(Input.click(TAVERN), COLUMN, column.look().orElseThrow()), column.done.toString());
+        assertTrue(column.press(TAVERN, COLUMN), column.done.toString());
         // Three blind scrolls down turn it back; eight up bring the tavern.
         assertEquals(Reach.BLIND_SCROLLS + 8 + 1, column.done.size(), column.done.toString());
         assertEquals(new Point(50, 390), column.wheel.getFirst(), "the middle of the band the members were cut in");
@@ -192,37 +203,47 @@ class ReachTest {
     @Test
     void aMemberNeitherWayBringsIsGivenUpOn() {
         Column column = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2), 4);
-        assertFalse(column.perform(Input.click(MACHINES), COLUMN, column.look().orElseThrow()));
+        assertFalse(column.press(MACHINES, COLUMN));
         // Down all its scrolls: past every member no end shows. Then up: four and the one that met the top.
-        assertEquals(ScreenList.SCROLLS + 5, column.done.size(), column.done.toString());
+        assertEquals(Scroll.MOST + 5, column.done.size(), column.done.toString());
         assertTrue(column.done.stream().allMatch(d -> d.startsWith("scroll")));
 
-        // Past every member, the wheel stays where the last one showed; a list with no end below is given up on:
+        // Past every member, the wheel stays where the last one showed; a strip with no end below is given up on:
         // all its scrolls down, as many back up, and the one that met the top.
         Column endless = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2), 100);
-        assertFalse(endless.perform(Input.click(MACHINES), COLUMN, endless.look().orElseThrow()));
-        assertEquals(2 * ScreenList.SCROLLS + 1, endless.done.size(), endless.done.toString());
+        assertFalse(endless.press(MACHINES, COLUMN));
+        assertEquals(2 * Scroll.MOST + 1, endless.done.size(), endless.done.toString());
     }
 
     /** The way back searches as far past the start as the first way went: back to the start, then on past it. */
     @Test
     void theWayBackGoesPastWhereTheSearchBegan() {
         ImageTemplate far = member("far", 5);
-        ScreenList list = ScreenList.of(-1, List.of(TAVERN, ARENA, CAMPAIGN, far));
+        Strip strip = Strip.of(Scroll.wheel(-1), List.of(TAVERN, ARENA, CAMPAIGN, far));
         Column column = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "far", 8), 100);
         column.scrolled = 6;
-        assertTrue(column.perform(Input.click(TAVERN), list, column.look().orElseThrow()), column.done.toString());
+        assertTrue(column.press(TAVERN, strip), column.done.toString());
         // Eight down, no end met; then fourteen up, from 14 to 0, eight of them past the start.
-        assertEquals(ScreenList.SCROLLS + 14 + 1, column.done.size());
+        assertEquals(Scroll.MOST + 14 + 1, column.done.size());
         assertEquals("click 140", column.done.getLast());
     }
 
     @Test
-    void aListOfNoNotchesScrollsNothing() {
+    void aStripOfNoNotchesScrollsNothing() {
         Column column = new Column(Map.of("tavern", 0, "war_machines", 8), 4);
-        assertFalse(column.perform(Input.click(MACHINES), ScreenList.of(0, COLUMN.members()),
-                column.look().orElseThrow()));
+        assertFalse(column.press(MACHINES, COLUMN.scroll(Scroll.wheel(0))));
         assertEquals(List.of(), column.done);
+    }
+
+    /** A strip tried as an input scrolls once over a member that shows; a hotkey is pressed. */
+    @Test
+    void aStripScrollsOnceOverAMemberAndAHotkeyIsPressed() {
+        Column column = new Column(Map.of("arena", 1), 4);
+        assertTrue(column.perform(COLUMN, column.look().orElseThrow()));
+        assertEquals(List.of("scroll -1"), column.done);
+        assertEquals(new Point(50, 240), column.wheel.getFirst());
+        assertTrue(column.perform(Hotkey.of(Key.ESCAPE), column.look().orElseThrow()));
+        assertEquals("key ESCAPE", column.done.getLast());
     }
 
     /** Three Go buttons on a grid of mission cards: two on the top row, one below, found out of reading order. */
@@ -245,38 +266,62 @@ class ReachTest {
         }
     }
 
-    private static final ImageTemplate GO = new ImageTemplate("images/go.png");
+    private static final Button GO = Button.of(new ImageTemplate("images/go.png")).repeated();
 
     @Test
-    void copiesAreCountedInReadingOrder() {
+    void copiesAreOrderedAlongAnOrder() {
         Cards cards = new Cards();
-        assertEquals(List.of(new Rect(100, 110, 80, 40), new Rect(300, 100, 80, 40), new Rect(300, 400, 80, 40)),
-                Reach.readingOrder(cards.copies, r -> r), "the top row left to right, then the next row");
+        Rect topLeft = new Rect(100, 110, 80, 40);
+        Rect topRight = new Rect(300, 100, 80, 40);
+        Rect below = new Rect(300, 400, 80, 40);
+        assertEquals(List.of(topLeft, topRight, below), Reach.readingOrder(cards.copies, r -> r),
+                "the top row left to right, then the next row");
+        Size frame = new Size(800, 600);
+        assertEquals(List.of(below, topLeft, topRight), Reach.ordered(cards.copies, r -> r, Order.SOUTH, frame),
+                "the bottom row first");
+        assertEquals(List.of(topRight, below, topLeft), Reach.ordered(cards.copies, r -> r, Order.EAST, frame),
+                "the right column first, top to bottom");
+        assertEquals(List.of(topLeft, topRight, below), Reach.ordered(cards.copies, r -> r, Order.WEST, frame));
+        assertEquals(below, Reach.ordered(cards.copies, r -> r, Order.CENTER, frame).getFirst(), "nearest (400, 300)");
+        assertEquals(topRight, Reach.ordered(cards.copies, r -> r, Order.NORTH_EAST, frame).getFirst());
+        assertEquals(below, Reach.ordered(cards.copies, r -> r, Order.SOUTH_EAST, frame).getFirst());
     }
 
     @Test
-    void anNthInputClicksThatCopy() {
+    void aPickClicksThatCopyAlongItsOrder() {
         Cards cards = new Cards();
-        assertTrue(cards.perform(Input.click(GO).nth(2), cards.look().orElseThrow()));
+        assertTrue(cards.perform(GO, null, Pick.nth(2, Order.NORTH), cards.look().orElseThrow()));
         assertEquals(List.of("click 340,120"), cards.done);
-        assertFalse(cards.perform(Input.click(GO).nth(4), cards.look().orElseThrow()), "no fourth copy");
-        assertEquals(1, cards.done.size());
+        assertFalse(cards.perform(GO, null, Pick.nth(4, Order.NORTH), cards.look().orElseThrow()), "no fourth copy");
+        assertTrue(cards.perform(GO, null, Pick.first(Order.SOUTH), cards.look().orElseThrow()));
+        assertEquals("click 340,420", cards.done.getLast());
+        assertTrue(cards.perform(GO, null, null, cards.look().orElseThrow()), "no pick: the first");
+        assertEquals("click 140,130", cards.done.getLast());
+        assertEquals(3, cards.done.size());
     }
 
     @Test
-    void anEachInputClicksEveryCopyLettingTheGameSettleBetween() {
+    void eachClicksEveryCopyLettingTheGameSettleBetween() {
         Cards cards = new Cards();
-        assertTrue(cards.perform(Input.click(GO).each(), cards.look().orElseThrow()));
+        assertTrue(cards.perform(GO, null, Pick.each(Order.NORTH), cards.look().orElseThrow()));
         assertEquals(List.of("click 340,420", "click 340,120", "click 140,130"), cards.done,
                 "last to first: a card claimed and gone shifts none still to press");
         assertEquals(2 * Reach.CLICK_SETTLE_MS, cards.now);
     }
 
     @Test
+    void aPickReadsInWords() {
+        assertEquals("#2 from the north", Pick.nth(2, Order.NORTH).label());
+        assertEquals("each from the south-west", Pick.each(Order.SOUTH_WEST).label());
+        assertEquals("until none", Pick.untilNone().label());
+        assertEquals(Pick.first(), new Pick(null, 7, null), "a first pick holds no nth and reads north");
+    }
+
+    @Test
     void theBandRunsAlongTheMembersGrownByTheLargest() {
         assertEquals(new Rect(-70, 20, 240, 740), Reach.band(COLUMN));
         assertEquals(null, Reach.band(null));
-        assertEquals(null, Reach.band(ScreenList.of(-1, List.of(new ImageTemplate("images/x.png")))),
+        assertEquals(null, Reach.band(Strip.of(Scroll.wheel(-1), List.of(new ImageTemplate("images/x.png")))),
                 "members cut nowhere: anywhere");
     }
 }

@@ -2,7 +2,7 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Modals;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.MapAudit;
 import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
@@ -140,14 +140,14 @@ final class ScreenPanel {
     }
 
     private void draw() {
-        GameScreen at = selected == null ? null : graph.screens().get(selected);
+        MapScreen at = selected == null ? null : graph.screens().get(selected);
         String notes = at == null || at.notes() == null ? "" : at.notes();
         Map<String, FrameCut> cuts = selected == null || services.pluginValues() == null ? Map.of()
                 : TemplateUses.cuts(services.pluginValues());
         double width = shotWidth();
         // Everything the panel shows: the screen itself (its back, looks, notes and debts), its card and rows, where
         // its inputs were cut, when its shot was taken and how wide it is drawn.
-        Object now = selected == null ? List.of(graph.screens().values().stream().allMatch(GameScreen::isPopup), busy)
+        Object now = selected == null ? List.of(graph.screens().values().stream().allMatch(MapScreen::isPopup), busy)
                 : List.of(at, card(selected), ScreenCards.rows(graph, selected), ScreenCards.path(graph, selected),
                 cutsOf(at, cuts), canvas.shotTime(selected), pictureTimes(), width, busy,
                 Optional.ofNullable(audits.get(selected)));
@@ -162,7 +162,7 @@ final class ScreenPanel {
      * Checks {@code constant}'s shot off the FX thread, and draws again once it differs from the one drawn: a shot
      * matched against every picture the screen names takes a second, too long to hold the window for.
      */
-    private void audit(String constant, GameScreen screen, Map<String, FrameCut> cuts) {
+    private void audit(String constant, MapScreen screen, Map<String, FrameCut> cuts) {
         Path resources = services.resourcesDir();
         double confidence = MapAudit.confidence(services);
         Thread.ofVirtual().name("screen-audit").start(() -> {
@@ -188,7 +188,7 @@ final class ScreenPanel {
     }
 
     /** Where each picture {@code screen} uses was cut: what its shot's boxes are drawn from. */
-    private Map<String, FrameCut> cutsOf(GameScreen screen, Map<String, FrameCut> cuts) {
+    private Map<String, FrameCut> cutsOf(MapScreen screen, Map<String, FrameCut> cuts) {
         if (screen == null) return Map.of();
         Map<String, FrameCut> used = new TreeMap<>();
         for (String id : graph.pictures(selected)) {
@@ -211,7 +211,7 @@ final class ScreenPanel {
 
     private List<Node> none() {
         // Popups alone start no tree: the first screen is still to be cut.
-        if (!graph.screens().values().stream().allMatch(GameScreen::isPopup)) {
+        if (!graph.screens().values().stream().allMatch(MapScreen::isPopup)) {
             return List.of(heading("Screens"), text("Pick a screen to see its inputs, try them, cut more and go there. "
                     + "Solid arrows are how each screen was found; dashed ones are other ways in and ways back. "
                     + "Double-click a screen to fold what is below it."));
@@ -227,7 +227,7 @@ final class ScreenPanel {
 
     private List<Node> screen(String notes, Map<String, FrameCut> cuts, double shotWidth) {
         Card card = card(selected);
-        GameScreen screen = graph.screens().get(selected);
+        MapScreen screen = graph.screens().get(selected);
         String shown = selected;
 
         Label name = new Label(card.name());
@@ -402,7 +402,7 @@ final class ScreenPanel {
      * its picture.
      */
     private void pick(String constant, ScreenCards.Row row) {
-        Optional<String> opens = graph.opens(constant, row.input());
+        Optional<String> opens = graph.opens(constant, row.field());
         if (opens.isPresent()) canvas.select(opens.get());
         else showPicture(constant, row, null);
     }
@@ -412,7 +412,7 @@ final class ScreenPanel {
      * place, its ← going back to {@code constant}; else its picture. {@code back} is the big view's own ←.
      */
     private void pickBig(String constant, ScreenCards.Row row, PictureView.Back back) {
-        Optional<String> opens = graph.opens(constant, row.input());
+        Optional<String> opens = graph.opens(constant, row.field());
         if (opens.isEmpty()) {
             showPicture(constant, row, back);
             return;
@@ -454,12 +454,12 @@ final class ScreenPanel {
     /** A link clicked on the map: the screen it leaves picked, and the picture clicked on it shown. */
     void showLink(ScreenCards.Link link) {
         canvas.select(link.from());
-        Optional<Row> row = link.via() == null ? Optional.empty() : ScreenCards.rows(graph, link.from()).stream()
-                .filter(r -> r.input().sameAs(link.via())).findFirst();
+        Optional<Row> row = link.field() == null ? Optional.empty() : ScreenCards.rows(graph, link.from()).stream()
+                .filter(r -> r.field().equals(link.field())).findFirst();
         row.ifPresentOrElse(r -> showPicture(link.from(), r, null), () -> say(link.via() == null
                 ? graph.shown(link.from()) + " has no way back of its own: a walk closes it by its close button, "
                 + "else Escape."
-                : link.via().label() + " is " + graph.shown(link.from()) + "'s way back, not one of its inputs: its "
+                : link.label() + " is " + graph.shown(link.from()) + "'s way back, not one of its inputs: its "
                 + "picture shows in 🖼 Manage Pictures."));
     }
 

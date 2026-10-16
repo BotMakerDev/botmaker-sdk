@@ -5,8 +5,9 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
-import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Reached;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.flow.FlowValue;
 
@@ -18,7 +19,7 @@ import java.util.Optional;
 /**
  * The bot's notes on its game and the protocol's steps for where the bot is ({@link Protocol}). The notes are Java,
  * never a file of their own (the user's call, 2026-10-15): a screen's on its {@code Screens} constant
- * ({@link GameScreen#notes}, {@link GameScreen#reached}, {@link GameScreen#owes}), what holds across the game on the
+ * setup ({@link Setup#notes}, {@link Setup#reached}, {@link Setup#owes}), what holds across the game on the
  * run ({@code Run.notes}). read_notes and write_notes keep what each session learnt; read_guide works out the stage
  * from them.
  */
@@ -98,7 +99,7 @@ final class NotesTools {
 
     /** One screen's notes as read_notes says them: its name, how far it got, what it owes, then its notes. */
     private static String screen(ScreenGraph graph, String constant) {
-        GameScreen screen = graph.screens().get(constant);
+        MapScreen screen = graph.screens().get(constant);
         StringBuilder out = new StringBuilder(graph.shown(constant)).append(" [").append(constant).append("]: ")
                 .append(screen.reached() == null ? "not surveyed" : screen.reached().name().toLowerCase(Locale.ROOT));
         if (!screen.owes().isEmpty()) out.append("; owes ").append(String.join("; ", screen.owes()));
@@ -130,14 +131,14 @@ final class NotesTools {
             ScreenGraph graph = FxCall.call(() -> ScreenBook.read(services));
             Optional<String> constant = ScreenBook.find(graph, note.screen());
             if (constant.isEmpty()) return AgentReply.refused(noScreen(graph, note.screen()));
-            Optional<String> failed = FxCall.call(() -> ScreenBook.update(services, constant.get(), s -> {
-                GameScreen now = s;
+            Optional<String> failed = FxCall.call(() -> ScreenBook.update(services, constant.get(), s -> s.setup(x -> {
+                Setup now = x;
                 if (note.text() != null) now = now.notes(note.text().strip());
                 if (note.reached() != null) now = now.reached(note.reached().reached());
                 if (note.owes() != null) now = now.owes(note.owes().stream().map(String::strip)
                         .filter(w -> !w.isEmpty()).toList());
                 return now;
-            }));
+            })));
             return failed.map(AgentReply::refused).orElseGet(() -> AgentReply.text("Kept on "
                     + graph.shown(constant.get()) + " (Screens." + constant.get() + ")."));
         } catch (IllegalStateException busy) {

@@ -1,11 +1,11 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentReply;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Way;
-import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.MapFixtures;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.FrameChange.Clock;
 import com.botmaker.sdk.internal.vision.FrameChange.Motion;
@@ -93,25 +93,24 @@ class MapToolsTest {
     /** Only the way in from that screen by that input is made conditional, whether it is the entrance or not. */
     @Test
     void aWayIsOpenOnlyWhileAMethodSaysSoAndTheOthersStayAlwaysOpen() {
-        Input map = Input.click(new ImageTemplate("images/map.png"));
-        Input hotkey = Input.click(new ImageTemplate("images/m_key.png"));
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home"));
-        screens.put("CAMPAIGN", GameScreen.named("Campaign"));
-        screens.put("MAP", GameScreen.named("Map").from(Way.of(BotConstants.screen("CAMPAIGN"), map))
-                .alsoFrom(List.of(Way.of(BotConstants.screen("HOME"), hotkey))));
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapFixtures.screen("Home", MapFixtures.click("m_key")));
+        screens.put("CAMPAIGN", MapFixtures.screen("Campaign", MapFixtures.click("map")));
+        screens.put("MAP", MapScreen.of(Setup.named("Map").from(BotConstants.input("CAMPAIGN", "map"))
+                .alsoFrom(List.of(Way.of(BotConstants.input("HOME", "m_key"))))));
         ScreenGraph graph = ScreenGraph.of(screens);
         BooleanSupplier eventOn = () -> true;
 
-        GameScreen entrance = ScreenEdits.withWayWhen(graph, screens.get("MAP"), "CAMPAIGN", map, eventOn);
+        MapScreen entrance = ScreenEdits.withWayWhen(graph, screens.get("MAP"), "CAMPAIGN", "map", eventOn);
         assertSame(eventOn, entrance.from().when());
         assertEquals(null, entrance.alsoFrom().getFirst().when(), "the hotkey stays always open");
 
-        GameScreen other = ScreenEdits.withWayWhen(graph, entrance, "HOME", hotkey, eventOn);
+        MapScreen other = ScreenEdits.withWayWhen(graph, entrance, "HOME", "m_key", eventOn);
         assertSame(eventOn, other.alsoFrom().getFirst().when());
-        assertEquals(null, ScreenEdits.withWayWhen(graph, other, "CAMPAIGN", map, null).from().when(), "always again");
-        assertSame(screens.get("MAP").from(), ScreenEdits.withWayWhen(graph, screens.get("MAP"), "HOME", map, eventOn)
-                .from(), "no way from Home by the map: nothing changes");
+        assertEquals(null, ScreenEdits.withWayWhen(graph, other, "CAMPAIGN", "map", null).from().when(),
+                "always again");
+        assertEquals(screens.get("MAP").from(), ScreenEdits.withWayWhen(graph, screens.get("MAP"), "HOME", "map",
+                eventOn).from(), "no way from Home by the map: nothing changes");
     }
 
     /** A {@code color} frame with its top-left {@code corner}×{@code corner} square white. */

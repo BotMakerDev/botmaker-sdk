@@ -6,17 +6,22 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Did;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Kind;
-import com.botmaker.sdk.api.screens.ScreenList;
+import com.botmaker.sdk.api.screens.Order;
+import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
-import com.botmaker.sdk.api.screens.Variant;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
@@ -30,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -72,7 +78,7 @@ final class MapTools {
                         + "that scrolls: positive up or away, negative down or toward you", optional = true)
                 Integer scroll,
                 @Describe(value = "which copy of a picture the screen shows more than once, from 1 in reading order: "
-                        + "each copy is an input of its own; left out, its best match", optional = true)
+                        + "the button is noted as repeated; left out, its best match", optional = true)
                 Integer match,
                 @Describe(value = "a hotkey instead of a picture, as printed on it: Q", optional = true) String key,
                 @Describe(value = "the name the screen it opens shows, when it opens one; left out, the picture's "
@@ -82,7 +88,7 @@ final class MapTools {
                         + "as tried, not clicked", optional = true) String never,
                 @Describe(value = "the picture proving it locked on this account (a padlock on it): recorded as "
                         + "tried, not clicked", optional = true) String locked,
-                @Describe(value = "what it is for", optional = true) Kind kind) {
+                @Describe(value = "what it is for", optional = true) Purpose purpose) {
     }
 
     record Try(@Describe("the screen the inputs are on, as the map names it: Home, or its constant HOME") String screen,
@@ -98,10 +104,11 @@ final class MapTools {
 
     /** One input of a try_input call, with the call's screen and settings: what {@link #tried} tries. */
     private record One(String screen, String picture, Integer scroll, Integer match, String key, String opens,
-                       String never, String locked, Kind kind, Integer settleMs, Boolean stay, Boolean desktop) {
+                       String never, String locked, Purpose purpose, Integer settleMs, Boolean stay,
+                       Boolean desktop) {
         static One of(Try call, Step step, Boolean stay) {
             return new One(call.screen(), step.picture(), step.scroll(), step.match(), step.key(), step.opens(),
-                    step.never(), step.locked(), step.kind(), call.settleMs(), stay, call.desktop());
+                    step.never(), step.locked(), step.purpose(), call.settleMs(), stay, call.desktop());
         }
 
         /** The input that walks the game up from {@code call}'s screen once every input of it was tried. */
@@ -254,7 +261,7 @@ final class MapTools {
         }
         boolean locked = input.locked() != null && !input.locked().isBlank();
         if (never && locked) return Tried.refused("An input is never done or locked, not both. Nothing was done.");
-        Optional<Kind> kind = Optional.ofNullable(input.kind());
+        Optional<Purpose> purpose = Optional.ofNullable(input.purpose());
         int notches = input.scroll() == null ? 0 : input.scroll();
         if (input.scroll() != null && (notches == 0 || !byPicture || never || locked)) {
             return Tried.refused(notches == 0 ? "Scroll by at least one notch." : !byPicture ? "A scroll is over "
@@ -278,13 +285,13 @@ final class MapTools {
         String name = graph.shown(screen);
         Optional<String> owing = graph.owingMarker();
         if (owing.isPresent()) return Tried.refused(owes(graph.shown(owing.get())));
-        GameScreen on = graph.screens().get(screen);
+        MapScreen on = graph.screens().get(screen);
         String what = byPicture ? input.picture().strip() : null;
-        Optional<Input> held = held(on, what, key.orElse(null), notches, match, graph, screen);
-        boolean untried = held.filter(i -> !graph.tried(screen, i)).isPresent();
+        Optional<String> held = held(on, what, key.orElse(null), notches, graph, screen);
+        boolean untried = held.filter(f -> !graph.tried(screen, f)).isPresent();
         if (byPicture && !ActTools.exists(context, what)) {
             if (!untried) return Tried.refused(Frames.noPicture(what));
-            Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> replaced(s, held.get(), null)));
+            Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withoutInput(held.get())));
             // Nothing clicked: the game is where it was.
             return new Tried(failed.map(AgentReply::refused).orElseGet(() -> AgentReply.text(what + " is no "
                     + "picture any more (deleted or renamed): taken off " + name + "'s untried inputs. Nothing was "
@@ -307,43 +314,34 @@ final class MapTools {
         Optional<AgentReply> away = notOn(context, graph, screen);
         // Left on a screen below it, finished with nothing to try (a rules panel): walked back to it first.
         if (away.isPresent() && !walkedTo(context, graph, screen, input.desktop())) return Tried.left(away.get());
-        if (match > 0 && held.isPresent() && held.get().nth() == 0) {
-            // The picture cut once for all its copies becomes one untried input per copy a run finds: none is left
-            // out of Discovery, each with its own result to come.
-            int count = ToolReach.of(context).flatMap(reach -> reach.look().map(frame -> reach.copies(held.get(),
-                    on.listOf(held.get()).orElse(null), frame).size())).orElse(0);
-            if (count < match) {
-                return Tried.left(AgentReply.text(what + " shows " + (count == 0 ? "nowhere" : count + (count == 1
-                        ? " time" : " times")) + " at a run's score, so it has no copy " + match
-                        + "; nothing was clicked."));
-            }
-            Optional<String> failed = write(() -> ScreenBook.update(services, screen,
-                    s -> copies(s, held.get(), count)));
-            return failed.isPresent() ? Tried.refused(failed.get()) : tried(input, context);
-        }
-        Input made =kinded(made(services, held, what, key.orElse(null), notches), kind);
-        // A copy tried by its place among the picture's copies is recorded as that copy.
-        Input base = match > 0 && made.nth() != match ? made.nth(match) : made;
-        Input old = held.orElse(null);
+        // The field the input is, or a new one named from what it acts on.
+        String field = held.orElseGet(() -> on.fieldFor(byPicture ? what : "key " + key.get().label()));
+        Input made = purposed(made(services, held.map(on.inputs()::get), what, key.orElse(null), notches), purpose);
+        // A copy tried by its place among the picture's copies: the button is repeated, and a way it opens goes
+        // through that copy.
+        Pick pick = match > 0 ? Pick.nth(match, Order.NORTH) : null;
+        Input base = match > 0 && made instanceof Button once && !once.repeats() ? once.repeated() : made;
         // A button with looks leads where the look clicked says: the way it opens names that look, and its usual
         // look none (a way taken whatever the button looks).
-        State look = what == null ? null : base.variants().stream()
-                .filter(v -> v.picture().id().equalsIgnoreCase(what)).map(Variant::state).findFirst().orElse(null);
+        State look = what == null || !(base instanceof Button looked) ? null : looked.looks().stream()
+                .filter(v -> v.picture().id().equalsIgnoreCase(what)).map(com.botmaker.sdk.api.screens.Look::state)
+                .findFirst().orElse(null);
         boolean ask = !graph.untried(screen).isEmpty();
         if (never || locked) {
             Input settled = never ? base.never(input.never().strip())
                     : base.locked(FxCall.call(() -> ScreenBook.picture(services, input.locked().strip())));
-            return new Tried(up(context, noted(services, screen, old, settled, never ? "never, " + input.never()
+            return new Tried(up(context, noted(services, screen, field, settled, never ? "never, " + input.never()
                     .strip() : "locked by " + input.locked().strip(), ask), screen, input), true);
         }
-        Optional<ScreenList> list = notches == 0 ? on.listOf(base) : Optional.empty();
-        if (list.isPresent()) {
-            // A member of a list out of view is scrolled to first, as a run scrolls to it.
+        Button button = base instanceof Button b ? b : null;
+        Optional<Strip> strip = notches == 0 ? on.stripOf(base) : Optional.empty();
+        if (strip.isPresent() && button != null) {
+            // A member of a strip out of view is scrolled to first, as a run scrolls to it.
             ToolReach.of(context).ifPresent(reach -> reach.look()
-                    .ifPresent(frame -> reach.inView(base, list.get(), frame)));
+                    .ifPresent(frame -> reach.inView(button, strip.get(), pick, frame)));
         }
-        ActTools.Entered first = ActTools.enter(context, screen, byPicture ? what : null, notches, base,
-                list.orElse(null), key.orElse(null), input.desktop(), settle, FrameChange.ANSWER_SHARE);
+        ActTools.Entered first = ActTools.enter(context, screen, byPicture ? what : null, notches, button, pick,
+                strip.orElse(null), key.orElse(null), input.desktop(), settle, FrameChange.ANSWER_SHARE);
         Markers onMarkers = Markers.of(on);
         ActTools.Entered slow = notches == 0 ? slowScreen(context, first, onMarkers) : first;
         ActTools.Entered entered = notches == 0 ? flash(context, slow, onMarkers) : slow;
@@ -362,7 +360,7 @@ final class MapTools {
         if (notches != 0) {
             // A list scrolled moves much of the screen and opens nothing: the end shows when nothing moves.
             boolean moved = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
-            AgentReply said = entered.reply().and(noted(services, screen, old, base.did(moved ? Did.IN_PLACE
+            AgentReply said = entered.reply().and(noted(services, screen, field, base.did(moved ? Did.IN_PLACE
                     : Did.NONE), moved ? "changes this screen in place" : "no visible effect", ask && !moved));
             if (moved) {
                 return new Tried(said.and(AgentReply.text("Scroll it again the same way until nothing moves (its "
@@ -378,20 +376,21 @@ final class MapTools {
             Optional<String> named = opens == null ? Optional.empty() : ScreenBook.find(graph, opens)
                     .filter(c -> !c.equals(screen));
             if (named.isPresent()) {
-                GameScreen to = graph.screens().get(named.get());
+                MapScreen to = graph.screens().get(named.get());
                 if (to.hasMarker() && !ActTools.shows(context, Markers.of(to), entered.after())) {
                     // Taken at its word, a fight's start panel was recorded as the fight (2026-10-15).
                     return Tried.left(entered.reply().and(AgentReply.text("Nothing was written: "
                             + graph.shown(named.get()) + "'s marker " + Markers.of(to).ids() + " does not show, so this "
                             + "is not " + graph.shown(named.get()) + ". Look at it (describe); give opens the name it "
-                            + "shows, and try " + base.label() + " again from " + name + ".")));
+                            + "shows, and try " + field + " again from " + name + ".")));
                 }
             }
             // A name the map lacks, given as opens, is a screen opened; else where the markers say the game is.
             boolean anew = opens != null && ScreenBook.find(graph, opens).isEmpty();
             Optional<String> known = anew ? Optional.empty() : named.or(() -> landed(context, graph, screen, entered));
             if (known.isPresent()) {
-                AgentReply said = entered.reply().and(reached(services, graph, screen, old, base, look, known.get()));
+                AgentReply said = entered.reply().and(reached(services, graph, screen, field, base, look, pick,
+                        known.get()));
                 // A popup shows over the screen; anything else left it, maybe finished.
                 return Tried.left(graph.screens().get(known.get()).isPopup() ? said : up(context, said, screen, input));
             }
@@ -400,11 +399,11 @@ final class MapTools {
                         + " opened a screen the map does not have, and a hotkey names none. Look at it (describe), "
                         + "go back to " + name + " and try it again with opens, the name it shows.")));
             }
-            return Tried.left(entered.reply().and(opened(context, graph, screen, old, base, look, child,
+            return Tried.left(entered.reply().and(opened(context, graph, screen, field, base, look, pick, child,
                     entered.after())));
         }
         boolean changed = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
-        AgentReply said = noted(services, screen, old, base.did(changed ? Did.IN_PLACE : Did.NONE),
+        AgentReply said = noted(services, screen, field, base.did(changed ? Did.IN_PLACE : Did.NONE),
                 changed ? "changes this screen in place" : "no visible effect", ask);
         return new Tried(up(context, entered.reply().and(changed ? said.and(AgentReply.text("Cut, with screen " + name
                 + ", each new input it shows (another state of a toggle, a tab's buttons): they are untried in turn."))
@@ -417,7 +416,7 @@ final class MapTools {
      * with no marker yet.
      */
     private static Optional<AgentReply> notOn(AgentContext context, ScreenGraph graph, String screen) {
-        GameScreen on = graph.screens().get(screen);
+        MapScreen on = graph.screens().get(screen);
         if (!on.hasMarker()) return Optional.empty();
         String name = graph.shown(screen);
         Optional<ToolReach> reach = ToolReach.of(context);
@@ -482,7 +481,7 @@ final class MapTools {
         } catch (IllegalStateException busy) {
             return said;
         }
-        boolean stays = graph.unfinished(screen) || graph.screen(screen).filter(GameScreen::isPopup).isPresent();
+        boolean stays = graph.unfinished(screen) || graph.screen(screen).filter(MapScreen::isPopup).isPresent();
         Optional<String> to = stays ? Optional.empty()
                 : graph.nextToExplore().filter(c -> !c.equals(screen));
         Optional<ToolReach> reach = ToolReach.of(context);
@@ -505,18 +504,21 @@ final class MapTools {
     }
 
     /** The game's usual close button, the bot's picture {@value #CLOSE}, as a way back with none tries it first. */
-    private static Input close(AgentContext context) {
+    private static Button close(AgentContext context) {
         if (!ActTools.exists(context, CLOSE)) return null;
         try {
-            return FxCall.call(() -> Input.click(ScreenBook.picture(context.services(), CLOSE)));
+            return FxCall.call(() -> Button.of(ScreenBook.picture(context.services(), CLOSE)));
         } catch (IllegalStateException busy) {
             return null;
         }
     }
 
-    /** {@code via} on {@code screen} as a way in, needing the look {@code look} of its button (null: any). */
-    private static Way way(String screen, Input via, State look) {
-        Way way = Way.of(BotConstants.screen(screen), ScreenGraph.bare(via));
+    /**
+     * {@code screen}'s field {@code field} as a way in, through the copy {@code pick} names (null: the first), needing
+     * the look {@code look} of its button (null: any).
+     */
+    private static Way way(String screen, String field, State look, Pick pick) {
+        Way way = Way.of(BotConstants.input(screen, field)).pick(pick);
         return look == null ? way : way.whenLooks(look);
     }
 
@@ -524,13 +526,14 @@ final class MapTools {
     static final String CLOSE = "close_x";
 
     /** {@code base}, which opened a screen the map has not: added below the others, owing its marker. */
-    private static AgentReply opened(AgentContext context, ScreenGraph graph, String screen, Input old, Input base,
-                                     State look, String child, BufferedImage frame) {
+    private static AgentReply opened(AgentContext context, ScreenGraph graph, String screen, String field, Input base,
+                                     State look, Pick pick, String child, BufferedImage frame) {
         StudioServices services = context.services();
         String constant = ScreenBook.constantFor(graph, child);
-        GameScreen made = GameScreen.named(child).from(way(screen, base, look));
+        MapScreen made = MapScreen.of(Setup.named(child).fromWay(way(screen, field, look, pick)));
         // Tried again, what it did before goes: the way it opens is what it does now.
-        Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> replaced(s, old, base.did(null)))
+        Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withInput(field,
+                        base.did(null)))
                 .or(() -> ScreenBook.add(services, constant, made)));
         if (failed.isPresent()) return unwritten(failed.get());
         // A draft: the frame right after the click may be the way there (Firestone's Arena replay kept its VS
@@ -538,7 +541,7 @@ final class MapTools {
         ScreenShots.save(services.resourcesDir(), constant, frame);
         String from = graph.shown(screen);
         return AgentReply.text("Opened " + child + ", added to the map as Screens." + constant + ", reached from "
-                        + from + " by " + base.label() + "; it owes its marker. 🖼 Manage Pictures groups the "
+                        + from + " by " + field + (pick == null ? "" : " " + pick.label()) + "; it owes its marker. 🖼 Manage Pictures groups the "
                         + "pictures it names under it. Before leaving it, "
                         + "from the screenshot below: crop_pictures with screen " + child + " and marker set a part "
                         + "only this screen shows, then with screen " + child + " every input on it (each button, "
@@ -550,69 +553,63 @@ final class MapTools {
     }
 
     /**
-     * {@code base} on {@code screen} led to {@code known}, mapped already: a popup over it, its way back, or another
-     * way into {@code known}, which names {@code screen} once it is declared below it; a screen reached through
-     * {@code known} cannot be named from it, so the input says it leaves.
+     * {@code base}, the field {@code field} of {@code screen}, led to {@code known}, mapped already: a popup over it,
+     * its way back, or another way into {@code known}; a screen above {@code screen} in the tree is no screen it opens,
+     * so the input says it leaves.
      */
-    private static AgentReply reached(StudioServices services, ScreenGraph graph, String screen, Input old, Input base,
-                                      State look, String known) {
+    private static AgentReply reached(StudioServices services, ScreenGraph graph, String screen, String field,
+                                      Input base, State look, Pick pick, String known) {
         String to = graph.shown(known);
-        GameScreen target = graph.screens().get(known);
+        MapScreen target = graph.screens().get(known);
         if (target.isPopup()) {
-            return noted(services, screen, old, base.did(Did.IN_PLACE), "shows the popup " + to, false)
+            return noted(services, screen, field, base.did(Did.IN_PLACE), "shows the popup " + to, false)
                     .and(AgentReply.text(to + " is a popup: close it before the next input."));
         }
         // A popup's way out is its back, whatever it uncovers: a popup is in no tree and names no screen.
         boolean up = graph.screens().get(screen).isPopup() || graph.parent(screen).filter(known::equals).isPresent();
-        Input back = graph.screens().get(screen).back();
-        if (up && back != null && !back.sameAs(base)) {
+        Optional<ScreenGraph.Edge> back = graph.backOf(screen).filter(edge -> edge.via() != null);
+        if (up && back.isPresent() && !graph.isBack(screen, field)) {
             // A Confirm that also goes back is an input of its own: the close button stays the way back (Rooms,
             // 2026-10-15).
-            return noted(services, screen, old, base.did(Did.LEAVES), "leaves for " + to + "; the way back stays "
-                    + back.label(), false);
+            return noted(services, screen, field, base.did(Did.LEAVES), "leaves for " + to + "; the way back stays "
+                    + back.get().label(), false);
         }
         if (up) {
             Optional<String> failed = write(() -> ScreenBook.update(services, screen,
-                    s -> replaced(s, old, null).back(ScreenEdits.untried(base))));
-            return failed.map(MapTools::unwritten).orElseGet(() -> noted(services, screen, base, null,
+                    s -> s.withInput(field, ScreenEdits.untried(base))
+                            .setup(x -> x.back(BotConstants.input(screen, field)))));
+            return failed.map(MapTools::unwritten).orElseGet(() -> noted(services, screen, field, null,
                     "its way back to " + to, false));
         }
-        List<String> order = List.copyOf(graph.screens().keySet());
-        int below = order.indexOf(known);
-        if (graph.dependsOn(screen).contains(known)) {
-            return noted(services, screen, old, base.did(Did.LEAVES), "leaves for " + to + ", which this screen is "
-                    + "reached through, so the map cannot name it from here", false);
+        if (graph.above(screen).contains(known)) {
+            return noted(services, screen, field, base.did(Did.LEAVES), "leaves for " + to + ", which this screen is "
+                    + "reached through", false);
         }
-        // The screen and every screen it is reached through declared below known move above it, in their order, so
-        // known may name the screen (Squads under Engineer, both mapped after Arena squad, 2026-10-16).
-        List<String> moving = order.stream().filter(c -> order.indexOf(c) > below
-                && (c.equals(screen) || graph.dependsOn(screen).contains(c))).toList();
         // A way taken whatever the button looks covers each look; one needing a look covers only that look.
-        boolean already = graph.leads(screen, base).stream().anyMatch(lead -> lead.to().equals(known)
-                && (lead.state() == null || lead.state() == look));
-        Optional<String> failed = write(() -> moving.stream()
-                .map(c -> ScreenBook.moveBefore(services, c, known)).flatMap(Optional::stream).findFirst()
-                .or(() -> ScreenBook.update(services, screen, s -> replaced(s, old, base.did(null))))
-                .or(() -> already ? Optional.empty() : ScreenBook.update(services, known, s -> {
-                    List<Way> ways = new ArrayList<>(s.alsoFrom());
-                    ways.add(way(screen, base, look));
-                    return s.alsoFrom(ways);
-                })));
+        boolean already = graph.leads(screen, field).stream().anyMatch(lead -> lead.to().equals(known)
+                && (lead.state() == null || lead.state() == look) && Objects.equals(lead.pick(), pick));
+        Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withInput(field,
+                        base.did(null)))
+                .or(() -> already ? Optional.empty() : ScreenBook.update(services, known, s -> s.setup(x -> {
+                    List<Way> ways = new ArrayList<>(x.alsoFrom());
+                    ways.add(way(screen, field, look, pick));
+                    return x.alsoFrom(ways);
+                }))));
         if (failed.isPresent()) return unwritten(failed.get());
-        return noted(services, screen, base, null, "opens " + to + ", mapped already: a way into it", false);
+        return noted(services, screen, field, null, "opens " + to + ", mapped already: a way into it", false);
     }
 
     /**
-     * Writes {@code now} in place of {@code old} on {@code screen} (none: nothing written), then says what the
-     * screen still holds; {@code ask} asks, as its last input goes, about inputs never cut.
+     * Writes {@code now} as {@code screen}'s field {@code field} (none: nothing written), then says what the screen
+     * still holds; {@code ask} asks, as its last input goes, about inputs never cut.
      */
-    private static AgentReply noted(StudioServices services, String screen, Input old, Input now, String did,
+    private static AgentReply noted(StudioServices services, String screen, String field, Input now, String did,
                                     boolean ask) {
         if (now != null) {
-            Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> replaced(s, old, now)));
+            Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withInput(field, now)));
             if (failed.isPresent()) return unwritten(failed.get());
         }
-        String what = now != null ? now.label() : old != null ? old.label() : "it";
+        String what = field;
         ScreenGraph graph;
         try {
             graph = FxCall.call(() -> ScreenBook.read(services));
@@ -621,14 +618,14 @@ final class MapTools {
                     + "read again: read_guide says what is left.");
         }
         String name = graph.shown(screen);
-        List<Input> left = graph.untried(screen);
+        List<String> left = graph.untried(screen);
         return AgentReply.text("Noted in " + name + ": tried " + what + ", " + did + "." + (left.isEmpty()
                 ? " Every input cut on it is tried" + graph.shape(screen).map(s -> s == ScreenGraph.Shape.MENU
                 ? ": a menu." : ": an activity.").orElse(".")
                 + (ask ? " Before leaving " + name + ": was every list and panel on it scrolled to both ends "
                 + "(try_input with scroll), every tab opened, every toggle flipped, every arrow paged? Each one "
                 + "that was not: crop_pictures it with screen " + name + " and try it." : "")
-                : " Untried: " + ScreenGraph.labels(left) + "."));
+                : " Untried: " + String.join(", ", left) + "."));
     }
 
     /** Where crop_pictures notes a cut: a screen of the map, or the one it starts; else why it cannot. */
@@ -650,7 +647,7 @@ final class MapTools {
         if (found.isPresent()) {
             boolean becomes = marker && popup && !graph.screens().get(found.get()).isPopup();
             List<String> after = graph.screens().keySet().stream()
-                    .filter(c -> !c.equals(found.get()) && graph.dependsOn(c).contains(found.get())).toList();
+                    .filter(c -> !c.equals(found.get()) && graph.opensFrom(c).contains(found.get())).toList();
             if (becomes && !after.isEmpty()) {
                 return Placing.refused(graph.shown(found.get()) + " cannot be a popup: " + String.join(", ",
                         after.stream().map(graph::shown).toList()) + " is reached from it, and a popup opens on its "
@@ -658,7 +655,7 @@ final class MapTools {
             }
             return new Placing(found.get(), graph.shown(found.get()), false, becomes, null);
         }
-        boolean first = graph.screens().values().stream().allMatch(GameScreen::isPopup);
+        boolean first = graph.screens().values().stream().allMatch(MapScreen::isPopup);
         if (marker && (popup || first)) {
             return new Placing(ScreenBook.constantFor(graph, typed), typed, true, popup, null);
         }
@@ -743,7 +740,7 @@ final class MapTools {
                 constant.get(), now);
         if (clash.isEmpty()) return "";
         Optional<String> failed = FxCall.call(() -> ScreenBook.update(services, constant.get(),
-                s -> s.markers(before.shown()).absent(before.absent())));
+                s -> s.setup(x -> x.markers(before.shown()).absent(before.absent()))));
         String name = graph.shown(constant.get());
         return " But " + clashSaid(graph, constant.get(), now, clash.get()) + (failed.isPresent() ? " Putting " + name
                 + "'s markers back failed: " + failed.get() : " " + name + " keeps " + before.said() + "; the "
@@ -779,15 +776,16 @@ final class MapTools {
             return FxCall.call(() -> {
                 ImageTemplate cut = ScreenBook.picture(services, picture);
                 if (at.starts()) {
-                    GameScreen screen = GameScreen.named(at.name()).markers(List.of(cut));
-                    Optional<String> failed = ScreenBook.add(services, at.constant(), at.popup() ? screen.popup() : screen);
+                    Setup setup = Setup.named(at.name()).markers(List.of(cut));
+                    Optional<String> failed = ScreenBook.add(services, at.constant(),
+                            MapScreen.of(at.popup() ? setup.popup() : setup));
                     return failed.map(why -> " It could not be added to the map: " + why).orElse(" Added "
                             + at.name() + " to the map as Screens." + at.constant() + ", this its marker" + (at.popup()
                             ? "; a popup, closed by Escape until its close button is cut with back true."
                             : ": the map's first screen. Cut every input on it with screen " + at.name() + "."));
                 }
                 ScreenGraph graph = ScreenBook.read(services);
-                GameScreen screen = graph.screens().get(at.constant());
+                MapScreen screen = graph.screens().get(at.constant());
                 if (screen == null) return " " + at.name() + " is no longer in the map, so it was not noted.";
                 Markers set = Markers.of(screen);
                 if (mark == Mark.ABSENT && set.shown().stream().anyMatch(p -> p.id().equals(cut.id()))) {
@@ -801,23 +799,25 @@ final class MapTools {
                 if (marker && now.same(set)) return " " + at.name() + " is told by " + set.said() + " already.";
                 // A set replaced by one picture is said: it loses what told the screen apart.
                 String was = mark == Mark.SET && set.any() ? set.ids() : null;
-                Optional<Input> lookOf = screen.allInputs().stream()
-                        .filter(i -> i.variants().stream().anyMatch(v -> v.picture().id().equals(cut.id()))).findFirst();
-                if (lookOf.isPresent()) return " " + at.name() + " has it as a look of " + lookOf.get().label() + ".";
-                Optional<Input> had = screen.allInputs().stream()
-                        .filter(i -> i.picture() != null && i.picture().id().equals(cut.id())).findFirst();
+                Optional<String> lookOf = screen.inputs().entrySet().stream()
+                        .filter(e -> e.getValue() instanceof Button b && b.looks().stream()
+                                .anyMatch(v -> v.picture().id().equals(cut.id())))
+                        .map(Map.Entry::getKey).findFirst();
+                if (lookOf.isPresent()) return " " + at.name() + " has it as a look of " + lookOf.get() + ".";
+                Optional<String> had = buttonOf(screen, cut);
                 boolean says = look.when() != null;
-                if (!marker && !back && had.isPresent() && (!sometimes || had.get().comesAndGoes() && !says)) {
+                if (!marker && !back && had.isPresent()
+                        && (!sometimes || screen.inputs().get(had.get()).comesAndGoes() && !says)) {
                     return " " + at.name() + " has it as an input already.";
                 }
-                // A way back is no input to try, and an input seen to come and go is marked so in place.
+                // An input seen to come and go is marked so in place.
                 Optional<String> failed = ScreenBook.update(services, at.constant(), s -> marker
-                        ? at.popup() ? s.markers(now.shown()).absent(now.absent()).popup()
-                        : s.markers(now.shown()).absent(now.absent())
-                        : back ? replaced(s, had.orElse(null), null).back(Input.click(cut))
-                        : had.isPresent() ? replaced(s, had.get(), brought(had.get().sometimes(), look))
-                        : s.inputs(added(s.inputs(), sometimes ? brought(Input.click(cut).sometimes(), look)
-                        : Input.click(cut))));
+                        ? s.setup(x -> at.popup() ? x.markers(now.shown()).absent(now.absent()).popup()
+                        : x.markers(now.shown()).absent(now.absent()))
+                        : back ? asBack(s, at.constant(), had.orElse(null), cut)
+                        : had.isPresent() ? s.withInput(had.get(), brought(s.inputs().get(had.get()).sometimes(), look))
+                        : s.withInput(s.fieldFor(cut.id()), sometimes ? brought(Button.of(cut).sometimes(), look)
+                        : Button.of(cut)));
                 if (failed.isPresent()) return " It could not be noted in " + at.name() + ": " + failed.get();
                 String popup = at.popup() ? "; a popup now, apart from the map's tree, closed on the way" : "";
                 return " Noted in " + at.name() + (mark == Mark.SET ? " as its marker" + (was == null || was.equals(
@@ -832,6 +832,24 @@ final class MapTools {
         }
     }
 
+    /**
+     * {@code screen} with {@code cut}, its button {@code field} (null: a new one), as its way back: a field of its own,
+     * untried, that its setup names.
+     */
+    private static MapScreen asBack(MapScreen screen, String constant, String field, ImageTemplate cut) {
+        String name = field != null ? field : screen.fieldFor(cut.id());
+        Input button = field != null ? ScreenEdits.untried(screen.inputs().get(field)) : Button.of(cut);
+        return screen.withInput(name, button).setup(x -> x.back(BotConstants.input(constant, name)));
+    }
+
+    /** The field of {@code screen}'s button clicking {@code picture}; empty when it has none. */
+    private static Optional<String> buttonOf(MapScreen screen, ImageTemplate picture) {
+        return screen.inputs().entrySet().stream()
+                .filter(e -> e.getValue() instanceof Button b && b.picture() != null
+                        && b.picture().id().equals(picture.id()))
+                .map(Map.Entry::getKey).findFirst();
+    }
+
     /** {@code input} with the method saying when it is there, as {@code look} names it; none keeps what it had. */
     private static Input brought(Input input, Look look) {
         return look.when() == null ? input : input.when(ScreenTypes.condition(look.when()));
@@ -843,19 +861,22 @@ final class MapTools {
         try {
             return FxCall.call(() -> {
                 ImageTemplate cut = ScreenBook.picture(services, picture);
-                GameScreen screen = ScreenBook.read(services).screens().get(at.constant());
+                MapScreen screen = ScreenBook.read(services).screens().get(at.constant());
                 if (screen == null) return " " + at.name() + " is no longer in the map, so it was not noted.";
-                Optional<Input> of = screen.allInputs().stream().filter(i -> i.looks().stream()
-                        .anyMatch(v -> v.picture().id().equalsIgnoreCase(look.variantOf().strip()))).findFirst();
+                Optional<String> of = screen.inputs().entrySet().stream()
+                        .filter(e -> e.getValue() instanceof Button b && b.allLooks().stream()
+                                .anyMatch(v -> v.picture().id().equalsIgnoreCase(look.variantOf().strip())))
+                        .map(Map.Entry::getKey).findFirst();
                 if (of.isEmpty()) {
                     return " " + at.name() + " has no input " + look.variantOf() + ": cut that button with screen "
                             + at.name() + " first, then this as its look.";
                 }
-                Input now = of.get().withVariant(Variant.of(cut, look.state()));
-                Optional<String> failed = ScreenBook.update(services, at.constant(), s -> replaced(s, of.get(), now));
+                Button now = ((Button) screen.inputs().get(of.get()))
+                        .withLook(com.botmaker.sdk.api.screens.Look.of(cut, look.state()));
+                Optional<String> failed = ScreenBook.update(services, at.constant(), s -> s.withInput(of.get(), now));
                 if (failed.isPresent()) return " It could not be noted in " + at.name() + ": " + failed.get();
                 String label = look.state().id();
-                return " Noted in " + at.name() + " as the " + label + " look of " + of.get().label() + ": one input, "
+                return " Noted in " + at.name() + " as the " + label + " look of " + of.get() + ": one input, "
                         + "found by any of its looks" + (look.state() == State.DISABLED ? ", never pressed while it "
                         + "looks so." : ". When this look leads elsewhere, try_input it by this picture: the way it "
                         + "opens names the look.");
@@ -878,16 +899,25 @@ final class MapTools {
         try {
             return FxCall.call(() -> {
                 ImageTemplate cut = ScreenBook.picture(services, picture);
-                GameScreen screen = ScreenBook.read(services).screens().get(at.constant());
+                MapScreen screen = ScreenBook.read(services).screens().get(at.constant());
                 if (screen == null) return " " + at.name() + " is no longer in the map, so it was not noted.";
                 ScreenVariant was = screen.variants().stream().filter(v -> v.name().equalsIgnoreCase(name)).findFirst()
                         .orElse(ScreenVariant.named(name));
-                Input input = sometimes ? brought(Input.click(cut).sometimes(), look) : Input.click(cut);
+                // An input only the look shows is a field of the screen, the look naming it.
+                Input input = sometimes ? brought(Button.of(cut).sometimes(), look) : Button.of(cut);
+                String field = buttonOf(screen, cut).orElseGet(() -> screen.fieldFor(cut.id()));
                 Markers set = marker ? marked(Markers.of(was), mark, cut) : Markers.of(was);
                 ScreenVariant told = was.markers(set.shown()).absent(set.absent());
                 ScreenVariant marked = look.when() == null ? told : told.when(ScreenTypes.condition(look.when()));
-                ScreenVariant now = marker ? marked : was.inputs(added(was.inputs(), input));
-                Optional<String> failed = ScreenBook.update(services, at.constant(), s -> s.withVariant(now));
+                List<Input> named = new ArrayList<>(was.inputs());
+                if (!named.contains(BotConstants.input(at.constant(), field))) {
+                    named.add(BotConstants.input(at.constant(), field));
+                }
+                ScreenVariant now = marker ? marked : was.inputs(named);
+                Optional<String> failed = ScreenBook.update(services, at.constant(), s -> {
+                    MapScreen looked = s.setup(x -> x.withVariant(now));
+                    return marker ? looked : looked.withInput(field, s.input(field).orElse(input));
+                });
                 if (failed.isPresent()) return " It could not be noted in " + at.name() + ": " + failed.get();
                 return " Noted in " + at.name() + "'s look " + was.name() + (marker ? " as what tells it apart, "
                         + set.said() + (look.when() == null ? "." : ", shown while " + look.when() + " answers true.")
@@ -911,40 +941,31 @@ final class MapTools {
                     : ScreenBook.find(graph, mistake.screen().strip());
             if (found.isEmpty()) return AgentReply.refused("No screen " + mistake.screen() + " in the bot's Screens.");
             String constant = found.get();
-            GameScreen screen = graph.screens().get(constant);
-            record Entrance(String from, Input via) {}
-            List<Way> ways = new ArrayList<>();
-            if (screen.from() != null) ways.add(screen.from());
-            ways.addAll(screen.alsoFrom());
-            List<Entrance> entrances = new ArrayList<>();
-            for (Way way : ways) {
-                Optional<String> from = graph.constantOf(way.from()).filter(c -> !c.equals(constant));
-                if (way.via() != null && from.isPresent()) entrances.add(new Entrance(from.get(), way.via()));
-            }
+            MapScreen screen = graph.screens().get(constant);
+            List<BotConstants.InputName> entrances = screen.ways().stream().map(way -> graph.nameOf(way.via()))
+                    .flatMap(Optional::stream).filter(n -> !n.screen().equals(constant)).toList();
             if (screen.isPopup() || entrances.isEmpty()) {
                 return AgentReply.refused(graph.shown(constant) + " was not opened by an input: nothing to take back.");
             }
             List<String> after = graph.screens().keySet().stream()
-                    .filter(c -> !c.equals(constant) && graph.dependsOn(c).contains(constant)).toList();
+                    .filter(c -> !c.equals(constant) && graph.opensFrom(c).contains(constant)).toList();
             if (!after.isEmpty()) {
                 return AgentReply.refused(String.join(", ", after.stream().map(graph::shown).toList())
                         + " is reached from " + graph.shown(constant) + ": it stays.");
             }
             Optional<String> failed = FxCall.call(() -> {
                 Optional<String> refused = ScreenBook.remove(services, constant);
-                for (Entrance in : entrances) {
+                for (BotConstants.InputName in : entrances) {
                     if (refused.isPresent()) break;
-                    refused = ScreenBook.update(services, in.from(), s -> s.allInputs().stream()
-                            .filter(in.via()::sameAs).findFirst()
-                            .map(held -> replaced(s, held, held.did(Did.IN_PLACE)))
-                            .orElseGet(() -> s.inputs(added(s.inputs(), ScreenGraph.bare(in.via()).did(Did.IN_PLACE)))));
+                    refused = ScreenBook.update(services, in.screen(), s -> s.input(in.field())
+                            .map(held -> s.withInput(in.field(), held.did(Did.IN_PLACE))).orElse(s));
                 }
                 return refused;
             });
             if (failed.isPresent()) return unwritten(failed.get());
             ScreenShots.remove(services.resourcesDir(), constant);
             return AgentReply.text(graph.shown(constant) + " is off the map; " + String.join(", ", entrances.stream()
-                    .map(in -> in.via().label() + " is noted in " + graph.shown(in.from())).toList())
+                    .map(in -> in.field() + " is noted in " + graph.shown(in.screen())).toList())
                     + " as changing it in place.");
         } catch (IllegalStateException busy) {
             return AgentReply.refused("Studio did not hand over the bot's Screens: " + busy.getMessage());
@@ -960,25 +981,25 @@ final class MapTools {
                                     List<String> sometimes, List<String> noted) {
         if (back == null && inputs.isEmpty() && sometimes.isEmpty()) return Optional.empty();
         return FxCall.call(() -> ScreenBook.update(services, at.constant(), s -> {
-            GameScreen now = s;
+            MapScreen now = s;
             if (back != null) {
                 ImageTemplate cut = ScreenBook.picture(services, back);
-                now = replaced(now, input(now, cut).orElse(null), null).back(Input.click(cut));
+                now = asBack(now, at.constant(), buttonOf(now, cut).orElse(null), cut);
                 noted.add(back + ": its way back");
             }
             for (String picture : inputs) {
                 ImageTemplate cut = ScreenBook.picture(services, picture);
-                if (input(now, cut).isPresent()) noted.add(picture + ": an input already");
+                if (buttonOf(now, cut).isPresent()) noted.add(picture + ": an input already");
                 else {
-                    now = now.inputs(added(now.inputs(), Input.click(cut)));
+                    now = now.withInput(now.fieldFor(cut.id()), Button.of(cut));
                     noted.add(picture + ": untried");
                 }
             }
             for (String picture : sometimes) {
                 ImageTemplate cut = ScreenBook.picture(services, picture);
-                Optional<Input> had = input(now, cut);
-                now = had.isPresent() ? replaced(now, had.get(), had.get().sometimes())
-                        : now.inputs(added(now.inputs(), Input.click(cut).sometimes()));
+                Optional<String> had = buttonOf(now, cut);
+                now = had.isPresent() ? now.withInput(had.get(), now.inputs().get(had.get()).sometimes())
+                        : now.withInput(now.fieldFor(cut.id()), Button.of(cut).sometimes());
                 noted.add(picture + ": comes and goes");
             }
             return now;
@@ -1114,7 +1135,7 @@ final class MapTools {
      * screen has looks and none matches, that this may be a new one to cut. Blank for a screen with no looks.
      */
     private static String looks(ScreenGraph graph, String constant, ScreenWalk walk, BufferedImage frame) {
-        GameScreen screen = graph.screens().get(constant);
+        MapScreen screen = graph.screens().get(constant);
         if (screen.variants().isEmpty()) return "";
         return walk.lookOn(constant, frame).map(v -> " It looks as " + v.name() + ".")
                 .orElse(" None of its looks' markers shows (" + String.join(", ", screen.variants().stream()
@@ -1129,7 +1150,7 @@ final class MapTools {
     private static void retakeShot(AgentContext context, ToolReach reach, ScreenGraph graph, String constant) {
         Path resources = context.services().resourcesDir();
         if (resources == null || RETAKEN.contains(resources.resolve(constant))) return;
-        if (graph.screen(constant).filter(GameScreen::hasMarker).isEmpty()) return;
+        if (graph.screen(constant).filter(MapScreen::hasMarker).isEmpty()) return;
         // Only a frame its markers show on: the walk's last frame may still be the way there.
         Optional<BufferedImage> frame = reach.look().filter(f -> ScreenFit.shows(reach, graph, constant, f));
         // Once a session: each arrival wrote a 1–3 MB shot of an animated game, a new file the next Project History
@@ -1210,97 +1231,51 @@ final class MapTools {
     }
 
     /**
-     * The input of {@code on} this try is: the key's, the picture's click, or for a scroll the one of those notches,
-     * else the picture's untried click, which the scroll then stands for. A copy {@code match} (from 1; 0 for the best
-     * match) is that copy's input, else the picture's untried input cut once for all its copies, which the copy then
-     * stands for.
+     * The field of {@code on} this try is: the key's, the picture's button (by any of its looks), or for a scroll the
+     * strip over that picture by those notches, else the picture's untried button, which the scroll then stands for.
      */
-    private static Optional<Input> held(GameScreen on, String picture, Key key, int notches, int match,
-                                        ScreenGraph graph, String screen) {
+    private static Optional<String> held(MapScreen on, String picture, Key key, int notches, ScreenGraph graph,
+                                         String screen) {
+        Map<String, Input> all = on.inputs();
         if (key != null) {
-            return on.allInputs().stream().filter(i -> i.act() == Input.Act.KEY && i.key() == key).findFirst();
+            return all.entrySet().stream().filter(e -> e.getValue() instanceof Hotkey h && h.key() == key)
+                    .map(Map.Entry::getKey).findFirst();
         }
-        Optional<Input> copy = held(on.allInputs().stream().filter(i -> i.nth() == match).toList(), picture,
-                notches, graph, screen);
-        return match == 0 || copy.isPresent() ? copy : held(on.allInputs().stream()
-                .filter(i -> i.nth() == 0 && !i.every() && !graph.tried(screen, i)).toList(), picture, notches,
-                graph, screen);
-    }
-
-    /** {@link #held(GameScreen, String, Key, int, int, ScreenGraph, String)} of a picture among {@code all}. */
-    private static Optional<Input> held(List<Input> all, String picture, int notches, ScreenGraph graph,
-                                        String screen) {
-        List<Input> same = all.stream()
-                .filter(i -> i.picture() != null && i.picture().id().equalsIgnoreCase(picture)).toList();
-        // A button's other look is that button: clicking its badge copy tries the same input.
+        Optional<String> button = all.entrySet().stream()
+                .filter(e -> e.getValue() instanceof Button b && b.picture() != null
+                        && b.picture().id().equalsIgnoreCase(picture))
+                .map(Map.Entry::getKey).findFirst();
         if (notches == 0) {
-            return same.stream().filter(i -> i.act() == Input.Act.CLICK).findFirst()
-                    .or(() -> all.stream().filter(i -> i.act() == Input.Act.CLICK)
-                            .filter(i -> i.variants().stream().anyMatch(v -> v.picture().id().equalsIgnoreCase(picture)))
-                            .findFirst());
+            // A button's other look is that button: clicking its badge copy tries the same input.
+            return button.or(() -> all.entrySet().stream()
+                    .filter(e -> e.getValue() instanceof Button b && b.looks().stream()
+                            .anyMatch(v -> v.picture().id().equalsIgnoreCase(picture)))
+                    .map(Map.Entry::getKey).findFirst());
         }
-        return same.stream().filter(i -> i.act() == Input.Act.SCROLL && i.notches() == notches).findFirst()
-                .or(() -> same.stream().filter(i -> i.act() == Input.Act.CLICK && !graph.tried(screen, i)).findFirst());
+        return all.entrySet().stream()
+                .filter(e -> e.getValue() instanceof Strip s && !s.members().isEmpty()
+                        && s.members().getFirst().id().equalsIgnoreCase(picture)
+                        && s.scroll() != null && s.scroll().notches() == notches)
+                .map(Map.Entry::getKey).findFirst()
+                .or(() -> button.filter(f -> !graph.tried(screen, f)));
     }
 
     /**
-     * The input to record: {@code held} as it is, a click it stood for made a scroll (what was said of the click kept:
-     * its kind, looks, coming and going), or a new one.
+     * The input to record: {@code held} as it is, a button it stood for made a strip over its picture (what was said
+     * of the button kept: its purpose, coming and going), or a new one.
      */
     private static Input made(StudioServices services, Optional<Input> held, String picture, Key key, int notches) {
-        if (held.isPresent() && (notches == 0 || held.get().act() == Input.Act.SCROLL)) return held.get();
-        if (key != null) return Input.key(key);
+        if (held.isPresent() && (notches == 0 || held.get() instanceof Strip)) return held.get();
+        if (key != null) return Hotkey.of(key);
         ImageTemplate cut = FxCall.call(() -> ScreenBook.picture(services, picture));
-        if (notches == 0) return Input.click(cut);
-        return held.map(click -> new Input(Input.Act.SCROLL, cut, null, notches, null, click.kind(), null,
-                click.comesAndGoes(), null, click.variants(), click.when(), click.nth(), click.every()))
-                .orElse(Input.scroll(cut, notches));
+        if (notches == 0) return Button.of(cut);
+        Strip strip = Strip.of(Scroll.wheel(notches), List.of(cut));
+        return held.map(button -> (Input) new Strip(strip.scroll(), strip.members(), null, button.purpose(), null,
+                button.comesAndGoes(), null, button.when())).orElse(strip);
     }
 
-    private static Input kinded(Input input, Optional<Kind> kind) {
-        return kind.map(input::kind).orElse(input);
-    }
-
-    /** {@code screen} with {@code once}, an input of a picture shown {@code count} times, as one input per copy. */
-    private static GameScreen copies(GameScreen screen, Input once, int count) {
-        GameScreen now = replaced(screen, once, once.nth(1));
-        for (int n = 2; n <= count; n++) now = replaced(now, null, once.nth(n));
-        return now;
-    }
-
-    /** {@code screen} with {@code now} where {@code old} was, added when {@code old} is not on it, gone when null. */
-    static GameScreen replaced(GameScreen screen, Input old, Input now) {
-        // An input of one of the screen's looks is changed in that look.
-        for (ScreenVariant look : screen.variants()) {
-            int in = old == null ? -1 : look.inputs().indexOf(old);
-            if (in < 0) continue;
-            List<Input> theirs = new ArrayList<>(look.inputs());
-            if (now == null) theirs.remove(in);
-            else theirs.set(in, now);
-            return screen.withVariant(look.inputs(theirs));
-        }
-        List<Input> inputs = new ArrayList<>(screen.inputs());
-        int at = old == null ? -1 : inputs.indexOf(old);
-        if (at >= 0 && now == null) {
-            inputs.remove(at);
-            // An input taken off is off its list too.
-            if (old.picture() != null) return screen.inputs(inputs)
-                    .lists(ScreenGraph.withoutMember(screen.lists(), old.picture().id()));
-        } else if (at >= 0) inputs.set(at, now);
-        else if (now != null && inputs.stream().noneMatch(now::equals)) inputs.add(now);
-        return screen.inputs(inputs);
-    }
-
-    /** {@code screen}'s input clicking or scrolling {@code picture}, its looks' too, if it has one. */
-    private static Optional<Input> input(GameScreen screen, ImageTemplate picture) {
-        return screen.allInputs().stream().filter(i -> i.picture() != null && i.picture().id().equals(picture.id()))
-                .findFirst();
-    }
-
-    private static List<Input> added(List<Input> inputs, Input input) {
-        List<Input> all = new ArrayList<>(inputs);
-        all.add(input);
-        return all;
+    private static Input purposed(Input input, Optional<Purpose> purpose) {
+        return purpose.map(input::purpose).orElse(input);
     }
 
     /** A write's failure, Studio's own refusal or its being busy; empty when written. */
@@ -1336,9 +1311,9 @@ final class MapTools {
      * or a click whose picture names no new screen ({@code close_x}, or a screen the map has).
      */
     static boolean asksWhatItOpens(ScreenGraph graph, String screen, Input input) {
-        if (input.act() == Input.Act.SCROLL || input.never() != null || input.lock() != null) return false;
-        if (input.picture() == null) return true;
-        String child = nameFrom(input.picture().id(), graph.shown(screen));
+        if (input instanceof Strip || input.never() != null || input.lock() != null) return false;
+        if (!(input instanceof Button button) || button.picture() == null) return true;
+        String child = nameFrom(button.picture().id(), graph.shown(screen));
         return !isName(child) || ScreenBook.find(graph, child).isPresent();
     }
 

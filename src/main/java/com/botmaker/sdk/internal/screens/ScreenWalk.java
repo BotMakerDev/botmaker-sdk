@@ -2,11 +2,11 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
@@ -61,7 +61,7 @@ public final class ScreenWalk {
     private final Reach reach;
     private final long stepMs;
     private final Consumer<String> reached;
-    private final Input close;
+    private final Button close;
     /** Whether {@link #go} clears an overlay the map lacks: a run's walks do, the assistant's leave it to the user. */
     private final boolean uncovers;
 
@@ -77,11 +77,11 @@ public final class ScreenWalk {
     }
 
     /** As above; a way back with no input clicks {@code close}, the game's usual close button, while it shows. */
-    public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Input close) {
+    public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Button close) {
         this(graph, reach, stepMs, reached, close, false);
     }
 
-    private ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Input close,
+    private ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Button close,
                        boolean uncovers) {
         this.graph = graph;
         this.reach = reach;
@@ -201,7 +201,7 @@ public final class ScreenWalk {
     }
 
     private Result walk(String target, String near) {
-        Optional<GameScreen> goal = graph.screen(target);
+        Optional<MapScreen> goal = graph.screen(target);
         if (goal.isEmpty()) {
             return new Result(Outcome.MISSING, near, List.of(), target + " is not in the bot's screen map.");
         }
@@ -280,7 +280,7 @@ public final class ScreenWalk {
             strayed.add(next);
             if (strayed.size() > MOST_REPLANS) {
                 return new Result(Outcome.STUCK, at, walked, graph.shown(next.to()) + " did not show after "
-                        + label(next) + " on " + graph.shown(from) + "; " + strayed.size() + " steps landed elsewhere.");
+                        + next.label() + " on " + graph.shown(from) + "; " + strayed.size() + " steps landed elsewhere.");
             }
         }
         return new Result(Outcome.STUCK, at, walked, "No way to " + graph.shown(target) + " in " + most + " steps.");
@@ -301,16 +301,16 @@ public final class ScreenWalk {
         // Further on, what comes and goes is planned with only when nothing else is open: planned first, Home's
         // Tavern icon pulled a walk on Town back to Home, which found it gone and went to Town again.
         if (!edge.from().equals(at)) return search || !via.comesAndGoes();
-        if (via.act() == Input.Act.KEY) return true;
-        boolean searched = listOf(edge).isPresent() && (search || !via.comesAndGoes());
-        if (edge.state() == null && via.variants().isEmpty()) {
-            // One a list scrolls to is looked for by the click, which scrolls first.
-            return !via.comesAndGoes() || searched || reach.seen(via, frame).isPresent();
+        if (!(via instanceof Button button)) return true;
+        Optional<Strip> strip = stripOf(edge);
+        boolean searched = strip.isPresent() && (search || !via.comesAndGoes());
+        if (edge.state() == null && button.looks().isEmpty()) {
+            // One a strip scrolls to is looked for by the click, which scrolls first.
+            return !via.comesAndGoes() || searched || reach.seen(button, null, edge.pick(), frame).isPresent();
         }
-        Optional<ScreenList> list = listOf(edge);
-        Optional<Reach.Seen> seen = reach.seen(via, list.orElse(null), frame);
+        Optional<Reach.Seen> seen = reach.seen(button, strip.orElse(null), edge.pick(), frame);
         // A member out of view is looked at once the click scrolls to it.
-        if (seen.isEmpty()) return searched || list.isEmpty() && !via.comesAndGoes() && edge.state() == null;
+        if (seen.isEmpty()) return searched || strip.isEmpty() && !via.comesAndGoes() && edge.state() == null;
         if (seen.get().state() == State.DISABLED) return false;
         return edge.state() == null || edge.state() == seen.get().state();
     }
@@ -345,13 +345,12 @@ public final class ScreenWalk {
             if (close == null || !reach.perform(close, frame)) reach.key(Key.ESCAPE);
             return true;
         }
-        return reach.perform(edge.via(), listOf(edge).orElse(null), frame);
+        return reach.perform(edge.via(), stripOf(edge).orElse(null), edge.pick(), frame);
     }
 
-    /** The list of the screen {@code edge} leaves that its input is a member of; empty for one at its place. */
-    private Optional<ScreenList> listOf(ScreenGraph.Edge edge) {
-        GameScreen from = graph.screens().get(edge.from());
-        return from == null ? Optional.empty() : from.listOf(edge.via());
+    /** The strip of the screen {@code edge} leaves that its input is a member of; empty for one at its place. */
+    private Optional<Strip> stripOf(ScreenGraph.Edge edge) {
+        return graph.screen(edge.from()).flatMap(from -> from.stripOf(edge.via()));
     }
 
     /**
@@ -361,7 +360,7 @@ public final class ScreenWalk {
      * {@code alsoFrom}) closes back to that one, which the walk reads from the next look (2026-10-15).
      */
     private boolean arrives(ScreenGraph.Edge edge) {
-        GameScreen screen = graph.screens().get(edge.to());
+        MapScreen screen = graph.screens().get(edge.to());
         Markers left = Markers.of(graph.screens().get(edge.from()));
         Markers shows = edge.back() ? left : Markers.of(screen);
         if (!shows.any()) {
@@ -418,9 +417,9 @@ public final class ScreenWalk {
 
     /** The look once {@code popup} is closed: its way out, then Escape when it stays. */
     private Optional<BufferedImage> close(String popup, BufferedImage frame) {
-        GameScreen screen = graph.screens().get(popup);
-        Markers shows = Markers.of(screen);
-        boolean escaped = screen.back() == null || !reach.perform(screen.back(), frame);
+        Markers shows = Markers.of(graph.screens().get(popup));
+        ScreenGraph.Edge back = graph.backOf(popup).orElseThrow();
+        boolean escaped = back.via() == null || !reach.perform(back.via(), frame);
         if (escaped) reach.key(Key.ESCAPE);
         Optional<BufferedImage> after = gone(shows);
         if (after.isEmpty() && !escaped) {
@@ -429,7 +428,7 @@ public final class ScreenWalk {
         }
         if (after.isPresent()) return after;
         throw new Stayed(graph.shown(popup) + " stayed after " + (escaped ? "Escape"
-                : screen.back().label() + " and Escape") + ".");
+                : back.label() + " and Escape") + ".");
     }
 
     /** The first look within a step's time that no longer shows {@code shows}; empty when it stays. */
@@ -460,8 +459,8 @@ public final class ScreenWalk {
                 || popupOn(frame).isPresent()) {
             return Optional.empty();
         }
-        List<Input> closes = closeButtons();
-        List<Optional<Rect>> found = reach.findEach(closes.stream().map(Input::picture).toList(), frame);
+        List<Button> closes = closeButtons();
+        List<Optional<Rect>> found = reach.findEach(closes.stream().map(Button::picture).toList(), frame);
         for (int i = 0; i < closes.size(); i++) {
             if (found.get(i).isEmpty()) continue;
             reach.click(reach.pointOn(found.get(i).get()));
@@ -481,16 +480,18 @@ public final class ScreenWalk {
     }
 
     /** The map's close buttons: the usual one, then every way back that clicks a picture, each picture once. */
-    private List<Input> closeButtons() {
-        List<Input> closes = new ArrayList<>();
+    private List<Button> closeButtons() {
+        List<Button> closes = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         List<Input> backs = new ArrayList<>();
         if (close != null) backs.add(close);
-        graph.screens().values().forEach(s -> {
-            if (s.back() != null) backs.add(s.back());
-        });
+        for (String constant : graph.screens().keySet()) {
+            graph.backOf(constant).map(ScreenGraph.Edge::via).ifPresent(backs::add);
+        }
         for (Input back : backs) {
-            if (back.act() == Input.Act.CLICK && back.picture() != null && seen.add(back.picture().id())) closes.add(back);
+            if (back instanceof Button button && button.picture() != null && seen.add(button.picture().id())) {
+                closes.add(button);
+            }
         }
         return closes;
     }
@@ -508,7 +509,7 @@ public final class ScreenWalk {
 
     /** Which look of {@code constant} {@code frame} shows: the first whose markers show; empty for none. */
     public Optional<ScreenVariant> lookOn(String constant, BufferedImage frame) {
-        GameScreen screen = graph.screens().get(constant);
+        MapScreen screen = graph.screens().get(constant);
         if (screen == null) return Optional.empty();
         List<ScreenVariant> told = screen.variants().stream().filter(ScreenVariant::hasMarker).toList();
         List<Boolean> on = Markers.onEach(reach, told.stream().map(Markers::of).toList(), frame);
@@ -535,11 +536,7 @@ public final class ScreenWalk {
         return shown;
     }
 
-    private static String label(ScreenGraph.Edge edge) {
-        return edge.via() == null ? "the way back" : edge.via().label();
-    }
-
     private static String labels(Set<ScreenGraph.Edge> edges) {
-        return String.join(", ", edges.stream().map(ScreenWalk::label).toList());
+        return String.join(", ", edges.stream().map(ScreenGraph.Edge::label).toList());
     }
 }

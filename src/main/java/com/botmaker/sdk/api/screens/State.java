@@ -3,7 +3,7 @@ package com.botmaker.sdk.api.screens;
 import java.util.Locale;
 
 /**
- * How a button looks at a moment, one {@link Variant} each: the same button with a badge, greyed out, or picked. A
+ * How a button looks at a moment, one {@link Look} each: the same button with a badge, greyed out, or picked. A
  * {@link Way} can need one ({@link Way#whenLooks}), so a button leads where its look says.
  */
 public enum State {

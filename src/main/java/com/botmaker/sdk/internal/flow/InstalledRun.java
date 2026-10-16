@@ -67,9 +67,11 @@ public final class InstalledRun {
     public static Runnable home() {
         if (current.home() != null) return current.home();
         ScreenGraph map = ScreenMaps.installed();
-        return map.root().flatMap(map::screen).<Runnable>map(root -> () -> {
-            if (!Navigate.to(root)) throw new BotStuckException("The run could not walk home to " + root.name() + ".");
-        }).orElse(null);
+        return map.root().flatMap(root -> map.instance(root).<Runnable>map(screen -> () -> {
+            if (!Navigate.to(screen)) {
+                throw new BotStuckException("The run could not walk home to " + map.shown(root) + ".");
+            }
+        })).orElse(null);
     }
 
     /** The flow being walked, or {@link Flow#NONE}. Never {@code null}. */

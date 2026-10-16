@@ -1,10 +1,11 @@
 package com.botmaker.sdk.plugin.pictures;
 
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.MapFixtures;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import org.junit.jupiter.api.Test;
 
@@ -39,13 +40,13 @@ class ScreenGroupsTest {
 
     @Test
     void eachScreenGroupsThePicturesItsMarkerAndInputsNameAndAPictureMayBeUnderTwo() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
-                .inputs(List.of(Input.click(picture("campaign_title")), Input.click(picture("close_x")))));
-        screens.put("CAMPAIGN", GameScreen.named("Campaign").markers(marks("campaign_title"))
-                .from(Way.of(BotConstants.screen("HOME"), Input.click(picture("campaign_title"))))
-                .back(Input.click(picture("close_x"))));
-        screens.put("ENGINEER", GameScreen.named("Engineer"));
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("home")),
+                Button.of(picture("campaign_title")), Button.of(picture("close_x"))));
+        screens.put("CAMPAIGN", MapFixtures.screen(Setup.named("Campaign").markers(marks("campaign_title"))
+                .from(BotConstants.input("HOME", "campaign_title")).back(BotConstants.input("CAMPAIGN", "close_x")),
+                Button.of(picture("close_x"))));
+        screens.put("ENGINEER", MapScreen.of(Setup.named("Engineer")));
 
         Map<String, List<Path>> groups = ScreenGroups.groups(ScreenGraph.of(screens), List.of(HOME, CLOSE, TITLE, ORE));
 

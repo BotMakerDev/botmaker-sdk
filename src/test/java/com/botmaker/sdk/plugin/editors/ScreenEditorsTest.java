@@ -4,12 +4,12 @@ import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Navigate;
-import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.editors.ScreenEditors.Choice;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayNameGeneration(ReplaceUnderscores.class)
 class ScreenEditorsTest {
 
-    private static final Executable TO = TestContexts.call((Ref.Of1<GameScreen, ?>) Navigate::to);
+    private static final Executable TO = TestContexts.call((Ref.Of1<Screen, ?>) Navigate::to);
 
     private static boolean claimed(ValueContext ctx) {
         return SdkEditors.ALL.stream().anyMatch(editor -> editor.matches(ctx));
@@ -55,28 +55,25 @@ class ScreenEditorsTest {
         for (Method method : Navigate.class.getDeclaredMethods()) {
             if (!Modifier.isPublic(method.getModifiers())) continue;
             for (int i = 0; i < method.getParameterCount(); i++) {
-                if (method.getParameterTypes()[i] != GameScreen.class) continue;
+                if (method.getParameterTypes()[i] != Screen.class) continue;
                 assertTrue(claimed(TestContexts.slot(method, i, "null")), method.getName() + " is not the picker's");
             }
         }
     }
 
-    /** The map's own screen, the {@code HOME} of {@code Way.of(HOME, …)}, and a row with no call are not. */
+    /** A row with no call is not: a screen is an argument. */
     @Test
-    void the_maps_own_screen_and_a_row_are_not() {
-        Executable way = TestContexts.call((Ref.Of2<GameScreen, Input, Way>) Way::of);
-        assertFalse(claimed(TestContexts.slot(way, 0, "HOME")));
-        assertFalse(claimed(TestContexts.row(GameScreen.class, "null")));
+    void a_row_is_not() {
+        assertFalse(claimed(TestContexts.row(Screen.class, "null")));
     }
 
     @Test
     void the_picker_lists_the_maps_screens_in_order_and_its_popups_only_when_asked() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").markers(List.of(new ImageTemplate("images/home_map.png"))));
-        screens.put("REWARD", GameScreen.named("Reward").markers(List.of(new ImageTemplate("images/reward.png")))
-                .popup());
-        screens.put("CAMPAIGN", GameScreen.named("Campaign").from(Way.of(BotConstants.screen("HOME"),
-                Input.click(new ImageTemplate("images/campaign.png")))));
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapScreen.of(Setup.named("Home").markers(List.of(new ImageTemplate("images/home_map.png")))));
+        screens.put("REWARD", MapScreen.of(Setup.named("Reward")
+                .markers(List.of(new ImageTemplate("images/reward.png"))).popup()));
+        screens.put("CAMPAIGN", MapScreen.of(Setup.named("Campaign").from(BotConstants.input("HOME", "campaign"))));
 
         ScreenGraph graph = ScreenGraph.of(screens);
         assertEquals(List.of(new Choice("HOME", "Home", "home_map"), new Choice("CAMPAIGN", "Campaign", null)),

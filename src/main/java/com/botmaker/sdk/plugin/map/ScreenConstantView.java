@@ -2,9 +2,9 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.ScreenVariant;
-import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A {@code Screens} constant as the bot's {@code Screens.java} shows it: its card as 🗺 Screens draws it (marker,
+ * A {@code Screens} class as the bot's {@code Screens.java} shows its setup: its card as 🗺 Screens draws it (marker,
  * name, how far Discovery got), its shot, what each input does, what it owes and its notes, and a button opening
  * the map on it (the user's call, 2026-10-15). The file is the plugin's, read-only in the editor; the map and the
  * assistant's tools edit it.
@@ -42,10 +42,9 @@ public final class ScreenConstantView {
 
     private ScreenConstantView() {}
 
-    /** Whether {@code ctx} is a {@code Screens} constant's own value, not a reference to one. */
+    /** Whether {@code ctx} is a {@code Screens} class's setup, the value its {@code setup()} returns. */
     public static boolean isScreenConstant(ValueContext ctx) {
-        return ctx.type().is(GameScreen.class) && ctx.member(SdkValues.SCREEN_MAP).isEmpty()
-                && constantOf(read(ctx), ctx.value(GameScreen.class)).isPresent();
+        return ctx.type().is(Setup.class) && constantOf(read(ctx), ctx.value(Setup.class)).isPresent();
     }
 
     /** The screen's card, shot, inputs, debts and notes, under the button opening the map on it. */
@@ -53,10 +52,10 @@ public final class ScreenConstantView {
         StudioServices services = ctx.services();
         // The map read once, and safely: a map being written draws the slot as written, never a broken editor.
         ScreenGraph graph = read(ctx);
-        Optional<String> found = constantOf(graph, ctx.value(GameScreen.class));
+        Optional<String> found = constantOf(graph, ctx.value(Setup.class));
         if (found.isEmpty()) return new Label(ctx.source());
         String constant = found.get();
-        GameScreen screen = graph.screens().get(constant);
+        MapScreen screen = graph.screens().get(constant);
         Card card = ScreenCards.card(graph, constant, ScreenDesk.stages(graph).getOrDefault(constant, ""));
 
         Label name = new Label(card.name());
@@ -73,7 +72,8 @@ public final class ScreenConstantView {
         VBox box = new VBox(6, head);
         box.setPadding(new Insets(4));
         shot(services.resourcesDir(), constant).ifPresent(box.getChildren()::add);
-        if (screen.back() != null) box.getChildren().add(new Label("Way back: " + screen.back().label()));
+        graph.backOf(constant).filter(back -> back.via() != null)
+                .ifPresent(back -> box.getChildren().add(new Label("Way back: " + back.label())));
         for (ScreenVariant look : screen.variants()) {
             String when = ScreenTypes.sourceOf(look.when());
             HBox line = new HBox(8, new Label("Look " + look.name() + (when.isEmpty() ? "" : ", while " + when)));
@@ -125,9 +125,9 @@ public final class ScreenConstantView {
         return ScreenMapRead.orEmpty(ctx.services() == null ? null : ctx.services().pluginValues());
     }
 
-    /** The constant of {@code graph} holding {@code held}; empty for none, and when the map could not be read. */
-    static Optional<String> constantOf(ScreenGraph graph, Optional<GameScreen> held) {
-        return held.flatMap(screen -> graph.screens().entrySet().stream().filter(e -> e.getValue().equals(screen))
-                .map(Map.Entry::getKey).findFirst());
+    /** The constant of {@code graph} whose setup is {@code held}; empty for none, and when the map could not be read. */
+    static Optional<String> constantOf(ScreenGraph graph, Optional<Setup> held) {
+        return held.flatMap(setup -> graph.screens().entrySet().stream()
+                .filter(e -> e.getValue().setup().equals(setup)).map(Map.Entry::getKey).findFirst());
     }
 }

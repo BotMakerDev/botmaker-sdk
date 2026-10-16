@@ -8,7 +8,7 @@ package com.botmaker.sdk.api.flow;
  * and its settings do not change with the flow, so they are said once, here, and not in each flow. Which flow
  * runs is the bot's {@code @Param}, which {@code Bot.runFlow} reads off {@code Sdk.java} beside this.
  *
- * <p>Popups the game opens on its own are screens of the bot's map ({@code GameScreen.popup()}), each closed by its
+ * <p>Popups the game opens on its own are screens of the bot's map ({@code Setup.popup()}), each closed by its
  * way back before every vision call: no run method clears them (2026-10-16).
  *
  * <pre>{@code
@@ -52,7 +52,7 @@ public record Run(Runnable home, Runnable setup, String notes) {
 
     /**
      * This run, with {@code notes} on the game as a whole: what holds across its screens (hotkeys, currencies, what
-     * never to press). A screen's own notes are on its {@code GameScreen}. Blank for none.
+     * never to press). A screen's own notes are in its {@code Setup}. Blank for none.
      */
     public Run notes(String notes) {
         return new Run(home, setup, notes);

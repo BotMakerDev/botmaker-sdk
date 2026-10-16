@@ -39,11 +39,12 @@ public final class Navigate {
      * @throws BotStuckException when the game is on no screen of the map, steps keep landing elsewhere, or the map's
      *                           way is no longer on the game: the run's recovery takes over
      */
-    public static boolean to(GameScreen screen) {
+    public static boolean to(Screen screen) {
         ScreenGraph map = ScreenMaps.installed();
         Optional<String> target = map.constantOf(screen);
         if (target.isEmpty()) {
-            Debug.log((screen == null ? "No screen" : screen.name()) + " is not in the bot's screen map.");
+            Debug.log((screen == null ? "No screen" : screen.getClass().getSimpleName())
+                    + " is not in the bot's screen map.");
             return false;
         }
         // Forgotten while walking: a walk that gets stuck is no step to walk back from to where it set out.
@@ -66,23 +67,24 @@ public final class Navigate {
     }
 
     /** Whether the game shows {@code screen} now: its markers are on the screen, and none of its absent pictures. */
-    public static boolean isOn(GameScreen screen) {
+    public static boolean isOn(Screen screen) {
         ScreenGraph map = ScreenMaps.installed();
         Optional<String> constant = map.constantOf(screen);
-        if (constant.isEmpty() || !screen.hasMarker()) return false;
+        Optional<Markers> markers = constant.flatMap(map::screen).map(Markers::of).filter(Markers::any);
+        if (markers.isEmpty()) return false;
         RunReach reach = new RunReach();
-        boolean on = reach.look().map(frame -> Markers.of(screen).on(reach, frame)).orElse(false);
+        boolean on = reach.look().map(frame -> markers.get().on(reach, frame)).orElse(false);
         // Remembered, not told: a screen's marker stays in view under a panel opened over it, so this may be its parent.
         if (on) ScreenMaps.seen(constant.get());
         return on;
     }
 
     /** The screen of the bot's map the game shows now, popups aside; empty when it shows none. */
-    public static Optional<GameScreen> where() {
+    public static Optional<Screen> where() {
         ScreenGraph map = ScreenMaps.installed();
         Optional<String> here = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, null).where(ScreenMaps.lastSeen());
         here.ifPresent(constant -> tell(map, constant));
-        return here.flatMap(map::screen);
+        return here.flatMap(map::instance);
     }
 
     /** Remembers the game is on {@code constant}, and tells whoever watches the run (the run bar, 🗺 Screens). */

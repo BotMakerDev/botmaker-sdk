@@ -5,11 +5,11 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
-import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.FxCall;
 import com.botmaker.sdk.plugin.assist.MapAudit;
@@ -156,22 +156,23 @@ public final class MapReport {
     private static void screen(StringBuilder out, ScreenGraph graph, Map<String, String> stages,
                                Predicate<String> shot, String constant, String indent) {
         Card card = ScreenCards.card(graph, constant, stages.getOrDefault(constant, ""));
-        GameScreen screen = graph.screens().get(constant);
+        MapScreen screen = graph.screens().get(constant);
         // The card's pills, in the card's words.
         out.append(indent).append(card.name()).append(" [").append(constant).append("] ")
                 .append(String.join(", ", ScreenCards.pills(card).stream().map(ScreenCards.Pill::text).toList()))
                 .append('\n');
         out.append(indent).append("  ").append(markers(screen.markers(), screen.absent()))
-                .append(" · back ").append(screen.back() == null ? "the default (a close button, then Escape)"
-                        : screen.back().label())
+                .append(" · back ").append(graph.backOf(constant).filter(b -> b.via() != null)
+                        .map(ScreenGraph.Edge::label).orElse("the default (a close button, then Escape)"))
                 .append(" · shot ").append(shot.test(constant) ? "yes" : "none").append('\n');
         // The tree's way in, then every other: a first screen has no tree's way in and may have others.
         List<String> ins = new ArrayList<>();
         if (screen.from() != null && screen.from().via() != null) {
-            ins.add("in from " + graph.parent(constant).map(graph::shown).orElse("?") + " by " + way(screen.from()));
+            ins.add("in from " + graph.parent(constant).map(graph::shown).orElse("?") + " by "
+                    + way(graph, screen.from()));
         }
-        screen.alsoFrom().forEach(way -> ins.add("also from " + graph.constantOf(way.from()).map(graph::shown)
-                .orElse("?") + " by " + way(way)));
+        screen.alsoFrom().forEach(way -> ins.add("also from " + graph.nameOf(way.via())
+                .map(n -> graph.shown(n.screen())).orElse("?") + " by " + way(graph, way)));
         if (!ins.isEmpty()) out.append(indent).append("  ").append(String.join("; ", ins)).append('\n');
         for (ScreenVariant look : screen.variants()) {
             String when = ScreenTypes.sourceOf(look.when());
@@ -207,14 +208,18 @@ public final class MapReport {
                 + (absent.isEmpty() ? "" : ", not " + String.join(", ", absent.stream().map(ImageTemplate::id).toList()));
     }
 
-    /** How a way in reads: its input, and the look and the method it needs: {@code click shop (badge, while F::on)}. */
-    private static String way(Way way) {
+    /**
+     * How a way in reads: its input's field, and the copy, the look and the method it needs: {@code shop (badge,
+     * while F::on)}.
+     */
+    private static String way(ScreenGraph graph, Way way) {
         List<String> needs = new ArrayList<>();
+        if (way.pick() != null) needs.add(way.pick().label());
         if (way.state() != null) needs.add(way.state().id());
         String when = ScreenTypes.sourceOf(way.when());
         if (!when.isEmpty()) needs.add("while " + when);
-        return (way.via() == null ? "?" : way.via().label()) + (needs.isEmpty() ? "" : " (" + String.join(", ", needs)
-                + ")");
+        String via = graph.nameOf(way.via()).map(n -> n.field()).orElse(way.via() == null ? "?" : way.via().label());
+        return via + (needs.isEmpty() ? "" : " (" + String.join(", ", needs) + ")");
     }
 
     /** What the map cannot do, one line each. */
@@ -223,16 +228,17 @@ public final class MapReport {
         Optional<String> root = ScreenCards.root(graph);
         for (String c : graph.screens().keySet()) {
             if (only != null && !only.equals(c)) continue;
-            GameScreen screen = graph.screens().get(c);
+            MapScreen screen = graph.screens().get(c);
             String name = graph.shown(c);
             if (!screen.isPopup() && root.isPresent() && !root.get().equals(c)
                     && graph.pathTo(root.get(), c, e -> true).isEmpty()) {
                 problems.add(name + ": no way from " + graph.shown(root.get()) + " reaches it, so a run cannot go "
                         + "there.");
             }
-            for (Input input : graph.unseen(c)) {
-                if (input.when() != null) continue;    // its method says when to look
-                problems.add(name + ": " + input.label() + " comes and goes and was never seen, and no method says "
+            for (String field : graph.unseen(c)) {
+                // Its method says when to look.
+                if (graph.input(c, field).map(Input::when).isPresent()) continue;
+                problems.add(name + ": " + field + " comes and goes and was never seen, and no method says "
                         + "when it is there (a crop_pictures box's when).");
             }
             Set<String> told = new HashSet<>();

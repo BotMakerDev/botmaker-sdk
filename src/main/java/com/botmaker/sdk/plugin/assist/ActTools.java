@@ -8,8 +8,9 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
-import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.ScreenList;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.text.OcrLanguage;
 import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.MatchResult;
@@ -214,18 +215,21 @@ final class ActTools {
     }
 
     /**
-     * {@code copy}'s copy of its button, counted as a run counts them ({@link Reach#copies}: any of its looks, along
-     * {@code list} for a member of one), when a run would find that many; {@code picture} names it in the reply.
+     * The copy of {@code copy}'s button {@code pick} names, counted as a run counts them ({@link Reach#copies}: any
+     * of its looks, along {@code strip} for a member of one), when a run would find that many; {@code picture} names
+     * it in the reply.
      */
-    private static Spotted spotCopy(String picture, Input copy, ScreenList list, String acted, AgentContext context) {
+    private static Spotted spotCopy(String picture, Button copy, Pick pick, Strip strip, String acted,
+                                    AgentContext context) {
         Optional<ToolReach> reach = ToolReach.of(context);
         if (reach.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noProject()));
         Optional<String> base = Frames.picture(reach.get().resources(), picture);
         if (base.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noPicture(picture)));
         Optional<BufferedImage> frame = reach.get().look();
         if (frame.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noScreen()));
-        int nth = copy.nth();
-        List<Rect> copies = reach.get().copies(copy, list, frame.get()).stream().map(Reach.Seen::place).toList();
+        int nth = Math.max(1, pick.nth());
+        List<Rect> copies = reach.get().copies(copy, strip, pick.order(), frame.get()).stream()
+                .map(Reach.Seen::place).toList();
         if (copies.size() < nth) {
             return Spotted.no(AgentReply.text(base.get() + " shows " + (copies.isEmpty() ? "nowhere" : copies.size()
                     + (copies.size() == 1 ? " time" : " times")) + " at a run's score " + Frames.score(reach.get()
@@ -283,18 +287,18 @@ final class ActTools {
     /**
      * Clicks {@code picture}, scrolls {@code notches} over it when they are not 0, or taps {@code key} for try_input
      * on {@code screen}, waiting up to {@code settleMs} for a change as big as {@code share} of the screen, and
-     * {@link FrameChange#QUIET_MS} when nothing moves at all. What moves on its own there is read again only past
-     * {@link #MOTION_REUSE_MS}.
+     * {@link FrameChange#QUIET_MS} when nothing moves at all. A {@code pick} clicks that copy of {@code copy}'s button
+     * along {@code strip}. What moves on its own there is read again only past {@link #MOTION_REUSE_MS}.
      */
-    static Entered enter(AgentContext context, String screen, String picture, int notches, Input copy,
-                         ScreenList list, Key key, Boolean desktop, int settleMs, double share) {
+    static Entered enter(AgentContext context, String screen, String picture, int notches, Button copy, Pick pick,
+                         Strip strip, Key key, Boolean desktop, int settleMs, double share) {
         if (key != null) {
             return acted(context, screen, null, null, desktop, settleMs, false, "Pressed " + key.label(),
                     "key " + key.label(), share, hands -> hands.key(key));
         }
         String verb = notches == 0 ? "clicked" : "scrolled";
-        Spotted spotted = copy == null || copy.nth() == 0 ? spot(picture, verb, context)
-                : spotCopy(picture, copy, list, verb, context);
+        Spotted spotted = copy == null || pick == null ? spot(picture, verb, context)
+                : spotCopy(picture, copy, pick, strip, verb, context);
         if (spotted.refusal() != null) return Entered.no(spotted.refusal());
         Point at = spotted.at();
         if (notches != 0) {

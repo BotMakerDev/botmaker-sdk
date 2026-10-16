@@ -770,8 +770,9 @@ final class ScreenCanvas {
         Input via = link.via();
         HBox chip = new HBox(4);
         if (link.entrance() && via != null) {
-            chip.getChildren().add(via.picture() != null ? thumb(via.picture().id(), EDGE_THUMB, "screen-edge-thumb")
-                    : new Label(via.key() == null ? "?" : via.key().label()));
+            String picture = ScreenCards.picture(via);
+            chip.getChildren().add(picture != null ? thumb(picture, EDGE_THUMB, "screen-edge-thumb")
+                    : new Label(via.label()));
         }
         List<String> needs = new ArrayList<>();
         if (!link.look().isEmpty()) needs.add(link.look());

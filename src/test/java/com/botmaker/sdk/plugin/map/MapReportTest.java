@@ -2,14 +2,12 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Did;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
-import com.botmaker.sdk.api.screens.Variant;
 import com.botmaker.sdk.api.screens.Way;
-import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
 import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
@@ -17,12 +15,17 @@ import com.botmaker.sdk.plugin.assist.MapAudit.Where;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.botmaker.sdk.internal.screens.MapFixtures.click;
+import static com.botmaker.sdk.internal.screens.MapFixtures.marks;
+import static com.botmaker.sdk.internal.screens.MapFixtures.picture;
+import static com.botmaker.sdk.internal.screens.MapFixtures.ref;
+import static com.botmaker.sdk.internal.screens.MapFixtures.screen;
+import static com.botmaker.sdk.internal.screens.MapFixtures.with;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,32 +33,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** read_map's text: the tree as the window draws it, then what the map cannot do. */
 class MapReportTest {
 
-    private static ImageTemplate picture(String id) {
-        return new ImageTemplate("images/" + id + ".png");
+    /** Home opens Tavern, which opens Market; Reward is a popup closed by a button written inline. */
+    private static Map<String, MapScreen> screens() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("tavern"),
+                click("event").sometimes()));
+        screens.put("TAVERN", screen(Setup.named("Tavern").markers(marks("tavern_title")).from(ref("HOME", "tavern"))
+                        .back(ref("TAVERN", "close")),
+                click("market"), click("play").did(Did.IN_PLACE), click("close")));
+        screens.put("MARKET", screen(Setup.named("Market").markers(marks("market_title")).from(ref("TAVERN", "market")),
+                click("gems").never("spends gems")));
+        screens.put("REWARD", screen(Setup.named("Reward").markers(marks("reward")).back(click("claim_inline"))
+                .popup()));
+        return screens;
     }
 
-    /** A screen's markers: the pictures {@code ids}. */
-    private static List<ImageTemplate> marks(String... ids) {
-        return Arrays.stream(ids).map(MapReportTest::picture).toList();
-    }
-
-    private static Input click(String id) {
-        return Input.click(picture(id));
-    }
-
-    /** Home opens Tavern, which opens Market; Lost names Home but by an input no screen has; Reward is a popup. */
     private static ScreenGraph map() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
-                .inputs(List.of(click("tavern"), click("event").sometimes())));
-        screens.put("TAVERN", GameScreen.named("Tavern").markers(marks("tavern_title"))
-                .from(Way.of(BotConstants.screen("HOME"), click("tavern"))).back(click("close"))
-                .inputs(List.of(click("market"), click("play").did(Did.IN_PLACE))));
-        screens.put("MARKET", GameScreen.named("Market").markers(marks("market_title"))
-                .from(Way.of(BotConstants.screen("TAVERN"), click("market")))
-                .inputs(List.of(click("gems").never("spends gems"))));
-        screens.put("REWARD", GameScreen.named("Reward").markers(marks("reward")).back(click("claim_inline")).popup());
-        return ScreenGraph.of(screens);
+        return ScreenGraph.of(screens());
     }
 
     private static final Set<String> NAMED = Set.of("home", "tavern", "event", "tavern_title", "close", "market",
@@ -66,10 +60,11 @@ class MapReportTest {
         String text = MapReport.text(map(), Map.of(), NAMED::contains, id -> true, "TAVERN"::equals, null);
         assertTrue(text.startsWith("The map: 4 screens, 1 popup.\nHome [HOME] "), text);
         assertTrue(text.contains("\n    Tavern [TAVERN] finished, activity\n"
-                + "      marker tavern_title · back click close · shot yes\n"
-                + "      in from Home by click tavern\n"
-                + "      - click market: → Market\n"
-                + "      - click play: in place\n"), text);
+                + "      marker tavern_title · back close · shot yes\n"
+                + "      in from Home by tavern\n"
+                + "      - market: → Market\n"
+                + "      - play: in place\n"
+                + "      - close: way back\n"), text);
         assertTrue(text.contains("\n        Market [MARKET] "), text);
         assertTrue(text.contains("\nPopups (opened by the game itself):\nReward [REWARD] "), text);
     }
@@ -78,7 +73,7 @@ class MapReportTest {
     void whatTheMapCannotDoIsSaid() {
         List<String> problems = MapReport.problems(map(), NAMED::contains, id -> !id.equals("market_title"), null);
         assertEquals(List.of(
-                "Home: click event comes and goes and was never seen, and no method says when it is there "
+                "Home: event comes and goes and was never seen, and no method says when it is there "
                         + "(a crop_pictures box's when).",
                 "Market: the picture market_title has no file.",
                 "Reward: the picture claim_inline is written inline in Screens.java, not as one of the bot's Pictures."),
@@ -87,35 +82,36 @@ class MapReportTest {
 
     @Test
     void looksAndTheMethodsSayingWhenAreRead() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
-        Input event = click("event").when(ScreenTypes.condition("Firestone::eventOn"));
-        Input tavern = click("tavern").variants(List.of(Variant.of(picture("tavern_badge"), State.BADGE)));
-        screens.put("HOME", screens.get("HOME").inputs(List.of(tavern, event)));
-        screens.put("TAVERN", screens.get("TAVERN").from(Way.of(BotConstants.screen("HOME"), tavern)
-                        .when(ScreenTypes.condition("Firestone::tavernOpen")))
-                .variants(List.of(ScreenVariant.named("Halloween").markers(marks("pumpkin"))
-                        .inputs(List.of(click("candy"))))));
+        Map<String, MapScreen> screens = screens();
+        screens.put("HOME", with(screens.get("HOME"),
+                click("tavern").looks(List.of(Look.of(picture("tavern_badge"), State.BADGE))),
+                click("event").when(ScreenTypes.condition("Firestone::eventOn"))));
+        screens.put("TAVERN", with(screens.get("TAVERN").setup(s -> s.fromWhen(
+                        ScreenTypes.condition("Firestone::tavernOpen")).variants(List.of(ScreenVariant
+                        .named("Halloween").markers(marks("pumpkin")).inputs(List.of(ref("TAVERN", "candy")))))),
+                click("candy")));
         ScreenGraph graph = ScreenGraph.of(screens);
 
         String text = MapReport.text(graph, Map.of(), id -> true, id -> true, id -> true, null);
-        assertTrue(text.contains("- click event: not seen yet (comes and goes) while Firestone::eventOn\n"), text);
-        assertTrue(text.contains("- click tavern: → Tavern (while Firestone::tavernOpen); looks normal tavern → "
+        assertTrue(text.contains("- event: not seen yet (comes and goes) while Firestone::eventOn\n"), text);
+        assertTrue(text.contains("- tavern: → Tavern (while Firestone::tavernOpen); looks normal tavern → "
                 + "Tavern (while Firestone::tavernOpen), badge tavern_badge → Tavern (while Firestone::tavernOpen)\n"),
                 text);
-        assertTrue(text.contains("in from Home by click tavern (while Firestone::tavernOpen)\n"), text);
+        assertTrue(text.contains("in from Home by tavern (while Firestone::tavernOpen)\n"), text);
         assertTrue(text.contains("look Halloween: marker pumpkin\n"), text);
-        assertTrue(text.contains("- click candy: untried [look Halloween]\n"), text);
+        assertTrue(text.contains("- candy: untried [look Halloween]\n"), text);
         assertTrue(MapReport.problems(graph, id -> true, id -> true, null).isEmpty(),
                 "a method saying when it is there answers for what comes and goes");
     }
 
     @Test
     void theFirstScreensOtherWaysInAreSaidToo() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
-        screens.put("HOME", screens.get("HOME").alsoFrom(List.of(Way.of(BotConstants.screen("TAVERN"),
-                click("home_button")))));
+        Map<String, MapScreen> screens = screens();
+        screens.put("TAVERN", with(screens.get("TAVERN"), click("home_button")));
+        screens.put("HOME", screens.get("HOME").setup(s -> s.alsoFrom(List.of(Way.of(ref("TAVERN",
+                "home_button"))))));
         String text = MapReport.text(ScreenGraph.of(screens), Map.of(), id -> true, id -> true, id -> true, "HOME");
-        assertTrue(text.contains("\n  also from Tavern by click home_button\n"), text);
+        assertTrue(text.contains("\n  also from Tavern by home_button\n"), text);
     }
 
     @Test
@@ -149,9 +145,8 @@ class MapReportTest {
 
     @Test
     void aScreenNoWayReachesIsSaid() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
-        screens.put("LOST", GameScreen.named("Lost").markers(marks("home"))
-                .from(Way.of(BotConstants.screen("NOWHERE"), click("tavern"))));
+        Map<String, MapScreen> screens = screens();
+        screens.put("LOST", screen(Setup.named("Lost").markers(marks("home")).from(ref("NOWHERE", "tavern"))));
         List<String> problems = MapReport.problems(ScreenGraph.of(screens), NAMED::contains, id -> true, "LOST");
         assertEquals(List.of("Lost: no way from Home reaches it, so a run cannot go there."), problems);
     }

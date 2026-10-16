@@ -46,6 +46,9 @@ public abstract class SpelledValues implements PluginValues {
 
     public Optional<String> removeGroup(String id, String group) { return Optional.of(NO_SOURCE_TREE); }
 
+    /** A class of the set {@code id} as its constant {@code member}, its setup {@code setup}. */
+    public Optional<String> addClass(String id, String member, Object setup) { return Optional.of(NO_SOURCE_TREE); }
+
     /** The methods returning {@code group} of the set {@code id}; both {@code null} for the {@code void} ones. */
     public List<String> methods(String id, String group) { return List.of(); }
 
@@ -103,6 +106,10 @@ public abstract class SpelledValues implements PluginValues {
 
     @Override public final Optional<String> removeGroup(ManagedValue<?> set, String group) {
         return removeGroup(set.id(), group);
+    }
+
+    @Override public final Optional<String> addClass(ManagedValue<?> set, String member, Object setup) {
+        return addClass(set.id(), member, setup);
     }
 
     @Override public final List<String> methods(ManagedValue<?> set, String group) {

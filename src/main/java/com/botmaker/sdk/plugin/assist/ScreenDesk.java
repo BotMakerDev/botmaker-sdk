@@ -3,7 +3,10 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
@@ -42,12 +45,15 @@ public final class ScreenDesk {
      * waits for it. Acting on the user's own desktop is allowed, since they pressed ▶ Try.
      */
     public static String tryInput(AgentContext context, String constant, Input input, String opens) {
-        MapTools.Try asked = new MapTools.Try(constant, List.of(new MapTools.Step(
-                input.picture() == null ? null : input.picture().id(),
-                input.act() == Input.Act.SCROLL ? input.notches() : null,
-                input.nth() > 0 ? input.nth() : null,
-                input.key() == null ? null : input.key().label(),
-                opens, null, null, input.kind())), null, true, true);
+        String picture = switch (input) {
+            case Button button -> button.picture() == null ? null : button.picture().id();
+            case Strip strip -> strip.members().isEmpty() ? null : strip.members().getFirst().id();
+            case Hotkey ignored -> null;
+        };
+        Integer notches = input instanceof Strip strip && strip.scroll() != null ? strip.scroll().notches() : null;
+        String key = input instanceof Hotkey hotkey && hotkey.key() != null ? hotkey.key().label() : null;
+        MapTools.Try asked = new MapTools.Try(constant, List.of(new MapTools.Step(picture, notches, null, key, opens,
+                null, null, input.purpose())), null, true, true);
         return text(MapTools.tryInput(asked, context));
     }
 

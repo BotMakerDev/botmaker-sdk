@@ -98,7 +98,7 @@ final class MapGuide {
             new Section("An input's ⋯", List.of(
                     new Entry("Result", null, "What it did: untried, changes the screen in place, no visible effect, "
                             + "leaves the screen, or opens a new one."),
-                    new Entry("Kind", null, "What it is for, a chore or a way on."),
+                    new Entry("Purpose", null, "What it is for: a task, a shortcut, a spend, or information."),
                     new Entry("Comes and goes", null, "It is not always there: a try that does not see it is not a "
                             + "failure."),
                     new Entry("Only there while", null, "A method of the bot that says when it is there."),

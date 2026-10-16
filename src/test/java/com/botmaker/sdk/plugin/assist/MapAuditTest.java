@@ -1,10 +1,13 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.ScreenList;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.screens.MapFixtures;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
 import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
 import com.botmaker.sdk.plugin.assist.MapAudit.Where;
@@ -70,9 +73,9 @@ class MapAuditTest {
                 "event", FrameCut.of(WIDTH, HEIGHT, places.get("event")));
     }
 
-    private static GameScreen screen() {
-        return GameScreen.named("Home").markers(marks("home")).inputs(List.of(Input.click(picture("here")),
-                Input.click(picture("moved")), Input.click(picture("gone")), Input.click(picture("event")).sometimes()));
+    private static MapScreen screen() {
+        return MapFixtures.screen(Setup.named("Home").markers(marks("home")), Button.of(picture("here")),
+                Button.of(picture("moved")), Button.of(picture("gone")), Button.of(picture("event")).sometimes());
     }
 
     @Test
@@ -104,9 +107,8 @@ class MapAuditTest {
         ImageTemplate moved = picture("moved").at(new Rect(400, 200, SIZE, SIZE));
         ImageTemplate out = picture("gone").at(new Rect(560, 250, SIZE, SIZE));
         Rect column = new Rect(360, 160, 280, 170);
-        GameScreen listed = GameScreen.named("Home").markers(marks("home"))
-                .inputs(List.of(Input.click(moved), Input.click(out)))
-                .lists(List.of(ScreenList.of(-3, List.of(moved, out))));
+        MapScreen listed = MapFixtures.screen(Setup.named("Home").markers(marks("home")), Button.of(moved),
+                Button.of(out), Strip.of(Scroll.wheel(-3), List.of(moved, out)));
         Audit audit = MapAudit.of(resources, 0.9, cuts, "HOME", listed).orElseThrow();
         assertEquals(Where.AT_PLACE, audit.of("moved").orElseThrow().where(), "another slot of its list");
         Spot gone = audit.of("gone").orElseThrow();
@@ -115,8 +117,8 @@ class MapAuditTest {
         assertEquals(column, gone.area());
         // Out of a list that does not hold it, it sits elsewhere again.
         ImageTemplate atHome = picture("moved").at(new Rect(20, 20, SIZE, SIZE));
-        GameScreen narrow = GameScreen.named("Home").markers(marks("home")).inputs(List.of(Input.click(atHome)))
-                .lists(List.of(ScreenList.of(-3, List.of(atHome))));
+        MapScreen narrow = MapFixtures.screen(Setup.named("Home").markers(marks("home")), Button.of(atHome),
+                Strip.of(Scroll.wheel(-3), List.of(atHome)));
         assertEquals(Where.ELSEWHERE,
                 MapAudit.of(resources, 0.9, cuts, "HOME", narrow).orElseThrow().of("moved").orElseThrow().where());
     }

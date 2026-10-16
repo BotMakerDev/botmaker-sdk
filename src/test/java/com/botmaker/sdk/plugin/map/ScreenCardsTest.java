@@ -3,14 +3,16 @@ package com.botmaker.sdk.plugin.map;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Did;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Kind;
-import com.botmaker.sdk.api.screens.ScreenList;
+import com.botmaker.sdk.api.screens.Hotkey;
+import com.botmaker.sdk.api.screens.Purpose;
+import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
@@ -19,12 +21,16 @@ import com.botmaker.sdk.plugin.map.ScreenCards.State;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.botmaker.sdk.internal.screens.MapFixtures.click;
+import static com.botmaker.sdk.internal.screens.MapFixtures.marks;
+import static com.botmaker.sdk.internal.screens.MapFixtures.picture;
+import static com.botmaker.sdk.internal.screens.MapFixtures.ref;
+import static com.botmaker.sdk.internal.screens.MapFixtures.screen;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,41 +38,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** What 🗺 Screens draws of a map: each card's state, progress and badges, each edge, each input's row. */
 class ScreenCardsTest {
 
-    private static ImageTemplate picture(String id) {
-        return new ImageTemplate("images/" + id + ".png");
-    }
-
-    /** A screen's markers: the pictures {@code ids}. */
-    private static List<ImageTemplate> marks(String... ids) {
-        return Arrays.stream(ids).map(ScreenCardsTest::picture).toList();
-    }
-
-    private static Input click(String id) {
-        return Input.click(picture(id));
-    }
-
     /**
-     * Home opens Campaign (finished, a chore and a never) and Engineer (owing its marker); Campaign's map opens Map,
+     * Home opens Campaign (finished, a task and a never) and Engineer (owing its marker); Campaign's map opens Map,
      * which Home also reaches by a hotkey; Arena is behind a locked input; Reward is a popup.
      */
+    private static Map<String, MapScreen> screens() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("campaign"), click("engineer"),
+                click("gold"), Hotkey.of(Key.M), click("arena").locked(picture("padlock")), click("event").sometimes()));
+        screens.put("CAMPAIGN", screen(Setup.named("Campaign").markers(marks("campaign_title"))
+                        .from(ref("HOME", "campaign")),
+                click("claim").did(Did.IN_PLACE).purpose(Purpose.TASK), click("map"),
+                click("gems").never("spends gems")));
+        screens.put("MAP", screen(Setup.named("Map").markers(marks("map_title")).from(ref("CAMPAIGN", "map"))
+                .alsoFrom(List.of(Way.of(ref("HOME", "key_m")))), Hotkey.of(Key.ESCAPE).did(Did.NONE)));
+        screens.put("ENGINEER", screen(Setup.named("Engineer").from(ref("HOME", "engineer"))));
+        screens.put("ARENA", screen(Setup.named("Arena").markers(marks("arena_title")).from(ref("HOME", "arena"))));
+        screens.put("REWARD", screen(Setup.named("Reward").markers(marks("reward")).back(click("close_x")).popup()));
+        return screens;
+    }
+
     private static ScreenGraph map() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
-                .inputs(List.of(click("campaign"), click("engineer"), click("gold"), Input.key(Key.M),
-                        click("arena").locked(picture("padlock")), click("event").sometimes())));
-        screens.put("CAMPAIGN", GameScreen.named("Campaign").markers(marks("campaign_title"))
-                .from(Way.of(BotConstants.screen("HOME"), click("campaign")))
-                .inputs(List.of(click("claim").did(Did.IN_PLACE).kind(Kind.CHORE), click("map"),
-                        click("gems").never("spends gems"))));
-        screens.put("MAP", GameScreen.named("Map").markers(marks("map_title"))
-                .from(Way.of(BotConstants.screen("CAMPAIGN"), click("map")))
-                .alsoFrom(List.of(Way.of(BotConstants.screen("HOME"), Input.key(Key.M))))
-                .inputs(List.of(Input.key(Key.ESCAPE).did(Did.NONE))));
-        screens.put("ENGINEER", GameScreen.named("Engineer").from(Way.of(BotConstants.screen("HOME"), click("engineer"))));
-        screens.put("ARENA", GameScreen.named("Arena").markers(marks("arena_title"))
-                .from(Way.of(BotConstants.screen("HOME"), click("arena").locked(picture("padlock")))));
-        screens.put("REWARD", GameScreen.named("Reward").markers(marks("reward")).back(click("close_x")).popup());
-        return ScreenGraph.of(screens);
+        return ScreenGraph.of(screens());
     }
 
     private static Card card(String constant) {
@@ -138,7 +131,8 @@ class ScreenCardsTest {
 
         List<ScreenCards.Row> campaign = ScreenCards.rows(map(), "CAMPAIGN");
         assertEquals("in place", campaign.getFirst().result());
-        assertEquals("chore", campaign.getFirst().kind());
+        assertEquals("task", campaign.getFirst().kind());
+        assertEquals("claim", campaign.getFirst().field());
         assertEquals(RowState.NEVER, campaign.getLast().state());
         assertEquals("never: spends gems", campaign.getLast().result());
         assertEquals(List.of(), ScreenCards.rows(map(), "NOWHERE"));
@@ -152,9 +146,9 @@ class ScreenCardsTest {
 
     @Test
     void aWayOpenOnlyWhileAMethodSaysSoCarriesItOnItsLink() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
-        screens.put("CAMPAIGN", screens.get("CAMPAIGN").from(Way.of(BotConstants.screen("HOME"), click("campaign"))
-                .when(ScreenTypes.condition("Firestone::eventOn"))));
+        Map<String, MapScreen> screens = screens();
+        screens.put("CAMPAIGN", screens.get("CAMPAIGN").setup(s -> s.fromWhen(
+                ScreenTypes.condition("Firestone::eventOn"))));
         Link campaign = ScreenCards.links(ScreenGraph.of(screens)).stream()
                 .filter(l -> l.to().equals("CAMPAIGN") && !l.back()).findFirst().orElseThrow();
         assertEquals("Firestone::eventOn", campaign.when());
@@ -171,8 +165,8 @@ class ScreenCardsTest {
 
     @Test
     void aPopupWithNothingCutIsFinishedAsTheGraphCountsIt() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
-        screens.put("OFFER", GameScreen.named("Offer").markers(marks("offer")).popup());
+        Map<String, MapScreen> screens = screens();
+        screens.put("OFFER", MapScreen.of(Setup.named("Offer").markers(marks("offer")).popup()));
         ScreenGraph graph = ScreenGraph.of(screens);
         assertFalse(graph.noneCut("OFFER"), "its default way back is its way out");
         assertFalse(graph.unfinished("OFFER"));
@@ -195,9 +189,9 @@ class ScreenCardsTest {
 
     @Test
     void aLinkSaysTheLookItsButtonMustHave() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
-        screens.put("CAMPAIGN", screens.get("CAMPAIGN").from(Way.of(BotConstants.screen("HOME"), click("campaign"))
-                .whenLooks(com.botmaker.sdk.api.screens.State.BADGE)));
+        Map<String, MapScreen> screens = screens();
+        screens.put("CAMPAIGN", screens.get("CAMPAIGN").setup(s -> s.fromLooks(
+                com.botmaker.sdk.api.screens.State.BADGE)));
         Link campaign = ScreenCards.links(ScreenGraph.of(screens)).stream()
                 .filter(l -> l.to().equals("CAMPAIGN") && !l.back()).findFirst().orElseThrow();
         assertEquals("badge", campaign.look());
@@ -220,7 +214,7 @@ class ScreenCardsTest {
 
     @Test
     void theConstantViewFindsItsScreenOnlyOnAMapThatRead() {
-        GameScreen campaign = map().screens().get("CAMPAIGN");
+        Setup campaign = map().screens().get("CAMPAIGN").setup();
         assertEquals(Optional.of("CAMPAIGN"), ScreenConstantView.constantOf(map(), Optional.of(campaign)));
         assertEquals(Optional.empty(), ScreenConstantView.constantOf(ScreenGraph.of(Map.of()),
                 Optional.of(campaign)), "a map that did not read: the slot draws as written");
@@ -233,10 +227,9 @@ class ScreenCardsTest {
         ImageTemplate tavern = picture("tavern").at(new Rect(10, 240, 100, 100));
         ImageTemplate arena = picture("arena").at(new Rect(12, 340, 100, 100));
         ImageTemplate library = picture("library");
-        List<Input> inputs = List.of(Input.click(tavern), Input.click(arena), Input.click(library).sometimes(),
-                click("mail"));
-        GameScreen home = GameScreen.named("Home").markers(marks("home")).inputs(inputs)
-                .lists(List.of(ScreenList.of(-5, List.of(arena, tavern, library))));
+        Setup setup = Setup.named("Home").markers(marks("home"));
+        MapScreen home = screen(setup, Button.of(tavern), Button.of(arena), Button.of(library).sometimes(),
+                click("mail"), Strip.of(Scroll.wheel(-5), List.of(arena, tavern, library)));
         ScreenGraph graph = ScreenGraph.of(Map.of("HOME", home));
         List<ScreenCards.Row> rows = ScreenCards.rows(graph, "HOME");
 
@@ -250,7 +243,8 @@ class ScreenCardsTest {
         assertTrue(column.has(rows.get(0)));
         assertFalse(column.has(rows.get(3)), "mail is boxed on the shot as before");
 
-        GameScreen nowhere = home.lists(List.of(ScreenList.of(-5, List.of(library, picture("mail")))));
+        MapScreen nowhere = screen(setup, Button.of(tavern), Button.of(arena), Button.of(library).sometimes(),
+                click("mail"), Strip.of(Scroll.wheel(-5), List.of(library, picture("mail"))));
         assertEquals(List.of(), ScreenCards.strips(ScreenGraph.of(Map.of("HOME", nowhere)), "HOME", rows),
                 "no member has a place: no strip");
     }

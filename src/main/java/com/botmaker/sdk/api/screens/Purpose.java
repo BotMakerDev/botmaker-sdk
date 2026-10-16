@@ -1,13 +1,13 @@
 package com.botmaker.sdk.api.screens;
 
 /** What an {@link Input} is for, as Discovery names it: the activities are chosen from it after Discovery. */
-public enum Kind {
+public enum Purpose {
     /** Work that repeats: a claim, a train, a start. */
-    CHORE,
-    /** A shortcut the game ships for a chore: Auto, x10, Max, Claim all, Skip. */
+    TASK,
+    /** A shortcut the game ships for a task: Auto, x10, Max, Claim all, Skip. */
     SHORTCUT,
     /** Spending the player decides on. */
-    CHOICE,
+    SPEND,
     /** Information only. */
     INFO
 }

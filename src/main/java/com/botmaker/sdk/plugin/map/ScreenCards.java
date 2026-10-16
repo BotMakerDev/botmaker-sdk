@@ -2,12 +2,14 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Kind;
-import com.botmaker.sdk.api.screens.ScreenList;
+import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.flow.BotConstants.InputName;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
@@ -22,7 +24,8 @@ import java.util.function.BooleanSupplier;
 
 /**
  * What 🗺 Screens draws of the map, decided apart from JavaFX: each screen's card (its state, progress and badges),
- * each edge, and each input's row in the side panel. Values, so a redraw happens only when one of them changed.
+ * each edge, and each input's row in the side panel, by its field. Values, so a redraw happens only when one of them
+ * changed.
  */
 final class ScreenCards {
 
@@ -52,7 +55,7 @@ final class ScreenCards {
      * @param presence  whether it can be reached now
      * @param tried     its inputs tried
      * @param inputs    its inputs
-     * @param chores    its inputs named a chore
+     * @param chores    its inputs named a task
      * @param stage     what its notes say it reached ({@code surveyed}), empty when nothing
      * @param at        where its card was moved to, null for where the layout puts it
      */
@@ -66,13 +69,15 @@ final class ScreenCards {
     }
 
     /**
-     * One edge: {@code via} on {@code from} reaches {@code to}. The entrance (the screen's {@code from}) is solid and
-     * places the cards; another way in and a way back are dashed.
+     * One edge: {@code via}, the field {@code field} of {@code from}, reaches {@code to}. The entrance (the screen's
+     * {@code from}) is solid and places the cards; another way in and a way back are dashed.
      */
-    record Link(String from, String to, Input via, boolean entrance, boolean back, String when, String look) {
+    record Link(String from, String to, String field, Input via, boolean entrance, boolean back, String when,
+                String look) {
 
         /** How the link's input reads; a way back with none of its own reads as the default one. */
         String label() {
+            if (field != null) return field;
             return via == null ? "the default way back (a close button, then Escape)" : via.label();
         }
     }
@@ -83,9 +88,10 @@ final class ScreenCards {
     /**
      * One input in the side panel.
      *
+     * @param field   its field on the screen's class
      * @param input   the input as the map holds it
-     * @param label   how it reads: {@code click campaign_claim}
-     * @param picture its picture's id, null for a key
+     * @param label   how it reads: its field, {@code beerBuy}
+     * @param picture its picture's id (a strip's first member's), null for a key
      * @param state   how it stands
      * @param result  what it did, in words: {@code → Campaign}, {@code in place}, {@code never: spends gems}
      * @param kind    what it is for, lower case; empty when not named
@@ -94,8 +100,8 @@ final class ScreenCards {
      * @param looks   each look of its button, the usual one first, with where it leads in that look: one entry for
      *                a button with one look
      */
-    record Row(Input input, String label, String picture, RowState state, String result, String kind, String look,
-               String when, List<ButtonLook> looks) {}
+    record Row(String field, Input input, String label, String picture, RowState state, String result, String kind,
+               String look, String when, List<ButtonLook> looks) {}
 
     /**
      * One look of an input's button as the side panel steps through it: its picture, what it means, and where it
@@ -104,12 +110,12 @@ final class ScreenCards {
     record ButtonLook(String picture, com.botmaker.sdk.api.screens.State state, String leads) {}
 
     /**
-     * One list of a screen as its shot draws it: every member's picture in the list's order, in a strip over the
-     * place the members were cut in, scrolled by the wheel; a member that comes and goes is drawn dimmed.
+     * One strip of a screen as its shot draws it: every member's picture in the strip's order, over the place the
+     * members were cut in, scrolled by the wheel; a member that comes and goes is drawn dimmed.
      *
      * @param place   the members' places joined, in the game's frame
      * @param down    whether the strip runs down (a column), not across
-     * @param members each member's row, in the list's order
+     * @param members each member's row, in the strip's order
      */
     record Strip(Rect place, boolean down, List<Row> members) {
 
@@ -122,18 +128,19 @@ final class ScreenCards {
     private ScreenCards() {}
 
     /**
-     * {@code constant}'s lists as its shot draws them, from {@code rows} ({@link #rows}); a list none of whose members
-     * has a place it was cut at is not drawn.
+     * {@code constant}'s strips as its shot draws them, from {@code rows} ({@link #rows}); a strip none of whose
+     * members has a place it was cut at is not drawn.
      */
     static List<Strip> strips(ScreenGraph graph, String constant, List<Row> rows) {
-        GameScreen screen = graph.screens().get(constant);
+        MapScreen screen = graph.screens().get(constant);
         if (screen == null) return List.of();
         List<Strip> strips = new ArrayList<>();
-        for (ScreenList list : screen.lists()) {
+        for (com.botmaker.sdk.api.screens.Strip strip : screen.strips().values()) {
             Rect place = null;
             List<Row> members = new ArrayList<>();
-            for (ImageTemplate member : list.members()) {
-                rows.stream().filter(r -> member.id().equals(r.picture())).findFirst().ifPresent(members::add);
+            for (ImageTemplate member : strip.members()) {
+                rows.stream().filter(r -> r.input() instanceof Button && member.id().equals(r.picture())).findFirst()
+                        .ifPresent(members::add);
                 Rect at = member.place();
                 if (at != null) place = place == null ? at : union(place, at);
             }
@@ -159,10 +166,11 @@ final class ScreenCards {
     }
 
     static Card card(ScreenGraph graph, String constant, String stage) {
-        GameScreen screen = graph.screens().get(constant);
-        List<Input> inputs = screen.allInputs();
-        int tried = (int) inputs.stream().filter(i -> graph.tried(constant, i)).count();
-        int chores = (int) inputs.stream().filter(i -> i.kind() == Kind.CHORE).count();
+        MapScreen screen = graph.screens().get(constant);
+        List<String> fields = graph.fields(constant);
+        int tried = (int) fields.stream().filter(f -> graph.tried(constant, f)).count();
+        int chores = (int) fields.stream()
+                .filter(f -> graph.input(constant, f).filter(i -> i.purpose() == Purpose.TASK).isPresent()).count();
         int untried = graph.untried(constant).size();
         int unseen = graph.unseen(constant).size();
         State state;
@@ -183,7 +191,7 @@ final class ScreenCards {
         String shape = state == State.FINISHED
                 ? graph.shape(constant).map(s -> s.name().toLowerCase(Locale.ROOT)).orElse("") : "";
         return new Card(constant, graph.shown(constant), screen.hasMarker() ? screen.firstMarker().id() : null, state,
-                said, shape, screen.isPopup(), graph.presence(constant), tried, inputs.size(), chores,
+                said, shape, screen.isPopup(), graph.presence(constant), tried, fields.size(), chores,
                 stage == null ? "" : stage, screen.at());
     }
 
@@ -206,12 +214,12 @@ final class ScreenCards {
         List<Link> links = new ArrayList<>();
         Set<String> entered = new HashSet<>();
         for (ScreenGraph.Edge edge : graph.edges()) {
-            GameScreen to = graph.screens().get(edge.to());
-            boolean entrance = !edge.back() && to.from() != null && edge.via() != null
-                    && edge.via().sameAs(to.from().via())
-                    && graph.parent(edge.to()).filter(edge.from()::equals).isPresent()
+            MapScreen to = graph.screens().get(edge.to());
+            Optional<InputName> tree = graph.nameOf(to.fromInput());
+            boolean entrance = !edge.back() && edge.input() != null
+                    && tree.filter(n -> n.screen().equals(edge.from()) && n.field().equals(edge.input())).isPresent()
                     && entered.add(edge.to());
-            links.add(new Link(edge.from(), edge.to(), edge.via(), entrance, edge.back(),
+            links.add(new Link(edge.from(), edge.to(), edge.input(), edge.via(), entrance, edge.back(),
                     edge.when() == null ? "" : ScreenTypes.sourceOf(edge.when()),
                     edge.state() == null ? "" : edge.state().displayName().toLowerCase(Locale.ROOT)));
         }
@@ -220,8 +228,7 @@ final class ScreenCards {
 
     /** The screen the map's tree starts at: the first that is no popup and is made known from none. */
     static Optional<String> root(ScreenGraph graph) {
-        return graph.screens().entrySet().stream().filter(e -> !e.getValue().isPopup() && e.getValue().from() == null)
-                .map(Map.Entry::getKey).findFirst();
+        return graph.root();
     }
 
     /** The names on the way from the first screen to {@code constant}, both included; just it for a popup. */
@@ -234,17 +241,16 @@ final class ScreenCards {
         return names;
     }
 
-    /** {@code constant}'s inputs as the side panel lists them, in the map's order. */
+    /** {@code constant}'s inputs as the side panel lists them, in the order its class declares them. */
     static List<Row> rows(ScreenGraph graph, String constant) {
-        GameScreen screen = graph.screens().get(constant);
-        if (screen == null) return List.of();
         List<Row> rows = new ArrayList<>();
-        for (Input input : screen.allInputs()) rows.add(row(graph, constant, input));
+        for (String field : graph.fields(constant)) rows.add(row(graph, constant, field));
         return rows;
     }
 
-    static Row row(ScreenGraph graph, String constant, Input input) {
-        Optional<String> opens = graph.opens(constant, input);
+    static Row row(ScreenGraph graph, String constant, String field) {
+        Input input = graph.input(constant, field).orElseThrow();
+        Optional<String> opens = graph.opens(constant, field);
         RowState state;
         String result;
         if (input.never() != null) {
@@ -253,11 +259,12 @@ final class ScreenCards {
         } else if (input.lock() != null) {
             state = RowState.LOCKED;
             result = "locked";
-        } else if (graph.tried(constant, input)) {
+        } else if (graph.tried(constant, field)) {
             // As the graph counts a tried input, so the card's ring and the rows never disagree.
             state = RowState.TRIED;
-            result = opens.isPresent() ? "→ " + String.join(" / ", graph.leads(constant, input).stream()
+            result = opens.isPresent() ? "→ " + String.join(" / ", graph.leads(constant, field).stream()
                     .map(lead -> graph.shown(lead.to()) + said(lead.state(), lead.when())).distinct().toList())
+                    : graph.isBack(constant, field) ? "way back"
                     : input.did() == null ? "tried" : switch (input.did()) {
                         case IN_PLACE -> "in place";
                         case NONE -> "no effect";
@@ -270,17 +277,31 @@ final class ScreenCards {
             state = RowState.UNTRIED;
             result = "untried";
         }
-        String kind = input.kind() != null ? input.kind().name().toLowerCase(Locale.ROOT)
+        String kind = input.purpose() != null ? input.purpose().name().toLowerCase(Locale.ROOT)
                 : input.comesAndGoes() ? "comes and goes" : "";
-        GameScreen screen = graph.screens().get(constant);
-        String look = screen == null ? "" : screen.variants().stream().filter(v -> v.inputs().contains(input))
+        MapScreen screen = graph.screens().get(constant);
+        InputName self = new InputName(constant, field);
+        String look = screen == null ? "" : screen.variants().stream()
+                .filter(v -> v.inputs().stream().anyMatch(i -> graph.nameOf(i).filter(self::equals).isPresent()))
                 .map(ScreenVariant::name).findFirst().orElse("");
-        List<ScreenGraph.Lead> leads = graph.leads(constant, input);
-        List<ButtonLook> looks = input.looks().stream().map(v -> new ButtonLook(v.picture().id(), v.state(),
-                String.join(" / ", leads.stream().filter(l -> l.state() == null || l.state() == v.state())
-                        .map(l -> graph.shown(l.to()) + said(null, l.when())).distinct().toList()))).toList();
-        return new Row(input, input.label(), input.picture() == null ? null : input.picture().id(), state, result,
-                kind, look, ScreenTypes.sourceOf(input.when()), looks);
+        List<ScreenGraph.Lead> leads = graph.leads(constant, field);
+        List<ButtonLook> looks = input instanceof Button button ? button.allLooks().stream()
+                .map(v -> new ButtonLook(v.picture().id(), v.state(), String.join(" / ", leads.stream()
+                        .filter(l -> l.state() == null || l.state() == v.state())
+                        .map(l -> graph.shown(l.to()) + said(null, l.when())).distinct().toList()))).toList()
+                : List.of();
+        return new Row(field, input, field, picture(input), state, result, kind, look,
+                ScreenTypes.sourceOf(input.when()), looks);
+    }
+
+    /** The picture {@code input} acts on: a button's, a strip's first member's; null for a key. */
+    static String picture(Input input) {
+        return switch (input) {
+            case Button button -> button.picture() == null ? null : button.picture().id();
+            case com.botmaker.sdk.api.screens.Strip strip -> strip.members().isEmpty() ? null
+                    : strip.members().getFirst().id();
+            case Hotkey ignored -> null;
+        };
     }
 
     /** What a way needs, in words after the screen it leads to: {@code  (disabled, while Firestone::eventOn)}. */

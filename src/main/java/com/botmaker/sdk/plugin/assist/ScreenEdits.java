@@ -3,13 +3,17 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.flow.BotConstants.InputName;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
@@ -28,11 +32,11 @@ import java.util.stream.Collectors;
 
 /**
  * The map edited by hand from 🗺 Screens' side panel: what the assistant's tools record by trying, set by the user
- * instead (the user's call, 2026-10-15): an input's result, kind, never, lock or coming and going, an input removed or
- * made the way back, a screen renamed, made a popup, taken back, deleted or given a new shot, pictures the bot has put
- * on a screen, a marker or a picture it never shows added or taken off, a screen added under another without trying
- * its way in, a way in or a way back taken off, and when a
- * way, an input or a look is there, and where a card sits on the map. The assistant's edit_map does each by the same
+ * instead (the user's call, 2026-10-15): an input's result, purpose, never, lock or coming and going, an input removed
+ * or made the way back, a screen renamed, made a popup, taken back, deleted or given a new shot, pictures the bot has
+ * put on a screen, a marker or a picture it never shows added or taken off, a screen added under another without
+ * trying its way in, a way in or a way back taken off, and when a way, an input or a look is there, and where a card
+ * sits on the map. An input is named by its field ({@code beerBuy}). The assistant's edit_map does each by the same
  * method ({@link MapEdits}). Each answers in a sentence what it wrote, or why it did not. On the FX thread, except
  * {@link #retakeShot}, which reads the game, and {@link #addMarker} and {@link #removeMarker}, which read every shot.
  */
@@ -43,68 +47,86 @@ public final class ScreenEdits {
 
     private ScreenEdits() {}
 
-    /**
-     * {@code input} as it was cut, untried: its result, never and lock cleared, its kind, variants and coming and
-     * going kept.
-     */
+    /** {@code input} as it was cut, untried: its result, never and lock cleared, the rest kept. */
     public static Input untried(Input input) {
-        return new Input(input.act(), input.picture(), input.key(), input.notches(), null, input.kind(), null,
-                input.comesAndGoes(), null, input.variants(), input.when(), input.nth(), input.every());
+        return input.did(null).never(null).locked(null);
     }
 
     /** {@code input} shown only at times, or always ({@code sometimes} false: when it is there goes too). */
     public static Input sometimes(Input input, boolean sometimes) {
-        return new Input(input.act(), input.picture(), input.key(), input.notches(), input.did(), input.kind(),
-                input.never(), sometimes, input.lock(), input.variants(), sometimes ? input.when() : null,
-                input.nth(), input.every());
+        if (sometimes) return input.sometimes();
+        return switch (input) {
+            case Button b -> new Button(b.picture(), b.did(), b.purpose(), b.never(), false, b.lock(), b.looks(), null,
+                    b.repeats());
+            case Hotkey h -> new Hotkey(h.key(), h.did(), h.purpose(), h.never(), false, h.lock(), null);
+            case Strip s -> new Strip(s.scroll(), s.members(), s.did(), s.purpose(), s.never(), false, s.lock(), null);
+        };
     }
 
-    /** {@code input}, with no kind named. */
+    /** {@code input}, with no purpose named. */
     public static Input unkinded(Input input) {
-        return new Input(input.act(), input.picture(), input.key(), input.notches(), input.did(), null,
-                input.never(), input.comesAndGoes(), input.lock(), input.variants(), input.when(), input.nth(),
-                input.every());
+        return input.purpose(null);
     }
 
-    /** Puts {@code now} where {@code old} is on {@code constant}; {@code now} null removes it. */
-    public static String setInput(StudioServices services, String constant, Input old, Input now) {
-        return said(ScreenBook.update(services, constant, s -> MapTools.replaced(s, old, now)),
-                now == null ? old.label() + " is off " + constant + "." : "Noted: " + now.label() + ".");
+    /** Puts {@code now} as {@code constant}'s field {@code field}; {@code now} null removes it. */
+    public static String setInput(StudioServices services, String constant, String field, Input now) {
+        return said(ScreenBook.update(services, constant,
+                        s -> now == null ? s.withoutInput(field) : s.withInput(field, now)),
+                now == null ? field + " is off " + constant + "." : "Noted: " + field + ".");
     }
 
     /**
-     * Makes {@code list} one of {@code constant}'s lists, in place of every list that holds one of its members; a list
-     * of no members (or 0 notches) takes those lists off, their inputs back at their places.
+     * Makes {@code strip} one of {@code constant}'s strips, as its field {@code field} (null: a new one named from its
+     * first member), in place of every strip that holds one of its members; a strip of no members (or 0 notches) takes
+     * those strips off, their buttons looked for at their places.
      */
-    public static String setList(StudioServices services, String constant, ScreenList list) {
-        boolean off = list.members().isEmpty() || list.notches() == 0;
-        String names = list.members().stream().map(ImageTemplate::id).collect(Collectors.joining(", "));
-        return said(ScreenBook.update(services, constant, s -> s.lists(listsWith(s.lists(), list, off))),
-                off ? "The list is off " + constant + ": its inputs are looked for at their places."
-                        : constant + " has a list of " + names + ", each found anywhere along it and scrolled to by "
-                        + list.notches() + " notches over another that shows.");
+    public static String setStrip(StudioServices services, String constant, String field, Strip strip) {
+        boolean off = strip.members().isEmpty() || strip.scroll() == null || strip.scroll().notches() == 0;
+        String names = strip.members().stream().map(ImageTemplate::id).collect(Collectors.joining(", "));
+        return said(ScreenBook.update(services, constant, s -> withStrip(s, field, strip, off)),
+                off ? "The strip is off " + constant + ": its buttons are looked for at their places."
+                        : constant + " has a strip of " + names + ", each found anywhere along it and scrolled to by "
+                        + strip.scroll().notches() + " notches over another that shows.");
     }
 
-    /** {@code lists} without any holding one of {@code list}'s members, and {@code list} last unless {@code off}. */
-    static List<ScreenList> listsWith(List<ScreenList> lists, ScreenList list, boolean off) {
-        List<ScreenList> now = new ArrayList<>(lists.stream()
-                .filter(l -> list.members().stream().noneMatch(l::has)).toList());
-        if (!off) now.add(list);
-        return now;
+    /** {@code screen} without any strip holding one of {@code strip}'s members, and {@code strip} last unless {@code off}. */
+    static MapScreen withStrip(MapScreen screen, String field, Strip strip, boolean off) {
+        MapScreen now = screen;
+        Strip had = null;
+        String hadField = null;
+        for (Map.Entry<String, Strip> held : screen.strips().entrySet()) {
+            if (held.getKey().equals(field) || strip.members().stream().anyMatch(held.getValue()::has)) {
+                if (had == null) {
+                    had = held.getValue();
+                    hadField = held.getKey();
+                }
+                now = now.withoutInput(held.getKey());
+            }
+        }
+        if (off) return now;
+        // The strip it replaces keeps its field and what it says of its members: only its members and scroll change.
+        Strip made = had == null ? strip : had.members(strip.members()).scroll(strip.scroll());
+        String name = hadField != null ? hadField : field != null && !now.inputs().containsKey(field) ? field
+                : now.fieldFor((strip.members().isEmpty() ? "" : strip.members().getFirst().id()) + " strip");
+        return now.withInput(name, made);
     }
 
-    /** Makes {@code input} {@code constant}'s way back, off its inputs; the way back it had is an untried input again. */
-    public static String useAsBack(StudioServices services, String constant, Input input) {
-        Input back = untried(input);
-        return said(ScreenBook.update(services, constant, s -> withInput(MapTools.replaced(s, input, null).back(back),
-                        input.sameAs(s.back()) ? null : s.back())),
-                input.label() + " is the way back.");
+    /**
+     * Makes the field {@code field} {@code constant}'s way back; a way back it had that was no field of its own is an
+     * untried input of it again.
+     */
+    public static String useAsBack(StudioServices services, String constant, String field) {
+        return said(ScreenBook.update(services, constant, s -> keepBack(s).setup(x -> x.back(
+                        BotConstants.input(constant, field)))
+                        .withInput(field, untried(s.input(field).orElseThrow()))),
+                field + " is the way back.");
     }
 
-    /** {@code screen} with {@code input} untried among its inputs, unless one of them acts the same; null: as it is. */
-    private static GameScreen withInput(GameScreen screen, Input input) {
-        if (input == null || screen.allInputs().stream().anyMatch(input::sameAs)) return screen;
-        return MapTools.replaced(screen, null, untried(input));
+    /** {@code screen} with its way back, when that is no field of its own, one of its inputs untried. */
+    private static MapScreen keepBack(MapScreen screen) {
+        Input back = screen.back();
+        if (back == null || BotConstants.inputName(back) != null || screen.fieldOf(back).isPresent()) return screen;
+        return screen.withInput(screen.fieldFor(back.label()), untried(back));
     }
 
     /** Gives {@code constant} the name the game shows, {@code name}; its constant stays. */
@@ -113,18 +135,19 @@ public final class ScreenEdits {
         String typed = name.strip();
         Optional<String> taken = ScreenBook.find(ScreenBook.read(services), typed).filter(c -> !c.equals(constant));
         if (taken.isPresent()) return NOT_WRITTEN + "Screens." + taken.get() + " is called " + typed + " already.";
-        return said(ScreenBook.update(services, constant, s -> s.name(typed)), "Renamed " + typed + ".");
+        return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.name(typed))), "Renamed " + typed + ".");
     }
 
     /** Makes {@code constant} a popup, or a screen of the tree again ({@code popup} false). */
     public static String setPopup(StudioServices services, String constant, boolean popup) {
-        return said(ScreenBook.update(services, constant, s -> popup ? s.popup() : s.notPopup()),
+        return said(ScreenBook.update(services, constant, s -> s.setup(x -> popup ? x.popup() : x.notPopup())),
                 popup ? "A popup now." : "No longer a popup.");
     }
 
     /** Puts {@code notes} on {@code constant}, over what it had; blank removes them. */
     public static String setNotes(StudioServices services, String constant, String notes) {
-        return said(ScreenBook.update(services, constant, s -> s.notes(notes == null ? null : notes.strip())),
+        return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.notes(notes == null ? null
+                        : notes.strip()))),
                 notes == null || notes.isBlank() ? "Notes removed." : "Notes saved.");
     }
 
@@ -133,11 +156,11 @@ public final class ScreenEdits {
         return ScreenDesk.text(MapTools.notAScreen(new MapTools.Mistake(constant), context));
     }
 
-    /** Deletes {@code constant} and its shot; refused while another screen is reached from it. */
+    /** Deletes {@code constant} and its shot; refused while another screen is reached through one of its inputs. */
     public static String delete(StudioServices services, String constant) {
         ScreenGraph graph = ScreenBook.read(services);
         List<String> after = graph.screens().keySet().stream()
-                .filter(c -> !c.equals(constant) && graph.dependsOn(c).contains(constant)).map(graph::shown).toList();
+                .filter(c -> !c.equals(constant) && graph.opensFrom(c).contains(constant)).map(graph::shown).toList();
         if (!after.isEmpty()) {
             return NOT_WRITTEN + String.join(", ", after) + " is reached from it: delete those first.";
         }
@@ -162,7 +185,7 @@ public final class ScreenEdits {
         } catch (IllegalStateException busy) {
             return "Studio did not hand over the bot's Screens: " + busy.getMessage();
         }
-        GameScreen screen = graph.screens().get(constant);
+        MapScreen screen = graph.screens().get(constant);
         if (screen == null) return "No screen " + constant + " in the map.";
         if (!screen.hasMarker()) {
             return graph.shown(constant) + " has no marker yet, so nothing tells it from the frame: cut its marker, "
@@ -184,107 +207,115 @@ public final class ScreenEdits {
     }
 
     /**
-     * Adds a screen the game calls {@code name} under {@code parent}, opened by {@code via}, without trying it: the
-     * input is put on {@code parent} too when it is not there.
+     * Adds a screen the game calls {@code name} under {@code parent}, opened by its field {@code viaField}, without
+     * trying it; with no field, {@code via} is put on {@code parent} first, a field named from what it acts on.
      */
-    public static String newScreen(StudioServices services, String parent, String name, Input via) {
+    public static String newScreen(StudioServices services, String parent, String name, String viaField, Input via) {
         if (name == null || !MapTools.isName(name.strip())) return NOT_WRITTEN + "name it in plain words, on one line.";
         ScreenGraph graph = ScreenBook.read(services);
         if (ScreenBook.find(graph, name.strip()).isPresent()) {
             return NOT_WRITTEN + "the map has " + name.strip() + " already.";
         }
+        MapScreen on = graph.screens().get(parent);
+        if (on == null) return NOT_WRITTEN + "no screen " + parent + " in the map.";
+        if (viaField == null && via == null) return NOT_WRITTEN + "name the input that opens it.";
+        String field = viaField != null ? viaField : on.fieldOf(via).orElseGet(() -> on.fieldFor(via.label()));
+        if (on.input(field).isEmpty() && via == null) return NOT_WRITTEN + parent + " has no input " + field + ".";
         String constant = ScreenBook.constantFor(graph, name.strip());
-        Input entrance = untried(via);
-        GameScreen made = GameScreen.named(name.strip()).from(Way.of(BotConstants.screen(parent),
-                ScreenGraph.bare(entrance)));
-        GameScreen on = graph.screens().get(parent);
-        Optional<Input> had = on == null ? Optional.empty()
-                : on.allInputs().stream().filter(i -> i.sameAs(via)).findFirst();
+        MapScreen made = MapScreen.of(Setup.named(name.strip()).from(BotConstants.input(parent, field)));
+        Input entrance = on.input(field).orElseGet(() -> untried(via));
         // The entrance on the parent and the new screen: one step of Studio's undo.
         Optional<String> failed = ScreenBook.step(services, "Add " + name.strip(), () -> ScreenBook.update(services,
-                parent, s -> MapTools.replaced(s, had.orElse(null), entrance))
+                parent, s -> s.withInput(field, untried(entrance)))
                 .or(() -> ScreenBook.add(services, constant, made)));
         return said(failed, "Added " + name.strip() + " as Screens." + constant + ": it owes its marker.");
     }
 
     /**
-     * Makes {@code to}'s way in from {@code from} by {@code via} open only while {@code method} answers true — a
-     * method reference, {@code Firestone::eventOn} — or always, {@code method} blank.
+     * Makes {@code to}'s way in through {@code from}'s field {@code viaField} open only while {@code method} answers
+     * true — a method reference, {@code Firestone::eventOn} — or always, {@code method} blank.
      */
-    public static String setWayWhen(StudioServices services, String to, String from, Input via, String method) {
+    public static String setWayWhen(StudioServices services, String to, String from, String viaField,
+                                    String method) {
         if (!ScreenTypes.isMethod(method)) return notMethod(method);
         BooleanSupplier when = ScreenTypes.condition(method);
         ScreenGraph graph = ScreenBook.read(services);
-        if (ways(graph.screens().get(to)).stream().noneMatch(way -> wayFrom(graph, way, from, via))) {
-            return noWay(graph, to, from, via);
+        if (ways(graph.screens().get(to)).stream().noneMatch(way -> wayFrom(graph, way, from, viaField))) {
+            return noWay(graph, to, from, viaField);
         }
-        return said(ScreenBook.update(services, to, s -> withWayWhen(graph, s, from, via, when)),
+        return said(ScreenBook.update(services, to, s -> withWayWhen(graph, s, from, viaField, when)),
                 when == null ? "That way is always open now." : "That way is open only while " + method.strip() + ".");
     }
 
-    /** {@code screen} with its way in from {@code from} by {@code via} taken only while {@code when}; null: always. */
-    static GameScreen withWayWhen(ScreenGraph graph, GameScreen screen, String from, Input via, BooleanSupplier when) {
-        GameScreen now = screen.from() != null && wayFrom(graph, screen.from(), from, via)
-                ? screen.from(screen.from().when(when)) : screen;
-        return now.alsoFrom(now.alsoFrom().stream()
-                .map(way -> wayFrom(graph, way, from, via) ? way.when(when) : way).toList());
+    /** {@code screen} with its way in through {@code from}'s field {@code viaField} taken only while {@code when}. */
+    static MapScreen withWayWhen(ScreenGraph graph, MapScreen screen, String from, String viaField,
+                                 BooleanSupplier when) {
+        return screen.setup(s -> {
+            Setup now = s.from() != null && wayFrom(graph, s.from(), from, viaField) ? s.fromWay(s.from().when(when))
+                    : s;
+            return now.alsoFrom(now.alsoFrom().stream()
+                    .map(way -> wayFrom(graph, way, from, viaField) ? way.when(when) : way).toList());
+        });
     }
 
     /**
-     * Takes {@code to}'s way in from {@code from} by {@code via} off the map: its next way in becomes the tree's when
-     * it was the tree's. Refused for a screen's only way in: the screen is deleted instead.
+     * Takes {@code to}'s way in through {@code from}'s field {@code viaField} off the map: its next way in becomes the
+     * tree's when it was the tree's. Refused for a screen's only way in: the screen is deleted instead.
      */
-    public static String removeWay(StudioServices services, String to, String from, Input via) {
+    public static String removeWay(StudioServices services, String to, String from, String viaField) {
         ScreenGraph graph = ScreenBook.read(services);
-        GameScreen screen = graph.screens().get(to);
-        if (ways(screen).stream().noneMatch(way -> wayFrom(graph, way, from, via))) {
-            return noWay(graph, to, from, via);
+        MapScreen screen = graph.screens().get(to);
+        if (ways(screen).stream().noneMatch(way -> wayFrom(graph, way, from, viaField))) {
+            return noWay(graph, to, from, viaField);
         }
-        if (screen.from() != null && ways(withoutWay(graph, screen, from, via)).isEmpty()) {
+        if (screen.from() != null && withoutWay(graph, screen, from, viaField).ways().isEmpty()) {
             return NOT_WRITTEN + "that is " + graph.shown(to) + "'s only way in: delete " + graph.shown(to)
                     + " instead, or take it for a change of " + graph.shown(from) + " in place (not a screen).";
         }
-        return said(ScreenBook.update(services, to, s -> withoutWay(graph, s, from, via)),
-                "Took " + graph.shown(to) + "'s way in from " + graph.shown(from) + " by " + via.label() + " off the "
+        return said(ScreenBook.update(services, to, s -> withoutWay(graph, s, from, viaField)),
+                "Took " + graph.shown(to) + "'s way in from " + graph.shown(from) + " by " + viaField + " off the "
                         + "map.");
     }
 
-    /** {@code screen} without its ways in from {@code from} by {@code via}; the tree's way in is its next one. */
-    private static GameScreen withoutWay(ScreenGraph graph, GameScreen screen, String from, Input via) {
-        List<Way> also = screen.alsoFrom().stream().filter(way -> !wayFrom(graph, way, from, via)).toList();
-        if (screen.from() == null || !wayFrom(graph, screen.from(), from, via)) return screen.alsoFrom(also);
-        return also.isEmpty() ? screen.from(null).alsoFrom(also)
-                : screen.from(also.getFirst()).alsoFrom(also.subList(1, also.size()));
+    /** {@code screen} without its ways in through {@code from}'s {@code viaField}; the tree's is its next one. */
+    private static MapScreen withoutWay(ScreenGraph graph, MapScreen screen, String from, String viaField) {
+        return screen.setup(s -> {
+            List<Way> also = s.alsoFrom().stream().filter(way -> !wayFrom(graph, way, from, viaField)).toList();
+            if (s.from() == null || !wayFrom(graph, s.from(), from, viaField)) return s.alsoFrom(also);
+            return also.isEmpty() ? s.fromWay(null).alsoFrom(also)
+                    : s.fromWay(also.getFirst()).alsoFrom(also.subList(1, also.size()));
+        });
     }
 
     /** {@code screen}'s ways in, the tree's first; none for no screen. */
-    private static List<Way> ways(GameScreen screen) {
-        List<Way> ways = new ArrayList<>();
-        if (screen == null) return ways;
-        if (screen.from() != null) ways.add(screen.from());
-        ways.addAll(screen.alsoFrom());
-        return ways;
+    private static List<Way> ways(MapScreen screen) {
+        return screen == null ? List.of() : screen.ways();
     }
 
-    private static String noWay(ScreenGraph graph, String to, String from, Input via) {
-        return NOT_WRITTEN + graph.shown(to) + " has no way in from " + graph.shown(from) + " by " + via.label() + ".";
+    private static String noWay(ScreenGraph graph, String to, String from, String viaField) {
+        return NOT_WRITTEN + graph.shown(to) + " has no way in from " + graph.shown(from) + " by " + viaField + ".";
     }
 
-    private static boolean wayFrom(ScreenGraph graph, Way way, String from, Input via) {
-        return way.via() != null && way.via().sameAs(via) && graph.constantOf(way.from()).filter(from::equals)
-                .isPresent();
+    private static boolean wayFrom(ScreenGraph graph, Way way, String from, String viaField) {
+        return graph.nameOf(way.via()).filter(new InputName(from, viaField)::equals).isPresent();
     }
 
     /**
      * Takes {@code constant}'s own way back off, a walk then closing it by its close button, else Escape: the input
-     * it was is an untried input of the screen again (a panel opened from it, taken for its way back).
+     * it was stays an input of the screen, untried again.
      */
     public static String removeBack(StudioServices services, String constant) {
-        GameScreen screen = ScreenBook.read(services).screens().get(constant);
+        ScreenGraph graph = ScreenBook.read(services);
+        MapScreen screen = graph.screens().get(constant);
         if (screen == null || screen.back() == null) return NOT_WRITTEN + "it has no way back of its own.";
-        Input was = untried(screen.back());
-        return said(ScreenBook.update(services, constant, s -> withInput(s.back(null), s.back())),
-                "No way back of its own: a walk closes it by its close button, else Escape. " + was.label()
+        Optional<String> field = graph.nameOf(screen.back()).filter(n -> n.screen().equals(constant))
+                .map(InputName::field);
+        String was = field.orElse(screen.back().label());
+        return said(ScreenBook.update(services, constant, s -> {
+                    MapScreen kept = keepBack(s).setup(x -> x.back(null));
+                    return field.flatMap(kept::input).map(i -> kept.withInput(field.get(), untried(i))).orElse(kept);
+                }),
+                "No way back of its own: a walk closes it by its close button, else Escape. " + was
                         + " is untried on it again.");
     }
 
@@ -294,7 +325,7 @@ public final class ScreenEdits {
      * Off the FX thread, unlike the other edits: it matches the set over every other screen's shot.
      */
     public static String addMarker(StudioServices services, String constant, ImageTemplate picture, boolean absent) {
-        GameScreen screen = FxCall.call(() -> ScreenBook.read(services)).screens().get(constant);
+        MapScreen screen = FxCall.call(() -> ScreenBook.read(services)).screens().get(constant);
         if (screen == null) return NOT_WRITTEN + "no screen " + constant + " in the map.";
         Markers was = Markers.of(screen);
         String id = picture.id();
@@ -313,7 +344,7 @@ public final class ScreenEdits {
      * for its last marker, and when another screen's shot shows what is left. Off the FX thread, as {@link #addMarker}.
      */
     public static String removeMarker(StudioServices services, String constant, String picture) {
-        GameScreen screen = FxCall.call(() -> ScreenBook.read(services)).screens().get(constant);
+        MapScreen screen = FxCall.call(() -> ScreenBook.read(services)).screens().get(constant);
         if (screen == null) return NOT_WRITTEN + "no screen " + constant + " in the map.";
         Markers was = Markers.of(screen);
         String id = picture == null ? "" : picture.strip();
@@ -332,7 +363,7 @@ public final class ScreenEdits {
                 constant, now);
         if (clash.isPresent()) return NOT_WRITTEN + MapTools.clashSaid(graph, constant, now, clash.get());
         return said(FxCall.call(() -> ScreenBook.update(services, constant,
-                s -> s.markers(now.shown()).absent(now.absent()))), "Told by " + now.said() + ".");
+                s -> s.setup(x -> x.markers(now.shown()).absent(now.absent())))), "Told by " + now.said() + ".");
     }
 
     private static boolean holds(List<ImageTemplate> pictures, String id) {
@@ -353,7 +384,7 @@ public final class ScreenEdits {
     public static String setLookWhen(StudioServices services, String constant, String look, String method) {
         if (!ScreenTypes.isMethod(method)) return notMethod(method);
         BooleanSupplier when = ScreenTypes.condition(method);
-        GameScreen screen = ScreenBook.read(services).screens().get(constant);
+        MapScreen screen = ScreenBook.read(services).screens().get(constant);
         Optional<ScreenVariant> had = screen == null || look == null ? Optional.empty() : screen.variants().stream()
                 .filter(v -> v.name().equalsIgnoreCase(look.strip())).findFirst();
         if (had.isEmpty()) {
@@ -362,19 +393,19 @@ public final class ScreenEdits {
                     .toList())) + ".";
         }
         String name = had.get().name();
-        return said(ScreenBook.update(services, constant, s -> s.withVariant(had.get().when(when))),
+        return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.withVariant(had.get().when(when)))),
                 when == null ? "No method says when " + name + " shows." : name + " shows only while "
                         + method.strip() + ".");
     }
 
-    /** {@code input} of {@code constant} there only while {@code method} answers true; blank: no method says. */
-    public static String setInputWhen(StudioServices services, String constant, Input input, String method) {
+    /** {@code constant}'s field {@code field} there only while {@code method} answers true; blank: no method says. */
+    public static String setInputWhen(StudioServices services, String constant, String field, String method) {
         if (!ScreenTypes.isMethod(method)) return notMethod(method);
         BooleanSupplier when = ScreenTypes.condition(method);
-        Input now = input.when(when);
-        return said(ScreenBook.update(services, constant, s -> MapTools.replaced(s, input, now)),
-                when == null ? "No method says when " + input.label() + " is there."
-                        : input.label() + " is there only while " + method.strip() + ".");
+        return said(ScreenBook.update(services, constant, s -> s.input(field)
+                        .map(input -> s.withInput(field, input.when(when))).orElse(s)),
+                when == null ? "No method says when " + field + " is there."
+                        : field + " is there only while " + method.strip() + ".");
     }
 
     /**
@@ -385,7 +416,7 @@ public final class ScreenEdits {
         ScreenGraph graph = ScreenBook.read(services);
         Map<String, Point> moving = new LinkedHashMap<>();
         corners.forEach((constant, corner) -> {
-            GameScreen screen = graph.screens().get(constant);
+            MapScreen screen = graph.screens().get(constant);
             if (screen != null && !Objects.equals(screen.at(), corner)) moving.put(constant, corner);
         });
         if (moving.isEmpty()) return "Nothing moved.";
@@ -395,7 +426,8 @@ public final class ScreenEdits {
         String[] answer = {moving.size() == 1 ? "Moved 1 screen." : "Moved " + moving.size() + " screens."};
         services.history().batch(label, () -> {
             for (Map.Entry<String, Point> corner : moving.entrySet()) {
-                Optional<String> failed = ScreenBook.update(services, corner.getKey(), s -> s.at(corner.getValue()));
+                Optional<String> failed = ScreenBook.update(services, corner.getKey(),
+                        s -> s.setup(x -> x.at(corner.getValue())));
                 if (failed.isPresent()) {
                     answer[0] = said(failed, "");
                     return;
@@ -410,9 +442,9 @@ public final class ScreenEdits {
         ScreenGraph graph = ScreenBook.read(services);
         String[] answer = {"Every card is where the layout puts it."};
         services.history().batch("Tidy the map", () -> {
-            for (Map.Entry<String, GameScreen> screen : graph.screens().entrySet()) {
+            for (Map.Entry<String, MapScreen> screen : graph.screens().entrySet()) {
                 if (screen.getValue().at() == null) continue;
-                Optional<String> failed = ScreenBook.update(services, screen.getKey(), s -> s.at(null));
+                Optional<String> failed = ScreenBook.update(services, screen.getKey(), s -> s.setup(x -> x.at(null)));
                 if (failed.isPresent()) {
                     answer[0] = said(failed, "");
                     return;

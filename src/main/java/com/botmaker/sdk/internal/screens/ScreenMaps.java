@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.screens;
 
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Screen;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * The bot's screen map at run time: each {@code static final GameScreen} of the {@code Screens} class beside a
+ * The bot's screen map at run time: each {@code static final} {@link Screen} of the {@code Screens} class beside a
  * holder ({@code Sdk.class}), read as {@code InstalledRun.nameFlows} reads {@code Flows}.
  */
 public final class ScreenMaps {
@@ -93,20 +93,24 @@ public final class ScreenMaps {
         }
     }
 
-    /** {@code holder}'s {@code static final GameScreen} constants, in the order it declares them. */
+    /**
+     * {@code holder}'s {@code static final} {@link Screen} constants, in the order it declares them, each read once
+     * every constant is set: a setup names any screen's inputs.
+     */
     public static ScreenGraph read(Class<?> holder) {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
+        Map<String, Screen> screens = new LinkedHashMap<>();
         for (Field field : holder.getDeclaredFields()) {
             int modifiers = field.getModifiers();
-            if (field.getType() != GameScreen.class || !Modifier.isStatic(modifiers) || !Modifier.isFinal(modifiers)) {
+            if (!Screen.class.isAssignableFrom(field.getType()) || !Modifier.isStatic(modifiers)
+                    || !Modifier.isFinal(modifiers)) {
                 continue;
             }
             try {
-                if (field.get(null) instanceof GameScreen screen) screens.put(field.getName(), screen);
+                if (field.get(null) instanceof Screen screen) screens.put(field.getName(), screen);
             } catch (IllegalAccessException | LinkageError unreadable) {
                 // Not the bot's to read here: the map lacks that screen, and a walk to it says so.
             }
         }
-        return ScreenGraph.of(screens);
+        return ScreenGraph.ofScreens(screens);
     }
 }

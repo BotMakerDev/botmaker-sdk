@@ -1,13 +1,13 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedSet;
-import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
@@ -22,18 +22,19 @@ import java.util.function.UnaryOperator;
 
 /**
  * The game's map as the bot's {@code Screens} class holds it, read and written through the host as 🗺 Screens will
- * write it: Discovery's tools keep it there rather than in the notes (2026-10-14). Every method runs on the FX thread
- * ({@link FxCall}).
+ * write it: Discovery's tools keep it there rather than in the notes (2026-10-14). A screen is a class of the set,
+ * its setup the class's member and each input a field ({@code ManagedValue.ofClasses}, 2026-10-16), so an edit
+ * writes only the parts it changed. Every method runs on the FX thread ({@link FxCall}).
  */
 final class ScreenBook {
 
-    static final ManagedSet<GameScreen> SCREENS = ManagedSet.of(SdkValues.SCREEN_MAP);
+    private static final ManagedValue<?> SCREENS = SdkValues.SCREEN_MAP;
     private static final ManagedSet<ImageTemplate> PICTURES = ManagedSet.of(SdkValues.PICTURES);
     private static final String HOLDER = "Screens";
 
     private ScreenBook() {}
 
-    /** The map, in the order the bot declares its screens; a constant the grammar cannot read is left out. */
+    /** The map, in the order the bot declares its screens; a field the grammar cannot read is left out. */
     static ScreenGraph read(StudioServices services) {
         return ScreenMapRead.of(services.pluginValues());
     }
@@ -57,24 +58,30 @@ final class ScreenBook {
     }
 
     /**
-     * Adds {@code screen} as {@code constant}, below every other, the class made on the first. Empty when written,
-     * else why not.
+     * Adds {@code screen} as {@code constant}: its class after every other, then each of its inputs, the class made
+     * on the first. Empty when written, else why not.
      */
-    static Optional<String> add(StudioServices services, String constant, GameScreen screen) {
+    static Optional<String> add(StudioServices services, String constant, MapScreen screen) {
         PluginValues values = services.pluginValues();
         if (values == null) return Optional.of("Studio has no source tree open.");
-        return step(services, "Add " + screen.name(), () -> values.create(SCREENS.value())
-                .or(() -> SCREENS.add(values, Member.of(constant), screen)));
+        return step(services, "Add " + screen.name(), () -> values.create(SCREENS)
+                .or(() -> values.addClass(SCREENS, constant, screen.setup()))
+                .or(() -> ScreenMapRead.add(values, constant, screen.inputs())));
     }
 
-    /** {@code constant} as {@code change} makes it, read again first. Empty when written, else why not. */
-    static Optional<String> update(StudioServices services, String constant, UnaryOperator<GameScreen> change) {
+    /**
+     * {@code constant} as {@code change} makes it, read again first: its setup written when it changed, each field
+     * gone removed, each new one added last and each changed one written. Empty when written, else why not.
+     */
+    static Optional<String> update(StudioServices services, String constant, UnaryOperator<MapScreen> change) {
         PluginValues values = services.pluginValues();
-        Optional<ValueContext> held = values == null ? Optional.empty() : SCREENS.open(values, Member.of(constant));
-        Optional<GameScreen> now = held.flatMap(SCREENS::read);
+        Optional<MapScreen> now = values == null ? Optional.empty() : read(services).screen(constant)
+                .filter(s -> ScreenMapRead.setup(values, constant).isPresent());
         if (now.isEmpty()) return Optional.of(HOLDER + "." + constant + " is gone or written by hand, so it is left as it is.");
+        MapScreen next = change.apply(now.get());
         // Named for Studio's ↶; a drag or a new screen around it is one step under its own name instead.
-        return step(services, "Edit " + now.get().name(), () -> held.get().write(change.apply(now.get())));
+        return step(services, "Edit " + now.get().name(),
+                () -> ScreenMapRead.write(values, constant, now.get(), next));
     }
 
     /** {@code write} as one step of Studio's undo named {@code label}, or part of the batch already open. */
@@ -84,19 +91,11 @@ final class ScreenBook {
         return answer.getFirst();
     }
 
-    /** Declares {@code constant} just above {@code before}, so {@code before} may name it. Empty when done. */
-    static Optional<String> moveBefore(StudioServices services, String constant, String before) {
-        PluginValues values = services.pluginValues();
-        if (values == null) return Optional.of("Studio has no source tree open.");
-        return step(services, "Reorder the map", () -> SCREENS.moveBefore(values, Member.of(constant),
-                Member.of(before)));
-    }
-
-    /** Takes {@code constant} out of the map. Empty when done, else why not. */
+    /** Takes {@code constant} out of the map, its class with it. Empty when done, else why not. */
     static Optional<String> remove(StudioServices services, String constant) {
         PluginValues values = services.pluginValues();
         if (values == null) return Optional.of("Studio has no source tree open.");
-        return step(services, "Delete Screens." + constant, () -> SCREENS.remove(values, Member.of(constant)));
+        return step(services, "Delete Screens." + constant, () -> values.removeGroup(SCREENS, constant));
     }
 
     /** Whether the bot's Pictures declare {@code name}. */

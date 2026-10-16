@@ -6,9 +6,11 @@ import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.BotStuckException;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import org.junit.jupiter.api.AfterEach;
@@ -60,8 +62,8 @@ class FlowWalkerTest {
      */
     @BeforeEach
     void mapAPopup() {
-        ScreenMaps.use(ScreenGraph.of(Map.of("OFFER", GameScreen.named("Offer")
-                .markers(List.of(new ImageTemplate("images/offer.png"))).popup())));
+        ScreenMaps.use(ScreenGraph.of(Map.of("OFFER", MapScreen.of(Setup.named("Offer")
+                .markers(List.of(new ImageTemplate("images/offer.png"))).popup()))));
     }
 
     @AfterEach
@@ -456,12 +458,22 @@ class FlowWalkerTest {
     void aRunWithNoHomeMethodWalksToTheMapsRoot() {
         assertNull(InstalledRun.home(), "the map in this test has a popup only: no root, no home");
 
-        ScreenMaps.use(ScreenGraph.of(Map.of("HOME", GameScreen.named("Home")
-                .markers(List.of(new ImageTemplate("images/home.png"))))));
+        ScreenMaps.use(ScreenGraph.of(Map.of("HOME", MapScreen.of(Setup.named("Home")
+                .markers(List.of(new ImageTemplate("images/home.png")))))));
+        assertNull(InstalledRun.home(), "a root the bot's class does not hold is no way to walk");
+        ScreenMaps.use(ScreenGraph.ofScreens(Map.of("HOME", new HomeScreen())));
         assertTrue(InstalledRun.home() != null, "a map's root is a way home");
 
         Runnable own = () -> {};
         InstalledRun.use(com.botmaker.sdk.api.flow.Run.of().home(own));
         assertEquals(own, InstalledRun.home(), "the run's own home wins");
+    }
+
+    /** A bot's first screen, as its {@code Screens} class holds it. */
+    private static final class HomeScreen extends Screen {
+        @Override
+        public Setup setup() {
+            return Setup.named("Home").markers(List.of(new ImageTemplate("images/home.png")));
+        }
     }
 }

@@ -257,7 +257,7 @@ public final class FlowWalker {
     private static volatile Predicate<String> walkBack = FlowWalker::navigate;
 
     private static boolean navigate(String constant) {
-        return ScreenMaps.installed().screen(constant).map(Navigate::to).orElse(false);
+        return ScreenMaps.installed().instance(constant).map(Navigate::to).orElse(false);
     }
 
     /** Test-only: walks back with {@code by} instead of the game; {@code null} is the game again. */

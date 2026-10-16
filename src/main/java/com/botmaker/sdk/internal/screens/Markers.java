@@ -1,7 +1,6 @@
 package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
@@ -28,7 +27,7 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent) {
         absent = absent == null ? List.of() : List.copyOf(absent);
     }
 
-    public static Markers of(GameScreen screen) {
+    public static Markers of(MapScreen screen) {
         return new Markers(screen.markers(), screen.absent());
     }
 

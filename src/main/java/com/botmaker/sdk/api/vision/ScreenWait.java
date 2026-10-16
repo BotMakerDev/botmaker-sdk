@@ -24,11 +24,11 @@ import java.time.Duration;
  * source and on a named one.
  */
 @Palette(category = "vision", categoryLabel = "Vision", icon = "🖥")
-public final class Screen {
+public final class ScreenWait {
 
     private static final long POLL_MS = 100;
 
-    private Screen() {}
+    private ScreenWait() {}
 
     /**
      * Waits until the current source has not changed for {@code quiet}, or {@code timeout} elapses.

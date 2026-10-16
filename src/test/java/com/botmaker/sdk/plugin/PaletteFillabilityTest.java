@@ -6,7 +6,7 @@ import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.basics.values.BasicsTypes;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
@@ -52,7 +52,7 @@ class PaletteFillabilityTest {
      * a screen of the map ({@code ScreenEditors}). A dropped block holds {@code null} until the pick, which the call
      * reads as none picked ({@code Navigate.to(null)} is false).
      */
-    private static final Set<Class<?>> PICKED_BY_AN_EDITOR = Set.of(GameScreen.class);
+    private static final Set<Class<?>> PICKED_BY_AN_EDITOR = Set.of(Screen.class);
 
     @Test
     void every_offered_parameter_can_be_filled() {

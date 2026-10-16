@@ -2,7 +2,7 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
@@ -165,7 +165,7 @@ final class ScreenFit {
      * marker yet shows wherever it is asked for: nothing tells it apart.
      */
     static boolean shows(ToolReach reach, ScreenGraph graph, String constant, BufferedImage frame) {
-        GameScreen screen = graph.screens().get(constant);
+        MapScreen screen = graph.screens().get(constant);
         if (screen == null || !screen.hasMarker()) return true;
         return Markers.of(screen).on(reach, frame)
                 || new ScreenWalk(graph, reach, ScreenWalk.STEP_MS, null).lookOn(constant, frame).isPresent();

@@ -73,8 +73,8 @@ public @interface SdkValue {
         /** A game font's digits as pictures, for {@code Text.readDigits} — a class of {@code DigitSet} constants. */
         DIGITS,
         /**
-         * The game's screens and the inputs between them, as Discovery found them — a class of {@code GameScreen}
-         * constants, {@code Screens}, that a run walks to reach a screen.
+         * The game's screens and the inputs between them, as Discovery found them — {@code Screens}, a class of
+         * {@code Screen} classes each with its constant, that a run walks to reach a screen.
          */
         SCREEN_MAP,
         /**

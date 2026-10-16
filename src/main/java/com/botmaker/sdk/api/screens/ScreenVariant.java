@@ -6,17 +6,17 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 
 /**
- * One look of a {@link GameScreen} that the same ways open and the same way leaves, doing the same job: the event
- * screen dressed for Halloween — {@code ScreenVariant.named("Halloween").markers(List.of(Pictures.EVENT_HALLOWEEN))}.
- * Its markers tell it apart once the screen's own matched, as a screen's do: all of {@link #markers} show and none of
- * {@link #absent}. Its inputs are those only it has, beside the screen's (the user's call, 2026-10-15). A screen that
- * is reached another way, left another way or does another job is a screen of its own; a list whose entries change by
- * day is one screen whose entries come and go ({@link Input#when}).
+ * One look of a {@link Screen} that the same ways open and the same way leaves, doing the same job: the event screen
+ * dressed for Halloween — {@code ScreenVariant.named("Halloween").markers(List.of(Pictures.EVENT_HALLOWEEN))}. Its
+ * markers tell it apart once the screen's own matched, as a screen's do: all of {@link #markers} show and none of
+ * {@link #absent}. Its inputs are those of the screen's fields only it shows, named as fields ({@code EVENT.pumpkin};
+ * the user's call, 2026-10-15). A screen that is reached another way, left another way or does another job is a
+ * screen of its own; a list whose entries change by day is one screen whose entries come and go ({@link Input#when}).
  *
  * @param name    what it is called, in plain words
  * @param markers pictures that all show while the screen has this look; empty until one is cut
  * @param absent  pictures none of which shows while the screen has this look
- * @param inputs  the inputs only this look has
+ * @param inputs  the screen's inputs only this look shows
  * @param when    the method answering whether this look shows now; null when not known
  */
 public record ScreenVariant(String name, List<ImageTemplate> markers, List<ImageTemplate> absent, List<Input> inputs,
@@ -53,7 +53,7 @@ public record ScreenVariant(String name, List<ImageTemplate> markers, List<Image
         return markers.isEmpty() ? null : markers.getFirst();
     }
 
-    /** This look, holding {@code inputs} beside the screen's. */
+    /** This look, showing the screen's {@code inputs} that only it shows. */
     public ScreenVariant inputs(List<Input> inputs) {
         return new ScreenVariant(name, markers, absent, inputs, when);
     }

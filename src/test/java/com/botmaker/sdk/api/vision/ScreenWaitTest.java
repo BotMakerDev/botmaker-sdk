@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The screen waits, on a source whose frames are drawn by capture number. */
-class ScreenTest {
+class ScreenWaitTest {
 
     private static BufferedImage filled(Color color) {
         BufferedImage image = new BufferedImage(64, 48, BufferedImage.TYPE_INT_RGB);
@@ -44,20 +44,20 @@ class ScreenTest {
     @Test
     void aScreenThatSettlesIsStable() {
         CaptureSource loading = frames(n -> filled(n < 4 && n % 2 == 0 ? Color.BLACK : Color.GRAY));
-        assertTrue(Screen.waitStable(loading, Duration.ofMillis(300), Duration.ofSeconds(3)));
+        assertTrue(ScreenWait.waitStable(loading, Duration.ofMillis(300), Duration.ofSeconds(3)));
     }
 
     @Test
     void aScreenThatKeepsMovingIsNotStable() {
         CaptureSource flashing = frames(n -> filled(n % 2 == 0 ? Color.BLACK : Color.WHITE));
-        assertFalse(Screen.waitStable(flashing, Duration.ofMillis(300), Duration.ofMillis(600)));
+        assertFalse(ScreenWait.waitStable(flashing, Duration.ofMillis(300), Duration.ofMillis(600)));
     }
 
     @Test
     void aChangeIsSeenAgainstTheFirstFrame() {
         CaptureSource clicked = frames(n -> filled(n < 3 ? Color.GRAY : Color.BLUE));
-        assertTrue(Screen.waitChange(clicked, Duration.ofSeconds(2)));
+        assertTrue(ScreenWait.waitChange(clicked, Duration.ofSeconds(2)));
         CaptureSource still = frames(n -> filled(Color.GRAY));
-        assertFalse(Screen.waitChange(still, Duration.ofMillis(400)));
+        assertFalse(ScreenWait.waitChange(still, Duration.ofMillis(400)));
     }
 }

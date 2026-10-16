@@ -3,7 +3,11 @@ package com.botmaker.sdk.internal.flow;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
 
 import java.util.List;
@@ -63,15 +67,77 @@ public final class BotConstants {
     }
 
     /**
-     * The bot's screen {@code name}, {@code Screens.HOME}, as an editor holds a reference to it: a screen called by
-     * the reference mark and the constant's name, with nothing else, equal to another only when it names the same
-     * constant ({@code ManagedValue.referredToAs}). A run never meets one: there {@code Way.from} holds the screen.
+     * The bot's screen {@code name}, {@code Screens.HOME}, as an editor holds a reference to it: a screen of no
+     * class of the bot's, equal to another only when it names the same constant ({@code ManagedValue.referredToAs}).
+     * A run never meets one: there the bot's constant is the screen.
      *
      * @throws IllegalArgumentException for a blank name, which names no constant
      */
-    public static GameScreen screen(String name) {
+    public static Screen screen(String name) {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("A screen reference needs a name");
-        return GameScreen.named(REFERENCE + name);
+        return new ScreenReference(name);
+    }
+
+    /** A screen an editor holds by its constant's name: its setup is that name and nothing else. */
+    private static final class ScreenReference extends Screen {
+
+        private final String name;
+
+        ScreenReference(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public Setup setup() {
+            return Setup.named(REFERENCE + name);
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof ScreenReference that && name.equals(that.name);
+        }
+
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+    /**
+     * The input {@code field} of the bot's screen {@code screen}, {@code Screens.MARKET.beerBuy}, as an editor holds a
+     * reference to it: a button of no picture of the bot's, equal to another only when it names the same field
+     * ({@code ManagedValue.fields}). A run never meets one: there the screen's field is the input.
+     *
+     * @throws IllegalArgumentException for a blank name, which names no field
+     */
+    public static Button input(String screen, String field) {
+        if (screen == null || screen.isBlank() || field == null || field.isBlank()) {
+            throw new IllegalArgumentException("An input reference needs its screen and its field");
+        }
+        return Button.of(new ImageTemplate(REFERENCE + screen + REFERENCE + field));
+    }
+
+    /** The screen and the field an {@link #input} reference names: {@code MARKET} and {@code beerBuy}. */
+    public record InputName(String screen, String field) {
+        @Override
+        public String toString() {
+            return screen + "." + field;
+        }
+    }
+
+    /** What {@code input} refers to when it is an {@link #input} reference; else null. */
+    public static InputName inputName(Input input) {
+        if (!(input instanceof Button button) || button.picture() == null) return null;
+        String path = button.picture().filePath();
+        if (!path.startsWith(REFERENCE) || !button.equals(Button.of(button.picture()))) return null;
+        String[] parts = path.substring(REFERENCE.length()).split(REFERENCE, -1);
+        return parts.length == 2 && !parts[0].isEmpty() && !parts[1].isEmpty() ? new InputName(parts[0], parts[1])
+                : null;
     }
 
     /**
@@ -93,9 +159,8 @@ public final class BotConstants {
     }
 
     /** The constant {@code screen} refers to when it is a {@link #screen} reference, {@code HOME}; else null. */
-    public static String screenName(GameScreen screen) {
-        return screen != null && screen.name() != null && screen.name().startsWith(REFERENCE)
-                && screen.equals(GameScreen.named(screen.name())) ? screen.name().substring(REFERENCE.length()) : null;
+    public static String screenName(Screen screen) {
+        return screen instanceof ScreenReference reference ? reference.name : null;
     }
 
     /** The constant {@code flow} refers to when it is a {@link #flow} reference, {@code DAILY}; else null. */

@@ -311,6 +311,25 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **Each screen is a class of its own** (breaking). `Screens.java` holds `public static final class Market extends
+  Screen` and its one constant, `public static final Market MARKET = new Market();`. Its inputs are its fields, so a
+  body names an input of that screen only: `Screens.MARKET.beerBuy`. The rest of the screen is one chain its
+  `setup()` returns: `Setup.named("Market").markers(…).from(HOME.market).back(MARKET.close)`. The map reads each
+  setup once every constant is set, so a screen names any other's inputs, whichever is declared first.
+  - `Input` is a sealed interface of three: `Button.of(picture)`, `Hotkey.of(key)` and `Strip.of(Scroll.wheel(-5),
+    List.of(…pictures))`. A strip lists its buttons by their pictures; each button is a field of its own. A strip's
+    traits are its members' defaults: `.sometimes()` on it makes each member come and go.
+  - A button's other looks are `.looks(List.of(Look.of(picture, State.DISABLED)))`, which was `variants(Variant…)`.
+  - A button the screen shows more than once is `.repeated()`, one input for all its copies. The copy is picked by
+    `Pick` (`first`, `nth`, `each`, `untilNone`) along an `Order`, the old `Direction` back: the four sides, the four
+    corners and `CENTER`. A way through one copy is `Way.of(MISSIONS.go).pick(Pick.nth(2, Order.NORTH))`, and the
+    tree's way `.from(…).fromPick(…)`. `nth` and `each` on an input are gone.
+  - `Kind` is `Purpose`: `TASK`, `SHORTCUT`, `SPEND`, `INFO`. try_input and edit_map take `purpose`, and edit_map's
+    `in_list` is `in_strip`.
+  - `Navigate.to(Screen)`, `isOn(Screen)` and `where()` take and give the screen class. `GameScreen`, `ScreenList`,
+    `Variant` and `Kind` are gone, with no conversion: Studio's upgrade repairs what a bot names.
+- **`Screen.waitStable` and `Screen.waitChange` are `ScreenWait.waitStable` and `ScreenWait.waitChange`**
+  (breaking): `Screen` is a screen of the map now.
 - **No `@ReplacedBy` pointers.** `BotSettings.debug()`/`debugOff()` and `Flow.Step.checksPopups()` stay
   `@Deprecated` without one, and `ApiPointersTest` is gone: a bot carries a removed or reshaped SDK element over
   with its own `@Migrate` rule (contract 0.10.0).

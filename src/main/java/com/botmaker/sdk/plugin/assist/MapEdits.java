@@ -6,17 +6,22 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Did;
-import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Kind;
-import com.botmaker.sdk.api.screens.ScreenList;
+import com.botmaker.sdk.api.screens.Purpose;
+import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.flow.BotConstants.InputName;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -24,14 +29,15 @@ import java.util.stream.Stream;
 /**
  * edit_map: the map fixed by hand, as 🗺 Screens' menus fix it, by the same {@link ScreenEdits} methods (the user's
  * call, 2026-10-15). What try_input recorded wrong (a panel taken for a way back, a result, a way in) or what the game
- * changed since is set here, nothing clicked. An input is named as try_input names it.
+ * changed since is set here, nothing clicked. An input is named as try_input names it: by its picture (a strip by its
+ * first member, with scroll) or its hotkey.
  */
 final class MapEdits {
 
     private static final String SCREEN = "the screen edited, as the map names it: Home, or its constant HOME; for "
             + "new_screen the screen it is opened from";
     private static final String PICTURE = "the input, by its picture, as try_input names it";
-    private static final String SCROLL = "with picture, the input that scrolls it by these notches";
+    private static final String SCROLL = "with picture, the strip that scrolls over it by these notches";
     private static final String KEY = "the input, by its hotkey: Q";
     private static final String FROM = "the screen the way in leaves";
     private static final String METHOD = "a method of the bot answering true while it holds (Firestone::eventOn); "
@@ -43,8 +49,8 @@ final class MapEdits {
     }
 
     /** What set_input records an input is for; none forgets it. */
-    enum Purpose {
-        CHORE, SHORTCUT, CHOICE, INFO, NONE
+    enum Goal {
+        TASK, SHORTCUT, SPEND, INFO, NONE
     }
 
     /** One edit of the bot's Screens; {@link #screen} is the screen it edits. */
@@ -82,7 +88,7 @@ final class MapEdits {
                     @Describe(value = KEY, optional = true) String key,
                     @Describe(value = "what it does, opening nothing (one that opens a screen the "
                             + "map lacks: new_screen)", optional = true) Result did,
-                    @Describe(value = "what it is for", optional = true) Purpose kind,
+                    @Describe(value = "what it is for", optional = true) Goal purpose,
                     @Describe(value = "why it is never clicked; blank to clear it", optional = true) String never,
                     @Describe(value = "the picture proving it locked; blank to clear it", optional = true)
                     String locked,
@@ -134,12 +140,12 @@ final class MapEdits {
                      @Describe(value = "", optional = true) String method) implements Edit, OfInput {
     }
 
-    @Describe("a list that scrolls or whose slots shift, by its inputs: each found anywhere along it, scrolled to "
-            + "over another that shows; no notches: the list is off")
-    record InList(String screen,
-                  @Describe(value = "the pictures of the screen's inputs in it, in its order", optional = true)
-                  List<String> members,
-                  @Describe(value = "each scroll's notches, negative down", optional = true) Integer notches)
+    @Describe("a strip of buttons that scrolls or whose slots shift, by its buttons: each found anywhere along it, "
+            + "scrolled to over another that shows; no notches: the strip is off")
+    record InStrip(String screen,
+                   @Describe(value = "the pictures of the screen's buttons in it, in its order", optional = true)
+                   List<String> members,
+                   @Describe(value = "each scroll's notches, negative down", optional = true) Integer notches)
             implements Edit {
     }
 
@@ -201,7 +207,7 @@ final class MapEdits {
             return AgentReply.refused("No screen " + edit.screen() + " in the bot's Screens. Nothing was written.");
         }
         String screen = found.get();
-        GameScreen on = graph.screens().get(screen);
+        MapScreen on = graph.screens().get(screen);
         return switch (edit) {
             case Rename rename -> said(ScreenEdits.rename(services, screen, rename.name()));
             case Delete ignored -> said(ScreenEdits.delete(services, screen));
@@ -213,40 +219,41 @@ final class MapEdits {
             case NewScreen opened -> newScreen(opened, graph, screen, context);
             case AddMarker ignored -> marker(edit, context);
             case RemoveMarker ignored -> marker(edit, context);
-            case SetInput set -> onInput(set, graph, screen, on, in -> setInput(context, screen, in, set));
-            case ResetInput reset -> onInput(reset, graph, screen, on,
-                    in -> said(ScreenEdits.setInput(services, screen, in, ScreenEdits.untried(in))));
+            case SetInput set -> onInput(set, graph, screen, on, field -> setInput(context, screen, on, field, set));
+            case ResetInput reset -> onInput(reset, graph, screen, on, field -> said(ScreenEdits.setInput(services,
+                    screen, field, ScreenEdits.untried(on.inputs().get(field)))));
             case RemoveInput remove -> onInput(remove, graph, screen, on,
-                    in -> said(ScreenEdits.setInput(services, screen, in, null)));
-            case UseAsBack back -> onInput(back, graph, screen, on, in -> said(ScreenEdits.useAsBack(services, screen,
-                    in)));
+                    field -> said(ScreenEdits.setInput(services, screen, field, null)));
+            case UseAsBack back -> onInput(back, graph, screen, on,
+                    field -> said(ScreenEdits.useAsBack(services, screen, field)));
             case InputWhen when -> onInput(when, graph, screen, on,
-                    in -> said(ScreenEdits.setInputWhen(services, screen, in, method(when.method()))));
-            case InList listed -> said(listed(context, screen, on, listed));
+                    field -> said(ScreenEdits.setInputWhen(services, screen, field, method(when.method()))));
+            case InStrip strip -> said(stripped(context, screen, on, strip));
         };
     }
 
     /**
-     * {@code screen}'s list of {@code listed}'s members, each one of its inputs' pictures, as the screen holds them (with
-     * the place each was cut at, which says where the list runs); no notches takes the lists holding them off. Said in
-     * a sentence, beginning {@link ScreenEdits#NOT_WRITTEN} when nothing was. On the FX thread.
+     * {@code screen}'s strip of {@code strip}'s members, each one of its buttons' pictures, as the screen holds them
+     * (with the place each was cut at, which says where the strip runs); no notches takes the strips holding them
+     * off. Said in a sentence, beginning {@link ScreenEdits#NOT_WRITTEN} when nothing was. On the FX thread.
      */
-    static String listed(AgentContext context, String screen, GameScreen on, InList listed) {
-        List<String> names = listed.members() == null ? List.of()
-                : listed.members().stream().filter(MapEdits::has).map(String::strip).toList();
-        if (names.isEmpty()) return ScreenEdits.NOT_WRITTEN + "name the pictures of the inputs in the list (members).";
+    static String stripped(AgentContext context, String screen, MapScreen on, InStrip strip) {
+        List<String> names = strip.members() == null ? List.of()
+                : strip.members().stream().filter(MapEdits::has).map(String::strip).toList();
+        if (names.isEmpty()) return ScreenEdits.NOT_WRITTEN + "name the pictures of the buttons in the strip (members).";
         List<ImageTemplate> members = new ArrayList<>();
         for (String name : names) {
-            Optional<ImageTemplate> member = on.allInputs().stream().filter(i -> i.act() != Input.Act.KEY)
-                    .map(Input::picture).filter(p -> p.id().equalsIgnoreCase(name)).findFirst();
+            Optional<ImageTemplate> member = on.inputs().values().stream()
+                    .flatMap(i -> i instanceof Button b ? Stream.of(b.picture()) : Stream.empty())
+                    .filter(p -> p.id().equalsIgnoreCase(name)).findFirst();
             if (member.isEmpty()) {
-                return ScreenEdits.NOT_WRITTEN + name + " is no input of " + on.name() + ": cut it there with "
+                return ScreenEdits.NOT_WRITTEN + name + " is no button of " + on.name() + ": cut it there with "
                         + "crop_pictures first.";
             }
             members.add(member.get());
         }
-        int notches = listed.notches() == null ? 0 : listed.notches();
-        return ScreenEdits.setList(context.services(), screen, ScreenList.of(notches, members));
+        int notches = strip.notches() == null ? 0 : strip.notches();
+        return ScreenEdits.setStrip(context.services(), screen, null, Strip.of(Scroll.wheel(notches), members));
     }
 
     /**
@@ -274,29 +281,40 @@ final class MapEdits {
                 absent));
     }
 
-    /** {@code then} on the input of {@code on} that {@code named} names; refused when it names none. */
-    private static AgentReply onInput(OfInput named, ScreenGraph graph, String screen, GameScreen on,
-                                      Function<Input, AgentReply> then) {
+    /** {@code then} on the field of {@code on} that {@code named} names; refused when it names none. */
+    private static AgentReply onInput(OfInput named, ScreenGraph graph, String screen, MapScreen on,
+                                      Function<String, AgentReply> then) {
         String unnamed = unnamed(named);
         if (unnamed != null) return AgentReply.refused(unnamed);
-        Optional<Input> held = on.allInputs().stream().filter(i -> named(i, named)).findFirst();
-        return held.map(then).orElseGet(() -> AgentReply.refused(noInput(graph, screen, named)));
+        return field(on, named).map(then).orElseGet(() -> AgentReply.refused(noInput(graph, screen, named)));
+    }
+
+    /** The field of {@code on} that {@code named} names. */
+    static Optional<String> field(MapScreen on, OfInput named) {
+        return on.inputs().entrySet().stream().filter(e -> named(e.getValue(), named)).map(Map.Entry::getKey)
+                .findFirst();
     }
 
     private static String method(String method) {
         return method == null ? "" : method;
     }
 
-    /** set_input: the result, never or lock given (one of them, each replacing the others), the kind, the coming and going. */
-    private static AgentReply setInput(AgentContext context, String screen, Input in, SetInput edit) {
+    /**
+     * set_input: the result, never or lock given (one of them, each replacing the others), the purpose, the coming
+     * and going.
+     */
+    private static AgentReply setInput(AgentContext context, String screen, MapScreen on, String field,
+                                       SetInput edit) {
         long settles = Stream.of(edit.did(), edit.never(), edit.locked()).filter(v -> v != null).count();
         if (settles > 1) {
             return AgentReply.refused("Give one of did, never and locked: each replaces the others. Nothing was "
                     + "written.");
         }
-        if (settles == 0 && edit.kind() == null && edit.sometimes() == null) {
-            return AgentReply.refused("Say what to set: did, kind, never, locked or sometimes. Nothing was written.");
+        if (settles == 0 && edit.purpose() == null && edit.sometimes() == null) {
+            return AgentReply.refused("Say what to set: did, purpose, never, locked or sometimes. Nothing was "
+                    + "written.");
         }
+        Input in = on.inputs().get(field);
         Input now = in;
         if (edit.did() != null) {
             now = switch (edit.did()) {
@@ -315,17 +333,17 @@ final class MapEdits {
             now = lock.isEmpty() ? ScreenEdits.untried(in)
                     : ScreenEdits.untried(in).locked(ScreenBook.picture(context.services(), lock));
         }
-        if (edit.kind() != null) {
-            now = switch (edit.kind()) {
-                case CHORE -> now.kind(Kind.CHORE);
-                case SHORTCUT -> now.kind(Kind.SHORTCUT);
-                case CHOICE -> now.kind(Kind.CHOICE);
-                case INFO -> now.kind(Kind.INFO);
+        if (edit.purpose() != null) {
+            now = switch (edit.purpose()) {
+                case TASK -> now.purpose(Purpose.TASK);
+                case SHORTCUT -> now.purpose(Purpose.SHORTCUT);
+                case SPEND -> now.purpose(Purpose.SPEND);
+                case INFO -> now.purpose(Purpose.INFO);
                 case NONE -> ScreenEdits.unkinded(now);
             };
         }
         if (edit.sometimes() != null) now = ScreenEdits.sometimes(now, edit.sometimes());
-        return said(ScreenEdits.setInput(context.services(), screen, in, now));
+        return said(ScreenEdits.setInput(context.services(), screen, field, now));
     }
 
     /**
@@ -341,15 +359,14 @@ final class MapEdits {
         }
         String unnamed = unnamed(named);
         if (unnamed != null) return AgentReply.refused(unnamed);
-        GameScreen on = graph.screens().get(screen);
-        List<Way> ways = Stream.concat(Stream.ofNullable(on.from()), on.alsoFrom().stream()).toList();
-        Optional<Input> via = ways.stream()
-                .filter(w -> w.via() != null && named(w.via(), named))
-                .filter(w -> graph.constantOf(w.from()).filter(from.get()::equals).isPresent())
-                .map(Way::via).findFirst();
+        List<Way> ways = graph.screens().get(screen).ways();
+        Optional<String> via = ways.stream().map(w -> graph.nameOf(w.via())).flatMap(Optional::stream)
+                .filter(n -> n.screen().equals(from.get()))
+                .filter(n -> graph.input(n.screen(), n.field()).filter(i -> named(i, named)).isPresent())
+                .map(InputName::field).findFirst();
         if (via.isEmpty()) {
-            List<String> each = ways.stream().filter(w -> w.via() != null).map(w -> "from " + graph.constantOf(
-                    w.from()).map(graph::shown).orElse("?") + " by " + w.via().label()).toList();
+            List<String> each = ways.stream().map(w -> graph.nameOf(w.via())).flatMap(Optional::stream)
+                    .map(n -> "from " + graph.shown(n.screen()) + " by " + n.field()).toList();
             return AgentReply.refused(graph.shown(screen) + " has no such way in" + (each.isEmpty() ? ""
                     : "; its ways in: " + String.join(", ", each)) + ". Nothing was written.");
         }
@@ -361,18 +378,19 @@ final class MapEdits {
     private static AgentReply newScreen(NewScreen edit, ScreenGraph graph, String parent, AgentContext context) {
         String unnamed = unnamed(edit);
         if (unnamed != null) return AgentReply.refused(unnamed);
-        Optional<Input> held = graph.screens().get(parent).allInputs().stream().filter(i -> named(i, edit))
-                .findFirst();
-        if (held.isPresent()) return said(ScreenEdits.newScreen(context.services(), parent, edit.name(), held.get()));
+        Optional<String> held = field(graph.screens().get(parent), edit);
+        if (held.isPresent()) {
+            return said(ScreenEdits.newScreen(context.services(), parent, edit.name(), held.get(), null));
+        }
         if (has(edit.key())) {
-            return said(ScreenEdits.newScreen(context.services(), parent, edit.name(),
-                    Input.key(Key.named(edit.key()).orElseThrow())));
+            return said(ScreenEdits.newScreen(context.services(), parent, edit.name(), null,
+                    Hotkey.of(Key.named(edit.key()).orElseThrow())));
         }
         String picture = edit.picture().strip();
         if (!ActTools.exists(context, picture)) return AgentReply.refused(Frames.noPicture(picture));
         ImageTemplate cut = ScreenBook.picture(context.services(), picture);
-        return said(ScreenEdits.newScreen(context.services(), parent, edit.name(),
-                edit.scroll() == null ? Input.click(cut) : Input.scroll(cut, edit.scroll())));
+        return said(ScreenEdits.newScreen(context.services(), parent, edit.name(), null,
+                edit.scroll() == null ? Button.of(cut) : Strip.of(Scroll.wheel(edit.scroll()), List.of(cut))));
     }
 
     /** Why {@code edit} names no input as try_input does, or null when it names one. */
@@ -380,7 +398,7 @@ final class MapEdits {
         boolean byPicture = has(edit.picture());
         boolean byKey = has(edit.key());
         if (byPicture == byKey) {
-            return "Name the input as try_input does: picture (with scroll for a scroll) or key, one of them. "
+            return "Name the input as try_input does: picture (with scroll for a strip) or key, one of them. "
                     + "Nothing was written.";
         }
         if (byKey && Key.named(edit.key()).isEmpty()) return "\"" + edit.key() + "\" is no key. Nothing was written.";
@@ -390,22 +408,31 @@ final class MapEdits {
         return null;
     }
 
-    /** Whether {@code input} is the one {@code edit} names. */
-    private static boolean named(Input input, OfInput edit) {
+    /**
+     * Whether {@code input} is the one {@code edit} names: a hotkey by its key, a button by its picture, a strip by its
+     * first member and its notches.
+     */
+    static boolean named(Input input, OfInput edit) {
         if (has(edit.key())) {
-            return input.act() == Input.Act.KEY && Key.named(edit.key()).filter(k -> k == input.key()).isPresent();
+            return input instanceof Hotkey hotkey && Key.named(edit.key()).filter(k -> k == hotkey.key()).isPresent();
         }
-        if (input.picture() == null || !input.picture().id().equalsIgnoreCase(edit.picture().strip())) return false;
-        return edit.scroll() == null ? input.act() == Input.Act.CLICK
-                : input.act() == Input.Act.SCROLL && input.notches() == edit.scroll();
+        String picture = edit.picture().strip();
+        return switch (input) {
+            case Button button -> edit.scroll() == null && button.picture() != null
+                    && button.picture().id().equalsIgnoreCase(picture);
+            case Strip strip -> edit.scroll() != null && !strip.members().isEmpty()
+                    && strip.members().getFirst().id().equalsIgnoreCase(picture)
+                    && strip.scroll() != null && strip.scroll().notches() == edit.scroll();
+            case Hotkey ignored -> false;
+        };
     }
 
     private static String noInput(ScreenGraph graph, String screen, OfInput edit) {
-        List<Input> all = graph.screens().get(screen).allInputs();
+        List<String> all = graph.fields(screen);
         String asked = has(edit.key()) ? "key " + edit.key().strip() : (edit.scroll() == null ? "click " : "scroll ")
                 + edit.picture().strip() + (edit.scroll() == null ? "" : " " + edit.scroll());
         return graph.shown(screen) + " has no input " + asked + (all.isEmpty() ? "" : "; its inputs: "
-                + ScreenGraph.labels(all)) + ". Nothing was written.";
+                + String.join(", ", all)) + ". Nothing was written.";
     }
 
     /** What {@link ScreenEdits} answered: refused when Studio would not write it. */

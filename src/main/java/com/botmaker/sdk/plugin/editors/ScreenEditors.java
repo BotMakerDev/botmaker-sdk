@@ -7,9 +7,8 @@ import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.plugin.toolkit.Styles;
-import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Navigate;
-import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
@@ -34,12 +33,12 @@ import java.util.function.Consumer;
  * screen picked, its marker beside its name, which lists the map's screens to pick from. The pick is written as the
  * {@code Screens} constant, never spelled out. Popups are offered only to {@code Navigate.isOn}: nothing goes to one.
  *
- * <p>{@code GameScreen} has no fresh value, as {@code Flow} has none: a dropped block holds {@code null} until a
- * screen is picked, which {@code Navigate} reads as no screen.
+ * <p>{@code Screen} has no fresh value, as {@code Flow} has none: a dropped block holds {@code null} until a screen
+ * is picked, which {@code Navigate} reads as no screen.
  */
 public final class ScreenEditors {
 
-    private static final ManagedSet<GameScreen> SCREENS = ManagedSet.of(SdkValues.SCREEN_MAP);
+    private static final ManagedSet<Screen> SCREENS = ManagedSet.of(SdkValues.SCREEN_MAP);
     /** The side of a marker's thumbnail, in the button and in the list. */
     private static final double THUMB = 22;
     /** The button's text while no screen is picked. */
@@ -53,13 +52,11 @@ public final class ScreenEditors {
     record Choice(String constant, String name, String marker) {}
 
     /**
-     * Whether {@code ctx} is a screen in a block: a {@code GameScreen} argument of a call. The map's own, the screen
-     * of a {@code Way.of(HOME, …)} in {@code Screens.java}, is left to the map: a pick there could name a screen
-     * declared after it.
+     * Whether {@code ctx} is a screen in a block: a {@code Screen} argument of a call. The map names inputs, never a
+     * screen, so none is the map's own.
      */
     public static boolean isScreen(ValueContext ctx) {
-        return ctx.type().is(GameScreen.class) && ctx.slot().flatMap(SlotContext::enclosingExecutable)
-                .filter(call -> call.getDeclaringClass() != Way.class).isPresent();
+        return ctx.type().is(Screen.class) && ctx.slot().flatMap(SlotContext::enclosingExecutable).isPresent();
     }
 
     /** Whether {@code ctx} is the screen of {@code Navigate.isOn}, the one call a popup is a fair answer to. */

@@ -51,7 +51,7 @@ public final class SdkEditors {
             SlotEditor.when(ScreenConstantView::isScreenConstant)
                     .draw(() -> ScreenConstantView::node, () -> ScreenConstantView::node),
             SlotEditor.when(ActivityEditors::isSkippedActivity).draw(() -> ActivityEditors::switchable),
-            // A screen of the bot's map in a block, Navigate.to(Screens.HOME). GameScreen is only parts, like Flow:
+            // A screen of the bot's map in a block, Navigate.to(Screens.HOME). A Screen is only parts, like Flow:
             // no type of this plugin's holds it, so no type's editor can draw it.
             SlotEditor.when(ScreenEditors::isScreen).draw(() -> ScreenEditors::screen),
 

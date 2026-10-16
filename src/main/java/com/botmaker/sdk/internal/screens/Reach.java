@@ -2,11 +2,17 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.ScreenList;
+import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Order;
+import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
-import com.botmaker.sdk.api.screens.Variant;
+import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
@@ -17,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.ToLongFunction;
 
 /**
  * What acts on the game, for whoever acts: a run ({@code RunReach}) or the assistant's tools ({@code ToolReach}).
@@ -25,22 +32,22 @@ import java.util.function.Function;
  */
 public interface Reach {
 
-    /** How long a list is let settle after a scroll before it is looked at again, and between two looks after. */
+    /** How long a strip is let settle after a scroll before it is looked at again, and between two looks after. */
     long SCROLL_SETTLE_MS = 400;
 
     /**
-     * The longest a list is looked at after a scroll for its members to hold still: Firestone's column glides for
+     * The longest a strip is looked at after a scroll for its members to hold still: Firestone's column glides for
      * over a second, and judged before it stopped it looked at its end (2026-10-16).
      */
     long SCROLL_SETTLE_MAX_MS = 3000;
 
-    /** Scrolls in a row the first way with no member showing before the list is scrolled the other way. */
+    /** Scrolls in a row the first way with no member showing before the strip is scrolled the other way. */
     int BLIND_SCROLLS = 3;
 
-    /** How long the game is let settle between two copies of a button an {@link Input#every each} input presses. */
+    /** How long the game is let settle between two copies of a button {@link Pick#each} presses. */
     long CLICK_SETTLE_MS = 600;
 
-    /** How far a list member may shift between two looks and still count as not moved: a match is found to a pixel or two. */
+    /** How far a member may shift between two looks and still count as not moved: a match is found to a pixel or two. */
     int STILL_PX = 4;
 
     /** The game's screen now; empty when it could not be captured. */
@@ -83,41 +90,42 @@ public interface Reach {
         return place.center();
     }
 
-    /** An input's button as {@code frame} shows it: which of its looks, and where. */
+    /** A button as {@code frame} shows it: which of its looks, and where. */
     record Seen(State state, Rect place) {}
 
     /**
      * Where {@code picture} is anywhere in {@code area} on {@code frame}, {@code area} in the frame the picture was cut
-     * from, when it clears this reach's confidence: a member of a {@link ScreenList list}. By default it is found
-     * anywhere and kept only when its centre is in {@code area}; a reach that matches through the SDK's matcher looks
-     * only there, scaled as the picture is.
+     * from, when it clears this reach's confidence: a member of a {@link Strip}. By default it is found anywhere and
+     * kept only when its centre is in {@code area}; a reach that matches through the SDK's matcher looks only there,
+     * scaled as the picture is.
      */
     default Optional<Rect> findWithin(ImageTemplate picture, Rect area, BufferedImage frame) {
         return find(picture, frame).filter(at -> area.contains(at.center()));
     }
 
-    /** {@link #seen(Input, ScreenList, BufferedImage)} of an input at its place, in no list. */
-    default Optional<Seen> seen(Input input, BufferedImage frame) {
-        return seen(input, null, frame);
+    /** {@link #seen(Button, Strip, Pick, BufferedImage)} of a button at its place, in no strip, its first copy. */
+    default Optional<Seen> seen(Button button, BufferedImage frame) {
+        return seen(button, null, null, frame);
     }
 
     /**
-     * How {@code input}'s button looks on {@code frame}: its variants looked for before its usual picture, since a
-     * badge or a grey copy of a button also passes for the button itself; a member of {@code list}, anywhere along
-     * it. Empty for a key, or a button not there.
+     * How {@code button} looks on {@code frame}: its looks looked for before its usual picture, since a badge or a
+     * grey copy of a button also passes for the button itself; a member of {@code strip}, anywhere along it. A
+     * repeated button is the copy {@code pick} names (null: the first), and every copy for {@link Pick.Mode#EACH}
+     * starts at the first. Empty for a button not there.
      */
-    default Optional<Seen> seen(Input input, ScreenList list, BufferedImage frame) {
-        if (input.nth() > 0 || input.every()) {
-            // One copy of a repeated button: the nth in reading order; every copy starts at the first.
-            List<Seen> copies = copies(input, list, frame);
-            int at = input.every() ? 0 : input.nth() - 1;
+    default Optional<Seen> seen(Button button, Strip strip, Pick pick, BufferedImage frame) {
+        if (button.repeats()) {
+            Pick p = pick == null ? Pick.first() : pick;
+            List<Seen> copies = copies(button, strip, p.order(), frame);
+            int at = p.mode() == Pick.Mode.NTH ? p.nth() - 1 : 0;
             return at < copies.size() ? Optional.of(copies.get(at)) : Optional.empty();
         }
-        List<Variant> order = lookOrder(input);
+        List<Look> order = lookOrder(button);
         if (order.isEmpty()) return Optional.empty();
-        Rect band = band(list);
+        Rect band = band(strip);
         List<Optional<Rect>> found = band == null
-                ? findEach(order.stream().map(Variant::picture).toList(), frame)
+                ? findEach(order.stream().map(Look::picture).toList(), frame)
                 : order.stream().map(look -> findWithin(look.picture(), band, frame)).toList();
         for (int i = 0; i < order.size(); i++) {
             if (found.get(i).isPresent()) return Optional.of(new Seen(order.get(i).state(), found.get(i).get()));
@@ -134,154 +142,213 @@ public interface Reach {
     }
 
     /**
-     * Every copy of {@code input}'s button on {@code frame}, in reading order ({@link #readingOrder}), each in the look
-     * it shows: a copy is found by any of its looks, its variants before its usual picture, and a place another look
-     * already holds is that copy. Only those along {@code list}, for a member of one.
+     * Every copy of {@code button} on {@code frame}, along {@code order}, each in the look it shows: a copy is found by
+     * any of its looks, its other looks before its usual picture, and a place another look already holds is that
+     * copy. Only those along {@code strip}, for a member of one.
      */
-    default List<Seen> copies(Input input, ScreenList list, BufferedImage frame) {
-        Rect band = band(list);
+    default List<Seen> copies(Button button, Strip strip, Order order, BufferedImage frame) {
+        Rect band = band(strip);
         List<Seen> all = new ArrayList<>();
-        for (Variant look : lookOrder(input)) {
+        for (Look look : lookOrder(button)) {
             for (Rect at : findAll(look.picture(), frame)) {
                 if (band != null && !band.contains(at.center())) continue;
                 if (all.stream().noneMatch(s -> s.place().contains(at.center()))) all.add(new Seen(look.state(), at));
             }
         }
-        return readingOrder(all, Seen::place);
+        return ordered(all, Seen::place, order, new Size(frame.getWidth(), frame.getHeight()));
     }
 
-    /** {@code input}'s looks in the order they are looked for: a badge or a grey copy also passes for the button. */
-    private static List<Variant> lookOrder(Input input) {
-        List<Variant> looks = input.looks();
+    /** {@code button}'s looks in the order they are looked for: a badge or a grey copy also passes for the button. */
+    private static List<Look> lookOrder(Button button) {
+        List<Look> looks = button.allLooks();
         if (looks.isEmpty()) return List.of();
-        List<Variant> order = new ArrayList<>(looks.subList(1, looks.size()));
+        List<Look> order = new ArrayList<>(looks.subList(1, looks.size()));
         order.add(looks.getFirst());
         return order;
     }
 
-    /**
-     * {@code items} in reading order by their {@code place}: top to bottom, then left to right. Two whose centres
-     * are less than half the row's first item's height apart are on one row.
-     */
+    /** {@code items} in reading order by their {@code place}: {@link Order#NORTH}. */
     static <T> List<T> readingOrder(List<T> items, Function<T, Rect> place) {
-        List<T> byTop = new ArrayList<>(items);
-        byTop.sort(Comparator.comparingInt(item -> place.apply(item).center().y()));
+        return ordered(items, place, Order.NORTH, null);
+    }
+
+    /**
+     * {@code items} along {@code order} by their {@code place}, on a frame of {@code frame}'s size (needed for
+     * {@link Order#CENTER} only). A side goes row by row, or column by column: two whose centres are less than half
+     * the first one's height (its width, for a column) apart are on one row.
+     */
+    static <T> List<T> ordered(List<T> items, Function<T, Rect> place, Order order, Size frame) {
+        Function<T, Point> at = item -> place.apply(item).center();
+        return switch (order) {
+            case NORTH -> lines(items, place, Comparator.comparingInt(i -> at.apply(i).y()), true,
+                    Comparator.comparingInt(i -> at.apply(i).x()));
+            case SOUTH -> lines(items, place, Comparator.comparingInt(i -> -at.apply(i).y()), true,
+                    Comparator.comparingInt(i -> at.apply(i).x()));
+            case WEST -> lines(items, place, Comparator.comparingInt(i -> at.apply(i).x()), false,
+                    Comparator.comparingInt(i -> at.apply(i).y()));
+            case EAST -> lines(items, place, Comparator.comparingInt(i -> -at.apply(i).x()), false,
+                    Comparator.comparingInt(i -> at.apply(i).y()));
+            case NORTH_EAST -> sorted(items, i -> at.apply(i).y() - at.apply(i).x(), at);
+            case NORTH_WEST -> sorted(items, i -> at.apply(i).x() + at.apply(i).y(), at);
+            case SOUTH_EAST -> sorted(items, i -> -(at.apply(i).x() + at.apply(i).y()), at);
+            case SOUTH_WEST -> sorted(items, i -> at.apply(i).x() - at.apply(i).y(), at);
+            case CENTER -> sorted(items, i -> distance(at.apply(i), frame), at);
+        };
+    }
+
+    private static <T> List<T> sorted(List<T> items, ToLongFunction<T> key, Function<T, Point> at) {
+        List<T> all = new ArrayList<>(items);
+        all.sort(Comparator.comparingLong(key).thenComparingInt(i -> at.apply(i).y())
+                .thenComparingInt(i -> at.apply(i).x()));
+        return all;
+    }
+
+    private static long distance(Point at, Size frame) {
+        if (frame == null) return 0;
+        long dx = at.x() - frame.width() / 2;
+        long dy = at.y() - frame.height() / 2;
+        return dx * dx + dy * dy;
+    }
+
+    /**
+     * {@code items} in lines along {@code across} (rows when {@code rows}, else columns), each line along
+     * {@code along}.
+     */
+    private static <T> List<T> lines(List<T> items, Function<T, Rect> place, Comparator<T> across, boolean rows,
+                                     Comparator<T> along) {
+        List<T> sorted = new ArrayList<>(items);
+        sorted.sort(across);
         List<T> ordered = new ArrayList<>();
-        List<T> row = new ArrayList<>();
-        for (T item : byTop) {
-            if (!row.isEmpty()) {
-                Rect first = place.apply(row.getFirst());
-                if (Math.abs(place.apply(item).center().y() - first.center().y()) * 2 >= first.height()) {
-                    row.sort(Comparator.comparingInt(r -> place.apply(r).center().x()));
-                    ordered.addAll(row);
-                    row.clear();
+        List<T> line = new ArrayList<>();
+        for (T item : sorted) {
+            if (!line.isEmpty()) {
+                Rect first = place.apply(line.getFirst());
+                Rect now = place.apply(item);
+                int apart = rows ? Math.abs(now.center().y() - first.center().y())
+                        : Math.abs(now.center().x() - first.center().x());
+                if (apart * 2 >= (rows ? first.height() : first.width())) {
+                    line.sort(along);
+                    ordered.addAll(line);
+                    line.clear();
                 }
             }
-            row.add(item);
+            line.add(item);
         }
-        row.sort(Comparator.comparingInt(r -> place.apply(r).center().x()));
-        ordered.addAll(row);
+        line.sort(along);
+        ordered.addAll(line);
         return ordered;
     }
 
-    /** {@link #perform(Input, ScreenList, BufferedImage)} of an input at its place, in no list. */
+    /** {@link #perform(Input, Strip, Pick, BufferedImage)} of an input at its place, in no strip, its first copy. */
     default boolean perform(Input input, BufferedImage frame) {
-        return perform(input, null, frame);
+        return perform(input, null, null, frame);
     }
 
     /**
-     * Does {@code input} on {@code frame}: its key pressed, or its button found, in any look but a disabled one, and
-     * clicked or scrolled over. A member of {@code list} not showing is scrolled to first: the wheel turns over a
-     * member that shows, by the list's notches, up to {@link ScreenList#SCROLLS} times each way, the game looked at
-     * again after each. A scroll after which no member moved met the list's end, and the scroll turns the other way
-     * once: the members' places say it, never the pixels, since a list may sit over a moving fight. False when the
-     * button is not there or greyed out, and nothing but those scrolls was done.
+     * Does {@code input} on {@code frame}: a key pressed; a strip scrolled once over a member that shows (the middle
+     * of its band when none does); a button found, in any look but a disabled one, and clicked. A member of
+     * {@code strip} not showing is scrolled to first: the strip's scroll turns over a member that shows, up to
+     * {@link Scroll#MOST} times each way, the game looked at again after each. A scroll after which no member moved
+     * met the strip's end, and the scroll turns the other way once: the members' places say it, never the pixels,
+     * since a strip may sit over a moving fight. False when the button is not there or greyed out, and nothing but
+     * those scrolls was done.
      *
-     * <p>An {@link Input#nth nth} input acts on that copy of its button; an {@link Input#every each} one on every copy
-     * the frame shows but a disabled one, the game let settle {@link #CLICK_SETTLE_MS} between them. They go last to
-     * first in reading order: a card claimed and gone shifts the ones after it, never one still to press. False for
-     * that one when no copy was acted on.
+     * <p>A repeated button is pressed on the copy {@code pick} names; {@link Pick#each} presses every copy the frame
+     * shows but a disabled one, the game let settle {@link #CLICK_SETTLE_MS} between them, last to first along its
+     * order: a card claimed and gone shifts the ones after it, never one still to press. False for that one when no
+     * copy was pressed.
      */
-    default boolean perform(Input input, ScreenList list, BufferedImage frame) {
-        if (input.act() == Input.Act.KEY) {
-            key(input.key());
-            return true;
-        }
-        if (input.every()) return performEach(input, list, frame);
-        Optional<Seen> button = inView(input, list, frame);
-        if (button.isEmpty() || button.get().state() == State.DISABLED) return false;
-        act(input, button.get().place());
-        return true;
+    default boolean perform(Input input, Strip strip, Pick pick, BufferedImage frame) {
+        return switch (input) {
+            case Hotkey hotkey -> {
+                key(hotkey.key());
+                yield true;
+            }
+            case Strip scrolled -> {
+                Map<String, Rect> shown = members(scrolled, frame);
+                Rect band = band(scrolled);
+                Point over = !shown.isEmpty() ? shown.values().iterator().next().center()
+                        : band == null ? null : band.center();
+                if (over == null) yield false;
+                scroll(over, scrolled.scroll() == null ? 0 : scrolled.scroll().notches());
+                yield true;
+            }
+            case Button button -> {
+                if (button.repeats() && pick != null && pick.mode() == Pick.Mode.EACH) {
+                    yield performEach(button, strip, pick, frame);
+                }
+                Optional<Seen> seen = inView(button, strip, pick, frame);
+                if (seen.isEmpty() || seen.get().state() == State.DISABLED) yield false;
+                click(pointOn(seen.get().place()));
+                yield true;
+            }
+        };
     }
 
-    /** {@link #perform} of an input done on every copy of its button. */
-    private boolean performEach(Input input, ScreenList list, BufferedImage frame) {
+    /** {@link #perform} of a repeated button on every copy. */
+    private boolean performEach(Button button, Strip strip, Pick pick, BufferedImage frame) {
         BufferedImage on = frame;
-        if (seen(input, list, frame).isEmpty()) {
-            // Scrolled to, the copies are read off the list as it now stands.
-            if (inView(input, list, frame).isEmpty()) return false;
+        if (seen(button, strip, pick, frame).isEmpty()) {
+            // Scrolled to, the copies are read off the strip as it now stands.
+            if (inView(button, strip, pick, frame).isEmpty()) return false;
             Optional<BufferedImage> now = look();
             if (now.isEmpty()) return false;
             on = now.get();
         }
         boolean any = false;
-        for (Seen copy : copies(input, list, on).reversed()) {
+        for (Seen copy : copies(button, strip, pick.order(), on).reversed()) {
             if (copy.state() == State.DISABLED) continue;
             if (any) {
                 pause(CLICK_SETTLE_MS);
                 if (Thread.currentThread().isInterrupted()) return true;
             }
-            act(input, copy.place());
+            click(pointOn(copy.place()));
             any = true;
         }
         return any;
     }
 
-    /** {@code input}'s click or scroll on its button at {@code place}. */
-    private void act(Input input, Rect place) {
-        if (input.act() == Input.Act.SCROLL) scroll(place.center(), input.notches());
-        else click(pointOn(place));
+    /**
+     * {@code button} on {@code frame}, or once {@code strip} is scrolled to it, as {@link #perform} scrolls; empty when
+     * neither way brought it. Nothing but scrolls is done: the assistant's try_input brings a member into view by it
+     * before clicking it as a run would.
+     */
+    default Optional<Seen> inView(Button button, Strip strip, Pick pick, BufferedImage frame) {
+        Optional<Seen> seen = seen(button, strip, pick, frame);
+        return seen.isPresent() || strip == null || strip.scroll() == null || strip.scroll().notches() == 0 ? seen
+                : scrolledTo(button, strip, pick, frame);
     }
 
     /**
-     * {@code input}'s button on {@code frame}, or once {@code list} is scrolled to it, as {@link #perform} scrolls;
-     * empty when neither way brought it. Nothing but scrolls is done: the assistant's try_input brings a member into
-     * view by it before clicking it as a run would.
+     * {@code button} once {@code strip} is scrolled to it; empty when neither way brought it. The way back gets the
+     * scrolls the first way took on top of its own, so it searches as far past the start as the first did.
      */
-    default Optional<Seen> inView(Input input, ScreenList list, BufferedImage frame) {
-        Optional<Seen> button = seen(input, list, frame);
-        return button.isPresent() || list == null || list.notches() == 0 ? button : scrolledTo(input, list, frame);
-    }
-
-    /**
-     * {@code input}'s button once {@code list} is scrolled to it; empty when neither way brought it. The way back
-     * gets the scrolls the first way took on top of its own, so it searches as far past the start as the first did.
-     */
-    private Optional<Seen> scrolledTo(Input input, ScreenList list, BufferedImage frame) {
-        Map<String, Rect> members = members(list, frame);
-        // Scrolled past every member, the wheel stays where the last one showed: a point in the list. With none
-        // showing yet (scrolled to an end of icons the list does not name), it turns over the middle of the band.
-        Rect band = band(list);
+    private Optional<Seen> scrolledTo(Button button, Strip strip, Pick pick, BufferedImage frame) {
+        Map<String, Rect> members = members(strip, frame);
+        // Scrolled past every member, the wheel stays where the last one showed: a point in the strip. With none
+        // showing yet (scrolled to an end of icons the strip does not name), it turns over the middle of the band.
+        Rect band = band(strip);
         Point over = band == null ? null : band.center();
+        int notches = strip.scroll().notches();
         int done = 0;
         boolean first = true;
         boolean shown = !members.isEmpty();
-        for (int notches : new int[] {list.notches(), -list.notches()}) {
-            int most = ScreenList.SCROLLS + done;
+        for (int way : new int[] {notches, -notches}) {
+            int most = Scroll.MOST + done;
             done = 0;
             int blind = 0;
             for (int i = 0; i < most; i++) {
                 if (!members.isEmpty()) over = members.values().iterator().next().center();
                 if (over == null) return Optional.empty();
-                scroll(over, notches);
+                scroll(over, way);
                 done++;
-                Optional<Settled> next = settled(list, members);
+                Optional<Settled> next = settled(strip, members);
                 if (next.isEmpty()) return Optional.empty();
-                Optional<Seen> button = seen(input, list, next.get().frame());
-                if (button.isPresent()) return button;
+                Optional<Seen> seen = seen(button, strip, pick, next.get().frame());
+                if (seen.isPresent()) return seen;
                 Map<String, Rect> now = next.get().members();
                 boolean end = !now.isEmpty() && still(members, now);
-                // No member shown yet, the first way: an end of icons the list does not name, scrolled further in.
+                // No member shown yet, the first way: an end of icons the strip does not name, scrolled further in.
                 shown |= !now.isEmpty();
                 blind = shown ? 0 : blind + 1;
                 members = now;
@@ -292,24 +359,24 @@ public interface Reach {
         return Optional.empty();
     }
 
-    /** A frame of a list that held still, and where its members show on it. */
+    /** A frame of a strip that held still, and where its members show on it. */
     record Settled(BufferedImage frame, Map<String, Rect> members) {
     }
 
     /**
-     * {@code list} once it holds still after a scroll: looked at every {@link #SCROLL_SETTLE_MS} until two looks in a
+     * {@code strip} once it holds still after a scroll: looked at every {@link #SCROLL_SETTLE_MS} until two looks in a
      * row show its members at the same places, for up to {@link #SCROLL_SETTLE_MAX_MS}. Members still where they
      * were {@code before} the scroll are looked at to the end of that time: a game may start gliding late, and only
-     * then is the list at its end. Empty when the game could not be captured or the wait was stopped.
+     * then is the strip at its end. Empty when the game could not be captured or the wait was stopped.
      */
-    private Optional<Settled> settled(ScreenList list, Map<String, Rect> before) {
+    private Optional<Settled> settled(Strip strip, Map<String, Rect> before) {
         long until = nowMs() + SCROLL_SETTLE_MAX_MS;
         Settled last = null;
         while (true) {
             pause(SCROLL_SETTLE_MS);
             Optional<BufferedImage> frame = look();
             if (frame.isEmpty() || Thread.currentThread().isInterrupted()) return Optional.empty();
-            Settled now = new Settled(frame.get(), members(list, frame.get()));
+            Settled now = new Settled(frame.get(), members(strip, frame.get()));
             boolean held = last != null && still(last.members(), now.members())
                     && (before.isEmpty() || !still(before, now.members()));
             if (held || nowMs() >= until) return Optional.of(now);
@@ -317,18 +384,18 @@ public interface Reach {
         }
     }
 
-    /** Where each member of {@code list} that shows is on {@code frame}, by its id, in the list's order. */
-    private Map<String, Rect> members(ScreenList list, BufferedImage frame) {
-        Rect band = band(list);
+    /** Where each member of {@code strip} that shows is on {@code frame}, by its id, in the strip's order. */
+    private Map<String, Rect> members(Strip strip, BufferedImage frame) {
+        Rect band = band(strip);
         Map<String, Rect> found = new LinkedHashMap<>();
-        for (ImageTemplate member : list.members()) {
+        for (ImageTemplate member : strip.members()) {
             (band == null ? find(member, frame) : findWithin(member, band, frame))
                     .ifPresent(at -> found.put(member.id(), at));
         }
         return found;
     }
 
-    /** Whether the same members show at the same places, to {@link #STILL_PX}: the list did not move. */
+    /** Whether the same members show at the same places, to {@link #STILL_PX}: the strip did not move. */
     static boolean still(Map<String, Rect> before, Map<String, Rect> after) {
         if (!before.keySet().equals(after.keySet())) return false;
         for (Map.Entry<String, Rect> was : before.entrySet()) {
@@ -340,18 +407,18 @@ public interface Reach {
     }
 
     /**
-     * Where {@code list}'s members are looked for: the box around their places where they were cut, grown by the
-     * largest of them, so a member shifted a slot or two is still in it. Null for no list, or members with no place:
+     * Where {@code strip}'s members are looked for: the box around their places where they were cut, grown by the
+     * largest of them, so a member shifted a slot or two is still in it. Null for no strip, or members with no place:
      * anywhere.
      */
-    static Rect band(ScreenList list) {
-        if (list == null) return null;
+    static Rect band(Strip strip) {
+        if (strip == null) return null;
         int left = Integer.MAX_VALUE;
         int top = Integer.MAX_VALUE;
         int right = Integer.MIN_VALUE;
         int bottom = Integer.MIN_VALUE;
         int grow = 0;
-        for (ImageTemplate member : list.members()) {
+        for (ImageTemplate member : strip.members()) {
             Rect at = member.place();
             if (at == null) continue;
             left = Math.min(left, at.x());

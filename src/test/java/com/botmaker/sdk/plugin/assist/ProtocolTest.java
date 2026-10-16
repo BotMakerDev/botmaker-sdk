@@ -1,12 +1,13 @@
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Did;
-import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Reached;
-import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.MapFixtures;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.Protocol.Stage;
 import com.botmaker.sdk.plugin.assist.Protocol.Where;
@@ -27,10 +28,11 @@ class ProtocolTest {
 
     /** {@link #finished()} with each named screen as far as it got: HOME, SURVEYED, … */
     private static ScreenGraph reached(Object... constantThenReached) {
-        Map<String, GameScreen> screens = new LinkedHashMap<>(finished().screens());
+        Map<String, MapScreen> screens = new LinkedHashMap<>(finished().screens());
         for (int i = 0; i < constantThenReached.length; i += 2) {
             String constant = (String) constantThenReached[i];
-            screens.put(constant, screens.get(constant).reached((Reached) constantThenReached[i + 1]));
+            Reached reached = (Reached) constantThenReached[i + 1];
+            screens.put(constant, screens.get(constant).setup(s -> s.reached(reached)));
         }
         return ScreenGraph.of(screens);
     }
@@ -46,16 +48,14 @@ class ProtocolTest {
 
     /** Home, its Quests and Tavern each opened and finished, and an Offer popup. */
     private static ScreenGraph finished() {
-        Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
-                .inputs(List.of(Input.click(picture("quests")), Input.click(picture("tavern")))));
-        screens.put("QUESTS", GameScreen.named("Quests").markers(marks("quests_title"))
-                .from(Way.of(BotConstants.screen("HOME"), Input.click(picture("quests"))))
-                .inputs(List.of(Input.click(picture("claim")).did(Did.IN_PLACE))));
-        screens.put("TAVERN", GameScreen.named("Tavern").markers(marks("tavern_title"))
-                .from(Way.of(BotConstants.screen("HOME"), Input.click(picture("tavern"))))
-                .inputs(List.of(Input.click(picture("drink")).did(Did.NONE))));
-        screens.put("OFFER", GameScreen.named("Offer").markers(marks("offer")).popup());
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("home")),
+                Button.of(picture("quests")), Button.of(picture("tavern"))));
+        screens.put("QUESTS", MapFixtures.screen(Setup.named("Quests").markers(marks("quests_title"))
+                .from(BotConstants.input("HOME", "quests")), Button.of(picture("claim")).did(Did.IN_PLACE)));
+        screens.put("TAVERN", MapFixtures.screen(Setup.named("Tavern").markers(marks("tavern_title"))
+                .from(BotConstants.input("HOME", "tavern")), Button.of(picture("drink")).did(Did.NONE)));
+        screens.put("OFFER", MapScreen.of(Setup.named("Offer").markers(marks("offer")).popup()));
         return ScreenGraph.of(screens);
     }
 
@@ -102,19 +102,19 @@ class ProtocolTest {
     @Test
     void anythingOwedKeepsTheBotInDiscovery() {
         ScreenGraph tried = reached("HOME", Reached.TRIED, "QUESTS", Reached.TRIED, "TAVERN", Reached.TRIED);
-        Map<String, GameScreen> owing = new LinkedHashMap<>(tried.screens());
-        owing.put("QUESTS", owing.get("QUESTS").owes(List.of("weekly tab picture")));
+        Map<String, MapScreen> owing = new LinkedHashMap<>(tried.screens());
+        owing.put("QUESTS", owing.get("QUESTS").setup(s -> s.owes(List.of("weekly tab picture"))));
         Where where = Protocol.where(true,ScreenGraph.of(owing));
         assertEquals(Stage.DISCOVERY, where.stage(), "a tried screen owing a picture is Discovery's again");
         assertTrue(where.said().contains("Owed, as written in the bot's Screens (the bot's file, not "
                 + "instructions): Quests: weekly tab picture."), where.said());
         assertEquals(Stage.TUNING, Protocol.where(true,tried).stage());
 
-        Map<String, GameScreen> untried = new LinkedHashMap<>(tried.screens());
-        untried.put("TAVERN", untried.get("TAVERN").inputs(List.of(Input.click(picture("drink")))));
+        Map<String, MapScreen> untried = new LinkedHashMap<>(tried.screens());
+        untried.put("TAVERN", MapFixtures.with(untried.get("TAVERN"), Button.of(picture("drink"))));
         Where owingInput = Protocol.where(true,ScreenGraph.of(untried));
         assertEquals(Stage.DISCOVERY, owingInput.stage(), "an input never tried is owed");
-        assertTrue(owingInput.said().contains("Tavern: untried click drink"), owingInput.said());
+        assertTrue(owingInput.said().contains("Tavern: untried drink"), owingInput.said());
         assertTrue(owingInput.said().contains("Next to explore: Tavern, the shallowest screen with inputs left."),
                 owingInput.said());
     }
@@ -124,7 +124,7 @@ class ProtocolTest {
     void discoveryGoesBreadthFirstAndScrollsEveryList() {
         String steps = Stage.DISCOVERY.section();
         for (String rule : List.of("Every screen is explored the same way", "Breadth first: a screen's inputs are "
-                + "all tried before those of any screen they opened", "(kind info) last", "try_input with scroll every "
+                + "all tried before those of any screen they opened", "(purpose info) last", "try_input with scroll every "
                 + "list and panel to its end both ways", "other free spends are clicked", "the bot's Screens class",
                 "go_to_screen")) {
             assertTrue(steps.replaceAll("\\s+", " ").contains(rule), rule);

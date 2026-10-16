@@ -5,9 +5,9 @@ import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.ManagedSet;
-import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
@@ -40,8 +40,6 @@ public final class TemplateUses {
 
     /** The open set the pictures are: {@code Pictures.java}. */
     static final ManagedSet<ImageTemplate> SET = ManagedSet.of(SdkValues.PICTURES);
-    /** The bot's screen map, {@code Screens.java}, whose pictures go with them. */
-    private static final ManagedSet<GameScreen> MAP = ManagedSet.of(SdkValues.SCREEN_MAP);
     private static final String SCREENS_FILE = "Screens.java";
 
     private TemplateUses() {}
@@ -91,28 +89,25 @@ public final class TemplateUses {
         boolean mapOnly = scan.uses().stream().allMatch(use -> use.file().getFileName().toString()
                 .equals(SCREENS_FILE));
         if (scan.isEmpty() || !mapOnly) return none;
-        record Held(Member member, ValueContext at, GameScreen screen) {}
-        List<Held> screens = new ArrayList<>();
-        for (Member member : MAP.members(values)) {
-            Optional<ValueContext> at = MAP.open(values, member);
-            Optional<GameScreen> screen = at.flatMap(MAP::read);
-            if (screen.isEmpty()) return none;    // a screen written by hand may name it: leave the map alone
-            if (ScreenGraph.enteredBy(screen.get(), baseName)) return none;
-            screens.add(new Held(member, at.get(), screen.get()));
+        ScreenGraph graph = ScreenMapRead.of(values);
+        for (String constant : graph.screens().keySet()) {
+            // A screen written by hand may name it: leave the map alone.
+            if (ScreenMapRead.setup(values, constant).isEmpty()) return none;
+            if (graph.enteredBy(constant, baseName)) return none;
         }
         // Every use goes with the map's own: only then is the map written.
         List<MapCut.Kept> kept = new ArrayList<>();
-        try {
-            for (Held held : screens) {
-                GameScreen without = ScreenGraph.without(held.screen(), baseName);
-                if (without.equals(held.screen())) continue;
-                held.at().set(without);
-                kept.add(new MapCut.Kept(held.member(), held.screen()));
+        for (Map.Entry<String, MapScreen> held : graph.screens().entrySet()) {
+            MapScreen without = ScreenGraph.without(held.getValue(), baseName);
+            if (without.equals(held.getValue())) continue;
+            Optional<String> refused = ScreenMapRead.write(values, held.getKey(), held.getValue(), without);
+            // Kept before it is known written: a write refused part-way goes back too.
+            kept.add(new MapCut.Kept(held.getKey(), held.getValue(), without));
+            if (refused.isPresent()) {
+                // A screen the host would not write: the ones written already go back as they were.
+                new MapCut(scan, List.copyOf(kept)).undo(values);
+                throw new IllegalStateException(refused.get());
             }
-        } catch (RuntimeException refused) {
-            // A screen the host would not write: the ones written already go back as they were.
-            new MapCut(scan, List.copyOf(kept)).undo(values);
-            throw refused;
         }
         MapCut cut = new MapCut(find(values, baseName), List.copyOf(kept));
         if (cut.scan().isEmpty()) return cut;
@@ -126,16 +121,23 @@ public final class TemplateUses {
      */
     public record MapCut(Scan scan, List<Kept> kept) {
 
-        /** A screen the picture was taken off, as it was. */
-        public record Kept(Member member, GameScreen was) {}
+        /** A screen the picture was taken off, as it was and as it is now. */
+        public record Kept(String constant, MapScreen was, MapScreen now) {}
 
         static MapCut none(Scan scan) {
             return new MapCut(scan, List.of());
         }
 
-        /** Writes each screen back as it was: the picture stays, so its uses do. On the FX thread. */
+        /**
+         * Writes each screen back as it was, from what the host holds now (a write refused part-way left some of it):
+         * the picture stays, so its uses do. On the FX thread.
+         */
         public void undo(PluginValues values) {
-            for (Kept screen : kept) MAP.open(values, screen.member()).ifPresent(at -> at.set(screen.was()));
+            Map<String, MapScreen> now = ScreenMapRead.of(values).screens();
+            for (Kept screen : kept) {
+                ScreenMapRead.write(values, screen.constant(), now.getOrDefault(screen.constant(), screen.now()),
+                        screen.was());
+            }
         }
 
         /** The names the game shows of the screens the picture was taken off, in the map's order. */
