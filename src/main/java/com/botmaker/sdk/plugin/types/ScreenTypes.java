@@ -120,7 +120,9 @@ public final class ScreenTypes {
                 .flag(Input::sometimes, Input::comesAndGoes)
                 .<ImageTemplate>with(Input::locked, Input::lock)
                 .<List<Variant>>with(Input::variants, Input::variants)
-                .<BooleanSupplier>with(Input::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
+                .<BooleanSupplier>with(Input::when, Parts.INPUT_WHEN.part(ScreenTypes::condition))
+                .<Integer>with(Input::nth, Input::nth)
+                .flag(Input::each, Input::every);
     }
 
     /** The screen map's shapes, which {@code SdkTypes.PARTS} hands the host. */

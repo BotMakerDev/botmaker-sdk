@@ -24,6 +24,10 @@ import java.util.function.BooleanSupplier;
  * <p>A button in a list that scrolls, or in a column whose slots shift, is a member of one of its screen's
  * {@link GameScreen#lists lists}: the list says where it is looked for and how it is scrolled to.
  *
+ * <p>A picture a screen shows more than once is one input per copy, since copies may open different screens: each
+ * is the {@link #nth} copy in reading order, with its own result. A chore done on every copy in turn (Claim on each
+ * mission card) is one input, {@link #each} (the user's call, 2026-10-16).
+ *
  * @param act          what is done
  * @param picture      the picture clicked or scrolled over, as the button usually looks; null for a key
  * @param key          the key pressed; null for a picture
@@ -36,9 +40,13 @@ import java.util.function.BooleanSupplier;
  * @param variants     the button's other looks, each with what it means
  * @param when         when it is there, for one that comes and goes: a method answering whether it is; null when
  *                     not known
+ * @param nth          which copy of its picture, in reading order (top to bottom, then left to right), from 1; 0 for
+ *                     its best match
+ * @param every        whether it is done on every copy of its picture in turn
  */
 public record Input(Act act, ImageTemplate picture, Key key, int notches, Did did, Kind kind, String never,
-                    boolean comesAndGoes, ImageTemplate lock, List<Variant> variants, BooleanSupplier when) {
+                    boolean comesAndGoes, ImageTemplate lock, List<Variant> variants, BooleanSupplier when, int nth,
+                    boolean every) {
 
     /** What an input does. */
     public enum Act { CLICK, KEY, SCROLL }
@@ -47,56 +55,70 @@ public record Input(Act act, ImageTemplate picture, Key key, int notches, Did di
         variants = variants == null ? List.of() : List.copyOf(variants);
         // When it is there is said only of what comes and goes.
         comesAndGoes = comesAndGoes || when != null;
+        // A key has no copies; every copy is no one copy.
+        nth = picture == null || every ? 0 : Math.max(0, nth);
+        every = every && picture != null;
     }
 
     /** {@code picture} clicked at its best match. */
     public static Input click(ImageTemplate picture) {
-        return new Input(Act.CLICK, picture, null, 0, null, null, null, false, null, null, null);
+        return new Input(Act.CLICK, picture, null, 0, null, null, null, false, null, null, null, 0, false);
     }
 
     /** {@code key} pressed. */
     public static Input key(Key key) {
-        return new Input(Act.KEY, null, key, 0, null, null, null, false, null, null, null);
+        return new Input(Act.KEY, null, key, 0, null, null, null, false, null, null, null, 0, false);
     }
 
     /** {@code notches} scrolled over {@code picture}'s best match: a list or a panel that scrolls. */
     public static Input scroll(ImageTemplate picture, int notches) {
-        return new Input(Act.SCROLL, picture, null, notches, null, null, null, false, null, null, null);
+        return new Input(Act.SCROLL, picture, null, notches, null, null, null, false, null, null, null, 0, false);
     }
 
     /** This input, tried, having done {@code did}. */
     public Input did(Did did) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when);
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when, nth, every);
     }
 
     /** This input, named a {@code kind}. */
     public Input kind(Kind kind) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when);
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when, nth, every);
     }
 
     /** This input, never done because {@code why}: it spends premium currency or real money. */
     public Input never(String why) {
-        return new Input(act, picture, key, notches, did, kind, why, comesAndGoes, lock, variants, when);
+        return new Input(act, picture, key, notches, did, kind, why, comesAndGoes, lock, variants, when, nth, every);
     }
 
     /** This input, showing only at times. */
     public Input sometimes() {
-        return new Input(act, picture, key, notches, did, kind, never, true, lock, variants, when);
+        return new Input(act, picture, key, notches, did, kind, never, true, lock, variants, when, nth, every);
     }
 
     /** This input, proved locked on this account by {@code lock} at its place. */
     public Input locked(ImageTemplate lock) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when);
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when, nth, every);
     }
 
     /** This input, its button also looking as each of {@code variants} says. */
     public Input variants(List<Variant> variants) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when);
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when, nth, every);
     }
 
     /** This input, coming and going, there while {@code condition} answers true: {@code Firestone::eventOn}. */
     public Input when(BooleanSupplier condition) {
-        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, condition);
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, condition, nth,
+                every);
+    }
+
+    /** This input, on the {@code n}th copy of its picture in reading order, from 1: one copy of a repeated button. */
+    public Input nth(int n) {
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when, n, false);
+    }
+
+    /** This input, done on every copy of its picture in turn: Claim on each mission card. */
+    public Input each() {
+        return new Input(act, picture, key, notches, did, kind, never, comesAndGoes, lock, variants, when, 0, true);
     }
 
     /** This input with {@code variant} put in place of the one of the same picture, or added last. */
@@ -127,19 +149,27 @@ public record Input(Act act, ImageTemplate picture, Key key, int notches, Did di
         return did != null || never != null || lock != null;
     }
 
-    /** Whether {@code other} acts the same way: the same act on the same picture or key, the same notches. */
+    /**
+     * Whether {@code other} acts the same way: the same act on the same picture or key, the same notches, the same
+     * copy of the picture.
+     */
     public boolean sameAs(Input other) {
         return other != null && act == other.act && key == other.key && notches == other.notches
+                && nth == other.nth && every == other.every
                 && (picture == null ? other.picture == null : other.picture != null
                 && picture.id().equals(other.picture.id()));
     }
 
-    /** How it reads in a sentence: {@code click campaign_claim}, {@code key Escape}, {@code scroll list -3}. */
+    /**
+     * How it reads in a sentence: {@code click campaign_claim}, {@code click mission_go #2}, {@code click claim each},
+     * {@code key Escape}, {@code scroll list -3}.
+     */
     public String label() {
+        String copy = every ? " each" : nth > 0 ? " #" + nth : "";
         return switch (act) {
-            case CLICK -> "click " + (picture == null ? "?" : picture.id());
+            case CLICK -> "click " + (picture == null ? "?" : picture.id()) + copy;
             case KEY -> "key " + (key == null ? "?" : key.label());
-            case SCROLL -> "scroll " + (picture == null ? "?" : picture.id()) + " " + notches;
+            case SCROLL -> "scroll " + (picture == null ? "?" : picture.id()) + copy + " " + notches;
         };
     }
 }

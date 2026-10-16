@@ -36,7 +36,7 @@ class ReachTest {
      * A column of icons, six slots in view: each icon at its slot less how far the column is scrolled, a notch down
      * scrolling it one slot, never past its ends. Time is counted, not waited.
      */
-    private static final class Column implements Reach {
+    private static class Column implements Reach {
         final Map<String, Integer> slots;
         final int end;
         final List<String> done = new ArrayList<>();
@@ -151,6 +151,53 @@ class ReachTest {
         assertFalse(column.perform(Input.click(MACHINES), ScreenList.of(0, COLUMN.members()),
                 column.look().orElseThrow()));
         assertEquals(List.of(), column.done);
+    }
+
+    /** Three Go buttons on a grid of mission cards: two on the top row, one below, found out of reading order. */
+    private static final class Cards extends Column {
+        final List<Rect> copies = List.of(new Rect(300, 400, 80, 40), new Rect(300, 100, 80, 40),
+                new Rect(100, 110, 80, 40));
+
+        Cards() {
+            super(Map.of(), 0);
+        }
+
+        @Override
+        public List<Rect> findAll(ImageTemplate picture, BufferedImage frame) {
+            return picture.id().equals("go") ? copies : List.of();
+        }
+
+        @Override
+        public void click(Point at) {
+            done.add("click " + at.x() + "," + at.y());
+        }
+    }
+
+    private static final ImageTemplate GO = new ImageTemplate("images/go.png");
+
+    @Test
+    void copiesAreCountedInReadingOrder() {
+        Cards cards = new Cards();
+        assertEquals(List.of(new Rect(100, 110, 80, 40), new Rect(300, 100, 80, 40), new Rect(300, 400, 80, 40)),
+                Reach.readingOrder(cards.copies, r -> r), "the top row left to right, then the next row");
+    }
+
+    @Test
+    void anNthInputClicksThatCopy() {
+        Cards cards = new Cards();
+        assertTrue(cards.perform(Input.click(GO).nth(2), cards.look().orElseThrow()));
+        assertEquals(List.of("click 340,120"), cards.done);
+        assertFalse(cards.perform(Input.click(GO).nth(4), cards.look().orElseThrow()), "no fourth copy");
+        assertEquals(1, cards.done.size());
+    }
+
+    @Test
+    void anEachInputClicksEveryCopyLettingTheGameSettleBetween() {
+        Cards cards = new Cards();
+        assertTrue(cards.perform(Input.click(GO).each(), cards.look().orElseThrow()));
+        assertEquals(List.of("click 340,420", "click 340,120", "click 140,130"), cards.done,
+                "last to first: a card claimed and gone shifts none still to press");
+        assertEquals(2 * Reach.CLICK_SETTLE_MS, cards.now);
     }
 
     @Test

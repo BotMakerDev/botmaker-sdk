@@ -82,6 +82,24 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
         }
     }
 
+    @Override
+    public List<Rect> findAll(ImageTemplate picture, BufferedImage frame) {
+        return Frames.picture(resources, picture.id()).map(name -> all(placed(name, picture), frame)).orElse(List.of());
+    }
+
+    /** Every place the bot's picture {@code name} clears the score a run needs on {@code frame}, in no order. */
+    List<Rect> findAll(String name, BufferedImage frame) {
+        return all(new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString()), frame);
+    }
+
+    /** {@code file}'s places on {@code frame}; it is released after the match. */
+    private List<Rect> all(ImageTemplate file, BufferedImage frame) {
+        try (file) {
+            return ToolTiming.timed(ToolTiming.Phase.MATCH, () -> ImageFinder.allMatches(file,
+                    new StillSource(frame), confidence)).stream().map(MatchResult::rect).toList();
+        }
+    }
+
     /** Looked for only in {@code area}, scaled to the frame as the picture is: its place there, with no margin. */
     @Override
     public Optional<Rect> findWithin(ImageTemplate picture, Rect area, BufferedImage frame) {

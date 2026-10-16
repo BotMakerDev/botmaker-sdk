@@ -45,6 +45,7 @@ public final class ScreenDesk {
         MapTools.Try asked = new MapTools.Try(constant, List.of(new MapTools.Step(
                 input.picture() == null ? null : input.picture().id(),
                 input.act() == Input.Act.SCROLL ? input.notches() : null,
+                input.nth() > 0 ? input.nth() : null,
                 input.key() == null ? null : input.key().label(),
                 opens, null, null, input.kind())), null, true, true);
         return text(MapTools.tryInput(asked, context));

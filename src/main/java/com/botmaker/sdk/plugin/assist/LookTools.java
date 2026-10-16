@@ -18,6 +18,7 @@ import com.botmaker.sdk.api.vision.Pixel;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.capture.StillSource;
+import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.vision.ColorText;
 import com.botmaker.sdk.internal.vision.Images;
@@ -40,6 +41,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * The assistant's eyes: what the bot sees, which pictures are on it, its text and its colours. Each reads a
@@ -74,7 +76,8 @@ final class LookTools {
 
     record Shown(@Describe(value = SHOW, optional = true) Boolean show,
                  @Describe(value = "true looks for every picture all over the frame, slow (a second per ten "
-                         + "pictures); left out, each is looked for near where it was cut", optional = true)
+                         + "pictures), and numbers each copy of one found more than once as try_input's match "
+                         + "counts them; left out, each is looked for near where it was cut", optional = true)
                  Boolean everywhere) {
     }
 
@@ -247,6 +250,8 @@ final class LookTools {
         double needs = Frames.confidence(context.services());
         List<String> lines = new ArrayList<>();
         List<Rect> found = new ArrayList<>();
+        // Copies are counted all over the frame, one more match each: only when the call asks for everywhere.
+        Optional<ToolReach> reach = Boolean.TRUE.equals(shown.everywhere()) ? ToolReach.of(context) : Optional.empty();
         for (Scored s : scored) {
             boolean on = s.match().confidence() >= needs;
             if (on) {
@@ -255,13 +260,26 @@ final class LookTools {
             }
             if (lines.size() < MOST_LISTED) {
                 lines.add((on ? "✓ " : "  ") + s.name() + " " + Frames.score(s.match().confidence()) + " at "
-                        + Frames.box(s.match().rect()));
+                        + Frames.box(s.match().rect()) + (on ? reach.map(r -> copies(r, s.name(), frame.get()))
+                        .orElse("") : ""));
             }
         }
         String head = found.isEmpty() ? "None of the pictures is on screen (a run needs " + Frames.score(needs) + ")."
                 : found.size() + " on screen (✓, a run needs " + Frames.score(needs) + "):";
         return Frames.found(onMap + head + "\n" + String.join("\n", lines), frame.get(), found, Frames.FOUND,
                 shown.show());
+    }
+
+    /**
+     * Each copy of the picture {@code name} on {@code frame}, when it shows more than once: {@code "; 3 copies: #1
+     * at …"}, numbered in reading order as try_input's match counts them. Empty for a picture that shows once.
+     */
+    private static String copies(ToolReach reach, String name, BufferedImage frame) {
+        List<Rect> all = Reach.readingOrder(reach.findAll(name, frame), Function.identity());
+        if (all.size() < 2) return "";
+        List<String> each = new ArrayList<>();
+        for (int i = 0; i < all.size(); i++) each.add("#" + (i + 1) + " at " + Frames.box(all.get(i)));
+        return "; " + all.size() + " copies (try_input match): " + String.join(", ", each);
     }
 
     static AgentReply waitForPicture(Wait wait, AgentContext context) {

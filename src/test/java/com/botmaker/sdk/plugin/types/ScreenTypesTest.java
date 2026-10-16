@@ -88,6 +88,17 @@ class ScreenTypesTest {
     }
 
     @Test
+    void aCopyOfARepeatedButtonAndEveryCopyGoBackTogether() {
+        Input second = Input.click(picture("mission_go")).nth(2).did(Did.IN_PLACE);
+        Input every = Input.click(picture("claim")).each().kind(Kind.CHORE);
+
+        assertEquals(second, roundTrip(ScreenTypes.CLICK_SHAPE, second));
+        assertEquals(every, roundTrip(ScreenTypes.CLICK_SHAPE, every));
+        assertEquals(0, every.nth(), "every copy is no one copy");
+        assertFalse(second.sameAs(Input.click(picture("mission_go"))), "each copy is an input of its own");
+    }
+
+    @Test
     void aListIsWrittenByItsMembersAndGoesWithItsScreen() {
         ScreenList column = ScreenList.of(-5, List.of(picture("tavern_home"), picture("campaign_home")));
         assertEquals(column, roundTrip(ScreenTypes.LIST_SHAPE, column));

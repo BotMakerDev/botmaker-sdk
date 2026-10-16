@@ -8,6 +8,8 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.text.OcrLanguage;
 import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.MatchResult;
@@ -16,6 +18,7 @@ import com.botmaker.sdk.internal.input.Hands.InSession;
 import com.botmaker.sdk.internal.input.Hands.OnDesktop;
 import com.botmaker.sdk.internal.input.Hands.OnEmulator;
 import com.botmaker.sdk.internal.screens.Markers;
+import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.vision.FrameChange;
 import com.botmaker.sdk.internal.vision.FrameChange.Clock;
 import com.botmaker.sdk.internal.vision.FrameChange.Motion;
@@ -210,6 +213,28 @@ final class ActTools {
         return new Spotted(frame.get(), reach.get().pointOn(match.rect()), base.get(), null);
     }
 
+    /**
+     * {@code copy}'s copy of its button, counted as a run counts them ({@link Reach#copies}: any of its looks, along
+     * {@code list} for a member of one), when a run would find that many; {@code picture} names it in the reply.
+     */
+    private static Spotted spotCopy(String picture, Input copy, ScreenList list, String acted, AgentContext context) {
+        Optional<ToolReach> reach = ToolReach.of(context);
+        if (reach.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noProject()));
+        Optional<String> base = Frames.picture(reach.get().resources(), picture);
+        if (base.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noPicture(picture)));
+        Optional<BufferedImage> frame = reach.get().look();
+        if (frame.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noScreen()));
+        int nth = copy.nth();
+        List<Rect> copies = reach.get().copies(copy, list, frame.get()).stream().map(Reach.Seen::place).toList();
+        if (copies.size() < nth) {
+            return Spotted.no(AgentReply.text(base.get() + " shows " + (copies.isEmpty() ? "nowhere" : copies.size()
+                    + (copies.size() == 1 ? " time" : " times")) + " at a run's score " + Frames.score(reach.get()
+                    .confidence()) + ", so it has no copy " + nth + "; nothing was " + acted + "."));
+        }
+        Rect at = copies.get(nth - 1);
+        return new Spotted(frame.get(), reach.get().pointOn(at), base.get() + " #" + nth, null);
+    }
+
     /** Why the game is not on {@code screen}, when its {@code marker} is not on a fresh look: try_input refuses. */
     static Optional<AgentReply> notOn(AgentContext context, String marker, String screen) {
         Spotted spotted = spot(marker, "done", context);
@@ -261,13 +286,15 @@ final class ActTools {
      * {@link FrameChange#QUIET_MS} when nothing moves at all. What moves on its own there is read again only past
      * {@link #MOTION_REUSE_MS}.
      */
-    static Entered enter(AgentContext context, String screen, String picture, int notches, Key key, Boolean desktop,
-                         int settleMs, double share) {
+    static Entered enter(AgentContext context, String screen, String picture, int notches, Input copy,
+                         ScreenList list, Key key, Boolean desktop, int settleMs, double share) {
         if (key != null) {
             return acted(context, screen, null, null, desktop, settleMs, false, "Pressed " + key.label(),
                     "key " + key.label(), share, hands -> hands.key(key));
         }
-        Spotted spotted = spot(picture, notches == 0 ? "clicked" : "scrolled", context);
+        String verb = notches == 0 ? "clicked" : "scrolled";
+        Spotted spotted = copy == null || copy.nth() == 0 ? spot(picture, verb, context)
+                : spotCopy(picture, copy, list, verb, context);
         if (spotted.refusal() != null) return Entered.no(spotted.refusal());
         Point at = spotted.at();
         if (notches != 0) {

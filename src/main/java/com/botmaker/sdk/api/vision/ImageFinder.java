@@ -129,6 +129,31 @@ public class ImageFinder {
         return bestMatches(templates, source, Math.max(0, margin));
     }
 
+    /**
+     * Every place {@code template} shows on one capture at or above {@code confidence}, in no order: the copies of
+     * one button that a screen map tells apart ({@code Input.nth}). Like {@code bestMatch} it stores nothing in
+     * {@link Vision}, sends no telemetry and writes no trace.
+     */
+    @Hidden("a screen map's copies of one button; a bot asks findAll()")
+    public static List<MatchResult> allMatches(ImageTemplate template, CaptureSource source, double confidence) {
+        Mat background = null;
+        try {
+            BufferedImage screenshot = source.capture();
+            if (screenshot == null) return List.of();
+            background = OpencvManager.bufferedImageToMat(screenshot);
+            Point origin = source.origin();
+            return OpencvManager.findMultipleMatches(template.getMat(), background, false, confidence,
+                            template.authoredSize()).stream()
+                    .map(r -> new MatchResult(new Point(r.x() + origin.x(), r.y() + origin.y()), r.width(),
+                            r.height(), r.score(), template.id()))
+                    .toList();
+        } catch (RuntimeException e) {
+            return List.of();
+        } finally {
+            if (background != null) background.release();
+        }
+    }
+
     /** A margin that means the whole frame, not a picture's place. */
     private static final int EVERYWHERE = -1;
 

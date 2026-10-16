@@ -11,10 +11,12 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * What acts on the game, for whoever acts: a run ({@code RunReach}) or the assistant's tools ({@code ToolReach}).
@@ -25,6 +27,9 @@ public interface Reach {
 
     /** How long a list is let settle after a scroll before it is looked at again. */
     long SCROLL_SETTLE_MS = 400;
+
+    /** How long the game is let settle between two copies of a button an {@link Input#every each} input presses. */
+    long CLICK_SETTLE_MS = 600;
 
     /** How far a list member may shift between two looks and still count as not moved: a match is found to a pixel or two. */
     int STILL_PX = 4;
@@ -81,10 +86,14 @@ public interface Reach {
      * it. Empty for a key, or a button not there.
      */
     default Optional<Seen> seen(Input input, ScreenList list, BufferedImage frame) {
-        List<Variant> looks = input.looks();
-        if (looks.isEmpty()) return Optional.empty();
-        List<Variant> order = new ArrayList<>(looks.subList(1, looks.size()));
-        order.add(looks.getFirst());
+        if (input.nth() > 0 || input.every()) {
+            // One copy of a repeated button: the nth in reading order; every copy starts at the first.
+            List<Seen> copies = copies(input, list, frame);
+            int at = input.every() ? 0 : input.nth() - 1;
+            return at < copies.size() ? Optional.of(copies.get(at)) : Optional.empty();
+        }
+        List<Variant> order = lookOrder(input);
+        if (order.isEmpty()) return Optional.empty();
         Rect band = band(list);
         List<Optional<Rect>> found = band == null
                 ? findEach(order.stream().map(Variant::picture).toList(), frame)
@@ -93,6 +102,65 @@ public interface Reach {
             if (found.get(i).isPresent()) return Optional.of(new Seen(order.get(i).state(), found.get(i).get()));
         }
         return Optional.empty();
+    }
+
+    /**
+     * Every place {@code picture} clears this reach's confidence on {@code frame}, in no order: the copies of a
+     * repeated button. By default only its best match; a reach that matches through the SDK's matcher finds them all.
+     */
+    default List<Rect> findAll(ImageTemplate picture, BufferedImage frame) {
+        return find(picture, frame).map(List::of).orElse(List.of());
+    }
+
+    /**
+     * Every copy of {@code input}'s button on {@code frame}, in reading order ({@link #readingOrder}), each in the look
+     * it shows: a copy is found by any of its looks, its variants before its usual picture, and a place another look
+     * already holds is that copy. Only those along {@code list}, for a member of one.
+     */
+    default List<Seen> copies(Input input, ScreenList list, BufferedImage frame) {
+        Rect band = band(list);
+        List<Seen> all = new ArrayList<>();
+        for (Variant look : lookOrder(input)) {
+            for (Rect at : findAll(look.picture(), frame)) {
+                if (band != null && !band.contains(at.center())) continue;
+                if (all.stream().noneMatch(s -> s.place().contains(at.center()))) all.add(new Seen(look.state(), at));
+            }
+        }
+        return readingOrder(all, Seen::place);
+    }
+
+    /** {@code input}'s looks in the order they are looked for: a badge or a grey copy also passes for the button. */
+    private static List<Variant> lookOrder(Input input) {
+        List<Variant> looks = input.looks();
+        if (looks.isEmpty()) return List.of();
+        List<Variant> order = new ArrayList<>(looks.subList(1, looks.size()));
+        order.add(looks.getFirst());
+        return order;
+    }
+
+    /**
+     * {@code items} in reading order by their {@code place}: top to bottom, then left to right. Two whose centres
+     * are less than half the row's first item's height apart are on one row.
+     */
+    static <T> List<T> readingOrder(List<T> items, Function<T, Rect> place) {
+        List<T> byTop = new ArrayList<>(items);
+        byTop.sort(Comparator.comparingInt(item -> place.apply(item).center().y()));
+        List<T> ordered = new ArrayList<>();
+        List<T> row = new ArrayList<>();
+        for (T item : byTop) {
+            if (!row.isEmpty()) {
+                Rect first = place.apply(row.getFirst());
+                if (Math.abs(place.apply(item).center().y() - first.center().y()) * 2 >= first.height()) {
+                    row.sort(Comparator.comparingInt(r -> place.apply(r).center().x()));
+                    ordered.addAll(row);
+                    row.clear();
+                }
+            }
+            row.add(item);
+        }
+        row.sort(Comparator.comparingInt(r -> place.apply(r).center().x()));
+        ordered.addAll(row);
+        return ordered;
     }
 
     /** {@link #perform(Input, ScreenList, BufferedImage)} of an input at its place, in no list. */
@@ -107,18 +175,51 @@ public interface Reach {
      * again after each. A scroll after which no member moved met the list's end, and the scroll turns the other way
      * once: the members' places say it, never the pixels, since a list may sit over a moving fight. False when the
      * button is not there or greyed out, and nothing but those scrolls was done.
+     *
+     * <p>An {@link Input#nth nth} input acts on that copy of its button; an {@link Input#every each} one on every copy
+     * the frame shows but a disabled one, the game let settle {@link #CLICK_SETTLE_MS} between them. They go last to
+     * first in reading order: a card claimed and gone shifts the ones after it, never one still to press. False for
+     * that one when no copy was acted on.
      */
     default boolean perform(Input input, ScreenList list, BufferedImage frame) {
         if (input.act() == Input.Act.KEY) {
             key(input.key());
             return true;
         }
+        if (input.every()) return performEach(input, list, frame);
         Optional<Seen> button = inView(input, list, frame);
         if (button.isEmpty() || button.get().state() == State.DISABLED) return false;
-        Rect place = button.get().place();
+        act(input, button.get().place());
+        return true;
+    }
+
+    /** {@link #perform} of an input done on every copy of its button. */
+    private boolean performEach(Input input, ScreenList list, BufferedImage frame) {
+        BufferedImage on = frame;
+        if (seen(input, list, frame).isEmpty()) {
+            // Scrolled to, the copies are read off the list as it now stands.
+            if (inView(input, list, frame).isEmpty()) return false;
+            Optional<BufferedImage> now = look();
+            if (now.isEmpty()) return false;
+            on = now.get();
+        }
+        boolean any = false;
+        for (Seen copy : copies(input, list, on).reversed()) {
+            if (copy.state() == State.DISABLED) continue;
+            if (any) {
+                pause(CLICK_SETTLE_MS);
+                if (Thread.currentThread().isInterrupted()) return true;
+            }
+            act(input, copy.place());
+            any = true;
+        }
+        return any;
+    }
+
+    /** {@code input}'s click or scroll on its button at {@code place}. */
+    private void act(Input input, Rect place) {
         if (input.act() == Input.Act.SCROLL) scroll(place.center(), input.notches());
         else click(pointOn(place));
-        return true;
     }
 
     /**

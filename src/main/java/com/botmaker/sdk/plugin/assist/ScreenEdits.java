@@ -49,19 +49,21 @@ public final class ScreenEdits {
      */
     public static Input untried(Input input) {
         return new Input(input.act(), input.picture(), input.key(), input.notches(), null, input.kind(), null,
-                input.comesAndGoes(), null, input.variants(), input.when());
+                input.comesAndGoes(), null, input.variants(), input.when(), input.nth(), input.every());
     }
 
     /** {@code input} shown only at times, or always ({@code sometimes} false: when it is there goes too). */
     public static Input sometimes(Input input, boolean sometimes) {
         return new Input(input.act(), input.picture(), input.key(), input.notches(), input.did(), input.kind(),
-                input.never(), sometimes, input.lock(), input.variants(), sometimes ? input.when() : null);
+                input.never(), sometimes, input.lock(), input.variants(), sometimes ? input.when() : null,
+                input.nth(), input.every());
     }
 
     /** {@code input}, with no kind named. */
     public static Input unkinded(Input input) {
         return new Input(input.act(), input.picture(), input.key(), input.notches(), input.did(), null,
-                input.never(), input.comesAndGoes(), input.lock(), input.variants(), input.when());
+                input.never(), input.comesAndGoes(), input.lock(), input.variants(), input.when(), input.nth(),
+                input.every());
     }
 
     /** Puts {@code now} where {@code old} is on {@code constant}; {@code now} null removes it. */

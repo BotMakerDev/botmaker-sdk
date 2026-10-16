@@ -34,6 +34,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - 🗺 Screens draws a list whole on a screen's shot: a strip over where the list sits with every member's picture,
     in the list's order, the wheel scrolling it. A member that comes and goes is faint. A click picks the member's
     input.
+- **A button a screen shows more than once.** Copies of one picture may open different screens, so each copy is an
+  input of its own: `Input.click(Pictures.MISSION_GO).nth(2)` is the second copy in reading order (top to bottom,
+  then left to right), with its own result in the map. `Input.click(Pictures.CLAIM).each()` is a chore done on every
+  copy in turn, the game let settle between them; a greyed-out copy is skipped.
+  - The assistant's `try_input` takes `match` (from 1) and records the copy it clicked. Copies are counted as a run
+    counts them (any of the button's looks, along its list). The input `crop_pictures` cut once for the picture
+    becomes one untried input per copy shown, so Discovery tries every one.
+  - An `each` input presses the copies last to first, so a card claimed and gone shifts none still to press.
+  - `which_screen` with `everywhere` numbers each copy of a picture it finds more than once, as `match` counts them.
 - **🗺 Screens opens at once.** The cards' shots load after the window shows. Firestone's 36 shots took 1.7 s to read
   before the first paint, and now cost the window under 10 ms. Reading the map every 1.5 s happens off the window's
   thread too.

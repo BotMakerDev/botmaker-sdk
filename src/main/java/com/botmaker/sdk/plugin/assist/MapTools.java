@@ -73,6 +73,10 @@ final class MapTools {
                 @Describe(value = "notches to scroll over the picture instead of clicking it, for a list or a panel "
                         + "that scrolls: positive up or away, negative down or toward you", optional = true)
                 Integer scroll,
+                @Describe(value = "which copy of the picture, when the screen shows it more than once: 1 for the "
+                        + "first in reading order (top to bottom, then left to right). Each copy is an input of its "
+                        + "own, with its own result; left out, its best match", optional = true)
+                Integer match,
                 @Describe(value = "a hotkey instead of a picture, as printed on it: Q", optional = true) String key,
                 @Describe(value = "the name the screen it opens shows, when it opens one; left out, the picture's "
                         + "name names it, and a hotkey's is tried again with it when it opened one", optional = true)
@@ -96,21 +100,22 @@ final class MapTools {
     }
 
     /** One input of a try_input call, with the call's screen and settings: what {@link #tried} tries. */
-    private record One(String screen, String picture, Integer scroll, String key, String opens, String never,
-                       String locked, Kind kind, Integer settleMs, Boolean stay, Boolean desktop) {
+    private record One(String screen, String picture, Integer scroll, Integer match, String key, String opens,
+                       String never, String locked, Kind kind, Integer settleMs, Boolean stay, Boolean desktop) {
         static One of(Try call, Step step, Boolean stay) {
-            return new One(call.screen(), step.picture(), step.scroll(), step.key(), step.opens(), step.never(),
-                    step.locked(), step.kind(), call.settleMs(), stay, call.desktop());
+            return new One(call.screen(), step.picture(), step.scroll(), step.match(), step.key(), step.opens(),
+                    step.never(), step.locked(), step.kind(), call.settleMs(), stay, call.desktop());
         }
 
         /** The input that walks the game up from {@code call}'s screen once every input of it was tried. */
         static One after(Try call) {
-            return new One(call.screen(), null, null, null, null, null, null, null, null, call.stay(), call.desktop());
+            return new One(call.screen(), null, null, null, null, null, null, null, null, null, call.stay(),
+                    call.desktop());
         }
 
         String label() {
-            return picture != null && !picture.isBlank() ? picture.strip() + (scroll == null ? "" : " " + scroll)
-                    : key == null ? "?" : key.strip();
+            return picture != null && !picture.isBlank() ? picture.strip() + (match == null ? "" : " #" + match)
+                    + (scroll == null ? "" : " " + scroll) : key == null ? "?" : key.strip();
         }
     }
 
@@ -259,6 +264,11 @@ final class MapTools {
                     + "a picture: the list or panel, cut with its screen." : "A scroll spends nothing and opens "
                     + "nothing: leave never and locked out.");
         }
+        int match = input.match() == null ? 0 : input.match();
+        if (input.match() != null && (match < 1 || !byPicture)) {
+            return Tried.refused(!byPicture ? "A hotkey has no copies: leave match out." : "match counts the "
+                    + "picture's copies from 1, the first in reading order. Nothing was done.");
+        }
         int settle = input.settleMs() == null ? ActTools.SETTLE_MS : input.settleMs();
         ScreenGraph graph = FxCall.call(() -> ScreenBook.read(services));
         Optional<String> found = ScreenBook.find(graph, asked);
@@ -295,7 +305,7 @@ final class MapTools {
         }
         GameScreen on = graph.screens().get(screen);
         String what = byPicture ? input.picture().strip() : null;
-        Optional<Input> held = held(on, what, key.orElse(null), notches, graph, screen);
+        Optional<Input> held = held(on, what, key.orElse(null), notches, match, graph, screen);
         boolean untried = held.filter(i -> !graph.tried(screen, i)).isPresent();
         if (byPicture && !ActTools.exists(context, what)) {
             if (!untried) return Tried.refused(Frames.noPicture(what));
@@ -322,7 +332,23 @@ final class MapTools {
         Optional<AgentReply> away = notOn(context, graph, screen);
         // Left on a screen below it, finished with nothing to try (a rules panel): walked back to it first.
         if (away.isPresent() && !walkedTo(context, graph, screen, input.desktop())) return Tried.left(away.get());
-        Input base = kinded(made(services, held, what, key.orElse(null), notches), kind);
+        if (match > 0 && held.isPresent() && held.get().nth() == 0) {
+            // The picture cut once for all its copies becomes one untried input per copy a run finds: none is left
+            // out of Discovery, each with its own result to come.
+            int count = ToolReach.of(context).flatMap(reach -> reach.look().map(frame -> reach.copies(held.get(),
+                    on.listOf(held.get()).orElse(null), frame).size())).orElse(0);
+            if (count < match) {
+                return Tried.left(AgentReply.text(what + " shows " + (count == 0 ? "nowhere" : count + (count == 1
+                        ? " time" : " times")) + " at a run's score, so it has no copy " + match
+                        + "; nothing was clicked."));
+            }
+            Optional<String> failed = write(() -> ScreenBook.update(services, screen,
+                    s -> copies(s, held.get(), count)));
+            return failed.isPresent() ? Tried.refused(failed.get()) : tried(input, context);
+        }
+        Input made =kinded(made(services, held, what, key.orElse(null), notches), kind);
+        // A copy tried by its place among the picture's copies is recorded as that copy.
+        Input base = match > 0 && made.nth() != match ? made.nth(match) : made;
         Input old = held.orElse(null);
         // A button with looks leads where the look clicked says: the way it opens names that look, and its usual
         // look none (a way taken whatever the button looks).
@@ -341,8 +367,8 @@ final class MapTools {
             ToolReach.of(context).ifPresent(reach -> reach.look()
                     .ifPresent(frame -> reach.inView(base, list.get(), frame)));
         }
-        ActTools.Entered first = ActTools.enter(context, screen, byPicture ? what : null, notches, key.orElse(null),
-                input.desktop(), settle, FrameChange.ANSWER_SHARE);
+        ActTools.Entered first = ActTools.enter(context, screen, byPicture ? what : null, notches, base,
+                list.orElse(null), key.orElse(null), input.desktop(), settle, FrameChange.ANSWER_SHARE);
         Markers onMarkers = Markers.of(on);
         ActTools.Entered slow = notches == 0 ? slowScreen(context, first, onMarkers) : first;
         ActTools.Entered entered = notches == 0 ? flash(context, slow, onMarkers) : slow;
@@ -1240,12 +1266,25 @@ final class MapTools {
 
     /**
      * The input of {@code on} this try is: the key's, the picture's click, or for a scroll the one of those notches,
-     * else the picture's untried click, which the scroll then stands for.
+     * else the picture's untried click, which the scroll then stands for. A copy {@code match} (from 1; 0 for the best
+     * match) is that copy's input, else the picture's untried input cut once for all its copies, which the copy then
+     * stands for.
      */
-    private static Optional<Input> held(GameScreen on, String picture, Key key, int notches, ScreenGraph graph,
+    private static Optional<Input> held(GameScreen on, String picture, Key key, int notches, int match,
+                                        ScreenGraph graph, String screen) {
+        if (key != null) {
+            return on.allInputs().stream().filter(i -> i.act() == Input.Act.KEY && i.key() == key).findFirst();
+        }
+        Optional<Input> copy = held(on.allInputs().stream().filter(i -> i.nth() == match).toList(), picture,
+                notches, graph, screen);
+        return match == 0 || copy.isPresent() ? copy : held(on.allInputs().stream()
+                .filter(i -> i.nth() == 0 && !i.every() && !graph.tried(screen, i)).toList(), picture, notches,
+                graph, screen);
+    }
+
+    /** {@link #held(GameScreen, String, Key, int, int, ScreenGraph, String)} of a picture among {@code all}. */
+    private static Optional<Input> held(List<Input> all, String picture, int notches, ScreenGraph graph,
                                         String screen) {
-        List<Input> all = on.allInputs();
-        if (key != null) return all.stream().filter(i -> i.act() == Input.Act.KEY && i.key() == key).findFirst();
         List<Input> same = all.stream()
                 .filter(i -> i.picture() != null && i.picture().id().equalsIgnoreCase(picture)).toList();
         // A button's other look is that button: clicking its badge copy tries the same input.
@@ -1269,11 +1308,19 @@ final class MapTools {
         ImageTemplate cut = FxCall.call(() -> ScreenBook.picture(services, picture));
         if (notches == 0) return Input.click(cut);
         return held.map(click -> new Input(Input.Act.SCROLL, cut, null, notches, null, click.kind(), null,
-                click.comesAndGoes(), null, click.variants(), click.when())).orElse(Input.scroll(cut, notches));
+                click.comesAndGoes(), null, click.variants(), click.when(), click.nth(), click.every()))
+                .orElse(Input.scroll(cut, notches));
     }
 
     private static Input kinded(Input input, Optional<Kind> kind) {
         return kind.map(input::kind).orElse(input);
+    }
+
+    /** {@code screen} with {@code once}, an input of a picture shown {@code count} times, as one input per copy. */
+    private static GameScreen copies(GameScreen screen, Input once, int count) {
+        GameScreen now = replaced(screen, once, once.nth(1));
+        for (int n = 2; n <= count; n++) now = replaced(now, null, once.nth(n));
+        return now;
     }
 
     /** {@code screen} with {@code now} where {@code old} was, added when {@code old} is not on it, gone when null. */

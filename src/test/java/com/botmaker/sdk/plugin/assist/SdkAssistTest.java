@@ -1093,6 +1093,42 @@ class SdkAssistTest {
     }
 
     /**
+     * A picture the screen shows twice is two inputs, each copy tried by its place in reading order, with its own
+     * result (the user's call, 2026-10-16); which_screen numbers the copies as match counts them.
+     */
+    @Test
+    void eachCopyOfARepeatedButtonIsTriedAsAnInputOfItsOwn() {
+        RecordingNativeController game = new RecordingNativeController();
+        NativeControllerFactory.setForTesting(game);
+        BufferedImage frame = withPatchAt(120, 20);
+        Graphics2D g = frame.createGraphics();
+        g.drawImage(noise(SIZE, SIZE, 21), 250, 200, null);
+        g.drawImage(noise(SIZE, SIZE, 21), 50, 200, null);
+        g.dispose();
+        agent.frame = frame;
+        run("screenshot");
+        cropOne("name", "home", "x", 120, "y", 20, "width", SIZE, "height", SIZE, "screen", "Home", "marker", "set");
+        cropOne("name", "go", "x", 250, "y", 200, "width", SIZE, "height", SIZE, "screen", "Home");
+
+        String listed = text(run("which_screen", "everywhere", true));
+        assertTrue(listed.contains("2 copies (try_input match): #1 at 50,200 (48×48), #2 at 250,200"), listed);
+        assertTrue(tryOne("screen", "Home", "picture", "go", "match", 0).isRefused(), "copies count from 1");
+        String none = text(tryOne("screen", "Home", "picture", "go", "match", 3, "desktop", true, "settleMs", 0));
+        assertTrue(none.contains("so it has no copy 3; nothing was clicked"), none);
+
+        String second = text(tryOne("screen", "Home", "picture", "go", "match", 2, "desktop", true, "settleMs", 0,
+                "stay", true));
+        assertTrue(second.contains("tried click go #2, no visible effect"), second);
+        assertTrue(game.events.contains("mouseMove(1274,724)"), "the second copy is clicked: " + game.events);
+        assertEquals(List.of("click go #1", "click go #2"), screen("HOME").inputs().stream().map(Input::label).toList(),
+                "the picture's one cut became an input per copy");
+        assertFalse(screen("HOME").inputs().getFirst().settled(), "the first copy is still to try");
+        tryOne("screen", "Home", "picture", "go", "match", 1, "desktop", true, "settleMs", 0, "stay", true);
+        assertTrue(game.events.contains("mouseMove(1074,724)"), game.events.toString());
+        assertTrue(screen("HOME").inputs().stream().allMatch(i -> i.did() == Did.NONE), "each copy has its own result");
+    }
+
+    /**
      * try_input reads where each input left the game on the frame the game shows after it (2026-10-15): a panel
      * closed to the screen under it, whose marker showed under the panel too, is that screen's way back and no new
      * screen; a popup stops try_input's list; a scroll keeps what was said of its input; a hotkey needs a name only once it

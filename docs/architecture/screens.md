@@ -15,7 +15,9 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a
   way out only.
 - **`Input`**: a picture click, a key or a scroll, with `did` (IN_PLACE, NONE, LEAVES; null while untried),
-  `kind` (CHORE, SHORTCUT, CHOICE, INFO), `never`, `sometimes`, `locked`, `when` and button looks (`variants`).
+  `kind` (CHORE, SHORTCUT, CHOICE, INFO), `never`, `sometimes`, `locked`, `when` and button looks (`variants`). A
+  picture shown more than once is one input per copy, `nth` (from 1, in reading order: `Reach.readingOrder`), since
+  copies may open different screens; `each` does every copy in turn (the user's call, 2026-10-16).
 - **`ScreenList`** (`GameScreen.lists`): some of a screen's inputs in one list that scrolls or column whose slots
   shift, named by their pictures and its `notches` — never by a rectangle (the user's call, 2026-10-16, after Home's
   left column over a moving fight). A member is looked for anywhere in the band its members were cut in
@@ -65,7 +67,9 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **Discovery** (`MapTools`): `crop_pictures` cuts a screen's inputs, marker, back, looks (`variantOf`,
   `screenLook`, `when`), `sometimes` and `popup`; `place_pictures` puts pictures the bot already has on a screen;
   `try_input` clicks each input of its list and records what it did — opened a new screen (owing its marker), led to a mapped one
-  (a way in or its way back, found with `whereOn`), changed it in place, or nothing — and stops at a popup;
+  (a way in or its way back, found with `whereOn`), changed it in place, or nothing — and stops at a popup; its
+  `match` tries one copy of a repeated picture (the picture's one cut split into an untried input per copy first), and
+  `which_screen` with `everywhere` numbers the copies;
   `not_a_screen` turns a screen back into an IN_PLACE result on each of its ways in; `go_to_screen` and
   `which_screen` walk the map as a run does; `read_map` prints it (`plugin/map/MapReport`). The tool refuses a
   screen while one below it is unfinished or one owes its marker.

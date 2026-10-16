@@ -48,6 +48,12 @@ public final class RunReach implements Reach {
                 .toList();
     }
 
+    @Override
+    public List<Rect> findAll(ImageTemplate picture, BufferedImage frame) {
+        return ImageFinder.allMatches(picture, new StillSource(frame), BotSettings.current().confidence()).stream()
+                .map(MatchResult::rect).toList();
+    }
+
     /** Looked for only in {@code area}, scaled to the frame as the picture is: its place there, with no margin. */
     @Override
     public Optional<Rect> findWithin(ImageTemplate picture, Rect area, BufferedImage frame) {
