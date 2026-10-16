@@ -69,7 +69,7 @@ final class NotesTools {
                             + "read_notes first to keep what holds")
                     .takes(Note.class).handledBy(NotesTools::writeNotes),
             AssistantTool.named("read_guide")
-                    .describedAs("The steps of the stage the bot is at, worked out from its home and popups methods "
+                    .describedAs("The steps of the stage the bot is at, worked out from its home method "
                             + "and its Screens (how far each screen got, what each owes), with where each screen "
                             + "stands; or one stage's steps by its number or name. Read it before starting and "
                             + "whenever a stage's check passes")
@@ -159,13 +159,12 @@ final class NotesTools {
         }
         StudioServices services = context.services();
         if (services.projectDir() == null) return AgentReply.refused(Frames.noProject());
-        // Opened as read_flow opens it: the bot's home and popups are its run's.
+        // Opened as read_flow opens it: the bot's home is its run's.
         FlowValue.Target target = FxCall.call(() -> FlowValue.target(services));
         if (target.problem() != null) return AgentReply.refused(target.problem());
         try {
             ScreenGraph map = FxCall.call(() -> ScreenBook.read(services));
-            return AgentReply.text(Protocol.where(target.run().home() != null, target.run().popups() != null, map)
-                    .said());
+            return AgentReply.text(Protocol.where(target.run().home() != null, map).said());
         } catch (IllegalArgumentException | IllegalStateException e) {
             return AgentReply.refused(e.getMessage());
         }

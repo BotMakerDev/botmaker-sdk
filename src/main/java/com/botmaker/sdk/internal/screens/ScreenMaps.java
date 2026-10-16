@@ -39,6 +39,12 @@ public final class ScreenMaps {
         last = null;
     }
 
+    /** Walks {@code map} from now on, as {@link #install} would learn it; {@code null} is the empty map. */
+    public static void use(ScreenGraph map) {
+        installed = map == null ? ScreenGraph.of(Map.of()) : map;
+        last = null;
+    }
+
     /** The screen of the installed map the game was last seen on: a walk looks for its neighbours first. */
     private static volatile String last;
 

@@ -122,15 +122,14 @@ final class FlowTools {
     record RemoveFlow(String name) implements Change {
     }
 
-    /** The run's own methods, one each for the whole bot: {@code .home(…)}, {@code .setup(…)}, {@code .popups(…)}. */
+    /** The run's own methods, one each for the whole bot: {@code .home(…)} and {@code .setup(…)}. */
     enum Hook {
-        HOME, SETUP, POPUPS;
+        HOME, SETUP;
 
         Runnable of(Run run) {
             return switch (this) {
                 case HOME -> run.home();
                 case SETUP -> run.setup();
-                case POPUPS -> run.popups();
             };
         }
 
@@ -138,16 +137,14 @@ final class FlowTools {
             return switch (this) {
                 case HOME -> run.home(method);
                 case SETUP -> run.setup(method);
-                case POPUPS -> run.popups(method);
             };
         }
     }
 
-    @Describe("set the bot's home, setup or popups (one each, whichever flow runs) to a method of the bot; write the "
-            + "method first")
+    @Describe("set the bot's home or setup (one each, whichever flow runs) to a method of the bot; write the method "
+            + "first. Popups have no method: they are popup screens of the map")
     record SetFlowMethod(@Describe(value = "home gets the game back to a known screen; setup makes it ready after "
-                                 + "the bot starts it, when doSetup is ticked; popups clears a popup the game opened "
-                                 + "on its own, before every look") Hook which,
+                                 + "the bot starts it, when doSetup is ticked") Hook which,
                          @Describe(value = "a public static void method of the bot with no parameter, Gamebot::setup; "
                                  + "leave out for none", optional = true) String method) implements Change {
     }
@@ -156,7 +153,7 @@ final class FlowTools {
             AssistantTool.named("read_flow")
                     .describedAs("The bot's flows by name, then one flow: each activity with its body, switches and "
                             + "outcomes, each sub-flow card with its exits, every arrow, where a run starts, its "
-                            + "limits, and the bot's home, setup and popups")
+                            + "limits, and the bot's home and setup")
                     .takes(Which.class).handledBy(FlowTools::readFlow),
             ToolTiming.actions("edit_flow", "Changes the bot's flows as the 🔀 Activity Flow window does",
                     Change.class, FlowTools::edit));
@@ -485,7 +482,7 @@ final class FlowTools {
 
     /** Only a method the bot has: a name it lacks would not compile. */
     static AgentReply setMethod(SetFlowMethod set, AgentContext context) {
-        if (set.which() == null) return AgentReply.refused("Say which: home, setup or popups.");
+        if (set.which() == null) return AgentReply.refused("Say which: home or setup.");
         String which = set.which().name().toLowerCase(Locale.ROOT);
         String method = set.method() == null ? "" : set.method().strip();
         if (!method.isEmpty()) {

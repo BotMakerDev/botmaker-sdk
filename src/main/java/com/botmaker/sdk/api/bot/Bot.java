@@ -113,7 +113,7 @@ public class Bot {
             Runnable home = InstalledRun.installed().home();
             if (home != null) home.run();
         };
-        installPopups();
+        PopupGuard.enabled(true);
         lifecycle(() -> FlowWalker.run(InstalledRun.flow(), InstalledRun.installed().home()), goHome,
                 doSetup ? InstalledRun.installed().setup() : null);
     }
@@ -141,7 +141,8 @@ public class Bot {
         InstalledGame.install(values);
         ScreenMaps.install(values);
         SessionBootstrap.joinOffered();
-        installPopups();
+        // Switched back on each run, so a warm JVM keeps no switch a body of the run before left off.
+        PopupGuard.enabled(true);
         try {
             homeFirst(body, values);
             body.run();
@@ -187,15 +188,6 @@ public class Bot {
             }
         }
         return out;
-    }
-
-    /**
-     * Before every vision call of every activity: the run's popups method, or none. Installed each run, and the
-     * guard switched back on, so a warm JVM keeps nothing of the run before.
-     */
-    private static void installPopups() {
-        PopupGuard.install(InstalledRun.installed().popups());
-        PopupGuard.enabled(true);
     }
 
     /** Why the supervisor invokes the start-up step: the first launch, or a recovery after a crash. */

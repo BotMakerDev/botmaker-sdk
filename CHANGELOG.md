@@ -266,6 +266,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **Popups come from the map** (breaking). `Run.popups(…)` is gone, and with it the Activity Flow window's Popups
+  section and `edit_flow`'s `set_flow_method popups`; `PopupGuard.install` and `uninstall` are gone too.
+  - Before every vision step, the guard closes each popup screen of the bot's map (`GameScreen.popup()`) that
+    shows, by its way back: a close button, or the choice that closes it. It waits for the popup's markers to go,
+    presses Escape once if they stay, and stops the run as stuck if they still do. A map with no popup costs
+    nothing.
+  - A wait that times out on no screen of the map tries the map's close buttons; a `Navigate` walk that finds none
+    looks twice, then tries them and Escape. The run's trace then warns that an unmapped popup covered the screen, to map it in
+    Upkeep.
+  - A bot whose `Sdk.run()` still says `.popups(…)` no longer compiles: Studio's upgrade resets its run. Map each
+    popup instead (`crop_pictures` with `popup` and `back`), then set the home again.
 - **A screen is told by a set of markers** (breaking). `GameScreen.marker(…)` and `ScreenVariant.marker(…)` are
   gone. In their place:
   - `.markers(List.of(A, B))`: the game shows the screen when all of them show.

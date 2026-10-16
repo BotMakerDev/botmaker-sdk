@@ -74,7 +74,6 @@ public final class FlowTypes {
 
         static final Held<Run, String> HOME = Held.as(String.class, run -> sourceOf(run.home()));
         static final Held<Run, String> SETUP = Held.as(String.class, run -> sourceOf(run.setup()));
-        static final Held<Run, String> POPUPS = Held.as(String.class, run -> sourceOf(run.popups()));
 
         static final Held<Flow.Step, Activity> CARD = Held.as(Activity.class, Flow.Step::activity);
         static final Held<Flow.Step, String> BODY = Held.as(String.class,
@@ -161,7 +160,6 @@ public final class FlowTypes {
             .writtenAs(Run::of)
             .<Runnable>with(Run::home, Parts.HOME.part(FlowTypes::method))
             .<Runnable>with(Run::setup, Parts.SETUP.part(FlowTypes::method))
-            .<Runnable>with(Run::popups, Parts.POPUPS.part(FlowTypes::method))
             .<String>with(Run::notes, Run::notes)
             .constants(Run.NONE);
 

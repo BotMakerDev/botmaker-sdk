@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
@@ -20,7 +21,9 @@ import java.util.function.Predicate;
 /**
  * Walks the bot's screen map on the game: which screen it is on ({@link #where}), and the way to another
  * ({@link #go}), one edge at a time. Each step does the edge's input, then waits for the next screen's marker. A
- * popup that shows is closed first; a step that lands elsewhere is read again and the way planned anew from there.
+ * popup of the map that shows is closed first ({@link #closePopups}, which the run's {@code PopupGuard} calls too),
+ * and an overlay the map lacks cleared once ({@link #uncover}); a step that lands elsewhere is read again and the way
+ * planned anew from there.
  * A way back with no input is the game's usual close button when the walk is given one, else Escape.
  *
  * <p>What is not always there decides the answer when no way is open now: one only through an input that comes and
@@ -57,6 +60,11 @@ public final class ScreenWalk {
     private final long stepMs;
     private final Consumer<String> reached;
     private final Input close;
+    /** Whether {@link #go} clears an overlay the map lacks: a run's walks do, the assistant's leave it to the user. */
+    private final boolean uncovers;
+
+    /** How long a screen of the map is given to show once an overlay's close was pressed: short, a wait timed out. */
+    static final long UNCOVER_MS = 2_000;
 
     /**
      * A walk over {@code graph} by {@code reach}, giving each step {@code stepMs} to show the next screen's marker,
@@ -68,11 +76,26 @@ public final class ScreenWalk {
 
     /** As above; a way back with no input clicks {@code close}, the game's usual close button, while it shows. */
     public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Input close) {
+        this(graph, reach, stepMs, reached, close, false);
+    }
+
+    private ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Input close,
+                       boolean uncovers) {
         this.graph = graph;
         this.reach = reach;
         this.stepMs = stepMs;
         this.reached = reached == null ? name -> {} : reached;
         this.close = close;
+        this.uncovers = uncovers;
+    }
+
+    /**
+     * This walk, clearing once an overlay the map lacks when {@link #go} finds no screen of the map ({@link #uncover},
+     * Escape included): a run's {@code Navigate}. Without it, such a walk ends {@link Outcome#STUCK}, as the
+     * assistant's do while the screen it explores is not mapped yet.
+     */
+    public ScreenWalk uncovering() {
+        return new ScreenWalk(graph, reach, stepMs, reached, close, true);
     }
 
     /** The screen the game shows now, {@code near}'s neighbours looked for first; popups aside. */
@@ -113,8 +136,20 @@ public final class ScreenWalk {
                 .or(() -> shown.stream().findFirst());
     }
 
-    /** Walks to {@code target} from where the game is, {@code near} the screen it was last seen on, or null. */
+    /**
+     * Walks to {@code target} from where the game is, {@code near} the screen it was last seen on, or null. A popup of
+     * the map that will not close ends it {@link Outcome#STUCK}; an overlay the map lacks is cleared once
+     * ({@link #uncover}), and the walk's answer says so.
+     */
     public Result go(String target, String near) {
+        try {
+            return walk(target, near);
+        } catch (Stayed stayed) {
+            return new Result(Outcome.STUCK, near, List.of(), stayed.getMessage());
+        }
+    }
+
+    private Result walk(String target, String near) {
         Optional<GameScreen> goal = graph.screen(target);
         if (goal.isEmpty()) {
             return new Result(Outcome.MISSING, near, List.of(), target + " is not in the bot's screen map.");
@@ -130,6 +165,8 @@ public final class ScreenWalk {
         String told = null;        // the screen the walk last said it is on
         String unmarked = null;    // a screen reached that has no marker to tell it by
         String left = null;        // the screen the step to it was done on
+        String uncovered = null;   // what cleared an overlay the map lacks, said once arrived
+        boolean lookedAgain = false;
         int most = graph.screens().size() * 2 + MOST_REPLANS;
         for (int step = 0; step < most; step++) {
             if (Thread.currentThread().isInterrupted()) return new Result(Outcome.STOPPED, at, walked, "Stopped.");
@@ -140,6 +177,19 @@ public final class ScreenWalk {
             // under it, or none shows.
             if (unmarked != null && (here.isEmpty() || here.get().equals(left))) here = Optional.of(unmarked);
             unmarked = null;
+            if (here.isEmpty() && uncovers && uncovered == null) {
+                if (!lookedAgain) {
+                    // A frame caught mid-transition shows no screen either: one more look before pressing anything.
+                    lookedAgain = true;
+                    reach.pause(POLL_MS);
+                    continue;
+                }
+                Optional<Uncovered> cleared = uncover(frame.get(), at, true);
+                if (cleared.isPresent()) {
+                    uncovered = covered(at, cleared.get());
+                    continue;    // planned from a fresh look: this one is the covered frame
+                }
+            }
             if (here.isEmpty()) {
                 return new Result(Outcome.STUCK, at, walked, "The game shows no screen of the bot's map"
                         + (at == null ? "." : "; it was last on " + graph.shown(at) + "."));
@@ -151,7 +201,10 @@ public final class ScreenWalk {
                 reached.accept(at);
                 told = at;
             }
-            if (at.equals(target)) return new Result(Outcome.ARRIVED, at, walked, "On " + graph.shown(at) + ".");
+            if (at.equals(target)) {
+                return new Result(Outcome.ARRIVED, at, walked, "On " + graph.shown(at) + "."
+                        + (uncovered == null ? "" : " " + uncovered));
+            }
             String from = at;
             BufferedImage seen = frame.get();
             Optional<List<ScreenGraph.Edge>> path = graph.pathTo(at, target,
@@ -268,6 +321,125 @@ public final class ScreenWalk {
         return popups.isEmpty() ? Optional.empty() : first(popups, frame);
     }
 
+    /** Whether the map has a popup it can tell: one with markers. Without one, closing popups looks at nothing. */
+    public boolean hasPopups() {
+        return !popups().isEmpty();
+    }
+
+    /** A popup of the map that its way out and Escape both left on the screen. */
+    public static final class Stayed extends RuntimeException {
+        Stayed(String why) {
+            super(why);
+        }
+    }
+
+    /**
+     * {@code frame}, or the look after closing each popup of the map it shows, up to {@link #MOST_POPUPS}. A popup
+     * closes by its {@code back} (Offline progress: its Claim, the choice that closes it), else Escape, and is closed
+     * once its markers are gone; still shown a step later, Escape once more.
+     *
+     * @throws Stayed when a popup is still shown after that
+     */
+    public Optional<BufferedImage> closePopups(Optional<BufferedImage> frame) {
+        List<String> popups = popups();
+        for (int i = 0; i < MOST_POPUPS && frame.isPresent() && !popups.isEmpty(); i++) {
+            Optional<String> popup = first(popups, frame.get());
+            if (popup.isEmpty()) return frame;
+            frame = close(popup.get(), frame.get());
+        }
+        return frame;
+    }
+
+    /** The look once {@code popup} is closed: its way out, then Escape when it stays. */
+    private Optional<BufferedImage> close(String popup, BufferedImage frame) {
+        GameScreen screen = graph.screens().get(popup);
+        Markers shows = Markers.of(screen);
+        boolean escaped = screen.back() == null || !reach.perform(screen.back(), frame);
+        if (escaped) reach.key(Key.ESCAPE);
+        Optional<BufferedImage> after = gone(shows);
+        if (after.isEmpty() && !escaped) {
+            reach.key(Key.ESCAPE);
+            after = gone(shows);
+        }
+        if (after.isPresent()) return after;
+        throw new Stayed(graph.shown(popup) + " stayed after " + (escaped ? "Escape"
+                : screen.back().label() + " and Escape") + ".");
+    }
+
+    /** The first look within a step's time that no longer shows {@code shows}; empty when it stays. */
+    private Optional<BufferedImage> gone(Markers shows) {
+        long deadline = reach.nowMs() + stepMs;
+        do {
+            reach.pause(POLL_MS);
+            Optional<BufferedImage> frame = reach.look();
+            if (frame.isPresent() && !shows.on(reach, frame.get())) return frame;
+        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
+        return Optional.empty();
+    }
+
+    /** What cleared an overlay the map does not know, and the screen of the map it uncovered. */
+    public record Uncovered(String at, String how) {}
+
+    /**
+     * Clears what covers the game when {@code frame} shows no screen and no popup of the map: an overlay the map
+     * lacks. The map's close buttons (the usual one first, then each way back that is a picture) are looked for on
+     * {@code frame} and the first found clicked; with {@code escape}, Escape when none is, or when the click uncovered
+     * nothing: only a walk, which knows it left a mapped screen, presses it. Empty when
+     * {@code frame} shows a screen of the map already, when the map tells no screen yet, or when nothing brought one
+     * back.
+     */
+    public Optional<Uncovered> uncover(BufferedImage frame, String near, boolean escape) {
+        boolean tells = graph.screens().values().stream().anyMatch(s -> !s.isPopup() && s.hasMarker());
+        if (!tells || Thread.currentThread().isInterrupted() || whereOn(frame, near).isPresent()
+                || popupOn(frame).isPresent()) {
+            return Optional.empty();
+        }
+        List<Input> closes = closeButtons();
+        List<Optional<Rect>> found = reach.findEach(closes.stream().map(Input::picture).toList(), frame);
+        for (int i = 0; i < closes.size(); i++) {
+            if (found.get(i).isEmpty()) continue;
+            reach.click(reach.pointOn(found.get(i).get()));
+            Optional<String> at = screenWithin(near);
+            if (at.isPresent()) return Optional.of(new Uncovered(at.get(), closes.get(i).picture().id()));
+            break;
+        }
+        if (!escape || Thread.currentThread().isInterrupted()) return Optional.empty();
+        reach.key(Key.ESCAPE);
+        return screenWithin(near).map(at -> new Uncovered(at, "Escape"));
+    }
+
+    /** The note for an overlay the map lacks, over {@code near} (the screen last seen, or null), cleared as said. */
+    public String covered(String near, Uncovered cleared) {
+        return "An unmapped popup covered " + (near == null ? "the game" : graph.shown(near)) + " (" + cleared.how()
+                + " closed it): map it in Upkeep.";
+    }
+
+    /** The map's close buttons: the usual one, then every way back that clicks a picture, each picture once. */
+    private List<Input> closeButtons() {
+        List<Input> closes = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        List<Input> backs = new ArrayList<>();
+        if (close != null) backs.add(close);
+        graph.screens().values().forEach(s -> {
+            if (s.back() != null) backs.add(s.back());
+        });
+        for (Input back : backs) {
+            if (back.act() == Input.Act.CLICK && back.picture() != null && seen.add(back.picture().id())) closes.add(back);
+        }
+        return closes;
+    }
+
+    /** The screen of the map the game shows within {@link #UNCOVER_MS}, its popups closed; empty when none shows. */
+    private Optional<String> screenWithin(String near) {
+        long deadline = reach.nowMs() + Math.min(stepMs, UNCOVER_MS);
+        do {
+            reach.pause(POLL_MS);
+            Optional<String> at = closePopups(reach.look()).flatMap(f -> whereOn(f, near));
+            if (at.isPresent()) return at;
+        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
+        return Optional.empty();
+    }
+
     /** Which look of {@code constant} {@code frame} shows: the first whose markers show; empty for none. */
     public Optional<ScreenVariant> lookOn(String constant, BufferedImage frame) {
         GameScreen screen = graph.screens().get(constant);
@@ -281,20 +453,6 @@ public final class ScreenWalk {
     private List<String> popups() {
         return graph.screens().entrySet().stream()
                 .filter(e -> e.getValue().isPopup() && e.getValue().hasMarker()).map(e -> e.getKey()).toList();
-    }
-
-    /** {@code frame}, or the one after closing each popup it shows, up to {@link #MOST_POPUPS}. */
-    private Optional<BufferedImage> closePopups(Optional<BufferedImage> frame) {
-        List<String> popups = popups();
-        for (int i = 0; i < MOST_POPUPS && frame.isPresent() && !popups.isEmpty(); i++) {
-            Optional<String> popup = first(popups, frame.get());
-            if (popup.isEmpty()) return frame;
-            Input back = graph.screens().get(popup.get()).back();
-            if (back == null || !reach.perform(back, frame.get())) reach.key(Key.ESCAPE);
-            reach.pause(POLL_MS);
-            frame = reach.look();
-        }
-        return frame;
     }
 
     /** The first of {@code constants} whose markers are on {@code frame}, all looked for on that one frame. */

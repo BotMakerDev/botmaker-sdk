@@ -74,6 +74,8 @@ public class ImageWaiter {
 
         Vision.setLastMatch(MatchResult.notFound());
         MissFrames.missed("timed out waiting for " + template.id(), source, null);
+        // An overlay the map lacks may be what hid it: cleared now, so the bot's next step finds its screen.
+        PopupGuard.uncover();
         return false;
     }
 

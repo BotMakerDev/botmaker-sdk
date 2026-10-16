@@ -360,7 +360,7 @@ public final class FlowValue {
     }
 
     /**
-     * Writes the run's home, setup and popups: {@code Sdk.run()} is written only when one of them changed. On the
+     * Writes the run's home and setup: {@code Sdk.run()} is written only when one of them changed. On the
      * JavaFX application thread.
      *
      * @return null when it was written or nothing changed, else why it could not be

@@ -36,13 +36,13 @@ public final class SdkAssist {
             stages: Setup once; then each screen through Discovery, Build and Trial, in that order; Tuning once
             its trial passed; Upkeep when the game changes. Never write a body for a screen not yet surveyed:
             it would miss the game's own controls.
-            - read_guide gives the steps of the stage the bot is at, worked out from its home and popups
-              methods and its Screens, and where each screen stands; read_guide with a stage gives another's.
+            - read_guide gives the steps of the stage the bot is at, worked out from its home method and its
+              Screens, and where each screen stands; read_guide with a stage gives another's.
               Read it before starting, and again whenever a stage's check passes.
             - The notes are the bot's Java (read_notes, write_notes): each screen's on its Screens constant, what
               holds across the game on the run. When a stage's check passes for a screen, write_notes it with
               reached (its new stage) and what the stage taught about the game, before going on.
-            - Stage 0, Setup: the game in view, a home method and a popups method.
+            - Stage 0, Setup: the game in view and a home method.
             - Stage 1, Discovery: every screen the same way, from home: cut its marker and every input on it,
               try each (every list scrolled to both ends), and finish a screen an input opens before the next
               input. crop_pictures and try_input write the map, the bot's Screens class; go_to_screen walks it;
@@ -75,10 +75,12 @@ public final class SdkAssist {
               activity starts from, safe to call at any moment. Make it with add_method, then name it with
               edit_flow's set_flow_method. An activity that needs another screen opens it from there in its
               own body.
-            - Popups the game opens on its own (an offer, a mail, a level-up) are no body's business: one
-              popups method clears them, named with edit_flow's set_flow_method popups, and the run calls it before every
-              look at the screen of every activity. A body that works through a popup-shaped screen itself
-              switches it off around that step with PopupGuard.enabled(false), and back on after.
+            - Popups the game opens on its own (an offer, a mail, a level-up) are no body's business: each is a
+              screen of the map (crop_pictures its marker with popup true, its way out with back true), and the
+              run closes the ones it shows before every look at the screen of every activity. An overlay the
+              map lacks is cleared by the map's close buttons, then Escape, and the run's trace says to map
+              it. A body that works through a popup-shaped screen itself switches the closing off around that
+              step with PopupGuard.enabled(false), and back on after.
             - Pictures, points and regions are the bot's constants (Pictures.CLAIM_RESEARCH): one per idea and
               place, named <idea>_<where>; the same idea on another screen is another picture. Tag each
               picture with the activity that uses it, or a custom tag (edit_tags) for home and popups:

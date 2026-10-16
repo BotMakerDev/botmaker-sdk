@@ -37,6 +37,13 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   shows, plan again from where a stray step landed. A way back is done once the left screen's marker is gone,
   wherever it lands. Ends: ARRIVED, NOT_NOW, LOCKED, MISSING (the map names a picture the game no longer shows:
   Upkeep), STUCK, STOPPED.
+- **Popups are screens of the map** (2026-10-16; no run method). `closePopups` closes each one a frame shows by its
+  `back` (or Escape), waits for its markers to go, presses Escape once more if they stay, and throws `Stayed`
+  after that. `PopupGuard.check` calls it before every vision step; with no popup in the map it takes no frame.
+  `uncover` clears an overlay the map lacks when a frame shows no screen of it: the map's close buttons (each
+  way back that clicks a picture), then Escape when asked. A `Navigate` walk (`uncovering()`) does that once,
+  after a second look, and says so; the assistant's walks never do. A timed-out wait clicks only, through
+  `PopupGuard.uncover`, which warns "an unmapped popup covered …: map it in Upkeep".
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
   `ToolReach` for the assistant. `perform` is the one place an input is done.
 - **Telemetry**: Navigate fires `on screen <CONSTANT>` (`ScreenStep`); the run bar and 🗺 Screens show its name.

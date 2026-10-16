@@ -3,11 +3,16 @@ package com.botmaker.sdk.api.bot;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.internal.screens.ScreenMaps;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,7 +23,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,7 +46,8 @@ class DebugTraceTest {
     @AfterEach
     void restoreTheGlobals() {
         Debug.enable();
-        PopupGuard.uninstall();
+        ScreenMaps.use(null);
+        Source.set(null);
         PopupGuard.enabled(true);
         InstalledRun.use(null);
     }
@@ -131,19 +139,63 @@ class DebugTraceTest {
 
     // --- PopupGuard ---
 
+    /** A popup of the map whose close button takes {@code closesMs} to take effect once clicked. */
+    private static final class SlowPopup implements CaptureSource {
+        final BufferedImage plain;
+        final BufferedImage popup;
+        final long closesMs;
+        long clickedAt = -1;
+
+        SlowPopup(BufferedImage plain, BufferedImage popup, long closesMs) {
+            this.plain = plain;
+            this.popup = popup;
+            this.closesMs = closesMs;
+        }
+
+        @Override public BufferedImage capture() {
+            boolean closed = clickedAt >= 0 && System.currentTimeMillis() - clickedAt >= closesMs;
+            return closed ? plain : popup;
+        }
+
+        @Override public Point origin() { return new Point(0, 0); }
+
+        @Override public void click(Point p) {
+            if (clickedAt < 0) clickedAt = System.currentTimeMillis();
+        }
+    }
+
+    /**
+     * A map whose one popup is told by the patch at 40,40 and closed by the one at 120,40, and a source showing it,
+     * closed {@code closesMs} after the click; {@code shown} false for one that never shows.
+     */
+    private static SlowPopup popupOver(Path dir, boolean shown, long closesMs) throws Exception {
+        ImageTemplate offer = tracedPatch(dir);
+        BufferedImage patch = new BufferedImage(24, 24, BufferedImage.TYPE_3BYTE_BGR);
+        for (int y = 0; y < 24; y++) {
+            for (int x = 0; x < 24; x++) patch.setRGB(x, y, ((y * 13) << 16) | ((x * 5) << 8) | 0x90);
+        }
+        Path closeFile = dir.resolve("trace_close.png");
+        ImageIO.write(patch, "png", closeFile.toFile());
+        Map<String, GameScreen> screens = new LinkedHashMap<>();
+        screens.put("OFFER", GameScreen.named("Offer").markers(List.of(offer))
+                .back(Input.click(new ImageTemplate(closeFile.toString()))).popup());
+        ScreenMaps.use(ScreenGraph.of(screens));
+        BufferedImage popup = noise();
+        popup.getGraphics().drawImage(ImageIO.read(dir.resolve("trace_probe.png").toFile()), 40, 40, null);
+        popup.getGraphics().drawImage(patch, 120, 40, null);
+        SlowPopup source = new SlowPopup(noise(), shown ? popup : noise(), closesMs);
+        Source.set(source);
+        return source;
+    }
+
     @Test
-    void aSlowPopupCheckIsCalledOutWhileTheFastOnesAreNot() {
-        PopupGuard.install(() -> {});
+    void aSlowPopupCheckIsCalledOutWhileTheFastOnesAreNot(@TempDir Path tmp) throws Exception {
+        popupOver(tmp, false, 0);
         String quiet = printed(PopupGuard::check);
         assertEquals("", quiet, "a check that costs nothing is not news: " + quiet);
 
-        PopupGuard.install(() -> {
-            try {
-                Thread.sleep(600);   // over the threshold at which a guard becomes the reason a bot looks hung
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
+        // Over the threshold at which a guard becomes the reason a bot looks hung.
+        popupOver(tmp, true, 600);
         String slow = printed(PopupGuard::check);
 
         List<String> lines = linesMatching(slow, "[PopupGuard] check took");
@@ -151,15 +203,9 @@ class DebugTraceTest {
     }
 
     @Test
-    void aQuietRunSaysNothingAboutPopups() {
+    void aQuietRunSaysNothingAboutPopups(@TempDir Path tmp) throws Exception {
         Debug.disable();
-        PopupGuard.install(() -> {
-            try {
-                Thread.sleep(600);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
+        popupOver(tmp, true, 600);
 
         assertEquals("", printed(PopupGuard::check));
     }

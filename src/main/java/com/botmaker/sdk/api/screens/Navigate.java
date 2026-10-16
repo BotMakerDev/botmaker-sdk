@@ -41,7 +41,7 @@ public final class Navigate {
             return false;
         }
         ScreenWalk.Result walked = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, constant -> tell(map, constant))
-                .go(target.get(), ScreenMaps.lastSeen());
+                .uncovering().go(target.get(), ScreenMaps.lastSeen());
         ScreenMaps.seen(walked.at());
         return switch (walked.outcome()) {
             case ARRIVED -> true;

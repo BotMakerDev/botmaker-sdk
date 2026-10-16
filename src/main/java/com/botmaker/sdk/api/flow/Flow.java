@@ -45,8 +45,8 @@ import java.util.List;
  *
  * <p>{@link #activity} takes the two things every step has, the activity and its work, and each other part is a
  * named link after it, written only when it is not the default: {@code .described("…")}, {@code .off()},
- * {@code .goesHome()}, {@code .switchable()}, {@code .whenOff(…)}. Popups are the run's, not a step's:
- * {@code Run.popups}.
+ * {@code .goesHome()}, {@code .switchable()}, {@code .whenOff(…)}. Popups are screens of the bot's map, closed
+ * in every activity, not a step's.
  *
  * <h2>A flow inside a flow</h2>
  *
@@ -267,12 +267,12 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
         /**
          * This step, unchanged.
          *
-         * @deprecated since 2026-10-14 the bot's popup method ({@link Run#popups}) runs before every vision call
-         * of every activity, so there is nothing to switch on per card. Kept so a flow written with it still reads;
-         * Studio no longer writes it.
+         * @deprecated since 2026-10-14 popups are closed before every vision call of every activity (since 2026-10-16
+         * by the map's popup screens), so there is nothing to switch on per card. Kept so a flow written with it
+         * still reads; Studio no longer writes it.
          */
         @Deprecated
-        @ReplacedBy(note = "Popups are handled in every activity by the run's popups method (Run.popups).")
+        @ReplacedBy(note = "Popups are screens of the bot's map, closed in every activity.")
         public Step checksPopups() {
             return this;
         }

@@ -23,6 +23,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -71,8 +72,12 @@ class ScreenWalkTest {
         screens.put("ARENA", GameScreen.named("Arena").markers(marks("arena_title"))
                 .from(from("HOME", click("arena").locked(picture("padlock")))));
         screens.put("OFFER", GameScreen.named("Offer").markers(marks("offer")).back(click("close_x")).popup());
+        screens.put("NEWS", GameScreen.named("News").markers(marks("news")).popup());
         return ScreenGraph.of(screens);
     }
+
+    /** What the game shows while an overlay the map lacks covers it. */
+    private static final String OVERLAY = "OVERLAY";
 
     /** The game: which screen shows, a popup over it, and what each input on each screen leads to. */
     private static final class Game implements Reach {
@@ -83,6 +88,10 @@ class ScreenWalkTest {
         final List<String> places = new ArrayList<>();
         String screen;
         String popup;
+        /** What closes the popup: its way out or Escape ("both"), only Escape, or nothing. */
+        String closes = "both";
+        /** An overlay the map lacks, over the screen: it shows {@link #OVERLAY}'s pictures and closes by them. */
+        boolean overlay;
         long now;
 
         Game(String screen) {
@@ -94,6 +103,7 @@ class ScreenWalkTest {
                 if (s.back() != null) on.add(s.back().picture().id());
                 shows.put(c, on);
             });
+            shows.put(OVERLAY, new HashSet<>(Set.of("close_x")));
             leads.put("HOME click campaign", "CAMPAIGN");
             leads.put("HOME click engineer", "ENGINEER");
             leads.put("HOME click mail", "MAIL");
@@ -108,14 +118,22 @@ class ScreenWalkTest {
         }
 
         private String showing() {
-            return popup != null ? popup : screen;
+            return overlay ? OVERLAY : popup != null ? popup : screen;
         }
 
         private void did(String what) {
             done.add(what);
             String key = showing() + " " + what;
+            if (overlay) {
+                if (shows.get(OVERLAY).isEmpty() ? what.equals("key ESCAPE") : what.equals("click close_x")) {
+                    overlay = false;
+                }
+                return;
+            }
             if (popup != null) {
-                if (what.equals("click close_x") || what.equals("key ESCAPE")) popup = null;
+                boolean way = what.equals("click close_x") && closes.equals("both");
+                boolean escape = what.equals("key ESCAPE") && !closes.equals("nothing");
+                if (way || escape) popup = null;
                 return;
             }
             String next = leads.get(key);
@@ -250,6 +268,90 @@ class ScreenWalkTest {
 
         assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome());
         assertEquals(List.of("click close_x", "click campaign"), game.done);
+    }
+
+    @Test
+    void aPopupWithNoWayOutIsClosedByEscape() {
+        Game game = new Game("HOME");
+        game.popup = "NEWS";
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, go(game, "CAMPAIGN", new ArrayList<>()).outcome());
+        assertEquals(List.of("key ESCAPE", "click campaign"), game.done);
+    }
+
+    @Test
+    void aPopupStillShownAfterItsWayOutGetsEscapeOnce() {
+        Game game = new Game("HOME");
+        game.popup = "OFFER";
+        game.closes = "escape";
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, go(game, "CAMPAIGN", new ArrayList<>()).outcome());
+        assertEquals(List.of("click close_x", "key ESCAPE", "click campaign"), game.done);
+    }
+
+    @Test
+    void aPopupThatStaysAfterItsWayOutAndEscapeIsStuck() {
+        Game game = new Game("HOME");
+        game.popup = "OFFER";
+        game.closes = "nothing";
+
+        ScreenWalk.Result walked = go(game, "CAMPAIGN", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.STUCK, walked.outcome());
+        assertTrue(walked.why().startsWith("Offer stayed after"), walked.why());
+        assertEquals(List.of("click close_x", "key ESCAPE"), game.done, "Escape once, then the run's recovery");
+        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+        assertThrows(ScreenWalk.Stayed.class, () -> walk.closePopups(game.look()), "the guard's own call throws");
+    }
+
+    @Test
+    void anOverlayTheMapLacksIsClearedByAMapsCloseButtonAndSaid() {
+        Game game = new Game("HOME");
+        game.overlay = true;
+
+        ScreenWalk.Result walked = new ScreenWalk(game.map, game, STEP_MS, null).uncovering().go("CAMPAIGN", null);
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
+        assertEquals(List.of("click close_x", "click campaign"), game.done, "Offer's way out, the map's close button");
+        assertTrue(walked.why().contains("An unmapped popup covered the game (close_x closed it): map it in Upkeep."),
+                walked.why());
+    }
+
+    /** The assistant's walks touch nothing the map lacks: the screen being explored may be one. */
+    @Test
+    void aWalkNotUncoveringEndsStuckOnAnOverlayAndPressesNothing() {
+        Game game = new Game("HOME");
+        game.overlay = true;
+
+        ScreenWalk.Result walked = go(game, "CAMPAIGN", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.STUCK, walked.outcome());
+        assertEquals(List.of(), game.done);
+    }
+
+    @Test
+    void anOverlayIsNotEscapedUnlessAsked() {
+        Game game = new Game("HOME");
+        game.overlay = true;
+        game.shows.get(OVERLAY).clear();
+        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+
+        assertEquals(Optional.empty(), walk.uncover(game.look().orElseThrow(), "HOME", false));
+        assertEquals(List.of(), game.done, "a timed-out wait never presses Escape");
+    }
+
+    @Test
+    void anOverlayWithNoCloseButtonOfTheMapGetsEscape() {
+        Game game = new Game("HOME");
+        game.overlay = true;
+        game.shows.get(OVERLAY).clear();
+        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+
+        Optional<ScreenWalk.Uncovered> cleared = walk.uncover(game.look().orElseThrow(), "HOME", true);
+
+        assertEquals(Optional.of(new ScreenWalk.Uncovered("HOME", "Escape")), cleared);
+        assertEquals(List.of("key ESCAPE"), game.done);
+        assertEquals(Optional.empty(), walk.uncover(game.look().orElseThrow(), "HOME", true), "nothing covers Home now");
     }
 
     /** A panel over its parent leaves the parent's marker in view: the panel is where the game is (2026-10-15). */

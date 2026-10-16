@@ -14,7 +14,7 @@ import java.util.Optional;
 /**
  * How the assistant automates a game, in stages (the user's call, 2026-10-14: a flat list of rules let it follow
  * one control deep and miss the screen's others). The plugin's guide ({@link SdkAssist#GUIDE}) names the stages;
- * read_guide gives the steps of the one the bot is at, worked out from its home and popups methods, its screen
+ * read_guide gives the steps of the one the bot is at, worked out from its home method, its screen
  * map ({@link ScreenGraph}) with how far each screen got, so the assistant reads what it needs now rather than every
  * stage at connect.
  */
@@ -32,8 +32,9 @@ final class Protocol {
                   whileFindAny(the group of close and claim buttons) clears what still covers home; each round
                   waits for what it acted on to change before it looks again. An Escape too many on home may open
                   the game's exit dialog; its close button belongs in that group.
-                - Make the popups method (edit_flow's set_flow_method popups): ImageFinder.whileFindAny of the close buttons
-                  of what the game opens on its own, clickLast.
+                - Popups the game opens on its own are screens of the map, not a method: Discovery cuts each one's
+                  marker with popup true and its way out with back true (its close button, or the choice that
+                  closes it: Offline progress' Claim). The run closes them before every look.
                 - Done when a run started from three different screens reaches home each time.
                 - Once Discovery has mapped Home, the home method can be Navigate.to(Screens.HOME): it walks the
                   map's back inputs and closes the popups it knows on the way. A screen off the map throws, and
@@ -229,18 +230,14 @@ final class Protocol {
     private Protocol() {}
 
     /**
-     * The stage the bot is at: Setup while it lacks a home or popups method, then Discovery while it has no screen
+     * The stage the bot is at: Setup while it lacks a home method, then Discovery while it has no screen
      * map or anything is owed (an input untried, a marker, what a screen {@link GameScreen#owes}), or a screen of the
      * map has not reached anything yet; then the earliest stage any screen goes through next. Popups go through no
      * stage.
      */
-    static Where where(boolean hasHome, boolean hasPopups, ScreenGraph graph) {
+    static Where where(boolean hasHome, ScreenGraph graph) {
         Map<String, String> screens = new LinkedHashMap<>();
-        if (!hasHome || !hasPopups) {
-            String missing = !hasHome && !hasPopups ? "no home method and no popups method"
-                    : !hasHome ? "no home method" : "no popups method";
-            return new Where(Stage.SETUP, "the bot has " + missing + ".", screens);
-        }
+        if (!hasHome) return new Where(Stage.SETUP, "the bot has no home method.", screens);
         Stage earliest = null;
         for (String constant : graph.screens().keySet()) {
             GameScreen at = graph.screens().get(constant);

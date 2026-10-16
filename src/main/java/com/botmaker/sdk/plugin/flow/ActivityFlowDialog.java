@@ -135,9 +135,6 @@ public final class ActivityFlowDialog {
     /** The run's setup, {@code Gamebot::setup}: written like {@link #home}. */
     private Runnable setup;
 
-    /** The run's popups method, {@code Gamebot::clearPopups}: written like {@link #home}. */
-    private Runnable popups;
-
     /**
      * Canvas renames not yet saved, label at last save → label now; an outcome's keyed first by its activity's
      * label now. A save renames the enum or constant holding the first, and every use of it, before writing the
@@ -439,7 +436,6 @@ public final class ActivityFlowDialog {
         FlowRefs refs = FlowRefs.of(services.pluginValues());
         home = target.run().home();
         setup = target.run().setup();
-        popups = target.run().popups();
         FlowLayout layout = loadLayout();
         FlowLayout.Cards cards = layout.cardsOf(target.name());
         boolean anyPlaced = false;
@@ -861,7 +857,6 @@ public final class ActivityFlowDialog {
             sidePanel.getChildren().addAll(heading("Variables"), buildParametersNote());
             sidePanel.getChildren().addAll(new Separator(), buildHomeSection());
             sidePanel.getChildren().addAll(new Separator(), buildSetupSection());
-            sidePanel.getChildren().addAll(new Separator(), buildPopupsSection());
             sidePanel.getChildren().addAll(new Separator(), buildFlowLimitsSection());
             return;
         }
@@ -1200,23 +1195,6 @@ public final class ActivityFlowDialog {
         box.getChildren().add(explain);
         box.getChildren().add(methodChoice("setup", setup, "GameSetup::prepare",
                 picked -> setup = picked));
-        return box;
-    }
-
-    /**
-     * The bot's popups method — {@code Sdk.run()}'s {@code .popups(Gamebot::clearPopups)}, run before every vision
-     * call of every activity — picked as the home is.
-     */
-    private Node buildPopupsSection() {
-        VBox box = new VBox(6);
-        box.getChildren().add(heading("Popups"));
-        Label explain = new Label("The method that clears a popup the game opened on its own (an offer, a mail, a "
-                + "level-up): run before every look at the screen in every activity, so no activity has to expect "
-                + "one. It looks for the popups' close buttons and clicks them.");
-        explain.setWrapText(true);
-        explain.getStyleClass().add("dialog-hint-text");
-        box.getChildren().add(explain);
-        box.getChildren().add(methodChoice("popups", popups, "Popups::clear", picked -> popups = picked));
         return box;
     }
 
@@ -1621,7 +1599,7 @@ public final class ActivityFlowDialog {
             target = FlowValue.target(services, target.name());
             // After the flow, so the run names the flow as just written; nothing when home and setup are as read.
             // The game's notes are the assistant's, kept as read.
-            refused = FlowValue.writeRun(services, target, new Run(home, setup, popups,
+            refused = FlowValue.writeRun(services, target, new Run(home, setup,
                     target.run() == null ? null : target.run().notes()));
         }
         Throwable failure = null;

@@ -57,8 +57,6 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   - A scrolling column (Home's left icons in Firestone) moves its inputs by whole slots, and scrolls some out:
     a copy per screen cannot hold it. An input needs a search area (the column) or a scroll to reach it, and
     the audit should not flag it.
-  - The map's popups and the run's `popups` method are two lists: a popup in the map is closed only while
-    Navigate walks. The guard could close the map's popups too.
   - A round or free-shape cut (outside the shape transparent; the matcher already masks by alpha), so a small
     round icon is cut whole without its background.
   - `edit_map` rename keeps the constant (`FAVORED_WAR_MACHINES` now names "Select the favored war

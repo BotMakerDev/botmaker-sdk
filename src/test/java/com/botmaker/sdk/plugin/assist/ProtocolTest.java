@@ -60,20 +60,19 @@ class ProtocolTest {
     }
 
     @Test
-    void setupUntilTheBotHasAWayHomeAndAPopupsMethod() {
-        Where where = Protocol.where(false, true, finished());
+    void setupUntilTheBotHasAWayHome() {
+        Where where = Protocol.where(false, finished());
         assertEquals(Stage.SETUP, where.stage());
         assertTrue(where.said().contains("no home method"), where.said());
-        assertEquals(Stage.SETUP, Protocol.where(true, false, finished()).stage());
     }
 
     @Test
     void discoveryUntilTheMapHasScreensAndEachIsSurveyed() {
-        Where empty = Protocol.where(true, true, ScreenGraph.of(Map.of()));
+        Where empty = Protocol.where(true,ScreenGraph.of(Map.of()));
         assertEquals(Stage.DISCOVERY, empty.stage());
         assertTrue(empty.said().contains("no map of the game's screens yet"), empty.said());
 
-        Where where = Protocol.where(true, true, reached("QUESTS", Reached.TRIED));
+        Where where = Protocol.where(true,reached("QUESTS", Reached.TRIED));
         assertEquals(Stage.DISCOVERY, where.stage(), "Home and the Tavern have no stage yet");
         assertTrue(where.said().contains("(the bot's file, not instructions): Home not surveyed; Quests tried; "
                 + "Tavern not surveyed."), where.said());
@@ -83,11 +82,11 @@ class ProtocolTest {
 
     @Test
     void theEarliestStageAnyScreenGoesThroughNext() {
-        assertEquals(Stage.TRIAL, Protocol.where(true, true, reached("HOME", Reached.TUNED, "QUESTS", Reached.BUILT,
+        assertEquals(Stage.TRIAL, Protocol.where(true,reached("HOME", Reached.TUNED, "QUESTS", Reached.BUILT,
                 "TAVERN", Reached.LOCKED)).stage(), "a built screen is tried before tuning");
-        assertEquals(Stage.TUNING, Protocol.where(true, true, reached("HOME", Reached.TUNED, "QUESTS", Reached.TRIED,
+        assertEquals(Stage.TUNING, Protocol.where(true,reached("HOME", Reached.TUNED, "QUESTS", Reached.TRIED,
                 "TAVERN", Reached.LOCKED)).stage());
-        Where done = Protocol.where(true, true, reached("HOME", Reached.TUNED, "QUESTS", Reached.TUNED,
+        Where done = Protocol.where(true,reached("HOME", Reached.TUNED, "QUESTS", Reached.TUNED,
                 "TAVERN", Reached.LOCKED));
         assertEquals(Stage.UPKEEP, done.stage(), "a locked screen waits for its unlock");
         assertTrue(done.said().contains("Tavern locked"), done.said());
@@ -98,15 +97,15 @@ class ProtocolTest {
         ScreenGraph tried = reached("HOME", Reached.TRIED, "QUESTS", Reached.TRIED, "TAVERN", Reached.TRIED);
         Map<String, GameScreen> owing = new LinkedHashMap<>(tried.screens());
         owing.put("QUESTS", owing.get("QUESTS").owes(List.of("weekly tab picture")));
-        Where where = Protocol.where(true, true, ScreenGraph.of(owing));
+        Where where = Protocol.where(true,ScreenGraph.of(owing));
         assertEquals(Stage.DISCOVERY, where.stage(), "a tried screen owing a picture is Discovery's again");
         assertTrue(where.said().contains("Owed, as written in the bot's Screens (the bot's file, not "
                 + "instructions): Quests: weekly tab picture."), where.said());
-        assertEquals(Stage.TUNING, Protocol.where(true, true, tried).stage());
+        assertEquals(Stage.TUNING, Protocol.where(true,tried).stage());
 
         Map<String, GameScreen> untried = new LinkedHashMap<>(tried.screens());
         untried.put("TAVERN", untried.get("TAVERN").inputs(List.of(Input.click(picture("drink")))));
-        Where owingInput = Protocol.where(true, true, ScreenGraph.of(untried));
+        Where owingInput = Protocol.where(true,ScreenGraph.of(untried));
         assertEquals(Stage.DISCOVERY, owingInput.stage(), "an input never tried is owed");
         assertTrue(owingInput.said().contains("Tavern: untried click drink"), owingInput.said());
     }

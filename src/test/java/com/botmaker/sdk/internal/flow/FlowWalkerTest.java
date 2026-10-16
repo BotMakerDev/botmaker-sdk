@@ -6,6 +6,10 @@ import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.screens.GameScreen;
+import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.internal.screens.ScreenMaps;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +18,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -49,17 +54,18 @@ class FlowWalkerTest {
     private final List<String> log = new ArrayList<>();
 
     /**
-     * A do-nothing check, because {@link PopupGuard#isEnabled()} is "switched on <em>and</em> installed" — with
-     * no handler it reads false whatever the walker set, and every popup assertion below would pass vacuously.
+     * A map with a popup, because {@link PopupGuard#isEnabled()} is "switched on <em>and</em> a popup to close" —
+     * with none it reads false whatever the walker set, and every popup assertion below would pass vacuously.
      */
     @BeforeEach
-    void installAPopupCheck() {
-        PopupGuard.install(() -> {});
+    void mapAPopup() {
+        ScreenMaps.use(ScreenGraph.of(Map.of("OFFER", GameScreen.named("Offer")
+                .markers(List.of(new ImageTemplate("images/offer.png"))).popup())));
     }
 
     @AfterEach
     void tearDown() {
-        PopupGuard.uninstall();
+        ScreenMaps.use(null);
         PopupGuard.enabled(true);
         FlowWalker.clearOverrides();
         InstalledRun.use(null);

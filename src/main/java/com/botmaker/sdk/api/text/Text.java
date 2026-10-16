@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.text;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.console.Debug;
 
 import com.botmaker.sdk.api.geometry.Point;
@@ -350,6 +351,7 @@ public final class Text {
             if (sleep()) return false;
         }
         MissFrames.missed("timed out waiting for text \"" + needle + "\"", source, null);
+        PopupGuard.uncover();    // as ImageWaiter's timeout: an overlay the map lacks may be what hid it
         return false;
     }
 
