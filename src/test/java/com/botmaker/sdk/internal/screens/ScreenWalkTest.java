@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -36,6 +37,11 @@ class ScreenWalkTest {
         return new ImageTemplate("images/" + id + ".png");
     }
 
+    /** A screen's markers: the pictures {@code ids}. */
+    private static List<ImageTemplate> marks(String... ids) {
+        return Arrays.stream(ids).map(ScreenWalkTest::picture).toList();
+    }
+
     private static Input click(String id) {
         return Input.click(picture(id));
     }
@@ -46,25 +52,25 @@ class ScreenWalkTest {
 
     private static ScreenGraph map() {
         Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").marker(picture("home"))
+        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
                 .inputs(List.of(click("campaign"), click("engineer"), click("mail"), click("event").sometimes(),
                         click("arena").locked(picture("padlock")), click("lobby"))));
-        screens.put("CAMPAIGN", GameScreen.named("Campaign").marker(picture("campaign_title"))
+        screens.put("CAMPAIGN", GameScreen.named("Campaign").markers(marks("campaign_title"))
                 .from(from("HOME", click("campaign"))).alsoFrom(List.of(from("MAIL", click("mail_campaign"))))
                 .inputs(List.of(click("map"), click("bonus").sometimes())));
-        screens.put("BONUS", GameScreen.named("Bonus").marker(picture("bonus_title"))
+        screens.put("BONUS", GameScreen.named("Bonus").markers(marks("bonus_title"))
                 .from(from("CAMPAIGN", click("bonus").sometimes())));
         screens.put("LOBBY", GameScreen.named("Lobby").from(from("HOME", click("lobby"))));
-        screens.put("MAP", GameScreen.named("Map").marker(picture("map_title")).from(from("CAMPAIGN", click("map"))));
-        screens.put("ENGINEER", GameScreen.named("Engineer").marker(picture("engineer_title"))
+        screens.put("MAP", GameScreen.named("Map").markers(marks("map_title")).from(from("CAMPAIGN", click("map"))));
+        screens.put("ENGINEER", GameScreen.named("Engineer").markers(marks("engineer_title"))
                 .from(from("HOME", click("engineer"))));
-        screens.put("MAIL", GameScreen.named("Mail").marker(picture("mail_title")).from(from("HOME", click("mail")))
+        screens.put("MAIL", GameScreen.named("Mail").markers(marks("mail_title")).from(from("HOME", click("mail")))
                 .inputs(List.of(click("mail_campaign"))));
-        screens.put("EVENT", GameScreen.named("Event").marker(picture("event_title"))
+        screens.put("EVENT", GameScreen.named("Event").markers(marks("event_title"))
                 .from(from("HOME", click("event").sometimes())));
-        screens.put("ARENA", GameScreen.named("Arena").marker(picture("arena_title"))
+        screens.put("ARENA", GameScreen.named("Arena").markers(marks("arena_title"))
                 .from(from("HOME", click("arena").locked(picture("padlock")))));
-        screens.put("OFFER", GameScreen.named("Offer").marker(picture("offer")).back(click("close_x")).popup());
+        screens.put("OFFER", GameScreen.named("Offer").markers(marks("offer")).back(click("close_x")).popup());
         return ScreenGraph.of(screens);
     }
 
@@ -83,7 +89,7 @@ class ScreenWalkTest {
             this.screen = screen;
             map.screens().forEach((c, s) -> {
                 Set<String> on = new HashSet<>();
-                if (s.marker() != null) on.add(s.marker().id());
+                s.markers().forEach(m -> on.add(m.id()));
                 s.inputs().stream().filter(i -> i.picture() != null && !i.comesAndGoes()).forEach(i -> on.add(i.picture().id()));
                 if (s.back() != null) on.add(s.back().picture().id());
                 shows.put(c, on);
@@ -404,5 +410,106 @@ class ScreenWalkTest {
 
         assertEquals(Optional.of("MAP"), new ScreenWalk(game.map, game, STEP_MS, null).where("CAMPAIGN"));
         assertEquals(Optional.empty(), new ScreenWalk(game.map, new Game("LOADING"), STEP_MS, null).where(null));
+    }
+
+    /** A frame that shows {@code pictures} and nothing else; it does nothing. */
+    private static class Shows implements Reach {
+        private final Set<String> pictures;
+
+        Shows(String... pictures) {
+            this.pictures = Set.of(pictures);
+        }
+
+        @Override
+        public Optional<BufferedImage> look() {
+            return Optional.of(new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB));
+        }
+
+        @Override
+        public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
+            return pictures.contains(picture.id()) ? Optional.of(new Rect(0, 0, 10, 10)) : Optional.empty();
+        }
+
+        @Override
+        public void click(Point at) {}
+
+        @Override
+        public void key(Key key) {}
+
+        @Override
+        public void scroll(Point at, int notches) {}
+
+        @Override
+        public long nowMs() {
+            return 0;
+        }
+
+        @Override
+        public void pause(long ms) {}
+    }
+
+    /**
+     * A window and its tab, each opened from Home, so neither hides the other by the tree: the tab is told by the
+     * window's title and its own tab, lit. Two dialogs share a title; one shows no close button.
+     */
+    private static ScreenGraph tabs() {
+        Map<String, GameScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
+                .inputs(List.of(click("window"), click("tab_b"), click("dialog"), click("shop"))));
+        screens.put("WINDOW", GameScreen.named("Window").markers(marks("window_title"))
+                .from(from("HOME", click("window"))));
+        screens.put("TAB_B", GameScreen.named("Tab B").markers(marks("window_title", "tab_b_lit"))
+                .from(from("HOME", click("tab_b"))));
+        screens.put("DIALOG", GameScreen.named("Dialog").markers(marks("dialog_title")).absent(marks("close_x"))
+                .from(from("HOME", click("dialog"))));
+        screens.put("SHOP", GameScreen.named("Shop").markers(marks("dialog_title"))
+                .from(from("HOME", click("shop"))));
+        return ScreenGraph.of(screens);
+    }
+
+    @Test
+    void aScreenToldBySeveralMarkersShowsOnlyWhenAllShow() {
+        ScreenGraph map = tabs();
+        BufferedImage frame = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+
+        assertEquals(Optional.of("WINDOW"),
+                new ScreenWalk(map, new Shows("window_title", "tab_b"), STEP_MS, null).whereOn(frame, null),
+                "the window's title alone is the window, not its tab");
+        assertEquals(Optional.of("TAB_B"),
+                new ScreenWalk(map, new Shows("window_title", "tab_b_lit"), STEP_MS, null).whereOn(frame, null),
+                "the title and the lit tab are the tab: the larger set wins, though the window, first in the map, "
+                        + "shows too");
+    }
+
+    @Test
+    void anAbsentPictureTellsTwoScreensWithOneTitleApart() {
+        ScreenGraph map = tabs();
+        BufferedImage frame = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+
+        assertEquals(Optional.of("SHOP"),
+                new ScreenWalk(map, new Shows("dialog_title", "close_x"), STEP_MS, null).whereOn(frame, null),
+                "a close button shown rules the dialog out");
+        assertEquals(Optional.of("DIALOG"),
+                new ScreenWalk(map, new Shows("dialog_title"), STEP_MS, null).whereOn(frame, "DIALOG"),
+                "no close button: both match, and the screen it was last on is looked at first");
+    }
+
+    @Test
+    void markersLookForEachPictureOnceAndNeedOneToTellAnything() {
+        List<String> looked = new ArrayList<>();
+        Reach counting = new Shows("a", "b") {
+            @Override
+            public List<Optional<Rect>> findEach(List<ImageTemplate> pictures, BufferedImage frame) {
+                pictures.forEach(p -> looked.add(p.id()));
+                return super.findEach(pictures, frame);
+            }
+        };
+        BufferedImage frame = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+
+        List<Boolean> on = Markers.onEach(counting, List.of(new Markers(marks("a", "b"), List.of()),
+                new Markers(marks("a"), marks("b")), new Markers(List.of(), List.of())), frame);
+
+        assertEquals(List.of(true, false, false), on);
+        assertEquals(List.of("a", "b"), looked);
     }
 }

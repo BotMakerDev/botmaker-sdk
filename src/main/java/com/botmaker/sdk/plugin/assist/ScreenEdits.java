@@ -137,12 +137,12 @@ public final class ScreenEdits {
         }
         GameScreen screen = graph.screens().get(constant);
         if (screen == null) return "No screen " + constant + " in the map.";
-        if (screen.marker() == null) {
+        if (!screen.hasMarker()) {
             return graph.shown(constant) + " has no marker yet, so nothing tells it from the frame: cut its marker, "
                     + "which takes its shot.";
         }
         if (!ScreenFit.shows(reach.get(), graph, constant, frame.get())) {
-            return "The game does not show " + graph.shown(constant) + " now: its marker is not found. The shot was "
+            return "The game does not show " + graph.shown(constant) + " now: its markers are not found. The shot was "
                     + "kept; go there first.";
         }
         ScreenShots.save(context.services().resourcesDir(), constant, frame.get());

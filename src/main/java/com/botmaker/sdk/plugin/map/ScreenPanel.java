@@ -254,7 +254,7 @@ final class ScreenPanel {
         tryNext.setDisable(busy || next.isEmpty());
         tryNext.getStyleClass().add("screen-panel-primary");
         Button cutInputs = action("✂ Cut inputs", MapGuide.CUT_INPUTS, () -> cut(shown, false));
-        Button cutMarker = action(screen.marker() == null ? "✂ Cut marker" : "✂ Recut marker",
+        Button cutMarker = action(screen.hasMarker() ? "✂ Recut marker" : "✂ Cut marker",
                 MapGuide.CUT_MARKER, () -> cut(shown, true));
         Button go = action("🧭 Go here", MapGuide.GO_HERE, () -> goHere(shown));
         go.setDisable(busy || card.popup());

@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,12 +34,17 @@ class ScreenTypesTest {
         return new ImageTemplate("images/" + id + ".png");
     }
 
+    /** A screen's markers: the pictures {@code ids}. */
+    private static List<ImageTemplate> marks(String... ids) {
+        return Arrays.stream(ids).map(ScreenTypesTest::picture).toList();
+    }
+
     private static <T> T roundTrip(ComponentType<T> shape, T value) {
         return shape.build(shape.components(value));
     }
 
     private static GameScreen campaign() {
-        return GameScreen.named("Campaign").marker(picture("campaign_title"))
+        return GameScreen.named("Campaign").markers(marks("campaign_title"))
                 .from(Way.of(BotConstants.screen("HOME"), Input.click(picture("campaign"))))
                 .alsoFrom(List.of(Way.of(BotConstants.screen("MAP"), Input.key(Key.ESCAPE))))
                 .back(Input.click(picture("close_x")))
@@ -53,7 +59,7 @@ class ScreenTypesTest {
     @Test
     void aScreenComesApartAndGoesBackTogetherWhole() {
         assertEquals(campaign(), roundTrip(ScreenTypes.SCREEN_SHAPE, campaign()));
-        GameScreen offer = GameScreen.named("Offer").marker(picture("offer")).popup();
+        GameScreen offer = GameScreen.named("Offer").markers(marks("offer")).popup();
         assertEquals(offer, roundTrip(ScreenTypes.SCREEN_SHAPE, offer));
         GameScreen noted = campaign().notes("Loot fills over 8 h.\nIts badge shows on Home.")
                 .reached(Reached.SURVEYED).owes(List.of("marker — every icon here animates"));
@@ -61,6 +67,8 @@ class ScreenTypesTest {
         GameScreen moved = campaign().at(new Point(420, -36));
         assertEquals(moved, roundTrip(ScreenTypes.SCREEN_SHAPE, moved), "where its card was moved to goes with it");
         assertNull(roundTrip(ScreenTypes.SCREEN_SHAPE, campaign()).at(), "a card never moved has no corner");
+        GameScreen told = campaign().markers(marks("window_title", "campaign_tab")).absent(marks("gems"));
+        assertEquals(told, roundTrip(ScreenTypes.SCREEN_SHAPE, told), "a set of markers and an absent picture go with it");
     }
 
     @Test
@@ -97,8 +105,8 @@ class ScreenTypesTest {
                 .when(ScreenTypes.condition("Firestone::eventOn"));
         assertEquals(way, roundTrip(ScreenTypes.WAY_SHAPE, way));
 
-        GameScreen event = GameScreen.named("Event").marker(picture("event_title"))
-                .variants(List.of(ScreenVariant.named("Halloween").marker(picture("pumpkin"))
+        GameScreen event = GameScreen.named("Event").markers(marks("event_title"))
+                .variants(List.of(ScreenVariant.named("Halloween").markers(marks("pumpkin"))
                         .inputs(List.of(Input.click(picture("candy")).sometimes()))
                         .when(ScreenTypes.condition("Firestone::halloween"))));
         assertEquals(event, roundTrip(ScreenTypes.SCREEN_SHAPE, event));

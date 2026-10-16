@@ -193,12 +193,13 @@ public final class MapAudit {
     }
 
     /**
-     * Each picture {@code screen} names that has a file, by its file's name: its marker, its inputs' and its way
-     * back's, then its looks' markers and inputs. A picture named twice is sure when either is.
+     * Each picture {@code screen} names that has a file, by its file's name: its markers, its inputs' and its way
+     * back's, then its looks' markers and inputs. A picture named twice is sure when either is. An absent picture is
+     * not looked for: the shot not showing it is what it says.
      */
     private static Map<String, Check> checks(Path resources, GameScreen screen) {
         Map<String, Check> checks = new LinkedHashMap<>();
-        if (screen.marker() != null) add(checks, resources, screen.marker(), true, true);
+        for (ImageTemplate marker : screen.markers()) add(checks, resources, marker, true, true);
         List<Input> named = new ArrayList<>(screen.inputs());
         if (screen.back() != null) named.add(screen.back());
         for (Input input : named) {
@@ -207,7 +208,7 @@ public final class MapAudit {
             if (input.lock() != null) add(checks, resources, input.lock(), false, false);
         }
         for (ScreenVariant look : screen.variants()) {
-            if (look.marker() != null) add(checks, resources, look.marker(), false, false);
+            for (ImageTemplate marker : look.markers()) add(checks, resources, marker, false, false);
             for (Input input : look.inputs()) {
                 for (Variant button : input.looks()) add(checks, resources, button.picture(), false, false);
             }

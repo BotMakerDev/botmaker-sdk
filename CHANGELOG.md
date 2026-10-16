@@ -266,6 +266,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A screen is told by a set of markers** (breaking). `GameScreen.marker(…)` and `ScreenVariant.marker(…)` are
+  gone. In their place:
+  - `.markers(List.of(A, B))`: the game shows the screen when all of them show.
+  - `.absent(List.of(C))`: none of them may show either.
+  
+  This tells apart screens that share a title or a frame, such as a window's tabs or two dialogs of one style. One
+  marker is a list of one. When two shown screens neither hides, the one told by more markers wins. A map written
+  with `.marker(X)` no longer compiles: Studio's upgrade resets it and marks it `@Refactor`, so cut its markers
+  again.
 - **The screen map walks more surely.**
   - **A way does what its screen's input says now.** A way into a screen keeps a copy of the input it was found
     by. A look, a lock or a `when` put on that input later now applies to the way too: the walk reads the

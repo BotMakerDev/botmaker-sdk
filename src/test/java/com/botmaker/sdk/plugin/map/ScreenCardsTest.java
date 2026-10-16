@@ -18,6 +18,7 @@ import com.botmaker.sdk.plugin.map.ScreenCards.State;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,11 @@ class ScreenCardsTest {
         return new ImageTemplate("images/" + id + ".png");
     }
 
+    /** A screen's markers: the pictures {@code ids}. */
+    private static List<ImageTemplate> marks(String... ids) {
+        return Arrays.stream(ids).map(ScreenCardsTest::picture).toList();
+    }
+
     private static Input click(String id) {
         return Input.click(picture(id));
     }
@@ -44,21 +50,21 @@ class ScreenCardsTest {
      */
     private static ScreenGraph map() {
         Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").marker(picture("home"))
+        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
                 .inputs(List.of(click("campaign"), click("engineer"), click("gold"), Input.key(Key.M),
                         click("arena").locked(picture("padlock")), click("event").sometimes())));
-        screens.put("CAMPAIGN", GameScreen.named("Campaign").marker(picture("campaign_title"))
+        screens.put("CAMPAIGN", GameScreen.named("Campaign").markers(marks("campaign_title"))
                 .from(Way.of(BotConstants.screen("HOME"), click("campaign")))
                 .inputs(List.of(click("claim").did(Did.IN_PLACE).kind(Kind.CHORE), click("map"),
                         click("gems").never("spends gems"))));
-        screens.put("MAP", GameScreen.named("Map").marker(picture("map_title"))
+        screens.put("MAP", GameScreen.named("Map").markers(marks("map_title"))
                 .from(Way.of(BotConstants.screen("CAMPAIGN"), click("map")))
                 .alsoFrom(List.of(Way.of(BotConstants.screen("HOME"), Input.key(Key.M))))
                 .inputs(List.of(Input.key(Key.ESCAPE).did(Did.NONE))));
         screens.put("ENGINEER", GameScreen.named("Engineer").from(Way.of(BotConstants.screen("HOME"), click("engineer"))));
-        screens.put("ARENA", GameScreen.named("Arena").marker(picture("arena_title"))
+        screens.put("ARENA", GameScreen.named("Arena").markers(marks("arena_title"))
                 .from(Way.of(BotConstants.screen("HOME"), click("arena").locked(picture("padlock")))));
-        screens.put("REWARD", GameScreen.named("Reward").marker(picture("reward")).back(click("close_x")).popup());
+        screens.put("REWARD", GameScreen.named("Reward").markers(marks("reward")).back(click("close_x")).popup());
         return ScreenGraph.of(screens);
     }
 
@@ -165,7 +171,7 @@ class ScreenCardsTest {
     @Test
     void aPopupWithNothingCutIsFinishedAsTheGraphCountsIt() {
         Map<String, GameScreen> screens = new LinkedHashMap<>(map().screens());
-        screens.put("OFFER", GameScreen.named("Offer").marker(picture("offer")).popup());
+        screens.put("OFFER", GameScreen.named("Offer").markers(marks("offer")).popup());
         ScreenGraph graph = ScreenGraph.of(screens);
         assertFalse(graph.noneCut("OFFER"), "its default way back is its way out");
         assertFalse(graph.unfinished("OFFER"));

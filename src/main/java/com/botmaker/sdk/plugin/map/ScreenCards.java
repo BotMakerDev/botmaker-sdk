@@ -118,7 +118,7 @@ final class ScreenCards {
         int unseen = graph.unseen(constant).size();
         State state;
         String said;
-        if (screen.marker() == null) {
+        if (!screen.hasMarker()) {
             state = State.OWES;
             said = "owes its marker";
         } else if (graph.noneCut(constant)) {
@@ -133,7 +133,7 @@ final class ScreenCards {
         }
         String shape = state == State.FINISHED
                 ? graph.shape(constant).map(s -> s.name().toLowerCase(Locale.ROOT)).orElse("") : "";
-        return new Card(constant, graph.shown(constant), screen.marker() == null ? null : screen.marker().id(), state,
+        return new Card(constant, graph.shown(constant), screen.hasMarker() ? screen.firstMarker().id() : null, state,
                 said, shape, screen.isPopup(), graph.presence(constant), tried, inputs.size(), chores,
                 stage == null ? "" : stage, screen.at());
     }

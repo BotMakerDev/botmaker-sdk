@@ -1,15 +1,14 @@
 package com.botmaker.sdk.internal.screens;
 
-import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
-import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -86,7 +85,8 @@ public final class ScreenWalk {
      * one under it in view, so of the screens whose markers show, one another shown screen was opened from is not
      * the answer: Info luck over Tavern is Info luck (2026-10-15). That is every screen a way into it is on, and the
      * screens above those in the tree; when ways loop so that every screen shown is under another, the nearest
-     * shown is the answer.
+     * shown is the answer. Of shown screens that neither hides, the one told by more markers wins: its set holds the
+     * other's and more (a tab of a window, the window's title and its own), the nearest first between equal sets.
      */
     public Optional<String> whereOn(BufferedImage frame, String near) {
         Set<String> order = new LinkedHashSet<>();
@@ -96,7 +96,7 @@ public final class ScreenWalk {
         }
         order.addAll(graph.screens().keySet());
         List<String> told = order.stream().filter(c -> !graph.screens().get(c).isPopup()
-                && graph.screens().get(c).marker() != null).toList();
+                && graph.screens().get(c).hasMarker()).toList();
         List<String> shown = shown(told, frame);
         Set<String> under = new HashSet<>();
         for (String c : shown) {
@@ -107,7 +107,10 @@ public final class ScreenWalk {
                 }
             }
         }
-        return shown.stream().filter(c -> !under.contains(c)).findFirst().or(() -> shown.stream().findFirst());
+        // Ranked by markers only among the screens nothing shown hides; the loop's fallback keeps the nearest first.
+        return shown.stream().filter(c -> !under.contains(c))
+                .min(Comparator.comparingInt((String c) -> -graph.screens().get(c).markers().size()))
+                .or(() -> shown.stream().findFirst());
     }
 
     /** Walks to {@code target} from where the game is, {@code near} the screen it was last seen on, or null. */
@@ -162,7 +165,7 @@ public final class ScreenWalk {
             if (arrives(next)) {
                 // Read again from the next look: a way back may land on another screen than the map's parent.
                 at = next.to();
-                if (graph.screens().get(at).marker() == null) {
+                if (!graph.screens().get(at).hasMarker()) {
                     unmarked = at;
                     left = from;
                 }
@@ -234,15 +237,15 @@ public final class ScreenWalk {
 
     /**
      * Whether {@code edge} got somewhere within a step's time, a popup that shows meanwhile closed. A way in arrives
-     * once its screen's marker shows. A way back arrives once the screen left is gone and another of the map shows:
+     * once its screen's markers show. A way back arrives once the screen left is gone and another of the map shows:
      * a panel's parent stays in view under it, and a screen opened from another than its parent in the tree (an
      * {@code alsoFrom}) closes back to that one, which the walk reads from the next look (2026-10-15).
      */
     private boolean arrives(ScreenGraph.Edge edge) {
         GameScreen screen = graph.screens().get(edge.to());
-        ImageTemplate left = edge.back() ? graph.screens().get(edge.from()).marker() : null;
-        ImageTemplate shows = edge.back() ? left : screen.marker();
-        if (shows == null) {
+        Markers left = Markers.of(graph.screens().get(edge.from()));
+        Markers shows = edge.back() ? left : Markers.of(screen);
+        if (!shows.any()) {
             reach.pause(POLL_MS);
             return true;    // a screen with no marker cannot be told: the walk takes it as reached, or left
         }
@@ -250,9 +253,9 @@ public final class ScreenWalk {
         do {
             reach.pause(POLL_MS);
             Optional<BufferedImage> frame = closePopups(reach.look());
-            if (frame.isPresent() && (edge.back() ? reach.find(left, frame.get()).isEmpty() && (screen.marker() == null
+            if (frame.isPresent() && (edge.back() ? !left.on(reach, frame.get()) && (!screen.hasMarker()
                     || whereOn(frame.get(), edge.to()).filter(c -> !c.equals(edge.from())).isPresent())
-                    : reach.find(screen.marker(), frame.get()).isPresent())) {
+                    : shows.on(reach, frame.get()))) {
                 return true;
             }
         } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
@@ -265,17 +268,19 @@ public final class ScreenWalk {
         return popups.isEmpty() ? Optional.empty() : first(popups, frame);
     }
 
-    /** Which look of {@code constant} {@code frame} shows: the first whose marker is found; empty for none. */
+    /** Which look of {@code constant} {@code frame} shows: the first whose markers show; empty for none. */
     public Optional<ScreenVariant> lookOn(String constant, BufferedImage frame) {
         GameScreen screen = graph.screens().get(constant);
         if (screen == null) return Optional.empty();
-        return screen.variants().stream().filter(v -> v.marker() != null && reach.find(v.marker(), frame).isPresent())
-                .findFirst();
+        List<ScreenVariant> told = screen.variants().stream().filter(ScreenVariant::hasMarker).toList();
+        List<Boolean> on = Markers.onEach(reach, told.stream().map(Markers::of).toList(), frame);
+        for (int i = 0; i < told.size(); i++) if (on.get(i)) return Optional.of(told.get(i));
+        return Optional.empty();
     }
 
     private List<String> popups() {
         return graph.screens().entrySet().stream()
-                .filter(e -> e.getValue().isPopup() && e.getValue().marker() != null).map(e -> e.getKey()).toList();
+                .filter(e -> e.getValue().isPopup() && e.getValue().hasMarker()).map(e -> e.getKey()).toList();
     }
 
     /** {@code frame}, or the one after closing each popup it shows, up to {@link #MOST_POPUPS}. */
@@ -292,17 +297,17 @@ public final class ScreenWalk {
         return frame;
     }
 
-    /** The first of {@code constants} whose marker is on {@code frame}, all looked for on that one frame. */
+    /** The first of {@code constants} whose markers are on {@code frame}, all looked for on that one frame. */
     private Optional<String> first(List<String> constants, BufferedImage frame) {
         return shown(constants, frame).stream().findFirst();
     }
 
-    /** Those of {@code constants} whose marker is on {@code frame}, in their order, all looked for on that frame. */
+    /** Those of {@code constants} whose markers are on {@code frame}, in their order, all looked for on that frame. */
     private List<String> shown(List<String> constants, BufferedImage frame) {
-        List<ImageTemplate> markers = constants.stream().map(c -> graph.screens().get(c).marker()).toList();
-        List<Optional<Rect>> found = reach.findEach(markers, frame);
+        List<Boolean> on = Markers.onEach(reach,
+                constants.stream().map(c -> Markers.of(graph.screens().get(c))).toList(), frame);
         List<String> shown = new ArrayList<>();
-        for (int i = 0; i < constants.size(); i++) if (found.get(i).isPresent()) shown.add(constants.get(i));
+        for (int i = 0; i < constants.size(); i++) if (on.get(i)) shown.add(constants.get(i));
         return shown;
     }
 

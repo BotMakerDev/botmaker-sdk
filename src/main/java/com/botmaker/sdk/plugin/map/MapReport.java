@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.FxCall;
 import com.botmaker.sdk.plugin.assist.MapAudit;
@@ -160,7 +161,7 @@ public final class MapReport {
         out.append(indent).append(card.name()).append(" [").append(constant).append("] ")
                 .append(String.join(", ", ScreenCards.pills(card).stream().map(ScreenCards.Pill::text).toList()))
                 .append('\n');
-        out.append(indent).append("  marker ").append(card.marker() == null ? "none" : card.marker())
+        out.append(indent).append("  ").append(markers(screen.markers(), screen.absent()))
                 .append(" · back ").append(screen.back() == null ? "the default (a close button, then Escape)"
                         : screen.back().label())
                 .append(" · shot ").append(shot.test(constant) ? "yes" : "none").append('\n');
@@ -174,8 +175,8 @@ public final class MapReport {
         if (!ins.isEmpty()) out.append(indent).append("  ").append(String.join("; ", ins)).append('\n');
         for (ScreenVariant look : screen.variants()) {
             String when = ScreenTypes.sourceOf(look.when());
-            out.append(indent).append("  look ").append(look.name()).append(": marker ")
-                    .append(look.marker() == null ? "none" : look.marker().id())
+            out.append(indent).append("  look ").append(look.name()).append(": ")
+                    .append(markers(look.markers(), look.absent()))
                     .append(when.isEmpty() ? "" : ", while " + when).append('\n');
         }
         for (Row row : ScreenCards.rows(graph, constant)) {
@@ -196,6 +197,14 @@ public final class MapReport {
                 out.append(indent).append("  | ").append(line).append('\n');
             }
         }
+    }
+
+    /** What tells a screen or a look: {@code markers shop_title + shop_tab, not close_x}, or {@code marker none}. */
+    static String markers(List<ImageTemplate> markers, List<ImageTemplate> absent) {
+        if (markers.isEmpty()) return "marker none";
+        String shown = String.join(" + ", markers.stream().map(ImageTemplate::id).toList());
+        return (markers.size() == 1 ? "marker " : "markers ") + shown
+                + (absent.isEmpty() ? "" : ", not " + String.join(", ", absent.stream().map(ImageTemplate::id).toList()));
     }
 
     /** How a way in reads: its input, and the look and the method it needs: {@code click shop (badge, while F::on)}. */

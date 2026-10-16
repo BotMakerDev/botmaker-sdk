@@ -64,6 +64,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
@@ -413,18 +414,18 @@ class SdkAssistTest {
     void aPictureOnlyTheMapUsesLeavesItWithItsFile() {
         ImageTemplate ore = new ImageTemplate(TemplateLibrary.pathForName("ore"));
         host.set("screen_map").put("HOME", TestContexts.row(Object.class, "").withValue(GameScreen.named("Home")
-                .marker(ore).inputs(List.of(Input.click(ore)))));
+                .markers(List.of(ore)).inputs(List.of(Input.click(ore)))));
         host.uses.put("ORE", List.of(new PluginValues.Use(Path.of("Screens.java"), 40, "helper(Pictures.ORE);")));
 
         AgentReply kept = run("edit_pictures", "action", "delete", "picture", "ore");
         assertTrue(kept.isRefused() && text(kept).contains("Screens.java:40"), text(kept));
-        assertEquals("ore", screen("HOME").marker().id(), "a use the map cannot take puts the screens back");
+        assertEquals("ore", screen("HOME").firstMarker().id(), "a use the map cannot take puts the screens back");
         assertEquals(1, screen("HOME").inputs().size());
 
         host.uses.clear();
         String deleted = text(run("edit_pictures", "action", "delete", "picture", "ore"));
         assertEquals("Deleted ore; it left the map's Home.", deleted);
-        assertNull(screen("HOME").marker());
+        assertFalse(screen("HOME").hasMarker());
         assertTrue(screen("HOME").inputs().isEmpty());
         assertFalse(TemplateLibrary.exists(resources, "ore"));
     }
@@ -935,7 +936,7 @@ class SdkAssistTest {
         assertTrue(started.contains("Added Home to the map as Screens.HOME"), started);
         assertTrue(text(cropOne("name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE,
                 "screen", "home")).contains("Noted in Home as untried"));
-        assertEquals("home", screen("HOME").marker().id());
+        assertEquals("home", screen("HOME").firstMarker().id());
         assertEquals(List.of("click gold"), screen("HOME").inputs().stream().map(Input::label).toList());
         String twice = text(cropOne("name", "gold", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home"));
         assertTrue(twice.contains("already exists: give its name with no box"), twice);
@@ -952,7 +953,7 @@ class SdkAssistTest {
 
         // What try_input writes when an input opens a screen: a screen below, reached from Home, owing its marker.
         host.set("screen_map").put("ENGINEER", TestContexts.row(Object.class, "").withValue(GameScreen.named("Engineer")
-                .from(Way.of(BotConstants.screen("HOME"), Input.click(screen("HOME").marker())))));
+                .from(Way.of(BotConstants.screen("HOME"), Input.click(screen("HOME").firstMarker())))));
         AgentReply gated = tryOne("screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
         assertTrue(gated.isRefused() && text(gated).startsWith("Engineer still owes its marker"), text(gated));
         assertTrue(text(cropOne("name", "coin", "x", 300, "y", 200, "width", SIZE, "height", SIZE,
@@ -1045,7 +1046,7 @@ class SdkAssistTest {
         assertTrue(text(both).contains("Noted in Engineer as its marker, in place of coin.")
                 && text(both).contains("Saved spade") && text(both).contains("Not saved, far: ")
                 && text(both).contains("Noted in Engineer: hoe: its way back; spade: untried."), text(both));
-        assertEquals("pick", screen("ENGINEER").marker().id());
+        assertEquals("pick", screen("ENGINEER").firstMarker().id());
         assertEquals("hoe", screen("ENGINEER").back().picture().id(), "the way back noted with the inputs");
         assertEquals(Set.of(), TemplateLibrary.manifest(host).tagsOf("spade"), "grouped by the map, not tagged");
         assertTrue(screen("ENGINEER").inputs().stream().anyMatch(i -> i.label().equals("click spade")));
@@ -1242,8 +1243,8 @@ class SdkAssistTest {
         BufferedImage sign = noise(SIZE, SIZE, 99);
         TemplateLibrary.saveTemplate(resources, sign, "guild");
         host.set("screen_map").put("GUILD", TestContexts.row(Object.class, "").withValue(GameScreen.named("Guild")
-                .marker(new ImageTemplate(TemplateLibrary.pathForName("guild")))
-                .from(Way.of(BotConstants.screen("HOME"), Input.click(screen("HOME").marker())))));
+                .markers(List.of(new ImageTemplate(TemplateLibrary.pathForName("guild"))))
+                .from(Way.of(BotConstants.screen("HOME"), Input.click(screen("HOME").firstMarker())))));
         BufferedImage guild = noise(WATCHED.width(), WATCHED.height(), 23);
         guild.getGraphics().drawImage(sign, 10, 10, null);
         agent.frame = guild;
@@ -1350,7 +1351,7 @@ class SdkAssistTest {
         ImageTemplate ore = new ImageTemplate(TemplateLibrary.pathForName("ore"));
         Input click = Input.click(ore);
         host.set("screen_map").put("HOME", TestContexts.row(Object.class, "").withValue(GameScreen.named("Home")
-                .marker(ore).inputs(List.of(click))));
+                .markers(List.of(ore)).inputs(List.of(click))));
 
         assertEquals("Noted: click ore.", ScreenEdits.setInput(host, "HOME", click, click.did(Did.IN_PLACE)));
         assertEquals(Did.IN_PLACE, screen("HOME").inputs().getFirst().did());
@@ -1408,10 +1409,10 @@ class SdkAssistTest {
         Input q = Input.key(Key.named("Q").orElseThrow());
         Input tab = Input.click(picture("tab"));
         host.set("screen_map").put("HOME", TestContexts.row(Object.class, "").withValue(GameScreen.named("Home")
-                .marker(picture("ore")).inputs(List.of(gem, q, tab))
-                .variants(List.of(ScreenVariant.named("Event").marker(picture("coin"))))));
+                .markers(marks("ore")).inputs(List.of(gem, q, tab))
+                .variants(List.of(ScreenVariant.named("Event").markers(marks("coin"))))));
         host.set("screen_map").put("SHOP", TestContexts.row(Object.class, "").withValue(GameScreen.named("Shop")
-                .marker(picture("coin")).from(Way.of(BotConstants.screen("HOME"), q))
+                .markers(marks("coin")).from(Way.of(BotConstants.screen("HOME"), q))
                 .inputs(List.of(Input.click(picture("close")), Input.click(picture("coin"))))));
         host.set("screen_map").put("MINE", TestContexts.row(Object.class, "").withValue(GameScreen.named("Mine")
                 .from(Way.of(BotConstants.screen("HOME"), gem))
@@ -1509,6 +1510,11 @@ class SdkAssistTest {
 
     private static ImageTemplate picture(String name) {
         return new ImageTemplate(TemplateLibrary.pathForName(name));
+    }
+
+    /** A screen's markers: the pictures {@code names}. */
+    private static List<ImageTemplate> marks(String... names) {
+        return Arrays.stream(names).map(SdkAssistTest::picture).toList();
     }
 
     /** The bot's screen {@code constant}, as try_input and crop_pictures last wrote it. */

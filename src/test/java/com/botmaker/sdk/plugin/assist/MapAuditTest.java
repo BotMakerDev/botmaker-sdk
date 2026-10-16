@@ -18,6 +18,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -69,7 +70,7 @@ class MapAuditTest {
     }
 
     private static GameScreen screen() {
-        return GameScreen.named("Home").marker(picture("home")).inputs(List.of(Input.click(picture("here")),
+        return GameScreen.named("Home").markers(marks("home")).inputs(List.of(Input.click(picture("here")),
                 Input.click(picture("moved")), Input.click(picture("gone")), Input.click(picture("event")).sometimes()));
     }
 
@@ -110,6 +111,11 @@ class MapAuditTest {
 
     private static ImageTemplate picture(String id) {
         return new ImageTemplate("images/" + id + ".png");
+    }
+
+    /** A screen's markers: the pictures {@code ids}. */
+    private static List<ImageTemplate> marks(String... ids) {
+        return Arrays.stream(ids).map(MapAuditTest::picture).toList();
     }
 
     private static BufferedImage noise(int width, int height, long seed) {

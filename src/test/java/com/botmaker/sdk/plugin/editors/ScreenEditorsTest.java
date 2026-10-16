@@ -72,8 +72,9 @@ class ScreenEditorsTest {
     @Test
     void the_picker_lists_the_maps_screens_in_order_and_its_popups_only_when_asked() {
         Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").marker(new ImageTemplate("images/home_map.png")));
-        screens.put("REWARD", GameScreen.named("Reward").marker(new ImageTemplate("images/reward.png")).popup());
+        screens.put("HOME", GameScreen.named("Home").markers(List.of(new ImageTemplate("images/home_map.png"))));
+        screens.put("REWARD", GameScreen.named("Reward").markers(List.of(new ImageTemplate("images/reward.png")))
+                .popup());
         screens.put("CAMPAIGN", GameScreen.named("Campaign").from(Way.of(BotConstants.screen("HOME"),
                 Input.click(new ImageTemplate("images/campaign.png")))));
 

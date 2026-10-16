@@ -33,13 +33,15 @@ public final class ScreenTypes {
     private ScreenTypes() {}
 
     /**
-     * {@code GameScreen.named(String)} and its links, each written only when the screen has it: {@code .marker(…)},
-     * {@code .from(…)}, {@code .alsoFrom(List.of(…))}, {@code .back(…)}, {@code .inputs(List.of(…))},
-     * {@code .popup()}, … and {@code .at(new Point(…))} once its card was moved on 🗺 Screens' map.
+     * {@code GameScreen.named(String)} and its links, each written only when the screen has it:
+     * {@code .markers(List.of(…))}, {@code .absent(List.of(…))}, {@code .from(…)}, {@code .alsoFrom(List.of(…))},
+     * {@code .back(…)}, {@code .inputs(List.of(…))}, {@code .popup()}, … and {@code .at(new Point(…))} once its card
+     * was moved on 🗺 Screens' map.
      */
     public static final DeclaredCall<GameScreen> SCREEN_SHAPE = ComponentType.part(GameScreen.class)
             .<String, GameScreen>writtenAs(GameScreen::named, GameScreen::name)
-            .<ImageTemplate>with(GameScreen::marker, GameScreen::marker)
+            .<List<ImageTemplate>>with(GameScreen::markers, GameScreen::markers)
+            .<List<ImageTemplate>>with(GameScreen::absent, GameScreen::absent)
             .<Way>with(GameScreen::from, GameScreen::from)
             .<List<Way>>with(GameScreen::alsoFrom, GameScreen::alsoFrom)
             .<Input>with(GameScreen::back, GameScreen::back)
@@ -73,12 +75,13 @@ public final class ScreenTypes {
             .<BooleanSupplier>with(Way::when, Parts.WAY_WHEN.part(ScreenTypes::condition));
 
     /**
-     * {@code ScreenVariant.named(String)} and its links: {@code .marker(…)}, {@code .inputs(List.of(…))},
-     * {@code .when(…)}.
+     * {@code ScreenVariant.named(String)} and its links: {@code .markers(List.of(…))}, {@code .absent(List.of(…))},
+     * {@code .inputs(List.of(…))}, {@code .when(…)}.
      */
     public static final DeclaredCall<ScreenVariant> SCREEN_VARIANT_SHAPE = ComponentType.part(ScreenVariant.class)
             .<String, ScreenVariant>writtenAs(ScreenVariant::named, ScreenVariant::name)
-            .<ImageTemplate>with(ScreenVariant::marker, ScreenVariant::marker)
+            .<List<ImageTemplate>>with(ScreenVariant::markers, ScreenVariant::markers)
+            .<List<ImageTemplate>>with(ScreenVariant::absent, ScreenVariant::absent)
             .<List<Input>>with(ScreenVariant::inputs, ScreenVariant::inputs)
             .<BooleanSupplier>with(ScreenVariant::when, Parts.VARIANT_WHEN.part(ScreenTypes::condition));
 

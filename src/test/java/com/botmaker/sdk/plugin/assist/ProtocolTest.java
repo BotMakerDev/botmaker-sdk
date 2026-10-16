@@ -12,6 +12,7 @@ import com.botmaker.sdk.plugin.assist.Protocol.Stage;
 import com.botmaker.sdk.plugin.assist.Protocol.Where;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,18 +39,23 @@ class ProtocolTest {
         return new ImageTemplate("images/" + id + ".png");
     }
 
+    /** A screen's markers: the pictures {@code ids}. */
+    private static List<ImageTemplate> marks(String... ids) {
+        return Arrays.stream(ids).map(ProtocolTest::picture).toList();
+    }
+
     /** Home, its Quests and Tavern each opened and finished, and an Offer popup. */
     private static ScreenGraph finished() {
         Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").marker(picture("home"))
+        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
                 .inputs(List.of(Input.click(picture("quests")), Input.click(picture("tavern")))));
-        screens.put("QUESTS", GameScreen.named("Quests").marker(picture("quests_title"))
+        screens.put("QUESTS", GameScreen.named("Quests").markers(marks("quests_title"))
                 .from(Way.of(BotConstants.screen("HOME"), Input.click(picture("quests"))))
                 .inputs(List.of(Input.click(picture("claim")).did(Did.IN_PLACE))));
-        screens.put("TAVERN", GameScreen.named("Tavern").marker(picture("tavern_title"))
+        screens.put("TAVERN", GameScreen.named("Tavern").markers(marks("tavern_title"))
                 .from(Way.of(BotConstants.screen("HOME"), Input.click(picture("tavern"))))
                 .inputs(List.of(Input.click(picture("drink")).did(Did.NONE))));
-        screens.put("OFFER", GameScreen.named("Offer").marker(picture("offer")).popup());
+        screens.put("OFFER", GameScreen.named("Offer").markers(marks("offer")).popup());
         return ScreenGraph.of(screens);
     }
 

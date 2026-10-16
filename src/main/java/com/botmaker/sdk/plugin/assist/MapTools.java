@@ -17,6 +17,7 @@ import com.botmaker.sdk.api.screens.Variant;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
 import com.botmaker.sdk.internal.vision.FrameChange;
@@ -335,11 +336,12 @@ final class MapTools {
         }
         ActTools.Entered first = ActTools.enter(context, screen, byPicture ? what : null, notches, key.orElse(null),
                 input.desktop(), settle, FrameChange.ANSWER_SHARE);
-        ActTools.Entered slow = notches == 0 ? slowScreen(context, first, on.marker()) : first;
-        ActTools.Entered entered = notches == 0 ? flash(context, slow, on.marker()) : slow;
-        boolean flashed = entered != slow;    // its marker hidden a moment, then back: this screen, redrawn
-        if (entered.after() == null && notches != 0 && !entered.reply().isRefused() && on.marker() != null
-                && Frames.look(context).filter(f -> ActTools.shows(context, on.marker().id(), f)).isPresent()) {
+        Markers onMarkers = Markers.of(on);
+        ActTools.Entered slow = notches == 0 ? slowScreen(context, first, onMarkers) : first;
+        ActTools.Entered entered = notches == 0 ? flash(context, slow, onMarkers) : slow;
+        boolean flashed = entered != slow;    // its markers hidden a moment, then back: this screen, redrawn
+        if (entered.after() == null && notches != 0 && !entered.reply().isRefused() && onMarkers.any()
+                && Frames.look(context).filter(f -> ActTools.shows(context, onMarkers, f)).isPresent()) {
             // The screen is still there: what scrolled is the picture itself, carried off by the list it was on.
             return Tried.refused("The scrolled picture " + what + " moved off its place (the list carried it), so "
                     + "nothing was scrolled. Scroll over a picture that stays put while the list moves (its frame, "
@@ -369,10 +371,10 @@ final class MapTools {
                     .filter(c -> !c.equals(screen));
             if (named.isPresent()) {
                 GameScreen to = graph.screens().get(named.get());
-                if (to.marker() != null && !ActTools.shows(context, to.marker().id(), entered.after())) {
+                if (to.hasMarker() && !ActTools.shows(context, Markers.of(to), entered.after())) {
                     // Taken at its word, a fight's start panel was recorded as the fight (2026-10-15).
                     return Tried.left(entered.reply().and(AgentReply.text("Nothing was written: "
-                            + graph.shown(named.get()) + "'s marker " + to.marker().id() + " does not show, so this "
+                            + graph.shown(named.get()) + "'s marker " + Markers.of(to).ids() + " does not show, so this "
                             + "is not " + graph.shown(named.get()) + ". Look at it (describe); give opens the name it "
                             + "shows, and try " + base.label() + " again from " + name + ".")));
                 }
@@ -408,15 +410,20 @@ final class MapTools {
      */
     private static Optional<AgentReply> notOn(AgentContext context, ScreenGraph graph, String screen) {
         GameScreen on = graph.screens().get(screen);
-        if (on.marker() == null) return Optional.empty();
+        if (!on.hasMarker()) return Optional.empty();
         String name = graph.shown(screen);
         Optional<ToolReach> reach = ToolReach.of(context);
-        if (reach.isEmpty()) return ActTools.notOn(context, on.marker().id(), name);
+        if (reach.isEmpty()) {
+            // No reach to read the whole set by: each marker looked for alone, the first missing one said.
+            return on.markers().stream().map(m -> ActTools.notOn(context, m.id(), name)).flatMap(Optional::stream)
+                    .findFirst();
+        }
         Optional<BufferedImage> frame = reach.get().look();
         if (frame.isEmpty()) return Optional.of(AgentReply.refused(Frames.noScreen()));
-        if (!ActTools.shows(context, on.marker().id(), frame.get())) {
-            return Optional.of(AgentReply.refused("The game is not on " + name + ": its marker " + on.marker().id()
-                    + " is not on the screen. Go back to " + name + " first."));
+        if (!ActTools.shows(context, Markers.of(on), frame.get())) {
+            return Optional.of(AgentReply.refused("The game is not on " + name + ": its marker " + Markers.of(on).ids()
+                    + (on.absent().isEmpty() ? "" : ", without " + String.join(", ", on.absent().stream()
+                    .map(ImageTemplate::id).toList())) + ", is not on the screen. Go back to " + name + " first."));
         }
         // A popup shows over the tree's screens, which whereOn answers with: its own marker is the proof.
         if (on.isPopup()) return Optional.empty();
@@ -438,7 +445,7 @@ final class MapTools {
         if (reach.isEmpty()) return Optional.empty();
         ScreenWalk walk = new ScreenWalk(graph, reach.get(), STEP_MS, null);
         Optional<String> popup = walk.popupOn(entered.after()).filter(c -> !c.equals(screen)
-                && !ActTools.shows(context, graph.screens().get(c).marker().id(), entered.before()));
+                && !ActTools.shows(context, Markers.of(graph.screens().get(c)), entered.before()));
         if (popup.isPresent()) return popup;
         return walk.whereOn(entered.after(), screen).filter(c -> !c.equals(screen));
     }
@@ -710,7 +717,7 @@ final class MapTools {
             return FxCall.call(() -> {
                 ImageTemplate cut = ScreenBook.picture(services, picture);
                 if (at.starts()) {
-                    GameScreen screen = GameScreen.named(at.name()).marker(cut);
+                    GameScreen screen = GameScreen.named(at.name()).markers(List.of(cut));
                     Optional<String> failed = ScreenBook.add(services, at.constant(), at.popup() ? screen.popup() : screen);
                     return failed.map(why -> " It could not be added to the map: " + why).orElse(" Added "
                             + at.name() + " to the map as Screens." + at.constant() + ", this its marker" + (at.popup()
@@ -720,8 +727,9 @@ final class MapTools {
                 ScreenGraph graph = ScreenBook.read(services);
                 GameScreen screen = graph.screens().get(at.constant());
                 if (screen == null) return " " + at.name() + " is no longer in the map, so it was not noted.";
-                String was = marker && screen.marker() != null && !screen.marker().id().equals(cut.id())
-                        ? screen.marker().id() : null;
+                String was = marker && screen.hasMarker()
+                        && !(screen.markers().size() == 1 && screen.firstMarker().id().equals(cut.id()))
+                        ? Markers.of(screen).ids() : null;
                 Optional<Input> lookOf = screen.allInputs().stream()
                         .filter(i -> i.variants().stream().anyMatch(v -> v.picture().id().equals(cut.id()))).findFirst();
                 if (lookOf.isPresent()) return " " + at.name() + " has it as a look of " + lookOf.get().label() + ".";
@@ -733,7 +741,7 @@ final class MapTools {
                 }
                 // A way back is no input to try, and an input seen to come and go is marked so in place.
                 Optional<String> failed = ScreenBook.update(services, at.constant(), s -> marker
-                        ? at.popup() ? s.marker(cut).popup() : s.marker(cut)
+                        ? at.popup() ? s.markers(List.of(cut)).popup() : s.markers(List.of(cut))
                         : back ? replaced(s, had.orElse(null), null).back(Input.click(cut))
                         : had.isPresent() ? replaced(s, had.get(), brought(had.get().sometimes(), look))
                         : s.inputs(added(s.inputs(), sometimes ? brought(Input.click(cut).sometimes(), look)
@@ -799,8 +807,8 @@ final class MapTools {
                 ScreenVariant was = screen.variants().stream().filter(v -> v.name().equalsIgnoreCase(name)).findFirst()
                         .orElse(ScreenVariant.named(name));
                 Input input = sometimes ? brought(Input.click(cut).sometimes(), look) : Input.click(cut);
-                ScreenVariant marked = look.when() == null ? was.marker(cut)
-                        : was.marker(cut).when(ScreenTypes.condition(look.when()));
+                ScreenVariant marked = look.when() == null ? was.markers(List.of(cut))
+                        : was.markers(List.of(cut)).when(ScreenTypes.condition(look.when()));
                 ScreenVariant now = marker ? marked : was.inputs(added(was.inputs(), input));
                 Optional<String> failed = ScreenBook.update(services, at.constant(), s -> s.withVariant(now));
                 if (failed.isPresent()) return " It could not be noted in " + at.name() + ": " + failed.get();
@@ -1039,8 +1047,8 @@ final class MapTools {
     private static void retakeShot(AgentContext context, ToolReach reach, ScreenGraph graph, String constant) {
         Path resources = context.services().resourcesDir();
         if (resources == null || RETAKEN.contains(resources.resolve(constant))) return;
-        if (graph.screen(constant).map(GameScreen::marker).isEmpty()) return;
-        // Only a frame its marker shows on: the walk's last frame may still be the way there.
+        if (graph.screen(constant).filter(GameScreen::hasMarker).isEmpty()) return;
+        // Only a frame its markers show on: the walk's last frame may still be the way there.
         Optional<BufferedImage> frame = reach.look().filter(f -> ScreenFit.shows(reach, graph, constant, f));
         // Once a session: each arrival wrote a 1–3 MB shot of an animated game, a new file the next Project History
         // snapshot hashed, compressed and kept, 2–3 s of every write and most of a 63 MB history (2026-10-16).
@@ -1064,8 +1072,8 @@ final class MapTools {
             return "";
         }
         Optional<String> constant = ScreenBook.find(graph, typed);
-        ImageTemplate marker = constant.map(c -> graph.screens().get(c).marker()).orElse(null);
-        if (marker == null || !marker.id().equals(picture)
+        List<ImageTemplate> markers = constant.map(c -> graph.screens().get(c).markers()).orElse(List.of());
+        if (markers.stream().noneMatch(m -> m.id().equals(picture))
                 || !ScreenFit.shows(reach.get(), graph, constant.get(), frame)) {
             return "";
         }
@@ -1082,13 +1090,13 @@ final class MapTools {
     }
 
     /**
-     * {@code entered}, or a later look when the screen's {@code marker} comes back within {@link #FLASH_MS}: a change
-     * over the whole screen that hid it a moment (a rarity raised in Artifacts flashed, 2026-10-15) changed the screen
-     * in place and opened none.
+     * {@code entered}, or a later look when the screen's {@code markers} come back within {@link #FLASH_MS}: a change
+     * over the whole screen that hid them a moment (a rarity raised in Artifacts flashed, 2026-10-15) changed the
+     * screen in place and opened none.
      */
-    private static ActTools.Entered flash(AgentContext context, ActTools.Entered entered, ImageTemplate marker) {
-        if (entered.after() == null || entered.share() < SCREEN_SHARE || marker == null
-                || ActTools.shows(context, marker.id(), entered.after())) {
+    private static ActTools.Entered flash(AgentContext context, ActTools.Entered entered, Markers markers) {
+        if (entered.after() == null || entered.share() < SCREEN_SHARE || !markers.any()
+                || ActTools.shows(context, markers, entered.after())) {
             return entered;
         }
         Optional<ToolReach> reach = ToolReach.of(context);
@@ -1098,7 +1106,7 @@ final class MapTools {
             while (reach.get().nowMs() < deadline && !Thread.currentThread().isInterrupted()) {
                 reach.get().pause(FLASH_POLL_MS);
                 Optional<BufferedImage> now = reach.get().look();
-                if (now.isPresent() && ActTools.shows(context, marker.id(), now.get())) {
+                if (now.isPresent() && ActTools.shows(context, markers, now.get())) {
                     return ActTools.again(context, entered, now.get());
                 }
             }
@@ -1107,17 +1115,17 @@ final class MapTools {
     }
 
     /**
-     * {@code first} read on while it changed less than a screen and the screen's {@code marker} still shows: a
+     * {@code first} read on while it changed less than a screen and the screen's {@code markers} still show: a
      * screen slow to draw (Garage, a second late) would be noted as a change in place. A change that grew with the
-     * marker still in view is drift, not a screen.
+     * markers still in view is drift, not a screen.
      */
-    private static ActTools.Entered slowScreen(AgentContext context, ActTools.Entered first, ImageTemplate marker) {
-        if (first.after() == null || first.share() >= SCREEN_SHARE || marker == null
-                || !ActTools.shows(context, marker.id(), first.after())) {
+    private static ActTools.Entered slowScreen(AgentContext context, ActTools.Entered first, Markers markers) {
+        if (first.after() == null || first.share() >= SCREEN_SHARE || !markers.any()
+                || !ActTools.shows(context, markers, first.after())) {
             return first;
         }
         ActTools.Entered later = ActTools.later(context, first, SLOW_SCREEN_MS, SCREEN_SHARE);
-        return later.after() == null || later != first && !ActTools.shows(context, marker.id(), later.after())
+        return later.after() == null || later != first && !ActTools.shows(context, markers, later.after())
                 ? later : first;
     }
 

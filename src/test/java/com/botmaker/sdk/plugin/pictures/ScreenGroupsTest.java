@@ -9,6 +9,7 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,12 +32,17 @@ class ScreenGroupsTest {
         return new ImageTemplate("images/" + id + ".png");
     }
 
+    /** A screen's markers: the pictures {@code ids}. */
+    private static List<ImageTemplate> marks(String... ids) {
+        return Arrays.stream(ids).map(ScreenGroupsTest::picture).toList();
+    }
+
     @Test
     void eachScreenGroupsThePicturesItsMarkerAndInputsNameAndAPictureMayBeUnderTwo() {
         Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").marker(picture("home"))
+        screens.put("HOME", GameScreen.named("Home").markers(marks("home"))
                 .inputs(List.of(Input.click(picture("campaign_title")), Input.click(picture("close_x")))));
-        screens.put("CAMPAIGN", GameScreen.named("Campaign").marker(picture("campaign_title"))
+        screens.put("CAMPAIGN", GameScreen.named("Campaign").markers(marks("campaign_title"))
                 .from(Way.of(BotConstants.screen("HOME"), Input.click(picture("campaign_title"))))
                 .back(Input.click(picture("close_x"))));
         screens.put("ENGINEER", GameScreen.named("Engineer"));

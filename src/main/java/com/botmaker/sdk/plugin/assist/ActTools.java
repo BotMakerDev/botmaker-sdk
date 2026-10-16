@@ -15,6 +15,7 @@ import com.botmaker.sdk.internal.input.Hands;
 import com.botmaker.sdk.internal.input.Hands.InSession;
 import com.botmaker.sdk.internal.input.Hands.OnDesktop;
 import com.botmaker.sdk.internal.input.Hands.OnEmulator;
+import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.vision.FrameChange;
 import com.botmaker.sdk.internal.vision.FrameChange.Clock;
 import com.botmaker.sdk.internal.vision.FrameChange.Motion;
@@ -221,6 +222,11 @@ final class ActTools {
     /** Whether the bot has a picture called {@code picture}. */
     static boolean exists(AgentContext context, String picture) {
         return Frames.resources(context).flatMap(r -> Frames.picture(r, picture)).isPresent();
+    }
+
+    /** Whether a run would tell {@code markers}' screen on {@code frame}: every marker found, no absent one. */
+    static boolean shows(AgentContext context, Markers markers, BufferedImage frame) {
+        return markers.on(p -> shows(context, p.id(), frame));
     }
 
     /** Whether a run would find {@code picture} on {@code frame}. */

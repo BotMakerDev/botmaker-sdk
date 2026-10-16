@@ -6,7 +6,9 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 
 ## The model (`api/screens`)
 
-- **`GameScreen`**: a name, a `marker` (a picture only this screen shows), a `from` way (the tree), `alsoFrom`
+- **`GameScreen`**: a name, `markers` (pictures that all show while the game shows it) and `absent` (pictures none of
+  which shows: what tells it from a screen showing the same markers; `internal/screens/Markers` is the one rule every
+  reader tells a screen by, 2026-10-16), a `from` way (the tree), `alsoFrom`
   ways, a `back` input (null: a close button, then Escape), `inputs`, looks (`ScreenVariant`), `popup`, `notes`,
   `reached` (SURVEYED → BUILT → TRIED → TUNED, or LOCKED), `owes`, and `at(Point)`, the corner its card was
   moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
@@ -29,7 +31,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **Discovery's order** is one rule for every screen (the user's, 2026-10-14): cut every input, try each, and
   finish a screen an input opens before the next input of the screen it was opened from (`unfinishedBelow`,
   `branchBegun`; popups are skipped). `upTo` and `workLeft` say what is next.
-- **`ScreenWalk`** finds where the game is (`whereOn`: a screen opened from another, by any way in, hides it) and
+- **`ScreenWalk`** finds where the game is (`whereOn`: a screen opened from another, by any way in, hides it; of two
+  shown that neither hides, the one told by more markers wins) and
   walks one edge at a time: do the input, wait up to `STEP_MS` (10 s) for the next marker, close a popup that
   shows, plan again from where a stray step landed. A way back is done once the left screen's marker is gone,
   wherever it lands. Ends: ARRIVED, NOT_NOW, LOCKED, MISSING (the map names a picture the game no longer shows:

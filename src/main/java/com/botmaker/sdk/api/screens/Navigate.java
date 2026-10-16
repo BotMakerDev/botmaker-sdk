@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.observe.Bots;
+import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.RunReach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
@@ -52,13 +53,13 @@ public final class Navigate {
         };
     }
 
-    /** Whether the game shows {@code screen} now: its marker is on the screen. */
+    /** Whether the game shows {@code screen} now: its markers are on the screen, and none of its absent pictures. */
     public static boolean isOn(GameScreen screen) {
         ScreenGraph map = ScreenMaps.installed();
         Optional<String> constant = map.constantOf(screen);
-        if (constant.isEmpty() || screen.marker() == null) return false;
+        if (constant.isEmpty() || !screen.hasMarker()) return false;
         RunReach reach = new RunReach();
-        boolean on = reach.look().flatMap(frame -> reach.find(screen.marker(), frame)).isPresent();
+        boolean on = reach.look().map(frame -> Markers.of(screen).on(reach, frame)).orElse(false);
         // Remembered, not told: a screen's marker stays in view under a panel opened over it, so this may be its parent.
         if (on) ScreenMaps.seen(constant.get());
         return on;

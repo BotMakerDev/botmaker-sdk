@@ -243,7 +243,7 @@ public final class ScreenGraph {
      * icon here animates} among its {@link GameScreen#owes}): one with a reason holds no other screen back.
      */
     public Optional<String> owingMarker() {
-        return screens.entrySet().stream().filter(e -> e.getValue().marker() == null && !markerExplained(e.getValue()))
+        return screens.entrySet().stream().filter(e -> !e.getValue().hasMarker() && !markerExplained(e.getValue()))
                 .map(Map.Entry::getKey).findFirst();
     }
 
@@ -471,7 +471,7 @@ public final class ScreenGraph {
         List<String> owed = new ArrayList<>();
         for (String c : screens.keySet()) {
             String name = shown(c);
-            if (screens.get(c).marker() == null && !markerExplained(screens.get(c))) owed.add(name + ": marker");
+            if (!screens.get(c).hasMarker() && !markerExplained(screens.get(c))) owed.add(name + ": marker");
             List<Input> untried = untried(c);
             if (!untried.isEmpty()) owed.add(name + ": untried " + labels(untried));
             else if (noneCut(c)) owed.add(name + ": no input cut yet");
@@ -483,17 +483,17 @@ public final class ScreenGraph {
     }
 
     /**
-     * The pictures {@code constant} names, each once by its id, in the order they are met: its marker, each input's
-     * picture, variants and lock, each look's marker and inputs, its way back's. Manage Pictures groups the bot's
-     * pictures by them.
+     * The pictures {@code constant} names, each once by its id, in the order they are met: its markers and absent
+     * pictures, each input's picture, variants and lock, each look's markers and inputs, its way back's. Manage
+     * Pictures groups the bot's pictures by them.
      */
     public List<String> pictures(String constant) {
         GameScreen screen = screens.get(constant);
         if (screen == null) return List.of();
         Set<String> ids = new LinkedHashSet<>();
-        if (screen.marker() != null) ids.add(screen.marker().id());
+        for (ImageTemplate p : Markers.of(screen).pictures()) ids.add(p.id());
         for (ScreenVariant look : screen.variants()) {
-            if (look.marker() != null) ids.add(look.marker().id());
+            for (ImageTemplate p : Markers.of(look).pictures()) ids.add(p.id());
         }
         List<Input> named = new ArrayList<>(screen.allInputs());
         if (screen.back() != null) named.add(screen.back());
@@ -505,12 +505,12 @@ public final class ScreenGraph {
     }
 
     /**
-     * {@code screen} with the picture {@code id} taken out: its marker or a look's, an input clicking it, a button's
-     * look, a lock, its way back. Its ways in are kept: a screen is not cut off by a picture going.
+     * {@code screen} with the picture {@code id} taken out: one of its markers or absent pictures or a look's, an input
+     * clicking it, a button's look, a lock, its way back. Its ways in are kept: a screen is not cut off by a picture
+     * going.
      */
     public static GameScreen without(GameScreen screen, String id) {
-        GameScreen now = screen;
-        if (is(now.marker(), id)) now = now.marker(null);
+        GameScreen now = screen.markers(butPicture(screen.markers(), id)).absent(butPicture(screen.absent(), id));
         if (now.back() != null) {
             List<Input> back = without(List.of(now.back()), id);
             now = now.back(back.isEmpty() ? null : back.getFirst());
@@ -518,7 +518,8 @@ public final class ScreenGraph {
         now = now.inputs(without(now.inputs(), id));
         List<ScreenVariant> looks = new ArrayList<>();
         for (ScreenVariant look : now.variants()) {
-            looks.add((is(look.marker(), id) ? look.marker(null) : look).inputs(without(look.inputs(), id)));
+            looks.add(look.markers(butPicture(look.markers(), id)).absent(butPicture(look.absent(), id))
+                    .inputs(without(look.inputs(), id)));
         }
         return now.variants(looks);
     }
@@ -539,6 +540,11 @@ public final class ScreenGraph {
             kept.add(is(now.lock(), id) ? now.locked(null) : now);
         }
         return kept;
+    }
+
+    /** {@code pictures} but the one whose id is {@code id}. */
+    private static List<ImageTemplate> butPicture(List<ImageTemplate> pictures, String id) {
+        return pictures.stream().filter(p -> !is(p, id)).toList();
     }
 
     private static boolean is(ImageTemplate picture, String id) {

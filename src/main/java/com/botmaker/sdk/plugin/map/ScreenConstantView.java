@@ -78,7 +78,7 @@ public final class ScreenConstantView {
             String when = ScreenTypes.sourceOf(look.when());
             HBox line = new HBox(8, new Label("Look " + look.name() + (when.isEmpty() ? "" : ", while " + when)));
             line.setAlignment(Pos.CENTER_LEFT);
-            thumb(services.resourcesDir(), look.marker() == null ? null : look.marker().id())
+            thumb(services.resourcesDir(), look.hasMarker() ? look.firstMarker().id() : null)
                     .ifPresent(line.getChildren()::addFirst);
             box.getChildren().add(line);
         }

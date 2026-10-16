@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,11 @@ class ScreenGraphTest {
         return new ImageTemplate("images/" + id + ".png");
     }
 
+    /** A screen's markers: the pictures {@code ids}. */
+    private static List<ImageTemplate> marks(String... ids) {
+        return Arrays.stream(ids).map(ScreenGraphTest::picture).toList();
+    }
+
     private static Input click(String id) {
         return Input.click(picture(id));
     }
@@ -42,12 +48,12 @@ class ScreenGraphTest {
      * screen by reference, as an editor holds it, so a test can change one screen and keep the others' ways in.
      */
     private static Map<String, GameScreen> firestone() {
-        GameScreen home = GameScreen.named("Home").marker(picture("home"))
+        GameScreen home = GameScreen.named("Home").markers(marks("home"))
                 .inputs(List.of(click("campaign"), click("engineer"), click("gold")));
-        GameScreen campaign = GameScreen.named("Campaign").marker(picture("campaign_title"))
+        GameScreen campaign = GameScreen.named("Campaign").markers(marks("campaign_title"))
                 .from(Way.of(BotConstants.screen("HOME"), click("campaign")))
                 .inputs(List.of(click("claim").did(Did.IN_PLACE), click("map"), click("gems").never("spends gems")));
-        GameScreen map = GameScreen.named("Map").marker(picture("map_title"))
+        GameScreen map = GameScreen.named("Map").markers(marks("map_title"))
                 .from(Way.of(BotConstants.screen("CAMPAIGN"), click("map")))
                 .inputs(List.of(Input.key(Key.ESCAPE).did(Did.NONE)));
         GameScreen engineer = GameScreen.named("Engineer").from(Way.of(BotConstants.screen("HOME"), click("engineer")));
@@ -77,7 +83,7 @@ class ScreenGraphTest {
         Map<String, GameScreen> screens = firestone();
         Input claim = click("claim").variants(List.of(Variant.of(picture("claim_badge"), State.BADGE)));
         screens.put("CAMPAIGN", screens.get("CAMPAIGN").inputs(List.of(claim, click("map")))
-                .variants(List.of(ScreenVariant.named("Halloween").marker(picture("pumpkin"))
+                .variants(List.of(ScreenVariant.named("Halloween").markers(marks("pumpkin"))
                         .inputs(List.of(click("candy"))))));
         ScreenGraph graph = ScreenGraph.of(screens);
 
@@ -89,12 +95,12 @@ class ScreenGraphTest {
         assertEquals(List.of(click("claim"), click("map")),
                 ScreenGraph.without(campaign, "claim_badge").inputs(), "a button's look goes, the button stays");
         assertEquals(List.of(), ScreenGraph.without(campaign, "candy").variants().getFirst().inputs());
-        assertEquals(null, ScreenGraph.without(campaign, "pumpkin").variants().getFirst().marker());
+        assertEquals(List.of(), ScreenGraph.without(campaign, "pumpkin").variants().getFirst().markers());
         assertEquals(campaign.from(), ScreenGraph.without(campaign, "campaign").from(), "a way in is kept");
         assertTrue(ScreenGraph.enteredBy(campaign, "campaign"), "so the picture it opens by stays used");
         assertFalse(ScreenGraph.enteredBy(campaign, "candy"));
         GameScreen withLooks = campaign.withVariant(ScreenVariant.named("Winter"))
-                .withVariant(ScreenVariant.named("Halloween").marker(picture("bat")));
+                .withVariant(ScreenVariant.named("Halloween").markers(marks("bat")));
         assertEquals(List.of("Halloween", "Winter"), withLooks.variants().stream().map(ScreenVariant::name).toList(),
                 "a look edited keeps its place");
     }
@@ -301,7 +307,7 @@ class ScreenGraphTest {
         Map<String, GameScreen> screens = firestone();
         screens.put("CAMPAIGN", screens.get("CAMPAIGN").inputs(List.of(click("claim").did(Did.IN_PLACE), click("map"),
                 click("loot"))));
-        screens.put("OFFER", GameScreen.named("Offer").marker(picture("offer")).inputs(List.of(click("buy"))).popup());
+        screens.put("OFFER", GameScreen.named("Offer").markers(marks("offer")).inputs(List.of(click("buy"))).popup());
         ScreenGraph graph = ScreenGraph.of(screens);
 
         assertEquals(Optional.of("CAMPAIGN"), graph.branchBegun("ENGINEER"), "a tree screen waits for Campaign");
@@ -351,11 +357,11 @@ class ScreenGraphTest {
     /** Home ▸ Campaign ▸ Map, each tried out but Home's {@code mail}. */
     private static ScreenGraph upMap(Input mail) {
         Map<String, GameScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", GameScreen.named("Home").marker(picture("home")).inputs(List.of(click("campaign"), mail)));
-        screens.put("CAMPAIGN", GameScreen.named("Campaign").marker(picture("campaign_title"))
+        screens.put("HOME", GameScreen.named("Home").markers(marks("home")).inputs(List.of(click("campaign"), mail)));
+        screens.put("CAMPAIGN", GameScreen.named("Campaign").markers(marks("campaign_title"))
                 .from(Way.of(BotConstants.screen("HOME"), click("campaign")))
                 .inputs(List.of(click("map"), click("claim").did(Did.IN_PLACE))));
-        screens.put("MAP", GameScreen.named("Map").marker(picture("map_title"))
+        screens.put("MAP", GameScreen.named("Map").markers(marks("map_title"))
                 .from(Way.of(BotConstants.screen("CAMPAIGN"), click("map"))).inputs(List.of(click("x").did(Did.NONE))));
         return ScreenGraph.of(screens);
     }
