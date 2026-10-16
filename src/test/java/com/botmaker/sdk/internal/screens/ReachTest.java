@@ -104,7 +104,67 @@ class ReachTest {
         // Slot 8 is the sixth in view after three notches down: 100 + 100 * 5, centred.
         assertEquals(List.of("scroll -1", "scroll -1", "scroll -1", "click 640"), column.done);
         assertTrue(column.wheel.stream().allMatch(at -> at.x() == 50), "the wheel turns over a member");
-        assertEquals(3 * Reach.SCROLL_SETTLE_MS, column.now, "each scroll is let settle");
+        assertEquals(3 * 2 * Reach.SCROLL_SETTLE_MS, column.now, "each scroll is looked at until it holds still");
+    }
+
+    /** A column that glides on for a while after each notch is judged once it stops, never mid-way (Firestone). */
+    @Test
+    void aListIsJudgedOnceItHoldsStill() {
+        Column gliding = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 8), 4) {
+            int owed;
+
+            @Override
+            public void scroll(Point at, int notches) {
+                done.add("scroll " + notches);
+                owed -= notches;
+            }
+
+            @Override
+            public void pause(long ms) {
+                super.pause(ms);
+                // Each look after the first moves it one slot more, until it has moved as far as it was scrolled.
+                if (owed != 0) {
+                    int step = Integer.signum(owed);
+                    int next = Math.clamp(scrolled + step, 0, end);
+                    owed = next == scrolled ? 0 : owed - step;
+                    scrolled = next;
+                }
+            }
+        };
+        gliding.scrolled = 4;
+        assertTrue(gliding.perform(Input.click(TAVERN), ScreenList.of(-3, COLUMN.members()),
+                gliding.look().orElseThrow()), gliding.done.toString());
+        assertEquals(List.of("scroll -3", "scroll 3", "scroll 3", "click 140"), gliding.done);
+    }
+
+    /** A column that starts moving only a second after the wheel turns is not taken for one at its end. */
+    @Test
+    void aListThatMovesLateIsNotTakenForItsEnd() {
+        Column late = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 8), 4) {
+            int owed;
+            long at;
+
+            @Override
+            public void scroll(Point at, int notches) {
+                done.add("scroll " + notches);
+                owed -= notches;
+                this.at = now;
+            }
+
+            @Override
+            public void pause(long ms) {
+                super.pause(ms);
+                if (owed != 0 && now - at > 1000) {
+                    scrolled = Math.clamp(scrolled + owed, 0, end);
+                    owed = 0;
+                }
+            }
+        };
+        late.scrolled = 2;
+        assertTrue(late.perform(Input.click(TAVERN), COLUMN, late.look().orElseThrow()), late.done.toString());
+        // Down to the end (two slots), then up four to the top: no scroll is judged before the column moved.
+        assertEquals(List.of("scroll -1", "scroll -1", "scroll -1", "scroll 1", "scroll 1", "scroll 1", "scroll 1",
+                "click 140"), late.done);
     }
 
     /** Scrolled to its end before the run looked: no member moved, so the scroll turns back up (Home's column). */
@@ -115,6 +175,18 @@ class ReachTest {
         assertTrue(column.perform(Input.click(TAVERN), COLUMN, column.look().orElseThrow()));
         assertEquals(List.of("scroll -1", "scroll 1", "scroll 1", "scroll 1", "scroll 1", "click 140"),
                 column.done);
+    }
+
+    /** Scrolled to an end of icons the list does not name: no member shows, so the wheel turns over its band. */
+    @Test
+    void aListShowingNoMemberIsScrolledOverItsBand() {
+        Column column = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2), 8);
+        column.scrolled = 8;
+        assertTrue(column.perform(Input.click(TAVERN), COLUMN, column.look().orElseThrow()), column.done.toString());
+        // Three blind scrolls down turn it back; eight up bring the tavern.
+        assertEquals(Reach.BLIND_SCROLLS + 8 + 1, column.done.size(), column.done.toString());
+        assertEquals(new Point(50, 390), column.wheel.getFirst(), "the middle of the band the members were cut in");
+        assertEquals("click 140", column.done.getLast());
     }
 
     @Test

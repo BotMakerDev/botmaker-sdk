@@ -29,6 +29,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     times each way. A scroll after which no member moved met the list's end, and the scroll turns back once, so a
     run finds the list scrolled anywhere. Where the members are says it, not the pixels: a list over a moving fight
     is no longer taken for moving.
+  - After each scroll the list is looked at until it holds still (up to 3 s): one that glides on, or starts late,
+    is judged once it stops. With no member showing (an end of icons the list does not name), the wheel turns over
+    the middle of the band, and three such scrolls the first way turn it back. Firestone's Home column is reached
+    from either end.
   - The assistant's edit_map `in_list` takes the list's `members` and `notches`; `read_map` and 🗺 Screens count
     anywhere along the list as a member's place, and one scrolled out of the shot is only a note.
   - 🗺 Screens draws a list whole on a screen's shot: a strip over where the list sits with every member's picture,

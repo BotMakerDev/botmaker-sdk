@@ -58,8 +58,10 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   method, else a walk to `ScreenGraph.root()` (the first screen reached from none, popups aside).
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
   `ToolReach` for the assistant. `perform` is the one place an input is done. A list member not in view is scrolled
-  to over a member that shows (past them all, where the last one showed), `ScreenList.SCROLLS` each way; a scroll
-  after which every member that shows sits where it was (`Reach.still`, 4 px) met the end and turns back once.
+  to over a member that shows (past them all, where the last one showed; none yet, the band's middle),
+  `ScreenList.SCROLLS` each way. After each scroll the list is looked at until two looks agree (`Reach.settled`, up
+  to `SCROLL_SETTLE_MAX_MS`; members still where they were are watched to the limit, as a game may glide late); a
+  scroll after which every member that shows sits where it was (`Reach.still`, 4 px) met the end and turns back once.
 - **Telemetry**: Navigate fires `on screen <CONSTANT>` (`ScreenStep`); the run bar and 🗺 Screens show its name.
 
 ## The assistant's tools (`plugin/assist`)

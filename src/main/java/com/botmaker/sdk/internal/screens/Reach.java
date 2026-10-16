@@ -25,8 +25,17 @@ import java.util.function.Function;
  */
 public interface Reach {
 
-    /** How long a list is let settle after a scroll before it is looked at again. */
+    /** How long a list is let settle after a scroll before it is looked at again, and between two looks after. */
     long SCROLL_SETTLE_MS = 400;
+
+    /**
+     * The longest a list is looked at after a scroll for its members to hold still: Firestone's column glides for
+     * over a second, and judged before it stopped it looked at its end (2026-10-16).
+     */
+    long SCROLL_SETTLE_MAX_MS = 3000;
+
+    /** Scrolls in a row the first way with no member showing before the list is scrolled the other way. */
+    int BLIND_SCROLLS = 3;
 
     /** How long the game is let settle between two copies of a button an {@link Input#every each} input presses. */
     long CLICK_SETTLE_MS = 600;
@@ -238,29 +247,62 @@ public interface Reach {
      */
     private Optional<Seen> scrolledTo(Input input, ScreenList list, BufferedImage frame) {
         Map<String, Rect> members = members(list, frame);
-        // Scrolled past every member, the wheel stays where the last one showed: a point in the list.
-        Point over = null;
+        // Scrolled past every member, the wheel stays where the last one showed: a point in the list. With none
+        // showing yet (scrolled to an end of icons the list does not name), it turns over the middle of the band.
+        Rect band = band(list);
+        Point over = band == null ? null : band.center();
         int done = 0;
+        boolean first = true;
+        boolean shown = !members.isEmpty();
         for (int notches : new int[] {list.notches(), -list.notches()}) {
             int most = ScreenList.SCROLLS + done;
             done = 0;
+            int blind = 0;
             for (int i = 0; i < most; i++) {
                 if (!members.isEmpty()) over = members.values().iterator().next().center();
                 if (over == null) return Optional.empty();
                 scroll(over, notches);
                 done++;
-                pause(SCROLL_SETTLE_MS);
-                Optional<BufferedImage> next = look();
-                if (next.isEmpty() || Thread.currentThread().isInterrupted()) return Optional.empty();
-                Optional<Seen> button = seen(input, list, next.get());
+                Optional<Settled> next = settled(list, members);
+                if (next.isEmpty()) return Optional.empty();
+                Optional<Seen> button = seen(input, list, next.get().frame());
                 if (button.isPresent()) return button;
-                Map<String, Rect> now = members(list, next.get());
+                Map<String, Rect> now = next.get().members();
                 boolean end = !now.isEmpty() && still(members, now);
+                // No member shown yet, the first way: an end of icons the list does not name, scrolled further in.
+                shown |= !now.isEmpty();
+                blind = shown ? 0 : blind + 1;
                 members = now;
-                if (end) break;
+                if (end || first && blind >= BLIND_SCROLLS) break;
             }
+            first = false;
         }
         return Optional.empty();
+    }
+
+    /** A frame of a list that held still, and where its members show on it. */
+    record Settled(BufferedImage frame, Map<String, Rect> members) {
+    }
+
+    /**
+     * {@code list} once it holds still after a scroll: looked at every {@link #SCROLL_SETTLE_MS} until two looks in a
+     * row show its members at the same places, for up to {@link #SCROLL_SETTLE_MAX_MS}. Members still where they
+     * were {@code before} the scroll are looked at to the end of that time: a game may start gliding late, and only
+     * then is the list at its end. Empty when the game could not be captured or the wait was stopped.
+     */
+    private Optional<Settled> settled(ScreenList list, Map<String, Rect> before) {
+        long until = nowMs() + SCROLL_SETTLE_MAX_MS;
+        Settled last = null;
+        while (true) {
+            pause(SCROLL_SETTLE_MS);
+            Optional<BufferedImage> frame = look();
+            if (frame.isEmpty() || Thread.currentThread().isInterrupted()) return Optional.empty();
+            Settled now = new Settled(frame.get(), members(list, frame.get()));
+            boolean held = last != null && still(last.members(), now.members())
+                    && (before.isEmpty() || !still(before, now.members()));
+            if (held || nowMs() >= until) return Optional.of(now);
+            last = now;
+        }
     }
 
     /** Where each member of {@code list} that shows is on {@code frame}, by its id, in the list's order. */
