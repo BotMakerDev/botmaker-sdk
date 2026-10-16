@@ -423,6 +423,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   right after the click (Firestone's Arena replay kept its VS splash). Cutting or placing the screen's marker replaces
   it with the frame the marker shows on. 🗺 Screens' *Take shot* and the shot a walk retakes on arrival are taken
   only while the screen's marker shows; otherwise the shot is kept and the reply says why.
+- **The map says what a screen's shot does not show.** Each shot is checked against the pictures its screen names.
+  `read_map`'s *What the map cannot do* lists:
+  - a shot without its marker;
+  - a picture away from its place, with how far: `close sits (+48,0) from its place on its shot`;
+  - a picture not on its shot.
+
+  A picture that comes and goes, or a look's picture, is one note per screen. In 🗺 Screens each box is drawn where its
+  picture is on the shot, dashed when that is away from its place. A picture not on the shot is listed under it, and
+  its row says *not on shot*. The check runs off the window's thread and is kept until a shot, a picture or a place
+  changes.
 - **Discovery no longer stalls or files a way wrong** (Firestone, 2026-10-16):
   - A screen whose way in comes and goes (Engineer's Home button, shown only while tools wait) holds nothing back
     while that button is hidden, and its branch never blocks another.

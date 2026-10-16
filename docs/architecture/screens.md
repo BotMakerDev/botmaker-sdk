@@ -63,7 +63,9 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   the default way back) and each input's row. **`ScreenCanvas`** draws them, folds the tree, caches at most 400
   images and places input boxes on any frame shape (`boxOn`, letterboxed).
 - **`ScreenPanel`** is the picked screen: its shot with boxes, ▶ Try, 🧭 Go here, ✂ Cut, notes, and the hand
-  edits of `ScreenHands`, all off while a try or a walk runs. **`ScreenDesk`** runs Try and Go here by the
+  edits of `ScreenHands`, all off while a try or a walk runs. Its boxes are where `MapAudit` (assist) finds each
+  picture on the shot, made on a virtual thread and kept by file times and places; `read_map` lists the same audit:
+  a shot without its marker, a picture off its place or not on the shot. **`ScreenDesk`** runs Try and Go here by the
   assistant's own code, so the window and the assistant cannot record an input two ways.
 - **Gestures** are `GraphCanvas`'s (the toolkit): the wheel zooms about the pointer, a right drag pans, a left
   drag moves a card or the selected ones (Ctrl/Shift+click, a box drag). A move is written as each moved card's

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
@@ -10,6 +11,9 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
+import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
+import com.botmaker.sdk.plugin.assist.MapAudit.Where;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import org.junit.jupiter.api.Test;
 
@@ -19,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** read_map's text: the tree as the window draws it, then what the map cannot do. */
@@ -105,6 +110,29 @@ class MapReportTest {
                 click("home_button")))));
         String text = MapReport.text(ScreenGraph.of(screens), Map.of(), id -> true, id -> true, id -> true, "HOME");
         assertTrue(text.contains("\n  also from Tavern by click home_button\n"), text);
+    }
+
+    @Test
+    void whatAShotDoesNotShowIsSaid() {
+        Rect close = new Rect(1800, 40, 40, 40);
+        Audit tavern = new Audit(List.of(
+                new Spot("tavern_title", true, true, Where.AT_PLACE, new Rect(900, 30, 80, 30), null),
+                new Spot("market", false, true, Where.MISSING, null, new Rect(400, 500, 60, 60)),
+                new Spot("play", false, false, Where.MISSING, null, null),
+                new Spot("close", false, true, Where.ELSEWHERE, new Rect(1848, 40, 40, 40), close)));
+        Audit market = new Audit(List.of(
+                new Spot("market_title", true, true, Where.MISSING, null, null),
+                new Spot("gems", false, true, Where.MISSING, null, null)));
+        String text = MapReport.text(map(), Map.of(), NAMED::contains, id -> true, id -> true,
+                Map.of("TAVERN", tavern, "MARKET", market), null);
+        assertTrue(text.contains("- Tavern: market is not on its shot.\n"), text);
+        assertTrue(text.contains("- Tavern: close sits (+48,0) from its place on its shot: placed again while the "
+                + "game shows Tavern, it gets a copy of its own there.\n"), text);
+        assertTrue(text.contains("- Tavern: its shot does not show play, which comes and goes or is another look "
+                + "(a note).\n"), text);
+        assertTrue(text.contains("- Market: its shot does not show its marker market_title: take the shot again "
+                + "while the game shows Market, or cut its marker again."), text);
+        assertFalse(text.contains("gems is not on"), "a shot of another moment says only that: " + text);
     }
 
     @Test

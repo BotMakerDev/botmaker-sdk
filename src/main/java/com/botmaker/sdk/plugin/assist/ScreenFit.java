@@ -3,12 +3,10 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.GameScreen;
-import com.botmaker.sdk.api.vision.ImageFinder;
-import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.api.vision.MatchResult;
-import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
+import com.botmaker.sdk.plugin.assist.MapAudit.Fit;
+import com.botmaker.sdk.plugin.assist.MapAudit.Where;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
@@ -34,13 +32,6 @@ import java.util.Set;
 final class ScreenFit {
 
     private ScreenFit() {}
-
-    /** Where a picture is on a frame: at its place (or anywhere, for one with no place), elsewhere, or nowhere. */
-    enum Where { AT_PLACE, ELSEWHERE, MISSING }
-
-    /** {@code picture} on a frame: where, and its box there when found. */
-    record Fit(String picture, Where where, Rect at) {
-    }
 
     /**
      * The pictures to put on a screen, in the order asked, each copy's name in place of a picture found away from its
@@ -165,50 +156,9 @@ final class ScreenFit {
                 .filter(c -> !c.equals(constant.get())).map(graph::shown);
     }
 
-    /**
-     * Where each of {@code pictures} is on {@code frame}: looked for near its place first ({@link LookTools#NEAR}), as
-     * the assistant's looks do; one not there is then looked for over the whole frame. Two batches, each frame prepared
-     * once.
-     */
+    /** Where each of {@code pictures} is on {@code frame}, matched as a run matches at the project's confidence. */
     static List<Fit> fits(ToolReach reach, Map<String, FrameCut> cuts, List<String> pictures, BufferedImage frame) {
-        List<MatchResult> near = batch(reach.resources(), cuts, pictures, frame, true);
-        List<String> away = new ArrayList<>();
-        for (int i = 0; i < pictures.size(); i++) {
-            if (!reach.clears(near.get(i))) away.add(pictures.get(i));
-        }
-        List<MatchResult> anywhere = away.isEmpty() ? List.of() : batch(reach.resources(), cuts, away, frame, false);
-        List<Fit> fits = new ArrayList<>();
-        for (int i = 0, next = 0; i < pictures.size(); i++) {
-            String picture = pictures.get(i);
-            if (reach.clears(near.get(i))) fits.add(new Fit(picture, Where.AT_PLACE, near.get(i).rect()));
-            else {
-                MatchResult best = anywhere.get(next++);
-                fits.add(reach.clears(best) ? new Fit(picture, Where.ELSEWHERE, best.rect())
-                        : new Fit(picture, Where.MISSING, null));
-            }
-        }
-        return fits;
-    }
-
-    /** Each picture's best match, near its place ({@code near}) or anywhere; not found when it has no file. */
-    private static List<MatchResult> batch(Path resources, Map<String, FrameCut> cuts, List<String> pictures,
-                                           BufferedImage frame, boolean near) {
-        List<ImageTemplate> templates = new ArrayList<>();
-        try {
-            for (String picture : pictures) {
-                FrameCut cut = cuts.get(picture);
-                ImageTemplate file = new ImageTemplate(TemplateLibrary.fileForName(resources, picture).toString());
-                if (near && cut != null && cut.place() != null) file = file.at(cut.place());
-                templates.add(cut == null || cut.frame() == null ? file : file.in(cut.frame()));
-            }
-            StillSource still = new StillSource(frame);
-            return ToolTiming.timed(ToolTiming.Phase.MATCH, () -> near
-                    ? ImageFinder.bestMatchesNear(templates, LookTools.NEAR, still)
-                    : ImageFinder.bestMatches(templates, still));
-        } finally {
-            // Released after the match: an unreleased template is native memory.
-            templates.forEach(ImageTemplate::close);
-        }
+        return MapAudit.fits(reach.resources(), reach.confidence(), cuts, pictures, frame);
     }
 
     /**

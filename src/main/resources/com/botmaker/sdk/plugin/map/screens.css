@@ -105,6 +105,22 @@
     -fx-stroke-width: 3;
 }
 
+/* A box drawn where its picture is on the shot, away from the picture's place: dashed, whatever its row's state. */
+.screen-shot-box-away {
+    -fx-stroke: -bm-screen-untried;
+    -fx-stroke-dash-array: 6 4;
+}
+
+/* The inputs whose picture is not on the shot, listed under it. */
+.screen-shot-missing-title {
+    -fx-text-fill: -bm-screen-plain;
+}
+
+.screen-shot-missing {
+    -fx-text-fill: -bm-screen-owes;
+    -fx-underline: true;
+}
+
 .screen-picture-view {
     -fx-background-color: -bm-screen-card;
 }

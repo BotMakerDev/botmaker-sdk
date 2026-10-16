@@ -13,6 +13,9 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Presence;
+import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
+import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
+import com.botmaker.sdk.plugin.assist.MapAudit.Where;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
@@ -579,11 +582,13 @@ final class ScreenCanvas {
     }
 
     /**
-     * {@link #shot} with each of {@code rows} boxed where its picture was cut ({@code cuts}, by picture), each box
-     * handing its row to {@code onPick} when clicked; {@code onShot} runs on a click elsewhere on the shot (null: none).
+     * {@link #shot} with each of {@code rows} boxed where its picture is on the shot ({@code audit}), else, before the
+     * audit is made or for a picture it has not checked, where it was cut ({@code cuts}, by picture); each box hands its
+     * row to {@code onPick} when clicked. A box away from its picture's place is dashed; a picture not on the shot is
+     * listed under it. {@code onShot} runs on a click elsewhere on the shot (null: none).
      */
     Optional<Node> shotWithInputs(String constant, double width, List<Row> rows, Map<String, FrameCut> cuts,
-                                  Consumer<Row> onPick, Runnable onShot) {
+                                  Audit audit, Consumer<Row> onPick, Runnable onShot) {
         int shotWidth = resources == null ? 0 : ScreenShots.width(ScreenShots.file(resources, constant));
         // One read: the shot and its boxes are of the same file, rewritten meanwhile or not.
         return image(constant, width).map(image -> {
@@ -594,19 +599,44 @@ final class ScreenCanvas {
             Pane boxes = new Pane();
             boxes.setPrefSize(width, height);
             boxes.setMaxSize(width, height);
+            FlowPane missing = new FlowPane(6, 4);
             for (Row row : rows) {
-                FrameCut cut = row.picture() == null ? null : cuts.get(row.picture());
-                if (cut == null || cut.place() == null) continue;
-                // A picture that names no frame was cut on the game's frame, which the shot is, pixel for pixel.
-                boolean framed = cut.frame() != null && cut.frame().width() > 0 && cut.frame().height() > 0;
-                double frameWidth = framed ? cut.frame().width() : shotWidth;
-                double frameHeight = framed ? cut.frame().height() : shotHeight;
-                if (frameWidth <= 0 || frameHeight <= 0) continue;
-                Box at = boxOn(cut.place(), frameWidth, frameHeight, width, height);
+                if (row.picture() == null) continue;
+                Optional<Spot> spot = audit == null ? Optional.empty() : audit.of(row.picture());
+                if (spot.isPresent() && spot.get().where() == Where.MISSING) {
+                    Label gone = new Label(row.label());
+                    gone.getStyleClass().addAll("screen-shot-missing", "screen-shot-open");
+                    Tooltip.install(gone, new Tooltip(row.label() + ": its picture is not on this shot"
+                            + (spot.get().sure() ? "." : "; it comes and goes, or is another look.")));
+                    gone.setOnMouseClicked(e -> onPick.accept(row));
+                    missing.getChildren().add(gone);
+                    continue;
+                }
+                Box at;
+                if (spot.isPresent() && spot.get().at() != null && shotWidth > 0 && shotHeight > 0) {
+                    // Found on the shot, in the shot's own pixels.
+                    at = boxOn(spot.get().at(), shotWidth, shotHeight, width, height);
+                } else {
+                    FrameCut cut = cuts.get(row.picture());
+                    if (cut == null || cut.place() == null) continue;
+                    // A picture that names no frame was cut on the game's frame, which the shot is, pixel for pixel.
+                    boolean framed = cut.frame() != null && cut.frame().width() > 0 && cut.frame().height() > 0;
+                    double frameWidth = framed ? cut.frame().width() : shotWidth;
+                    double frameHeight = framed ? cut.frame().height() : shotHeight;
+                    if (frameWidth <= 0 || frameHeight <= 0) continue;
+                    at = boxOn(cut.place(), frameWidth, frameHeight, width, height);
+                }
                 Rectangle box = new Rectangle(at.x(), at.y(), at.width(), at.height());
                 box.getStyleClass().addAll("screen-shot-box", "screen-shot-box-" + row.state().name()
                         .toLowerCase(Locale.ROOT));
-                Tooltip.install(box, new Tooltip(row.label() + ": " + row.result()));
+                String tip = row.label() + ": " + row.result();
+                if (spot.isPresent() && spot.get().where() == Where.ELSEWHERE) {
+                    box.getStyleClass().add("screen-shot-box-away");
+                    tip += "\nIt sits " + (spot.get().place() == null ? "here"
+                            : spot.get().dx() + "," + spot.get().dy() + " px from its place") + ": its picture's place "
+                            + "is elsewhere.";
+                }
+                Tooltip.install(box, new Tooltip(tip));
                 box.setOnMouseClicked(e -> {
                     onPick.accept(row);
                     e.consume();
@@ -619,7 +649,14 @@ final class ScreenCanvas {
                 layered.setOnMouseClicked(e -> onShot.run());
                 layered.getStyleClass().add("screen-shot-open");
             }
-            return layered;
+            if (missing.getChildren().isEmpty()) return layered;
+            Label title = new Label("Not on this shot:");
+            title.getStyleClass().add("screen-shot-missing-title");
+            missing.getChildren().addFirst(title);
+            missing.setMaxWidth(width);
+            VBox shotAndMissing = new VBox(4, layered, missing);
+            shotAndMissing.setMaxWidth(width);
+            return shotAndMissing;
         });
     }
 

@@ -11,18 +11,25 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.FxCall;
+import com.botmaker.sdk.plugin.assist.MapAudit;
+import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
+import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
+import com.botmaker.sdk.plugin.assist.MapAudit.Where;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
+import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -49,7 +56,9 @@ public final class MapReport {
                     .describedAs("The bot's Screens as 🗺 Screens shows them, in text: each screen under the one it "
                             + "is opened from, how far Discovery got, its marker, way back and shot, and what each "
                             + "input does; then what the map cannot do: a screen no way reaches, an input that comes "
-                            + "and goes never seen, a picture written inline or with no file. show adds the drawing")
+                            + "and goes never seen, a picture written inline or with no file, a shot without its "
+                            + "marker, a picture away from its place or not on its screen's shot. show adds the "
+                            + "drawing")
                     .takes(Ask.class).handledBy(MapReport::read));
 
     private MapReport() {}
@@ -74,8 +83,16 @@ public final class MapReport {
         Predicate<String> file = id -> resources != null && Files.isRegularFile(TemplateLibrary.fileForName(resources,
                 id));
         Predicate<String> shot = c -> resources != null && Files.isRegularFile(ScreenShots.file(resources, c));
+        Map<String, FrameCut> cuts = FxCall.call(() -> services.pluginValues() == null ? Map.<String, FrameCut>of()
+                : TemplateUses.cuts(services.pluginValues()));
+        double confidence = FxCall.call(() -> MapAudit.confidence(services));
+        Map<String, Audit> audits = new HashMap<>();
+        for (String c : read.graph().screens().keySet()) {
+            if (only != null && !only.equals(c)) continue;
+            MapAudit.of(resources, confidence, cuts, c, read.graph().screens().get(c)).ifPresent(a -> audits.put(c, a));
+        }
         AgentReply said = AgentReply.text(text(read.graph(), read.stages(), read.pictures()::contains, file, shot,
-                only));
+                audits, only));
         if (!Boolean.TRUE.equals(ask.show())) return said;
         BufferedImage drawn = FxCall.call(() -> MapDrawing.of(services, read.graph(), read.stages()));
         return said.and(AgentReply.image(drawn));
@@ -88,6 +105,12 @@ public final class MapReport {
      */
     static String text(ScreenGraph graph, Map<String, String> stages, Predicate<String> named, Predicate<String> file,
                        Predicate<String> shot, String only) {
+        return text(graph, stages, named, file, shot, Map.of(), only);
+    }
+
+    /** {@link #text}, with what each screen's shot does not show ({@code audits}, by constant) among what it cannot do. */
+    static String text(ScreenGraph graph, Map<String, String> stages, Predicate<String> named, Predicate<String> file,
+                       Predicate<String> shot, Map<String, Audit> audits, String only) {
         StringBuilder out = new StringBuilder();
         Set<String> written = new LinkedHashSet<>();
         if (only != null) {
@@ -114,7 +137,8 @@ public final class MapReport {
                 for (String c : off) screen(out, graph, stages, shot, c, "");
             }
         }
-        List<String> problems = problems(graph, named, file, only);
+        List<String> problems = new ArrayList<>(problems(graph, named, file, only));
+        problems.addAll(misfits(graph, audits, only));
         out.append(problems.isEmpty() ? "\nNothing the map cannot do.\n" : "\nWhat the map cannot do:\n");
         for (String problem : problems) out.append("- ").append(problem).append('\n');
         return out.toString().stripTrailing();
@@ -215,4 +239,50 @@ public final class MapReport {
         return problems;
     }
 
+    /**
+     * What each screen's shot does not show as the screen says, one line each: a shot without its marker (and nothing
+     * else said of it: a shot of another moment misses everything), a picture away from its place, one not on it.
+     * A picture that comes and goes, a look's or a lock missing is one note for the screen.
+     */
+    static List<String> misfits(ScreenGraph graph, Map<String, Audit> audits, String only) {
+        List<String> lines = new ArrayList<>();
+        for (String c : graph.screens().keySet()) {
+            Audit audit = audits.get(c);
+            if (audit == null || only != null && !only.equals(c)) continue;
+            String name = graph.shown(c);
+            if (!audit.showsMarker()) {
+                String marker = audit.spots().stream().filter(Spot::marker).map(Spot::picture).findFirst().orElse("?");
+                lines.add(name + ": its shot does not show its marker " + marker + ": take the shot again while the "
+                        + "game shows " + name + ", or cut its marker again.");
+                continue;
+            }
+            List<String> noted = new ArrayList<>();
+            for (Spot spot : audit.spots()) {
+                if (spot.where() == Where.ELSEWHERE) {
+                    lines.add(name + ": " + spot.picture() + " sits " + offset(spot) + " from its place on its shot"
+                            + (spot.marker() ? "." : ": placed again while the game shows " + name + ", it gets a "
+                            + "copy of its own there."));
+                } else if (spot.where() == Where.MISSING) {
+                    if (spot.sure()) lines.add(name + ": " + spot.picture() + " is not on its shot.");
+                    else noted.add(spot.picture());
+                }
+            }
+            if (!noted.isEmpty()) {
+                lines.add(name + ": its shot does not show " + String.join(", ", noted) + (noted.size() == 1
+                        ? ", which comes and goes or is another look (a note)."
+                        : ", which come and go or are other looks (a note)."));
+            }
+        }
+        return lines;
+    }
+
+    /** {@code (+48,0)}; {@code elsewhere} for a picture with no place to be away from. */
+    private static String offset(Spot spot) {
+        if (spot.place() == null) return "elsewhere";
+        return "(" + signed(spot.dx()) + "," + signed(spot.dy()) + ")";
+    }
+
+    private static String signed(int n) {
+        return n > 0 ? "+" + n : String.valueOf(n);
+    }
 }

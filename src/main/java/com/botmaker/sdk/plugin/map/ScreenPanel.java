@@ -4,6 +4,10 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.assist.MapAudit;
+import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
+import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
+import com.botmaker.sdk.plugin.assist.MapAudit.Where;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
@@ -32,7 +36,9 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -79,6 +85,8 @@ final class ScreenPanel {
     private String notesOf;
     /** The notes as the map held them when the box was filled: a box still holding them takes newer ones. */
     private String notesRead;
+    /** Each screen's shot as last checked ({@link MapAudit}), by constant: made off the FX thread, kept on it. */
+    private final Map<String, Audit> audits = new HashMap<>();
 
     /**
      * @param changed run once an action wrote the map, so the window reads it at once rather than at its next poll
@@ -141,11 +149,37 @@ final class ScreenPanel {
         // its inputs were cut, when its shot was taken and how wide it is drawn.
         Object now = selected == null ? List.of(graph.screens().values().stream().allMatch(GameScreen::isPopup), busy)
                 : List.of(at, card(selected), ScreenCards.rows(graph, selected), ScreenCards.path(graph, selected),
-                cutsOf(at, cuts), canvas.shotTime(selected), pictureTimes(), width, busy);
+                cutsOf(at, cuts), canvas.shotTime(selected), pictureTimes(), width, busy,
+                Optional.ofNullable(audits.get(selected)));
         if (now.equals(drawn)) return;
         drawn = now;
         content.getChildren().setAll(selected == null ? none() : screen(notes, cuts, width));
         content.getChildren().add(status);
+        if (at != null) audit(selected, at, cuts);
+    }
+
+    /**
+     * Checks {@code constant}'s shot off the FX thread, and draws again once it differs from the one drawn: a shot
+     * matched against every picture the screen names takes a second, too long to hold the window for.
+     */
+    private void audit(String constant, GameScreen screen, Map<String, FrameCut> cuts) {
+        Path resources = services.resourcesDir();
+        double confidence = MapAudit.confidence(services);
+        Thread.ofVirtual().name("screen-audit").start(() -> {
+            Optional<Audit> made;
+            try {
+                made = MapAudit.of(resources, confidence, cuts, constant, screen);
+            } catch (RuntimeException unmatched) {
+                made = Optional.empty();
+            }
+            Optional<Audit> checked = made;
+            Platform.runLater(() -> {
+                if (checked.equals(Optional.ofNullable(audits.get(constant)))) return;
+                if (checked.isPresent()) audits.put(constant, checked.get());
+                else audits.remove(constant);
+                if (constant.equals(selected)) draw();
+            });
+        });
     }
 
     /** {@code constant}'s card, the stage its notes say it reached on it. */
@@ -236,7 +270,8 @@ final class ScreenPanel {
         for (Row row : rows) inputs.getChildren().add(row(shown, row));
 
         VBox all = new VBox(12, head, pills, actions, heading("Inputs"), inputs);
-        canvas.shotWithInputs(shown, shotWidth, rows, cuts, row -> pick(shown, row), () -> showScreen(shown))
+        canvas.shotWithInputs(shown, shotWidth, rows, cuts, audits.get(shown), row -> pick(shown, row),
+                        () -> showScreen(shown))
                 .ifPresent(shot -> all.getChildren().addFirst(shot));
         all.getChildren().add(text("Way back: " + (screen.back() == null ? "the default one, a close button, then "
                 + "Escape" : screen.back().label()) + "."));
@@ -295,6 +330,18 @@ final class ScreenPanel {
             case NEVER, LOCKED -> "plain";
         });
         result.setMaxWidth(130);
+        // What the shot says of its picture: not on it, or away from its place.
+        Optional<Spot> spot = Optional.ofNullable(audits.get(constant)).flatMap(a -> a.of(row.picture()));
+        Optional<Label> onShot = spot.filter(s -> s.where() != Where.AT_PLACE).map(s -> {
+            boolean gone = s.where() == Where.MISSING;
+            Label said = pill(gone ? "not on shot" : "off its place", gone && s.sure() ? "screen-pill-owes"
+                    : "screen-pill-untried");
+            Tooltip.install(said, new Tooltip(gone ? "Its picture is not on " + graph.shown(constant) + "'s shot"
+                    + (s.sure() ? "." : "; it comes and goes, or is another look.")
+                    : "Its picture sits elsewhere on the shot than its place: placed again while the game shows "
+                    + graph.shown(constant) + ", it gets a copy of its own there."));
+            return said;
+        });
         // A button with several looks steps through them; any look's thumb shows the input's picture.
         Node thumb = LookToggle.of(row.looks(), picture -> {
             Node one = canvas.thumb(picture, ROW_THUMB, "screen-row-thumb");
@@ -306,6 +353,7 @@ final class ScreenPanel {
         }, result, row.result());
         boolean untried = row.state() == ScreenCards.RowState.UNTRIED || row.state() == ScreenCards.RowState.UNSEEN;
         HBox line = new HBox(8, thumb, words, result);
+        onShot.ifPresent(said -> line.getChildren().add(said));
         line.setAlignment(Pos.CENTER_LEFT);
         line.getStyleClass().add("screen-row");
         if (untried) {
@@ -384,7 +432,7 @@ final class ScreenPanel {
                 : TemplateUses.cuts(services.pluginValues());
         List<Row> rows = ScreenCards.rows(graph, constant);
         return viewer.showScreen(graph.shown(constant), width -> canvas.shotWithInputs(constant, width, rows, cuts,
-                row -> pick(constant, row), null));
+                audits.get(constant), row -> pick(constant, row), null));
     }
 
     /** Takes {@code constant}'s shot again from the game, off the FX thread. */

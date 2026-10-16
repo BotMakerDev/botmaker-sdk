@@ -89,7 +89,10 @@ final class MapGuide {
                             + "shot; add pictures the bot has; a new screen from here; not a screen, when its way in "
                             + "only changes the screen above; delete. A card's right-click opens the same menu."),
                     new Entry("the shot", null, "Click it to see it big; click a box for what that input opens, "
-                            + "else its picture. A picture shows ← to go back to its screen."))),
+                            + "else its picture. A picture shows ← to go back to its screen. Each box is where its "
+                            + "picture is on the shot; a dashed one is away from its picture's place (placed again "
+                            + "while the game shows the screen, it gets a copy of its own there); one not on the shot "
+                            + "is listed under it, and its row says not on shot."))),
             new Section("An input's ⋯", List.of(
                     new Entry("Result", null, "What it did: untried, changes the screen in place, no visible effect, "
                             + "leaves the screen, or opens a new one."),
