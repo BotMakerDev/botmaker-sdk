@@ -411,6 +411,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **A picture goes on a screen only where the game shows it.** A picture keeps one place, true on every screen that
+  uses it:
+  - `place_pictures` and a `crop_pictures` box with only a name look for the picture on the game first. Found away
+    from its place, a copy of its own for that screen is cut where it sits (`close_x_all_war_machines`) and put on
+    instead. Not found, the call is refused. While the game shows another screen, it is put on unchecked and the
+    reply says so.
+  - `crop_pictures` refuses a new box for a screen while the screenshot shows another screen of the map (a cut on
+    Map noted on Home). A call with a marker box passes: it starts the screen or recuts its marker.
 - **Discovery no longer stalls or files a way wrong** (Firestone, 2026-10-16):
   - A screen whose way in comes and goes (Engineer's Home button, shown only while tools wait) holds nothing back
     while that button is hidden, and its branch never blocks another.

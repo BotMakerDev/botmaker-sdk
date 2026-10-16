@@ -1205,6 +1205,52 @@ class SdkAssistTest {
         assertTrue(branch.contains("tried click sort"), "Gift's branch, begun, holds no other back: " + branch);
     }
 
+    @Test
+    void aPictureGoesOnAScreenOnlyWhereTheGameShowsIt() throws IOException {
+        BufferedImage first = withPatchAt(120, 80);
+        agent.frame = first;
+        run("screenshot");
+        cropOne("name", "home", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Home", "marker", true);
+        cropOne("name", "bell", "x", 300, "y", 200, "width", SIZE, "height", SIZE);
+        cropOne("name", "lamp", "x", 200, "y", 230, "width", SIZE, "height", SIZE);
+
+        // The bell moved on this screen, the lamp is gone: Home's marker still shows.
+        BufferedImage moved = covered(covered(first, 300, 200, SIZE, SIZE, 5), 200, 230, SIZE, SIZE, 6);
+        moved.getGraphics().drawImage(first.getSubimage(300, 200, SIZE, SIZE), 40, 220, null);
+        agent.frame = moved;
+        String placed = text(run("place_pictures", "screen", "Home", "pictures", List.of("bell")));
+        assertTrue(placed.contains("Used a copy of its own on Home: bell_home (bell sits at 40,220"), placed);
+        assertTrue(TemplateLibrary.exists(resources, "bell_home"));
+        assertEquals(List.of("click bell_home"), screen("HOME").inputs().stream().map(Input::label).toList(),
+                "the copy goes on, the picture keeps its place");
+        AgentReply gone = run("place_pictures", "screen", "Home", "pictures", List.of("lamp"));
+        assertTrue(gone.isRefused() && text(gone).startsWith("lamp is not on Home now"), text(gone));
+        AgentReply kept = run("crop_pictures", "screen", "Home", "boxes", List.of(Map.of("name", "lamp")));
+        assertTrue(kept.isRefused() && text(kept).startsWith("lamp is not on Home now"), text(kept));
+        String hidden = text(run("place_pictures", "screen", "Home", "sometimes", List.of("lamp")));
+        assertTrue(hidden.contains("lamp: comes and goes"), "one that comes and goes may be hidden now: " + hidden);
+        assertTrue(text(run("place_pictures", "screen", "Home", "pictures", List.of("bell"))).contains("an input "
+                + "already"), "the copy cut before is used again while it sits where the game shows it");
+
+        // Another screen of the map shows: a new box is not noted on Home.
+        BufferedImage sign = noise(SIZE, SIZE, 99);
+        TemplateLibrary.saveTemplate(resources, sign, "guild");
+        host.set("screen_map").put("GUILD", TestContexts.row(Object.class, "").withValue(GameScreen.named("Guild")
+                .marker(new ImageTemplate(TemplateLibrary.pathForName("guild")))
+                .from(Way.of(BotConstants.screen("HOME"), Input.click(screen("HOME").marker())))));
+        BufferedImage guild = noise(WATCHED.width(), WATCHED.height(), 23);
+        guild.getGraphics().drawImage(sign, 10, 10, null);
+        agent.frame = guild;
+        run("screenshot");
+        AgentReply wrong = cropOne("name", "flag", "x", 200, "y", 100, "width", SIZE, "height", SIZE, "screen", "Home");
+        assertTrue(wrong.isRefused() && text(wrong).startsWith("The screenshot shows Guild, not Home"), text(wrong));
+        assertFalse(TemplateLibrary.exists(resources, "flag"));
+        assertFalse(cropOne("name", "flag", "x", 200, "y", 100, "width", SIZE, "height", SIZE, "screen", "Guild")
+                .isRefused(), "noted on the screen it shows");
+        String unchecked = text(run("place_pictures", "screen", "Home", "pictures", List.of("lamp")));
+        assertTrue(unchecked.contains("Not checked on the game: it does not show Home now."), unchecked);
+    }
+
     /** {@code frame} with the box at {@code x, y} drawn over by other pixels: a panel opened over it. */
     private static BufferedImage covered(BufferedImage frame, int x, int y, int width, int height, long seed) {
         BufferedImage now = new BufferedImage(frame.getWidth(), frame.getHeight(), BufferedImage.TYPE_3BYTE_BGR);

@@ -48,7 +48,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -96,6 +98,12 @@ final class PictureTools {
         /** Whether only some of the box is given. */
         boolean partial() {
             return !kept() && (x == null || y == null || width == null || height == null);
+        }
+
+        /** This cut under another name: a picture the bot has, put on the screen as its copy for that screen. */
+        Crop named(String other) {
+            return new Crop(other, x, y, width, height, tags, ignore, screen, marker, back, sometimes, popup, variantOf,
+                    state, when, screenLook);
         }
 
         /** This cut, noted on no screen: crop_pictures notes such boxes together. */
@@ -281,9 +289,15 @@ final class PictureTools {
         if (boxes.isEmpty()) return AgentReply.refused("Give the boxes to cut: name, x, y, width and height each.");
         String screen = blankless(crops.screen());
         List<Crop> cuts = new ArrayList<>(boxes.stream().map(b -> Crop.of(b, crops.tags(), screen)).toList());
-        if (cuts.size() == 1) return cropPicture(cuts.getFirst(), context);
-        Optional<String> wrong = refusal(cuts, screen);
+        Optional<String> wrong = cuts.size() == 1 ? Optional.empty() : refusal(cuts, screen);
         if (wrong.isPresent()) return AgentReply.refused(wrong.get() + " Nothing was saved.");
+        String fitted = "";
+        if (screen != null && context.services() != null && context.services().projectDir() != null) {
+            Checked checked = checked(context, screen, cuts);
+            if (checked.refusal() != null) return AgentReply.refused(checked.refusal() + " Nothing was saved.");
+            fitted = checked.said();
+        }
+        if (cuts.size() == 1) return said(cropPicture(cuts.getFirst(), context), fitted);
         // One watch of the screen for every box: each box watched alone took a second (2026-10-14).
         Supplier<List<BufferedImage>> live = liveLooks(context);
         // The markers first: one may start the screen the other boxes are noted on.
@@ -327,7 +341,55 @@ final class PictureTools {
         for (Crop crop : cuts) {
             if (crop.alone() && !Boolean.TRUE.equals(crop.marker())) all = joined(all, crop, cropPicture(crop, context, live));
         }
-        return all;
+        return said(all, fitted);
+    }
+
+    /** What checking a call's boxes against the game found: why it is refused (null: it is not), and what to add. */
+    private record Checked(String refusal, String said) {
+    }
+
+    /**
+     * {@code cuts} checked against the game before any is cut, for the screen {@code screen}. A new box is refused
+     * while the screenshot shows another screen of the map (Firestone's chat_map, cut on Map and noted on Home): a
+     * marker's box is not, the screen being started or its marker recut. A box naming a picture the bot has is looked
+     * for on the game: one sitting away from its place is replaced in {@code cuts} by its copy for that screen
+     * ({@link ScreenFit#fit}), one not there refuses the call.
+     */
+    private static Checked checked(AgentContext context, String screen, List<Crop> cuts) {
+        boolean recut = cuts.stream().anyMatch(c -> Boolean.TRUE.equals(c.marker()));
+        Optional<BufferedImage> boxed = Frames.shown();
+        if (!recut && boxed.isPresent() && cuts.stream().anyMatch(c -> !c.kept())) {
+            Optional<String> other = ScreenFit.otherScreen(context, screen, boxed.get());
+            if (other.isPresent()) {
+                return new Checked("The screenshot shows " + other.get() + ", not " + screen + ": go_to_screen "
+                        + screen + " and take a screenshot, or give screen " + other.get() + ".", "");
+            }
+        }
+        List<Integer> kept = new ArrayList<>();
+        for (int i = 0; i < cuts.size(); i++) if (cuts.get(i).kept()) kept.add(i);
+        if (kept.isEmpty()) return new Checked(null, "");
+        List<Crop> named = kept.stream().map(cuts::get).toList();
+        ScreenFit.Fitted fitted = ScreenFit.fit(context, screen, named.stream().map(Crop::name).toList(),
+                names(named, c -> Boolean.TRUE.equals(c.marker()) || c.screenLook() != null),
+                names(named, c -> Boolean.TRUE.equals(c.sometimes()) || c.when() != null));
+        if (!fitted.missing().isEmpty()) {
+            return new Checked(String.join(", ", fitted.missing()) + (fitted.missing().size() == 1 ? " is" : " are")
+                    + " not on " + screen + " now: go there, or cut what it shows with a box.", "");
+        }
+        Optional<String> uncut = fitted.save(context);
+        if (uncut.isPresent()) return new Checked("A copy was not cut: " + uncut.get(), "");
+        for (int k = 0; k < kept.size(); k++) cuts.set(kept.get(k), cuts.get(kept.get(k)).named(fitted.pictures().get(k)));
+        return new Checked(null, fitted.said());
+    }
+
+    /** The names of the {@code cuts} that {@code which} holds for. */
+    private static Set<String> names(List<Crop> cuts, Predicate<Crop> which) {
+        return cuts.stream().filter(which).map(Crop::name).collect(Collectors.toSet());
+    }
+
+    /** {@code reply} with {@code more} after it, when there is more to say. */
+    private static AgentReply said(AgentReply reply, String more) {
+        return more.isBlank() ? reply : reply.and(AgentReply.text(more.strip()));
     }
 
     /** {@code one}, the reply to {@code crop}, after {@code all}; a refusal is said, and the rest goes on. */

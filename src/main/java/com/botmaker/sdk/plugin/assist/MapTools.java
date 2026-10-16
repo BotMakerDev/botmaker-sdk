@@ -25,9 +25,11 @@ import com.botmaker.sdk.plugin.types.ScreenTypes;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -917,23 +919,39 @@ final class MapTools {
                 return AgentReply.refused("The bot has no picture " + String.join(", ", missing) + "; crop_pictures "
                         + "cuts a new one. Nothing was noted.");
             }
+            // Each checked on the game first: one found away from its place goes on as a copy cut where it sits.
+            ScreenFit.Fitted fitted = ScreenFit.fit(context, screen, all,
+                    places.marker() == null ? Set.of() : Set.of(places.marker()), Set.copyOf(sometimes));
+            if (!fitted.missing().isEmpty()) {
+                return AgentReply.refused(String.join(", ", fitted.missing()) + (fitted.missing().size() == 1
+                        ? " is" : " are") + " not on " + screen + " now: go there, or cut what it shows with "
+                        + "crop_pictures. Nothing was noted.");
+            }
+            Optional<String> uncut = fitted.save(context);
+            if (uncut.isPresent()) return AgentReply.refused("A copy was not cut: " + uncut.get() + " Nothing was noted.");
+            Map<String, String> as = new HashMap<>();
+            for (int i = 0; i < all.size(); i++) as.put(all.get(i), fitted.pictures().get(i));
+            String marker = places.marker() == null ? null : as.get(places.marker());
+            String back = places.back() == null ? null : as.get(places.back());
+            List<String> plain = inputs.stream().map(as::get).toList();
+            List<String> comes = sometimes.stream().map(as::get).toList();
             StringBuilder said = new StringBuilder();
-            if (places.marker() != null) {
+            if (marker != null) {
                 Placing at = placing(services, screen, true, popup);
                 if (at.refusal() != null) return AgentReply.refused(at.refusal());
-                said.append(places.marker()).append(':').append(noteCut(services, at, places.marker(), true, false,
-                        false));
+                said.append(marker).append(':').append(noteCut(services, at, marker, true, false, false));
             }
             Placing at = placing(services, screen, false, false);
             if (at.refusal() != null) return said.isEmpty() ? AgentReply.refused(at.refusal())
                     : AgentReply.text(said + " Nothing else was noted: " + at.refusal());
             List<String> noted = new ArrayList<>();
-            Optional<String> failed = noteAll(services, at, places.back(), inputs, sometimes, noted);
+            Optional<String> failed = noteAll(services, at, back, plain, comes, noted);
             if (failed.isPresent()) {
                 return said.isEmpty() ? unwritten(failed.get())
                         : AgentReply.text(said + " Nothing else was noted: " + failed.get());
             }
-            return AgentReply.text((said + noted(at.name(), noted, !inputs.isEmpty() || !sometimes.isEmpty())).strip());
+            return AgentReply.text((said + noted(at.name(), noted, !plain.isEmpty() || !comes.isEmpty())
+                    + fitted.said()).strip());
         } catch (IllegalStateException busy) {
             return AgentReply.refused("Studio did not hand over the bot's Screens: " + busy.getMessage());
         }
