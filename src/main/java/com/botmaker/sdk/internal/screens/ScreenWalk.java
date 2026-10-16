@@ -4,6 +4,8 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Pressed;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
@@ -284,6 +286,149 @@ public final class ScreenWalk {
             }
         }
         return new Result(Outcome.STUCK, at, walked, "No way to " + graph.shown(target) + " in " + most + " steps.");
+    }
+
+    /** The most presses of one {@link Pick#untilNone}: a button that never runs out is no loop to run for ever. */
+    static final int MOST_PRESSES = 50;
+
+    /** A press's end: what came of it, the screen the game showed after (null when none), the presses, and why. */
+    public record Press(Pressed.Result result, String at, int times, String why) {}
+
+    /**
+     * Presses the field {@code field} of {@code constant}, the screen the game is on ({@code Navigate.press} walks
+     * there first): a key pressed, a strip scrolled once, a button scrolled to along its strip and clicked on the copy
+     * {@code pick} names (null: the first), popups closed before each look. Then it waits for where the map says the
+     * input leads, its copy and its look matching (a lead that is a popup looked for before popups are closed); with
+     * nowhere to go, it lets the game settle {@link Reach#CLICK_SETTLE_MS}, and reads where the game is. A press that
+     * leaves the game on its screen though the map says it leads away is pressed once more: a click lost to lag.
+     *
+     * <p>{@link Pick#untilNone} presses again while the game stays on {@code constant}, until the button is gone or
+     * looks disabled, at most {@link #MOST_PRESSES} times. Nothing is pressed of an input that is locked, never done,
+     * or whose method says it is not there now.
+     */
+    public Press press(String constant, String field, Pick pick) {
+        MapScreen screen = graph.screens().get(constant);
+        Optional<Input> found = screen == null ? Optional.empty() : screen.effective(field);
+        String name = graph.shown(constant) + "'s " + field;
+        if (found.isEmpty()) return new Press(Pressed.Result.ABSENT, constant, 0, name + " is not in the map.");
+        Input input = found.get();
+        if (input.lock() != null) return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is locked.");
+        if (input.never() != null) {
+            return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is never pressed: " + input.never());
+        }
+        if (!Conditions.holds(input.when())) {
+            return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is not there now: its method says no.");
+        }
+        Strip strip = screen.stripOf(input).orElse(null);
+        Pick p = pick == null ? Pick.first() : pick;
+        int most = input instanceof Button && p.mode() == Pick.Mode.UNTIL_NONE ? MOST_PRESSES : 1;
+        int times = 0;
+        boolean retried = false;
+        Pressed.Result missed = Pressed.Result.ABSENT;
+        try {
+            for (int i = 0; i < most && !Thread.currentThread().isInterrupted(); i++) {
+                Optional<BufferedImage> frame = closePopups(reach.look());
+                if (frame.isEmpty()) {
+                    return new Press(times > 0 ? Pressed.Result.DONE : Pressed.Result.ABSENT, constant, times,
+                            "The screen could not be captured.");
+                }
+                State look = null;
+                if (input instanceof Button button && p.mode() != Pick.Mode.EACH) {
+                    Optional<Reach.Seen> seen = reach.inView(button, strip, p, frame.get());
+                    if (seen.isEmpty()) break;
+                    if (seen.get().state() == State.DISABLED) {
+                        missed = Pressed.Result.DISABLED;
+                        break;
+                    }
+                    reach.click(reach.pointOn(seen.get().place()));
+                    look = seen.get().state();
+                } else if (!reach.perform(input, strip, p, frame.get())) {
+                    // Every copy greyed out is a disabled button; none at all, an absent one.
+                    if (input instanceof Button button && reach.seen(button, strip, p, frame.get()).isPresent()) {
+                        missed = Pressed.Result.DISABLED;
+                    }
+                    break;
+                }
+                times++;
+                List<String> leads = leads(constant, field, input, p, look);
+                Optional<String> landed = landing(constant, leads);
+                if (landed.isEmpty() || !landed.get().equals(constant)) {
+                    boolean led = landed.isPresent() && leads.contains(landed.get());
+                    return new Press(led ? Pressed.Result.DONE : Pressed.Result.LEFT, landed.orElse(null), times,
+                            name + " led to " + landed.map(graph::shown).orElse("no screen of the map") + ".");
+                }
+                // Still here though the map says it leads away: a click lost to lag is pressed once more.
+                if (most == 1 && !leads.isEmpty() && !retried) {
+                    retried = true;
+                    i--;
+                }
+            }
+        } catch (Stayed stayed) {
+            return new Press(times > 0 ? Pressed.Result.LEFT : Pressed.Result.ABSENT, null, times,
+                    stayed.getMessage());
+        }
+        if (times == 0 && Thread.currentThread().isInterrupted()) {
+            return new Press(Pressed.Result.NOT_NOW, constant, 0, "Stopped.");
+        }
+        if (times > 0) return new Press(Pressed.Result.DONE, constant, times, name + " pressed " + times + "×.");
+        return new Press(missed, constant, 0, name + (missed == Pressed.Result.DISABLED ? " looks disabled."
+                : " is not on " + graph.shown(constant) + "."));
+    }
+
+    /**
+     * The screens the field {@code field} of {@code constant}, {@code input}, leads to in {@code look}: of a repeated
+     * button, only the ways through the copy {@code pick} pressed.
+     */
+    private List<String> leads(String constant, String field, Input input, Pick pick, State look) {
+        boolean copies = input instanceof Button button && button.repeats();
+        return graph.leads(constant, field).stream()
+                .filter(lead -> !copies || sameCopy(lead.pick(), pick))
+                .filter(lead -> lead.state() == null || lead.state() == look)
+                .filter(lead -> Conditions.holds(lead.when()))
+                .map(ScreenGraph.Lead::to).distinct().toList();
+    }
+
+    /**
+     * Whether a way through the copy {@code way} names (null: the first) is the copy {@code pressed} clicked: the same
+     * place along the same order. {@link Pick#untilNone} clicks the first; {@link Pick#each}, every one, none a way's.
+     */
+    static boolean sameCopy(Pick way, Pick pressed) {
+        Pick a = way == null ? Pick.first() : way;
+        if (a.mode() == Pick.Mode.EACH || pressed.mode() == Pick.Mode.EACH) return false;
+        return Math.max(1, a.nth()) == Math.max(1, pressed.nth()) && a.order() == pressed.order();
+    }
+
+    /**
+     * Where the game is once a press settled: the first of {@code leads} whose markers show within a step's time (one
+     * with no markers is taken as reached), else the screen a look after {@link Reach#CLICK_SETTLE_MS} shows, popups
+     * closed; empty when it shows none.
+     */
+    private Optional<String> landing(String from, List<String> leads) {
+        Optional<String> unmarked = leads.stream().filter(to -> !Markers.of(graph.screens().get(to)).any()).findFirst();
+        if (unmarked.isPresent()) {
+            reach.pause(POLL_MS);
+            return unmarked;
+        }
+        if (!leads.isEmpty()) {
+            long deadline = reach.nowMs() + stepMs;
+            do {
+                reach.pause(POLL_MS);
+                // Looked for before popups are closed, since a lead may be one (a confirm), then once they are.
+                Optional<BufferedImage> raw = reach.look();
+                Optional<String> shown = raw.flatMap(frame -> shownLead(leads, frame));
+                if (shown.isPresent()) return shown;
+                shown = closePopups(raw).flatMap(frame -> shownLead(leads, frame));
+                if (shown.isPresent()) return shown;
+            } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
+        } else {
+            reach.pause(Reach.CLICK_SETTLE_MS);
+        }
+        return closePopups(reach.look()).flatMap(frame -> whereOn(frame, from));
+    }
+
+    /** The first of {@code leads} whose markers {@code frame} shows. */
+    private Optional<String> shownLead(List<String> leads, BufferedImage frame) {
+        return leads.stream().filter(to -> Markers.of(graph.screens().get(to)).on(reach, frame)).findFirst();
     }
 
     /**

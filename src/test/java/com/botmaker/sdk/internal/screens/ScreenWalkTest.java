@@ -5,6 +5,9 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Order;
+import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Pressed;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
@@ -91,6 +94,12 @@ class ScreenWalkTest {
         /** An overlay the map lacks, over the screen: it shows {@link #OVERLAY}'s pictures and closes by them. */
         boolean overlay;
         long now;
+        /** A picture that runs out: after {@link #left} clicks it is gone, {@link #greyed} shown in its place. */
+        String runsOut;
+        int left;
+        String greyed;
+        /** How many clicks in a row the game misses: lag. */
+        int deaf;
 
         Game(String screen) {
             this.screen = screen;
@@ -124,6 +133,10 @@ class ScreenWalkTest {
 
         private void did(String what) {
             done.add(what);
+            if (what.startsWith("click ") && deaf > 0) {
+                deaf--;
+                return;
+            }
             String key = showing() + " " + what;
             if (overlay) {
                 if (shows.get(OVERLAY).isEmpty() ? what.equals("key ESCAPE") : what.equals("click close_x")) {
@@ -139,8 +152,13 @@ class ScreenWalkTest {
             }
             String shown = reveals.get(key);
             if (shown != null) shows.get(screen).add(shown);
+            if (what.equals("click " + runsOut) && --left == 0) {
+                shows.get(screen).remove(runsOut);
+                if (greyed != null) shows.get(screen).add(greyed);
+            }
             String next = leads.get(key);
-            if (next != null) screen = next;
+            if (next != null && next.startsWith("popup:")) popup = next.substring("popup:".length());
+            else if (next != null) screen = next;
         }
 
         @Override
@@ -188,6 +206,124 @@ class ScreenWalkTest {
 
     private static ScreenWalk.Result go(Game game, String target, List<String> reached) {
         return new ScreenWalk(game.map, game, STEP_MS, reached::add).go(target, null);
+    }
+
+    /** Home with a Claim the game shows, greyed as claim_off once it runs out. */
+    private static ScreenGraph withClaim() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("HOME", with(screens.get("HOME"),
+                click("claim").looks(List.of(Look.of(picture("claim_off"), State.DISABLED)))));
+        return ScreenGraph.of(screens);
+    }
+
+    private static Game claiming(int left) {
+        Game game = new Game("HOME");
+        game.shows.get("HOME").add("claim");
+        game.runsOut = "claim";
+        game.left = left;
+        game.greyed = "claim_off";
+        return game;
+    }
+
+    @Test
+    void aPressClicksItsButtonAndWaitsForWhereTheMapSaysItLeads() {
+        Game game = new Game("HOME");
+
+        ScreenWalk.Press press = new ScreenWalk(game.map, game, STEP_MS, null).press("HOME", "campaign", null);
+
+        assertEquals(Pressed.Result.DONE, press.result(), press.toString());
+        assertEquals("CAMPAIGN", press.at());
+        assertEquals(List.of("click campaign"), game.done);
+    }
+
+    @Test
+    void aChoreThatStaysOnItsScreenIsDone() {
+        Game game = claiming(5);
+
+        ScreenWalk.Press press = new ScreenWalk(withClaim(), game, STEP_MS, null).press("HOME", "claim", null);
+
+        assertEquals(new ScreenWalk.Press(Pressed.Result.DONE, "HOME", 1, press.why()), press);
+        assertEquals(List.of("click claim"), game.done);
+    }
+
+    /** Buy until the money runs out: pressed while it shows lit, stopped by its disabled look. */
+    @Test
+    void untilNonePressesUntilTheButtonLooksDisabled() {
+        Game game = claiming(3);
+
+        ScreenWalk.Press press = new ScreenWalk(withClaim(), game, STEP_MS, null)
+                .press("HOME", "claim", Pick.untilNone());
+
+        assertEquals(Pressed.Result.DONE, press.result(), press.toString());
+        assertEquals(3, press.times());
+        assertEquals(List.of("click claim", "click claim", "click claim"), game.done);
+
+        ScreenWalk.Press again = new ScreenWalk(withClaim(), game, STEP_MS, null)
+                .press("HOME", "claim", Pick.untilNone());
+        assertEquals(new ScreenWalk.Press(Pressed.Result.DISABLED, "HOME", 0, again.why()), again);
+        assertEquals(3, game.done.size(), "a disabled button is never clicked");
+    }
+
+    @Test
+    void aButtonNotShownIsAbsentAndOneThatLeadsElsewhereLeft() {
+        Game gone = new Game("HOME");
+        ScreenWalk.Press absent = new ScreenWalk(withClaim(), gone, STEP_MS, null).press("HOME", "claim", null);
+        assertEquals(Pressed.Result.ABSENT, absent.result(), absent.toString());
+        assertTrue(gone.done.isEmpty());
+
+        Game game = claiming(5);
+        game.leads.put("HOME click claim", "ENGINEER");
+        ScreenWalk.Press left = new ScreenWalk(withClaim(), game, STEP_MS, null).press("HOME", "claim", null);
+        assertEquals(new ScreenWalk.Press(Pressed.Result.LEFT, "ENGINEER", 1, left.why()), left);
+    }
+
+    /** A Claim that opens a popup the map leads to: seen before the run's popup closing would shut it. */
+    @Test
+    void aLeadThatIsAPopupIsSeenBeforeItIsClosed() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>(withClaim().screens());
+        screens.put("OFFER", screen(Setup.named("Offer").markers(marks("offer")).back(click("close_x")).popup()
+                .from(ref("HOME", "claim"))));
+        Game game = claiming(5);
+        game.leads.put("HOME click claim", "popup:OFFER");
+
+        ScreenWalk.Press press = new ScreenWalk(ScreenGraph.of(screens), game, STEP_MS, null).press("HOME", "claim", null);
+
+        assertEquals(new ScreenWalk.Press(Pressed.Result.DONE, "OFFER", 1, press.why()), press);
+        assertEquals("OFFER", game.popup, "left open for the body");
+    }
+
+    /** A click lost to lag, the game still on its screen though the map says it leads away: pressed once more. */
+    @Test
+    void aPressTheGameMissedIsPressedOnceMore() {
+        Game game = new Game("HOME");
+        game.deaf = 1;
+
+        ScreenWalk.Press press = new ScreenWalk(game.map, game, STEP_MS, null).press("HOME", "campaign", null);
+
+        assertEquals(Pressed.Result.DONE, press.result(), press.toString());
+        assertEquals("CAMPAIGN", press.at());
+        assertEquals(List.of("click campaign", "click campaign"), game.done);
+    }
+
+    /** A way through a copy is the copy pressed by its place along its order, whatever the pick's mode. */
+    @Test
+    void aWaysCopyIsTheOnePressedByPlaceAndOrder() {
+        assertTrue(ScreenWalk.sameCopy(null, Pick.untilNone()));
+        assertTrue(ScreenWalk.sameCopy(Pick.first(), Pick.nth(1, Order.NORTH)));
+        assertFalse(ScreenWalk.sameCopy(Pick.first(), Pick.first(Order.SOUTH)));
+        assertFalse(ScreenWalk.sameCopy(Pick.nth(2, Order.NORTH), Pick.first()));
+        assertFalse(ScreenWalk.sameCopy(null, Pick.each(Order.NORTH)));
+    }
+
+    @Test
+    void aLockedInputIsNotPressed() {
+        Game game = new Game("HOME");
+        game.shows.get("HOME").add("arena");
+
+        ScreenWalk.Press press = new ScreenWalk(game.map, game, STEP_MS, null).press("HOME", "arena", null);
+
+        assertEquals(Pressed.Result.NOT_NOW, press.result());
+        assertTrue(game.done.isEmpty());
     }
 
     @Test

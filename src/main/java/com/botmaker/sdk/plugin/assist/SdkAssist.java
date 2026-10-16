@@ -74,8 +74,8 @@ public final class SdkAssist {
               activity. Put the order of chores there, never in a body calling another body.
             - Navigation is the map's: an activity's body opens with Navigate.to(Screens.X), X the screen
               its chore is on, returns its NOT_NOW (or LOCKED) outcome when that answers false, and then
-              clicks X's own inputs only. A chore that leaves X walks again with Navigate.to, never with hand
-              clicks. When a step gets stuck, the run walks back to the screen the body's Navigate.to reached
+              presses inputs with Navigate.press(Screens.X.field), never picture chains: a press walks to
+              its input's screen first. When a step gets stuck, the run walks back to the screen the body's Navigate.to reached
               and runs the body once more; then the run's home, which with no home method walks to the map's
               root screen.
             - Popups the game opens on its own (an offer, a mail, a level-up) are no body's business: each is a

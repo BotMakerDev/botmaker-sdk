@@ -54,6 +54,11 @@ public final class SdkEditors {
             // A screen of the bot's map in a block, Navigate.to(Screens.HOME). A Screen is only parts, like Flow:
             // no type of this plugin's holds it, so no type's editor can draw it.
             SlotEditor.when(ScreenEditors::isScreen).draw(() -> ScreenEditors::screen),
+            // An input of the map in a block, Navigate.press(Screens.MARKET.beerBuy): a screen, then one of its fields
+            // on its shot. A Pick and its Order are parts, which no type of this plugin's holds either.
+            SlotEditor.when(InputPicker::isInput).draw(() -> InputPicker::input),
+            SlotEditor.when(ScreenEditors::isPick).draw(() -> ScreenEditors::pick),
+            SlotEditor.when(ScreenEditors::isOrder).draw(() -> ScreenEditors::order),
 
             // Several named pictures. Ahead of SdkTypes' single-picture editor because it claims a subset of
             // what that one would, and the host consults a plugin's slot editors before its types' editors:

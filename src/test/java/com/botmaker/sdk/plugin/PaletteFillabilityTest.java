@@ -6,6 +6,9 @@ import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.basics.values.BasicsTypes;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Hotkey;
+import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import io.github.classgraph.ClassGraph;
@@ -49,10 +52,12 @@ class PaletteFillabilityTest {
 
     /**
      * Types no plugin gives a fresh value, whose slot a plugin's editor fills by picking one of the bot's constants:
-     * a screen of the map ({@code ScreenEditors}). A dropped block holds {@code null} until the pick, which the call
-     * reads as none picked ({@code Navigate.to(null)} is false).
+     * a screen of the map ({@code ScreenEditors}), an input of one ({@code InputPicker}), and which copy a press takes
+     * ({@code ScreenEditors.pick}). A dropped block holds {@code null} until the pick, which the call reads as none
+     * picked ({@code Navigate.to(null)} is false, {@code press(null)} ABSENT), and a null pick as the first copy.
      */
-    private static final Set<Class<?>> PICKED_BY_AN_EDITOR = Set.of(Screen.class);
+    private static final Set<Class<?>> PICKED_BY_AN_EDITOR = Set.of(Screen.class, Button.class, Hotkey.class,
+            Pick.class);
 
     @Test
     void every_offered_parameter_can_be_filled() {

@@ -117,8 +117,11 @@ final class Protocol {
                   activity's body and run_activity it.
                 - A body opens with Navigate.to(Screens.X), X the screen its chore is on. False (the way there is
                   locked or closed now) returns its LOCKED or NOT_NOW outcome: connect the activity on it to the
-                  activity after it in the lap, so the flow comes back to it next lap. Then it clicks X's own
-                  inputs only; a chore that leaves X walks again with Navigate.to, never with hand clicks.
+                  activity after it in the lap, so the flow comes back to it next lap. Then it presses X's own
+                  inputs by the map: Navigate.press(Screens.X.field[, Pick]) walks there, scrolls its strip, picks
+                  the copy (Pick.each(Order.NORTH), Pick.untilNone() until it is gone or disabled) and waits where
+                  it leads; switch on its result() (DONE, DISABLED, ABSENT, NOT_NOW, LEFT). No picture chains:
+                  the loop methods below are for what no input holds.
                 - A click can be missed and a screen can be slow (lag, a dropped connection), so a step repeats
                   until the screen shows it worked, never clicks once and trusts it. Write a body out of the loop
                   methods that take a lambda: ImageFinder.whileFindAny, whileFindAll, ifFindAny (group, found ->

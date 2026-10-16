@@ -26,7 +26,11 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   parent's current input that `sameAs` it, so a look, a lock or a `when` added later counts (2026-10-15).
 - **Conditions** (`Input.when`, `Way.when`, `ScreenVariant.when`) are method references only
   (`Firestone::eventOn`); `ScreenTypes.isMethod` refuses anything else before it reaches the Java.
-- **`Navigate.to / isOn / where`** (palette, Interaction) are the bot's calls.
+- **`Navigate.to / isOn / where / press / state`** (palette, Interaction) are the bot's calls. `press(Screens.X.field[,
+  Pick])` walks to the input's screen, scrolls its strip, clicks the copy, closes popups and waits where the map says
+  it leads (`ScreenWalk.press`); its `Pressed.result()` is DONE, DISABLED, ABSENT, NOT_NOW or LEFT, its `landed()` the
+  screen after. `Pick.untilNone()` presses until the button is gone or disabled (at most 50). `state(button)` is how
+  it looks now, nothing walked or scrolled.
 
 ## The graph and the walk (`internal/screens`)
 
@@ -116,5 +120,6 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   input's picture at whole-pixel zoom, never blurred, with "← <screen>" back to the shot it was opened from. A box
   clicked on the big shot that opens a screen shows that screen's shot in its place, its ← back to the one before.
 - **`MapGuide`** is the toolbar's **?** legend, and holds the tooltips it repeats.
-- Around it: the `Navigate` screen picker (`plugin/editors/ScreenEditors`), the `Screens` constant preview
+- Around it: the `Navigate` screen picker and the `Pick`/`Order` editors (`plugin/editors/ScreenEditors`), the
+  input picker (`InputPicker`: a screen, then its fields of the slot's type on its shot), the `Screens` constant preview
   (`ScreenConstantView`), Manage Pictures' groups by screen (`plugin/pictures/ScreenGroups`).

@@ -21,6 +21,21 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **`Navigate.press`: a body presses the map's inputs.** `Navigate.press(Screens.MARKET.beerBuy, Pick.untilNone())`
+  walks to the input's screen when the game is elsewhere, scrolls its strip to it, clicks the copy the `Pick` names,
+  closes popups and waits where the map says it leads. It returns `Pressed`: `result()` is `DONE`, `DISABLED`,
+  `ABSENT`, `NOT_NOW` (the way there or the input is not open now, locked or never done) or `LEFT` (it led to a screen
+  the map does not say), `landed()` the screen after and `times()` the presses. `press(Hotkey)` too.
+  - `Pick.untilNone()` presses again while the game stays on the screen, until the button is gone or shows its
+    disabled look, at most 50 times: Buy until the money runs out. A disabled button is never pressed.
+  - `Navigate.state(button)` is how a button looks now (`State.DISABLED` for a greyed Buy), nothing walked or scrolled.
+  - In a block, an input is picked from the map: a screen, then one of its fields on its shot, each boxed where its
+    picture was cut, or from the list beside it. Only what the slot takes is offered: a button slot shows the buttons,
+    a strip's members under it, no hotkey. The pick is written `Screens.MARKET.beerBuy`.
+  - A `Pick` has its editor (First, Nth, Each, Until none, and the order) and shows only beside a repeated button; an
+    `Order` is a pad of arrows, the old direction pad.
+  - The assistant's guide writes bodies on `Navigate.press`, never picture chains.
+
 - **Lists that scroll, named by their buttons.** `GameScreen.lists(List.of(ScreenList.of(-5, List.of(
   Pictures.TAVERN_HOME, Pictures.ARENA_HOME, …))))` says some of a screen's buttons sit in one list or column. No
   number places it: a member is looked for anywhere along the band its members were cut in, so a Home column whose

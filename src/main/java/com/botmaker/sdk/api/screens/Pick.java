@@ -51,7 +51,10 @@ public record Pick(Mode mode, int nth, Order order) {
         return new Pick(Mode.EACH, 0, order);
     }
 
-    /** The topmost copy until none is left or it looks disabled: Buy until the money runs out. */
+    /**
+     * The topmost copy until none is left or it looks disabled: Buy until the money runs out. Of a repeated button,
+     * a topmost copy greyed out stops it, though one further down is lit.
+     */
     public static Pick untilNone() {
         return new Pick(Mode.UNTIL_NONE, 0, Order.NORTH);
     }

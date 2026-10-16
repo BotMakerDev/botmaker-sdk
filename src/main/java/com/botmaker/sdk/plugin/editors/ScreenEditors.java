@@ -8,23 +8,35 @@ import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.screens.Navigate;
+import com.botmaker.sdk.api.screens.Order;
+import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -121,6 +133,95 @@ public final class ScreenEditors {
             menu.show(button, Side.BOTTOM, 0, 0);
         });
         return button;
+    }
+
+    // --- which copy: an order and a pick ----------------------------------------------------------------
+
+    /** The pad's orders, row by row, and the arrow each is drawn as. */
+    private static final List<Order> PAD = List.of(Order.NORTH_WEST, Order.NORTH, Order.NORTH_EAST, Order.WEST,
+            Order.CENTER, Order.EAST, Order.SOUTH_WEST, Order.SOUTH, Order.SOUTH_EAST);
+    private static final String ARROWS = "↖↑↗←⊙→↙↓↘";
+
+    /** Whether {@code ctx} is an {@link Order}: which copy of a repeated button comes first. */
+    public static boolean isOrder(ValueContext ctx) {
+        return ctx.type().is(Order.class);
+    }
+
+    /** An order as a pad of arrows, the old direction pad (2026-10-17): the side or corner the first copy is at. */
+    public static Node order(ValueContext ctx) {
+        return pad(ctx.value(Order.class).orElse(null), ctx::set);
+    }
+
+    /** The nine orders as a pad, {@code current} held down; a press hands {@code onPick} its order. */
+    static Node pad(Order current, Consumer<Order> onPick) {
+        GridPane grid = new GridPane();
+        grid.setHgap(2);
+        grid.setVgap(2);
+        ToggleGroup group = new ToggleGroup();
+        for (int i = 0; i < PAD.size(); i++) {
+            Order order = PAD.get(i);
+            ToggleButton arrow = new ToggleButton(String.valueOf(ARROWS.charAt(i)));
+            arrow.setToggleGroup(group);
+            arrow.setSelected(order == current);
+            arrow.setPrefSize(30, 30);
+            arrow.setTooltip(new Tooltip(order.name().toLowerCase(Locale.ROOT).replace('_', '-') + " first"));
+            arrow.setOnAction(e -> {
+                arrow.setSelected(true);    // a toggle group must not be emptied by clicking the pick
+                onPick.accept(order);
+            });
+            grid.add(arrow, i % 3, i / 3);
+        }
+        return grid;
+    }
+
+    /** Whether {@code ctx} is a {@link Pick}: which copies of a repeated button a press takes. */
+    public static boolean isPick(ValueContext ctx) {
+        return ctx.type().is(Pick.class);
+    }
+
+    /**
+     * A pick: how many copies (the first, the nth, each, or until none is left), and along which order. Beside a
+     * button the map shows once, only a line saying so: there is no copy to pick (the call's button read, when the
+     * host can).
+     */
+    public static Node pick(ValueContext ctx) {
+        boolean once = ctx.slot().flatMap(slot -> slot.argumentValue(0, com.botmaker.sdk.api.screens.Button.class))
+                .filter(button -> !button.repeats()).isPresent();
+        if (once) return new Label("Shown once on its screen: no copy to pick.");
+        Pick[] now = {ctx.value(Pick.class).orElse(Pick.first())};
+        Spinner<Integer> nth = new Spinner<>(1, 50, Math.max(1, now[0].nth()));
+        nth.setPrefWidth(70);
+        Node[] pad = new Node[1];
+        Consumer<Pick> write = pick -> {
+            now[0] = pick;
+            ctx.set(pick);
+            nth.setVisible(pick.mode() == Pick.Mode.NTH);
+            pad[0].setVisible(pick.mode() != Pick.Mode.UNTIL_NONE);
+        };
+        pad[0] = pad(now[0].order(), order -> write.accept(new Pick(now[0].mode(), now[0].nth(), order)));
+        nth.valueProperty().addListener((o, was, n) -> write.accept(new Pick(Pick.Mode.NTH, n, now[0].order())));
+        ToggleGroup modes = new ToggleGroup();
+        HBox row = new HBox(2);
+        for (Pick.Mode mode : Pick.Mode.values()) {
+            ToggleButton button = new ToggleButton(switch (mode) {
+                case FIRST -> "First";
+                case NTH -> "Nth";
+                case EACH -> "Each";
+                case UNTIL_NONE -> "Until none";
+            });
+            button.setToggleGroup(modes);
+            button.setSelected(mode == now[0].mode());
+            button.setOnAction(e -> {
+                button.setSelected(true);
+                write.accept(new Pick(mode, nth.getValue(), now[0].order()));
+            });
+            row.getChildren().add(button);
+        }
+        nth.setVisible(now[0].mode() == Pick.Mode.NTH);
+        pad[0].setVisible(now[0].mode() != Pick.Mode.UNTIL_NONE);
+        HBox top = new HBox(6, row, nth);
+        top.setAlignment(Pos.CENTER_LEFT);
+        return new VBox(4, top, pad[0]);
     }
 
     /** The marker {@code picture} as a small image; null when the screen has none or its file is missing. */

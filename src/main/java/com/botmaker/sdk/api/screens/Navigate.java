@@ -3,8 +3,10 @@ package com.botmaker.sdk.api.screens;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.screens.Markers;
+import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.screens.RunReach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
@@ -18,8 +20,9 @@ import java.util.Optional;
  * closed on the way.
  *
  * <p>An activity runs on the map (2026-10-16): its body opens with {@code if (!Navigate.to(Screens.TAVERN)) return
- * Activities.Tavern.NOT_NOW;}, then does its chores on that screen only, clicking the screen's own input pictures. A
- * chore that leaves the screen walks again with {@code Navigate.to}, never with hand clicks. When a step of the
+ * Activities.Tavern.NOT_NOW;}, then does its chores by pressing the screen's own inputs, {@code
+ * Navigate.press(Screens.MARKET.beerBuy, Pick.untilNone())}, never by picture chains (2026-10-17). A press walks to
+ * its input's screen first, so a chore that leaves the screen walks back by the map, never by hand. When a step of the
  * activity gets stuck, the run walks back to the screen its last {@code Navigate.to} reached and runs the activity
  * once more, before the run's home.
  *
@@ -64,6 +67,59 @@ public final class Navigate {
             }
             case MISSING, STUCK -> throw new BotStuckException(walked.why());
         };
+    }
+
+    /** {@link #press(Button, Pick)} of its first copy. */
+    public static Pressed press(Button button) {
+        return pressed(button, null);
+    }
+
+    /**
+     * Presses {@code button}, an input of a screen of the map ({@code Screens.MARKET.beerBuy}): walks to its screen
+     * when the game is elsewhere, as {@link #to} does, scrolls its strip to it, clicks the copy {@code pick} names
+     * (null: the first), and waits for where the map says it leads. {@link Pick#untilNone} presses it again while the
+     * game stays there, until it is gone or looks disabled: Buy until the money runs out (2026-10-17). An input of a
+     * popup is {@link Pressed.Result#NOT_NOW}: nothing walks to a popup, and the run closes the ones it shows.
+     *
+     * @throws BotStuckException as {@link #to} does, when the walk to its screen gets stuck
+     */
+    public static Pressed press(Button button, Pick pick) {
+        return pressed(button, pick);
+    }
+
+    /** Presses {@code hotkey} on its screen, walking there first, as {@link #press(Button, Pick)} does. */
+    public static Pressed press(Hotkey hotkey) {
+        return pressed(hotkey, null);
+    }
+
+    /**
+     * How {@code button} looks on the game now, by its looks ({@link State#DISABLED} for a greyed-out Buy); empty when
+     * it is not in view. Nothing is walked or scrolled to: it is a look at the screen as it stands.
+     */
+    public static Optional<State> state(Button button) {
+        ScreenGraph map = ScreenMaps.installed();
+        Optional<Strip> strip = map.nameOf(button).flatMap(name -> map.screen(name.screen()))
+                .flatMap(screen -> screen.stripOf(button));
+        RunReach reach = new RunReach();
+        return reach.look().flatMap(frame -> reach.seen(button, strip.orElse(null), Pick.first(), frame))
+                .map(Reach.Seen::state);
+    }
+
+    private static Pressed pressed(Input input, Pick pick) {
+        ScreenGraph map = ScreenMaps.installed();
+        Optional<BotConstants.InputName> name = map.nameOf(input);
+        if (name.isEmpty()) {
+            Debug.log((input == null ? "No input" : input.label()) + " is not in the bot's screen map.");
+            return new Pressed(Pressed.Result.ABSENT, null, 0);
+        }
+        String constant = name.get().screen();
+        if (!to(map.instance(constant).orElse(null))) return new Pressed(Pressed.Result.NOT_NOW, null, 0);
+        ScreenWalk.Press press = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, null)
+                .press(constant, name.get().field(), pick);
+        if (press.at() != null) tell(map, press.at());
+        if (press.result() != Pressed.Result.DONE) Debug.log(press.why());
+        return new Pressed(press.result(), press.at() == null ? null : map.instance(press.at()).orElse(null),
+                press.times());
     }
 
     /** Whether the game shows {@code screen} now: its markers are on the screen, and none of its absent pictures. */
