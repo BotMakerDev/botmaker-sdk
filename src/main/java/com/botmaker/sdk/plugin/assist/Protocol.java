@@ -102,7 +102,9 @@ final class Protocol {
                   through to a moving background; leave out the corner a badge (a red count or bell) comes and
                   goes on, and any part that moves (crop_pictures refuses a box that changes within a second: cut
                   a still part). Matching ignores colour: a lit button and its greyed-out twin both match
-                  (crop_pictures says where else a cut is found), so cut the twin too.
+                  (crop_pictures says where else a cut is found), so cut the twin too. A round button or an odd
+                  icon over a moving background is cut with shape ellipse or polygon: a box's corners would carry
+                  the background; the preview checkers what is left out, so check it clips none of the icon.
                 - Done when every input on the screen is tried and has its kind, and no Appeared word is left
                   unexplained: write_notes the screen with what it taught and reached surveyed, or reached locked
                   for a feature this account has not opened (its lock picture and unlock condition in its notes).

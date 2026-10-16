@@ -270,6 +270,37 @@ class SdkAssistTest {
     }
 
     @Test
+    void aFreeShapeIsCutThroughItsPointsAndItsOutsideLeftOut() throws IOException {
+        agent.frame = withPatchAt(120, 80);
+        run("screenshot");
+        agent.frame = null;
+        List<Map<String, Integer>> triangle = List.of(Map.of("x", 120, "y", 80), Map.of("x", 167, "y", 80),
+                Map.of("x", 120, "y", 127));
+        assertTrue(cropOne("name", "tri", "points", triangle.subList(0, 2)).isRefused(), "three points at least");
+        assertTrue(cropOne("name", "tri", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "points", triangle)
+                .isRefused(), "a polygon's box is its points'");
+        assertTrue(cropOne("name", "tri", "shape", "ellipse", "points", triangle).isRefused(), "points are a polygon's");
+        assertFalse(TemplateLibrary.exists(resources, "tri"));
+
+        AgentReply saved = cropOne("name", "tri", "points", triangle);
+        assertTrue(text(saved).startsWith("Saved tri as Pictures.TRI."), text(saved));
+        BufferedImage tri = ImageIO.read(TemplateLibrary.fileForName(resources, "tri").toFile());
+        assertEquals(SIZE, tri.getWidth(), "cut to the box around the points");
+        assertEquals(SIZE, tri.getHeight());
+        assertEquals(255, tri.getRGB(4, 4) >>> 24, "inside the triangle is kept");
+        assertEquals(0, tri.getRGB(SIZE - 3, SIZE - 3) >>> 24, "outside it is transparent");
+        BufferedImage preview = ImageIO.read(new ByteArrayInputStream(saved.parts().stream()
+                .filter(p -> p.kind() == AgentReply.Kind.IMAGE).findFirst().orElseThrow().png()));
+        assertEquals(255, preview.getRGB(SIZE - 3, SIZE - 3) >>> 24, "the preview checkers what is left out");
+
+        AgentReply round = cropOne("name", "coin", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "shape", "ellipse");
+        assertTrue(text(round).startsWith("Saved coin as Pictures.COIN."), text(round));
+        BufferedImage coin = ImageIO.read(TemplateLibrary.fileForName(resources, "coin").toFile());
+        assertEquals(255, coin.getRGB(SIZE / 2, SIZE / 2) >>> 24);
+        assertEquals(0, coin.getRGB(0, 0) >>> 24, "a corner is outside the oval");
+    }
+
+    @Test
     void aBoxThatChangesOverTimeIsNotCut() {
         agent.frame = withPatchAt(120, 80);
         run("screenshot");

@@ -9,9 +9,9 @@ import com.botmaker.plugin.api.overlay.Marks;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
-import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.geometry.Anchor;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Zone;
@@ -39,6 +39,7 @@ import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateManifest;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.assist.MapTools.Mark;
+import com.botmaker.sdk.plugin.screen.CutShape;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import javax.imageio.ImageIO;
@@ -80,13 +81,22 @@ final class PictureTools {
 
     /** One picture cut: a box of crop_pictures with the call's tags and screen. */
     private record Crop(String name, Integer x, Integer y, Integer width, Integer height, List<String> tags, Skip ignore,
-                        String screen, Mark marker, Boolean back, Boolean sometimes, Boolean popup,
-                        String variantOf, State state, String when, String screenLook) {
+                        CutShape shape, List<Point> points, String screen, Mark marker, Boolean back, Boolean sometimes,
+                        Boolean popup, String variantOf, State state, String when, String screenLook) {
 
+        /** {@code box} with the call's tags and screen; a polygon's box is the one around its points. */
         static Crop of(Box box, List<String> tags, String screen) {
-            return new Crop(box.name(), box.x(), box.y(), box.width(), box.height(), tags, box.ignore(), screen,
-                    box.marker(), box.back(), box.sometimes(), box.popup(), box.variantOf(), box.state(), box.when(),
-                    box.screenLook());
+            List<Point> points = Corner.points(box.points());
+            Optional<Rect> around = PictureCuts.bounds(points);
+            return new Crop(box.name(), around.map(Rect::x).orElse(box.x()), around.map(Rect::y).orElse(box.y()),
+                    around.map(Rect::width).orElse(box.width()), around.map(Rect::height).orElse(box.height()), tags,
+                    box.ignore(), shapeOf(box.shape(), points), points, screen, box.marker(), box.back(),
+                    box.sometimes(), box.popup(), box.variantOf(), box.state(), box.when(), box.screenLook());
+        }
+
+        /** The box it cuts, in the screenshot's pixels. */
+        Rect box() {
+            return new Rect(x, y, width, height);
         }
 
         /** Whether it is noted on its screen by itself, as its own call would: a marker, a popup, a look or a when. */
@@ -102,8 +112,8 @@ final class PictureTools {
 
         /** This cut as {@code mark} says instead. */
         Crop marked(Mark mark) {
-            return new Crop(name, x, y, width, height, tags, ignore, screen, mark, back, sometimes, popup, variantOf,
-                    state, when, screenLook);
+            return new Crop(name, x, y, width, height, tags, ignore, shape, points, screen, mark, back, sometimes, popup,
+                    variantOf, state, when, screenLook);
         }
 
         /** Whether it names a picture the bot has, to note as it is: no part of a box given. */
@@ -118,16 +128,54 @@ final class PictureTools {
 
         /** This cut under another name: a picture the bot has, put on the screen as its copy for that screen. */
         Crop named(String other) {
-            return new Crop(other, x, y, width, height, tags, ignore, screen, marker, back, sometimes, popup, variantOf,
-                    state, when, screenLook);
+            return new Crop(other, x, y, width, height, tags, ignore, shape, points, screen, marker, back, sometimes,
+                    popup, variantOf, state, when, screenLook);
         }
 
         /** This cut, noted on no screen: crop_pictures notes such boxes together. */
         Crop unplaced() {
-            return new Crop(name, x, y, width, height, tags, ignore, null, null, null, null, null, null, null, null,
-                    null);
+            return new Crop(name, x, y, width, height, tags, ignore, shape, points, null, null, null, null, null, null,
+                    null, null, null);
         }
     }
+
+    /** The shape a cut takes: the one asked, else a polygon when points are given, else the box. */
+    private static CutShape shapeOf(CutShape asked, List<Point> points) {
+        if (asked != null) return asked;
+        return points.isEmpty() ? CutShape.RECT : CutShape.POLYGON;
+    }
+
+    /**
+     * Why {@code name}'s shape and points do not make a cut with a box given or not, or empty when they do: a polygon
+     * has three points or more and no box, and only a polygon has points.
+     */
+    private static Optional<String> shapeProblem(String name, CutShape shape, List<Corner> points, boolean boxed) {
+        int corners = points == null ? 0 : points.size();
+        if (corners > 0 && shape != null && shape != CutShape.POLYGON) {
+            return Optional.of(name + ": points are a polygon's; a rect or an ellipse takes x, y, width and height.");
+        }
+        if ((shape == CutShape.POLYGON || corners > 0) && (corners < 3 || boxed)) {
+            return Optional.of(name + ": a polygon is three points or more, and no x, y, width or height: its box is "
+                    + "the one around them.");
+        }
+        return Optional.empty();
+    }
+
+    /** A corner of a polygon cut. */
+    record Corner(@Describe("across, in the screenshot's pixels") int x,
+                  @Describe("down, in the screenshot's pixels") int y) {
+
+        static List<Point> points(List<Corner> corners) {
+            return corners == null ? List.of() : corners.stream().map(c -> new Point(c.x(), c.y())).toList();
+        }
+    }
+
+    private static final String SHAPE = "rect (the default), ellipse: the oval inside the box, a circle when it is "
+            + "square, or polygon: the shape through points; outside an ellipse or a polygon is skipped, so a round "
+            + "button or an odd-shaped icon matches over any background";
+
+    private static final String POINTS = "a polygon's corners, in order around it, three or more, in place of x, y, "
+            + "width and height";
 
     /** A part of a box that matching skips. */
     record Skip(@Describe("left edge, in the screenshot's pixels") int x,
@@ -146,6 +194,8 @@ final class PictureTools {
                @Describe(value = "top edge, in the screenshot's pixels", optional = true) Integer y,
                @Describe(value = "width in pixels", optional = true) Integer width,
                @Describe(value = "height in pixels", optional = true) Integer height,
+               @Describe(value = SHAPE, optional = true) CutShape shape,
+               @Describe(value = POINTS, optional = true) List<Corner> points,
                @Describe(value = IGNORE, optional = true) Skip ignore,
                @Describe(value = "what tells the screen apart; a screen shows where all its markers are found and none "
                        + "of its absent pictures is. set: one marker when it is unique, several boxes when the screen "
@@ -208,10 +258,13 @@ final class PictureTools {
 
     @Describe("give a picture a new image cut from the last screenshot, keeping its name and every use")
     record Replace(String picture,
-                   @Describe("left edge of the new image, in the last screenshot's pixels") int x,
-                   @Describe("top edge") int y,
-                   @Describe("width in pixels") int width,
-                   @Describe("height in pixels") int height,
+                   @Describe(value = "left edge of the new image, in the last screenshot's pixels", optional = true)
+                   Integer x,
+                   @Describe(value = "top edge", optional = true) Integer y,
+                   @Describe(value = "width in pixels", optional = true) Integer width,
+                   @Describe(value = "height in pixels", optional = true) Integer height,
+                   @Describe(value = SHAPE, optional = true) CutShape shape,
+                   @Describe(value = POINTS, optional = true) List<Corner> points,
                    @Describe(value = IGNORE, optional = true) Skip ignore) implements Edit {
     }
 
@@ -307,6 +360,15 @@ final class PictureTools {
     static AgentReply cropPictures(Crops crops, AgentContext context) {
         List<Box> boxes = crops.boxes() == null ? List.of() : crops.boxes();
         if (boxes.isEmpty()) return AgentReply.refused("Give the boxes to cut: name, x, y, width and height each.");
+        for (Box box : boxes) {
+            boolean boxed = box.x() != null || box.y() != null || box.width() != null || box.height() != null;
+            Optional<String> shapeless = shapeProblem(box.name(), box.shape(), box.points(), boxed);
+            if (shapeless.isPresent()) return AgentReply.refused(shapeless.get() + " Nothing was saved.");
+            if (!boxed && box.points() == null && box.shape() != null) {
+                return AgentReply.refused(box.name() + ": a shape is a new cut's, with its box; a picture the bot has "
+                        + "keeps its own (edit_pictures' replace cuts it anew). Nothing was saved.");
+            }
+        }
         String screen = blankless(crops.screen());
         List<Crop> cuts = new ArrayList<>(boxes.stream().map(b -> Crop.of(b, crops.tags(), screen)).toList());
         Optional<String> wrong = cuts.size() == 1 ? Optional.empty() : refusal(cuts, screen);
@@ -533,8 +595,8 @@ final class PictureTools {
         }
         Optional<BufferedImage> frame = crop.kept() ? Optional.empty() : Frames.shown();
         if (!crop.kept() && frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
-        Optional<PictureCuts.Piece> picture = frame.flatMap(shown -> PictureCuts.crop(shown, null,
-                new Area(crop.x(), crop.y(), crop.width(), crop.height())))
+        Optional<PictureCuts.Piece> picture = frame.flatMap(shown -> PictureCuts.cut(shown, crop.box(), crop.shape(),
+                        crop.points()))
                 .map(piece -> crop.ignore() == null ? piece : PictureCuts.masked(piece, crop.ignore().rect()));
         if (!crop.kept() && picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
@@ -604,18 +666,17 @@ final class PictureTools {
                     : ", tagged " + String.join(", ", tags)) + "." + noted
                     + (untagged.isEmpty() ? "" : " Not tagged: " + String.join(" ", untagged)));
         }
-        Optional<String> moving = moving(context, frame.get(), new Rect(crop.x(), crop.y(), crop.width(),
-                crop.height()), live);
+        Optional<String> moving = moving(context, frame.get(), picture.get(), live);
         if (moving.isPresent()) return AgentReply.refused(moving.get());
-        String alike = lookAlikes(context, frame.get(), picture.get().image(),
-                new Rect(crop.x(), crop.y(), crop.width(), crop.height())).map(a -> " " + a).orElse("");
+        Rect place = picture.get().place();
+        String alike = lookAlikes(context, frame.get(), picture.get().image(), place).map(a -> " " + a).orElse("");
         List<String> untagged = new ArrayList<>();
         PictureCuts.Cut saved = FxCall.call(() -> {
             PictureCuts.Cut cut = PictureCuts.save(context.services(), picture.get(), crop.name(), frame.get());
             if (!tags.isEmpty()) untagged.addAll(TemplateLibrary.applyTags(context.services(), Map.of(cut.name(), tags)));
             return cut;
         });
-        Frames.mark(context, new Rect(crop.x(), crop.y(), crop.width(), crop.height()), Marks.Kind.NOTE, saved.name());
+        Frames.mark(context, place, Marks.Kind.NOTE, saved.name());
         String constant = TemplateNames.constantFor(saved.name());
         boolean comes = sometimes;
         MapTools.Look look = new MapTools.Look(variantOf, state.orElse(null), when, screenLook);
@@ -625,7 +686,12 @@ final class PictureTools {
                         + "." + constant) + (tags.isEmpty() || !untagged.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
                         + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike
                         + (untagged.isEmpty() ? "" : " Not tagged: " + String.join(" ", untagged)))
-                .and(AgentReply.image(picture.get().image()));
+                .and(preview(picture.get()));
+    }
+
+    /** A cut picture as the reply shows it: what the cut leaves out checkered, so a clipped icon is seen. */
+    private static AgentReply preview(PictureCuts.Piece piece) {
+        return AgentReply.image(PictureCuts.checkered(piece.image()));
     }
 
     private static String blankless(String text) {
@@ -717,18 +783,27 @@ final class PictureTools {
         if (base.isEmpty()) return AgentReply.refused(Frames.noPicture(replace.picture()));
         Optional<BufferedImage> frame = Frames.shown();
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
-        Optional<PictureCuts.Piece> picture = PictureCuts.crop(frame.get(), null,
-                new Area(replace.x(), replace.y(), replace.width(), replace.height()))
+        boolean boxed = replace.x() != null && replace.y() != null && replace.width() != null && replace.height() != null;
+        boolean anyBox = replace.x() != null || replace.y() != null || replace.width() != null || replace.height() != null;
+        Optional<String> shapeless = shapeProblem(replace.picture(), replace.shape(), replace.points(), anyBox);
+        if (shapeless.isPresent()) return AgentReply.refused(shapeless.get());
+        List<Point> points = Corner.points(replace.points());
+        CutShape shape = shapeOf(replace.shape(), points);
+        if (shape != CutShape.POLYGON && !boxed) {
+            return AgentReply.refused(replace.picture() + ": give x, y, width and height, or a polygon's points.");
+        }
+        Rect box = shape == CutShape.POLYGON ? PictureCuts.bounds(points).orElseThrow()
+                : new Rect(replace.x(), replace.y(), replace.width(), replace.height());
+        Optional<PictureCuts.Piece> picture = PictureCuts.cut(frame.get(), box, shape, points)
                 .map(piece -> replace.ignore() == null ? piece : PictureCuts.masked(piece, replace.ignore().rect()));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
-        Optional<String> moving = moving(context, frame.get(), new Rect(replace.x(), replace.y(), replace.width(),
-                replace.height()), liveLooks(context));
+        Optional<String> moving = moving(context, frame.get(), picture.get(), liveLooks(context));
         if (moving.isPresent()) return AgentReply.refused(moving.get());
         PictureEdits.Done done = FxCall.call(() -> PictureEdits.replace(context.services(), base.get(),
                 picture.get().image(), FrameCut.of(frame.get().getWidth(), frame.get().getHeight(),
                         picture.get().place())));
-        return done.ok() ? AgentReply.text(done.said()).and(AgentReply.image(picture.get().image()))
+        return done.ok() ? AgentReply.text(done.said()).and(preview(picture.get()))
                 : AgentReply.refused(done.said());
     }
 
@@ -861,8 +936,9 @@ final class PictureTools {
      * counter, a sparkle passing, or the screen moved since the screenshot. Such a picture matches only the
      * moment it was cut at. With no live frame of the screenshot's size the check is skipped.
      */
-    private static Optional<String> moving(AgentContext context, BufferedImage shown, Rect asked,
+    private static Optional<String> moving(AgentContext context, BufferedImage shown, PictureCuts.Piece piece,
                                            Supplier<List<BufferedImage>> live) {
+        Rect asked = piece.place();
         Optional<Rect> inside = Frames.within(shown, asked.x(), asked.y(), asked.width(), asked.height());
         if (inside.isEmpty()) return Optional.empty();
         Rect box = inside.get();
@@ -876,7 +952,8 @@ final class PictureTools {
         if (looks.stream().anyMatch(l -> l.getWidth() != shown.getWidth() || l.getHeight() != shown.getHeight())) {
             return Optional.empty();
         }
-        try (ImageTemplate cut = ImageTemplate.of("still", Images.cut(shown, box))) {
+        // The piece as it is saved: what its shape or its ignored part leaves out a run skips, so it may move.
+        try (ImageTemplate cut = ImageTemplate.of("still", piece.image())) {
             for (int look = 0; look < looks.size(); look++) {
                 MatchResult best = ImageFinder.bestMatch(cut, new StillSource(Images.cut(looks.get(look),
                         around.get())));

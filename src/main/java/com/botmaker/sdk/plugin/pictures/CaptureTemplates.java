@@ -4,12 +4,14 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.plugin.pictures.TemplateNaming.NamedCapture;
 import com.botmaker.sdk.plugin.pictures.TemplateNaming.NamedTemplate;
 import com.botmaker.sdk.plugin.screen.CaptureSurface;
 import com.botmaker.sdk.plugin.screen.CaptureSurface.Region;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.screen.CutShape;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
 import com.botmaker.sdk.plugin.screen.ObjectCaptureSurface;
 import com.botmaker.sdk.plugin.screen.OverlayStage;
@@ -29,9 +31,6 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -109,7 +108,7 @@ public final class CaptureTemplates {
     private ObjectCaptureSurface objectSurface;
 
     /** The shape the ▢/⬭ toggle currently selects for Capture one/many (object mode ignores it). */
-    private CaptureSurface.Shape shape = CaptureSurface.Shape.RECT;
+    private CutShape shape = CutShape.RECT;
 
     /** Set the first time the tool finishes, so Esc pressed twice doesn't reopen the caller twice. */
     private boolean closed;
@@ -221,7 +220,7 @@ public final class CaptureTemplates {
             warn(failure.headline() + "\n\n" + failure.detail());
             onCancelled.run();
         };
-        grab(frame -> surface = CaptureSurface.single(frame, CaptureSurface.Shape.RECT, region -> {
+        grab(frame -> surface = CaptureSurface.single(frame, CutShape.RECT, region -> {
             surface.hide();
             grabAfterHiding(fresh -> {
                 dropSurface();
@@ -296,26 +295,29 @@ public final class CaptureTemplates {
     }
 
     /**
-     * The ▢/⬭ switch that sets {@link #shape} for Capture one/many. A rectangle captures a plain crop; an
-     * ellipse captures the inscribed oval with a transparent background. Object capture ignores it.
+     * The ▢/⬭/✎ switch that sets {@link #shape} for Capture one/many, and so for 🗺's ✂ Cut, which opens this
+     * toolbar. A rectangle captures a plain crop; an ellipse the inscribed oval, a free shape the polygon clicked
+     * point by point, each with a transparent background. Object capture ignores it.
      */
     private HBox shapeToggle() {
         ToggleGroup group = new ToggleGroup();
-        ToggleButton rect = new ToggleButton("▢");
-        rect.setTooltip(new Tooltip("Rectangle crop"));
-        rect.setToggleGroup(group);
-        rect.setSelected(shape == CaptureSurface.Shape.RECT);
-        ToggleButton ellipse = new ToggleButton("⬭");
-        ellipse.setTooltip(new Tooltip("Ellipse crop (transparent outside the oval; hold Shift for a circle)"));
-        ellipse.setToggleGroup(group);
-        ellipse.setSelected(shape == CaptureSurface.Shape.ELLIPSE);
-
-        rect.setOnAction(e -> { rect.setSelected(true); shape = CaptureSurface.Shape.RECT; });
-        ellipse.setOnAction(e -> { ellipse.setSelected(true); shape = CaptureSurface.Shape.ELLIPSE; });
-
-        HBox box = new HBox(0, rect, ellipse);
+        ToggleButton rect = shapeButton(group, "▢", "Rectangle crop", CutShape.RECT);
+        ToggleButton ellipse = shapeButton(group, "⬭",
+                "Ellipse crop (transparent outside the oval; hold Shift for a circle)", CutShape.ELLIPSE);
+        ToggleButton free = shapeButton(group, "✎", "Free shape (click each corner; double-click or Enter closes it, "
+                + "Backspace removes the last corner; transparent outside)", CutShape.POLYGON);
+        HBox box = new HBox(0, rect, ellipse, free);
         box.setAlignment(Pos.CENTER_LEFT);
         return box;
+    }
+
+    private ToggleButton shapeButton(ToggleGroup group, String text, String tip, CutShape of) {
+        ToggleButton button = new ToggleButton(text);
+        button.setTooltip(new Tooltip(tip));
+        button.setToggleGroup(group);
+        button.setSelected(shape == of);
+        button.setOnAction(e -> { button.setSelected(true); shape = of; });
+        return button;
     }
 
     /**
@@ -520,12 +522,18 @@ public final class CaptureTemplates {
     /**
      * Maps a drawn {@link Region} (overlay-logical pixels) onto {@code full} (physical pixels) and crops it.
      * A rectangle region is a plain subimage; an ellipse region is cropped to its bounding box and masked to
-     * the inscribed oval, transparent outside it.
+     * the inscribed oval, a polygon region to the polygon, transparent outside it ({@link PictureCuts#cut}).
      */
     private static PictureCuts.Piece crop(BufferedImage full, Region r) {
         if (r.paneW() <= 0 || r.paneH() <= 0) return null;
         double scaleX = full.getWidth() / r.paneW();
         double scaleY = full.getHeight() / r.paneH();
+        if (r.shape() == CutShape.POLYGON) {
+            List<Point> points = r.points().stream()
+                    .map(p -> new Point((int) Math.round(p.getX() * scaleX), (int) Math.round(p.getY() * scaleY)))
+                    .toList();
+            return PictureCuts.polygon(full, points).orElse(null);
+        }
         int x = (int) Math.round(r.x() * scaleX);
         int y = (int) Math.round(r.y() * scaleY);
         int w = (int) Math.round(r.w() * scaleX);
@@ -534,27 +542,8 @@ public final class CaptureTemplates {
         y = Math.max(0, Math.min(y, full.getHeight() - 1));
         w = Math.max(1, Math.min(w, full.getWidth() - x));
         h = Math.max(1, Math.min(h, full.getHeight() - y));
-        BufferedImage sub = full.getSubimage(x, y, w, h);
-        return new PictureCuts.Piece(r.shape() == CaptureSurface.Shape.ELLIPSE ? oval(sub) : sub, new Rect(x, y, w, h));
-    }
-
-    /**
-     * {@code image} inside its inscribed oval, transparent outside it, with a smooth rim.
-     *
-     * <p>The oval is painted as an anti-aliased mask and the image drawn into it ({@code SRC_IN}). Clipping to
-     * the oval instead would ignore anti-aliasing — a clip is all or nothing per pixel
-     * — and give every oval picture a stair-stepped edge the matcher had to forgive.
-     */
-    static BufferedImage oval(BufferedImage image) {
-        int w = image.getWidth(), h = image.getHeight();
-        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = out.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.fill(new Ellipse2D.Double(0, 0, w, h));
-        g.setComposite(java.awt.AlphaComposite.SrcIn);
-        g.drawImage(image, 0, 0, null);
-        g.dispose();
-        return out;
+        PictureCuts.Piece piece = new PictureCuts.Piece(full.getSubimage(x, y, w, h), new Rect(x, y, w, h));
+        return r.shape() == CutShape.ELLIPSE ? PictureCuts.ellipse(piece) : piece;
     }
 
     /**

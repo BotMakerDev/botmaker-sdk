@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.plugin.toolkit.Styles;
 import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
@@ -9,11 +10,15 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Ellipse;
+import javafx.scene.shape.Polygon;
+import javafx.scene.shape.Polyline;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.shape.Shape;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
@@ -35,7 +40,9 @@ import java.util.function.Consumer;
  *   <li>{@link Mode#MANY} — each rubber-band is kept on screen with an index badge and recorded; a
  *       {@code Done (N)} / {@code Cancel} bar ends the pass, firing {@code onDone} with all recorded regions.</li>
  * </ul>
- * Escape cancels the surface in either mode ({@code onCancel}); it does not tear down the whole tool.
+ * Escape cancels the surface in either mode ({@code onCancel}); it does not tear down the whole tool. A free shape
+ * ({@link CutShape#POLYGON}) is clicked corner by corner instead of dragged: a double-click or Enter closes it,
+ * Backspace drops the last corner, and Escape drops the shape being drawn before it cancels the surface.
  */
 public final class CaptureSurface {
 
@@ -43,38 +50,43 @@ public final class CaptureSurface {
     public enum Mode { SINGLE, MANY }
 
     /**
-     * The geometry a drawn region describes: an axis-aligned {@link #RECT} box (a plain crop) or an
-     * {@link #ELLIPSE} inscribed in that box (a transparent-background oval/circle crop). Fixed per session
-     * by the toolbar's shape toggle; the drag maths (a bounding box) are identical either way.
-     */
-    public enum Shape { RECT, ELLIPSE }
-
-    /**
      * A drawn selection in the surface's own (overlay-logical) pixels, together with the surface size it was
      * drawn on ({@code paneW}/{@code paneH}) so it can be scaled onto the captured physical image later. The
-     * {@code shape} decides whether the crop is rectangular or an ellipse inscribed in that box.
+     * {@code shape} decides whether the crop is rectangular, an ellipse inscribed in that box, or the polygon through
+     * {@code points}, whose bounding box the box is; {@code points} is empty for the other two.
      */
-    public record Region(double x, double y, double w, double h, double paneW, double paneH, Shape shape) {}
+    public record Region(double x, double y, double w, double h, double paneW, double paneH, CutShape shape,
+                         List<Point2D> points) {
+
+        public Region {
+            points = List.copyOf(points);
+        }
+    }
+
+    /** The fewest corners a free shape closes with. */
+    private static final int CORNERS = 3;
 
     private final Stage stage;
     private final Pane pane;
     private final Mode mode;
-    private final Shape shape;
+    private final CutShape shape;
     private final Consumer<Region> onRegion;
     private final Consumer<List<Region>> onDone;
     private final Runnable onCancel;
 
-    /** The live rubber-band — a {@link Rectangle} or an {@link Ellipse} depending on {@link #shape}. */
-    private final javafx.scene.shape.Shape rubberBand;
+    /** The live rubber-band — a {@link Rectangle}, an {@link Ellipse} or a {@link Polyline} depending on {@link #shape}. */
+    private final Shape rubberBand;
     /** The current band's bounding box {x, y, w, h} in overlay pixels, so a release is shape-agnostic. */
     private final double[] box = new double[4];
+    /** A free shape's corners clicked so far, in overlay pixels. */
+    private final List<Point2D> corners = new ArrayList<>();
     private final List<Region> regions = new ArrayList<>();
     /** Each recorded region's outline and badge, in step with {@link #regions}, so the last can be undone. */
     private final List<List<javafx.scene.Node>> marks = new ArrayList<>();
     private Button doneButton;
     private boolean finished;
 
-    private CaptureSurface(EditorFrame frame, Mode mode, Shape shape,
+    private CaptureSurface(EditorFrame frame, Mode mode, CutShape shape,
                            Consumer<Region> onRegion, Consumer<List<Region>> onDone, Runnable onCancel) {
         Rectangle2D bounds = frame.placement();
         // The frame isn't on the desktop behind us (an emulator's pixels arrive over ADB), so draw it —
@@ -86,7 +98,11 @@ public final class CaptureSurface {
         this.onDone = onDone;
         this.onCancel = onCancel;
 
-        rubberBand = (shape == Shape.ELLIPSE) ? new Ellipse() : new Rectangle();
+        rubberBand = switch (shape) {
+            case RECT -> new Rectangle();
+            case ELLIPSE -> new Ellipse();
+            case POLYGON -> new Polyline();
+        };
         styleBand(rubberBand, Color.color(0.3, 0.6, 1.0, 0.25), 1.5);
         rubberBand.setVisible(false);
         rubberBand.setMouseTransparent(true);
@@ -103,7 +119,8 @@ public final class CaptureSurface {
             pane.getChildren().add(0, view);
         }
         pane.getChildren().add(buildControlBar());
-        installDrawHandlers();
+        if (shape == CutShape.POLYGON) installCornerHandlers();
+        else installDrawHandlers();
 
         stage = new Stage(StageStyle.TRANSPARENT);
         // Deliberately ownerless: an owned stage minimizes with the Studio window; the capture surface must
@@ -119,8 +136,14 @@ public final class CaptureSurface {
         pane.getStyleClass().add(Styles.UNTHEMED);
         Scene scene = new Scene(pane, bounds.getWidth(), bounds.getHeight(), Color.TRANSPARENT);
         scene.setOnKeyPressed(e -> {
-            if (e.getCode() == KeyCode.ESCAPE) cancel();
-            else if (mode == Mode.MANY && e.isShortcutDown() && e.getCode() == KeyCode.Z) removeLast();
+            if (e.getCode() == KeyCode.ESCAPE) {
+                if (corners.isEmpty()) cancel();
+                else dropCorners();
+            } else if (e.getCode() == KeyCode.ENTER && shape == CutShape.POLYGON) closeShape();
+            else if (e.getCode() == KeyCode.BACK_SPACE && !corners.isEmpty()) {
+                corners.removeLast();
+                drawCorners(null);
+            } else if (mode == Mode.MANY && e.isShortcutDown() && e.getCode() == KeyCode.Z) removeLast();
         });
         stage.setScene(scene);
     }
@@ -133,7 +156,7 @@ public final class CaptureSurface {
      * is not on screen (an emulator, whose pixels arrive over ADB) it paints the frame, so what the user draws
      * over is what the crop is taken from.
      */
-    public static CaptureSurface single(EditorFrame frame, Shape shape, Consumer<Region> onRegion,
+    public static CaptureSurface single(EditorFrame frame, CutShape shape, Consumer<Region> onRegion,
                                         Runnable onCancel) {
         CaptureSurface s = new CaptureSurface(frame, Mode.SINGLE, shape, onRegion, null, onCancel);
         s.stage.show();
@@ -145,7 +168,7 @@ public final class CaptureSurface {
      * Opens a multi-region surface over {@code frame}: draw several, then Done fires {@code onDone}; Ctrl+Z
      * removes the last one drawn; Esc/Cancel fires {@code onCancel}.
      */
-    public static CaptureSurface many(EditorFrame frame, Shape shape, Consumer<List<Region>> onDone,
+    public static CaptureSurface many(EditorFrame frame, CutShape shape, Consumer<List<Region>> onDone,
                                       Runnable onCancel) {
         CaptureSurface s = new CaptureSurface(frame, Mode.MANY, shape, null, onDone, onCancel);
         s.stage.show();
@@ -171,9 +194,10 @@ public final class CaptureSurface {
         bar.setLayoutX(12);
         bar.setLayoutY(12);
 
-        Label hint = new Label(mode == Mode.SINGLE
-                ? "Draw a region over the window · Esc to cancel"
-                : "Draw regions over the window, then Done · Ctrl+Z removes the last · Esc to cancel");
+        String click = "Click each corner, double-click or Enter to close · Backspace removes a corner";
+        String draw = mode == Mode.SINGLE ? "Draw a region over the window" : "Draw regions over the window, then Done";
+        Label hint = new Label((shape == CutShape.POLYGON ? click + (mode == Mode.MANY ? ", then Done" : "") : draw)
+                + (mode == Mode.MANY ? " · Ctrl+Z removes the last" : "") + " · Esc to cancel");
         hint.setTextFill(Color.WHITE);
 
         Button cancel = new Button("✕ Cancel");
@@ -214,18 +238,72 @@ public final class CaptureSurface {
             double x = box[0], y = box[1], w = box[2], h = box[3];
             rubberBand.setVisible(false);
             if (w < 3 || h < 3) return;
-            Region region = new Region(x, y, w, h, pane.getWidth(), pane.getHeight(), shape);
-            if (mode == Mode.SINGLE) {
-                finished = true;
-                onRegion.accept(region);
-            } else {
-                addRegion(region);
-            }
+            take(new Region(x, y, w, h, pane.getWidth(), pane.getHeight(), shape, List.of()));
         });
     }
 
+    /**
+     * A free shape's clicks: each adds a corner, the second click of a double-click closes the shape, and the line to
+     * the pointer shows where the next corner goes.
+     */
+    private void installCornerHandlers() {
+        pane.setOnMouseClicked(e -> {
+            if (finished || e.getButton() != MouseButton.PRIMARY || inControlBar(e.getX(), e.getY())) return;
+            // Keys go to the surface, not to the Cancel or Done button last pressed.
+            pane.requestFocus();
+            // The first click of the pair already added this corner. A third, right after a close, starts the next shape.
+            if (e.getClickCount() == 2) closeShape();
+            else {
+                corners.add(new Point2D(e.getX(), e.getY()));
+                drawCorners(null);
+            }
+        });
+        pane.setOnMouseMoved(e -> {
+            if (!finished && !corners.isEmpty()) drawCorners(new Point2D(e.getX(), e.getY()));
+        });
+    }
+
+    /** The corners clicked so far as the band, with a last segment to {@code pointer} when it is given. */
+    private void drawCorners(Point2D pointer) {
+        Polyline line = (Polyline) rubberBand;
+        line.getPoints().clear();
+        for (Point2D corner : corners) line.getPoints().addAll(corner.getX(), corner.getY());
+        if (pointer != null) line.getPoints().addAll(pointer.getX(), pointer.getY());
+        rubberBand.setVisible(!corners.isEmpty());
+        rubberBand.toFront();
+    }
+
+    /** Closes the free shape drawn so far into a region; one with too few corners or no size is kept drawing. */
+    private void closeShape() {
+        if (finished || corners.size() < CORNERS) return;
+        double left = corners.stream().mapToDouble(Point2D::getX).min().orElseThrow();
+        double top = corners.stream().mapToDouble(Point2D::getY).min().orElseThrow();
+        double right = corners.stream().mapToDouble(Point2D::getX).max().orElseThrow();
+        double bottom = corners.stream().mapToDouble(Point2D::getY).max().orElseThrow();
+        if (right - left < 3 || bottom - top < 3) return;
+        Region region = new Region(left, top, right - left, bottom - top, pane.getWidth(), pane.getHeight(), shape,
+                corners);
+        dropCorners();
+        take(region);
+    }
+
+    private void dropCorners() {
+        corners.clear();
+        drawCorners(null);
+    }
+
+    /** A region drawn: the one-shot's answer, or one more of many. */
+    private void take(Region region) {
+        if (mode == Mode.SINGLE) {
+            finished = true;
+            onRegion.accept(region);
+        } else {
+            addRegion(region);
+        }
+    }
+
     /** Common band/mark styling: translucent blue fill + a solid blue outline. */
-    private static void styleBand(javafx.scene.shape.Shape node, Color fill, double strokeWidth) {
+    private static void styleBand(Shape node, Color fill, double strokeWidth) {
         node.setFill(fill);
         node.setStroke(Color.web("#2f80ed"));
         node.setStrokeWidth(strokeWidth);
@@ -242,13 +320,18 @@ public final class CaptureSurface {
         }
     }
 
-    /** A persistent outline of the region in this surface's shape (rectangle or ellipse), for MANY mode. */
-    private javafx.scene.shape.Shape markFor(Region region) {
-        if (shape == Shape.ELLIPSE) {
-            return new Ellipse(region.x() + region.w() / 2, region.y() + region.h() / 2,
+    /** A persistent outline of the region in this surface's shape (rectangle, ellipse or polygon), for MANY mode. */
+    private Shape markFor(Region region) {
+        return switch (shape) {
+            case RECT -> new Rectangle(region.x(), region.y(), region.w(), region.h());
+            case ELLIPSE -> new Ellipse(region.x() + region.w() / 2, region.y() + region.h() / 2,
                     region.w() / 2, region.h() / 2);
-        }
-        return new Rectangle(region.x(), region.y(), region.w(), region.h());
+            case POLYGON -> {
+                Polygon outline = new Polygon();
+                for (Point2D corner : region.points()) outline.getPoints().addAll(corner.getX(), corner.getY());
+                yield outline;
+            }
+        };
     }
 
     /** Removes the region drawn last, and its outline and badge (MANY mode, Ctrl+Z). */
@@ -263,7 +346,7 @@ public final class CaptureSurface {
     private void addRegion(Region region) {
         regions.add(region);
 
-        javafx.scene.shape.Shape mark = markFor(region);
+        Shape mark = markFor(region);
         styleBand(mark, Color.color(0.3, 0.6, 1.0, 0.15), 1.5);
         mark.setMouseTransparent(true);
 
@@ -282,6 +365,8 @@ public final class CaptureSurface {
 
     private void finish() {
         if (finished) return;
+        // A free shape still open is one more region when it can close, never dropped without a word.
+        closeShape();
         finished = true;
         onDone.accept(List.copyOf(regions));
     }

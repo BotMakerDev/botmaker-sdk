@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Round and free-shape pictures.** A picture can be cut as an oval or as a polygon you click corner by corner;
+  what lies outside it is transparent, and a run skips it, so a round button or an odd-shaped icon matches over any
+  background.
+  - ✂ Capture Templates' toolbar, and so 🗺 Screens' ✂ Cut, has a third shape, ✎: click each corner; a
+    double-click or Enter closes the shape, Backspace removes the last corner, Esc drops the shape.
+  - The assistant's `crop_pictures` box and `edit_pictures`' replace take `shape` (`rect`, `ellipse` or `polygon`)
+    and a polygon's `points`, whose box is the one around them. The picture each reply shows has its left-out part
+    checkered, so an icon the shape clipped is seen.
+
 - **The assistant's tools take real types**, so a wrong value is refused before the tool runs, naming the right
   ones:
   - `crop_pictures` cuts one picture or many: each box is an object (`name`, `x`, `y`, `width`, `height`, an
