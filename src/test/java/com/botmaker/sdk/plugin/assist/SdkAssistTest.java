@@ -972,6 +972,12 @@ class SdkAssistTest {
         assertTrue(tryOne("screen", "Engineer", "key", "Q", "scroll", 3).isRefused(), "a scroll is over a "
                 + "picture");
         assertTrue(tryOne("screen", "Engineer", "picture", "gem", "kind", "loot").isRefused(), "no such kind");
+        // The list carried its own picture away: Engineer still shows, so the scroll is said, not a screen left.
+        agent.frame = covered(over, 120, 80, SIZE, SIZE, 6);
+        AgentReply carried = tryOne("screen", "Engineer", "picture", "list", "scroll", -3, "desktop", true,
+                "settleMs", 0);
+        assertTrue(carried.isRefused() && text(carried).contains("moved off its place"), text(carried));
+        agent.frame = over;
         String scrolled = text(tryOne("screen", "Engineer", "picture", "list", "scroll", -3, "desktop",
                 true, "settleMs", 0));
         assertTrue(scrolled.contains("tried scroll list -3, no visible effect.") && scrolled.contains("that end is "
@@ -1418,6 +1424,10 @@ class SdkAssistTest {
         run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "did", "in_place", "kind", "info");
         assertEquals(Did.IN_PLACE, screen("HOME").inputs().get(2).did());
         assertEquals(Kind.INFO, screen("HOME").inputs().get(2).kind());
+        AgentReply again = run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "did",
+                "in_place");
+        assertFalse(again.isRefused(), "what the map already says is no error: " + text(again));
+        assertTrue(text(again).startsWith("Nothing to change"), text(again));
         run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "never", "spends gems");
         assertEquals("spends gems", screen("HOME").inputs().get(2).never());
         assertNull(screen("HOME").inputs().get(2).did(), "never replaces the result");

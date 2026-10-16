@@ -56,7 +56,9 @@ final class Protocol {
                      panel to its end both ways. Claim buttons and other free spends are clicked; an input that
                      spends premium currency or real money is tried with never and its reason, never clicked; one
                      proved locked (a padlock on it) with locked, the lock's picture. What a tab, toggle, arrow or
-                     scroll brings into view is cut, and untried in turn.
+                     scroll brings into view is cut, and untried in turn. A tab whose content has a title and
+                     inputs of its own opens a screen: try it with opens, the tab's title, and cut that content
+                     on that screen, never on the one the tabs sit on.
                   3. An input that opens a screen (give opens the name it shows) adds it to the map, owing a
                      marker, and the answer brings its screenshot: crop_pictures its marker (marker true, a part
                      only that screen shows), then explore it by these same steps, to its end, before the next

@@ -347,7 +347,7 @@ final class ScreenPanel {
             Node one = canvas.thumb(picture, ROW_THUMB, "screen-row-thumb");
             if (picture != null) {
                 Tooltip.install(one, new Tooltip("Show " + picture + " at its own size"));
-                one.setOnMouseClicked(e -> showPicture(constant, row));
+                one.setOnMouseClicked(e -> showPicture(constant, row, null));
             }
             return one;
         }, result, row.result());
@@ -370,18 +370,34 @@ final class ScreenPanel {
     // --- actions ---
 
     /**
-     * A boxed input of {@code constant} clicked on a shot: the screen it opens, selected on the map; else its
-     * picture. The shot's own screen, not the one picked since: the big view stays open on it.
+     * A boxed input of {@code constant} clicked on the panel's shot: the screen it opens, selected on the map; else
+     * its picture.
      */
     private void pick(String constant, ScreenCards.Row row) {
         Optional<String> opens = graph.opens(constant, row.input());
         if (opens.isPresent()) canvas.select(opens.get());
-        else showPicture(constant, row);
+        else showPicture(constant, row, null);
     }
 
-    private void showPicture(String constant, ScreenCards.Row row) {
+    /**
+     * A boxed input of {@code constant} clicked in the big view: the screen it opens, selected and shown big in its
+     * place, its ← going back to {@code constant}; else its picture. {@code back} is the big view's own ←.
+     */
+    private void pickBig(String constant, ScreenCards.Row row, PictureView.Back back) {
+        Optional<String> opens = graph.opens(constant, row.input());
+        if (opens.isEmpty()) {
+            showPicture(constant, row, back);
+            return;
+        }
+        canvas.select(opens.get());
+        if (!bigShot(opens.get(), new PictureView.Back(graph.shown(constant), () -> bigShot(constant, back)))) {
+            say(graph.shown(opens.get()) + " has no shot yet: ⋯ Screen ▸ take it again while the game shows it.");
+        }
+    }
+
+    private void showPicture(String constant, ScreenCards.Row row, PictureView.Back from) {
         boolean untried = row.state() == ScreenCards.RowState.UNTRIED || row.state() == ScreenCards.RowState.UNSEEN;
-        PictureView.Back back = new PictureView.Back(graph.shown(constant), () -> bigShot(constant));
+        PictureView.Back back = new PictureView.Back(graph.shown(constant), () -> bigShot(constant, from));
         viewer.showPicture(row, back, untried && !busy ? () -> tryRow(constant, row) : null, () -> {
             drawn = null;
             canvas.forgetPictures();
@@ -412,7 +428,7 @@ final class ScreenPanel {
         canvas.select(link.from());
         Optional<Row> row = link.via() == null ? Optional.empty() : ScreenCards.rows(graph, link.from()).stream()
                 .filter(r -> r.input().sameAs(link.via())).findFirst();
-        row.ifPresentOrElse(r -> showPicture(link.from(), r), () -> say(link.via() == null
+        row.ifPresentOrElse(r -> showPicture(link.from(), r, null), () -> say(link.via() == null
                 ? graph.shown(link.from()) + " has no way back of its own: a walk closes it by its close button, "
                 + "else Escape."
                 : link.via().label() + " is " + graph.shown(link.from()) + "'s way back, not one of its inputs: its "
@@ -421,18 +437,21 @@ final class ScreenPanel {
 
     /** {@code constant}'s shot in the picture window, big, its inputs boxed: the wheel zooms it. */
     void showScreen(String constant) {
-        if (!bigShot(constant)) {
+        if (!bigShot(constant, null)) {
             say(graph.shown(constant) + " has no shot yet: ⋯ Screen ▸ take it again while the game shows it.");
         }
     }
 
-    /** {@code constant}'s shot in the picture window; false, and nothing shown, when it has none. */
-    private boolean bigShot(String constant) {
+    /**
+     * {@code constant}'s shot in the picture window, {@code back} its ← (null for none); false, and nothing shown,
+     * when it has none.
+     */
+    private boolean bigShot(String constant, PictureView.Back back) {
         Map<String, FrameCut> cuts = services.pluginValues() == null ? Map.of()
                 : TemplateUses.cuts(services.pluginValues());
         List<Row> rows = ScreenCards.rows(graph, constant);
-        return viewer.showScreen(graph.shown(constant), width -> canvas.shotWithInputs(constant, width, rows, cuts,
-                audits.get(constant), row -> pick(constant, row), null));
+        return viewer.showScreen(graph.shown(constant), back, width -> canvas.shotWithInputs(constant, width, rows,
+                cuts, audits.get(constant), row -> pickBig(constant, row, back), null));
     }
 
     /** Takes {@code constant}'s shot again from the game, off the FX thread. */

@@ -433,6 +433,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   picture is on the shot, dashed when that is away from its place. A picture not on the shot is listed under it, and
   its row says *not on shot*. The check runs off the window's thread and is kept until a shot, a picture or a place
   changes.
+- **The big screen view follows a click.** Clicking a box in 🗺 Screens' big view that opens another screen now
+  shows that screen big as well as selecting it, with *← <the screen it came from>* to go back.
+- **`edit_map` asked for what the map already says answers plainly**, *Nothing to change: the map already says
+  so.*, instead of an error. What it will not write (a name taken, no such way) is still refused, and the
+  window's hand edits say those as *Not written: …*.
+- **A scroll whose list carried its picture away says so.** `try_input` with scroll, its picture gone while the
+  screen still shows, answers *The scrolled picture … moved off its place* and asks for a picture that stays put,
+  instead of *left the screen, or covered it*.
+- **The guide says a tab with its own title and inputs is a screen of its own**, and that a picture shown elsewhere
+  on another screen gets that screen's own copy.
 - **Discovery no longer stalls or files a way wrong** (Firestone, 2026-10-16):
   - A screen whose way in comes and goes (Engineer's Home button, shown only while tools wait) holds nothing back
     while that button is hidden, and its branch never blocks another.

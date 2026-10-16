@@ -124,15 +124,18 @@ final class PictureView {
             actions.getChildren().addFirst(play);
         }
         VBox side = new VBox(10, title(name), said, actions, status);
-        if (back != null) {
-            Button screen = new Button("← " + back.screen());
-            screen.setTooltip(new Tooltip("Show " + back.screen() + "'s shot again"));
-            screen.setOnAction(e -> {
-                if (!back.show().getAsBoolean()) status.setText(back.screen() + " has no shot yet.");
-            });
-            side.getChildren().addFirst(screen);
-        }
+        if (back != null) side.getChildren().addFirst(backButton(back, status));
         show(name, picture, side);
+    }
+
+    /** The "← screen" button: {@code back}'s shot shown again, else {@code status} says it has none. */
+    private static Button backButton(Back back, Label status) {
+        Button screen = new Button("← " + back.screen());
+        screen.setTooltip(new Tooltip("Show " + back.screen() + "'s shot again"));
+        screen.setOnAction(e -> {
+            if (!back.show().getAsBoolean()) status.setText(back.screen() + " has no shot yet.");
+        });
+        return screen;
     }
 
     /**
@@ -189,9 +192,10 @@ final class PictureView {
 
     /**
      * A screen's shot, big: {@code shotAt} draws it at a width with its inputs boxed, again at each zoom, so the boxes
-     * stay on their buttons. The wheel zooms it, Ctrl or not. False when there is no shot to draw.
+     * stay on their buttons. The wheel zooms it, Ctrl or not. {@code back} is the "← screen" button to the shot it
+     * was opened from, null for none. False when there is no shot to draw.
      */
-    boolean showScreen(String name, Function<Double, Optional<Node>> shotAt) {
+    boolean showScreen(String name, Back back, Function<Double, Optional<Node>> shotAt) {
         double[] width = {SCREEN_WIDTH};
         Optional<Node> first = shotAt.apply(width[0]);
         if (first.isEmpty()) return false;
@@ -209,8 +213,15 @@ final class PictureView {
             width[0] = next;
             shotAt.apply(next).ifPresent(shot -> holder.getChildren().setAll(shot));
         });
-        show(name, scroller, new VBox(6, title(name), text("The wheel zooms, a drag moves it; click a box for what "
-                + "that input opens.")));
+        VBox side = new VBox(6, title(name), text("The wheel zooms, a drag moves it; click a box for what that "
+                + "input opens."));
+        if (back != null) {
+            Label status = new Label();
+            status.getStyleClass().add("screen-panel-status");
+            side.getChildren().addFirst(backButton(back, status));
+            side.getChildren().add(status);
+        }
+        show(name, scroller, side);
         return true;
     }
 

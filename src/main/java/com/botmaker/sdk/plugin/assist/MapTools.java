@@ -338,6 +338,13 @@ final class MapTools {
         ActTools.Entered slow = notches == 0 ? slowScreen(context, first, on.marker()) : first;
         ActTools.Entered entered = notches == 0 ? flash(context, slow, on.marker()) : slow;
         boolean flashed = entered != slow;    // its marker hidden a moment, then back: this screen, redrawn
+        if (entered.after() == null && notches != 0 && !entered.reply().isRefused() && on.marker() != null
+                && Frames.look(context).filter(f -> ActTools.shows(context, on.marker().id(), f)).isPresent()) {
+            // The screen is still there: what scrolled is the picture itself, carried off by the list it was on.
+            return Tried.refused("The scrolled picture " + what + " moved off its place (the list carried it), so "
+                    + "nothing was scrolled. Scroll over a picture that stays put while the list moves (its frame, "
+                    + "its title), cut with screen " + name + ".");
+        }
         if (entered.after() == null) {
             return Tried.left(entered.reply().isRefused() ? entered.reply() : entered.reply().and(AgentReply.text(
                     "Nothing was written. Look where the game is before trying it again from " + name + ".")));

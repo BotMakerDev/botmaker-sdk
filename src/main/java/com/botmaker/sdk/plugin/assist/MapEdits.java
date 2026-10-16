@@ -157,9 +157,10 @@ final class MapEdits {
             return FxCall.call(() -> {
                 ScreenGraph before = ScreenBook.read(context.services());
                 AgentReply reply = edited(edit, context);
-                // What ScreenEdits said without writing (a name taken, no such way) is a refusal: the map is as it was.
+                // What ScreenEdits would not write (a name taken, no such way) is refused already. A write that
+                // left the map as it was asked for what it already said: said plainly, not as an error.
                 return reply.isRefused() || !before.screens().equals(ScreenBook.read(context.services()).screens())
-                        ? reply : AgentReply.refused(ScreenDesk.text(reply) + " Nothing was written.");
+                        ? reply : AgentReply.text("Nothing to change: the map already says so.");
             });
         } catch (IllegalStateException busy) {
             return AgentReply.refused("Studio did not answer while editing the bot's Screens: " + busy.getMessage()

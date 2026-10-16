@@ -82,10 +82,10 @@ public final class ScreenEdits {
 
     /** Gives {@code constant} the name the game shows, {@code name}; its constant stays. */
     public static String rename(StudioServices services, String constant, String name) {
-        if (name == null || !MapTools.isName(name.strip())) return "Name it in plain words, on one line.";
+        if (name == null || !MapTools.isName(name.strip())) return NOT_WRITTEN + "name it in plain words, on one line.";
         String typed = name.strip();
         Optional<String> taken = ScreenBook.find(ScreenBook.read(services), typed).filter(c -> !c.equals(constant));
-        if (taken.isPresent()) return "Screens." + taken.get() + " is called " + typed + " already.";
+        if (taken.isPresent()) return NOT_WRITTEN + "Screens." + taken.get() + " is called " + typed + " already.";
         return said(ScreenBook.update(services, constant, s -> s.name(typed)), "Renamed " + typed + ".");
     }
 
@@ -111,7 +111,9 @@ public final class ScreenEdits {
         ScreenGraph graph = ScreenBook.read(services);
         List<String> after = graph.screens().keySet().stream()
                 .filter(c -> !c.equals(constant) && graph.dependsOn(c).contains(constant)).map(graph::shown).toList();
-        if (!after.isEmpty()) return String.join(", ", after) + " is reached from it: delete those first.";
+        if (!after.isEmpty()) {
+            return NOT_WRITTEN + String.join(", ", after) + " is reached from it: delete those first.";
+        }
         Optional<String> failed = ScreenBook.step(services, "Delete " + graph.shown(constant),
                 () -> ScreenBook.remove(services, constant));
         if (failed.isEmpty()) ScreenShots.remove(services.resourcesDir(), constant);
@@ -159,9 +161,11 @@ public final class ScreenEdits {
      * input is put on {@code parent} too when it is not there.
      */
     public static String newScreen(StudioServices services, String parent, String name, Input via) {
-        if (name == null || !MapTools.isName(name.strip())) return "Name it in plain words, on one line.";
+        if (name == null || !MapTools.isName(name.strip())) return NOT_WRITTEN + "name it in plain words, on one line.";
         ScreenGraph graph = ScreenBook.read(services);
-        if (ScreenBook.find(graph, name.strip()).isPresent()) return "The map has " + name.strip() + " already.";
+        if (ScreenBook.find(graph, name.strip()).isPresent()) {
+            return NOT_WRITTEN + "the map has " + name.strip() + " already.";
+        }
         String constant = ScreenBook.constantFor(graph, name.strip());
         Input entrance = untried(via);
         GameScreen made = GameScreen.named(name.strip()).from(Way.of(BotConstants.screen(parent),
@@ -210,8 +214,8 @@ public final class ScreenEdits {
             return noWay(graph, to, from, via);
         }
         if (screen.from() != null && ways(withoutWay(graph, screen, from, via)).isEmpty()) {
-            return "That is " + graph.shown(to) + "'s only way in: delete " + graph.shown(to) + " instead, or take it "
-                    + "for a change of " + graph.shown(from) + " in place (not a screen).";
+            return NOT_WRITTEN + "that is " + graph.shown(to) + "'s only way in: delete " + graph.shown(to)
+                    + " instead, or take it for a change of " + graph.shown(from) + " in place (not a screen).";
         }
         return said(ScreenBook.update(services, to, s -> withoutWay(graph, s, from, via)),
                 "Took " + graph.shown(to) + "'s way in from " + graph.shown(from) + " by " + via.label() + " off the "
@@ -236,7 +240,7 @@ public final class ScreenEdits {
     }
 
     private static String noWay(ScreenGraph graph, String to, String from, Input via) {
-        return graph.shown(to) + " has no way in from " + graph.shown(from) + " by " + via.label() + ".";
+        return NOT_WRITTEN + graph.shown(to) + " has no way in from " + graph.shown(from) + " by " + via.label() + ".";
     }
 
     private static boolean wayFrom(ScreenGraph graph, Way way, String from, Input via) {
@@ -250,7 +254,7 @@ public final class ScreenEdits {
      */
     public static String removeBack(StudioServices services, String constant) {
         GameScreen screen = ScreenBook.read(services).screens().get(constant);
-        if (screen == null || screen.back() == null) return "It has no way back of its own.";
+        if (screen == null || screen.back() == null) return NOT_WRITTEN + "it has no way back of its own.";
         Input was = untried(screen.back());
         return said(ScreenBook.update(services, constant, s -> withInput(s.back(null), s.back())),
                 "No way back of its own: a walk closes it by its close button, else Escape. " + was.label()
@@ -265,8 +269,9 @@ public final class ScreenEdits {
         Optional<ScreenVariant> had = screen == null || look == null ? Optional.empty() : screen.variants().stream()
                 .filter(v -> v.name().equalsIgnoreCase(look.strip())).findFirst();
         if (had.isEmpty()) {
-            return "No look " + look + " of it" + (screen == null || screen.variants().isEmpty() ? "" : ": its looks "
-                    + "are " + String.join(", ", screen.variants().stream().map(ScreenVariant::name).toList())) + ".";
+            return NOT_WRITTEN + "no look " + look + " of it" + (screen == null || screen.variants().isEmpty() ? ""
+                    : ": its looks are " + String.join(", ", screen.variants().stream().map(ScreenVariant::name)
+                    .toList())) + ".";
         }
         String name = had.get().name();
         return said(ScreenBook.update(services, constant, s -> s.withVariant(had.get().when(when))),
@@ -347,7 +352,7 @@ public final class ScreenEdits {
     }
 
     private static String notMethod(String method) {
-        return "\"" + method.strip() + "\" is no method reference (Firestone::eventOn): nothing was written.";
+        return NOT_WRITTEN + "\"" + method.strip() + "\" is no method reference (Firestone::eventOn).";
     }
 
     private static String said(Optional<String> failed, String done) {

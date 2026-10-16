@@ -49,7 +49,10 @@ public final class SdkAssist {
               read_map reads it as the user's 🗺 Screens window shows it, and what it cannot do. A button that
               changes its look is one input (a box's variantOf + state); the same screen dressed otherwise
               (an event's theme) is one of its looks (screenLook), never a screen of its own; a list whose
-              entries change by day is one screen whose entries come and go. When a method of the bot can say
+              entries change by day is one screen whose entries come and go. A tab whose content has a title
+              and inputs of its own is a screen of its own, the tab its way in. A picture sits at one place
+              on every screen that uses it: where a screen shows it elsewhere, the tools cut that screen a
+              copy of its own. When a method of the bot can say
               when one is there, name it as a box's when (Firestone::eventOn). What try_input recorded
               wrong (a panel taken for a way back, a result, a way in) is fixed with edit_map: trying the
               input again does not undo it.

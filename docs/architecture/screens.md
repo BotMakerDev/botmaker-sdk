@@ -77,7 +77,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   Activity Flow) walk that history, and the assistant's MCP `undo`/`redo` walk it too. Nothing in the window
   keeps an undo of its own.
 - **`PictureView`** is one window beside the map: a screen's shot big (its inputs boxed, the wheel zooming), or an
-  input's picture at whole-pixel zoom, never blurred, with "← <screen>" back to the shot it was opened from.
+  input's picture at whole-pixel zoom, never blurred, with "← <screen>" back to the shot it was opened from. A box
+  clicked on the big shot that opens a screen shows that screen's shot in its place, its ← back to the one before.
 - **`MapGuide`** is the toolbar's **?** legend, and holds the tooltips it repeats.
 - Around it: the `Navigate` screen picker (`plugin/editors/ScreenEditors`), the `Screens` constant preview
   (`ScreenConstantView`), Manage Pictures' groups by screen (`plugin/pictures/ScreenGroups`).
