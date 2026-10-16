@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +67,18 @@ class ReachTest {
         public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
             Integer slot = slots.get(picture.id());
             if (slot == null || slot - scrolled < 0 || slot - scrolled > 5) return Optional.empty();
-            return Optional.of(new Rect(10, 100 + 100 * (slot - scrolled), 80, 80));
+            return Optional.of(new Rect(10, 100 + 100 * (slot - scrolled) + bounce, 80, 80));
+        }
+
+        /** How far the icons sit off their slots: a column that bounces at its end. */
+        int bounce;
+
+        /** A drag up by a slot's height scrolls it one slot on, as a notch down does. */
+        @Override
+        public void drag(Point from, Point to, Duration time) {
+            done.add("drag " + (to.y() - from.y()));
+            wheel.add(from);
+            scrolled = Math.clamp(scrolled - (to.y() - from.y()) / 100, 0, end);
         }
 
         @Override
@@ -226,6 +238,132 @@ class ReachTest {
         // Eight down, no end met; then fourteen up, from 14 to 0, eight of them past the start.
         assertEquals(Scroll.MOST + 14 + 1, column.done.size());
         assertEquals("click 140", column.done.getLast());
+    }
+
+    /** A strip measured fast is looked at sooner after each scroll: a sixth of its settle, from 100 ms. */
+    @Test
+    void aFastStripIsLookedAtSooner() {
+        Column column = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 8), 4);
+        Strip fast = COLUMN.scroll(Scroll.wheel(-1).settle(Duration.ofMillis(300)));
+        assertTrue(column.press(MACHINES, fast));
+        assertEquals(List.of("scroll -1", "scroll -1", "scroll -1", "click 640"), column.done);
+        assertEquals(3 * 2 * Reach.MEASURE_MS, column.now);
+    }
+
+    /**
+     * A strip measured slow is let start late: one that moves only 3.5 s after the wheel is taken for at its end
+     * at the SDK's 3 s, and found at its own 5 s.
+     */
+    @Test
+    void aSlowStripIsWaitedForByItsOwnSettle() {
+        class Late extends Column {
+            int owed;
+            long at;
+
+            Late() {
+                super(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 8), 4);
+            }
+
+            @Override
+            public void scroll(Point at, int notches) {
+                done.add("scroll " + notches);
+                owed -= notches;
+                this.at = now;
+            }
+
+            @Override
+            public void pause(long ms) {
+                super.pause(ms);
+                if (owed != 0 && now - at > 3500) {
+                    scrolled = Math.clamp(scrolled + owed, 0, end);
+                    owed = 0;
+                }
+            }
+        }
+        Late slow = new Late();
+        assertTrue(slow.press(MACHINES, COLUMN.scroll(Scroll.wheel(-1).settle(Duration.ofSeconds(5)))),
+                slow.done.toString());
+        assertEquals(List.of("scroll -1", "scroll -1", "scroll -1", "click 640"), slow.done);
+
+        Late hurried = new Late();
+        hurried.press(MACHINES, COLUMN);
+        assertEquals("scroll 1", hurried.done.get(1), "judged at its end before it moved: turned the other way");
+    }
+
+    /** A drag strip is dragged from a member the way its members go, and the other way back. */
+    @Test
+    void aDragStripIsDraggedFromAMember() {
+        Column column = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 8), 4);
+        Strip dragged = COLUMN.scroll(Scroll.drag(Order.NORTH, 100, Duration.ofMillis(300)));
+        assertTrue(column.press(MACHINES, dragged));
+        assertEquals(List.of("drag -100", "drag -100", "drag -100", "click 640"), column.done);
+        assertTrue(column.wheel.stream().allMatch(at -> at.x() == 50), "dragged from a member");
+
+        column.done.clear();
+        assertTrue(column.press(TAVERN, dragged));
+        // One drag on to its end, one that met it, then back four to the top.
+        assertEquals(List.of("drag -100", "drag -100", "drag 100", "drag 100", "drag 100", "drag 100", "click 140"),
+                column.done);
+    }
+
+    /** At its end a column bouncing 10 px is at its end by its step; by the SDK's 4 px it seems to move on. */
+    @Test
+    void anEndIsJudgedByTheStripsStep() {
+        class Bouncing extends Column {
+            Bouncing() {
+                super(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 8), 4);
+                scrolled = 4;
+            }
+
+            @Override
+            public void scroll(Point at, int notches) {
+                int was = scrolled;
+                super.scroll(at, notches);
+                bounce = scrolled == was ? 10 - bounce : 0;
+            }
+        }
+        Bouncing measured = new Bouncing();
+        assertTrue(measured.press(TAVERN, COLUMN.scroll(Scroll.wheel(-1).step(100))), measured.done.toString());
+        assertEquals(List.of("scroll -1", "scroll 1", "scroll 1", "scroll 1", "scroll 1", "click 140"),
+                measured.done);
+
+        Bouncing unmeasured = new Bouncing();
+        assertTrue(unmeasured.press(TAVERN, COLUMN));
+        assertEquals(Scroll.MOST + 4 + 1, unmeasured.done.size(), "every scroll down seemed to move it");
+    }
+
+    /** Discovery scrolls a strip once and times it: how far its members went, how long they glided. */
+    @Test
+    void aStripIsMeasured() {
+        Column column = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 5), 4);
+        BufferedImage frame = column.look().orElseThrow();
+        // At once: one slot, held still at the first look. 100 ms, half again plus 200, rounded up.
+        assertEquals(Optional.of(Scroll.wheel(-1).step(100).settle(Duration.ofMillis(400))),
+                column.measure(COLUMN, frame));
+
+        Column gliding = new Column(Map.of("tavern", 0, "arena", 1, "campaign", 2, "war_machines", 5), 4) {
+            int owed;
+
+            @Override
+            public void scroll(Point at, int notches) {
+                owed -= notches;
+            }
+
+            @Override
+            public void pause(long ms) {
+                super.pause(ms);
+                if (owed != 0) {
+                    scrolled++;
+                    owed--;
+                }
+            }
+        };
+        // Two slots, one at each look: still from 200 ms; the campaign and the war machines moved 200 px.
+        assertEquals(Optional.of(Scroll.wheel(-2).step(200).settle(Duration.ofMillis(500))),
+                gliding.measure(COLUMN.scroll(Scroll.wheel(-2)), frame));
+
+        Column atEnd = new Column(Map.of("tavern", 0, "arena", 1), 0);
+        assertEquals(Optional.empty(), atEnd.measure(COLUMN, frame), "nothing moved: no measure");
     }
 
     @Test

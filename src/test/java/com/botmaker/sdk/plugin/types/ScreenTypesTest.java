@@ -21,6 +21,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
@@ -102,6 +103,20 @@ class ScreenTypesTest {
         assertEquals(Scroll.wheel(-5), roundTrip(ScreenTypes.SCROLL_SHAPE, Scroll.wheel(-5)));
         assertTrue(column.has(picture("campaign_home")));
         assertFalse(column.has(picture("town")));
+    }
+
+    /** A wheel or a drag, each by its own factory, with what Discovery measured as links. */
+    @Test
+    void aScrollIsAWheelOrADragWithItsMeasures() {
+        Scroll wheel = Scroll.wheel(-5).step(96).settle(Duration.ofMillis(900)).most(12);
+        assertEquals(wheel, roundTrip(ScreenTypes.SCROLL_SHAPE, wheel));
+        Scroll drag = Scroll.drag(Order.WEST, 300, Duration.ofMillis(400)).step(280);
+        assertEquals(drag, roundTrip(ScreenTypes.SCROLL_DRAG_SHAPE, drag));
+        assertTrue(ScreenTypes.SCROLL_SHAPE.writes(wheel));
+        assertFalse(ScreenTypes.SCROLL_SHAPE.writes(drag));
+        assertTrue(ScreenTypes.SCROLL_DRAG_SHAPE.writes(drag));
+        assertEquals(Scroll.drag(Order.EAST, 300, Duration.ofMillis(400)).step(280), drag.back());
+        assertEquals(Scroll.SETTLE, Scroll.wheel(-1).settle());
     }
 
     @Test

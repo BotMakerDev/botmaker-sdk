@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Way;
@@ -81,12 +82,12 @@ public final class ScreenEdits {
      * those strips off, their buttons looked for at their places.
      */
     public static String setStrip(StudioServices services, String constant, String field, Strip strip) {
-        boolean off = strip.members().isEmpty() || strip.scroll() == null || strip.scroll().notches() == 0;
+        boolean off = strip.members().isEmpty() || strip.scroll() == null || !strip.scroll().moves();
         String names = strip.members().stream().map(ImageTemplate::id).collect(Collectors.joining(", "));
         return said(ScreenBook.update(services, constant, s -> withStrip(s, field, strip, off)),
                 off ? "The strip is off " + constant + ": its buttons are looked for at their places."
                         : constant + " has a strip of " + names + ", each found anywhere along it and scrolled to by "
-                        + strip.scroll().notches() + " notches over another that shows.");
+                        + strip.scroll().label() + " over another that shows.");
     }
 
     /** {@code screen} without any strip holding one of {@code strip}'s members, and {@code strip} last unless {@code off}. */
@@ -104,11 +105,20 @@ public final class ScreenEdits {
             }
         }
         if (off) return now;
-        // The strip it replaces keeps its field and what it says of its members: only its members and scroll change.
-        Strip made = had == null ? strip : had.members(strip.members()).scroll(strip.scroll());
+        // The strip it replaces keeps its field and what it says of its members: only its members and scroll change,
+        // and a scroll not measured that goes the same way keeps what Discovery measured of the old one.
+        Strip made = had == null ? strip : had.members(strip.members()).scroll(kept(had.scroll(), strip.scroll()));
         String name = hadField != null ? hadField : field != null && !now.inputs().containsKey(field) ? field
                 : now.fieldFor((strip.members().isEmpty() ? "" : strip.members().getFirst().id()) + " strip");
         return now.withInput(name, made);
+    }
+
+    /** {@code now}, or {@code had} when {@code now} is a scroll not measured yet that goes the way {@code had} goes. */
+    private static Scroll kept(Scroll had, Scroll now) {
+        boolean unmeasured = now.step() == 0 && now.settle().equals(Scroll.SETTLE) && now.most() == Scroll.MOST;
+        boolean same = had != null && had.notches() == now.notches() && had.drag() == now.drag()
+                && had.px() == now.px() && had.time().equals(now.time());
+        return unmeasured && same ? had : now;
     }
 
     /**

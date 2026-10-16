@@ -15,6 +15,7 @@ import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -167,6 +168,11 @@ class ScreenWalkTest {
         @Override
         public void scroll(Point at, int notches) {
             did("scroll " + places.get(at.x() / 20) + " " + notches);
+        }
+
+        @Override
+        public void drag(Point from, Point to, Duration time) {
+            did("drag " + places.get(from.x() / 20));
         }
 
         @Override
@@ -425,6 +431,7 @@ class ScreenWalkTest {
             @Override public void click(Point at) { game.click(at); }
             @Override public void key(Key key) { game.key(key); }
             @Override public void scroll(Point at, int notches) { game.scroll(at, notches); }
+            @Override public void drag(Point from, Point to, Duration time) { game.drag(from, to, time); }
             @Override public long nowMs() { return game.nowMs(); }
             @Override public void pause(long ms) { game.pause(ms); }
         };
@@ -611,6 +618,9 @@ class ScreenWalkTest {
 
         @Override
         public void scroll(Point at, int notches) {}
+
+        @Override
+        public void drag(Point from, Point to, Duration time) {}
 
         @Override
         public long nowMs() {

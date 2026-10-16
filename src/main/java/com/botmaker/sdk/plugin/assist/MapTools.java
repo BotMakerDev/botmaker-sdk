@@ -360,8 +360,20 @@ final class MapTools {
         if (notches != 0) {
             // A list scrolled moves much of the screen and opens nothing: the end shows when nothing moves.
             boolean moved = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
-            AgentReply said = entered.reply().and(noted(services, screen, field, base.did(moved ? Did.IN_PLACE
+            // A strip that moved is scrolled once more and timed: how far its members go and how long they glide,
+            // written as its own scroll so a run judges it by its speed.
+            Optional<Scroll> measured = moved && base instanceof Strip scrolled ? ToolReach.of(context)
+                    .flatMap(reach -> reach.look().flatMap(frame -> reach.measure(scrolled, frame)))
+                    : Optional.empty();
+            Input tried = measured.isPresent() && base instanceof Strip scrolled ? scrolled.scroll(measured.get())
+                    : base;
+            AgentReply said = entered.reply().and(noted(services, screen, field, tried.did(moved ? Did.IN_PLACE
                     : Did.NONE), moved ? "changes this screen in place" : "no visible effect", ask && !moved));
+            if (measured.isPresent()) {
+                said = said.and(AgentReply.text("Scrolled once more and timed: its members move "
+                        + measured.get().step() + " px a scroll and hold still within "
+                        + measured.get().settle().toMillis() + " ms, written as its scroll."));
+            }
             if (moved) {
                 return new Tried(said.and(AgentReply.text("Scroll it again the same way until nothing moves (its "
                         + "end), then the other way to its other end; cut, with screen " + name + ", each input it "

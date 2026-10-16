@@ -23,6 +23,7 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.regex.Pattern;
@@ -138,9 +139,21 @@ public final class ScreenTypes {
             .<ImageTemplate>with(Strip::locked, Strip::lock)
             .<BooleanSupplier>with(Strip::when, Parts.STRIP_WHEN.part(ScreenTypes::condition));
 
-    /** {@code Scroll.wheel(int)}: how a strip scrolls. */
+    /** {@code Scroll.wheel(int)} and its links: how a strip scrolls, and what Discovery measured of it. */
     public static final DeclaredCall<Scroll> SCROLL_SHAPE = ComponentType.part(Scroll.class)
-            .<Integer, Scroll>writtenAs(Scroll::wheel, Scroll::notches);
+            .<Integer, Scroll>writtenAs(Scroll::wheel, Scroll::notches)
+            .<Integer>with(Scroll::step, Scroll::step)
+            .<Duration>with(Scroll::settle, Scroll::settle)
+            .<Integer>with(Scroll::most, Scroll::most)
+            .when(scroll -> scroll.drag() == null);
+
+    /** {@code Scroll.drag(Order, int, Duration)} and the same links. */
+    public static final DeclaredCall<Scroll> SCROLL_DRAG_SHAPE = ComponentType.part(Scroll.class)
+            .<Order, Integer, Duration, Scroll>writtenAs(Scroll::drag, Scroll::drag, Scroll::px, Scroll::time)
+            .<Integer>with(Scroll::step, Scroll::step)
+            .<Duration>with(Scroll::settle, Scroll::settle)
+            .<Integer>with(Scroll::most, Scroll::most)
+            .when(scroll -> scroll.drag() != null);
 
     /** {@code Pick.first(Order)}. */
     public static final DeclaredCall<Pick> PICK_FIRST_SHAPE = ComponentType.part(Pick.class)
@@ -164,7 +177,7 @@ public final class ScreenTypes {
 
     /** The screen map's shapes, which {@code SdkTypes.PARTS} hands the host. */
     public static final List<ComponentType<?>> ALL = List.of(SETUP_SHAPE, WAY_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE,
-            BUTTON_SHAPE, HOTKEY_SHAPE, STRIP_SHAPE, SCROLL_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
+            BUTTON_SHAPE, HOTKEY_SHAPE, STRIP_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
             PICK_UNTIL_NONE_SHAPE);
 
     /** A condition that only knows what it is written as — {@code Firestone::eventOn} — or {@code null}. */

@@ -14,6 +14,7 @@ import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -145,6 +146,11 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
     @Override
     public void scroll(Point at, int notches) {
         hands.scroll(at.x(), at.y(), notches);
+    }
+
+    @Override
+    public void drag(Point from, Point to, Duration time) {
+        hands.drag(from.x(), from.y(), to.x(), to.y(), time.toMillis());
     }
 
     @Override

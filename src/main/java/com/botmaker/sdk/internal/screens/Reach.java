@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -32,14 +33,14 @@ import java.util.function.ToLongFunction;
  */
 public interface Reach {
 
-    /** How long a strip is let settle after a scroll before it is looked at again, and between two looks after. */
+    /**
+     * The longest a strip is let settle after a scroll before it is looked at again, and between two looks after: a
+     * strip that settles fast is looked at sooner, a sixth of its {@link Scroll#settle}, down to {@link #MEASURE_MS}.
+     */
     long SCROLL_SETTLE_MS = 400;
 
-    /**
-     * The longest a strip is looked at after a scroll for its members to hold still: Firestone's column glides for
-     * over a second, and judged before it stopped it looked at its end (2026-10-16).
-     */
-    long SCROLL_SETTLE_MAX_MS = 3000;
+    /** How often a strip is looked at while {@link #measure} times it: the shortest settle it can tell. */
+    long MEASURE_MS = 100;
 
     /** Scrolls in a row the first way with no member showing before the strip is scrolled the other way. */
     int BLIND_SCROLLS = 3;
@@ -78,6 +79,32 @@ public interface Reach {
     void key(Key key);
 
     void scroll(Point at, int notches);
+
+    /** Presses at {@code from}, moves to {@code to} over {@code time}, and lets go. */
+    void drag(Point from, Point to, Duration time);
+
+    /** {@code scroll} done once over {@code over}: the wheel turned there, or the pointer dragged from there. */
+    default void scroll(Point over, Scroll scroll) {
+        if (scroll.drag() == null) {
+            scroll(over, scroll.notches());
+            return;
+        }
+        double side = scroll.px() / Math.sqrt(2);
+        int px = scroll.px();
+        int d = (int) Math.round(side);
+        Point to = switch (scroll.drag()) {
+            case NORTH -> new Point(over.x(), over.y() - px);
+            case SOUTH -> new Point(over.x(), over.y() + px);
+            case EAST -> new Point(over.x() + px, over.y());
+            case WEST -> new Point(over.x() - px, over.y());
+            case NORTH_EAST -> new Point(over.x() + d, over.y() - d);
+            case NORTH_WEST -> new Point(over.x() - d, over.y() - d);
+            case SOUTH_EAST -> new Point(over.x() + d, over.y() + d);
+            case SOUTH_WEST -> new Point(over.x() - d, over.y() + d);
+            case CENTER -> over;
+        };
+        drag(over, to, scroll.time());
+    }
 
     /** Milliseconds on a clock that only goes forward. */
     long nowMs();
@@ -247,9 +274,10 @@ public interface Reach {
     /**
      * Does {@code input} on {@code frame}: a key pressed; a strip scrolled once over a member that shows (the middle
      * of its band when none does); a button found, in any look but a disabled one, and clicked. A member of
-     * {@code strip} not showing is scrolled to first: the strip's scroll turns over a member that shows, up to
-     * {@link Scroll#MOST} times each way, the game looked at again after each. A scroll after which no member moved
-     * met the strip's end, and the scroll turns the other way once: the members' places say it, never the pixels,
+     * {@code strip} not showing is scrolled to first: the strip's scroll is done over a member that shows, up to its
+     * {@link Scroll#most} times each way, the game looked at again once the strip holds still. A scroll after which
+     * no member moved a quarter of the strip's step met its end, and the scroll turns the other way once: the
+     * members' places say it, never the pixels,
      * since a strip may sit over a moving fight. False when the button is not there or greyed out, and nothing but
      * those scrolls was done.
      *
@@ -269,8 +297,8 @@ public interface Reach {
                 Rect band = band(scrolled);
                 Point over = !shown.isEmpty() ? shown.values().iterator().next().center()
                         : band == null ? null : band.center();
-                if (over == null) yield false;
-                scroll(over, scrolled.scroll() == null ? 0 : scrolled.scroll().notches());
+                if (over == null || scrolled.scroll() == null) yield false;
+                scroll(over, scrolled.scroll());
                 yield true;
             }
             case Button button -> {
@@ -315,7 +343,7 @@ public interface Reach {
      */
     default Optional<Seen> inView(Button button, Strip strip, Pick pick, BufferedImage frame) {
         Optional<Seen> seen = seen(button, strip, pick, frame);
-        return seen.isPresent() || strip == null || strip.scroll() == null || strip.scroll().notches() == 0 ? seen
+        return seen.isPresent() || strip == null || strip.scroll() == null || !strip.scroll().moves() ? seen
                 : scrolledTo(button, strip, pick, frame);
     }
 
@@ -329,12 +357,12 @@ public interface Reach {
         // showing yet (scrolled to an end of icons the strip does not name), it turns over the middle of the band.
         Rect band = band(strip);
         Point over = band == null ? null : band.center();
-        int notches = strip.scroll().notches();
+        Scroll scroll = strip.scroll();
         int done = 0;
         boolean first = true;
         boolean shown = !members.isEmpty();
-        for (int way : new int[] {notches, -notches}) {
-            int most = Scroll.MOST + done;
+        for (Scroll way : List.of(scroll, scroll.back())) {
+            int most = scroll.most() + done;
             done = 0;
             int blind = 0;
             for (int i = 0; i < most; i++) {
@@ -347,7 +375,7 @@ public interface Reach {
                 Optional<Seen> seen = seen(button, strip, pick, next.get().frame());
                 if (seen.isPresent()) return seen;
                 Map<String, Rect> now = next.get().members();
-                boolean end = !now.isEmpty() && still(members, now);
+                boolean end = !now.isEmpty() && still(members, now, endPx(scroll));
                 // No member shown yet, the first way: an end of icons the strip does not name, scrolled further in.
                 shown |= !now.isEmpty();
                 blind = shown ? 0 : blind + 1;
@@ -364,24 +392,89 @@ public interface Reach {
     }
 
     /**
-     * {@code strip} once it holds still after a scroll: looked at every {@link #SCROLL_SETTLE_MS} until two looks in a
-     * row show its members at the same places, for up to {@link #SCROLL_SETTLE_MAX_MS}. Members still where they
-     * were {@code before} the scroll are looked at to the end of that time: a game may start gliding late, and only
-     * then is the strip at its end. Empty when the game could not be captured or the wait was stopped.
+     * {@code strip} once it holds still after a scroll: looked at every {@link #poll} until two looks in a row show its
+     * members at the same places, for up to its scroll's {@link Scroll#settle}. Members still where they were
+     * {@code before} the scroll are looked at to the end of that time: a game may start gliding late, and only then
+     * is the strip at its end. Empty when the game could not be captured or the wait was stopped.
      */
     private Optional<Settled> settled(Strip strip, Map<String, Rect> before) {
-        long until = nowMs() + SCROLL_SETTLE_MAX_MS;
+        Scroll scroll = strip.scroll();
+        long until = nowMs() + scroll.settle().toMillis();
+        long poll = poll(scroll);
         Settled last = null;
         while (true) {
-            pause(SCROLL_SETTLE_MS);
+            pause(poll);
             Optional<BufferedImage> frame = look();
             if (frame.isEmpty() || Thread.currentThread().isInterrupted()) return Optional.empty();
             Settled now = new Settled(frame.get(), members(strip, frame.get()));
             boolean held = last != null && still(last.members(), now.members())
-                    && (before.isEmpty() || !still(before, now.members()));
+                    && (before.isEmpty() || !still(before, now.members(), endPx(scroll)));
             if (held || nowMs() >= until) return Optional.of(now);
             last = now;
         }
+    }
+
+    /** How long between two looks at a strip settling: a sixth of its settle, within {@link #MEASURE_MS} and 400 ms. */
+    static long poll(Scroll scroll) {
+        return Math.clamp(scroll.settle().toMillis() / 6, MEASURE_MS, SCROLL_SETTLE_MS);
+    }
+
+    /**
+     * How little a member may move on a scroll for the strip to be at its end: a quarter of its measured
+     * {@link Scroll#step}, so a game that bounces a few pixels at its end is not taken for one still scrolling;
+     * {@link #STILL_PX} for a strip not measured yet.
+     */
+    static int endPx(Scroll scroll) {
+        return Math.max(STILL_PX, scroll.step() / 4);
+    }
+
+    /**
+     * {@code strip} scrolled once by its own scroll, over a member {@code frame} shows, and timed: how far its members
+     * moved and how long they took to hold still (two calm looks in a row), looked at every {@link #MEASURE_MS} for
+     * up to its {@link Scroll#settle} or {@link Scroll#SETTLE}, the longer. The scroll answered has that
+     * {@link Scroll#step} (0 when no member showed both before and after) and a settle of half as long again plus 200 ms, rounded up to 100 ms: a strip is judged by its own
+     * speed, with room for a slow frame. Empty when no member shows, nothing moved (an end), or the game could not be
+     * captured; the strip stays scrolled either way. Discovery measures a strip by it.
+     */
+    default Optional<Scroll> measure(Strip strip, BufferedImage frame) {
+        Scroll scroll = strip.scroll();
+        if (scroll == null || !scroll.moves()) return Optional.empty();
+        Map<String, Rect> before = members(strip, frame);
+        if (before.isEmpty()) return Optional.empty();
+        long start = nowMs();
+        long until = start + Math.max(scroll.settle().toMillis(), Scroll.SETTLE.toMillis());
+        scroll(before.values().iterator().next().center(), scroll);
+        Map<String, Rect> last = null;
+        long movedAt = start;
+        int calm = 0;
+        while (true) {
+            pause(MEASURE_MS);
+            Optional<BufferedImage> look = look();
+            if (look.isEmpty() || Thread.currentThread().isInterrupted()) return Optional.empty();
+            Map<String, Rect> now = members(strip, look.get());
+            long at = nowMs();
+            // Two calm looks in a row: an eased glide moves under STILL_PX in one look near its end.
+            if (last != null && still(last, now) && !still(before, now)) {
+                if (++calm >= 2) break;
+            } else {
+                calm = 0;
+                movedAt = at;
+            }
+            if (at >= until) return Optional.empty();
+            last = now;
+        }
+        List<Integer> moved = new ArrayList<>();
+        for (Map.Entry<String, Rect> was : before.entrySet()) {
+            Rect to = last.get(was.getKey());
+            if (to == null) continue;
+            Point a = was.getValue().center();
+            Point b = to.center();
+            moved.add(Math.max(Math.abs(a.x() - b.x()), Math.abs(a.y() - b.y())));
+        }
+        int step = moved.isEmpty() ? 0 : moved.stream().sorted().toList().get(moved.size() / 2);
+        long took = movedAt - start;
+        long settle = (took * 3 / 2 + 200 + 99) / 100 * 100;
+        return Optional.of(scroll.step(step).settle(Duration.ofMillis(settle)));
     }
 
     /** Where each member of {@code strip} that shows is on {@code frame}, by its id, in the strip's order. */
@@ -397,11 +490,16 @@ public interface Reach {
 
     /** Whether the same members show at the same places, to {@link #STILL_PX}: the strip did not move. */
     static boolean still(Map<String, Rect> before, Map<String, Rect> after) {
+        return still(before, after, STILL_PX);
+    }
+
+    /** Whether the same members show, none moved more than {@code px}. */
+    static boolean still(Map<String, Rect> before, Map<String, Rect> after, int px) {
         if (!before.keySet().equals(after.keySet())) return false;
         for (Map.Entry<String, Rect> was : before.entrySet()) {
             Point a = was.getValue().center();
             Point b = after.get(was.getKey()).center();
-            if (Math.abs(a.x() - b.x()) > STILL_PX || Math.abs(a.y() - b.y()) > STILL_PX) return false;
+            if (Math.abs(a.x() - b.x()) > px || Math.abs(a.y() - b.y()) > px) return false;
         }
         return true;
     }

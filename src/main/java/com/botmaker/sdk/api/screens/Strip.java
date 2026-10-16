@@ -14,8 +14,8 @@ import java.util.function.BooleanSupplier;
  * way name it as any other ({@code HOME.tavern}); the strip says where it is looked for and how it is scrolled to
  * (the user's call, 2026-10-16). A member is looked for anywhere along the strip: the band its members' places span.
  * One not showing is scrolled to by the strip's {@link #scroll}, over a member that shows; a scroll after which no
- * member moved met the strip's end, and the scroll turns the other way once. No number places the strip: its
- * pictures do.
+ * member moved a quarter of its step met the strip's end, and the scroll turns the other way once. No number places
+ * the strip: its pictures do. How fast it scrolls and settles is its scroll's, which Discovery measures.
  *
  * <p>Its traits are its members' defaults: a strip that {@link #sometimes comes and goes} is one whose members each
  * may be absent. Its {@link #did} is the strip's own, scrolled when Discovery tried it.

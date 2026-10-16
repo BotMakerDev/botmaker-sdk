@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.capture.StillSource;
 
 import java.awt.image.BufferedImage;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -103,6 +104,12 @@ public final class RunReach implements Reach {
     public void scroll(Point at, int notches) {
         CaptureSource source = Source.current();
         source.scroll(onScreen(source, at), notches);
+    }
+
+    @Override
+    public void drag(Point from, Point to, Duration time) {
+        CaptureSource source = Source.current();
+        source.drag(onScreen(source, from), onScreen(source, to), time.toMillis());
     }
 
     @Override

@@ -328,6 +328,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     `in_list` is `in_strip`.
   - `Navigate.to(Screen)`, `isOn(Screen)` and `where()` take and give the screen class. `GameScreen`, `ScreenList`,
     `Variant` and `Kind` are gone, with no conversion: Studio's upgrade repairs what a bot names.
+- **A strip scrolls by its own numbers.** `Scroll` is the wheel, `Scroll.wheel(-5)`, or a drag,
+  `Scroll.drag(Order.NORTH, 300, Duration.ofMillis(400))`, for a list that takes no wheel. Its links say how the
+  strip behaves: `.step(px)`, how far its members move on one scroll; `.settle(Duration)`, the longest it is looked
+  at to hold still; `.most(n)`, the scrolls each way (`Scroll.MOST`, 8, by default).
+  - A strip not measured yet keeps the old numbers: looked at for up to 3 s (`Scroll.SETTLE`), every 400 ms. A
+    measured one is looked at every sixth of its settle, from 100 ms, so a fast list is judged sooner and a slow one
+    is let start late.
+  - The end of a strip is a scroll that moved its members less than a quarter of its step: a list that bounces a
+    few pixels at its end is no longer taken for one still scrolling.
+  - try_input measures a strip whose scroll moved the screen. It scrolls once more and times it: the members'
+    distance is its step, and the time they took to hold still, half again plus 200 ms, is its settle. A strip
+    edited again with the same wheel keeps what was measured.
 - **`Screen.waitStable` and `Screen.waitChange` are `ScreenWait.waitStable` and `ScreenWait.waitChange`**
   (breaking): `Screen` is a screen of the map now.
 - **No `@ReplacedBy` pointers.** `BotSettings.debug()`/`debugOff()` and `Flow.Step.checksPopups()` stay

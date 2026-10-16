@@ -28,6 +28,9 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
 
     void scroll(int x, int y, int amount);
 
+    /** Presses at ({@code fromX}, {@code fromY}), glides to ({@code toX}, {@code toY}) over {@code ms}, and lets go. */
+    void drag(int fromX, int fromY, int toX, int toY, long ms);
+
     /** The private display's own pointer and keyboard, as a run's {@code Mouse} and {@code Keyboard} use them. */
     record InSession(PrivateSession session) implements Hands {
 
@@ -55,6 +58,12 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
             session.controller().scroll(amount);
         }
 
+        @Override
+        public void drag(int fromX, int fromY, int toX, int toY, long ms) {
+            Point o = origin();
+            glide(session.controller(), o.x() + fromX, o.y() + fromY, o.x() + toX, o.y() + toY, ms);
+        }
+
         /** Where the game's window sits in the display: the frame's (0, 0), as {@code SessionSource} says. */
         private Point origin() {
             GenericWindow window = session.attached();
@@ -63,7 +72,7 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
         }
     }
 
-    /** The emulator's touch: a click only. */
+    /** The emulator's touch: a click, and a swipe for a drag. */
     record OnEmulator(CaptureSource emulator) implements Hands {
 
         @Override
@@ -79,6 +88,11 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
         @Override
         public void scroll(int x, int y, int amount) {
             throw new UnsupportedOperationException("The emulator takes clicks here; a scroll needs try_statement.");
+        }
+
+        @Override
+        public void drag(int fromX, int fromY, int toX, int toY, long ms) {
+            emulator.drag(new Point(fromX, fromY), new Point(toX, toY), ms);
         }
     }
 
@@ -106,6 +120,36 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
             controller.mouseMove(origin.x() + x, origin.y() + y);
             controller.scroll(amount);
             if (back != null) controller.mouseMove(back.x, back.y);
+        }
+
+        @Override
+        public void drag(int fromX, int fromY, int toX, int toY, long ms) {
+            NativeController controller = NativeControllerFactory.get();
+            java.awt.Point back = controller.cursorPosition();
+            glide(controller, origin.x() + fromX, origin.y() + fromY, origin.x() + toX, origin.y() + toY, ms);
+            if (back != null) controller.mouseMove(back.x, back.y);
+        }
+    }
+
+    /**
+     * The left button pressed at the start, the pointer moved in steps of about 15 ms to the end, as {@code Mouse.drag}
+     * glides, and let go there; an interrupt ends the glide early, kept for what follows.
+     */
+    private static void glide(NativeController controller, int fromX, int fromY, int toX, int toY, long ms) {
+        controller.mouseMove(fromX, fromY);
+        controller.mouseButton(MouseButton.LEFT.code(), true);
+        try {
+            int steps = Math.max(1, (int) (ms / 15));
+            for (int i = 1; i <= steps; i++) {
+                double t = (double) i / steps;
+                controller.mouseMove((int) Math.round(fromX + (toX - fromX) * t),
+                        (int) Math.round(fromY + (toY - fromY) * t));
+                if (ms > 0) Thread.sleep(ms / steps);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            controller.mouseButton(MouseButton.LEFT.code(), false);
         }
     }
 
