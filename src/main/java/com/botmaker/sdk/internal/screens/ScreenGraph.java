@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Kind;
 import com.botmaker.sdk.api.screens.ScreenList;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
@@ -14,6 +15,7 @@ import com.botmaker.sdk.internal.flow.BotConstants;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,10 +36,10 @@ import java.util.regex.Pattern;
  * the tree Discovery walks, its {@code alsoFrom} and {@code back} the other edges a run may take. Pure: it reads
  * values and answers, and writes nothing.
  *
- * <p>Discovery's order (the user's rule, 2026-10-14) is one algorithm for every screen: cut every input on it, try
- * each, and finish a screen an input opens before the next input of the screen it was opened from. So a screen's
- * inputs wait while one {@link #unfinishedBelow below} it is unfinished, and a branch begun is finished before
- * another ({@link #branchBegun}).
+ * <p>Discovery's order is breadth first (the user's call, 2026-10-16, in place of finishing each opened screen first):
+ * a screen an input opens gets its marker and its inputs cut at once, and is tried once the screens above it are
+ * finished. {@link #nextToExplore} is the shallowest screen with work left, information last; {@link #untried} lists
+ * a screen's inputs with its information ones last.
  *
  * <p>What is not always there is read off the edges, never flagged on a screen ({@link #presence}): a screen every
  * way into which passes an input that {@link Input#sometimes comes and goes} shows only at times, and one behind a
@@ -216,10 +218,27 @@ public final class ScreenGraph {
         return input.settled() || opens(constant, input).isPresent();
     }
 
-    /** {@code constant}'s inputs still to try, the ones that come and go aside. */
+    /**
+     * {@code constant}'s inputs still to try, the ones that come and go aside, in the order Discovery tries them: the
+     * screen's own work first, its information ({@link #isInfo}) last.
+     */
     public List<Input> untried(String constant) {
-        return inputs(constant).stream().filter(i -> !i.comesAndGoes() && !tried(constant, i)).toList();
+        return inputs(constant).stream().filter(i -> !i.comesAndGoes() && !tried(constant, i))
+                .sorted(Comparator.comparing(ScreenGraph::isInfo)).toList();
     }
+
+    /**
+     * Whether {@code input} only tells: named {@link Kind#INFO}, or a picture called help, info, rules, faq, how to
+     * play, a leaderboard or the rankings ({@code help_button}, {@code info_i}, {@code i}). Discovery tries such an
+     * input last on its screen, and explores the screen it opens after every other (the user's call, 2026-10-16).
+     * A rank-up or a tier's button is no information: {@code rank} alone and an {@code i} inside a name are not.
+     */
+    public static boolean isInfo(Input input) {
+        return input.kind() == Kind.INFO || input.picture() != null && INFO.matcher(input.picture().id()).find();
+    }
+
+    private static final Pattern INFO = Pattern.compile(
+            "(?i)^i$|(^|_)(help|info|rules|faq|how_to_play|leaderboards?|rankings)(_|$)");
 
     /** {@code constant}'s inputs that come and go and were never seen to try. */
     public List<Input> unseen(String constant) {
@@ -268,93 +287,38 @@ public final class ScreenGraph {
         return screen.owes().stream().anyMatch(ScreenGraph::markerWithReason);
     }
 
-    /** Whether {@code constant}, or a screen below it, still has an input to try. */
-    public boolean workLeft(String constant) {
-        return unfinished(constant) || unfinishedBelow(constant).isPresent();
-    }
-
     /**
-     * Where Discovery goes once {@code screen} is finished: up its parents to the first with work left on or below it,
-     * else the top one. Empty while it has work left, and for a popup or the top screen.
+     * The screen Discovery explores next: the shallowest one still unfinished, so a screen's own inputs are all
+     * tried before any screen they opened, and main screens before the panels under them (the user's call,
+     * 2026-10-16, breadth first). One that shows only at times ({@link #presence}: Engineer, whose Home button shows
+     * only while tools wait) comes after every other, then one opened by an information input ({@link #isInfo}:
+     * help, rules, a leaderboard); a locked one is none to go to, nor is a popup. Of two otherwise alike, the one
+     * declared first, as the map was found. Empty when nothing is left.
      */
-    public Optional<String> upTo(String screen) {
-        if (workLeft(screen) || screen(screen).filter(GameScreen::isPopup).isPresent()) return Optional.empty();
-        Set<String> seen = new HashSet<>(Set.of(screen));
-        Optional<String> up = parent(screen);
-        while (up.isPresent() && !workLeft(up.get()) && parent(up.get()).isPresent()) {
-            if (!seen.add(up.get())) return Optional.empty();    // a map whose ways in loop has no top to go to
-            up = parent(up.get());
-        }
-        return up.filter(c -> !c.equals(screen));
+    public Optional<String> nextToExplore() {
+        List<String> order = new ArrayList<>(screens.keySet());
+        Map<String, Presence> presence = presences();
+        return order.stream()
+                .filter(c -> depth(c).isPresent() && presence.get(c) != Presence.LOCKED && unfinished(c))
+                .min(Comparator.<String, Presence>comparing(presence::get)
+                        .thenComparing(this::underInfo)
+                        .thenComparingInt(c -> depth(c).orElse(DEEPEST))
+                        .thenComparingInt(order::indexOf));
     }
 
-    /**
-     * The nearest screen made known from {@code constant}, directly or deeper, still unfinished: a child before its
-     * own children. {@code constant}'s next input waits for it.
-     */
-    public Optional<String> unfinishedBelow(String constant) {
-        return unfinishedBelow(constant, Set.of());
-    }
-
-    /**
-     * {@link #unfinishedBelow(String)}, leaving out the screens in {@code hidden} and everything under them: ones
-     * whose way in comes and goes and is not there now, so they cannot be finished yet (Engineer, whose Home button
-     * shows only while tools wait to be claimed, 2026-10-16).
-     */
-    public Optional<String> unfinishedBelow(String constant, Set<String> hidden) {
-        Set<String> seen = new HashSet<>(hidden);
-        seen.remove(constant);
-        return unfinishedUnder(constant, seen);
-    }
-
-    private Optional<String> unfinishedUnder(String constant, Set<String> seen) {
-        if (!seen.add(constant) || seen.size() > DEEPEST * DEEPEST) return Optional.empty();
-        for (String child : children(constant)) {
-            if (seen.contains(child)) continue;
-            if (unfinished(child)) return Optional.of(child);
-            Optional<String> deeper = unfinishedUnder(child, seen);
-            if (deeper.isPresent()) return deeper;
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * A screen begun (something on it tried) whose branch is not finished, off {@code constant}'s own path to the
-     * first screen: it is finished first, so one branch is explored to its end before the next is begun. A popup is
-     * on no branch: it shows over any screen, and its inputs are tried whenever it does.
-     */
-    public Optional<String> branchBegun(String constant) {
-        return branchBegun(constant, Set.of());
-    }
-
-    /** {@link #branchBegun(String)}, leaving out the screens in {@code hidden} and everything under them. */
-    public Optional<String> branchBegun(String constant, Set<String> hidden) {
-        if (screen(constant).filter(GameScreen::isPopup).isPresent()) return Optional.empty();
-        Set<String> above = new HashSet<>();
-        String at = constant;
-        while (at != null && above.add(at) && above.size() < DEEPEST) at = parent(at).orElse(null);
-        // Every screen a way into it leaves from, by any of its ways, is on its path: Engineer, opened from Home and
-        // also from Garage, is part of Garage's branch when reached from there (2026-10-16).
-        above.addAll(dependsOn(constant));
-        return screens.keySet().stream()
-                .filter(c -> !above.contains(c) && depth(c).isPresent() && triedAny(c))
-                .filter(c -> !under(c, hidden))
-                .filter(c -> !branchDone(c, new HashSet<>()))
-                .findFirst();
-    }
-
-    /** Whether {@code constant} is one of {@code screens} or made known, directly or deeper, from one of them. */
-    private boolean under(String constant, Set<String> screens) {
+    /** Whether a way on {@code constant}'s path from the first screen is an information input, or names help. */
+    private boolean underInfo(String constant) {
         Set<String> seen = new HashSet<>();
         for (String at = constant; at != null && seen.add(at) && seen.size() < DEEPEST; at = parent(at).orElse(null)) {
-            if (screens.contains(at)) return true;
+            GameScreen screen = screens.get(at);
+            if (screen == null || screen.from() == null) return false;
+            Way way = screen.from();
+            // A way keeps its input bare: its kind is said by the input on the screen it leaves.
+            Optional<Input> via = parent(at).map(screens::get).flatMap(from -> from.allInputs().stream()
+                    .filter(i -> i.sameAs(way.via())).findFirst()).or(() -> Optional.ofNullable(way.via()));
+            if (via.filter(ScreenGraph::isInfo).isPresent() || INFO.matcher(at).find()) return true;
         }
         return false;
-    }
-
-    private boolean branchDone(String constant, Set<String> seen) {
-        if (!seen.add(constant) || seen.size() > DEEPEST * DEEPEST) return true;
-        return !unfinished(constant) && children(constant).stream().allMatch(c -> branchDone(c, seen));
     }
 
     /**

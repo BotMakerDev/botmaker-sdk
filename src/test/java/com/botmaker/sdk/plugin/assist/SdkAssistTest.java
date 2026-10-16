@@ -998,7 +998,8 @@ class SdkAssistTest {
         cropOne("name", "gem", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
         cropOne("name", "list", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "screen", "Engineer");
         AgentReply next = tryOne("screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
-        assertTrue(next.isRefused() && text(next).startsWith("Finish Engineer first"), text(next));
+        assertFalse(text(next).contains("Finish Engineer first"), "breadth first: Engineer, opened and cut, waits "
+                + "for Home's own inputs (2026-10-16): " + text(next));
         assertTrue(tryOne("screen", "Engineer", "picture", "gem", "never", " ").isRefused(),
                 "a blank reason never clicks");
         assertTrue(tryOne("screen", "Engineer", "picture", "coin", "never", "spends gems").isRefused(),
@@ -1162,8 +1163,8 @@ class SdkAssistTest {
         game.then(home);
         String closed = text(tryOne("screen", "Shop", "picture", "close_shop", "desktop", true,
                 "settleMs", 0));
-        assertTrue(closed.contains("tried click close_shop, its way back to Home") && closed.contains("went back up "
-                + "to Home"), closed);
+        assertTrue(closed.contains("tried click close_shop, its way back to Home") && closed.contains("went to Home, "
+                + "the next screen to explore"), closed);
         assertEquals(List.of("HOME", "SHOP"), List.copyOf(host.set("screen_map").keySet()), "no screen Close shop");
         assertEquals("close_shop", screen("SHOP").back().picture().id());
 
@@ -1247,11 +1248,11 @@ class SdkAssistTest {
     }
 
     /**
-     * A screen opened by an input that comes and goes holds back the next input of the screen it was opened from
-     * only while that input shows: gone, the screen cannot be finished now (Engineer, 2026-10-16).
+     * Breadth first (the user's call, 2026-10-16): a screen opened, its marker and inputs cut, waits while the
+     * screen it was opened from is tried on, and read_guide names the next screen to explore.
      */
     @Test
-    void aScreenWhoseWayInIsGoneHoldsNothingBack() {
+    void aScreensInputsAreTriedOnWhileAScreenItOpenedIsUnfinished() {
         Game game = new Game();
         NativeControllerFactory.setForTesting(game);
         BufferedImage home = noise(WATCHED.width(), WATCHED.height(), 41);
@@ -1267,18 +1268,16 @@ class SdkAssistTest {
         run("crop_pictures", "screen", "Gift", "boxes", List.of(box("gift", 300, 40, 48, 48, "marker", "set"),
                 box("open_box", 200, 200, 48, 48)));
 
-        agent.frame = home;
-        String held = text(tryOne("screen", "Home", "picture", "bag", "desktop", true, "settleMs", 0));
-        assertTrue(held.contains("Finish Gift first"), "its way in shows, so Gift comes first: " + held);
         agent.frame = giftless;
         BufferedImage bag = covered(giftless, 0, 120, 140, 180, 44);
         game.then(bag);
         String tried = text(tryOne("screen", "Home", "picture", "bag", "opens", "Bag", "desktop", true, "settleMs", 0));
-        assertTrue(tried.contains("Opened Bag"), "Gift's way in is gone, so it waits: " + tried);
+        assertTrue(tried.contains("Opened Bag") && tried.contains("go_to_screen Home and try its next input"),
+                "Gift, opened and cut, holds Home's bag back no more: " + tried);
         run("crop_pictures", "screen", "Bag", "boxes", List.of(box("bag_title", 30, 130, 48, 48, "marker", "set"),
                 box("sort", 60, 240, 48, 48)));
-        String branch = text(tryOne("screen", "Bag", "picture", "sort", "desktop", true, "settleMs", 0));
-        assertTrue(branch.contains("tried click sort"), "Gift's branch, begun, holds no other back: " + branch);
+        String sorted = text(tryOne("screen", "Bag", "picture", "sort", "desktop", true, "settleMs", 0, "stay", true));
+        assertTrue(sorted.contains("tried click sort"), "any screen may be tried; the order is advice: " + sorted);
     }
 
     @Test

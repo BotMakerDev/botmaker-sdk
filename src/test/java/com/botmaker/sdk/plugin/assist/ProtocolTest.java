@@ -115,14 +115,16 @@ class ProtocolTest {
         Where owingInput = Protocol.where(true,ScreenGraph.of(untried));
         assertEquals(Stage.DISCOVERY, owingInput.stage(), "an input never tried is owed");
         assertTrue(owingInput.said().contains("Tavern: untried click drink"), owingInput.said());
+        assertTrue(owingInput.said().contains("Next to explore: Tavern, the shallowest screen with inputs left."),
+                owingInput.said());
     }
 
-    /** The user's rule: every screen the same way, cut whole, each input tried, a screen opened finished first. */
+    /** The user's rule: every screen the same way, cut whole, each input tried, breadth first (2026-10-16). */
     @Test
-    void discoveryFinishesEachScreenItOpensAndScrollsEveryList() {
+    void discoveryGoesBreadthFirstAndScrollsEveryList() {
         String steps = Stage.DISCOVERY.section();
-        for (String rule : List.of("Every screen is explored the same way", "explore it by these same steps, to "
-                + "its end, before the next input of the screen it was opened from", "try_input with scroll every "
+        for (String rule : List.of("Every screen is explored the same way", "Breadth first: a screen's inputs are "
+                + "all tried before those of any screen they opened", "(kind info) last", "try_input with scroll every "
                 + "list and panel to its end both ways", "other free spends are clicked", "the bot's Screens class",
                 "go_to_screen")) {
             assertTrue(steps.replaceAll("\\s+", " ").contains(rule), rule);

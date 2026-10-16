@@ -43,6 +43,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     becomes one untried input per copy shown, so Discovery tries every one.
   - An `each` input presses the copies last to first, so a card claimed and gone shifts none still to press.
   - `which_screen` with `everywhere` numbers each copy of a picture it finds more than once, as `match` counts them.
+- **Discovery goes breadth first.** A screen an input opens gets its marker and its inputs cut at once; then the
+  screen it came from is tried on, and the new one waits until the screens above it are finished: main screens
+  before the panels under them. Help, rules and leaderboards (kind info, or a picture named so) are tried last on
+  their screen, and the screens they open are explored after every other.
+  - `try_input` no longer refuses while a screen opened from this one is unfinished; it still refuses while a
+    screen owes its marker. A screen finished walks to the next screen to explore, the shallowest with inputs
+    left, and `read_guide` names it.
 - **🗺 Screens opens at once.** The cards' shots load after the window shows. Firestone's 36 shots took 1.7 s to read
   before the first paint, and now cost the window under 10 ms. Reading the map every 1.5 s happens off the window's
   thread too.
@@ -161,7 +168,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   screen below the others, reached from this one and owing its marker. One that leads to a screen already mapped
   becomes a way into it, or this screen's way back. When the map cannot name that screen from here, the input
   says `Did.LEAVES`. try_input also takes `locked` (the lock's picture) and `kind`. The order of Discovery comes
-  from the graph: a screen opened is finished before the next input of the one it was opened from. A marker still
+  from the graph, breadth first (see "Discovery goes breadth first" above). A marker still
   owed holds every other screen back, unless the screen's notes say why with `Owed: marker — <why>`.
 - **go_to_screen** walks the game to a screen of the map, as `Navigate.to` does at run time. **which_screen** first
   says which screen of the map the game shows, by the markers, nearest the last one seen first.

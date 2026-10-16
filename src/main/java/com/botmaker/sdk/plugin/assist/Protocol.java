@@ -68,19 +68,19 @@ final class Protocol {
                      on that screen, never on the one the tabs sit on.
                   3. An input that opens a screen (give opens the name it shows) adds it to the map, owing a
                      marker, and the answer brings its screenshot: crop_pictures its marker (marker set, a part
-                     only that screen shows), then explore it by these same steps, to its end, before the next
-                     input of the screen it was opened from. One that leads to a screen mapped already is a way
-                     into it, or this screen's way back.
-                  4. A screen is finished when nothing on it is untried. try_input then goes back up by itself,
-                     to the nearest screen with inputs left (its way back, else the picture named close x, else Escape),
-                     and checks that screen's marker; stay true on the last input keeps the screen open.
+                     only that screen shows) and every input on it (step 1), then go back and try the next input
+                     of the screen it was opened from. Breadth first: a screen's inputs are all tried before those
+                     of any screen they opened, main screens before their panels; help, rules and leaderboards
+                     (kind info) last. One that leads to a screen mapped already is a way into it, or this
+                     screen's way back.
+                  4. A screen is finished when nothing on it is untried. try_input then walks by itself to the next
+                     screen to explore, the shallowest with inputs left (read_guide names it), and checks that
+                     screen's marker; stay true on the last input keeps the screen open.
                      go_to_screen walks the map as a run does, and which_screen says where the game is.
                 - try_input says a screen's shape once nothing on it is untried (menu when every input opened a
                   screen, else activity: a fact for Build, not a rule here), and then asks once whether every
                   list was scrolled and every tab opened: answer it on that screen (go_to_screen back to it when
-                  try_input went up). It refuses while
-                  a screen owes its marker, while a screen reached from this one is unfinished, and while another
-                  branch begun is not finished. What cannot be cut yet the screen owes (write_notes with its
+                  try_input went on). It refuses while a screen owes its marker. What cannot be cut yet the screen owes (write_notes with its
                   screen and owes); Discovery is not done while anything is owed or untried; a debt paid by
                   hand is taken out of owes with write_notes.
                 - A record try_input got wrong is fixed with edit_map; trying the input again does not undo it: a
@@ -262,8 +262,10 @@ final class Protocol {
                     owed);
         }
         if (!owed.isEmpty()) {
+            String next = graph.nextToExplore().map(c -> " Next to explore: " + graph.shown(c) + ", the shallowest "
+                    + "screen with inputs left.").orElse("");
             return new Where(Stage.DISCOVERY, owed.size() + (owed.size() == 1 ? " thing is" : " things are")
-                    + " still owed: Discovery is done when none is.", screens, owed);
+                    + " still owed: Discovery is done when none is." + next, screens, owed);
         }
         if (earliest == null) {
             return new Where(Stage.UPKEEP, "every screen is tuned or locked.", screens);

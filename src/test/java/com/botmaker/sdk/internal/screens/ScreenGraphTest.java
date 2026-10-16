@@ -136,29 +136,59 @@ class ScreenGraphTest {
         assertEquals(OptionalInt.of(2), graph.depth("MAP"));
     }
 
+    /** Breadth first (the user's call, 2026-10-16): a screen's own inputs, then the screens they opened, shallowest first. */
     @Test
-    void aScreenOpenedIsFinishedBeforeTheNextInputOfTheOneItWasOpenedFrom() {
+    void discoveryExploresTheShallowestScreenWithInputsLeftFirst() {
         Map<String, GameScreen> screens = firestone();
-        ScreenGraph graph = ScreenGraph.of(screens);
-        assertEquals(Optional.of("ENGINEER"), graph.unfinishedBelow("HOME"), "Engineer has no input cut yet");
+        assertEquals(Optional.of("HOME"), ScreenGraph.of(screens).nextToExplore(),
+                "Home's gold before Engineer, which it opened");
 
-        screens.put("ENGINEER", screens.get("ENGINEER").inputs(List.of(click("upgrade"))));
-        assertEquals(Optional.of("ENGINEER"), ScreenGraph.of(screens).unfinishedBelow("HOME"));
+        screens.put("HOME", screens.get("HOME").inputs(List.of(click("campaign"), click("engineer"),
+                click("gold").did(Did.NONE))));
+        screens.put("MAP", screens.get("MAP").inputs(List.of(click("node"))));
+        assertEquals(Optional.of("ENGINEER"), ScreenGraph.of(screens).nextToExplore(), "Engineer, a step down, "
+                + "before Map, two");
+        Map<String, GameScreen> fickle = new LinkedHashMap<>(screens);
+        fickle.put("HOME", fickle.get("HOME").inputs(List.of(click("campaign"), click("engineer").sometimes(),
+                click("gold").did(Did.NONE))));
+        assertEquals(Optional.of("MAP"), ScreenGraph.of(fickle).nextToExplore(),
+                "a screen whose way in comes and goes waits for every other");
+        fickle.put("HOME", fickle.get("HOME").inputs(List.of(click("campaign"), click("engineer").locked(
+                picture("padlock")), click("gold").did(Did.NONE))));
+        fickle.put("MAP", fickle.get("MAP").inputs(List.of(click("node").did(Did.NONE))));
+        assertEquals(Optional.empty(), ScreenGraph.of(fickle).nextToExplore(), "a locked screen is none to go to");
 
         screens.put("ENGINEER", screens.get("ENGINEER").inputs(List.of(click("upgrade").did(Did.IN_PLACE))));
-        screens.put("MAP", screens.get("MAP").inputs(List.of(click("node"))));
-        assertEquals(Optional.of("MAP"), ScreenGraph.of(screens).unfinishedBelow("HOME"),
-                "a grandchild left unfinished holds its grandparent too");
+        assertEquals(Optional.of("MAP"), ScreenGraph.of(screens).nextToExplore());
+        screens.put("MAP", screens.get("MAP").inputs(List.of(click("node").did(Did.NONE))));
+        assertEquals(Optional.empty(), ScreenGraph.of(screens).nextToExplore(), "nothing left");
     }
 
+    /** Help, rules and leaderboards only tell: tried last on their screen, and explored after every other screen. */
     @Test
-    void aBranchBegunIsFinishedBeforeAnotherIsBegun() {
+    void informationIsTriedAndExploredLast() {
         Map<String, GameScreen> screens = firestone();
-        screens.put("MAP", screens.get("MAP").inputs(List.of(click("node"), click("zoom").did(Did.IN_PLACE))));
-        ScreenGraph graph = ScreenGraph.of(screens);
+        Input ranks = click("ranks").kind(Kind.INFO);
+        screens.put("HOME", screens.get("HOME").inputs(List.of(click("help_button"), ranks, click("campaign"),
+                click("engineer"), click("gold"))));
+        assertEquals(List.of(click("gold"), click("help_button"), ranks), ScreenGraph.of(screens).untried("HOME"));
+        assertTrue(ScreenGraph.isInfo(click("i")) && ScreenGraph.isInfo(click("how_to_play")));
+        assertFalse(ScreenGraph.isInfo(click("rank_up")) || ScreenGraph.isInfo(click("tier_i_reward"))
+                || ScreenGraph.isInfo(click("guide_arrow")), "a rank-up or a tier's button does work");
 
-        assertEquals(Optional.of("CAMPAIGN"), graph.branchBegun("ENGINEER"), "Campaign's branch still owes Map");
-        assertEquals(Optional.empty(), graph.branchBegun("MAP"), "Map is on its own path");
+        screens.put("HOME", screens.get("HOME").inputs(List.of(click("help_button"), ranks.did(Did.NONE),
+                click("campaign"), click("engineer"), click("gold").did(Did.NONE))));
+        Map<String, GameScreen> withHelp = new LinkedHashMap<>();
+        withHelp.put("HOME", screens.get("HOME"));
+        withHelp.put("RULES", GameScreen.named("Rules").from(Way.of(BotConstants.screen("HOME"), click("help_button"))));
+        screens.forEach(withHelp::putIfAbsent);
+        withHelp.put("MAP", withHelp.get("MAP").inputs(List.of(click("node"))));
+        ScreenGraph graph = ScreenGraph.of(withHelp);
+        assertEquals(Optional.of("ENGINEER"), graph.nextToExplore(), "Rules, declared first, opened by help, waits");
+        withHelp.put("ENGINEER", withHelp.get("ENGINEER").inputs(List.of(click("upgrade").did(Did.IN_PLACE))));
+        assertEquals(Optional.of("MAP"), ScreenGraph.of(withHelp).nextToExplore(), "a deeper screen before help");
+        withHelp.put("MAP", withHelp.get("MAP").inputs(List.of(click("node").did(Did.NONE))));
+        assertEquals(Optional.of("RULES"), ScreenGraph.of(withHelp).nextToExplore());
     }
 
     @Test
@@ -191,8 +221,7 @@ class ScreenGraphTest {
         ScreenGraph graph = ScreenGraph.of(screens);
 
         assertEquals(OptionalInt.empty(), graph.depth("A"));
-        assertEquals(Optional.empty(), graph.unfinishedBelow("A"));
-        assertEquals(Optional.empty(), graph.branchBegun("A"));
+        assertEquals(Optional.empty(), graph.nextToExplore(), "a loop starts nowhere: no screen to go to");
         assertEquals(ScreenGraph.Presence.LOCKED, graph.presence("A"), "no way in starts anywhere");
         assertTrue(graph.pathTo("A", "B", edge -> true).isPresent());
 
@@ -308,17 +337,12 @@ class ScreenGraphTest {
         assertEquals(List.of(), List.copyOf(graph.opensFrom("HOME")));
     }
 
-    /** A popup shows over any screen: its inputs wait for no branch of the tree (2026-10-15). */
+    /** A popup shows over any screen: its inputs are tried while it shows, and Discovery never walks to it. */
     @Test
-    void aPopupIsOnNoBranch() {
-        Map<String, GameScreen> screens = firestone();
-        screens.put("CAMPAIGN", screens.get("CAMPAIGN").inputs(List.of(click("claim").did(Did.IN_PLACE), click("map"),
-                click("loot"))));
+    void aPopupIsNoScreenToExploreNext() {
+        Map<String, GameScreen> screens = new LinkedHashMap<>(upMap(click("mail").did(Did.NONE)).screens());
         screens.put("OFFER", GameScreen.named("Offer").markers(marks("offer")).inputs(List.of(click("buy"))).popup());
-        ScreenGraph graph = ScreenGraph.of(screens);
-
-        assertEquals(Optional.of("CAMPAIGN"), graph.branchBegun("ENGINEER"), "a tree screen waits for Campaign");
-        assertEquals(Optional.empty(), graph.branchBegun("OFFER"), "the popup does not");
+        assertEquals(Optional.empty(), ScreenGraph.of(screens).nextToExplore());
     }
 
     /** A screen that says why it has no marker owes it no more, and holds no other screen back. */
@@ -340,25 +364,15 @@ class ScreenGraphTest {
         assertTrue(graph.owed().stream().noneMatch(line -> line.startsWith("Engineer: marker")), graph.owed().toString());
     }
 
-    /**
-     * A screen finished sends the game up to the nearest screen above with work left, past finished ones; a screen
-     * with work left, or below which some is left, goes nowhere (2026-10-14).
-     */
+    /** A screen finished sends the game to the next screen to explore, wherever it is; none when all is done. */
     @Test
-    void aFinishedScreenGoesUpToTheNearestScreenWithWorkLeft() {
-        ScreenGraph open = upMap(click("mail"));
-        assertEquals(Optional.of("HOME"), open.upTo("MAP"), "past Campaign, finished, to Home's mail");
-        assertEquals(Optional.of("HOME"), open.upTo("CAMPAIGN"));
-        assertEquals(Optional.empty(), open.upTo("HOME"), "Home has work left");
+    void aFinishedScreenGoesToTheNextScreenToExplore() {
+        assertEquals(Optional.of("HOME"), upMap(click("mail")).nextToExplore(), "Home's mail");
+        assertEquals(Optional.empty(), upMap(click("mail").did(Did.NONE)).nextToExplore(), "all finished");
 
-        ScreenGraph done = upMap(click("mail").did(Did.NONE));
-        assertEquals(Optional.of("HOME"), done.upTo("MAP"), "all finished: the top screen");
-        assertEquals(Optional.empty(), done.upTo("HOME"), "the top screen goes nowhere");
-
-        Map<String, GameScreen> screens = new LinkedHashMap<>(open.screens());
+        Map<String, GameScreen> screens = new LinkedHashMap<>(upMap(click("mail").did(Did.NONE)).screens());
         screens.put("MAP", screens.get("MAP").inputs(List.of(click("zoom"))));
-        assertEquals(Optional.empty(), ScreenGraph.of(screens).upTo("MAP"), "Map's zoom is untried");
-        assertEquals(Optional.empty(), ScreenGraph.of(screens).upTo("CAMPAIGN"), "Map, below it, is not done");
+        assertEquals(Optional.of("MAP"), ScreenGraph.of(screens).nextToExplore(), "Map's zoom, two steps down");
     }
 
     /** Home ▸ Campaign ▸ Map, each tried out but Home's {@code mail}. */

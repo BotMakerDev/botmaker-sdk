@@ -34,9 +34,11 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   behind a `sometimes` input shows at times, one behind a `locked` input is locked: read off the edges, never
   flagged), shape, the pictures each screen uses, and what each screen owes (`owed`; an `owes` entry
   "marker — why" stands for the marker).
-- **Discovery's order** is one rule for every screen (the user's, 2026-10-14): cut every input, try each, and
-  finish a screen an input opens before the next input of the screen it was opened from (`unfinishedBelow`,
-  `branchBegun`; popups are skipped). `upTo` and `workLeft` say what is next.
+- **Discovery's order** is breadth first (the user's call, 2026-10-16, in place of 2026-10-14's finish-each-opened-
+  screen-first): cut every input of a screen an input opens at once, then try on the screen it came from.
+  `nextToExplore` is the shallowest unfinished screen, the ones behind an information input (`isInfo`: kind INFO,
+  or help, rules, a leaderboard by name) or a way in that comes and goes last; `untried` lists information inputs
+  last. Popups are never gone to.
 - **`ScreenWalk`** finds where the game is (`whereOn`: a screen opened from another, by any way in, hides it; of two
   shown that neither hides, the one told by more markers wins) and
   walks one edge at a time: do the input, wait up to `STEP_MS` (10 s) for the next marker, close a popup that
@@ -71,8 +73,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `match` tries one copy of a repeated picture (the picture's one cut split into an untried input per copy first), and
   `which_screen` with `everywhere` numbers the copies;
   `not_a_screen` turns a screen back into an IN_PLACE result on each of its ways in; `go_to_screen` and
-  `which_screen` walk the map as a run does; `read_map` prints it (`plugin/map/MapReport`). The tool refuses a
-  screen while one below it is unfinished or one owes its marker.
+  `which_screen` walk the map as a run does; `read_map` prints it (`plugin/map/MapReport`). The tool refuses while a
+  screen owes its marker; a screen finished walks to `nextToExplore`.
 - **`edit_map`** (`MapEdits`) fixes a wrong record by hand, nothing clicked: rename, delete, popup, notes, an
   input's result or kind, reset or remove an input, use one as the way back, remove a way, a way's, input's or
   look's `when`, a new screen under another. Each action is the `ScreenEdits` method the window's menus call.

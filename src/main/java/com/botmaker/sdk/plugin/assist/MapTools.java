@@ -5,7 +5,6 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
-import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.GameScreen;
@@ -28,7 +27,6 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -73,9 +71,8 @@ final class MapTools {
                 @Describe(value = "notches to scroll over the picture instead of clicking it, for a list or a panel "
                         + "that scrolls: positive up or away, negative down or toward you", optional = true)
                 Integer scroll,
-                @Describe(value = "which copy of the picture, when the screen shows it more than once: 1 for the "
-                        + "first in reading order (top to bottom, then left to right). Each copy is an input of its "
-                        + "own, with its own result; left out, its best match", optional = true)
+                @Describe(value = "which copy of a picture the screen shows more than once, from 1 in reading order: "
+                        + "each copy is an input of its own; left out, its best match", optional = true)
                 Integer match,
                 @Describe(value = "a hotkey instead of a picture, as printed on it: Q", optional = true) String key,
                 @Describe(value = "the name the screen it opens shows, when it opens one; left out, the picture's "
@@ -120,7 +117,7 @@ final class MapTools {
     }
 
     private static final String STAY = "true stays on the screen when this leaves it finished; left out, the game is "
-            + "walked back up to the nearest screen with inputs left to try";
+            + "walked to the next screen to explore";
 
     record Goal(@Describe("the screen to go to, as the map names it: Campaign, or its constant CAMPAIGN") String screen,
                 @Describe(value = "true to act on the user's own desktop, taking their mouse; refused there "
@@ -160,10 +157,10 @@ final class MapTools {
                             + "one, or taps a hotkey) and records in the bot's Screens what each did: opened a screen "
                             + "(a new one, owing its marker, with its screenshot), led to one mapped already, changed "
                             + "this one in place, or nothing. Every picture crop_pictures cut with a screen is untried "
-                            + "until this tries it. A screen opened is finished before the next input of the screen "
-                            + "it was opened from: refused while a screen owes its marker, while a screen opened from "
-                            + "this one has an input left to try, and while another branch begun is not finished. "
-                            + "Once nothing on the screen is left to try, it goes back up by itself (stay keeps it)")
+                            + "until this tries it. Breadth first: a screen opened gets its marker and inputs cut, "
+                            + "then its parent's inputs are tried on; refused while a screen owes its marker. Once "
+                            + "nothing on the screen is left to try, it walks to the next screen to explore, the "
+                            + "shallowest with inputs left (stay keeps it)")
                     .takes(Try.class).handledBy(MapTools::tryInput),
             AssistantTool.named("go_to_screen")
                     .describedAs("Walks the game to a screen of the bot's Screens as a run does: finds where it is "
@@ -281,28 +278,6 @@ final class MapTools {
         String name = graph.shown(screen);
         Optional<String> owing = graph.owingMarker();
         if (owing.isPresent()) return Tried.refused(owes(graph.shown(owing.get())));
-        Optional<String> below = graph.unfinishedBelow(screen);
-        Set<String> hidden = Set.of();
-        if (below.isPresent()) {
-            hidden = hiddenWays(context, graph, screen);
-            below = graph.unfinishedBelow(screen, hidden);
-        }
-        if (below.isPresent()) {
-            String child = graph.shown(below.get());
-            List<Input> waiting = graph.untried(below.get());
-            String why = !waiting.isEmpty() ? "it still has untried inputs (" + ScreenGraph.labels(waiting) + ")"
-                    : "nothing on it is cut yet: crop_pictures every input on it with screen " + child
-                    + ", then try each; its close button too";
-            return Tried.refused("Finish " + child + " first: " + why + ", and it is below " + name
-                    + ". A screen opened is finished, every button, tab, toggle and arrow tried and every "
-                    + "list scrolled, before the next input of the screen it was opened from. Nothing was done.");
-        }
-        Optional<String> begun = graph.branchBegun(screen, fickle(graph));
-        if (begun.isPresent()) {
-            return Tried.refused("Finish the branch begun at " + graph.shown(begun.get()) + " first: it, or a "
-                    + "screen reached from it, still has inputs to try. One branch to its end before the next. "
-                    + "Nothing was done.");
-        }
         GameScreen on = graph.screens().get(screen);
         String what = byPicture ? input.picture().strip() : null;
         Optional<Input> held = held(on, what, key.orElse(null), notches, match, graph, screen);
@@ -495,8 +470,9 @@ final class MapTools {
     }
 
     /**
-     * {@code said}, and when the try left {@code screen} finished, the game walked back up to the nearest screen above
-     * it with work left ({@link ScreenGraph#upTo}), checked by that screen's marker; {@code input}'s {@code stay} keeps it.
+     * {@code said}, and when the try left {@code screen} finished, the game walked to the screen Discovery explores next
+     * ({@link ScreenGraph#nextToExplore}: the shallowest with work left), checked by that screen's marker;
+     * {@code input}'s {@code stay} keeps it. A popup's inputs are tried while it shows, so it walks nowhere.
      */
     private static AgentReply up(AgentContext context, AgentReply said, String screen, One input) {
         if (said.isRefused() || Boolean.TRUE.equals(input.stay())) return said;
@@ -506,7 +482,9 @@ final class MapTools {
         } catch (IllegalStateException busy) {
             return said;
         }
-        Optional<String> to = graph.upTo(screen);
+        boolean stays = graph.unfinished(screen) || graph.screen(screen).filter(GameScreen::isPopup).isPresent();
+        Optional<String> to = stays ? Optional.empty()
+                : graph.nextToExplore().filter(c -> !c.equals(screen));
         Optional<ToolReach> reach = ToolReach.of(context);
         if (to.isEmpty() || reach.isEmpty()
                 || ActTools.desktopRefusal(context, reach.get().hands(), input.desktop()).isPresent()) {
@@ -519,11 +497,11 @@ final class MapTools {
         String back = graph.shown(to.get());
         String left = graph.shown(screen);
         return said.and(AgentReply.text(walked.arrived()
-                ? "Nothing left to try on " + left + ": went back up to " + back + ". Anything on " + left + " not cut "
-                + "yet (a tab's buttons, a list's far end): go_to_screen " + left + ", cut it with screen " + left
-                + " and try it."
-                : "Nothing left to try on " + left + ", but the way up to " + back + " failed: " + walked.why()
-                + " Look where the game is (which_screen)."));
+                ? "Nothing left to try on " + left + ": went to " + back + ", the next screen to explore (the "
+                + "shallowest with inputs left). Anything on " + left + " not cut yet (a tab's buttons, a list's far "
+                + "end): go_to_screen " + left + ", cut it with screen " + left + " and try it."
+                : "Nothing left to try on " + left + ", but the way to " + back + ", the next screen to explore, "
+                + "failed: " + walked.why() + " Look where the game is (which_screen)."));
     }
 
     /** The game's usual close button, the bot's picture {@value #CLOSE}, as a way back with none tries it first. */
@@ -565,43 +543,10 @@ final class MapTools {
                         + "from the screenshot below: crop_pictures with screen " + child + " and marker set a part "
                         + "only this screen shows, then with screen " + child + " every input on it (each button, "
                         + "icon, tab, toggle, arrow and list, and its close button); what cannot be cut now, "
-                        + "write_notes with screen " + child + " and owes. Then try each of them, and finish " + child
-                        + " before going back to " + from + " for its next input.")
+                        + "write_notes with screen " + child + " and owes. Then go_to_screen " + from + " and try its "
+                        + "next input: Discovery is breadth first, so " + child + "'s inputs are tried once the "
+                        + "screens above it are finished (read_guide names the next screen to explore).")
                 .and(LookTools.screenshot(new LookTools.Shot(null, null, null, null, null, null), context));
-    }
-
-    /**
-     * The screens opened from {@code screen} by an input that comes and goes and is not on the game now: they cannot
-     * be finished until it shows, so they hold back none of {@code screen}'s other inputs. Empty when the game cannot
-     * be looked at.
-     */
-    private static Set<String> hiddenWays(AgentContext context, ScreenGraph graph, String screen) {
-        List<String> children = graph.children(screen).stream().filter(c -> comesAndGoes(graph, c)).toList();
-        Optional<ToolReach> reach = ToolReach.of(context);
-        Optional<BufferedImage> frame = children.isEmpty() || reach.isEmpty() ? Optional.empty() : Frames.look(context);
-        if (frame.isEmpty()) return Set.of();
-        List<Optional<Rect>> found = reach.get().findEach(children.stream()
-                .map(c -> graph.screens().get(c).from().via().picture()).toList(), frame.get());
-        Set<String> hidden = new HashSet<>();
-        for (int i = 0; i < children.size(); i++) if (found.get(i).isEmpty()) hidden.add(children.get(i));
-        return hidden;
-    }
-
-    /**
-     * The screens whose way in comes and goes: a branch begun at one cannot be finished on demand, so it holds back
-     * no other branch (Engineer, under a Home button shown only while tools wait, held Garage's, 2026-10-16).
-     */
-    private static Set<String> fickle(ScreenGraph graph) {
-        return Set.copyOf(graph.screens().keySet().stream().filter(c -> comesAndGoes(graph, c)).toList());
-    }
-
-    /** Whether {@code constant}'s way in is a button that shows only at times. */
-    private static boolean comesAndGoes(ScreenGraph graph, String constant) {
-        Way way = graph.screens().get(constant).from();
-        if (way == null || way.via() == null || way.via().picture() == null) return false;
-        // A way keeps its input bare: whether it comes and goes is said by the input on the screen it leaves.
-        Optional<GameScreen> from = graph.parent(constant).map(graph.screens()::get);
-        return from.isPresent() && from.get().inputs().stream().anyMatch(i -> i.comesAndGoes() && i.sameAs(way.via()));
     }
 
     /**
