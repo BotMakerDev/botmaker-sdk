@@ -468,7 +468,7 @@ final class MapTools {
         ScreenWalk.Result walked = new ScreenWalk(graph, reach.get(), STEP_MS, null, close(context)).go(to.get(),
                 screen);
         seen(graph, walked.at());
-        if (walked.arrived()) retakeShot(context, reach.get(), walked.at());
+        if (walked.arrived()) retakeShot(context, reach.get(), graph, walked.at());
         String back = graph.shown(to.get());
         String left = graph.shown(screen);
         return said.and(AgentReply.text(walked.arrived()
@@ -508,6 +508,8 @@ final class MapTools {
         Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> replaced(s, old, base.did(null)))
                 .or(() -> ScreenBook.add(services, constant, made)));
         if (failed.isPresent()) return unwritten(failed.get());
+        // A draft: the frame right after the click may be the way there (Firestone's Arena replay kept its VS
+        // splash, 2026-10-16). The marker's cut replaces it with the frame the marker was cut from.
         ScreenShots.save(services.resourcesDir(), constant, frame);
         String from = graph.shown(screen);
         return AgentReply.text("Opened " + child + ", added to the map as Screens." + constant + ", reached from "
@@ -940,6 +942,8 @@ final class MapTools {
                 Placing at = placing(services, screen, true, popup);
                 if (at.refusal() != null) return AgentReply.refused(at.refusal());
                 said.append(marker).append(':').append(noteCut(services, at, marker, true, false, false));
+                said.append(markerShot(context, screen, marker, fitted.frame() != null ? fitted.frame()
+                        : Frames.look(context).orElse(null)));
             }
             Placing at = placing(services, screen, false, false);
             if (at.refusal() != null) return said.isEmpty() ? AgentReply.refused(at.refusal())
@@ -977,8 +981,8 @@ final class MapTools {
         ScreenWalk.Result walked = new ScreenWalk(graph, reach.get(), STEP_MS, null, close(context)).go(target.get(),
                 lastSeen);
         seen(graph, walked.at());
-        if (walked.arrived()) retakeShot(context, reach.get(), walked.at());
-        String path = walked.walked().isEmpty() ? "" : " Walked: " + String.join(" › ",
+        if (walked.arrived()) retakeShot(context, reach.get(), graph, walked.at());
+        String path =walked.walked().isEmpty() ? "" : " Walked: " + String.join(" › ",
                 walked.walked().stream().map(graph::shown).toList()) + ".";
         return AgentReply.text((walked.arrived() ? "" : "Not there (" + walked.outcome().name().toLowerCase(Locale.ROOT)
                 .replace('_', ' ') + "): ") + walked.why() + path);
@@ -1025,12 +1029,42 @@ final class MapTools {
      * kept only when missing may show a panel opened over the screen before that panel was mapped (Market over Tavern,
      * 2026-10-15).
      */
-    private static void retakeShot(AgentContext context, ToolReach reach, String constant) {
+    private static void retakeShot(AgentContext context, ToolReach reach, ScreenGraph graph, String constant) {
         Path resources = context.services().resourcesDir();
+        if (resources == null || RETAKEN.contains(resources.resolve(constant))) return;
+        if (graph.screen(constant).map(GameScreen::marker).isEmpty()) return;
+        // Only a frame its marker shows on: the walk's last frame may still be the way there.
+        Optional<BufferedImage> frame = reach.look().filter(f -> ScreenFit.shows(reach, graph, constant, f));
         // Once a session: each arrival wrote a 1–3 MB shot of an animated game, a new file the next Project History
         // snapshot hashed, compressed and kept, 2–3 s of every write and most of a 63 MB history (2026-10-16).
-        if (resources == null || !RETAKEN.add(resources.resolve(constant))) return;
-        reach.look().ifPresent(frame -> ScreenShots.save(resources, constant, frame));
+        if (frame.isPresent() && RETAKEN.add(resources.resolve(constant))) ScreenShots.save(resources, constant, frame.get());
+    }
+
+    /**
+     * After {@code picture} is noted as {@code typed}'s marker: {@code frame} becomes its shot when the map has that
+     * marker and it shows on the frame, said as a sentence; blank otherwise (the note failed, the screen is not in the
+     * map). The shot a screen got when it opened was the frame right after the click, a draft; and a recut marker means
+     * the screen changed.
+     */
+    static String markerShot(AgentContext context, String typed, String picture, BufferedImage frame) {
+        Optional<ToolReach> reach = ToolReach.of(context);
+        Path resources = context.services().resourcesDir();
+        if (frame == null || reach.isEmpty() || resources == null) return "";
+        ScreenGraph graph;
+        try {
+            graph = FxCall.call(() -> ScreenBook.read(context.services()));
+        } catch (IllegalStateException busy) {
+            return "";
+        }
+        Optional<String> constant = ScreenBook.find(graph, typed);
+        ImageTemplate marker = constant.map(c -> graph.screens().get(c).marker()).orElse(null);
+        if (marker == null || !marker.id().equals(picture)
+                || !ScreenFit.shows(reach.get(), graph, constant.get(), frame)) {
+            return "";
+        }
+        ScreenShots.save(resources, constant.get(), frame);
+        RETAKEN.add(resources.resolve(constant.get()));
+        return " " + graph.shown(constant.get()) + "'s shot is this frame now.";
     }
 
     /** The shots a walk has taken again since the plugin loaded, by file. */

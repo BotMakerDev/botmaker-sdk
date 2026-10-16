@@ -526,6 +526,9 @@ final class PictureTools {
             MapTools.Look look = new MapTools.Look(variantOf, state.orElse(null), when, screenLook);
             String noted = section.map(s -> MapTools.noteCut(context.services(), s, name, marker, back, comes, look))
                     .orElse("");
+            if (marker && screenLook == null && screen != null) {
+                noted += MapTools.markerShot(context, screen, name, Frames.look(context).orElse(null));
+            }
             return AgentReply.text("Kept " + name + " as it is" + (tags.isEmpty() || !untagged.isEmpty() ? ""
                     : ", tagged " + String.join(", ", tags)) + "." + noted
                     + (untagged.isEmpty() ? "" : " Not tagged: " + String.join(" ", untagged)));
@@ -547,6 +550,8 @@ final class PictureTools {
         MapTools.Look look = new MapTools.Look(variantOf, state.orElse(null), when, screenLook);
         String noted = section.map(s -> MapTools.noteCut(context.services(), s, saved.name(), marker, back,
                 comes, look)).orElse("");
+        // The frame a screen's marker is cut from shows the screen: its shot.
+        if (marker && screenLook == null && screen != null) noted += MapTools.markerShot(context, screen, saved.name(), frame.get());
         return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
                         + "." + constant) + (tags.isEmpty() || !untagged.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
                         + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike

@@ -1251,6 +1251,52 @@ class SdkAssistTest {
         assertTrue(unchecked.contains("Not checked on the game: it does not show Home now."), unchecked);
     }
 
+    /**
+     * A screen's shot shows its marker: the frame right after the click that opened it is a draft, replaced by the
+     * frame its marker is cut from, and a shot is taken again only while the game shows the screen (Firestone's Arena
+     * replay kept its VS splash, 2026-10-16).
+     */
+    @Test
+    void aScreensShotShowsItsMarker() throws IOException {
+        Game game = new Game();
+        NativeControllerFactory.setForTesting(game);
+        BufferedImage home = noise(WATCHED.width(), WATCHED.height(), 51);
+        BufferedImage splash = noise(WATCHED.width(), WATCHED.height(), 52);
+        BufferedImage bag = covered(home, 0, 120, 400, 180, 53);
+        agent.frame = home;
+        run("screenshot");
+        String started = text(cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen",
+                "Home", "marker", true));
+        assertTrue(started.contains("Home's shot is this frame now."), started);
+        assertEquals(home.getRGB(5, 5), shot("HOME").getRGB(5, 5));
+        run("crop_pictures", "screen", "Home", "boxes", List.of(box("bag", 200, 20, 48, 48)));
+
+        game.then(splash);
+        tryOne("screen", "Home", "picture", "bag", "opens", "Bag", "desktop", true, "settleMs", 0);
+        assertEquals(splash.getRGB(5, 5), shot("BAG").getRGB(5, 5), "the frame after the click, a draft");
+        assertTrue(ScreenEdits.retakeShot(agent, "BAG").startsWith("Bag has no marker yet"),
+                "nothing tells the splash from Bag yet: the draft is kept");
+
+        agent.frame = bag;
+        run("screenshot");
+        String marked = text(cropOne("name", "bag_title", "x", 30, "y", 130, "width", SIZE, "height", SIZE,
+                "screen", "Bag", "marker", true));
+        assertTrue(marked.contains("Bag's shot is this frame now."), marked);
+        assertEquals(bag.getRGB(5, 150), shot("BAG").getRGB(5, 150), "the frame its marker is cut from");
+
+        agent.frame = splash;
+        String refused = ScreenEdits.retakeShot(agent, "BAG");
+        assertTrue(refused.startsWith("The game does not show Bag now"), refused);
+        assertEquals(bag.getRGB(5, 150), shot("BAG").getRGB(5, 150), "the shot is kept");
+        agent.frame = bag;
+        assertEquals("Shot taken.", ScreenEdits.retakeShot(agent, "BAG"));
+    }
+
+    /** {@code constant}'s saved shot. */
+    private BufferedImage shot(String constant) throws IOException {
+        return ImageIO.read(ScreenShots.file(resources, constant).toFile());
+    }
+
     /** {@code frame} with the box at {@code x, y} drawn over by other pixels: a panel opened over it. */
     private static BufferedImage covered(BufferedImage frame, int x, int y, int width, int height, long seed) {
         BufferedImage now = new BufferedImage(frame.getWidth(), frame.getHeight(), BufferedImage.TYPE_3BYTE_BGR);

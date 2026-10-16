@@ -14,8 +14,9 @@ import java.util.Iterator;
  * it is but not what is on it (the user's call, 2026-10-15). Kept at the capture's own size, so a picture cut on that
  * frame is boxed on it pixel for pixel (the user's call, 2026-10-15, after a 480-pixel shot read too blurred). One file
  * a screen, {@code screens/<CONSTANT>.png} in the project's resources, beside the pictures and never one of them:
- * nothing matches it, and a missing one only leaves the card showing its marker. try_input saves one when it opens a
- * screen; which_screen when it sees one that has none.
+ * nothing matches it, and a missing one only leaves the card showing its marker. try_input saves a draft when it opens a
+ * screen, and the cut of the screen's marker replaces it with the frame it was cut from; which_screen saves one when it
+ * sees a screen that has none. Any other shot is taken only on a frame the screen's marker shows on (2026-10-16).
  */
 public final class ScreenShots {
 

@@ -419,6 +419,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     reply says so.
   - `crop_pictures` refuses a new box for a screen while the screenshot shows another screen of the map (a cut on
     Map noted on Home). A call with a marker box passes: it starts the screen or recuts its marker.
+- **A screen's shot shows the screen.** The shot `try_input` saves when an input opens a screen is a draft, the frame
+  right after the click (Firestone's Arena replay kept its VS splash). Cutting or placing the screen's marker replaces
+  it with the frame the marker shows on. 🗺 Screens' *Take shot* and the shot a walk retakes on arrival are taken
+  only while the screen's marker shows; otherwise the shot is kept and the reply says why.
 - **Discovery no longer stalls or files a way wrong** (Firestone, 2026-10-16):
   - A screen whose way in comes and goes (Engineer's Home button, shown only while tools wait) holds nothing back
     while that button is hidden, and its branch never blocks another.

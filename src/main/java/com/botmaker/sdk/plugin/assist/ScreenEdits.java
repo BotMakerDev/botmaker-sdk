@@ -118,10 +118,31 @@ public final class ScreenEdits {
         return said(failed, "Deleted " + graph.shown(constant) + ".");
     }
 
-    /** {@code constant}'s whole-screen shot taken again from the game now. Off the FX thread: it reads the game. */
+    /**
+     * {@code constant}'s whole-screen shot taken again from the game now, only while the game shows it: its marker is
+     * found. Off the FX thread: it reads the game.
+     */
     public static String retakeShot(AgentContext context, String constant) {
+        Optional<ToolReach> reach = ToolReach.of(context);
+        if (reach.isEmpty()) return Frames.noProject();
         Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return Frames.noScreen();
+        ScreenGraph graph;
+        try {
+            graph = FxCall.call(() -> ScreenBook.read(context.services()));
+        } catch (IllegalStateException busy) {
+            return "Studio did not hand over the bot's Screens: " + busy.getMessage();
+        }
+        GameScreen screen = graph.screens().get(constant);
+        if (screen == null) return "No screen " + constant + " in the map.";
+        if (screen.marker() == null) {
+            return graph.shown(constant) + " has no marker yet, so nothing tells it from the frame: cut its marker, "
+                    + "which takes its shot.";
+        }
+        if (!ScreenFit.shows(reach.get(), graph, constant, frame.get())) {
+            return "The game does not show " + graph.shown(constant) + " now: its marker is not found. The shot was "
+                    + "kept; go there first.";
+        }
         ScreenShots.save(context.services().resourcesDir(), constant, frame.get());
         return "Shot taken.";
     }
