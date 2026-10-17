@@ -72,7 +72,8 @@ final class MapTools {
     private static volatile String lastSeen;
 
     /** One input try_input tries: a picture to click or scroll over, or a hotkey. */
-    record Step(@Describe(value = "a picture cut on that screen, clicked at its best match", optional = true)
+    record Step(@Describe(value = "a picture cut on that screen, clicked at its best match, or an input's field "
+            + "(beerBuy)", optional = true)
                 String picture,
                 @Describe(value = "notches to scroll over the picture instead of clicking it, for a list or a panel "
                         + "that scrolls: positive up or away, negative down or toward you", optional = true)
@@ -115,6 +116,11 @@ final class MapTools {
         static One after(Try call) {
             return new One(call.screen(), null, null, null, null, null, null, null, null, null, call.stay(),
                     call.desktop());
+        }
+
+        /** This input, by {@code picture} scrolled {@code scroll} over, or by {@code key}. */
+        One named(String picture, Integer scroll, String key) {
+            return new One(screen, picture, scroll, match, key, opens, never, locked, purpose, settleMs, stay, desktop);
         }
 
         String label() {
@@ -224,11 +230,42 @@ final class MapTools {
 
     private static Tried attempt(One input, AgentContext context) {
         try {
-            return tried(input, context);
+            One named = byField(input, context);
+            if (named == null) {
+                return Tried.refused(input.picture().strip() + " is a strip that scrolls by a drag, which try_input "
+                        + "cannot do: try its members by their pictures. Nothing was done.");
+            }
+            return tried(named, context);
         } catch (IllegalStateException busy) {
             return Tried.refused("Studio did not answer while reading or writing the bot's Screens: "
                     + busy.getMessage() + " Look where the game is and read the map (read_guide) before trying again.");
         }
+    }
+
+    /**
+     * {@code input} named by a field of its screen ({@code beerBuy}), as read_map lists it: made the picture, the strip
+     * (its first member, scrolled by its notches) or the key the field holds. As it was when it names no field, or
+     * names a picture the bot has: a picture's name wins, so a call by picture reads as it always did. Null for a
+     * strip that scrolls by a drag, which try_input cannot do.
+     */
+    private static One byField(One input, AgentContext context) {
+        if (input.picture() == null || input.picture().isBlank() || input.key() != null && !input.key().isBlank()
+                || context.services().projectDir() == null || ActTools.exists(context, input.picture().strip())) {
+            return input;
+        }
+        ScreenGraph graph = FxCall.call(() -> ScreenBook.read(context.services()));
+        String field = input.picture().strip();
+        Optional<Input> held = ScreenBook.find(graph, input.screen() == null ? "" : input.screen().strip())
+                .flatMap(screen -> graph.input(screen, field));
+        return held.map(named -> switch (named) {
+            case Button button -> button.picture() == null ? input : input.named(button.picture().id(), input.scroll(),
+                    null);
+            case Strip strip when strip.scroll() != null && strip.scroll().drag() != null && input.scroll() == null ->
+                    null;
+            case Strip strip -> strip.members().isEmpty() ? input : input.named(strip.members().getFirst().id(),
+                    input.scroll() != null || strip.scroll() == null ? input.scroll() : strip.scroll().notches(), null);
+            case Hotkey hotkey -> hotkey.key() == null ? input : input.named(null, null, hotkey.key().label());
+        }).orElse(input);
     }
 
     /** The constant {@code typed} names in the map; empty when none or Studio is busy. */

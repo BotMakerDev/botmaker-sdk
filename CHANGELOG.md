@@ -36,6 +36,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     `Order` is a pad of arrows, the old direction pad.
   - The assistant's guide writes bodies on `Navigate.press`, never picture chains.
 
+- **The map tools name an input by its field.** `edit_map` and `try_input` take `picture: beerBuy`, the field
+  `read_map` lists, as well as the picture; a strip's field tries its first member by its notches. `edit_map`'s
+  `set_input` sets `repeated`, a button the screen shows more than once. `read_map`, the 🗺 window's rows and the
+  constant view say a button's copies (`repeated`) and a strip's scroll as measured (`wheel -5, step 120px, settles in
+  400 ms`, or `not measured`).
+
 - **Lists that scroll, named by their buttons.** `GameScreen.lists(List.of(ScreenList.of(-5, List.of(
   Pictures.TAVERN_HOME, Pictures.ARENA_HOME, …))))` says some of a screen's buttons sit in one list or column. No
   number places it: a member is looked for anywhere along the band its members were cut in, so a Home column whose

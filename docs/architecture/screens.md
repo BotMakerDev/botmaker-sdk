@@ -87,8 +87,13 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   the shape is transparent and the matcher masks by alpha, so a small round icon over a moving background is cut
   whole without it. `crop_pictures` and its replace take `shape`/`points`; the Capture window's ✎ toggles the shape.
 - **`edit_map`** (`MapEdits`) fixes a wrong record by hand, nothing clicked: rename, delete, popup, notes, an
-  input's result or kind, reset or remove an input, use one as the way back, remove a way, a way's, input's or
-  look's `when`, a new screen under another. Each action is the `ScreenEdits` method the window's menus call.
+  input's result, kind or copies (`repeated`), reset or remove an input, use one as the way back, remove a way, a
+  way's, input's or look's `when`, a new screen under another. Each action is the `ScreenEdits` method the window's
+  menus call.
+- **An input is named by its field** in `edit_map` and `try_input` (`picture: beerBuy`), as `read_map` lists it, or
+  by its picture as before; a strip's field tries its first member by its notches. `read_map`, the 🗺 rows and the
+  constant view say what the class form adds (`ScreenCards.Row.traits`): `repeated`, and a strip's scroll as measured
+  (`wheel -5, step 120px, settles in 400 ms`, or `not measured`).
 - `Protocol` and `SdkAssist.GUIDE` say when each runs (Discovery, Upkeep).
 
 ## The window (`plugin/map`)

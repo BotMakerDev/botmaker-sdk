@@ -982,6 +982,23 @@ class SdkAssistTest {
         assertTrue(kept.contains("Kept bag as it is") && kept.contains("Noted in Home as untried"), kept);
         assertEquals(List.of("gold", "bag"), fields("HOME"), "a picture cut earlier, on no screen, is noted as it is");
         assertFalse(run("edit_map", "action", "remove_input", "screen", "Home", "picture", "bag").isRefused());
+        // An input named by its field, as read_map lists it, where its picture has another name.
+        Input goldInput = input("HOME", "gold");
+        host.set("screen_map").remove("HOME.gold");
+        put("HOME", screen("HOME").withInput("pile", goldInput));
+        assertFalse(run("edit_map", "action", "set_input", "screen", "Home", "picture", "pile", "repeated", true)
+                .isRefused());
+        assertTrue(((Button) input("HOME", "pile")).repeats());
+        assertFalse(run("edit_map", "action", "set_input", "screen", "Home", "picture", "gold", "repeated", false)
+                .isRefused(), "by its picture still");
+        assertFalse(((Button) input("HOME", "pile")).repeats());
+        String never = text(tryOne("screen", "Home", "picture", "pile", "never", "spends gems"));
+        assertEquals("spends gems", input("HOME", "pile").never(), never);
+        assertFalse(run("edit_map", "action", "set_input", "screen", "Home", "picture", "pile", "never", "")
+                .isRefused());
+        Input pile = input("HOME", "pile");
+        host.set("screen_map").remove("HOME.pile");
+        put("HOME", screen("HOME").withInput("gold", pile));
         assertTrue(cropOne("name", "none_yet", "screen", "Home").isRefused(), "no box names a picture the bot has");
         assertTrue(cropOne("name", "half", "x", 10, "screen", "Home").isRefused(), "a box is all four or none");
         assertEquals(Set.of(), TemplateLibrary.manifest(host).tagsOf("gold"),

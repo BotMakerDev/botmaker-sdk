@@ -36,7 +36,7 @@ final class MapEdits {
 
     private static final String SCREEN = "the screen edited, as the map names it: Home, or its constant HOME; for "
             + "new_screen the screen it is opened from";
-    private static final String PICTURE = "the input, by its picture, as try_input names it";
+    private static final String PICTURE = "the input: its field (beerBuy) or picture";
     private static final String SCROLL = "with picture, the strip that scrolls over it by these notches";
     private static final String KEY = "the input, by its hotkey: Q";
     private static final String FROM = "the screen the way in leaves";
@@ -81,7 +81,7 @@ final class MapEdits {
             implements Edit {
     }
 
-    @Describe("set what an input did or is for, or why it is never clicked or what proves it locked")
+    @Describe("set what an input did, is for, or why it is never done or locked")
     record SetInput(String screen,
                     @Describe(value = PICTURE, optional = true) String picture,
                     @Describe(value = SCROLL, optional = true) Integer scroll,
@@ -92,7 +92,9 @@ final class MapEdits {
                     @Describe(value = "why it is never clicked; blank to clear it", optional = true) String never,
                     @Describe(value = "the picture proving it locked; blank to clear it", optional = true)
                     String locked,
-                    @Describe(value = "true when it shows only at times", optional = true) Boolean sometimes)
+                    @Describe(value = "true when it shows only at times", optional = true) Boolean sometimes,
+                    @Describe(value = "true for a button shown more than once", optional = true)
+                    Boolean repeated)
             implements Edit, OfInput {
     }
 
@@ -114,7 +116,7 @@ final class MapEdits {
                      @Describe(value = "", optional = true) String key) implements Edit, OfInput {
     }
 
-    @Describe("its way back becomes an untried input again: a panel taken for it")
+    @Describe("its way back made an untried input again")
     record RemoveBack(String screen) implements Edit {
     }
 
@@ -140,8 +142,8 @@ final class MapEdits {
                      @Describe(value = "", optional = true) String method) implements Edit, OfInput {
     }
 
-    @Describe("a strip of buttons that scrolls or whose slots shift, by its buttons: each found anywhere along it, "
-            + "scrolled to over another that shows; no notches: the strip is off")
+    @Describe("a strip of buttons that scrolls or shifts, by its buttons, each scrolled to over one that shows; no "
+            + "notches: no strip")
     record InStrip(String screen,
                    @Describe(value = "the pictures of the screen's buttons in it, in its order", optional = true)
                    List<String> members,
@@ -154,8 +156,8 @@ final class MapEdits {
                     @Describe(value = "", optional = true) String method) implements Edit {
     }
 
-    @Describe("add a picture the bot has to what tells the screen apart: a marker, all of which show, or with absent "
-            + "true one it never shows; refused when another screen's shot shows the set too")
+    @Describe("add a picture to what tells the screen apart: a marker (all show), or with absent true one it never "
+            + "shows; refused when another screen's shot shows the set too")
     record AddMarker(String screen, @Describe("a picture the bot has") String picture,
                      @Describe(value = "true for a picture the screen never shows, where a screen like it does",
                              optional = true) Boolean absent) implements Edit {
@@ -289,10 +291,18 @@ final class MapEdits {
         return field(on, named).map(then).orElseGet(() -> AgentReply.refused(noInput(graph, screen, named)));
     }
 
-    /** The field of {@code on} that {@code named} names. */
+    /**
+     * The field of {@code on} that {@code named} names: by its picture or key, else by the field itself; a picture
+     * wins, so a call by picture reads as it always did.
+     */
     static Optional<String> field(MapScreen on, OfInput named) {
         return on.inputs().entrySet().stream().filter(e -> named(e.getValue(), named)).map(Map.Entry::getKey)
-                .findFirst();
+                .findFirst().or(() -> Optional.ofNullable(asField(named)).filter(on.inputs()::containsKey));
+    }
+
+    /** The field {@code named} may name by its picture ({@code beerBuy}); null when it names a key or a scroll. */
+    private static String asField(OfInput named) {
+        return has(named.picture()) && !has(named.key()) && named.scroll() == null ? named.picture().strip() : null;
     }
 
     private static String method(String method) {
@@ -310,11 +320,14 @@ final class MapEdits {
             return AgentReply.refused("Give one of did, never and locked: each replaces the others. Nothing was "
                     + "written.");
         }
-        if (settles == 0 && edit.purpose() == null && edit.sometimes() == null) {
-            return AgentReply.refused("Say what to set: did, purpose, never, locked or sometimes. Nothing was "
-                    + "written.");
+        if (settles == 0 && edit.purpose() == null && edit.sometimes() == null && edit.repeated() == null) {
+            return AgentReply.refused("Say what to set: did, purpose, never, locked, sometimes or repeated. Nothing "
+                    + "was written.");
         }
         Input in = on.inputs().get(field);
+        if (edit.repeated() != null && !(in instanceof Button)) {
+            return AgentReply.refused(field + " is no button: only a button has copies. Nothing was written.");
+        }
         Input now = in;
         if (edit.did() != null) {
             now = switch (edit.did()) {
@@ -343,6 +356,11 @@ final class MapEdits {
             };
         }
         if (edit.sometimes() != null) now = ScreenEdits.sometimes(now, edit.sometimes());
+        if (edit.repeated() != null && now instanceof Button b) {
+            now = edit.repeated() ? b.repeated()
+                    : new Button(b.picture(), b.did(), b.purpose(), b.never(), b.comesAndGoes(), b.lock(), b.looks(),
+                    b.when(), false);
+        }
         return said(ScreenEdits.setInput(context.services(), screen, field, now));
     }
 
@@ -360,10 +378,12 @@ final class MapEdits {
         String unnamed = unnamed(named);
         if (unnamed != null) return AgentReply.refused(unnamed);
         List<Way> ways = graph.screens().get(screen).ways();
-        Optional<String> via = ways.stream().map(w -> graph.nameOf(w.via())).flatMap(Optional::stream)
-                .filter(n -> n.screen().equals(from.get()))
+        List<InputName> leaving = ways.stream().map(w -> graph.nameOf(w.via())).flatMap(Optional::stream)
+                .filter(n -> n.screen().equals(from.get())).toList();
+        Optional<String> via = leaving.stream()
                 .filter(n -> graph.input(n.screen(), n.field()).filter(i -> named(i, named)).isPresent())
-                .map(InputName::field).findFirst();
+                .map(InputName::field).findFirst()
+                .or(() -> leaving.stream().map(InputName::field).filter(f -> f.equals(asField(named))).findFirst());
         if (via.isEmpty()) {
             List<String> each = ways.stream().map(w -> graph.nameOf(w.via())).flatMap(Optional::stream)
                     .map(n -> "from " + graph.shown(n.screen()) + " by " + n.field()).toList();

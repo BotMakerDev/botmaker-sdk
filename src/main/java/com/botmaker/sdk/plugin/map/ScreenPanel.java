@@ -320,7 +320,7 @@ final class ScreenPanel {
         label.getStyleClass().add("screen-row-label");
         label.setMinWidth(0);
         VBox words = new VBox(1, label);
-        String about = String.join(" · ", Stream.of(row.kind(),
+        String about = String.join(" · ", Stream.of(row.kind(), row.traits(),
                 row.look().isEmpty() ? "" : "look " + row.look(), row.when().isEmpty() ? "" : "while " + row.when())
                 .filter(s -> !s.isEmpty()).toList());
         if (!about.isEmpty()) {

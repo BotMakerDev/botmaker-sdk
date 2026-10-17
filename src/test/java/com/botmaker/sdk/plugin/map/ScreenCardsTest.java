@@ -21,6 +21,7 @@ import com.botmaker.sdk.plugin.map.ScreenCards.State;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -247,6 +248,19 @@ class ScreenCardsTest {
                 click("mail"), Strip.of(Scroll.wheel(-5), List.of(library, picture("mail"))));
         assertEquals(List.of(), ScreenCards.strips(ScreenGraph.of(Map.of("HOME", nowhere)), "HOME", rows),
                 "no member has a place: no strip");
+    }
+
+    /** What the class form says beyond what an input did: a button's copies, a strip's scroll as measured. */
+    @Test
+    void aRowSaysAButtonsCopiesAndAStripsScroll() {
+        Setup setup = Setup.named("Home").markers(marks("home"));
+        MapScreen home = screen(setup, Button.of(picture("claim")).repeated(), click("mail"),
+                Strip.of(Scroll.wheel(-5), List.of(picture("tavern"))),
+                Strip.of(Scroll.wheel(3).step(120).settle(Duration.ofMillis(400)), List.of(picture("arena"))));
+        List<String> traits = ScreenCards.rows(ScreenGraph.of(Map.of("HOME", home)), "HOME").stream()
+                .map(ScreenCards.Row::traits).toList();
+        assertEquals(List.of("repeated", "", "wheel -5, not measured", "wheel 3, step 120px, settles in 400 ms"),
+                traits);
     }
 
     @Test

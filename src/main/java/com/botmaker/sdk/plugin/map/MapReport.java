@@ -183,6 +183,7 @@ public final class MapReport {
         for (Row row : ScreenCards.rows(graph, constant)) {
             out.append(indent).append("  - ").append(row.label()).append(": ").append(row.result());
             if (!row.kind().isEmpty()) out.append(" (").append(row.kind()).append(')');
+            if (!row.traits().isEmpty()) out.append(" {").append(row.traits()).append('}');
             if (!row.look().isEmpty()) out.append(" [look ").append(row.look()).append(']');
             if (!row.when().isEmpty()) out.append(" while ").append(row.when());
             if (row.looks().size() > 1) {

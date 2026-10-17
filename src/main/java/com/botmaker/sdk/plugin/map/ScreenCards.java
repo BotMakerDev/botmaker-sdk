@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -99,9 +100,11 @@ final class ScreenCards {
      * @param when    the method saying when it is there, {@code Firestone::eventOn}; empty for none
      * @param looks   each look of its button, the usual one first, with where it leads in that look: one entry for
      *                a button with one look
+     * @param traits  what its class form says beyond that: {@code repeated} for a button shown more than once, a
+     *                strip's scroll ({@code wheel -5, step 120px, settles in 400 ms}); empty for none
      */
     record Row(String field, Input input, String label, String picture, RowState state, String result, String kind,
-               String look, String when, List<ButtonLook> looks) {}
+               String look, String when, List<ButtonLook> looks, String traits) {}
 
     /**
      * One look of an input's button as the side panel steps through it: its picture, what it means, and where it
@@ -290,8 +293,19 @@ final class ScreenCards {
                         .filter(l -> l.state() == null || l.state() == v.state())
                         .map(l -> graph.shown(l.to()) + said(null, l.when())).distinct().toList()))).toList()
                 : List.of();
+        String traits = switch (input) {
+            case Button button -> button.repeats() ? "repeated" : "";
+            case com.botmaker.sdk.api.screens.Strip strip -> strip.scroll() == null ? "" : scrolled(strip.scroll());
+            case Hotkey ignored -> "";
+        };
         return new Row(field, input, field, picture(input), state, result, kind, look,
-                ScreenTypes.sourceOf(input.when()), looks);
+                ScreenTypes.sourceOf(input.when()), looks, traits);
+    }
+
+    /** How a strip scrolls, as try_input measured it: {@code wheel -5, step 120px, settles in 400 ms}. */
+    static String scrolled(Scroll scroll) {
+        return scroll.label() + (scroll.step() == 0 ? ", not measured" : ", step " + scroll.step() + "px, settles in "
+                + scroll.settle().toMillis() + " ms");
     }
 
     /** The picture {@code input} acts on: a button's, a strip's first member's; null for a key. */

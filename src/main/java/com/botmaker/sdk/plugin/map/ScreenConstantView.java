@@ -87,6 +87,7 @@ public final class ScreenConstantView {
             Node picture = LookToggle.of(row.looks(), id -> thumb(services.resourcesDir(), id)
                     .orElseGet(Region::new), leads, row.result());
             String about = (row.kind().isEmpty() ? "" : " (" + row.kind() + ")")
+                    + (row.traits().isEmpty() ? "" : " {" + row.traits() + "}")
                     + (row.look().isEmpty() ? "" : " [look " + row.look() + "]")
                     + (row.when().isEmpty() ? "" : " while " + row.when());
             HBox line = new HBox(8, picture, new Label(row.label() + about + ":"), leads);
