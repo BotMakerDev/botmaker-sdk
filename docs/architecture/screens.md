@@ -98,10 +98,20 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 
 ## The window (`plugin/map`)
 
-- **`ScreenMap`**: one window per project (and a narrow copy in the overlay editor). It reads the map every
-  1.5 s on a virtual thread, and at once after the user's own edit (a read the other overtook draws nothing). It
-  redraws only when a `ScreenCards` value or a picture's file time changed; an empty read is trusted on the second
-  in a row. The card a run is on is lit from telemetry.
+- **`ScreenMap`**: one window per project (and a narrow copy in the overlay editor). Every 1.5 s it reads the map
+  on a virtual thread only when `Screens.java` was written since (`ScreensFile`), or after 20 polls anyway, and at
+  once after the user's own edit (a read the other overtook draws nothing). One read of a 45-screen map takes about
+  a second. It redraws only when a `ScreenCards` value or a picture's file time changed; an empty read is trusted
+  on the second in a row. The card a run is on is lit from telemetry.
+- **Reads on the FX thread** go through `ScreenMapRead.orEmpty` (`plugin/pictures`): one read per FX event, shared
+  by every card and editor drawn in it, dropped after it; a write calls `forget()`. A picture opens on its own cut
+  (`TemplateUses.cut`), never on every picture constant's.
+- **Search** (*Find a screen…*, `GraphCanvas.searchField`): each card's terms are `ScreenCards.terms` — its name,
+  constant, `input <field>`, `picture <id>` and `notes …`; a term's label is shown, never searched. At most 12 hits
+  are listed under the field, inside the map (a popup window would take the field's keys): names that begin with
+  the query, then names that hold it, then other terms, each row the screen's marker, name and what matched.
+  ↑ ↓ Enter or a click picks one: the map zooms to it at readable size (`zoomTo`, eased over 250 ms) and selects it;
+  Esc clears the field and fits the map. Every hit is also lit on the map.
 - **`ScreenCards`** decides, apart from JavaFX, each card (state, progress, `pills`), each link (`label()` names
   the default way back), each input's row and each list's `Strip`. **`ScreenCanvas`** draws them, folds the tree,
   caches at most 400 images and places input boxes on any frame shape (`boxOn`, letterboxed). A card's shot loads in
@@ -126,5 +136,6 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   clicked on the big shot that opens a screen shows that screen's shot in its place, its ← back to the one before.
 - **`MapGuide`** is the toolbar's **?** legend, and holds the tooltips it repeats.
 - Around it: the `Navigate` screen picker and the `Pick`/`Order` editors (`plugin/editors/ScreenEditors`), the
-  input picker (`InputPicker`: a screen, then its fields of the slot's type on its shot), the `Screens` constant preview
-  (`ScreenConstantView`), Manage Pictures' groups by screen (`plugin/pictures/ScreenGroups`).
+  input picker (`InputPicker`: a screen, then its fields of the slot's type on its shot), the `Screens.java` tab
+  (`ScreenConstantView`: one line per screen — marker, name, how far Discovery got, a button to the map — whose ▸
+  builds its full card on first open, kept open for the session), Manage Pictures' groups by screen (`plugin/pictures/ScreenGroups`).
