@@ -344,6 +344,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **`Screens.java` lists its screens one line each.** A line shows the screen's marker, name, how far Discovery got
+  and *Open in 🗺*; its ▸ (or a click on the name) opens the shot, the way back, the looks, each input, the debts and
+  the notes. A screen opened stays open across edits until Studio closes; a new one starts shut.
 - **Each screen is a class of its own** (breaking). `Screens.java` holds `public static final class Market extends
   Screen` and its one constant, `public static final Market MARKET = new Market();`. Its inputs are its fields, so a
   body names an input of that screen only: `Screens.MARKET.beerBuy`. The rest of the screen is one chain its

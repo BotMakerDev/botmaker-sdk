@@ -19,6 +19,7 @@ import com.botmaker.sdk.plugin.map.ScreenCards.State;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -217,6 +218,24 @@ class ScreenCardsTest {
         assertEquals(Optional.empty(), ScreenConstantView.constantOf(ScreenGraph.of(Map.of()),
                 Optional.of(campaign)), "a map that did not read: the slot draws as written");
         assertEquals(Optional.empty(), ScreenConstantView.constantOf(map(), Optional.empty()));
+    }
+
+    /** A card opened stays open for that project's screen only, until it is shut. */
+    @Test
+    void aCardOpenedStaysOpenForItsProjectAndScreenOnly() {
+        String here = ScreenConstantView.key(Path.of("/bots/a/../a"), "HOME");
+        assertEquals(here, ScreenConstantView.key(Path.of("/bots/a"), "HOME"), "the same project however spelled");
+        assertFalse(ScreenConstantView.isOpen(here), "shut until opened");
+        try {
+            ScreenConstantView.setOpen(here, true);
+            assertTrue(ScreenConstantView.isOpen(here));
+            assertFalse(ScreenConstantView.isOpen(ScreenConstantView.key(Path.of("/bots/b"), "HOME")));
+            assertFalse(ScreenConstantView.isOpen(ScreenConstantView.key(Path.of("/bots/a"), "MARKET")));
+            ScreenConstantView.setOpen(here, false);
+            assertFalse(ScreenConstantView.isOpen(here));
+        } finally {
+            ScreenConstantView.setOpen(here, false);
+        }
     }
 
     /** Home's left column: drawn whole over where its members were cut, in the list's order, one with no place too. */
