@@ -14,8 +14,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a
   way out only.
-- **`Input`**: a picture click, a key or a scroll, with `did` (IN_PLACE, NONE, LEAVES; null while untried),
-  `kind` (CHORE, SHORTCUT, CHOICE, INFO), `never`, `sometimes`, `locked`, `when` and button looks (`variants`). A
+- **`Input`**: a picture click, a key or a scroll, with `tried()` (opened nothing), `leaves()` (to a screen
+  reached otherwise), `info()` (only tells: tried last), `never`, `sometimes`, `locked`, `when` and button looks (`variants`). A
   picture shown more than once is one input per copy, `nth` (from 1, in reading order: `Reach.readingOrder`), since
   copies may open different screens; `each` does every copy in turn (the user's call, 2026-10-16).
 - **`ScreenList`** (`GameScreen.lists`): some of a screen's inputs in one list that scrolls or column whose slots
@@ -80,7 +80,7 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   (a way in or its way back, found with `whereOn`), changed it in place, or nothing — and stops at a popup; its
   `match` tries one copy of a repeated picture (the picture's one cut split into an untried input per copy first), and
   `which_screen` with `everywhere` numbers the copies;
-  `not_a_screen` turns a screen back into an IN_PLACE result on each of its ways in; `go_to_screen` and
+  `not_a_screen` turns a screen back into a tried input on each of its ways in; `go_to_screen` and
   `which_screen` walk the map as a run does; `read_map` prints it (`plugin/map/MapReport`). The tool refuses while a
   screen owes its marker; a screen finished walks to `nextToExplore`.
 - **Cuts** are a box, a round or a free polygon (`plugin/screen/CutShape`, `PictureCuts.cut/ellipse/polygon`): outside

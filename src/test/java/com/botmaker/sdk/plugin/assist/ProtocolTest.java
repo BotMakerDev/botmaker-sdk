@@ -1,7 +1,6 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.screens.Button;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -52,9 +51,9 @@ class ProtocolTest {
         screens.put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("home")),
                 Button.of(picture("quests")), Button.of(picture("tavern"))));
         screens.put("QUESTS", MapFixtures.screen(Setup.named("Quests").markers(marks("quests_title"))
-                .from(BotConstants.input("HOME", "quests")), Button.of(picture("claim")).did(Did.IN_PLACE)));
+                .from(BotConstants.input("HOME", "quests")), Button.of(picture("claim")).tried()));
         screens.put("TAVERN", MapFixtures.screen(Setup.named("Tavern").markers(marks("tavern_title"))
-                .from(BotConstants.input("HOME", "tavern")), Button.of(picture("drink")).did(Did.NONE)));
+                .from(BotConstants.input("HOME", "tavern")), Button.of(picture("drink")).tried()));
         screens.put("OFFER", MapScreen.of(Setup.named("Offer").markers(marks("offer")).popup()));
         return ScreenGraph.of(screens);
     }

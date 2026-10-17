@@ -62,6 +62,22 @@ public interface Reach {
         return pictures.stream().map(picture -> find(picture, frame)).toList();
     }
 
+    /** A picture found: where, and how well it matched, from 0 to 1. */
+    record Found(Rect place, double score) {}
+
+    /** {@link #findAll} with each match's score; by default each scores 1. */
+    default List<Found> findAllScored(ImageTemplate picture, BufferedImage frame) {
+        return findAll(picture, frame).stream().map(place -> new Found(place, 1)).toList();
+    }
+
+    /**
+     * {@link #findEach} with each match's score: of a button's looks that all clear the confidence, the one that
+     * matches best is the one shown. By default each scores 1, so the first found wins.
+     */
+    default List<Optional<Found>> findEachScored(List<ImageTemplate> pictures, BufferedImage frame) {
+        return findEach(pictures, frame).stream().map(at -> at.map(place -> new Found(place, 1))).toList();
+    }
+
     /** How far from its cut place a marker is looked for, in the frame's pixels: a title moves a few pixels at most. */
     int MARKER_MARGIN = 60;
 
@@ -117,8 +133,8 @@ public interface Reach {
         return place.center();
     }
 
-    /** A button as {@code frame} shows it: which of its looks, and where. */
-    record Seen(State state, Rect place) {}
+    /** A button as {@code frame} shows it: which of its looks (what it means, and its picture), and where. */
+    record Seen(State state, Rect place, ImageTemplate picture) {}
 
     /**
      * Where {@code picture} is anywhere in {@code area} on {@code frame}, {@code area} in the frame the picture was cut
@@ -128,6 +144,11 @@ public interface Reach {
      */
     default Optional<Rect> findWithin(ImageTemplate picture, Rect area, BufferedImage frame) {
         return find(picture, frame).filter(at -> area.contains(at.center()));
+    }
+
+    /** {@link #findWithin} with the match's score; by default it scores 1. */
+    default Optional<Found> findWithinScored(ImageTemplate picture, Rect area, BufferedImage frame) {
+        return findWithin(picture, area, frame).map(place -> new Found(place, 1));
     }
 
     /** {@link #seen(Button, Strip, Pick, BufferedImage)} of a button at its place, in no strip, its first copy. */
@@ -145,19 +166,31 @@ public interface Reach {
         if (button.repeats()) {
             Pick p = pick == null ? Pick.first() : pick;
             List<Seen> copies = copies(button, strip, p.order(), frame);
+            if (p.mode() == Pick.Mode.UNTIL_NONE) {
+                // The first copy still to press; every one greyed out, the first: a Claim under grey ones (Firestone's
+                // Quests, 2026-10-17).
+                return copies.stream().filter(copy -> copy.state() != State.DISABLED).findFirst()
+                        .or(() -> copies.stream().findFirst());
+            }
             int at = p.mode() == Pick.Mode.NTH ? p.nth() - 1 : 0;
             return at < copies.size() ? Optional.of(copies.get(at)) : Optional.empty();
         }
         List<Look> order = lookOrder(button);
         if (order.isEmpty()) return Optional.empty();
         Rect band = band(strip);
-        List<Optional<Rect>> found = band == null
-                ? findEach(order.stream().map(Look::picture).toList(), frame)
-                : order.stream().map(look -> findWithin(look.picture(), band, frame)).toList();
+        List<Optional<Found>> found = band == null
+                ? findEachScored(order.stream().map(Look::picture).toList(), frame)
+                : order.stream().map(look -> findWithinScored(look.picture(), band, frame)).toList();
+        // The best match wins, the first in order on a tie: a green Play passed for its grey look too, 0.82 to its
+        // own 0.91 (Firestone's Tavern, 2026-10-17).
+        int best = -1;
         for (int i = 0; i < order.size(); i++) {
-            if (found.get(i).isPresent()) return Optional.of(new Seen(order.get(i).state(), found.get(i).get()));
+            if (found.get(i).isPresent() && (best < 0 || found.get(i).get().score() > found.get(best).get().score())) {
+                best = i;
+            }
         }
-        return Optional.empty();
+        return best < 0 ? Optional.empty()
+                : Optional.of(new Seen(order.get(best).state(), found.get(best).get().place(), order.get(best).picture()));
     }
 
     /**
@@ -176,10 +209,23 @@ public interface Reach {
     default List<Seen> copies(Button button, Strip strip, Order order, BufferedImage frame) {
         Rect band = band(strip);
         List<Seen> all = new ArrayList<>();
+        List<Double> scores = new ArrayList<>();
         for (Look look : lookOrder(button)) {
-            for (Rect at : findAll(look.picture(), frame)) {
+            for (Found found : findAllScored(look.picture(), frame)) {
+                Rect at = found.place();
                 if (band != null && !band.contains(at.center())) continue;
-                if (all.stream().noneMatch(s -> s.place().contains(at.center()))) all.add(new Seen(look.state(), at));
+                int same = -1;
+                for (int i = 0; i < all.size() && same < 0; i++) {
+                    if (all.get(i).place().contains(at.center())) same = i;
+                }
+                // A place two looks match is the look that matches it best: a green Claim passed for a grey one too.
+                if (same < 0) {
+                    all.add(new Seen(look.state(), at, look.picture()));
+                    scores.add(found.score());
+                } else if (found.score() > scores.get(same)) {
+                    all.set(same, new Seen(look.state(), at, look.picture()));
+                    scores.set(same, found.score());
+                }
             }
         }
         return ordered(all, Seen::place, order, new Size(frame.getWidth(), frame.getHeight()));

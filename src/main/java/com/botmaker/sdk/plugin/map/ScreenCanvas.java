@@ -416,8 +416,6 @@ final class ScreenCanvas {
         badges.setAlignment(Pos.TOP_RIGHT);
         badges.setTranslateX(8);
         badges.setTranslateY(-9);
-        if (card.chores() > 0) badges.getChildren().add(badge("✓" + card.chores(), card.chores() + " chore"
-                + (card.chores() == 1 ? "" : "s")));
         if (card.presence() == Presence.LOCKED) {
             badges.getChildren().add(badge("🔒", MapGuide.LOCKED));
         }

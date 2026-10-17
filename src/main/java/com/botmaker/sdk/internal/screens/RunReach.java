@@ -47,6 +47,15 @@ public final class RunReach implements Reach {
     }
 
     @Override
+    public List<Optional<Found>> findEachScored(List<ImageTemplate> pictures, BufferedImage frame) {
+        double needs = BotSettings.current().confidence();
+        return ImageFinder.bestMatches(pictures, new StillSource(frame)).stream()
+                .map(best -> best.isFound() && best.confidence() >= needs
+                        ? Optional.of(new Found(best.rect(), best.confidence())) : Optional.<Found>empty())
+                .toList();
+    }
+
+    @Override
     public List<Optional<Rect>> findEachNear(List<ImageTemplate> pictures, BufferedImage frame) {
         return cleared(ImageFinder.bestMatchesNear(pictures, MARKER_MARGIN, new StillSource(frame)));
     }
@@ -64,14 +73,25 @@ public final class RunReach implements Reach {
                 .map(MatchResult::rect).toList();
     }
 
+    @Override
+    public List<Found> findAllScored(ImageTemplate picture, BufferedImage frame) {
+        return ImageFinder.allMatches(picture, new StillSource(frame), BotSettings.current().confidence()).stream()
+                .map(match -> new Found(match.rect(), match.confidence())).toList();
+    }
+
     /** Looked for only in {@code area}, scaled to the frame as the picture is: its place there, with no margin. */
     @Override
     public Optional<Rect> findWithin(ImageTemplate picture, Rect area, BufferedImage frame) {
+        return findWithinScored(picture, area, frame).map(Found::place);
+    }
+
+    @Override
+    public Optional<Found> findWithinScored(ImageTemplate picture, Rect area, BufferedImage frame) {
         ImageTemplate inArea = picture.at(area);
         try {
             MatchResult best = ImageFinder.bestMatchesNear(List.of(inArea), 0, new StillSource(frame)).getFirst();
             return best.isFound() && best.confidence() >= BotSettings.current().confidence()
-                    ? Optional.of(best.rect()) : Optional.empty();
+                    ? Optional.of(new Found(best.rect(), best.confidence())) : Optional.empty();
         } finally {
             // A copy of its own loads its pixels anew: released after the match, as native memory.
             inArea.close();

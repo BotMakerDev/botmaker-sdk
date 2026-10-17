@@ -18,19 +18,20 @@ import java.util.function.BooleanSupplier;
  * the strip: its pictures do. How fast it scrolls and settles is its scroll's, which Discovery measures.
  *
  * <p>Its traits are its members' defaults: a strip that {@link #sometimes comes and goes} is one whose members each
- * may be absent. Its {@link #did} is the strip's own, scrolled when Discovery tried it.
+ * may be absent. Its {@link #isTried} is the strip's own, scrolled when Discovery tried it.
  *
  * @param scroll       how it is scrolled
  * @param members      the pictures of its buttons, in the strip's order
- * @param did          what scrolling it did when tried; null when untried
- * @param purpose      what its members are for; null when not named yet
+ * @param isTried      whether Discovery scrolled it
+ * @param isLeaving    whether its members go to screens mapped already that they are no way into
+ * @param isInfo       whether its members only tell
  * @param never        why its members are never done; null when they may be
  * @param comesAndGoes whether its members each show only at times
  * @param lock         the picture proving it locked on this account; null when it is not
  * @param when         when its members are there; null when not known
  */
-public record Strip(Scroll scroll, List<ImageTemplate> members, Did did, Purpose purpose, String never,
-                    boolean comesAndGoes, ImageTemplate lock, BooleanSupplier when) implements Input {
+public record Strip(Scroll scroll, List<ImageTemplate> members, boolean isTried, boolean isLeaving, boolean isInfo,
+                    String never, boolean comesAndGoes, ImageTemplate lock, BooleanSupplier when) implements Input {
 
     public Strip {
         members = members == null ? List.of() : List.copyOf(members);
@@ -39,47 +40,52 @@ public record Strip(Scroll scroll, List<ImageTemplate> members, Did did, Purpose
 
     /** The buttons {@code members}, by their pictures, scrolled by {@code scroll}. */
     public static Strip of(Scroll scroll, List<ImageTemplate> members) {
-        return new Strip(scroll, members, null, null, null, false, null, null);
+        return new Strip(scroll, members, false, false, false, null, false, null, null);
     }
 
     @Override
-    public Strip did(Did did) {
-        return new Strip(scroll, members, did, purpose, never, comesAndGoes, lock, when);
+    public Strip tried() {
+        return new Strip(scroll, members, true, isLeaving, isInfo, never, comesAndGoes, lock, when);
     }
 
     @Override
-    public Strip purpose(Purpose purpose) {
-        return new Strip(scroll, members, did, purpose, never, comesAndGoes, lock, when);
+    public Strip leaves() {
+        return new Strip(scroll, members, isTried, true, isInfo, never, comesAndGoes, lock, when);
+    }
+
+    @Override
+    public Strip info() {
+        return new Strip(scroll, members, isTried, isLeaving, true, never, comesAndGoes, lock, when);
     }
 
     @Override
     public Strip never(String why) {
-        return new Strip(scroll, members, did, purpose, why, comesAndGoes, lock, when);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, why, comesAndGoes, lock, when);
     }
 
     @Override
     public Strip sometimes() {
-        return new Strip(scroll, members, did, purpose, never, true, lock, when);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, never, true, lock, when);
     }
 
     @Override
     public Strip locked(ImageTemplate lock) {
-        return new Strip(scroll, members, did, purpose, never, comesAndGoes, lock, when);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when);
     }
 
     @Override
     public Strip when(BooleanSupplier condition) {
-        return new Strip(scroll, members, did, purpose, never, comesAndGoes, lock, condition);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, never, comesAndGoes, lock, condition);
     }
 
     /** This strip, its members {@code members}. */
     public Strip members(List<ImageTemplate> members) {
-        return new Strip(scroll, members, did, purpose, never, comesAndGoes, lock, when);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when);
     }
 
     /** This strip, scrolled by {@code scroll}. */
     public Strip scroll(Scroll scroll) {
-        return new Strip(scroll, members, did, purpose, never, comesAndGoes, lock, when);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when);
     }
 
     /** Whether {@code picture} is one of its members, by its id. */

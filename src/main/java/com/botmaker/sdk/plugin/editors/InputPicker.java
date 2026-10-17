@@ -46,7 +46,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -220,9 +219,7 @@ public final class InputPicker {
             case Hotkey h -> h.label();
             case Strip s -> pickable ? "strip of " + s.members().size() : "strip:";
         };
-        return choice.field() + "  —  " + what
-                + (choice.input().purpose() == null ? ""
-                : ", " + choice.input().purpose().name().toLowerCase(Locale.ROOT));
+        return choice.field() + "  —  " + what + (choice.input().isInfo() ? ", info" : "");
     }
 
     private static void pick(ValueContext ctx, String constant, String field, Popup popup,

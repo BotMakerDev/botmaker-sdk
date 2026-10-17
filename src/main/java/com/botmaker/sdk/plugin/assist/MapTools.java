@@ -7,12 +7,10 @@ import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
-import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
@@ -89,7 +87,8 @@ final class MapTools {
                         + "as tried, not clicked", optional = true) String never,
                 @Describe(value = "the picture proving it locked on this account (a padlock on it): recorded as "
                         + "tried, not clicked", optional = true) String locked,
-                @Describe(value = "what it is for", optional = true) Purpose purpose) {
+                @Describe(value = "true when it only tells (help, rules, a leaderboard): tried last",
+                        optional = true) Boolean info) {
     }
 
     record Try(@Describe("the screen the inputs are on, as the map names it: Home, or its constant HOME") String screen,
@@ -105,11 +104,11 @@ final class MapTools {
 
     /** One input of a try_input call, with the call's screen and settings: what {@link #tried} tries. */
     private record One(String screen, String picture, Integer scroll, Integer match, String key, String opens,
-                       String never, String locked, Purpose purpose, Integer settleMs, Boolean stay,
+                       String never, String locked, Boolean info, Integer settleMs, Boolean stay,
                        Boolean desktop) {
         static One of(Try call, Step step, Boolean stay) {
             return new One(call.screen(), step.picture(), step.scroll(), step.match(), step.key(), step.opens(),
-                    step.never(), step.locked(), step.purpose(), call.settleMs(), stay, call.desktop());
+                    step.never(), step.locked(), step.info(), call.settleMs(), stay, call.desktop());
         }
 
         /** The input that walks the game up from {@code call}'s screen once every input of it was tried. */
@@ -120,7 +119,7 @@ final class MapTools {
 
         /** This input, by {@code picture} scrolled {@code scroll} over, or by {@code key}. */
         One named(String picture, Integer scroll, String key) {
-            return new One(screen, picture, scroll, match, key, opens, never, locked, purpose, settleMs, stay, desktop);
+            return new One(screen, picture, scroll, match, key, opens, never, locked, info, settleMs, stay, desktop);
         }
 
         String label() {
@@ -262,10 +261,21 @@ final class MapTools {
                     null);
             case Strip strip when strip.scroll() != null && strip.scroll().drag() != null && input.scroll() == null ->
                     null;
-            case Strip strip -> strip.members().isEmpty() ? input : input.named(strip.members().getFirst().id(),
+            case Strip strip -> strip.members().isEmpty() ? input : input.named(shownMember(strip, context),
                     input.scroll() != null || strip.scroll() == null ? input.scroll() : strip.scroll().notches(), null);
             case Hotkey hotkey -> hotkey.key() == null ? input : input.named(null, null, hotkey.key().label());
         }).orElse(input);
+    }
+
+    /**
+     * The member of {@code strip} to scroll over: the first one a fresh look shows, wherever the strip carried it,
+     * else its first. Home's column scrolled over its first member, out of view, moved nothing (2026-10-17).
+     */
+    private static String shownMember(Strip strip, AgentContext context) {
+        Optional<BufferedImage> frame = Frames.look(context);
+        return strip.members().stream().map(ImageTemplate::id)
+                .filter(id -> frame.isPresent() && ActTools.shows(context, id, frame.get()))
+                .findFirst().orElse(strip.members().getFirst().id());
     }
 
     /** The constant {@code typed} names in the map; empty when none or Studio is busy. */
@@ -298,7 +308,7 @@ final class MapTools {
         }
         boolean locked = input.locked() != null && !input.locked().isBlank();
         if (never && locked) return Tried.refused("An input is never done or locked, not both. Nothing was done.");
-        Optional<Purpose> purpose = Optional.ofNullable(input.purpose());
+        boolean info = Boolean.TRUE.equals(input.info());
         int notches = input.scroll() == null ? 0 : input.scroll();
         if (input.scroll() != null && (notches == 0 || !byPicture || never || locked)) {
             return Tried.refused(notches == 0 ? "Scroll by at least one notch." : !byPicture ? "A scroll is over "
@@ -353,7 +363,8 @@ final class MapTools {
         if (away.isPresent() && !walkedTo(context, graph, screen, input.desktop())) return Tried.left(away.get());
         // The field the input is, or a new one named from what it acts on.
         String field = held.orElseGet(() -> on.fieldFor(byPicture ? what : "key " + key.get().label()));
-        Input made = purposed(made(services, held.map(on.inputs()::get), what, key.orElse(null), notches), purpose);
+        Input made = made(services, held.map(on.inputs()::get), what, key.orElse(null), notches);
+        if (info) made = made.info();
         // A copy tried by its place among the picture's copies: the button is repeated, and a way it opens goes
         // through that copy.
         Pick pick = match > 0 ? Pick.nth(match, Order.NORTH) : null;
@@ -404,8 +415,8 @@ final class MapTools {
                     : Optional.empty();
             Input tried = measured.isPresent() && base instanceof Strip scrolled ? scrolled.scroll(measured.get())
                     : base;
-            AgentReply said = entered.reply().and(noted(services, screen, field, tried.did(moved ? Did.IN_PLACE
-                    : Did.NONE), moved ? "changes this screen in place" : "no visible effect", ask && !moved));
+            AgentReply said = entered.reply().and(noted(services, screen, field, tried.tried(),
+                    moved ? "changes this screen in place" : "no visible effect", ask && !moved));
             if (measured.isPresent()) {
                 said = said.and(AgentReply.text("Scrolled once more and timed: its members move "
                         + measured.get().step() + " px a scroll and hold still within "
@@ -452,7 +463,7 @@ final class MapTools {
                     entered.after())));
         }
         boolean changed = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
-        AgentReply said = noted(services, screen, field, base.did(changed ? Did.IN_PLACE : Did.NONE),
+        AgentReply said = noted(services, screen, field, base.tried(),
                 changed ? "changes this screen in place" : "no visible effect", ask);
         return new Tried(up(context, entered.reply().and(changed ? said.and(AgentReply.text("Cut, with screen " + name
                 + ", each new input it shows (another state of a toggle, a tab's buttons): they are untried in turn."))
@@ -582,7 +593,7 @@ final class MapTools {
         MapScreen made = MapScreen.of(Setup.named(child).fromWay(way(screen, field, look, pick)));
         // Tried again, what it did before goes: the way it opens is what it does now.
         Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withInput(field,
-                        base.did(null)))
+                        ScreenEdits.untried(base)))
                 .or(() -> ScreenBook.add(services, constant, made)));
         if (failed.isPresent()) return unwritten(failed.get());
         // A draft: the frame right after the click may be the way there (Firestone's Arena replay kept its VS
@@ -611,7 +622,7 @@ final class MapTools {
         String to = graph.shown(known);
         MapScreen target = graph.screens().get(known);
         if (target.isPopup()) {
-            return noted(services, screen, field, base.did(Did.IN_PLACE), "shows the popup " + to, false)
+            return noted(services, screen, field, base.tried(), "shows the popup " + to, false)
                     .and(AgentReply.text(to + " is a popup: close it before the next input."));
         }
         // A popup's way out is its back, whatever it uncovers: a popup is in no tree and names no screen.
@@ -620,7 +631,7 @@ final class MapTools {
         if (up && back.isPresent() && !graph.isBack(screen, field)) {
             // A Confirm that also goes back is an input of its own: the close button stays the way back (Rooms,
             // 2026-10-15).
-            return noted(services, screen, field, base.did(Did.LEAVES), "leaves for " + to + "; the way back stays "
+            return noted(services, screen, field, base.leaves(), "leaves for " + to + "; the way back stays "
                     + back.get().label(), false);
         }
         if (up) {
@@ -631,14 +642,14 @@ final class MapTools {
                     "its way back to " + to, false));
         }
         if (graph.above(screen).contains(known)) {
-            return noted(services, screen, field, base.did(Did.LEAVES), "leaves for " + to + ", which this screen is "
+            return noted(services, screen, field, base.leaves(), "leaves for " + to + ", which this screen is "
                     + "reached through", false);
         }
         // A way taken whatever the button looks covers each look; one needing a look covers only that look.
         boolean already = graph.leads(screen, field).stream().anyMatch(lead -> lead.to().equals(known)
                 && (lead.state() == null || lead.state() == look) && Objects.equals(lead.pick(), pick));
         Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withInput(field,
-                        base.did(null)))
+                        ScreenEdits.untried(base)))
                 .or(() -> already ? Optional.empty() : ScreenBook.update(services, known, s -> s.setup(x -> {
                     List<Way> ways = new ArrayList<>(x.alsoFrom());
                     ways.add(way(screen, field, look, pick));
@@ -979,7 +990,7 @@ final class MapTools {
 
     /**
      * not_a_screen: the screen removed, and each way into it ({@code from} and {@code alsoFrom}) recorded on the screen
-     * it leaves as {@link Did#IN_PLACE}: one left as a way would bring the screen back as soon as it is tried again.
+     * it leaves as {@link Input#tried}: one left as a way would bring the screen back as soon as it is tried again.
      */
     static AgentReply notAScreen(Mistake mistake, AgentContext context) {
         StudioServices services = context.services();
@@ -1007,7 +1018,7 @@ final class MapTools {
                 for (BotConstants.InputName in : entrances) {
                     if (refused.isPresent()) break;
                     refused = ScreenBook.update(services, in.screen(), s -> s.input(in.field())
-                            .map(held -> s.withInput(in.field(), held.did(Did.IN_PLACE))).orElse(s));
+                            .map(held -> s.withInput(in.field(), held.tried())).orElse(s));
                 }
                 return refused;
             });
@@ -1301,17 +1312,18 @@ final class MapTools {
                             .anyMatch(v -> v.picture().id().equalsIgnoreCase(picture)))
                     .map(Map.Entry::getKey).findFirst());
         }
+        // Over any member it shows, either way and by any notches: a strip is scrolled over the member in view, to
+        // both its ends. Its member's own button field is never made a strip.
         return all.entrySet().stream()
-                .filter(e -> e.getValue() instanceof Strip s && !s.members().isEmpty()
-                        && s.members().getFirst().id().equalsIgnoreCase(picture)
-                        && s.scroll() != null && s.scroll().notches() == notches)
+                .filter(e -> e.getValue() instanceof Strip s
+                        && s.members().stream().anyMatch(m -> m.id().equalsIgnoreCase(picture)))
                 .map(Map.Entry::getKey).findFirst()
                 .or(() -> button.filter(f -> !graph.tried(screen, f)));
     }
 
     /**
      * The input to record: {@code held} as it is, a button it stood for made a strip over its picture (what was said
-     * of the button kept: its purpose, coming and going), or a new one.
+     * of the button kept: whether it only tells, its coming and going), or a new one.
      */
     private static Input made(StudioServices services, Optional<Input> held, String picture, Key key, int notches) {
         if (held.isPresent() && (notches == 0 || held.get() instanceof Strip)) return held.get();
@@ -1319,12 +1331,8 @@ final class MapTools {
         ImageTemplate cut = FxCall.call(() -> ScreenBook.picture(services, picture));
         if (notches == 0) return Button.of(cut);
         Strip strip = Strip.of(Scroll.wheel(notches), List.of(cut));
-        return held.map(button -> (Input) new Strip(strip.scroll(), strip.members(), null, button.purpose(), null,
-                button.comesAndGoes(), null, button.when())).orElse(strip);
-    }
-
-    private static Input purposed(Input input, Optional<Purpose> purpose) {
-        return purpose.map(input::purpose).orElse(input);
+        return held.map(button -> (Input) new Strip(strip.scroll(), strip.members(), false, false, button.isInfo(),
+                null, button.comesAndGoes(), null, button.when())).orElse(strip);
     }
 
     /** A write's failure, Studio's own refusal or its being busy; empty when written. */

@@ -62,16 +62,25 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
      */
     @Override
     public List<Optional<Rect>> findEach(List<ImageTemplate> pictures, BufferedImage frame) {
+        return places(matched(pictures, frame, false));
+    }
+
+    @Override
+    public List<Optional<Found>> findEachScored(List<ImageTemplate> pictures, BufferedImage frame) {
         return matched(pictures, frame, false);
     }
 
     @Override
     public List<Optional<Rect>> findEachNear(List<ImageTemplate> pictures, BufferedImage frame) {
-        return matched(pictures, frame, true);
+        return places(matched(pictures, frame, true));
     }
 
-    /** {@link #findEach}, each picture looked for within {@link #MARKER_MARGIN} of its place when {@code near}. */
-    private List<Optional<Rect>> matched(List<ImageTemplate> pictures, BufferedImage frame, boolean near) {
+    private static List<Optional<Rect>> places(List<Optional<Found>> found) {
+        return found.stream().map(at -> at.map(Found::place)).toList();
+    }
+
+    /** {@link #findEachScored}, each picture looked for within {@link #MARKER_MARGIN} of its place when {@code near}. */
+    private List<Optional<Found>> matched(List<ImageTemplate> pictures, BufferedImage frame, boolean near) {
         List<ImageTemplate> files = new ArrayList<>();
         try {
             for (ImageTemplate picture : pictures) {
@@ -81,11 +90,12 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
             List<MatchResult> bests = ToolTiming.timed(ToolTiming.Phase.MATCH, () -> near
                     ? ImageFinder.bestMatchesNear(known, MARKER_MARGIN, new StillSource(frame))
                     : ImageFinder.bestMatches(known, new StillSource(frame)));
-            List<Optional<Rect>> found = new ArrayList<>();
+            List<Optional<Found>> found = new ArrayList<>();
             int next = 0;
             for (ImageTemplate file : files) {
                 MatchResult best = file == null ? null : bests.get(next++);
-                found.add(best != null && clears(best) ? Optional.of(best.rect()) : Optional.empty());
+                found.add(best != null && clears(best) ? Optional.of(new Found(best.rect(), best.confidence()))
+                        : Optional.empty());
             }
             return found;
         } finally {
@@ -96,31 +106,43 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
 
     @Override
     public List<Rect> findAll(ImageTemplate picture, BufferedImage frame) {
+        return findAllScored(picture, frame).stream().map(Found::place).toList();
+    }
+
+    @Override
+    public List<Found> findAllScored(ImageTemplate picture, BufferedImage frame) {
         return Frames.picture(resources, picture.id()).map(name -> all(placed(name, picture), frame)).orElse(List.of());
     }
 
     /** Every place the bot's picture {@code name} clears the score a run needs on {@code frame}, in no order. */
     List<Rect> findAll(String name, BufferedImage frame) {
-        return all(new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString()), frame);
+        return all(new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString()), frame).stream()
+                .map(Found::place).toList();
     }
 
-    /** {@code file}'s places on {@code frame}; it is released after the match. */
-    private List<Rect> all(ImageTemplate file, BufferedImage frame) {
+    /** {@code file}'s places on {@code frame}, each with its score; it is released after the match. */
+    private List<Found> all(ImageTemplate file, BufferedImage frame) {
         try (file) {
             return ToolTiming.timed(ToolTiming.Phase.MATCH, () -> ImageFinder.allMatches(file,
-                    new StillSource(frame), confidence)).stream().map(MatchResult::rect).toList();
+                    new StillSource(frame), confidence)).stream()
+                    .map(match -> new Found(match.rect(), match.confidence())).toList();
         }
     }
 
     /** Looked for only in {@code area}, scaled to the frame as the picture is: its place there, with no margin. */
     @Override
     public Optional<Rect> findWithin(ImageTemplate picture, Rect area, BufferedImage frame) {
+        return findWithinScored(picture, area, frame).map(Found::place);
+    }
+
+    @Override
+    public Optional<Found> findWithinScored(ImageTemplate picture, Rect area, BufferedImage frame) {
         Optional<ImageTemplate> file = Frames.picture(resources, picture.id()).map(name -> placed(name, picture.at(area)));
         if (file.isEmpty()) return Optional.empty();
         try {
             MatchResult best = ToolTiming.timed(ToolTiming.Phase.MATCH,
                     () -> ImageFinder.bestMatchesNear(List.of(file.get()), 0, new StillSource(frame))).getFirst();
-            return clears(best) ? Optional.of(best.rect()) : Optional.empty();
+            return clears(best) ? Optional.of(new Found(best.rect(), best.confidence())) : Optional.empty();
         } finally {
             file.get().close();
         }

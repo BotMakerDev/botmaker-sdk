@@ -28,7 +28,19 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   the map does not say), `landed()` the screen after and `times()` the presses. `press(Hotkey)` too.
   - `Pick.untilNone()` presses again while the game stays on the screen, until the button is gone or shows its
     disabled look, at most 50 times: Buy until the money runs out. A disabled button is never pressed.
+  - `Button.cycling(List.of(X1, X10, X50))` is one button that shows its next look on each press, the first again
+    after the last. `Pick.until(Pictures.SPEED_X50)` presses it until it shows that look, at most once round; already
+    showing it is no press. Beside a cycling button, the `Pick` editor offers its looks.
+  - A button not in view yet is waited for a step's time (10 s) before its first press, so a press follows the one
+    that brings it up: Play, then a card, with no wait between them. A strip's member is scrolled to instead.
   - `Navigate.state(button)` is how a button looks now (`State.DISABLED` for a greyed Buy), nothing walked or scrolled.
+  - A button whose looks all match is the look that matches best: a green Play also passed for its grey look, and
+    was read as disabled. Each copy of a repeated button is the look that matches it best too.
+  - `Pick.untilNone()` on a repeated button presses the first copy not greyed out: a Claim under grey ones is pressed,
+    and the button looks disabled only when every copy does.
+  - A popup a press brings up (each Claim's rewards) is closed and `Pick.untilNone()` goes on pressing.
+  - A walk's step that did not reach its screen is done once more before another way is planned: a click lost to lag,
+    or one the game took to pan its view.
   - In a block, an input is picked from the map: a screen, then one of its fields on its shot, each boxed where its
     picture was cut, or from the list beside it. Only what the slot takes is offered: a button slot shows the buttons,
     a strip's members under it, no hotkey. The pick is written `Screens.MARKET.beerBuy`.
@@ -345,8 +357,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     `Pick` (`first`, `nth`, `each`, `untilNone`) along an `Order`, the old `Direction` back: the four sides, the four
     corners and `CENTER`. A way through one copy is `Way.of(MISSIONS.go).pick(Pick.nth(2, Order.NORTH))`, and the
     tree's way `.from(…).fromPick(…)`. `nth` and `each` on an input are gone.
-  - `Kind` is `Purpose`: `TASK`, `SHORTCUT`, `SPEND`, `INFO`. try_input and edit_map take `purpose`, and edit_map's
-    `in_list` is `in_strip`.
+  - An input keeps only what changes a walk or Discovery: `.tried()` (Discovery tried it and it opened no screen),
+    `.leaves()` (it goes to a screen reached otherwise) and `.info()` (it only tells: tried last). `Did` and `Kind`
+    are gone, with no `Purpose` in their place: what an input did beyond that, or what it is for, is not written.
+    try_input takes `info`, edit_map's `set_input` takes `did` (`tried`, `leaves`, `untried`) and `info`, and its
+    `in_list` is `in_strip`. A 🗺 card no longer counts chores.
   - `Navigate.to(Screen)`, `isOn(Screen)` and `where()` take and give the screen class. `GameScreen`, `ScreenList`,
     `Variant` and `Kind` are gone, with no conversion: Studio's upgrade repairs what a bot names.
 - **A strip scrolls by its own numbers.** `Scroll` is the wheel, `Scroll.wheel(-5)`, or a drag,

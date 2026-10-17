@@ -68,7 +68,6 @@ final class MapGuide {
                     new Entry("list", "screen-pill-plain", "Its shape once finished, a popup, or a screen reached "
                             + "only at times or locked; such a card is drawn dashed."),
                     new Entry("Build", "screen-pill-stage", "The stage its notes say it reached."),
-                    new Entry("✓2", null, "Inputs that are chores: work the bot does there, not a way on."),
                     new Entry("🔒", null, LOCKED + "."),
                     new Entry("⊕", null, FOLDED + "."),
                     new Entry("thick outline", null, "The screen a run is on now; a thin one, the screens it came "
@@ -96,9 +95,9 @@ final class MapGuide {
                             + "while the game shows the screen, it gets a copy of its own there); one not on the shot "
                             + "is listed under it, and its row says not on shot."))),
             new Section("An input's ⋯", List.of(
-                    new Entry("Result", null, "What it did: untried, changes the screen in place, no visible effect, "
-                            + "leaves the screen, or opens a new one."),
-                    new Entry("Purpose", null, "What it is for: a task, a shortcut, a spend, or information."),
+                    new Entry("Result", null, "What it did: untried, tried (opening nothing), leaves for a screen "
+                            + "reached otherwise, or opens a new one."),
+                    new Entry("Information only", null, "It only tells: Discovery tries it last."),
                     new Entry("Comes and goes", null, "It is not always there: a try that does not see it is not a "
                             + "failure."),
                     new Entry("Only there while", null, "A method of the bot that says when it is there."),

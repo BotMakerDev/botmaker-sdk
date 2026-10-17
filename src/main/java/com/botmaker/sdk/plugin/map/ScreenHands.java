@@ -3,9 +3,7 @@ package com.botmaker.sdk.plugin.map;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.toolkit.Modals;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
@@ -32,7 +30,6 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.VBox;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -65,23 +62,16 @@ final class ScreenHands {
         ToggleGroup did = new ToggleGroup();
         Menu result = new Menu("Result");
         result.getItems().addAll(
-                pick("Untried", did, !opens && input.did() == null, () -> set(constant, field,
+                pick("Untried", did, !opens && !input.isTried() && !input.isLeaving(), () -> set(constant, field,
                         ScreenEdits.untried(input))),
-                pick("Changes this screen in place", did, !opens && input.did() == Did.IN_PLACE, () -> set(constant,
-                        field, ScreenEdits.untried(input).did(Did.IN_PLACE))),
-                pick("No visible effect", did, !opens && input.did() == Did.NONE, () -> set(constant, field,
-                        ScreenEdits.untried(input).did(Did.NONE))),
-                pick("Leaves this screen", did, !opens && input.did() == Did.LEAVES, () -> set(constant, field,
-                        ScreenEdits.untried(input).did(Did.LEAVES))),
+                pick("Tried, opens nothing", did, !opens && input.isTried(), () -> set(constant, field,
+                        ScreenEdits.untried(input).tried())),
+                pick("Leaves for a screen reached otherwise", did, !opens && input.isLeaving(), () -> set(constant,
+                        field, ScreenEdits.untried(input).leaves())),
                 pick("Opens a new screen…", did, opens, () -> newScreen(constant, field)));
-        ToggleGroup kinds = new ToggleGroup();
-        Menu kind = new Menu("Purpose");
-        kind.getItems().add(pick("None", kinds, input.purpose() == null, () -> set(constant, field,
-                ScreenEdits.unkinded(input))));
-        for (Purpose p : Purpose.values()) {
-            kind.getItems().add(pick(label(p.name()), kinds, input.purpose() == p, () -> set(constant, field,
-                    input.purpose(p))));
-        }
+        CheckMenuItem info = new CheckMenuItem("Information only");
+        info.setSelected(input.isInfo());
+        info.setOnAction(e -> set(constant, field, ScreenEdits.info(input, info.isSelected())));
         CheckMenuItem sometimes = new CheckMenuItem("Comes and goes");
         sometimes.setSelected(input.comesAndGoes());
         sometimes.setOnAction(e -> set(constant, field, ScreenEdits.sometimes(input, sometimes.isSelected())));
@@ -104,7 +94,7 @@ final class ScreenHands {
         menu.setTooltip(new Tooltip("Set what " + row.label() + " does by hand"));
         Menu when = whileMenu("Only there while", ScreenTypes.sourceOf(input.when()),
                 method -> done.accept(ScreenEdits.setInputWhen(services, constant, field, method)));
-        menu.getItems().addAll(result, kind, sometimes, when, never, locked, new SeparatorMenuItem(), back, remove);
+        menu.getItems().addAll(result, info, sometimes, when, never, locked, new SeparatorMenuItem(), back, remove);
         return menu;
     }
 
@@ -288,10 +278,5 @@ final class ScreenHands {
         MenuItem item = new MenuItem(text);
         item.setOnAction(e -> onPress.run());
         return item;
-    }
-
-    private static String label(String constant) {
-        String lower = constant.toLowerCase(Locale.ROOT);
-        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
     }
 }

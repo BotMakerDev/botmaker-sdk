@@ -48,25 +48,41 @@ public final class ScreenEdits {
 
     private ScreenEdits() {}
 
-    /** {@code input} as it was cut, untried: its result, never and lock cleared, the rest kept. */
+    /** {@code input} as it was cut, untried: tried, leaving, never and lock cleared, the rest kept. */
     public static Input untried(Input input) {
-        return input.did(null).never(null).locked(null);
+        return switch (input) {
+            case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.comesAndGoes(), null,
+                    b.looks(), b.when(), b.repeats(), b.cycles());
+            case Hotkey h -> new Hotkey(h.key(), false, false, h.isInfo(), null, h.comesAndGoes(), null, h.when());
+            case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.comesAndGoes(), null,
+                    s.when());
+        };
     }
 
     /** {@code input} shown only at times, or always ({@code sometimes} false: when it is there goes too). */
     public static Input sometimes(Input input, boolean sometimes) {
         if (sometimes) return input.sometimes();
         return switch (input) {
-            case Button b -> new Button(b.picture(), b.did(), b.purpose(), b.never(), false, b.lock(), b.looks(), null,
-                    b.repeats());
-            case Hotkey h -> new Hotkey(h.key(), h.did(), h.purpose(), h.never(), false, h.lock(), null);
-            case Strip s -> new Strip(s.scroll(), s.members(), s.did(), s.purpose(), s.never(), false, s.lock(), null);
+            case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.never(), false,
+                    b.lock(), b.looks(), null, b.repeats(), b.cycles());
+            case Hotkey h -> new Hotkey(h.key(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.lock(),
+                    null);
+            case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.never(),
+                    false, s.lock(), null);
         };
     }
 
-    /** {@code input}, with no purpose named. */
-    public static Input unkinded(Input input) {
-        return input.purpose(null);
+    /** {@code input} only telling, or not ({@code info} false). */
+    public static Input info(Input input, boolean info) {
+        if (info) return input.info();
+        return switch (input) {
+            case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.comesAndGoes(),
+                    b.lock(), b.looks(), b.when(), b.repeats(), b.cycles());
+            case Hotkey h -> new Hotkey(h.key(), h.isTried(), h.isLeaving(), false, h.never(), h.comesAndGoes(),
+                    h.lock(), h.when());
+            case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.never(),
+                    s.comesAndGoes(), s.lock(), s.when());
+        };
     }
 
     /** Puts {@code now} as {@code constant}'s field {@code field}; {@code now} null removes it. */

@@ -4,9 +4,7 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Hotkey;
-import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
@@ -49,10 +47,10 @@ class ScreenCardsTest {
                 click("gold"), Hotkey.of(Key.M), click("arena").locked(picture("padlock")), click("event").sometimes()));
         screens.put("CAMPAIGN", screen(Setup.named("Campaign").markers(marks("campaign_title"))
                         .from(ref("HOME", "campaign")),
-                click("claim").did(Did.IN_PLACE).purpose(Purpose.TASK), click("map"),
+                click("claim").tried(), click("map"),
                 click("gems").never("spends gems")));
         screens.put("MAP", screen(Setup.named("Map").markers(marks("map_title")).from(ref("CAMPAIGN", "map"))
-                .alsoFrom(List.of(Way.of(ref("HOME", "key_m")))), Hotkey.of(Key.ESCAPE).did(Did.NONE)));
+                .alsoFrom(List.of(Way.of(ref("HOME", "key_m")))), Hotkey.of(Key.ESCAPE).tried()));
         screens.put("ENGINEER", screen(Setup.named("Engineer").from(ref("HOME", "engineer"))));
         screens.put("ARENA", screen(Setup.named("Arena").markers(marks("arena_title")).from(ref("HOME", "arena"))));
         screens.put("REWARD", screen(Setup.named("Reward").markers(marks("reward")).back(click("close_x")).popup()));
@@ -81,7 +79,6 @@ class ScreenCardsTest {
         Card campaign = card("CAMPAIGN");
         assertEquals(State.FINISHED, campaign.state());
         assertEquals("activity", campaign.shape(), "its claim opened nothing");
-        assertEquals(1, campaign.chores());
         assertEquals("surveyed", campaign.stage());
         assertEquals("campaign_title", campaign.marker());
 
@@ -131,8 +128,8 @@ class ScreenCardsTest {
         assertEquals("event", home.getLast().picture());
 
         List<ScreenCards.Row> campaign = ScreenCards.rows(map(), "CAMPAIGN");
-        assertEquals("in place", campaign.getFirst().result());
-        assertEquals("task", campaign.getFirst().kind());
+        assertEquals("tried", campaign.getFirst().result());
+        assertEquals("", campaign.getFirst().kind());
         assertEquals("claim", campaign.getFirst().field());
         assertEquals(RowState.NEVER, campaign.getLast().state());
         assertEquals("never: spends gems", campaign.getLast().result());

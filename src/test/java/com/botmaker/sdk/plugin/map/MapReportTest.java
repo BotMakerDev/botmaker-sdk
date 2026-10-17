@@ -1,7 +1,6 @@
 package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
@@ -40,7 +39,7 @@ class MapReportTest {
                 click("event").sometimes()));
         screens.put("TAVERN", screen(Setup.named("Tavern").markers(marks("tavern_title")).from(ref("HOME", "tavern"))
                         .back(ref("TAVERN", "close")),
-                click("market"), click("play").did(Did.IN_PLACE), click("close")));
+                click("market"), click("play").tried(), click("close")));
         screens.put("MARKET", screen(Setup.named("Market").markers(marks("market_title")).from(ref("TAVERN", "market")),
                 click("gems").never("spends gems")));
         screens.put("REWARD", screen(Setup.named("Reward").markers(marks("reward")).back(click("claim_inline"))
@@ -63,7 +62,7 @@ class MapReportTest {
                 + "      marker tavern_title · back close · shot yes\n"
                 + "      in from Home by tavern\n"
                 + "      - market: → Market\n"
-                + "      - play: in place\n"
+                + "      - play: tried\n"
                 + "      - close: way back\n"), text);
         assertTrue(text.contains("\n        Market [MARKET] "), text);
         assertTrue(text.contains("\nPopups (opened by the game itself):\nReward [REWARD] "), text);

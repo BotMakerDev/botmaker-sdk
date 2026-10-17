@@ -1,17 +1,21 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.sdk.api.vision.ImageTemplate;
+
 import java.util.Locale;
 
 /**
  * Which copies of a {@link Button#repeated repeated button} are pressed, along an {@link Order} — {@code
  * Pick.each(Order.NORTH)}: the first, the nth, each in turn, or each until none is left (the user's call,
- * 2026-10-16, in place of one input per copy).
+ * 2026-10-16, in place of one input per copy). Of a {@link Button#cycling cycling} button, {@link #until} presses
+ * until it shows one of its looks (2026-10-17).
  *
  * @param mode  how many copies
  * @param nth   which copy for {@link Mode#NTH}, from 1; 0 otherwise
  * @param order which copy comes first
+ * @param look  the look {@link Mode#UNTIL} presses until; null otherwise
  */
-public record Pick(Mode mode, int nth, Order order) {
+public record Pick(Mode mode, int nth, Order order, ImageTemplate look) {
 
     /** How many copies a pick presses. */
     public enum Mode {
@@ -22,13 +26,21 @@ public record Pick(Mode mode, int nth, Order order) {
         /** Every copy shown, once each. */
         EACH,
         /** The first copy, again and again, until none is left or the button looks disabled. */
-        UNTIL_NONE
+        UNTIL_NONE,
+        /** The button, again and again, until it shows {@link #look}: at most once round its cycle. */
+        UNTIL
     }
 
     public Pick {
         mode = mode == null ? Mode.FIRST : mode;
         nth = mode == Mode.NTH ? Math.max(1, nth) : 0;
         order = order == null ? Order.NORTH : order;
+        look = mode == Mode.UNTIL ? look : null;
+    }
+
+    /** A pick of no look: every mode but {@link Mode#UNTIL}. */
+    public Pick(Mode mode, int nth, Order order) {
+        this(mode, nth, order, null);
     }
 
     /** The topmost copy: what a way or a press takes when it names none. */
@@ -59,6 +71,11 @@ public record Pick(Mode mode, int nth, Order order) {
         return new Pick(Mode.UNTIL_NONE, 0, Order.NORTH);
     }
 
+    /** Presses until the button shows {@code look}, none when it already does: the speed at x50. */
+    public static Pick until(ImageTemplate look) {
+        return new Pick(Mode.UNTIL, 0, Order.NORTH, look);
+    }
+
     /** How it reads in a sentence: {@code #2 from the north}, {@code each from the north}. */
     public String label() {
         String from = " from the " + order.name().toLowerCase(Locale.ROOT).replace('_', '-');
@@ -67,6 +84,7 @@ public record Pick(Mode mode, int nth, Order order) {
             case NTH -> "#" + nth + from;
             case EACH -> "each" + from;
             case UNTIL_NONE -> "until none";
+            case UNTIL -> "until it shows " + (look == null ? "?" : look.id());
         };
     }
 }

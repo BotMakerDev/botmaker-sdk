@@ -25,7 +25,7 @@ class MapGuideTest {
         List<String> signs = MapGuide.sections().stream().flatMap(s -> s.entries().stream())
                 .map(MapGuide.Entry::sign).toList();
         for (String sign : List.of("▶ Try", "▶ Try next", "✂ Cut inputs", "✂ Cut marker", "🧭 Go here", "⋯ Screen",
-                "Result", "Purpose", "Comes and goes", "Never…", "Locked by…", "Use as the way back", "solid", "dashed")) {
+                "Result", "Information only", "Comes and goes", "Never…", "Locked by…", "Use as the way back", "solid", "dashed")) {
             assertTrue(signs.contains(sign), sign);
         }
     }

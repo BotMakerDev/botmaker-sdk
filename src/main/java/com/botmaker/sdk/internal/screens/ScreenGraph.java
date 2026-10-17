@@ -1,11 +1,9 @@
 package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.screens.Button;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Pick;
-import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
@@ -260,14 +258,14 @@ public final class ScreenGraph {
     }
 
     /**
-     * Whether the input {@code input}, the field {@code field}, only tells: for {@link Purpose#INFO}, or a picture or
+     * Whether the input {@code input}, the field {@code field}, only tells: {@link Input#isInfo}, or a picture or
      * a field called help, info, rules, faq, how to play, a leaderboard or the rankings ({@code help_button},
      * {@code info_i}, {@code i}). Discovery tries such an input last on its screen, and explores the screen it opens
      * after every other (the user's call, 2026-10-16). A rank-up or a tier's button is no information: {@code rank}
      * alone and an {@code i} inside a name are not.
      */
     public static boolean isInfo(String field, Input input) {
-        if (input != null && input.purpose() == Purpose.INFO) return true;
+        if (input != null && input.isInfo()) return true;
         if (input instanceof Button button && button.picture() != null && INFO.matcher(button.picture().id()).find()) {
             return true;
         }
@@ -385,7 +383,7 @@ public final class ScreenGraph {
         for (String field : fields(constant)) {
             Input input = input(constant, field).orElseThrow();
             if (input.never() != null || input.lock() != null || input instanceof Strip || isBack(constant, field)
-                    || input.did() == Did.LEAVES || !tried(constant, field)) {
+                    || input.isLeaving() || !tried(constant, field)) {
                 continue;
             }
             if (opens(constant, field).isEmpty()) return Optional.of(Shape.ACTIVITY);

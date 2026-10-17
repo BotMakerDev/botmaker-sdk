@@ -6,13 +6,11 @@ import com.botmaker.plugin.api.value.Held;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
-import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
@@ -109,21 +107,36 @@ public final class ScreenTypes {
      */
     public static final DeclaredCall<Button> BUTTON_SHAPE = ComponentType.part(Button.class)
             .<ImageTemplate, Button>writtenAs(Button::of, Button::picture)
-            .<Did>with(Button::did, Button::did)
-            .<Purpose>with(Button::purpose, Button::purpose)
+            .flag(Button::tried, Button::isTried)
+            .flag(Button::leaves, Button::isLeaving)
+            .flag(Button::info, Button::isInfo)
             .<String>with(Button::never, Button::never)
             .flag(Button::sometimes, Button::comesAndGoes)
             .<ImageTemplate>with(Button::locked, Button::lock)
             .<List<Look>>with(Button::looks, Button::looks)
             .<BooleanSupplier>with(Button::when, Parts.BUTTON_WHEN.part(ScreenTypes::condition))
             .flag(Button::repeated, Button::repeats)
-            .when(button -> BotConstants.inputName(button) == null);
+            .when(button -> BotConstants.inputName(button) == null && !button.cycles());
+
+    /** {@code Button.cycling(List<ImageTemplate>)} and its links: a button showing its looks in turn. */
+    public static final DeclaredCall<Button> BUTTON_CYCLING_SHAPE = ComponentType.part(Button.class)
+            .<List<ImageTemplate>, Button>writtenAs(Button::cycling, Button::cycle)
+            .flag(Button::tried, Button::isTried)
+            .flag(Button::leaves, Button::isLeaving)
+            .flag(Button::info, Button::isInfo)
+            .<String>with(Button::never, Button::never)
+            .flag(Button::sometimes, Button::comesAndGoes)
+            .<ImageTemplate>with(Button::locked, Button::lock)
+            .<BooleanSupplier>with(Button::when, Parts.BUTTON_WHEN.part(ScreenTypes::condition))
+            .flag(Button::repeated, Button::repeats)
+            .when(button -> BotConstants.inputName(button) == null && button.cycles());
 
     /** {@code Hotkey.of(Key)} and its links. */
     public static final DeclaredCall<Hotkey> HOTKEY_SHAPE = ComponentType.part(Hotkey.class)
             .<Key, Hotkey>writtenAs(Hotkey::of, Hotkey::key)
-            .<Did>with(Hotkey::did, Hotkey::did)
-            .<Purpose>with(Hotkey::purpose, Hotkey::purpose)
+            .flag(Hotkey::tried, Hotkey::isTried)
+            .flag(Hotkey::leaves, Hotkey::isLeaving)
+            .flag(Hotkey::info, Hotkey::isInfo)
             .<String>with(Hotkey::never, Hotkey::never)
             .flag(Hotkey::sometimes, Hotkey::comesAndGoes)
             .<ImageTemplate>with(Hotkey::locked, Hotkey::lock)
@@ -132,8 +145,9 @@ public final class ScreenTypes {
     /** {@code Strip.of(Scroll, List<ImageTemplate>)} and its links: its members' defaults. */
     public static final DeclaredCall<Strip> STRIP_SHAPE = ComponentType.part(Strip.class)
             .<Scroll, List<ImageTemplate>, Strip>writtenAs(Strip::of, Strip::scroll, Strip::members)
-            .<Did>with(Strip::did, Strip::did)
-            .<Purpose>with(Strip::purpose, Strip::purpose)
+            .flag(Strip::tried, Strip::isTried)
+            .flag(Strip::leaves, Strip::isLeaving)
+            .flag(Strip::info, Strip::isInfo)
             .<String>with(Strip::never, Strip::never)
             .flag(Strip::sometimes, Strip::comesAndGoes)
             .<ImageTemplate>with(Strip::locked, Strip::lock)
@@ -175,10 +189,15 @@ public final class ScreenTypes {
             .<Pick>writtenAs(Pick::untilNone)
             .when(pick -> pick.mode() == Pick.Mode.UNTIL_NONE);
 
+    /** {@code Pick.until(ImageTemplate)}. */
+    public static final DeclaredCall<Pick> PICK_UNTIL_SHAPE = ComponentType.part(Pick.class)
+            .<ImageTemplate, Pick>writtenAs(Pick::until, Pick::look)
+            .when(pick -> pick.mode() == Pick.Mode.UNTIL);
+
     /** The screen map's shapes, which {@code SdkTypes.PARTS} hands the host. */
     public static final List<ComponentType<?>> ALL = List.of(SETUP_SHAPE, WAY_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE,
-            BUTTON_SHAPE, HOTKEY_SHAPE, STRIP_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
-            PICK_UNTIL_NONE_SHAPE);
+            BUTTON_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_SHAPE, STRIP_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE,
+            PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE, PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE);
 
     /** A condition that only knows what it is written as — {@code Firestone::eventOn} — or {@code null}. */
     public static BooleanSupplier condition(String source) {

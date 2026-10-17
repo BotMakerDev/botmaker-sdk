@@ -5,7 +5,6 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -56,12 +55,11 @@ final class ScreenCards {
      * @param presence  whether it can be reached now
      * @param tried     its inputs tried
      * @param inputs    its inputs
-     * @param chores    its inputs named a task
      * @param stage     what its notes say it reached ({@code surveyed}), empty when nothing
      * @param at        where its card was moved to, null for where the layout puts it
      */
     record Card(String constant, String name, String marker, State state, String said, String shape, boolean popup,
-                ScreenGraph.Presence presence, int tried, int inputs, int chores, String stage, Point at) {
+                ScreenGraph.Presence presence, int tried, int inputs, String stage, Point at) {
 
         /** Whether it shows only at times, or is locked: drawn dashed. */
         boolean conditional() {
@@ -172,8 +170,6 @@ final class ScreenCards {
         MapScreen screen = graph.screens().get(constant);
         List<String> fields = graph.fields(constant);
         int tried = (int) fields.stream().filter(f -> graph.tried(constant, f)).count();
-        int chores = (int) fields.stream()
-                .filter(f -> graph.input(constant, f).filter(i -> i.purpose() == Purpose.TASK).isPresent()).count();
         int untried = graph.untried(constant).size();
         int unseen = graph.unseen(constant).size();
         State state;
@@ -194,7 +190,7 @@ final class ScreenCards {
         String shape = state == State.FINISHED
                 ? graph.shape(constant).map(s -> s.name().toLowerCase(Locale.ROOT)).orElse("") : "";
         return new Card(constant, graph.shown(constant), screen.hasMarker() ? screen.firstMarker().id() : null, state,
-                said, shape, screen.isPopup(), graph.presence(constant), tried, fields.size(), chores,
+                said, shape, screen.isPopup(), graph.presence(constant), tried, fields.size(),
                 stage == null ? "" : stage, screen.at());
     }
 
@@ -268,11 +264,7 @@ final class ScreenCards {
             result = opens.isPresent() ? "→ " + String.join(" / ", graph.leads(constant, field).stream()
                     .map(lead -> graph.shown(lead.to()) + said(lead.state(), lead.when())).distinct().toList())
                     : graph.isBack(constant, field) ? "way back"
-                    : input.did() == null ? "tried" : switch (input.did()) {
-                        case IN_PLACE -> "in place";
-                        case NONE -> "no effect";
-                        case LEAVES -> "leaves";
-                    };
+                    : input.isLeaving() ? "leaves" : "tried";
         } else if (input.comesAndGoes()) {
             state = RowState.UNSEEN;
             result = "not seen yet";
@@ -280,8 +272,7 @@ final class ScreenCards {
             state = RowState.UNTRIED;
             result = "untried";
         }
-        String kind = input.purpose() != null ? input.purpose().name().toLowerCase(Locale.ROOT)
-                : input.comesAndGoes() ? "comes and goes" : "";
+        String kind = input.isInfo() ? "info" : input.comesAndGoes() ? "comes and goes" : "";
         MapScreen screen = graph.screens().get(constant);
         InputName self = new InputName(constant, field);
         String look = screen == null ? "" : screen.variants().stream()
@@ -294,7 +285,7 @@ final class ScreenCards {
                         .map(l -> graph.shown(l.to()) + said(null, l.when())).distinct().toList()))).toList()
                 : List.of();
         String traits = switch (input) {
-            case Button button -> button.repeats() ? "repeated" : "";
+            case Button button -> button.cycles() ? "cycling" : button.repeats() ? "repeated" : "";
             case com.botmaker.sdk.api.screens.Strip strip -> strip.scroll() == null ? "" : scrolled(strip.scroll());
             case Hotkey ignored -> "";
         };

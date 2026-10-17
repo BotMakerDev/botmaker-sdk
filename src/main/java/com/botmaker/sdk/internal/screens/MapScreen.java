@@ -237,7 +237,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
         Input now = input;
         if (s.comesAndGoes() && !now.comesAndGoes()) now = now.sometimes();
         if (now.when() == null && s.when() != null) now = now.when(s.when());
-        if (now.purpose() == null && s.purpose() != null) now = now.purpose(s.purpose());
+        if (!now.isInfo() && s.isInfo()) now = now.info();
         if (now.never() == null && s.never() != null) now = now.never(s.never());
         if (now.lock() == null && s.lock() != null) now = now.locked(s.lock());
         return now;

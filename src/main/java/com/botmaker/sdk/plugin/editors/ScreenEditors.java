@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
@@ -185,9 +186,14 @@ public final class ScreenEditors {
      * host can).
      */
     public static Node pick(ValueContext ctx) {
-        boolean once = ctx.slot().flatMap(slot -> slot.argumentValue(0, com.botmaker.sdk.api.screens.Button.class))
-                .filter(button -> !button.repeats()).isPresent();
-        if (once) return new Label("Shown once on its screen: no copy to pick.");
+        Optional<com.botmaker.sdk.api.screens.Button> pressed = ctx.slot()
+                .flatMap(slot -> slot.argumentValue(0, com.botmaker.sdk.api.screens.Button.class));
+        if (pressed.filter(com.botmaker.sdk.api.screens.Button::cycles).isPresent()) {
+            return untilLook(ctx, pressed.get().cycle());
+        }
+        if (pressed.filter(button -> !button.repeats()).isPresent()) {
+            return new Label("Shown once on its screen: no copy to pick.");
+        }
         Pick[] now = {ctx.value(Pick.class).orElse(Pick.first())};
         Spinner<Integer> nth = new Spinner<>(1, 50, Math.max(1, now[0].nth()));
         nth.setPrefWidth(70);
@@ -198,16 +204,18 @@ public final class ScreenEditors {
             nth.setVisible(pick.mode() == Pick.Mode.NTH);
             pad[0].setVisible(pick.mode() != Pick.Mode.UNTIL_NONE);
         };
-        pad[0] = pad(now[0].order(), order -> write.accept(new Pick(now[0].mode(), now[0].nth(), order)));
+        pad[0] = pad(now[0].order(), order -> write.accept(new Pick(now[0].mode(), now[0].nth(), order, now[0].look())));
         nth.valueProperty().addListener((o, was, n) -> write.accept(new Pick(Pick.Mode.NTH, n, now[0].order())));
         ToggleGroup modes = new ToggleGroup();
         HBox row = new HBox(2);
         for (Pick.Mode mode : Pick.Mode.values()) {
+            // Until a look is a cycling button's, offered above.
+            if (mode == Pick.Mode.UNTIL) continue;
             ToggleButton button = new ToggleButton(switch (mode) {
                 case FIRST -> "First";
                 case NTH -> "Nth";
                 case EACH -> "Each";
-                case UNTIL_NONE -> "Until none";
+                case UNTIL_NONE, UNTIL -> "Until none";
             });
             button.setToggleGroup(modes);
             button.setSelected(mode == now[0].mode());
@@ -222,6 +230,24 @@ public final class ScreenEditors {
         HBox top = new HBox(6, row, nth);
         top.setAlignment(Pos.CENTER_LEFT);
         return new VBox(4, top, pad[0]);
+    }
+
+    /** A cycling button's pick: which of its {@code looks} it is pressed until it shows. */
+    private static Node untilLook(ValueContext ctx, List<ImageTemplate> looks) {
+        Pick now = ctx.value(Pick.class).orElse(Pick.first());
+        ToggleGroup group = new ToggleGroup();
+        HBox row = new HBox(2);
+        for (ImageTemplate look : looks) {
+            ToggleButton button = new ToggleButton(look.id());
+            button.setToggleGroup(group);
+            button.setSelected(now.look() != null && now.look().id().equals(look.id()));
+            button.setOnAction(e -> {
+                button.setSelected(true);
+                ctx.set(Pick.until(look));
+            });
+            row.getChildren().add(button);
+        }
+        return new VBox(4, new Label("Pressed until it shows:"), row);
     }
 
     /** The marker {@code picture} as a small image; null when the screen has none or its file is missing. */

@@ -2,12 +2,10 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
-import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
@@ -54,9 +52,9 @@ class ScreenGraphTest {
                 click("gold")));
         screens.put("CAMPAIGN", screen(Setup.named("Campaign").markers(marks("campaign_title"))
                         .from(ref("HOME", "campaign")),
-                click("claim").did(Did.IN_PLACE), click("map"), click("gems").never("spends gems")));
+                click("claim").tried(), click("map"), click("gems").never("spends gems")));
         screens.put("MAP", screen(Setup.named("Map").markers(marks("map_title")).from(ref("CAMPAIGN", "map")),
-                key(Key.ESCAPE).did(Did.NONE)));
+                key(Key.ESCAPE).tried()));
         screens.put("ENGINEER", screen(Setup.named("Engineer").from(ref("HOME", "engineer"))));
         return screens;
     }
@@ -147,7 +145,7 @@ class ScreenGraphTest {
         assertEquals(Optional.of("HOME"), ScreenGraph.of(screens).nextToExplore(),
                 "Home's gold before Engineer, which it opened");
 
-        screens.put("HOME", with(screens.get("HOME"), click("gold").did(Did.NONE)));
+        screens.put("HOME", with(screens.get("HOME"), click("gold").tried()));
         screens.put("MAP", with(screens.get("MAP"), click("node")));
         assertEquals(Optional.of("ENGINEER"), ScreenGraph.of(screens).nextToExplore(), "Engineer, a step down, "
                 + "before Map, two");
@@ -156,12 +154,12 @@ class ScreenGraphTest {
         assertEquals(Optional.of("MAP"), ScreenGraph.of(fickle).nextToExplore(),
                 "a screen whose way in comes and goes waits for every other");
         fickle.put("HOME", with(fickle.get("HOME"), click("engineer").locked(picture("padlock"))));
-        fickle.put("MAP", with(fickle.get("MAP"), click("node").did(Did.NONE)));
+        fickle.put("MAP", with(fickle.get("MAP"), click("node").tried()));
         assertEquals(Optional.empty(), ScreenGraph.of(fickle).nextToExplore(), "a locked screen is none to go to");
 
-        screens.put("ENGINEER", with(screens.get("ENGINEER"), click("upgrade").did(Did.IN_PLACE)));
+        screens.put("ENGINEER", with(screens.get("ENGINEER"), click("upgrade").tried()));
         assertEquals(Optional.of("MAP"), ScreenGraph.of(screens).nextToExplore());
-        screens.put("MAP", with(screens.get("MAP"), click("node").did(Did.NONE)));
+        screens.put("MAP", with(screens.get("MAP"), click("node").tried()));
         assertEquals(Optional.empty(), ScreenGraph.of(screens).nextToExplore(), "nothing left");
     }
 
@@ -169,7 +167,7 @@ class ScreenGraphTest {
     @Test
     void informationIsTriedAndExploredLast() {
         Map<String, MapScreen> screens = firestone();
-        Input ranks = click("ranks").purpose(Purpose.INFO);
+        Input ranks = click("ranks").info();
         screens.put("HOME", screen(screens.get("HOME").setup(), click("help_button"), ranks, click("campaign"),
                 click("engineer"), click("gold")));
         assertEquals(List.of("gold", "help_button", "ranks"), ScreenGraph.of(screens).untried("HOME"));
@@ -178,7 +176,7 @@ class ScreenGraphTest {
         assertFalse(ScreenGraph.isInfo(null, click("rank_up")) || ScreenGraph.isInfo(null, click("tier_i_reward"))
                 || ScreenGraph.isInfo(null, click("guide_arrow")), "a rank-up or a tier's button does work");
 
-        screens.put("HOME", with(screens.get("HOME"), ranks.did(Did.NONE), click("gold").did(Did.NONE)));
+        screens.put("HOME", with(screens.get("HOME"), ranks.tried(), click("gold").tried()));
         Map<String, MapScreen> withHelp = new LinkedHashMap<>();
         withHelp.put("HOME", screens.get("HOME"));
         withHelp.put("RULES", screen(Setup.named("Rules").from(ref("HOME", "help_button"))));
@@ -186,9 +184,9 @@ class ScreenGraphTest {
         withHelp.put("MAP", with(withHelp.get("MAP"), click("node")));
         ScreenGraph graph = ScreenGraph.of(withHelp);
         assertEquals(Optional.of("ENGINEER"), graph.nextToExplore(), "Rules, declared first, opened by help, waits");
-        withHelp.put("ENGINEER", with(withHelp.get("ENGINEER"), click("upgrade").did(Did.IN_PLACE)));
+        withHelp.put("ENGINEER", with(withHelp.get("ENGINEER"), click("upgrade").tried()));
         assertEquals(Optional.of("MAP"), ScreenGraph.of(withHelp).nextToExplore(), "a deeper screen before help");
-        withHelp.put("MAP", with(withHelp.get("MAP"), click("node").did(Did.NONE)));
+        withHelp.put("MAP", with(withHelp.get("MAP"), click("node").tried()));
         assertEquals(Optional.of("RULES"), ScreenGraph.of(withHelp).nextToExplore());
     }
 
@@ -260,12 +258,12 @@ class ScreenGraphTest {
     void aStripThatComesAndGoesMakesEachMemberComeAndGo() {
         Map<String, MapScreen> screens = firestone();
         screens.put("HOME", with(screens.get("HOME"),
-                Strip.of(Scroll.wheel(-5), marks("campaign", "engineer")).sometimes().purpose(Purpose.TASK)));
+                Strip.of(Scroll.wheel(-5), marks("campaign", "engineer")).sometimes().info()));
         ScreenGraph graph = ScreenGraph.of(screens);
 
         Input campaign = graph.input("HOME", "campaign").orElseThrow();
         assertTrue(campaign.comesAndGoes());
-        assertEquals(Purpose.TASK, campaign.purpose());
+        assertTrue(campaign.isInfo());
         assertEquals(ScreenGraph.Presence.SOMETIMES, graph.presence("CAMPAIGN"));
         assertFalse(graph.input("HOME", "gold").orElseThrow().comesAndGoes(), "a button off the strip is its own");
         assertEquals(Optional.of(graph.screens().get("HOME").strips().get("campaign_strip")),
@@ -290,7 +288,7 @@ class ScreenGraphTest {
     void aFinishedScreenIsAMenuWhenEveryInputItTriedOpenedOne() {
         Map<String, MapScreen> screens = firestone();
         screens.put("HOME", screen(screens.get("HOME").setup(), click("campaign"), click("engineer"),
-                Strip.of(Scroll.wheel(-5), marks("left_column")).did(Did.IN_PLACE),
+                Strip.of(Scroll.wheel(-5), marks("left_column")).tried(),
                 click("guild").locked(picture("padlock"))));
         ScreenGraph graph = ScreenGraph.of(screens);
 
@@ -397,7 +395,7 @@ class ScreenGraphTest {
     /** A popup shows over any screen: its inputs are tried while it shows, and Discovery never walks to it. */
     @Test
     void aPopupIsNoScreenToExploreNext() {
-        Map<String, MapScreen> screens = new LinkedHashMap<>(upMap(click("mail").did(Did.NONE)).screens());
+        Map<String, MapScreen> screens = new LinkedHashMap<>(upMap(click("mail").tried()).screens());
         screens.put("OFFER", screen(Setup.named("Offer").markers(marks("offer")).popup(), click("buy")));
         assertEquals(Optional.empty(), ScreenGraph.of(screens).nextToExplore());
     }
@@ -426,9 +424,9 @@ class ScreenGraphTest {
     @Test
     void aFinishedScreenGoesToTheNextScreenToExplore() {
         assertEquals(Optional.of("HOME"), upMap(click("mail")).nextToExplore(), "Home's mail");
-        assertEquals(Optional.empty(), upMap(click("mail").did(Did.NONE)).nextToExplore(), "all finished");
+        assertEquals(Optional.empty(), upMap(click("mail").tried()).nextToExplore(), "all finished");
 
-        Map<String, MapScreen> screens = new LinkedHashMap<>(upMap(click("mail").did(Did.NONE)).screens());
+        Map<String, MapScreen> screens = new LinkedHashMap<>(upMap(click("mail").tried()).screens());
         screens.put("MAP", with(screens.get("MAP"), click("zoom")));
         assertEquals(Optional.of("MAP"), ScreenGraph.of(screens).nextToExplore(), "Map's zoom, two steps down");
     }
@@ -438,9 +436,9 @@ class ScreenGraphTest {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("campaign"), mail));
         screens.put("CAMPAIGN", screen(Setup.named("Campaign").markers(marks("campaign_title"))
-                .from(ref("HOME", "campaign")), click("map"), click("claim").did(Did.IN_PLACE)));
+                .from(ref("HOME", "campaign")), click("map"), click("claim").tried()));
         screens.put("MAP", screen(Setup.named("Map").markers(marks("map_title")).from(ref("CAMPAIGN", "map")),
-                click("x").did(Did.NONE)));
+                click("x").tried()));
         return ScreenGraph.of(screens);
     }
 }

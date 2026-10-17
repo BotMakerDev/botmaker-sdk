@@ -7,10 +7,8 @@ import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Way;
@@ -43,14 +41,12 @@ final class MapEdits {
     private static final String METHOD = "a method of the bot answering true while it holds (Firestone::eventOn); "
             + "left out or blank, always";
 
-    /** What set_input records an input did, opening nothing; untried forgets what it did. */
+    /**
+     * What set_input records an input did, opening nothing: tried, or leaves for a screen reached otherwise; untried
+     * forgets it.
+     */
     enum Result {
-        IN_PLACE, NONE, LEAVES, UNTRIED
-    }
-
-    /** What set_input records an input is for; none forgets it. */
-    enum Goal {
-        TASK, SHORTCUT, SPEND, INFO, NONE
+        TRIED, LEAVES, UNTRIED
     }
 
     /** One edit of the bot's Screens; {@link #screen} is the screen it edits. */
@@ -81,14 +77,15 @@ final class MapEdits {
             implements Edit {
     }
 
-    @Describe("set what an input did, is for, or why it is never done or locked")
+    @Describe("set what an input did, whether it only tells, or why it is never done or locked")
     record SetInput(String screen,
                     @Describe(value = PICTURE, optional = true) String picture,
                     @Describe(value = SCROLL, optional = true) Integer scroll,
                     @Describe(value = KEY, optional = true) String key,
                     @Describe(value = "what it does, opening nothing (one that opens a screen the "
                             + "map lacks: new_screen)", optional = true) Result did,
-                    @Describe(value = "what it is for", optional = true) Goal purpose,
+                    @Describe(value = "true when it only tells (help, rules, a leaderboard): tried last",
+                            optional = true) Boolean info,
                     @Describe(value = "why it is never clicked; blank to clear it", optional = true) String never,
                     @Describe(value = "the picture proving it locked; blank to clear it", optional = true)
                     String locked,
@@ -310,8 +307,8 @@ final class MapEdits {
     }
 
     /**
-     * set_input: the result, never or lock given (one of them, each replacing the others), the purpose, the coming
-     * and going.
+     * set_input: the result, never or lock given (one of them, each replacing the others), whether it only tells, the
+     * coming and going.
      */
     private static AgentReply setInput(AgentContext context, String screen, MapScreen on, String field,
                                        SetInput edit) {
@@ -320,8 +317,8 @@ final class MapEdits {
             return AgentReply.refused("Give one of did, never and locked: each replaces the others. Nothing was "
                     + "written.");
         }
-        if (settles == 0 && edit.purpose() == null && edit.sometimes() == null && edit.repeated() == null) {
-            return AgentReply.refused("Say what to set: did, purpose, never, locked, sometimes or repeated. Nothing "
+        if (settles == 0 && edit.info() == null && edit.sometimes() == null && edit.repeated() == null) {
+            return AgentReply.refused("Say what to set: did, info, never, locked, sometimes or repeated. Nothing "
                     + "was written.");
         }
         Input in = on.inputs().get(field);
@@ -331,9 +328,8 @@ final class MapEdits {
         Input now = in;
         if (edit.did() != null) {
             now = switch (edit.did()) {
-                case IN_PLACE -> ScreenEdits.untried(in).did(Did.IN_PLACE);
-                case NONE -> ScreenEdits.untried(in).did(Did.NONE);
-                case LEAVES -> ScreenEdits.untried(in).did(Did.LEAVES);
+                case TRIED -> ScreenEdits.untried(in).tried();
+                case LEAVES -> ScreenEdits.untried(in).leaves();
                 case UNTRIED -> ScreenEdits.untried(in);
             };
         }
@@ -346,21 +342,9 @@ final class MapEdits {
             now = lock.isEmpty() ? ScreenEdits.untried(in)
                     : ScreenEdits.untried(in).locked(ScreenBook.picture(context.services(), lock));
         }
-        if (edit.purpose() != null) {
-            now = switch (edit.purpose()) {
-                case TASK -> now.purpose(Purpose.TASK);
-                case SHORTCUT -> now.purpose(Purpose.SHORTCUT);
-                case SPEND -> now.purpose(Purpose.SPEND);
-                case INFO -> now.purpose(Purpose.INFO);
-                case NONE -> ScreenEdits.unkinded(now);
-            };
-        }
+        if (edit.info() != null) now = ScreenEdits.info(now, edit.info());
         if (edit.sometimes() != null) now = ScreenEdits.sometimes(now, edit.sometimes());
-        if (edit.repeated() != null && now instanceof Button b) {
-            now = edit.repeated() ? b.repeated()
-                    : new Button(b.picture(), b.did(), b.purpose(), b.never(), b.comesAndGoes(), b.lock(), b.looks(),
-                    b.when(), false);
-        }
+        if (edit.repeated() != null && now instanceof Button b) now = b.repeats(edit.repeated());
         return said(ScreenEdits.setInput(context.services(), screen, field, now));
     }
 

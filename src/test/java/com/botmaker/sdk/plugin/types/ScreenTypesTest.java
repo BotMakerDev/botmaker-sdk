@@ -4,12 +4,10 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
-import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
@@ -84,9 +82,9 @@ class ScreenTypesTest {
 
     @Test
     void eachInputIsWrittenByItsOwnFactory() {
-        Button click = Button.of(picture("claim")).did(Did.IN_PLACE).sometimes().purpose(Purpose.TASK);
-        Hotkey key = Hotkey.of(Key.ESCAPE).purpose(Purpose.SHORTCUT);
-        Strip strip = Strip.of(Scroll.wheel(4), marks("list")).locked(picture("padlock")).did(Did.NONE);
+        Button click = Button.of(picture("claim")).tried().sometimes().info();
+        Hotkey key = Hotkey.of(Key.ESCAPE).leaves();
+        Strip strip = Strip.of(Scroll.wheel(4), marks("list")).locked(picture("padlock")).tried();
         Button never = Button.of(picture("gems")).never("spends gems").repeated();
 
         assertEquals(click, roundTrip(ScreenTypes.BUTTON_SHAPE, click));

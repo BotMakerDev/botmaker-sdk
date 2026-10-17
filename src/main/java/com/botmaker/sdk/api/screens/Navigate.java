@@ -78,7 +78,9 @@ public final class Navigate {
      * Presses {@code button}, an input of a screen of the map ({@code Screens.MARKET.beerBuy}): walks to its screen
      * when the game is elsewhere, as {@link #to} does, scrolls its strip to it, clicks the copy {@code pick} names
      * (null: the first), and waits for where the map says it leads. {@link Pick#untilNone} presses it again while the
-     * game stays there, until it is gone or looks disabled: Buy until the money runs out (2026-10-17). An input of a
+     * game stays there, until it is gone or looks disabled: Buy until the money runs out (2026-10-17); {@link
+     * Pick#until} presses a {@link Button#cycling cycling} button until it shows a look. A button not in view yet is
+     * waited for a step's time first, so a press follows the one that brings it up. An input of a
      * popup is {@link Pressed.Result#NOT_NOW}: nothing walks to a popup, and the run closes the ones it shows.
      *
      * @throws BotStuckException as {@link #to} does, when the walk to its screen gets stuck

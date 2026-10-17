@@ -53,7 +53,7 @@ public final class ScreenDesk {
         Integer notches = input instanceof Strip strip && strip.scroll() != null ? strip.scroll().notches() : null;
         String key = input instanceof Hotkey hotkey && hotkey.key() != null ? hotkey.key().label() : null;
         MapTools.Try asked = new MapTools.Try(constant, List.of(new MapTools.Step(picture, notches, null, key, opens,
-                null, null, input.purpose())), null, true, true);
+                null, null, input.isInfo() ? true : null)), null, true, true);
         return text(MapTools.tryInput(asked, context));
     }
 

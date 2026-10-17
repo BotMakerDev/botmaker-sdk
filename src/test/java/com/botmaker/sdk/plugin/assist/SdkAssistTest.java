@@ -28,11 +28,9 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Button;
-import com.botmaker.sdk.api.screens.Did;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.input.Key;
-import com.botmaker.sdk.api.screens.Purpose;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
@@ -1028,7 +1026,6 @@ class SdkAssistTest {
         assertTrue(tryOne("screen", "Engineer", "picture", "list", "scroll", 0).isRefused());
         assertTrue(tryOne("screen", "Engineer", "key", "Q", "scroll", 3).isRefused(), "a scroll is over a "
                 + "picture");
-        assertTrue(tryOne("screen", "Engineer", "picture", "gem", "purpose", "loot").isRefused(), "no such purpose");
         // The list carried its own picture away: Engineer still shows, so the scroll is said, not a screen left.
         agent.frame = covered(over, 120, 80, SIZE, SIZE, 6);
         AgentReply carried = tryOne("screen", "Engineer", "picture", "list", "scroll", -3, "desktop", true,
@@ -1047,16 +1044,16 @@ class SdkAssistTest {
         assertEquals(List.of("list"), list.members().stream().map(ImageTemplate::id).toList(),
                 "the list's cut became a strip over it");
         assertEquals(Scroll.wheel(-3), list.scroll());
-        assertEquals(Did.NONE, list.did());
+        assertTrue(list.isTried());
 
         // Engineer, opened from Home, covers it: closed first by its way back, Escape with no close button.
         game.then(homeAlone);
-        AgentReply still = tryOne("screen", "Home", "picture", "gold", "purpose", "task", "desktop", true,
+        AgentReply still = tryOne("screen", "Home", "picture", "gold", "info", true, "desktop", true,
                 "settleMs", 0);
         assertTrue(text(still).contains("Noted in Home: tried gold, no visible effect. Every input cut on it is "
                 + "tried: an activity."), text(still));
         Button gold = (Button) input("HOME", "gold");
-        assertEquals(Button.of(gold.picture()).did(Did.NONE).purpose(Purpose.TASK), gold);
+        assertEquals(Button.of(gold.picture()).tried().info(), gold);
         assertTrue(tryOne("screen", "Engineer", "picture", "home").isRefused(),
                 "a picture naming a screen the map has asks for opens");
 
@@ -1069,8 +1066,6 @@ class SdkAssistTest {
         assertFalse(stopped.isRefused(), "gold was tried");
         assertTrue(text(stopped).contains("Noted in Home: tried gold") && text(stopped).contains("Stopped "
                 + "before nosuch: ") && text(stopped).contains("Not tried: nosuch, Q."), text(stopped));
-        assertTrue(run("try_input", "screen", "Home", "inputs", List.of(Map.of("picture", "gold", "purpose",
-                "loot"))).isRefused(), "a purpose is one of the choices");
 
         assertTrue(run("go_to_screen", "screen", "Guild").isRefused());
         agent.frame = over;
@@ -1117,7 +1112,7 @@ class SdkAssistTest {
         assertTrue(taken.startsWith("Engineer is off the map; ") && taken.endsWith(" is noted in Home as changing it "
                 + "in place."), taken);
         assertFalse(host.set("screen_map").containsKey("ENGINEER"));
-        assertTrue(screen("HOME").inputs().values().stream().anyMatch(i -> i.did() == Did.IN_PLACE));
+        assertTrue(screen("HOME").inputs().values().stream().anyMatch(Input::isTried));
     }
 
     /**
@@ -1151,7 +1146,7 @@ class SdkAssistTest {
         assertTrue(game.events.contains("mouseMove(1274,724)"), "the second copy is clicked: " + game.events);
         assertEquals(List.of("go"), fields("HOME"), "one button for all its copies");
         assertTrue(((Button) input("HOME", "go")).repeats(), "noted as repeated");
-        assertEquals(Did.NONE, input("HOME", "go").did());
+        assertTrue(input("HOME", "go").isTried());
         tryOne("screen", "Home", "picture", "go", "match", 1, "desktop", true, "settleMs", 0, "stay", true);
         assertTrue(game.events.contains("mouseMove(1074,724)"), game.events.toString());
     }
@@ -1502,12 +1497,12 @@ class SdkAssistTest {
         Button click = Button.of(ore);
         put("HOME", MapFixtures.screen(Setup.named("Home").markers(List.of(ore)), click));
 
-        assertEquals("Noted: ore.", ScreenEdits.setInput(host, "HOME", "ore", click.did(Did.IN_PLACE)));
-        assertEquals(Did.IN_PLACE, input("HOME", "ore").did());
+        assertEquals("Noted: ore.", ScreenEdits.setInput(host, "HOME", "ore", click.tried()));
+        assertTrue(input("HOME", "ore").isTried());
         Input inPlace = input("HOME", "ore");
         ScreenEdits.setInput(host, "HOME", "ore", ScreenEdits.untried(inPlace).never("spends gems"));
         assertEquals("spends gems", input("HOME", "ore").never());
-        assertNull(input("HOME", "ore").did(), "never replaces the result");
+        assertFalse(input("HOME", "ore").isTried(), "never replaces the result");
 
         assertTrue(ScreenEdits.newScreen(host, "HOME", "Mine", "ore", null).startsWith("Added Mine as Screens.MINE"));
         assertEquals("Mine", screen("MINE").name());
@@ -1566,23 +1561,22 @@ class SdkAssistTest {
         assertTrue(text(run("edit_map", "screen", "Home", "action", "fly")).contains("rename, delete"));
         assertTrue(run("edit_map", "screen", "Nowhere", "action", "delete").isRefused());
 
-        // An input: its result, purpose, never, lock, coming and going, and when it is there.
-        run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "did", "in_place", "purpose",
-                "info");
-        assertEquals(Did.IN_PLACE, input("HOME", "tab").did());
-        assertEquals(Purpose.INFO, input("HOME", "tab").purpose());
+        // An input: its result, whether it only tells, never, lock, coming and going, and when it is there.
+        run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "did", "tried", "info", true);
+        assertTrue(input("HOME", "tab").isTried());
+        assertTrue(input("HOME", "tab").isInfo());
         AgentReply again = run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "did",
-                "in_place");
+                "tried");
         assertFalse(again.isRefused(), "what the map already says is no error: " + text(again));
         assertTrue(text(again).startsWith("Nothing to change"), text(again));
         run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "never", "spends gems");
         assertEquals("spends gems", input("HOME", "tab").never());
-        assertNull(input("HOME", "tab").did(), "never replaces the result");
-        assertEquals(Purpose.INFO, input("HOME", "tab").purpose(), "the purpose stays");
-        assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "did", "none",
+        assertFalse(input("HOME", "tab").isTried(), "never replaces the result");
+        assertTrue(input("HOME", "tab").isInfo(), "it still only tells");
+        assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "did", "tried",
                 "never", "x").isRefused(), "one of did, never and locked");
         assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab").isRefused());
-        assertTrue(text(run("edit_map", "screen", "Home", "action", "set_input", "picture", "nope", "did", "none"))
+        assertTrue(text(run("edit_map", "screen", "Home", "action", "set_input", "picture", "nope", "did", "tried"))
                 .contains("its inputs: gem, key_q, tab"));
         run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "locked", "lock");
         assertEquals("lock", input("HOME", "tab").lock().id());

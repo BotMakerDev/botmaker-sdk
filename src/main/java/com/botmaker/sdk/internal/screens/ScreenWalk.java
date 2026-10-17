@@ -214,13 +214,15 @@ public final class ScreenWalk {
         List<String> walked = new ArrayList<>();
         Set<ScreenGraph.Edge> missed = new HashSet<>();     // its picture was not on the screen
         Set<ScreenGraph.Edge> strayed = new HashSet<>();    // done, and the game showed another screen
+        Set<ScreenGraph.Edge> retried = new HashSet<>();    // done once already, its screen not shown
         String at = near;
         String told = null;        // the screen the walk last said it is on
         String unmarked = null;    // a screen reached that has no marker to tell it by
         String left = null;        // the screen the step to it was done on
         String uncovered = null;   // what cleared an overlay the map lacks, said once arrived
         boolean lookedAgain = false;
-        int most = graph.screens().size() * 2 + MOST_REPLANS;
+        // Each step that misses may be tried once more before it counts as landing elsewhere.
+        int most = graph.screens().size() * 2 + MOST_REPLANS * 2 + 1;
         for (int step = 0; step < most; step++) {
             if (Thread.currentThread().isInterrupted()) return new Result(Outcome.STOPPED, at, walked, "Stopped.");
             Optional<BufferedImage> frame = closePopups(reach.look());
@@ -279,6 +281,9 @@ public final class ScreenWalk {
                 }
                 continue;
             }
+            // Planned once more from a fresh look before it counts as landing elsewhere: a click lost to lag, or one
+            // the game took to pan its view (Firestone's Town, its first Tavern click after a start, 2026-10-17).
+            if (retried.add(next)) continue;
             strayed.add(next);
             if (strayed.size() > MOST_REPLANS) {
                 return new Result(Outcome.STUCK, at, walked, graph.shown(next.to()) + " did not show after "
@@ -303,7 +308,9 @@ public final class ScreenWalk {
      * leaves the game on its screen though the map says it leads away is pressed once more: a click lost to lag.
      *
      * <p>{@link Pick#untilNone} presses again while the game stays on {@code constant}, until the button is gone or
-     * looks disabled, at most {@link #MOST_PRESSES} times. Nothing is pressed of an input that is locked, never done,
+     * looks disabled, at most {@link #MOST_PRESSES} times; {@link Pick#until} presses until the button shows the look
+     * asked, at most once round its looks. A button not in view yet is waited for a step's time before its first
+     * press, one the last press brings up late. Nothing is pressed of an input that is locked, never done,
      * or whose method says it is not there now.
      */
     public Press press(String constant, String field, Pick pick) {
@@ -321,13 +328,20 @@ public final class ScreenWalk {
         }
         Strip strip = screen.stripOf(input).orElse(null);
         Pick p = pick == null ? Pick.first() : pick;
-        int most = input instanceof Button && p.mode() == Pick.Mode.UNTIL_NONE ? MOST_PRESSES : 1;
+        int most = !(input instanceof Button button) ? 1 : switch (p.mode()) {
+            case UNTIL_NONE -> MOST_PRESSES;
+            // Once round its cycle, and one look more for the last press's.
+            case UNTIL -> button.allLooks().size();
+            default -> 1;
+        };
         int times = 0;
         boolean retried = false;
+        boolean shows = false;
         Pressed.Result missed = Pressed.Result.ABSENT;
         try {
             for (int i = 0; i < most && !Thread.currentThread().isInterrupted(); i++) {
                 Optional<BufferedImage> frame = closePopups(reach.look());
+                if (times == 0 && input instanceof Button button && strip == null) frame = awaited(button, p, frame);
                 if (frame.isEmpty()) {
                     return new Press(times > 0 ? Pressed.Result.DONE : Pressed.Result.ABSENT, constant, times,
                             "The screen could not be captured.");
@@ -336,6 +350,11 @@ public final class ScreenWalk {
                 if (input instanceof Button button && p.mode() != Pick.Mode.EACH) {
                     Optional<Reach.Seen> seen = reach.inView(button, strip, p, frame.get());
                     if (seen.isEmpty()) break;
+                    if (p.mode() == Pick.Mode.UNTIL && p.look() != null
+                            && seen.get().picture().id().equals(p.look().id())) {
+                        shows = true;
+                        break;
+                    }
                     if (seen.get().state() == State.DISABLED) {
                         missed = Pressed.Result.DISABLED;
                         break;
@@ -352,6 +371,9 @@ public final class ScreenWalk {
                 times++;
                 List<String> leads = leads(constant, field, input, p, look);
                 Optional<String> landed = landing(constant, leads);
+                // A popup the press brings up is closed by the next look: each Claim's rewards (Firestone's Map,
+                // 2026-10-17).
+                if (most > 1 && landed.flatMap(graph::screen).filter(MapScreen::isPopup).isPresent()) continue;
                 if (landed.isEmpty() || !landed.get().equals(constant)) {
                     boolean led = landed.isPresent() && leads.contains(landed.get());
                     return new Press(led ? Pressed.Result.DONE : Pressed.Result.LEFT, landed.orElse(null), times,
@@ -370,9 +392,31 @@ public final class ScreenWalk {
         if (times == 0 && Thread.currentThread().isInterrupted()) {
             return new Press(Pressed.Result.NOT_NOW, constant, 0, "Stopped.");
         }
+        if (p.mode() == Pick.Mode.UNTIL && (shows || times > 0)) {
+            if (shows) return new Press(Pressed.Result.DONE, constant, times, name + " shows " + p.look().id() + ".");
+            // Greyed out or gone before it showed the look asked: never a success.
+            return new Press(missed, constant, times, name + " never showed "
+                    + (p.look() == null ? "the look asked" : p.look().id()) + " after " + times + " presses.");
+        }
         if (times > 0) return new Press(Pressed.Result.DONE, constant, times, name + " pressed " + times + "×.");
         return new Press(missed, constant, 0, name + (missed == Pressed.Result.DISABLED ? " looks disabled."
                 : " is not on " + graph.shown(constant) + "."));
+    }
+
+    /**
+     * {@code frame}, or a later look once {@code button} shows on it, popups closed, within a step's time: a button
+     * the last press brings up late is waited for, Play's cards (Firestone's Tavern, 2026-10-17). A member of a strip
+     * is not: the press scrolls to it instead.
+     */
+    private Optional<BufferedImage> awaited(Button button, Pick pick, Optional<BufferedImage> frame) {
+        long deadline = reach.nowMs() + stepMs;
+        Optional<BufferedImage> now = frame;
+        while (now.isPresent() && reach.seen(button, null, pick, now.get()).isEmpty() && reach.nowMs() < deadline
+                && !Thread.currentThread().isInterrupted()) {
+            reach.pause(POLL_MS);
+            now = closePopups(reach.look());
+        }
+        return now;
     }
 
     /**

@@ -6,7 +6,7 @@ package com.botmaker.sdk.api.screens;
  *
  * <pre>{@code
  * public static final class Market extends Screen {
- *     public final Button beerBuy = Button.of(Pictures.BEER_BUY_TAVERN).purpose(Purpose.TASK)
+ *     public final Button beerBuy = Button.of(Pictures.BEER_BUY_TAVERN).tried()
  *             .looks(List.of(Look.of(Pictures.BEER_BUY_OFF_TAVERN, State.DISABLED)));
  *     public final Button close = Button.of(Pictures.CLOSE_MARKET);
  *
