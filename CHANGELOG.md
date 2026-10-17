@@ -584,6 +584,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **`Navigate.press` says LEFT when the game stays put twice.** A press the map says leads away, pressed twice with
   the game still on its screen, no longer reports DONE. A screen's way back, pressed, is DONE when the game lands on
   a screen it is opened from, no longer LEFT.
+- **Discovery no longer writes a strip's scroll as 0 px.** A scroll that carries every member out of view leaves
+  the strip unmeasured.
 - **`Screens.java` opened slowly on a big map.** Each screen's card read the whole map twice, so a map of 45
   screens took over 30 s to open. Every card drawn in one go now shares one read (about 0.5 s on Firestone), and
   the shots and thumbnails load in the background. Moving to another screen in the open file reads nothing again.
