@@ -318,6 +318,23 @@ class ScreenWalkTest {
         assertEquals(List.of("click campaign", "click campaign"), game.done, "pressed twice, never a third time");
     }
 
+    /** A screen's way back leads to the screen it is opened from: landing there is what the map says. */
+    @Test
+    void aWayBackPressedLandsWhereTheScreenIsOpenedFrom() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("ENGINEER", screen(screens.get("ENGINEER").setup().back(ref("ENGINEER", "close")),
+                click("close")));
+        Game game = new Game("ENGINEER");
+        game.shows.get("ENGINEER").add("close");
+        game.leads.put("ENGINEER click close", "HOME");
+
+        ScreenWalk.Press press = new ScreenWalk(ScreenGraph.of(screens), game, STEP_MS, null)
+                .press("ENGINEER", "close", null);
+
+        assertEquals(Pressed.Result.DONE, press.result(), press.toString());
+        assertEquals("HOME", press.at());
+    }
+
     /** A way through a copy is the copy pressed by its place along its order, whatever the pick's mode. */
     @Test
     void aWaysCopyIsTheOnePressedByPlaceAndOrder() {

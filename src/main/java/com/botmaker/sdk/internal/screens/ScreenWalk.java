@@ -431,15 +431,20 @@ public final class ScreenWalk {
 
     /**
      * The screens the field {@code field} of {@code constant}, {@code input}, leads to in {@code look}: of a repeated
-     * button, only the ways through the copy {@code pick} pressed.
+     * button, only the ways through the copy {@code pick} pressed. Its way back leads to every screen it is opened from.
      */
     private List<String> leads(String constant, String field, Input input, Pick pick, State look) {
         boolean copies = input instanceof Button button && button.repeats();
-        return graph.leads(constant, field).stream()
+        List<String> ahead = graph.leads(constant, field).stream()
                 .filter(lead -> !copies || sameCopy(lead.pick(), pick))
                 .filter(lead -> lead.state() == null || lead.state() == look)
                 .filter(lead -> Conditions.holds(lead.when()))
                 .map(ScreenGraph.Lead::to).distinct().toList();
+        if (!graph.isBack(constant, field)) return ahead;
+        Set<String> all = new LinkedHashSet<>(ahead);
+        all.addAll(graph.opensFrom(constant));
+        all.remove(constant);
+        return List.copyOf(all);
     }
 
     /**
