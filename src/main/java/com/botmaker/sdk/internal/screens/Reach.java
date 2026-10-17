@@ -194,15 +194,46 @@ public interface Reach {
                 ? findEachScored(order.stream().map(Look::picture).toList(), frame)
                 : order.stream().map(look -> findWithinScored(look.picture(), band, frame)).toList();
         // The best match wins, the first in order on a tie: a green Play passed for its grey look too, 0.82 to its
-        // own 0.91 (Firestone's Tavern, 2026-10-17).
+        // own 0.91 (Firestone's Tavern, 2026-10-17); the usual look only by more than LOOK_TIE.
         int best = -1;
         for (int i = 0; i < order.size(); i++) {
-            if (found.get(i).isPresent() && (best < 0 || found.get(i).get().score() > found.get(best).get().score())) {
+            if (found.get(i).isPresent() && (best < 0 || found.get(i).get().score()
+                    > found.get(best).get().score() + tie(order.get(i)))) {
                 best = i;
             }
         }
         return best < 0 ? Optional.empty()
-                : Optional.of(new Seen(order.get(best).state(), found.get(best).get().place(), order.get(best).picture()));
+                : Optional.of(new Seen(order.get(best).state(), placeOf(button, order.get(best),
+                found.get(best).get().place()), order.get(best).picture()));
+    }
+
+    /**
+     * How much better than another look the usual one must match to be taken: a button's usual picture cut in some
+     * state matches that state as well as the look cut for it does, and the state is told by what differs. A tree
+     * node seen only maxed has its usual picture cut on the maxed card; both scored 1.00 and the node was pressed
+     * (Firestone's Tree I, 2026-10-17).
+     */
+    double LOOK_TIE = 0.02;
+
+    private static double tie(Look look) {
+        return look.state() == State.NORMAL ? LOOK_TIE : 0;
+    }
+
+    /**
+     * Where {@code button} itself sits when its {@code look} is found at {@code found}: a look cut at another place
+     * than the button's picture, a node's whole card that says Max level, is moved back by where each was cut, scaled
+     * as it was found, so a tree's offsets and a click land on the button whatever look it shows (Firestone's Tree I,
+     * 2026-10-17). The place found when either place is unknown.
+     */
+    private static Rect placeOf(Button button, Look look, Rect found) {
+        Rect own = button.picture() == null ? null : button.picture().place();
+        Rect cut = look.picture().place();
+        if (own == null || cut == null || cut.equals(own) || cut.width() <= 0 || cut.height() <= 0) return found;
+        double sx = (double) found.width() / cut.width();
+        double sy = (double) found.height() / cut.height();
+        return new Rect(found.x() + (int) Math.round((own.x() - cut.x()) * sx),
+                found.y() + (int) Math.round((own.y() - cut.y()) * sy),
+                (int) Math.round(own.width() * sx), (int) Math.round(own.height() * sy));
     }
 
     /**
@@ -224,7 +255,7 @@ public interface Reach {
         List<Double> scores = new ArrayList<>();
         for (Look look : lookOrder(button)) {
             for (Found found : findAllScored(look.picture(), frame)) {
-                Rect at = found.place();
+                Rect at = placeOf(button, look, found.place());
                 if (band != null && !band.contains(at.center())) continue;
                 int same = -1;
                 for (int i = 0; i < all.size() && same < 0; i++) {
@@ -234,7 +265,7 @@ public interface Reach {
                 if (same < 0) {
                     all.add(new Seen(look.state(), at, look.picture()));
                     scores.add(found.score());
-                } else if (found.score() > scores.get(same)) {
+                } else if (found.score() > scores.get(same) + tie(look)) {
                     all.set(same, new Seen(look.state(), at, look.picture()));
                     scores.set(same, found.score());
                 }
@@ -552,6 +583,21 @@ public interface Reach {
     }
 
     /** Whether the same members show at the same places, to {@link #STILL_PX}: the strip did not move. */
+    /**
+     * Whether a member seen both {@code before} and {@code after} moved more than {@link #STILL_PX}: one gone behind a
+     * popup or a tooltip is no move.
+     */
+    static boolean moved(Map<String, Rect> before, Map<String, Rect> after) {
+        for (Map.Entry<String, Rect> was : before.entrySet()) {
+            Rect now = after.get(was.getKey());
+            if (now == null) continue;
+            Point a = was.getValue().center();
+            Point b = now.center();
+            if (Math.abs(a.x() - b.x()) > STILL_PX || Math.abs(a.y() - b.y()) > STILL_PX) return true;
+        }
+        return false;
+    }
+
     static boolean still(Map<String, Rect> before, Map<String, Rect> after) {
         return still(before, after, STILL_PX);
     }

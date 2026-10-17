@@ -2,12 +2,17 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.screens.Reach;
 import org.junit.jupiter.api.Test;
 
+import java.awt.image.BufferedImage;
+import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -84,5 +89,62 @@ class TreeMeasureTest {
         assertEquals(List.of(), now.nodes().get(0).beside(), "the pair written the other way round goes");
         assertEquals(List.of(Beside.of(A, 1.2, 0)), now.nodes().get(1).beside());
         assertEquals(List.of("c"), now.unplaced(), "c has no offset to a yet");
+    }
+
+    /**
+     * A view that starts gliding only after the first look, each look taking 11 s (Firestone's Tree I): the first look,
+     * past the settle time already, is not taken for the view at its end.
+     */
+    @Test
+    void aViewThatGlidesLateIsLookedAtAgainPastTheTime() {
+        Reach late = new Reach() {
+            final Map<BufferedImage, Integer> shifts = new HashMap<>();
+            long now;
+
+            @Override
+            public Optional<BufferedImage> look() {
+                now += 11_000;
+                BufferedImage frame = new BufferedImage(1, 1, BufferedImage.TYPE_BYTE_GRAY);
+                shifts.put(frame, shifts.isEmpty() ? 0 : -300);
+                return Optional.of(frame);
+            }
+
+            @Override
+            public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
+                return Optional.of(new Rect(700 + shifts.get(frame), 100, 100, 100));
+            }
+
+            @Override
+            public void click(Point at) {
+            }
+
+            @Override
+            public void key(Key key) {
+            }
+
+            @Override
+            public void scroll(Point at, int notches) {
+            }
+
+            @Override
+            public void drag(Point from, Point to, Duration time) {
+            }
+
+            @Override
+            public long nowMs() {
+                return now;
+            }
+
+            @Override
+            public void pause(long ms) {
+                now += ms;
+            }
+        };
+        Tree one = Tree.of(List.of(Node.of(A)));
+
+        BufferedImage settled = TreeMeasure.settled(late, one, Map.of(), Map.of("a", new Rect(700, 100, 100, 100)))
+                .orElseThrow();
+
+        assertEquals(new Rect(400, 100, 100, 100), late.find(A, settled).orElseThrow(), "the view after the glide");
     }
 }

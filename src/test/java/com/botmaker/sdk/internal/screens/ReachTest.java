@@ -6,9 +6,11 @@ import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
+import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.Test;
@@ -412,6 +414,43 @@ class ReachTest {
         public void click(Point at) {
             done.add("click " + at.x() + "," + at.y());
         }
+    }
+
+    /**
+     * A look cut wider than its button, a node's card that says Max level, says where the button is by where each was
+     * cut (Firestone's Tree I).
+     */
+    @Test
+    void aLookCutElsewhereSaysWhereItsButtonIs() {
+        ImageTemplate card = new ImageTemplate("images/card.png").at(new Rect(0, 95, 300, 90));
+        Button node = Button.of(TAVERN).looks(List.of(Look.of(card, State.DONE)));
+        Column shown = new Column(Map.of(), 0) {
+            @Override
+            public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
+                return picture.id().equals("card") ? Optional.of(new Rect(200, 300, 300, 90)) : Optional.empty();
+            }
+        };
+
+        Reach.Seen seen = shown.seen(node, shown.look().orElseThrow()).orElseThrow();
+
+        assertEquals(State.DONE, seen.state());
+        assertEquals(new Rect(210, 305, 80, 80), seen.place(), "the button's own place, moved as the card was");
+    }
+
+    /** A usual picture cut on a maxed card matches it as well as the maxed look: the look tells the state. */
+    @Test
+    void aLookTiedWithTheUsualPictureTellsTheState() {
+        ImageTemplate card = new ImageTemplate("images/card.png").at(new Rect(10, 100, 300, 90));
+        Button node = Button.of(TAVERN).looks(List.of(Look.of(card, State.DONE)));
+        Column both = new Column(Map.of(), 0) {
+            @Override
+            public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
+                return Optional.of(picture.id().equals("card") ? new Rect(10, 100, 300, 90) : new Rect(10, 100, 80, 80));
+            }
+        };
+
+        assertEquals(State.DONE, both.seen(node, both.look().orElseThrow()).orElseThrow().state());
+        assertEquals(State.DONE, both.copies(node, null, Order.NORTH, both.look().orElseThrow()).getFirst().state());
     }
 
     private static final Button GO = Button.of(new ImageTemplate("images/go.png")).repeated();

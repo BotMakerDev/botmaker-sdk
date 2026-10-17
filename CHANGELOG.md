@@ -600,6 +600,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **A tree that glides late is measured, not taken for its end.** try_input's scroll over a node, and
+  `Navigate.press` walking a tree, look at the view at least twice after a move. They wait for its nodes to leave
+  the place they held before. Looking at sixteen nodes took 11 s, so the first look ran past the settle time and
+  still showed the view before it moved.
+- **A look cut wider than its button says where the button is.** A node's maxed card, cut whole, is moved back to
+  the node's own place by where each was cut. A tree's offsets and a click land on the node whatever look it shows.
+- **A look beats the usual picture on a tie.** A button's usual picture cut in some state matches that state as
+  well as the look does. The usual picture is now taken only when it matches better by more than 0.02. A maxed node
+  scored 1.00 both ways, and was pressed.
 - **A screen is found in a window of another size or shape.** A marker's slack round where it was cut now grows
   with the window, as its place does. When no screen shows where its markers were cut, the screens one step away
   are looked for over the whole window.

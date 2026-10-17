@@ -217,8 +217,10 @@ final class TreeWalk {
 
     /**
      * The view once it holds still after a move: looked at every {@link Reach#SCROLL_SETTLE_MS} until two looks in a
-     * row show the nodes seen before the move at the same places, for up to {@link Scroll#SETTLE}. Empty when the
-     * game could not be captured or the walk was stopped.
+     * row show the nodes seen before the move at the same places, away from where they were, for up to
+     * {@link Scroll#SETTLE}. Nodes still where they were are looked at to the end of that time, and at least twice: a
+     * game may start gliding late, and a slow look can pass the time on the first one. Empty when the game could not
+     * be captured or the walk was stopped.
      */
     private static Optional<BufferedImage> settled(Reach reach, Tree tree, Map<String, Rect> seen,
                                                    Map<String, Button> buttons) {
@@ -234,7 +236,8 @@ final class TreeWalk {
                 List<Reach.Seen> copies = reach.copies(buttonOf(picture, buttons), null, Order.NORTH, frame.get());
                 if (copies.size() == 1) now.put(picture.id(), copies.getFirst().place());
             }
-            if (last != null && Reach.still(last, now) || reach.nowMs() >= until) return frame;
+            boolean held = last != null && Reach.still(last, now) && (seen.isEmpty() || Reach.moved(seen, now));
+            if (held || last != null && reach.nowMs() >= until) return frame;
             last = now;
         }
     }

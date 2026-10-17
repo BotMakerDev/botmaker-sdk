@@ -196,19 +196,23 @@ final class TreeMeasure {
 
     /**
      * The view once it holds still after the move: looked at every {@link Reach#SCROLL_SETTLE_MS} until two looks in a
-     * row show its nodes at the same places, for up to {@link Scroll#SETTLE}.
+     * row show its nodes at the same places, away from where they were {@code before}, for up to
+     * {@link Scroll#SETTLE}. Nodes still where they were are looked at to the end of that time, and at least twice: a
+     * game may start gliding late, and a look over sixteen nodes took 11 s, past the time on the first look (Firestone's
+     * Tree I read as at its end, 2026-10-17).
      */
-    private static Optional<BufferedImage> settled(Reach reach, Tree tree, Map<String, Button> buttons,
-                                                   Map<String, Rect> before) {
+    static Optional<BufferedImage> settled(Reach reach, Tree tree, Map<String, Button> buttons,
+                                           Map<String, Rect> before) {
         long until = reach.nowMs() + Scroll.SETTLE.toMillis();
-        Map<String, Rect> last = before;
+        Map<String, Rect> last = null;
         while (true) {
             reach.pause(Reach.SCROLL_SETTLE_MS);
             Optional<BufferedImage> frame = reach.look();
             if (frame.isEmpty() || Thread.currentThread().isInterrupted()) return Optional.empty();
             Map<String, Rect> now = shown(reach, tree, buttons, frame.get());
             // Two looks showing no node tell nothing of a glide: only nodes held still settle it.
-            if (last != before && !now.isEmpty() && Reach.still(last, now) || reach.nowMs() >= until) return frame;
+            boolean held = last != null && !now.isEmpty() && Reach.still(last, now) && Reach.moved(before, now);
+            if (held || last != null && reach.nowMs() >= until) return frame;
             last = now;
         }
     }
