@@ -366,6 +366,16 @@ class ReachTest {
         assertEquals(Optional.empty(), atEnd.measure(COLUMN, frame), "nothing moved: no measure");
     }
 
+    /** A scroll that carries every member shown out of view tells nothing of how far it goes: no measure. */
+    @Test
+    void aStripWhoseMembersAllLeaveTheViewIsNotMeasured() {
+        Column column = new Column(Map.of("tavern", 0, "arena", 1), 10);
+        BufferedImage frame = column.look().orElseThrow();
+
+        assertEquals(Optional.empty(), column.measure(COLUMN.scroll(Scroll.wheel(-8)), frame),
+                "measured 0 px would read as a strip at its end");
+    }
+
     @Test
     void aStripOfNoNotchesScrollsNothing() {
         Column column = new Column(Map.of("tavern", 0, "war_machines", 8), 4);

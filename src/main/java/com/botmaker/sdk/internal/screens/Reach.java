@@ -481,9 +481,10 @@ public interface Reach {
      * {@code strip} scrolled once by its own scroll, over a member {@code frame} shows, and timed: how far its members
      * moved and how long they took to hold still (two calm looks in a row), looked at every {@link #MEASURE_MS} for
      * up to its {@link Scroll#settle} or {@link Scroll#SETTLE}, the longer. The scroll answered has that
-     * {@link Scroll#step} (0 when no member showed both before and after) and a settle of half as long again plus 200 ms, rounded up to 100 ms: a strip is judged by its own
-     * speed, with room for a slow frame. Empty when no member shows, nothing moved (an end), or the game could not be
-     * captured; the strip stays scrolled either way. Discovery measures a strip by it.
+     * {@link Scroll#step} and a settle of half as long again plus 200 ms, rounded up to 100 ms: a strip is judged by
+     * its own speed, with room for a slow frame. Empty when no member shows, none shows both before and after, nothing
+     * moved (an end), or the game could not be captured; the strip stays scrolled either way. Discovery measures a
+     * strip by it.
      */
     default Optional<Scroll> measure(Strip strip, BufferedImage frame) {
         Scroll scroll = strip.scroll();
@@ -520,7 +521,9 @@ public interface Reach {
             Point b = to.center();
             moved.add(Math.max(Math.abs(a.x() - b.x()), Math.abs(a.y() - b.y())));
         }
-        int step = moved.isEmpty() ? 0 : moved.stream().sorted().toList().get(moved.size() / 2);
+        // No member seen both before and after (a scroll that carries them all out of view): how far is not known.
+        if (moved.isEmpty()) return Optional.empty();
+        int step = moved.stream().sorted().toList().get(moved.size() / 2);
         long took = movedAt - start;
         long settle = (took * 3 / 2 + 200 + 99) / 100 * 100;
         return Optional.of(scroll.step(step).settle(Duration.ofMillis(settle)));
