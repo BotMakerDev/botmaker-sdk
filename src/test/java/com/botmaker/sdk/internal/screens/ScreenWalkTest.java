@@ -3,8 +3,10 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Pressed;
@@ -12,6 +14,7 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -293,6 +296,31 @@ class ScreenWalkTest {
                 .press("HOME", "claim", Pick.untilNone());
         assertEquals(new ScreenWalk.Press(Pressed.Result.DONE, "HOME", 1, press.why()), press);
         assertEquals(List.of("click claim"), game.done, "stopped by its busy look");
+    }
+
+    @Test
+    void aNodeOfATreeIsPressedInViewAndWalkedToOutOfIt() {
+        ImageTemplate root = picture("root").at(new Rect(0, 0, 10, 10));
+        ImageTemplate fist = picture("fist").at(new Rect(0, 0, 10, 10));
+        Tree tree = Tree.of(List.of(Node.of(root), Node.of(fist).beside(List.of(Beside.of(root, 40, 0)))));
+        Map<String, MapScreen> screens = screens();
+        screens.put("HOME", with(screens.get("HOME"), Button.of(root), Button.of(fist), tree));
+
+        Game shown = new Game("HOME");
+        shown.shows.get("HOME").addAll(List.of("root", "fist"));
+        ScreenWalk.Press pressed = new ScreenWalk(ScreenGraph.of(screens), shown, STEP_MS, null)
+                .press("HOME", "fist", null);
+        assertEquals(Pressed.Result.DONE, pressed.result(), pressed.why());
+        assertEquals(List.of("click fist"), shown.done);
+
+        // Out of view, 40 of the root's widths east, and the tree does not scroll: missed, saying why.
+        Game hidden = new Game("HOME");
+        hidden.shows.get("HOME").add("root");
+        ScreenWalk.Press missed = new ScreenWalk(ScreenGraph.of(screens), hidden, STEP_MS, null)
+                .press("HOME", "fist", null);
+        assertEquals(Pressed.Result.ABSENT, missed.result());
+        assertTrue(missed.why().contains("does not scroll"), missed.why());
+        assertTrue(hidden.done.isEmpty());
     }
 
     @Test

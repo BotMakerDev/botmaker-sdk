@@ -243,6 +243,17 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
         return trees().values().stream().filter(tree -> tree.has(button.picture())).findFirst();
     }
 
+    /** Its buttons that are nodes of {@code tree}, by their picture's id: the looks a walk finds each node by. */
+    public Map<String, Button> nodeButtons(Tree tree) {
+        Map<String, Button> buttons = new LinkedHashMap<>();
+        for (Input input : inputs.values()) {
+            if (input instanceof Button button && tree.has(button.picture())) {
+                buttons.putIfAbsent(button.picture().id(), button);
+            }
+        }
+        return buttons;
+    }
+
     /**
      * Its field {@code field} with what its strip or tree says of its members put on it where it says nothing itself:
      * a strip that comes and goes makes each member come and go. Empty for no such field.

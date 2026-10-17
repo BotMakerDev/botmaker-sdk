@@ -59,7 +59,7 @@ public record Tree(List<Node> nodes, boolean isDragged, int notches, boolean isT
         return new Tree(nodes, true, notches, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when);
     }
 
-    /** This tree, scrolled by the wheel, {@code notches} a scroll. */
+    /** This tree, scrolled by the wheel, {@code notches} a scroll: how far only, a walk turns it the way a node lies. */
     public Tree wheel(int notches) {
         return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when);
     }

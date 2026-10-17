@@ -126,6 +126,14 @@ public interface Reach {
         drag(over, to, scroll.time());
     }
 
+    /**
+     * How far the view moved from {@code before} to {@code after}, in pixels, right and down positive: read off the
+     * pixels, for a tree no node of which shows on both. Empty when it cannot tell.
+     */
+    default Optional<Point> shift(BufferedImage before, BufferedImage after) {
+        return FrameShift.of(before, after);
+    }
+
     /** Milliseconds on a clock that only goes forward. */
     long nowMs();
 

@@ -76,7 +76,8 @@ public final class Navigate {
 
     /**
      * Presses {@code button}, an input of a screen of the map ({@code Screens.MARKET.beerBuy}): walks to its screen
-     * when the game is elsewhere, as {@link #to} does, scrolls its strip to it, clicks the copy {@code pick} names
+     * when the game is elsewhere, as {@link #to} does, scrolls its strip to it or moves its {@link Tree tree}'s view
+     * to it along the tree's offsets from a node in view, clicks the copy {@code pick} names
      * (null: the first), and waits for where the map says it leads. {@link Pick#untilNone} presses it again while the
      * game stays there, until it is gone or looks disabled: Buy until the money runs out (2026-10-17); {@link
      * Pick#until} presses a {@link Button#cycling cycling} button until it shows a look. A button not in view yet is

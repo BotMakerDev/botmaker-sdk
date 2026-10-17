@@ -26,7 +26,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   .beside(List.of(Beside.of(Pictures.DAMAGE, 1.2, -0.6))))).dragged()`. Each node is one of the screen's buttons.
   `after` says which nodes unlock it. `beside` says where it sits from a connected node, in that node's widths and
   heights, so no pixel or resolution is written down. The tree says only how it scrolls: `.dragged()`,
-  `.wheel(notches)`, or neither when it fits on the screen. Walking to a node out of view comes next.
+  `.wheel(notches)`, or neither when it fits on the screen.
+- **`Navigate.press` reaches a node of a tree anywhere on it.** It finds the nodes in view, follows the offsets from
+  one of them to the node, and drags or scrolls the view there. Each move is at most 80 % of the frame, and the next
+  look plans again, so an overshoot is corrected. When the node is not reached, the press is `ABSENT` and says why:
+  no node in view, no chain of offsets, the view stopped moving, or the node is not where its offsets put it.
 - **A button's look can say locked, finished or busy.** `State` gains `LOCKED`, `DONE` and `BUSY`. A button showing
   one is never pressed, as a disabled one is. `Navigate.press` reports `Pressed.Result.LOCKED`, `FINISHED` or `BUSY`,
   and `Pick.untilNone()` stops on it.

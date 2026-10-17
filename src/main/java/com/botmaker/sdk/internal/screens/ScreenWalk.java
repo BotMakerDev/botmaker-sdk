@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.screens.Pressed;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
@@ -17,6 +18,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -331,6 +333,7 @@ public final class ScreenWalk {
             return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is not there now: its method says no.");
         }
         Strip strip = screen.stripOf(input).orElse(null);
+        Tree tree = screen.treeOf(input).orElse(null);
         Pick p = pick == null ? Pick.first() : pick;
         int most = !(input instanceof Button button) ? 1 : switch (p.mode()) {
             case UNTIL_NONE -> MOST_PRESSES;
@@ -343,17 +346,31 @@ public final class ScreenWalk {
         boolean shows = false;
         Pressed.Result missed = Pressed.Result.ABSENT;
         State blocking = null;
+        String walked = null;
         try {
             for (int i = 0; i < most && !Thread.currentThread().isInterrupted(); i++) {
                 Optional<BufferedImage> frame = closePopups(reach.look());
-                if (times == 0 && input instanceof Button button && strip == null) frame = awaited(button, p, frame);
+                if (times == 0 && input instanceof Button button && strip == null) {
+                    // A node out of view is walked to: what is waited for is a tree that has drawn a node.
+                    frame = tree == null ? awaited(f -> reach.seen(button, null, p, f).isPresent(), frame)
+                            : awaited(f -> tree.members().stream().anyMatch(m -> reach.find(m, f).isPresent()), frame);
+                }
                 if (frame.isEmpty()) {
                     return new Press(times > 0 ? Pressed.Result.DONE : Pressed.Result.ABSENT, constant, times,
                             "The screen could not be captured.");
                 }
                 State look = null;
                 if (input instanceof Button button && p.mode() != Pick.Mode.EACH) {
-                    Optional<Reach.Seen> seen = reach.inView(button, strip, p, frame.get());
+                    Optional<Reach.Seen> seen;
+                    if (tree != null) {
+                        // A node out of view is walked to along its tree's offsets.
+                        TreeWalk.Walked walk = TreeWalk.reach(reach, button, tree, screen.nodeButtons(tree),
+                                frame.get());
+                        seen = walk.found();
+                        walked = walk.why();
+                    } else {
+                        seen = reach.inView(button, strip, p, frame.get());
+                    }
                     if (seen.isEmpty()) break;
                     if (p.mode() == Pick.Mode.UNTIL && p.look() != null
                             && seen.get().picture().id().equals(p.look().id())) {
@@ -416,18 +433,18 @@ public final class ScreenWalk {
         }
         if (times > 0) return new Press(Pressed.Result.DONE, constant, times, name + " pressed " + times + "×.");
         return new Press(missed, constant, 0, name + (blocking != null ? " looks " + blocking.id() + "."
-                : " is not on " + graph.shown(constant) + "."));
+                : walked != null ? " " + walked : " is not on " + graph.shown(constant) + "."));
     }
 
     /**
-     * {@code frame}, or a later look once {@code button} shows on it, popups closed, within a step's time: a button
-     * the last press brings up late is waited for, Play's cards (Firestone's Tavern, 2026-10-17). A member of a strip
-     * is not: the press scrolls to it instead.
+     * {@code frame}, or a later look once it {@code shows} what is pressed, popups closed, within a step's time: a
+     * button the last press brings up late is waited for, Play's cards (Firestone's Tavern, 2026-10-17). A member of a
+     * strip is not: the press scrolls to it instead.
      */
-    private Optional<BufferedImage> awaited(Button button, Pick pick, Optional<BufferedImage> frame) {
+    private Optional<BufferedImage> awaited(Predicate<BufferedImage> shows, Optional<BufferedImage> frame) {
         long deadline = reach.nowMs() + stepMs;
         Optional<BufferedImage> now = frame;
-        while (now.isPresent() && reach.seen(button, null, pick, now.get()).isEmpty() && reach.nowMs() < deadline
+        while (now.isPresent() && !shows.test(now.get()) && reach.nowMs() < deadline
                 && !Thread.currentThread().isInterrupted()) {
             reach.pause(POLL_MS);
             now = closePopups(reach.look());
@@ -513,7 +530,8 @@ public final class ScreenWalk {
         if (!edge.from().equals(at)) return search || !via.comesAndGoes();
         if (!(via instanceof Button button)) return true;
         Optional<Strip> strip = stripOf(edge);
-        boolean searched = strip.isPresent() && (search || !via.comesAndGoes());
+        // A node of a tree out of view is walked to by the click, as a strip's member is scrolled to.
+        boolean searched = (strip.isPresent() || treeOf(edge).isPresent()) && (search || !via.comesAndGoes());
         if (edge.state() == null && button.looks().isEmpty()) {
             // One a strip scrolls to is looked for by the click, which scrolls first.
             return !via.comesAndGoes() || searched || reach.seen(button, null, edge.pick(), frame).isPresent();
@@ -555,12 +573,27 @@ public final class ScreenWalk {
             if (close == null || !reach.perform(close, frame)) reach.key(Key.ESCAPE);
             return true;
         }
+        Optional<Tree> tree = treeOf(edge);
+        if (edge.via() instanceof Button button && tree.isPresent()) {
+            Map<String, Button> buttons = graph.screen(edge.from()).map(from -> from.nodeButtons(tree.get()))
+                    .orElse(Map.of());
+            Optional<Reach.Seen> seen = TreeWalk.reach(reach, button, tree.get(), buttons, frame).found();
+            if (seen.isEmpty() || seen.get().state().blocks()) return false;
+            if (edge.state() != null && edge.state() != seen.get().state()) return false;
+            reach.click(reach.pointOn(seen.get().place()));
+            return true;
+        }
         return reach.perform(edge.via(), stripOf(edge).orElse(null), edge.pick(), frame);
     }
 
     /** The strip of the screen {@code edge} leaves that its input is a member of; empty for one at its place. */
     private Optional<Strip> stripOf(ScreenGraph.Edge edge) {
         return graph.screen(edge.from()).flatMap(from -> from.stripOf(edge.via()));
+    }
+
+    /** The tree of the screen {@code edge} leaves that its input is a node of; empty for one in none. */
+    private Optional<Tree> treeOf(ScreenGraph.Edge edge) {
+        return graph.screen(edge.from()).flatMap(from -> from.treeOf(edge.via()));
     }
 
     /**
