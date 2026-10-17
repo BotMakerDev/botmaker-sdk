@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -56,6 +57,8 @@ public final class ScreenEdits {
             case Hotkey h -> new Hotkey(h.key(), false, false, h.isInfo(), null, h.comesAndGoes(), null, h.when());
             case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.comesAndGoes(), null,
                     s.when());
+            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.notches(), false, false, t.isInfo(), null,
+                    t.comesAndGoes(), null, t.when());
         };
     }
 
@@ -69,6 +72,8 @@ public final class ScreenEdits {
                     null);
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.never(),
                     false, s.lock(), null);
+            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.notches(), t.isTried(), t.isLeaving(), t.isInfo(),
+                    t.never(), false, t.lock(), null);
         };
     }
 
@@ -82,6 +87,8 @@ public final class ScreenEdits {
                     h.lock(), h.when());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.never(),
                     s.comesAndGoes(), s.lock(), s.when());
+            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.notches(), t.isTried(), t.isLeaving(), false,
+                    t.never(), t.comesAndGoes(), t.lock(), t.when());
         };
     }
 

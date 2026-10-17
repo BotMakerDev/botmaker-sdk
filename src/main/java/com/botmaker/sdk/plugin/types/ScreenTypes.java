@@ -5,10 +5,12 @@ import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Held;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Reached;
@@ -17,6 +19,7 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -73,6 +76,7 @@ public final class ScreenTypes {
         static final Held<Button, String> BUTTON_WHEN = Held.as(String.class, input -> sourceOf(input.when()));
         static final Held<Hotkey, String> HOTKEY_WHEN = Held.as(String.class, input -> sourceOf(input.when()));
         static final Held<Strip, String> STRIP_WHEN = Held.as(String.class, input -> sourceOf(input.when()));
+        static final Held<Tree, String> TREE_WHEN = Held.as(String.class, input -> sourceOf(input.when()));
         static final Held<ScreenVariant, String> VARIANT_WHEN = Held.as(String.class, v -> sourceOf(v.when()));
     }
 
@@ -153,6 +157,29 @@ public final class ScreenTypes {
             .<ImageTemplate>with(Strip::locked, Strip::lock)
             .<BooleanSupplier>with(Strip::when, Parts.STRIP_WHEN.part(ScreenTypes::condition));
 
+    /** {@code Beside.of(ImageTemplate, double, double)}: a node's offset from a connected one, in that one's size. */
+    public static final DeclaredCall<Beside> BESIDE_SHAPE = ComponentType.part(Beside.class)
+            .<ImageTemplate, Double, Double, Beside>writtenAs(Beside::of, Beside::other, Beside::across, Beside::down);
+
+    /** {@code Node.of(ImageTemplate)} and its links: the nodes that unlock it, and its offsets. */
+    public static final DeclaredCall<Node> NODE_SHAPE = ComponentType.part(Node.class)
+            .<ImageTemplate, Node>writtenAs(Node::of, Node::picture)
+            .<List<ImageTemplate>>with(Node::after, Node::after)
+            .<List<Beside>>with(Node::beside, Node::beside);
+
+    /** {@code Tree.of(List<Node>)} and its links: how it scrolls, and its nodes' defaults. */
+    public static final DeclaredCall<Tree> TREE_SHAPE = ComponentType.part(Tree.class)
+            .<List<Node>, Tree>writtenAs(Tree::of, Tree::nodes)
+            .flag(Tree::dragged, Tree::isDragged)
+            .<Integer>with(Tree::wheel, Tree::notches)
+            .flag(Tree::tried, Tree::isTried)
+            .flag(Tree::leaves, Tree::isLeaving)
+            .flag(Tree::info, Tree::isInfo)
+            .<String>with(Tree::never, Tree::never)
+            .flag(Tree::sometimes, Tree::comesAndGoes)
+            .<ImageTemplate>with(Tree::locked, Tree::lock)
+            .<BooleanSupplier>with(Tree::when, Parts.TREE_WHEN.part(ScreenTypes::condition));
+
     /** {@code Scroll.wheel(int)} and its links: how a strip scrolls, and what Discovery measured of it. */
     public static final DeclaredCall<Scroll> SCROLL_SHAPE = ComponentType.part(Scroll.class)
             .<Integer, Scroll>writtenAs(Scroll::wheel, Scroll::notches)
@@ -196,7 +223,8 @@ public final class ScreenTypes {
 
     /** The screen map's shapes, which {@code SdkTypes.PARTS} hands the host. */
     public static final List<ComponentType<?>> ALL = List.of(SETUP_SHAPE, WAY_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE,
-            BUTTON_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_SHAPE, STRIP_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE,
+            BUTTON_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_SHAPE, STRIP_SHAPE, BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE,
+            SCROLL_SHAPE, SCROLL_DRAG_SHAPE,
             PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE, PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE);
 
     /** A condition that only knows what it is written as — {@code Firestone::eventOn} — or {@code null}. */

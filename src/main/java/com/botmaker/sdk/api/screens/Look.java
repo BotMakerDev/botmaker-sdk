@@ -11,6 +11,11 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
  */
 public record Look(ImageTemplate picture, State state) {
 
+    public Look {
+        // A look saying nothing is the usual one.
+        state = state == null ? State.NORMAL : state;
+    }
+
     public static Look of(ImageTemplate picture, State state) {
         return new Look(picture, state);
     }

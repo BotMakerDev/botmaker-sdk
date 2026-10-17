@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
@@ -314,8 +315,11 @@ public final class MapAudit {
         for (Input input : named) {
             // One in a strip may be scrolled out of the shot, and is anywhere along it.
             Rect band = Reach.band(screen.stripOf(input).orElse(null));
+            // A node of a tree that scrolls may be anywhere off the shot.
+            boolean scrolled = screen.treeOf(input).filter(Tree::scrolls).isPresent();
             Input its = screen.effective(input);
-            boolean sure = !looksOnly.contains(input) && !its.comesAndGoes() && its.lock() == null && band == null;
+            boolean sure = !looksOnly.contains(input) && !its.comesAndGoes() && its.lock() == null && band == null
+                    && !scrolled;
             if (input instanceof Button button) {
                 for (Look look : button.allLooks()) {
                     add(checks, resources, look.picture(), false, sure && button.looks().isEmpty(), band);

@@ -3,9 +3,11 @@ package com.botmaker.sdk.plugin.types;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Reached;
@@ -14,6 +16,7 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -101,6 +104,21 @@ class ScreenTypesTest {
         assertEquals(Scroll.wheel(-5), roundTrip(ScreenTypes.SCROLL_SHAPE, Scroll.wheel(-5)));
         assertTrue(column.has(picture("campaign_home")));
         assertFalse(column.has(picture("town")));
+    }
+
+    /** A tree is written by its nodes, each by its picture, its unlock lines and its offsets, and how it scrolls. */
+    @Test
+    void aTreeIsWrittenByItsNodesAndHowItScrolls() {
+        Node health = Node.of(picture("health")).after(marks("damage"))
+                .beside(List.of(Beside.of(picture("damage"), 1.2, -0.6)));
+        Tree tree = Tree.of(List.of(Node.of(picture("damage")), health)).dragged().sometimes();
+        assertEquals(tree, roundTrip(ScreenTypes.TREE_SHAPE, tree));
+        assertEquals(health, roundTrip(ScreenTypes.NODE_SHAPE, health));
+        assertEquals(Node.of(picture("damage")), roundTrip(ScreenTypes.NODE_SHAPE, Node.of(picture("damage"))));
+        Tree wheel = Tree.of(List.of(Node.of(picture("damage")))).wheel(-3);
+        assertEquals(wheel, roundTrip(ScreenTypes.TREE_SHAPE, wheel));
+        assertEquals(Beside.of(picture("damage"), -2, 0.5),
+                roundTrip(ScreenTypes.BESIDE_SHAPE, Beside.of(picture("damage"), -2, 0.5)));
     }
 
     /** A wheel or a drag, each by its own factory, with what Discovery measured as links. */

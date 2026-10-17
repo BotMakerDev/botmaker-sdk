@@ -264,6 +264,37 @@ class ScreenWalkTest {
         assertEquals(3, game.done.size(), "a disabled button is never clicked");
     }
 
+    /** A node showing locked, maxed or upgrading is never clicked, and says which; pressing until none stops on it. */
+    @Test
+    void aButtonThatLooksLockedDoneOrBusyIsNotPressed() {
+        Map<State, Pressed.Result> results = Map.of(State.LOCKED, Pressed.Result.LOCKED,
+                State.DONE, Pressed.Result.FINISHED, State.BUSY, Pressed.Result.BUSY);
+        for (Map.Entry<State, Pressed.Result> look : results.entrySet()) {
+            Map<String, MapScreen> screens = screens();
+            screens.put("HOME", with(screens.get("HOME"),
+                    click("claim").looks(List.of(Look.of(picture("claim_" + look.getKey().id()), look.getKey())))));
+            ScreenGraph map = ScreenGraph.of(screens);
+            Game game = new Game("HOME");
+            game.shows.get("HOME").add("claim_" + look.getKey().id());
+
+            ScreenWalk.Press press = new ScreenWalk(map, game, STEP_MS, null).press("HOME", "claim", null);
+
+            assertEquals(new ScreenWalk.Press(look.getValue(), "HOME", 0, press.why()), press);
+            assertTrue(press.why().contains(look.getKey().id()), press.why());
+            assertTrue(game.done.isEmpty(), look.getKey() + " is never clicked");
+        }
+
+        Map<String, MapScreen> screens = screens();
+        screens.put("HOME", with(screens.get("HOME"),
+                click("claim").looks(List.of(Look.of(picture("claim_busy"), State.BUSY)))));
+        Game game = claiming(1);
+        game.greyed = "claim_busy";
+        ScreenWalk.Press press = new ScreenWalk(ScreenGraph.of(screens), game, STEP_MS, null)
+                .press("HOME", "claim", Pick.untilNone());
+        assertEquals(new ScreenWalk.Press(Pressed.Result.DONE, "HOME", 1, press.why()), press);
+        assertEquals(List.of("click claim"), game.done, "stopped by its busy look");
+    }
+
     @Test
     void aButtonNotShownIsAbsentAndOneThatLeadsElsewhereLeft() {
         Game gone = new Game("HOME");

@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
@@ -427,6 +428,8 @@ final class MapEdits {
             case Strip strip -> edit.scroll() != null && !strip.members().isEmpty()
                     && strip.members().getFirst().id().equalsIgnoreCase(picture)
                     && strip.scroll() != null && strip.scroll().notches() == edit.scroll();
+            // A tree is named by its field, never by a picture and a scroll.
+            case Tree ignored -> false;
             case Hotkey ignored -> false;
         };
     }

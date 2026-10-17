@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -264,6 +265,7 @@ final class MapTools {
             case Strip strip -> strip.members().isEmpty() ? input : input.named(shownMember(strip, context),
                     input.scroll() != null || strip.scroll() == null ? input.scroll() : strip.scroll().notches(), null);
             case Hotkey hotkey -> hotkey.key() == null ? input : input.named(null, null, hotkey.key().label());
+            case Tree ignored -> input;
         }).orElse(input);
     }
 
@@ -1368,7 +1370,9 @@ final class MapTools {
      * or a click whose picture names no new screen ({@code close_x}, or a screen the map has).
      */
     static boolean asksWhatItOpens(ScreenGraph graph, String screen, Input input) {
-        if (input instanceof Strip || input.never() != null || input.lock() != null) return false;
+        if (input instanceof Strip || input instanceof Tree || input.never() != null || input.lock() != null) {
+            return false;
+        }
         if (!(input instanceof Button button) || button.picture() == null) return true;
         String child = nameFrom(button.picture().id(), graph.shown(screen));
         return !isName(child) || ScreenBook.find(graph, child).isPresent();

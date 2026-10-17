@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
@@ -172,7 +173,7 @@ public interface Reach {
             if (p.mode() == Pick.Mode.UNTIL_NONE) {
                 // The first copy still to press; every one greyed out, the first: a Claim under grey ones (Firestone's
                 // Quests, 2026-10-17).
-                return copies.stream().filter(copy -> copy.state() != State.DISABLED).findFirst()
+                return copies.stream().filter(copy -> !copy.state().blocks()).findFirst()
                         .or(() -> copies.stream().findFirst());
             }
             int at = p.mode() == Pick.Mode.NTH ? p.nth() - 1 : 0;
@@ -341,6 +342,8 @@ public interface Reach {
                 key(hotkey.key());
                 yield true;
             }
+            // A tree is walked to one of its nodes, never pressed as a whole.
+            case Tree ignored -> false;
             case Strip scrolled -> {
                 Map<String, Rect> shown = members(scrolled, frame);
                 Rect band = band(scrolled);
@@ -355,7 +358,7 @@ public interface Reach {
                     yield performEach(button, strip, pick, frame);
                 }
                 Optional<Seen> seen = inView(button, strip, pick, frame);
-                if (seen.isEmpty() || seen.get().state() == State.DISABLED) yield false;
+                if (seen.isEmpty() || seen.get().state().blocks()) yield false;
                 click(pointOn(seen.get().place()));
                 yield true;
             }
@@ -374,7 +377,7 @@ public interface Reach {
         }
         boolean any = false;
         for (Seen copy : copies(button, strip, pick.order(), on).reversed()) {
-            if (copy.state() == State.DISABLED) continue;
+            if (copy.state().blocks()) continue;
             if (any) {
                 pause(CLICK_SETTLE_MS);
                 if (Thread.currentThread().isInterrupted()) return true;

@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -309,6 +310,7 @@ final class ScreenCards {
         String traits = switch (input) {
             case Button button -> button.cycles() ? "cycling" : button.repeats() ? "repeated" : "";
             case com.botmaker.sdk.api.screens.Strip strip -> strip.scroll() == null ? "" : scrolled(strip.scroll());
+            case Tree tree -> tree.isDragged() ? "dragged" : tree.notches() != 0 ? "wheel " + tree.notches() : "";
             case Hotkey ignored -> "";
         };
         return new Row(field, input, field, picture(input), state, result, kind, look,
@@ -327,6 +329,7 @@ final class ScreenCards {
             case Button button -> button.picture() == null ? null : button.picture().id();
             case com.botmaker.sdk.api.screens.Strip strip -> strip.members().isEmpty() ? null
                     : strip.members().getFirst().id();
+            case Tree tree -> tree.members().isEmpty() ? null : tree.members().getFirst().id();
             case Hotkey ignored -> null;
         };
     }

@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A tree of nodes is an input.** A research or skill tree is a `Tree` field of its screen:
+  `Tree.of(List.of(Node.of(Pictures.DAMAGE), Node.of(Pictures.HEALTH).after(List.of(Pictures.DAMAGE))
+  .beside(List.of(Beside.of(Pictures.DAMAGE, 1.2, -0.6))))).dragged()`. Each node is one of the screen's buttons.
+  `after` says which nodes unlock it. `beside` says where it sits from a connected node, in that node's widths and
+  heights, so no pixel or resolution is written down. The tree says only how it scrolls: `.dragged()`,
+  `.wheel(notches)`, or neither when it fits on the screen. Walking to a node out of view comes next.
+- **A button's look can say locked, finished or busy.** `State` gains `LOCKED`, `DONE` and `BUSY`. A button showing
+  one is never pressed, as a disabled one is. `Navigate.press` reports `Pressed.Result.LOCKED`, `FINISHED` or `BUSY`,
+  and `Pick.untilNone()` stops on it.
 - **The assistant asks itself why when it gets stuck.** Every stage of `read_guide` ends with what to do when a
   tool refuses, or a run goes wrong, twice for one goal. The assistant stops and says what the refusal means, what
   the tool assumes and whether the guide already answers it, then changes its approach. Discovery also says what a

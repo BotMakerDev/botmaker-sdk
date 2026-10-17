@@ -17,6 +17,12 @@ public record Pressed(Result result, Screen landed, int times) {
         DONE,
         /** Its button showed only its {@link State#DISABLED disabled} look: nothing was pressed. */
         DISABLED,
+        /** Its button showed its {@link State#LOCKED locked} look: nothing was pressed. */
+        LOCKED,
+        /** Its button showed its {@link State#DONE done} look, finished for good: nothing was pressed. */
+        FINISHED,
+        /** Its button showed its {@link State#BUSY busy} look, in progress: nothing was pressed. */
+        BUSY,
         /** It was not on its screen, its strip scrolled both ways: nothing was pressed. */
         ABSENT,
         /** Its screen could not be reached now, or it is locked or its method says no: nothing was pressed. */
@@ -26,6 +32,17 @@ public record Pressed(Result result, Screen landed, int times) {
          * stayed on its own after a second press, though the map says it leads away.
          */
         LEFT
+    }
+
+    /** What a press of a button showing {@code look} reports, nothing pressed; null for a look that does not block. */
+    public static Result blockedBy(State look) {
+        return switch (look) {
+            case DISABLED -> Result.DISABLED;
+            case LOCKED -> Result.LOCKED;
+            case DONE -> Result.FINISHED;
+            case BUSY -> Result.BUSY;
+            case NORMAL, BADGE, SELECTED -> null;
+        };
     }
 
     /** Whether it was pressed and went as the map says. */

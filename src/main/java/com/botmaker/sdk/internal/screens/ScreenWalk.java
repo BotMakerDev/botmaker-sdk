@@ -342,6 +342,7 @@ public final class ScreenWalk {
         boolean retried = false;
         boolean shows = false;
         Pressed.Result missed = Pressed.Result.ABSENT;
+        State blocking = null;
         try {
             for (int i = 0; i < most && !Thread.currentThread().isInterrupted(); i++) {
                 Optional<BufferedImage> frame = closePopups(reach.look());
@@ -359,16 +360,21 @@ public final class ScreenWalk {
                         shows = true;
                         break;
                     }
-                    if (seen.get().state() == State.DISABLED) {
-                        missed = Pressed.Result.DISABLED;
+                    if (seen.get().state().blocks()) {
+                        missed = Pressed.blockedBy(seen.get().state());
+                        blocking = seen.get().state();
                         break;
                     }
                     reach.click(reach.pointOn(seen.get().place()));
                     look = seen.get().state();
                 } else if (!reach.perform(input, strip, p, frame.get())) {
-                    // Every copy greyed out is a disabled button; none at all, an absent one.
-                    if (input instanceof Button button && reach.seen(button, strip, p, frame.get()).isPresent()) {
-                        missed = Pressed.Result.DISABLED;
+                    // Every copy greyed out, locked, done or busy is a button showing that look; none at all, an
+                    // absent one.
+                    Optional<Reach.Seen> seen = input instanceof Button button
+                            ? reach.seen(button, strip, p, frame.get()) : Optional.empty();
+                    if (seen.isPresent()) {
+                        blocking = seen.get().state().blocks() ? seen.get().state() : State.DISABLED;
+                        missed = Pressed.blockedBy(blocking);
                     }
                     break;
                 }
@@ -409,7 +415,7 @@ public final class ScreenWalk {
                     + (p.look() == null ? "the look asked" : p.look().id()) + " after " + times + " presses.");
         }
         if (times > 0) return new Press(Pressed.Result.DONE, constant, times, name + " pressed " + times + "×.");
-        return new Press(missed, constant, 0, name + (missed == Pressed.Result.DISABLED ? " looks disabled."
+        return new Press(missed, constant, 0, name + (blocking != null ? " looks " + blocking.id() + "."
                 : " is not on " + graph.shown(constant) + "."));
     }
 
@@ -515,7 +521,7 @@ public final class ScreenWalk {
         Optional<Reach.Seen> seen = reach.seen(button, strip.orElse(null), edge.pick(), frame);
         // A member out of view is looked at once the click scrolls to it.
         if (seen.isEmpty()) return searched || strip.isEmpty() && !via.comesAndGoes() && edge.state() == null;
-        if (seen.get().state() == State.DISABLED) return false;
+        if (seen.get().state().blocks()) return false;
         return edge.state() == null || edge.state() == seen.get().state();
     }
 

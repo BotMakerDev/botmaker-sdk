@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -382,7 +383,8 @@ public final class ScreenGraph {
         boolean opened = false;
         for (String field : fields(constant)) {
             Input input = input(constant, field).orElseThrow();
-            if (input.never() != null || input.lock() != null || input instanceof Strip || isBack(constant, field)
+            if (input.never() != null || input.lock() != null || input instanceof Strip || input instanceof Tree
+                    || isBack(constant, field)
                     || input.isLeaving() || !tried(constant, field)) {
                 continue;
             }
@@ -540,6 +542,7 @@ public final class ScreenGraph {
         List<String> ids = new ArrayList<>();
         if (input instanceof Button button) for (Look look : button.allLooks()) ids.add(look.picture().id());
         if (input instanceof Strip strip) for (ImageTemplate member : strip.members()) ids.add(member.id());
+        if (input instanceof Tree tree) for (ImageTemplate member : tree.members()) ids.add(member.id());
         if (input.lock() != null) ids.add(input.lock().id());
         return ids;
     }
@@ -580,8 +583,12 @@ public final class ScreenGraph {
                 kept = button.looks(button.looks().stream().filter(v -> !is(v.picture(), id)).toList());
             }
             if (kept instanceof Strip strip) kept = strip.members(butPicture(strip.members(), id));
+            if (kept instanceof Tree tree) kept = tree.without(id);
             if (is(kept.lock(), id)) kept = kept.locked(null);
-            if (kept instanceof Strip strip && strip.members().isEmpty()) now = now.withoutInput(e.getKey());
+            if (kept instanceof Strip strip && strip.members().isEmpty()
+                    || kept instanceof Tree tree && tree.nodes().isEmpty()) {
+                now = now.withoutInput(e.getKey());
+            }
             else if (!kept.equals(input)) now = now.withInput(e.getKey(), kept);
         }
         return now;

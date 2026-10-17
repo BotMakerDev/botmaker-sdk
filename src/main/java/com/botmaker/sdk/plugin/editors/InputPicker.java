@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -218,6 +219,7 @@ public final class InputPicker {
             case Button b -> b.repeats() ? "button, repeated" : "button";
             case Hotkey h -> h.label();
             case Strip s -> pickable ? "strip of " + s.members().size() : "strip:";
+            case Tree t -> pickable ? "tree of " + t.nodes().size() : "tree:";
         };
         return choice.field() + "  —  " + what + (choice.input().isInfo() ? ", info" : "");
     }
@@ -271,6 +273,7 @@ public final class InputPicker {
         List<ImageTemplate> pictures = switch (input) {
             case Button b -> b.picture() == null ? List.of() : List.of(b.picture());
             case Strip s -> s.members();
+            case Tree t -> t.members();
             case Hotkey h -> List.of();
         };
         Rect band = null;

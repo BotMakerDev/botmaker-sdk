@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
@@ -164,6 +165,12 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
                 if (members.isEmpty()) now.remove(e.getKey());
                 else now.put(e.getKey(), strip.members(members));
             }
+            for (Map.Entry<String, Input> e : inputs.entrySet()) {
+                if (!(e.getValue() instanceof Tree tree) || !tree.has(button.picture())) continue;
+                Tree kept = tree.without(id);
+                if (kept.nodes().isEmpty()) now.remove(e.getKey());
+                else now.put(e.getKey(), kept);
+            }
         }
         return new MapScreen(setup, now);
     }
@@ -221,19 +228,34 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
                 .findFirst();
     }
 
+    /** Its trees, by field name. */
+    public Map<String, Tree> trees() {
+        Map<String, Tree> trees = new LinkedHashMap<>();
+        inputs.forEach((field, input) -> {
+            if (input instanceof Tree tree) trees.put(field, tree);
+        });
+        return trees;
+    }
+
+    /** The tree {@code input}'s picture is a node of; empty for a button in no tree, a key, a strip or a tree. */
+    public Optional<Tree> treeOf(Input input) {
+        if (!(input instanceof Button button) || button.picture() == null) return Optional.empty();
+        return trees().values().stream().filter(tree -> tree.has(button.picture())).findFirst();
+    }
+
     /**
-     * Its field {@code field} with what its strip says of its members put on it where it says nothing itself: a strip
-     * that comes and goes makes each member come and go. Empty for no such field.
+     * Its field {@code field} with what its strip or tree says of its members put on it where it says nothing itself:
+     * a strip that comes and goes makes each member come and go. Empty for no such field.
      */
     public Optional<Input> effective(String field) {
         return input(field).map(this::effective);
     }
 
-    /** {@code input}, one of its fields, with its strip's defaults ({@link #effective(String)}). */
+    /** {@code input}, one of its fields, with its strip's or tree's defaults ({@link #effective(String)}). */
     public Input effective(Input input) {
-        Optional<Strip> strip = stripOf(input);
-        if (strip.isEmpty()) return input;
-        Strip s = strip.get();
+        Optional<Input> group = stripOf(input).<Input>map(strip -> strip).or(() -> treeOf(input));
+        if (group.isEmpty()) return input;
+        Input s = group.get();
         Input now = input;
         if (s.comesAndGoes() && !now.comesAndGoes()) now = now.sometimes();
         if (now.when() == null && s.when() != null) now = now.when(s.when());

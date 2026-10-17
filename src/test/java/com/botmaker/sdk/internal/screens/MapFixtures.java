@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 
@@ -60,6 +61,7 @@ public final class MapFixtures {
             case Button button -> button.picture().id();
             case Hotkey hotkey -> "key_" + hotkey.key().name().toLowerCase(Locale.ROOT);
             case Strip strip -> strip.members().getFirst().id() + "_strip";
+            case Tree tree -> tree.members().getFirst().id() + "_tree";
         };
     }
 

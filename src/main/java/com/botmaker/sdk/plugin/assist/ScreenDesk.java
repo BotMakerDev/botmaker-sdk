@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
@@ -48,6 +49,7 @@ public final class ScreenDesk {
         String picture = switch (input) {
             case Button button -> button.picture() == null ? null : button.picture().id();
             case Strip strip -> strip.members().isEmpty() ? null : strip.members().getFirst().id();
+            case Tree tree -> tree.members().isEmpty() ? null : tree.members().getFirst().id();
             case Hotkey ignored -> null;
         };
         Integer notches = input instanceof Strip strip && strip.scroll() != null ? strip.scroll().notches() : null;
