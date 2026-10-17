@@ -193,6 +193,13 @@
     -fx-background-radius: 14;
 }
 
+/* A tree's unlock line, from a node to the one it opens (TreeView). */
+.screen-tree-line {
+    -fx-stroke: -bm-screen-line;
+    -fx-stroke-width: 2;
+    -fx-stroke-line-cap: round;
+}
+
 /* --- the progress ring --- */
 
 .screen-ring-track {

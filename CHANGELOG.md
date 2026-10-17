@@ -36,6 +36,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   field) measures every linked pair in view, moves the view once, and measures the pairs the move split; it writes
   each offset. `read_map` lists a tree's nodes by their lines, with their offsets and looks, and names the nodes no
   offset places. `crop_pictures` takes `state: locked`, `done` or `busy` for a node's look.
+- **🗺 Screens draws a tree.** A tree's row has a 🌳 button that draws its nodes in the picture window, each where
+  its offsets from the first node place it, with a line for each unlock. Nodes no offset places yet sit in a row
+  below. Clicking a node shows its picture, or the screen it opens. `read_guide` tells Discovery how to map a tree.
 - **A button's look can say locked, finished or busy.** `State` gains `LOCKED`, `DONE` and `BUSY`. A button showing
   one is never pressed, as a disabled one is. `Navigate.press` reports `Pressed.Result.LOCKED`, `FINISHED` or `BUSY`,
   and `Pick.untilNone()` stops on it.

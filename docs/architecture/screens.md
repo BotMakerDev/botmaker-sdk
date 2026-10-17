@@ -33,6 +33,27 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   (lag); a second stay is LEFT. `Pick.untilNone()` presses until the button is gone or disabled (at most 50). `state(button)` is how
   it looks now, nothing walked or scrolled.
 
+## Trees (`api/screens/Tree`, the user's calls of 2026-10-17)
+
+- **`Tree`** is an input: linked nodes, each a `Button` field of the one screen it is on, that scroll in two
+  dimensions (a research tree). It is generic: another game's tree may have no levels, locks or scroll. It declares
+  only how it scrolls (`dragged()`, `wheel(n)`, or neither); nothing measured is kept on it. Zoom is out of scope.
+- **`Node`**: its picture, `after` (the nodes whose line leads to it, as the game draws it; never moves a walk) and
+  `beside` offsets. **No screen coordinates**: `Beside(other, across, down)` puts the node's centre at `other`'s
+  centre plus `across` × other's width and `down` × other's height. `Tree.path` is the fewest offsets from a node in
+  view to another, each read either way; `unplaced()` the nodes no chain joins to the first.
+- **A look's `State`** gains LOCKED, DONE and BUSY (`State.blocks()`); a press on such a look is `Pressed.blockedBy`.
+- **The walk** (`TreeWalk`, from `Reach.perform`): anchors are the nodes seen once on the frame; it moves the view
+  toward the target's predicted place (drag or wheel), carries the anchors across by how far the view moved
+  (`Reach.shift`, `FrameShift`; else the drag asked for), and clicks the target once it shows.
+- **Discovery** cuts the nodes, `edit_map group kind tree` (`by` drag, wheel or none) and `link`, then `try_input`
+  with `scroll` over a node (`TreeMeasure`): every linked pair in view is measured (rounded to 0.05), the view moved
+  once, and pairs the move split measured across it; offsets merge into the tree as it is when written. `read_map`
+  lists the nodes indented by their lines and names the unplaced ones as a problem.
+- **🗺**: a tree's row says how it scrolls, its nodes and how many are not placed; its 🌳 draws it (`TreeView`) in the
+  picture window, each node at the sum of offsets from the first, scaled to fit, its lines drawn, the unplaced ones in
+  a row below. A node clicked is picked as a boxed input of the shot is.
+
 ## The graph and the walk (`internal/screens`)
 
 - **`ScreenGraph`** is the one pure model every consumer reads: edges, `pathTo`, `presence` (a screen only

@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.MapAudit;
@@ -363,6 +364,10 @@ final class ScreenPanel {
             play.setDisable(busy);
             line.getChildren().add(play);
         }
+        if (row.input() instanceof Tree) {
+            line.getChildren().add(action("🌳", "Draw " + row.field() + "'s nodes where their offsets place them",
+                    () -> showTree(constant, row.field())));
+        }
         Node menu = hands.rowMenu(constant, row);
         menu.setDisable(busy);
         line.getChildren().add(menu);
@@ -476,6 +481,24 @@ final class ScreenPanel {
         List<ScreenCards.Strip> strips = ScreenCards.strips(graph, constant, rows);
         return viewer.showScreen(graph.shown(constant), back, width -> canvas.shotWithInputs(constant, width, rows,
                 strips, cuts, audits.get(constant), row -> pickBig(constant, row, back), null));
+    }
+
+    /**
+     * {@code constant}'s tree {@code field} drawn big in the picture window ({@link TreeView}): a node clicked is
+     * picked as a boxed input of the shot is, its ← coming back to the drawing. False when the screen has no such tree.
+     */
+    private boolean showTree(String constant, String field) {
+        MapScreen screen = graph.screens().get(constant);
+        Tree tree = screen == null ? null : screen.trees().get(field);
+        if (tree == null) return false;
+        PictureView.Back back = new PictureView.Back(field, () -> showTree(constant, field));
+        return viewer.showScreen(graph.shown(constant) + " · " + field, null, width -> Optional.of(TreeView.drawing(tree,
+                canvas::pictureSize, width, (id, side) -> canvas.thumb(id, side, "screen-row-thumb"),
+                id -> ScreenCards.rows(graph, constant).stream()
+                        .filter(r -> r.input() instanceof com.botmaker.sdk.api.screens.Button && id.equals(r.picture()))
+                        .findFirst().ifPresentOrElse(r -> pickBig(constant, r, back), () -> say(id + " is in "
+                                + field + " but is no button of " + graph.shown(constant) + ": crop_pictures it with "
+                                + "screen " + graph.shown(constant) + ".")))));
     }
 
     /** Takes {@code constant}'s shot again from the game, off the FX thread. */

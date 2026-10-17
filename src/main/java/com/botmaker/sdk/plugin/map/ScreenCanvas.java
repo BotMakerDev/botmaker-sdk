@@ -514,6 +514,11 @@ final class ScreenCanvas {
         redraw();
     }
 
+    /** The picture {@code id}'s size as cut, in the game's pixels; empty when it is not cut. */
+    Size pictureSize(String id) {
+        return resources == null ? new Size() : ScreenShots.size(TemplateLibrary.fileForName(resources, id));
+    }
+
     /** When the picture {@code id} was written, 0 for none: a recut changes it. */
     long pictureTime(String id) {
         return resources == null ? 0 : modified(TemplateLibrary.fileForName(resources, id));
