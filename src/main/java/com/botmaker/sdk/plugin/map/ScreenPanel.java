@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -142,14 +141,13 @@ final class ScreenPanel {
     private void draw() {
         MapScreen at = selected == null ? null : graph.screens().get(selected);
         String notes = at == null || at.notes() == null ? "" : at.notes();
-        Map<String, FrameCut> cuts = selected == null || services.pluginValues() == null ? Map.of()
-                : TemplateUses.cuts(services.pluginValues());
+        Map<String, FrameCut> cuts = selected == null ? Map.of() : cutsOf(selected);
         double width = shotWidth();
         // Everything the panel shows: the screen itself (its back, looks, notes and debts), its card and rows, where
         // its inputs were cut, when its shot was taken and how wide it is drawn.
         Object now = selected == null ? List.of(graph.screens().values().stream().allMatch(MapScreen::isPopup), busy)
                 : List.of(at, card(selected), ScreenCards.rows(graph, selected), ScreenCards.path(graph, selected),
-                cutsOf(at, cuts), canvas.shotTime(selected), pictureTimes(), width, busy,
+                cuts, canvas.shotTime(selected), pictureTimes(), width, busy,
                 Optional.ofNullable(audits.get(selected)));
         if (now.equals(drawn)) return;
         drawn = now;
@@ -187,15 +185,13 @@ final class ScreenPanel {
         return ScreenCards.card(graph, constant, ScreenDesk.stages(graph).getOrDefault(constant, ""));
     }
 
-    /** Where each picture {@code screen} uses was cut: what its shot's boxes are drawn from. */
-    private Map<String, FrameCut> cutsOf(MapScreen screen, Map<String, FrameCut> cuts) {
-        if (screen == null) return Map.of();
-        Map<String, FrameCut> used = new TreeMap<>();
-        for (String id : graph.pictures(selected)) {
-            FrameCut cut = cuts.get(id);
-            if (cut != null) used.put(id, cut);
-        }
-        return used;
+    /**
+     * Where each picture {@code constant} uses was cut: what its shot's boxes are drawn from. Only its own pictures
+     * are opened, never all of the bot's: the panel draws on every read of the map.
+     */
+    private Map<String, FrameCut> cutsOf(String constant) {
+        if (services.pluginValues() == null || !graph.screens().containsKey(constant)) return Map.of();
+        return TemplateUses.cuts(services.pluginValues(), graph.pictures(constant));
     }
 
     /** When each picture the selected screen uses was written: a recut draws its thumbs again. */
@@ -475,8 +471,7 @@ final class ScreenPanel {
      * when it has none.
      */
     private boolean bigShot(String constant, PictureView.Back back) {
-        Map<String, FrameCut> cuts = services.pluginValues() == null ? Map.of()
-                : TemplateUses.cuts(services.pluginValues());
+        Map<String, FrameCut> cuts = cutsOf(constant);
         List<Row> rows = ScreenCards.rows(graph, constant);
         List<ScreenCards.Strip> strips = ScreenCards.strips(graph, constant, rows);
         return viewer.showScreen(graph.shown(constant), back, width -> canvas.shotWithInputs(constant, width, rows,

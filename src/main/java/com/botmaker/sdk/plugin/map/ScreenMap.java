@@ -44,19 +44,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * 🗺 Screens: the bot's screen map, its {@code Screens} class, drawn as a graph — the SDK plugin's own window, and a
  * smaller copy in the overlay editor's tool pane. Studio only hosts it and names no screen type.
  *
- * <p>It follows the map as it changes: the Java is read again every {@link #POLL} and the cards drawn again only
- * when one changed, so a screen the assistant's try_input adds fades in while it works. During a run the screen
+ * <p>It follows the map as it changes: the Java is read again every {@link #POLL} that {@code Screens.java} was
+ * written ({@link ScreensFile}) and the cards drawn again only when one changed, so a screen the assistant's try_input adds fades in while it works. During a run the screen
  * the bot's walk reached is lit, from the run's telemetry ({@link ScreenStep}).
  */
 public final class ScreenMap {
 
     /** How often the map is read again while shown. */
     static final Duration POLL = Duration.seconds(1.5);
+    /** The polls after which the map is read again even with {@code Screens.java} unchanged, about 30 s. */
+    private static final int READ_ANYWAY = 20;
 
     /** The window open on each project, by its folder. On the FX thread. */
     private static final Map<Path, ScreenMap> OPEN = new HashMap<>();
@@ -89,6 +92,10 @@ public final class ScreenMap {
     private boolean stopped;
     /** Each read asked, counted: a read off the FX thread that another overtook draws nothing. */
     private long reads;
+    /** {@code Screens.java} as the last poll's read found it; null until one drew. A poll reads only when it moved. */
+    private ScreensFile lastFile;
+    /** Polls since the last read: every {@link #READ_ANYWAY}th reads whatever the file says. */
+    private int pollsSinceRead;
     /** What the first drawing with cards does, once: fit the map and pick the screen asked for. Null after. */
     private Runnable firstDrawn;
 
@@ -275,7 +282,20 @@ public final class ScreenMap {
         if (reading || !stillOpen()) return;
         reading = true;
         long asked = ++reads;
+        ScreensFile was = lastFile;
+        boolean due = ++pollsSinceRead >= READ_ANYWAY;
         Thread.ofVirtual().name("screen-map-read").start(() -> {
+            Optional<ScreensFile> file = ScreensFile.of(project, was == null ? null : was.file());
+            if (!due && file.isPresent() && file.get().equals(was)) {
+                // Screens.java as it was: only a picture or shot rewritten since is drawn again.
+                Platform.runLater(() -> {
+                    reading = false;
+                    if (stopped || !stillOpen() || asked != reads) return;
+                    if (canvas.filesChanged()) canvas.redraw();
+                    if (panel != null) panel.show(graph, selected);
+                });
+                return;
+            }
             Read read;
             try {
                 read = read();
@@ -287,7 +307,14 @@ public final class ScreenMap {
             Platform.runLater(() -> {
                 reading = false;
                 if (stopped || !stillOpen()) return;
-                if (asked == reads) apply(done);
+                if (asked != reads) return;
+                apply(done);
+                // Kept only for a read that drew: a failed one, or an empty one the last drawing stayed over, is
+                // read again at the next poll.
+                if (done.failed() == null && !emptyOnce) {
+                    lastFile = file.orElse(null);
+                    pollsSinceRead = 0;
+                }
             });
         });
     }

@@ -108,7 +108,8 @@ public final class ScreenConstantView {
         if (resources == null || picture == null) return Optional.empty();
         Path file = TemplateLibrary.fileForName(resources, picture);
         if (!Files.isRegularFile(file)) return Optional.empty();
-        ImageView view = new ImageView(new Image(file.toUri().toString(), THUMB, THUMB, true, true));
+        // In the background, as the shot: a file of fifty screens draws at once, each picture as it arrives.
+        ImageView view = new ImageView(new Image(file.toUri().toString(), THUMB, THUMB, true, true, true));
         return Optional.of(view);
     }
 
@@ -116,12 +117,13 @@ public final class ScreenConstantView {
         if (resources == null) return Optional.empty();
         Path file = ScreenShots.file(resources, constant);
         if (!Files.isRegularFile(file)) return Optional.empty();
-        ImageView view = new ImageView(new Image(file.toUri().toString(), SHOT * 2, 0, true, true));
+        ImageView view = new ImageView(new Image(file.toUri().toString(), SHOT * 2, 0, true, true, true));
         view.setFitWidth(SHOT);
         view.setPreserveRatio(true);
         return Optional.of(view);
     }
 
+    /** The map, one read for every card the tab draws in one go ({@link ScreenMapRead#orEmpty}). */
     private static ScreenGraph read(ValueContext ctx) {
         return ScreenMapRead.orEmpty(ctx.services() == null ? null : ctx.services().pluginValues());
     }

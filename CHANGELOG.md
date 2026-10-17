@@ -565,6 +565,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **`Screens.java` opened slowly on a big map.** Each screen's card read the whole map twice, so a map of 45
+  screens took over 30 s to open. Every card drawn in one go now shares one read (about 0.5 s on Firestone), and
+  the shots and thumbnails load in the background. Moving to another screen in the open file reads nothing again.
+- **A picture and the 🗺 side panel read every picture.** Where a picture was cut is now read from its own
+  constant, and the panel reads only its screen's pictures.
+- **🗺 Screens read the whole map every 1.5 s.** It now reads again only when `Screens.java` was written, and
+  every 30 s whatever the file says; a recut picture or a new shot still shows at once.
+
 - **A run in the private display found no game window.** A bot whose capture names gamescope's window
   (`CaptureSource.window("gamescope", "")`, as on the desktop) looked for it inside the private display, where
   gamescope is the display itself, and every capture failed. A pinned window the private display lacks now stands for

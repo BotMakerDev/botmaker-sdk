@@ -13,7 +13,9 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -270,6 +272,27 @@ public final class TemplateUses {
                     .ifPresent(held -> cuts.put(baseName, new FrameCut(held.frame(), held.place())));
         }
         return cuts;
+    }
+
+    /**
+     * Where each of {@code names} was cut, as {@link #cuts} says, opening only their constants: one screen's
+     * pictures, never the bot's hundreds (2026-10-17). A name with no cut is left out. On the FX thread.
+     */
+    public static Map<String, FrameCut> cuts(PluginValues values, Collection<String> names) {
+        Map<String, FrameCut> cuts = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (String name : names) cut(values, name).ifPresent(cut -> cuts.put(name, cut));
+        return cuts;
+    }
+
+    /** Where {@code baseName} was cut, as {@link #cuts} says, opening its constant alone; empty when it says not. */
+    public static Optional<FrameCut> cut(PluginValues values, String baseName) {
+        // Any case, as cuts' names are.
+        String name = baseName == null ? null : baseName.toLowerCase(Locale.ROOT);
+        Member constant = name == null ? null : constantFor(name);
+        if (constant == null) return Optional.empty();
+        return SET.read(values, constant)
+                .filter(held -> TemplateNames.pathFor(name).equals(held.filePath()))
+                .map(held -> new FrameCut(held.frame(), held.place()));
     }
 
     /**

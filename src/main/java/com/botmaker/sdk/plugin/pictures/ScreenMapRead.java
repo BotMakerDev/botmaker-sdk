@@ -8,10 +8,13 @@ import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.shared.Diag;
+import javafx.application.Platform;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The bot's map read out of its {@code Screens} class: the one read the assistant's tools, 🗺 Screens, the
@@ -33,7 +36,9 @@ public final class ScreenMapRead {
      * drawing then. On the FX thread.
      */
     public static ScreenGraph of(PluginValues values) {
+        long start = System.nanoTime();
         Map<String, MapScreen> screens = new LinkedHashMap<>();
+        int inputs = 0;
         if (values != null) {
             for (String constant : values.groups(SdkValues.SCREEN_MAP)) {
                 screens.put(constant, new MapScreen(setup(values, constant).orElse(Setup.named(constant)),
@@ -42,10 +47,13 @@ public final class ScreenMapRead {
             for (Member member : values.members(SdkValues.SCREEN_MAP)) {
                 MapScreen screen = member.grouped() ? screens.get(member.group()) : null;
                 if (screen == null) continue;
+                inputs++;
                 input(values, member).ifPresent(input ->
                         screens.put(member.group(), screens.get(member.group()).withInput(member.name(), input)));
             }
         }
+        Diag.log("map read: " + screens.size() + " screens, " + inputs + " inputs in "
+                + (System.nanoTime() - start) / 1_000_000 + " ms");
         return ScreenGraph.of(screens);
     }
 
@@ -66,6 +74,14 @@ public final class ScreenMapRead {
      * named goes once it names it no more. Empty when written, else why not. On the FX thread.
      */
     public static Optional<String> write(PluginValues values, String constant, MapScreen was, MapScreen now) {
+        try {
+            return written(values, constant, was, now);
+        } finally {
+            forget();
+        }
+    }
+
+    private static Optional<String> written(PluginValues values, String constant, MapScreen was, MapScreen now) {
         Optional<String> fields = writeFields(values, constant, was, now);
         if (fields.isPresent()) return fields;
         if (!now.setup().equals(was.setup())) {
@@ -103,11 +119,15 @@ public final class ScreenMapRead {
 
     /** Declares each of {@code inputs} in {@code constant}'s class, in order. Empty when written, else why not. */
     public static Optional<String> add(PluginValues values, String constant, Map<String, Input> inputs) {
-        for (Map.Entry<String, Input> e : inputs.entrySet()) {
-            Optional<String> refused = addField(values, Member.of(constant, e.getKey()), e.getValue());
-            if (refused.isPresent()) return refused;
+        try {
+            for (Map.Entry<String, Input> e : inputs.entrySet()) {
+                Optional<String> refused = addField(values, Member.of(constant, e.getKey()), e.getValue());
+                if (refused.isPresent()) return refused;
+            }
+            return Optional.empty();
+        } finally {
+            forget();
         }
-        return Optional.empty();
     }
 
     /** {@code member = input;}: the set is of screens, its fields of inputs, which the host checks. */
@@ -116,12 +136,46 @@ public final class ScreenMapRead {
         return values.add((ManagedValue<Object>) (ManagedValue<?>) SdkValues.SCREEN_MAP, member, input);
     }
 
-    /** {@link #of}, or no screens when the class will not read: what a view that must draw anyway shows. */
+    /**
+     * {@link #of}, or no screens when the class will not read: what a view that must draw anyway shows.
+     *
+     * <p>On the FX thread one read serves the whole event (2026-10-17): the {@code Screens.java} tab draws one card
+     * per screen, each asking, and each read opens every screen and input. Dropped once the event ends, and by
+     * every write here; off the FX thread nothing is kept.
+     */
     public static ScreenGraph orEmpty(PluginValues values) {
+        boolean fx = onFxThread();
+        Kept kept = KEPT.get();
+        if (fx && kept != null && kept.values() == values) return kept.graph();
+        ScreenGraph graph;
         try {
-            return of(values);
+            graph = of(values);
         } catch (RuntimeException unreadable) {
-            return ScreenGraph.of(Map.of());
+            graph = ScreenGraph.of(Map.of());
+        }
+        if (fx && values != null) {
+            KEPT.set(new Kept(values, graph));
+            Platform.runLater(ScreenMapRead::forget);
+        }
+        return graph;
+    }
+
+    /** The last read on the FX thread and what it read: {@link #orEmpty}'s, until its event ends. */
+    private record Kept(PluginValues values, ScreenGraph graph) {}
+
+    private static final AtomicReference<Kept> KEPT = new AtomicReference<>();
+
+    /** Drops the read kept: what writes the map calls it, so a view drawn after the write reads it again. */
+    public static void forget() {
+        KEPT.set(null);
+    }
+
+    /** Whether this is the FX thread; false where JavaFX is not there to ask, as in a headless host. */
+    private static boolean onFxThread() {
+        try {
+            return Platform.isFxApplicationThread();
+        } catch (RuntimeException | LinkageError noFx) {
+            return false;
         }
     }
 }

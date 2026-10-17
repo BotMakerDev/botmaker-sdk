@@ -135,6 +135,12 @@ class TemplateUsesTest {
         assertEquals(new FrameCut(new Size(1280, 720), new Rect(820, 610, 96, 40)), cuts.get("ore"));
         assertEquals(new FrameCut(null, null), cuts.get("GOLD"), "no frame or place written; the name matches in any case");
         assertEquals(2, cuts.size(), "a path the user chose is theirs: " + cuts);
+
+        for (String name : List.of("ore", "GOLD", "elsewhere", "nothing")) {
+            assertEquals(Optional.ofNullable(cuts.get(name)), TemplateUses.cut(host, name), "one picture, as all: " + name);
+        }
+        assertEquals(Map.of("ore", cuts.get("ore")), TemplateUses.cuts(host, List.of("ore", "elsewhere")),
+                "only the names asked, and only those with a cut");
     }
 
     @Test

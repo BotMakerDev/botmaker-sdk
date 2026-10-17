@@ -87,7 +87,12 @@ final class ScreenBook {
     /** {@code write} as one step of Studio's undo named {@code label}, or part of the batch already open. */
     static Optional<String> step(StudioServices services, String label, Supplier<Optional<String>> write) {
         List<Optional<String>> answer = new ArrayList<>(List.of(Optional.empty()));
-        services.history().batch(label, () -> answer.set(0, write.get()));
+        // Dropped after the write as well: a view drawn during it may have kept the map as it was.
+        try {
+            services.history().batch(label, () -> answer.set(0, write.get()));
+        } finally {
+            ScreenMapRead.forget();
+        }
         return answer.getFirst();
     }
 

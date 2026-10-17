@@ -262,7 +262,8 @@ final class PictureView {
 
     /** Where {@code name} was cut, as its constant says, on a line; empty when it does not say. */
     private String where(String name) {
-        FrameCut cut = services.pluginValues() == null ? null : TemplateUses.cuts(services.pluginValues()).get(name);
+        FrameCut cut = services.pluginValues() == null ? null
+                : TemplateUses.cut(services.pluginValues(), name).orElse(null);
         if (cut == null || cut.place() == null) return "";
         Rect r = cut.place();
         return "Cut at " + r.x() + "," + r.y() + " (" + r.width() + "×" + r.height() + ")"
