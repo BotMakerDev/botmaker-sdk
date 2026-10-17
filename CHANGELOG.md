@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The assistant asks itself why when it gets stuck.** Every stage of `read_guide` ends with what to do when a
+  tool refuses, or a run goes wrong, twice for one goal. The assistant stops and says what the refusal means, what
+  the tool assumes and whether the guide already answers it, then changes its approach. Discovery also says what a
+  marker is (a title or an icon only its screen shows, never a close button) and that a view doing another job is a
+  screen of its own.
 - **🗺 Screens finds a screen by more than its name.** *Find a screen…* lists the screens whose name, constant,
   input fields, pictures or notes hold the words. Each row shows the marker and the name, and what matched when it
   was not the name (`input beerBuy`). ↑ ↓ and Enter, or a click, zoom the map to that screen at a readable size.

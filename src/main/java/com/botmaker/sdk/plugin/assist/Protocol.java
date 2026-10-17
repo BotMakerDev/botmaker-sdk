@@ -21,6 +21,18 @@ import java.util.Optional;
  */
 final class Protocol {
 
+    /**
+     * What every stage says when the work stalls (the user's call, 2026-10-17: an assistant tried marker after marker
+     * that edit_map refused, instead of asking why).
+     */
+    static final String STUCK = """
+            When stuck (a tool refuses, or a run goes wrong, twice for one goal), stop before a third try and
+            answer three questions, saying the answers: what does the refusal say (a check that keeps refusing
+            means the map is modelled wrong, not that a way round is owed)? What does the tool assume (a marker
+            near where it was cut, a press waiting for where the map says it leads)? Does this guide answer it
+            already (a screen of its own)? Then change the approach, and write_notes what it taught.
+            """;
+
     /** A stage, in the order a screen goes through them, its steps as the assistant reads them. */
     enum Stage {
         SETUP("Stage 0, Setup: the game in view and a way home", """
@@ -57,7 +69,12 @@ final class Protocol {
                      marker (marker set) when one picture only it shows; several boxes with marker set when it
                      shares its title or frame with others (a tab, a dialog style), or marker add for one more;
                      marker absent for a picture only a screen like it shows (a button the other has). A set
-                     another screen's shot shows too is put back, naming that screen.
+                     another screen's shot shows too is put back, naming that screen. A marker is a picture only
+                     its screen shows, where it was cut: a title or an icon of its own, never a close, back or OK
+                     button, nor a picture the map uses on another screen. A marker is looked for near the place
+                     it was cut, scaled with the frame: a panel whose content sits elsewhere is not told by it.
+                     A view an input opens that does another job is a screen of its own, not a look (a running
+                     mission's Cancel where a new one has Start).
                   2. try_input each one, by its picture or its hotkey (several in one call, stopping at the first
                      that leaves the screen); try_input with scroll every list and
                      panel to its end both ways. Claim buttons and other free spends are clicked; an input that
@@ -185,9 +202,9 @@ final class Protocol {
             return title;
         }
 
-        /** The stage's title and steps, as read_guide gives them. */
+        /** The stage's title and steps, as read_guide gives them, and what to do when stuck (any stage). */
         String section() {
-            return title + "\n" + steps;
+            return title + "\n" + steps + "\n" + STUCK;
         }
 
         /** The stage {@code typed} names: its number, or its name in any case. */
