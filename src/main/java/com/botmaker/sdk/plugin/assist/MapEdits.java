@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
@@ -33,14 +34,13 @@ import java.util.stream.Stream;
  */
 final class MapEdits {
 
-    private static final String SCREEN = "the screen edited, as the map names it: Home, or its constant HOME; for "
-            + "new_screen the screen it is opened from";
+    private static final String SCREEN = "the screen edited, by name or constant (Home, HOME); for new_screen the "
+            + "one it opens from";
     private static final String PICTURE = "the input: its field (beerBuy) or picture";
-    private static final String SCROLL = "with picture, the strip that scrolls over it by these notches";
+    private static final String SCROLL = "with picture, a strip scrolled over it by these notches";
     private static final String KEY = "the input, by its hotkey: Q";
     private static final String FROM = "the screen the way in leaves";
-    private static final String METHOD = "a method of the bot answering true while it holds (Firestone::eventOn); "
-            + "left out or blank, always";
+    private static final String METHOD = "the bot's method true while it holds (Firestone::eventOn); blank: always";
 
     /**
      * What set_input records an input did, opening nothing: tried, or leaves for a screen reached otherwise; untried
@@ -66,7 +66,7 @@ final class MapEdits {
 
     @Describe("rename the screen")
     record Rename(@Describe(SCREEN) String screen,
-                  @Describe("the new name, or new_screen's: the name the game shows") String name) implements Edit {
+                  @Describe("the new name, or new_screen's, as the game shows it") String name) implements Edit {
     }
 
     @Describe("delete the screen")
@@ -74,18 +74,18 @@ final class MapEdits {
     }
 
     @Describe("make the screen a popup the game opens on its own, or a screen of the tree again")
-    record Popup(String screen, @Describe("true for a popup, false for a screen of the tree") boolean popup)
+    record Popup(String screen, boolean popup)
             implements Edit {
     }
 
-    @Describe("set what an input did, whether it only tells, or why it is never done or locked")
+    @Describe("set an input's result, info, never, lock, sometimes or repeated")
     record SetInput(String screen,
                     @Describe(value = PICTURE, optional = true) String picture,
                     @Describe(value = SCROLL, optional = true) Integer scroll,
                     @Describe(value = KEY, optional = true) String key,
                     @Describe(value = "what it does, opening nothing (one that opens a screen the "
                             + "map lacks: new_screen)", optional = true) Result did,
-                    @Describe(value = "true when it only tells (help, rules, a leaderboard): tried last",
+                    @Describe(value = "true when it only tells (help, rules): tried last",
                             optional = true) Boolean info,
                     @Describe(value = "why it is never clicked; blank to clear it", optional = true) String never,
                     @Describe(value = "the picture proving it locked; blank to clear it", optional = true)
@@ -118,14 +118,14 @@ final class MapEdits {
     record RemoveBack(String screen) implements Edit {
     }
 
-    @Describe("remove a way in: from, and the input of from that opens it")
+    @Describe("remove a way in: from, and its input")
     record RemoveWay(String screen, @Describe(FROM) String from,
                      @Describe(value = "", optional = true) String picture,
                      @Describe(value = "", optional = true) Integer scroll,
                      @Describe(value = "", optional = true) String key) implements Edit, OfInput {
     }
 
-    @Describe("a way in (from, and the input of from that opens it) taken only while method holds")
+    @Describe("a way in (from, and its input) taken only while method holds")
     record WayWhen(String screen, String from,
                    @Describe(value = "", optional = true) String picture,
                    @Describe(value = "", optional = true) Integer scroll,
@@ -140,32 +140,46 @@ final class MapEdits {
                      @Describe(value = "", optional = true) String method) implements Edit, OfInput {
     }
 
-    @Describe("a strip of buttons that scrolls or shifts, by its buttons, each scrolled to over one that shows; no "
-            + "notches: no strip")
-    record InStrip(String screen,
-                   @Describe(value = "the pictures of the screen's buttons in it, in its order", optional = true)
-                   List<String> members,
-                   @Describe(value = "each scroll's notches, negative down", optional = true) Integer notches)
+    /** What a group of a screen's buttons is: a strip along one line, or a tree of linked nodes. */
+    enum GroupKind {
+        STRIP, TREE
+    }
+
+    /** How a group scrolls. */
+    enum GroupScroll {
+        WHEEL, DRAG, NONE
+    }
+
+    @Describe("buttons scrolled together: a strip (one line; by none: off) or a tree (linked nodes)")
+    record Group(String screen, @Describe(value = "", optional = true) GroupKind kind,
+                 @Describe(value = "its buttons' pictures, in order", optional = true) List<String> members,
+                 @Describe(value = "drag: a tree only", optional = true) GroupScroll by,
+                 @Describe(value = "wheel notches a scroll, negative down", optional = true) Integer notches)
+            implements Edit {
+    }
+
+    @Describe("a tree node's parents, whose lines lead to it")
+    record Link(String screen, String picture,
+                @Describe(value = "their pictures; none clears them", optional = true) List<String> after)
             implements Edit {
     }
 
     @Describe("a look of the screen that shows only while method holds")
-    record LookWhen(String screen, @Describe("the screen's look, by its name") String look,
+    record LookWhen(String screen, @Describe("the look's name") String look,
                     @Describe(value = "", optional = true) String method) implements Edit {
     }
 
-    @Describe("add a picture to what tells the screen apart: a marker (all show), or with absent true one it never "
-            + "shows; refused when another screen's shot shows the set too")
+    @Describe("add a marker (all show), or with absent true one the screen never shows where one like it does; "
+            + "refused when another screen's shot shows the set")
     record AddMarker(String screen, @Describe("a picture the bot has") String picture,
-                     @Describe(value = "true for a picture the screen never shows, where a screen like it does",
-                             optional = true) Boolean absent) implements Edit {
+                     @Describe(value = "", optional = true) Boolean absent) implements Edit {
     }
 
-    @Describe("take a picture off what tells the screen apart, a marker or one it never shows")
-    record RemoveMarker(String screen, @Describe("the picture, by its name") String picture) implements Edit {
+    @Describe("take a marker, or a picture it never shows, off the screen")
+    record RemoveMarker(String screen, String picture) implements Edit {
     }
 
-    @Describe("a screen the map lacks, named as the game shows it, opened by an input of screen (added untried)")
+    @Describe("a screen the map lacks, opened by an input of screen (added untried)")
     record NewScreen(String screen, String name,
                      @Describe(value = "", optional = true) String picture,
                      @Describe(value = "", optional = true) Integer scroll,
@@ -173,8 +187,8 @@ final class MapEdits {
     }
 
     static final List<AssistantTool<?>> TOOLS = List.of(
-            ToolTiming.actions("edit_map", "Fixes the bot's Screens by hand, as the 🗺 Screens window's menus do, "
-                    + "when try_input recorded something wrong or the game changed; nothing is clicked", Edit.class,
+            ToolTiming.actions("edit_map", "Fixes the bot's Screens by hand, as 🗺 Screens' menus do, when try_input "
+                    + "recorded something wrong or the game changed; clicks nothing", Edit.class,
                     MapEdits::edit));
 
     private MapEdits() {}
@@ -228,19 +242,22 @@ final class MapEdits {
                     field -> said(ScreenEdits.useAsBack(services, screen, field)));
             case InputWhen when -> onInput(when, graph, screen, on,
                     field -> said(ScreenEdits.setInputWhen(services, screen, field, method(when.method()))));
-            case InStrip strip -> said(stripped(context, screen, on, strip));
+            case Group group -> said(grouped(context, screen, on, group));
+            case Link link -> said(ScreenEdits.link(services, screen, on, link.picture(),
+                    link.after() == null ? List.of() : link.after()));
         };
     }
 
     /**
-     * {@code screen}'s strip of {@code strip}'s members, each one of its buttons' pictures, as the screen holds them
-     * (with the place each was cut at, which says where the strip runs); no notches takes the strips holding them
-     * off. Said in a sentence, beginning {@link ScreenEdits#NOT_WRITTEN} when nothing was. On the FX thread.
+     * {@code screen}'s strip or tree of {@code group}'s members, each one of its buttons' pictures, as the screen
+     * holds them (with the place each was cut at); a strip by none takes the strips holding them off (a tree goes by
+     * remove_input on its field).
+     * Said in a sentence, beginning {@link ScreenEdits#NOT_WRITTEN} when nothing was. On the FX thread.
      */
-    static String stripped(AgentContext context, String screen, MapScreen on, InStrip strip) {
-        List<String> names = strip.members() == null ? List.of()
-                : strip.members().stream().filter(MapEdits::has).map(String::strip).toList();
-        if (names.isEmpty()) return ScreenEdits.NOT_WRITTEN + "name the pictures of the buttons in the strip (members).";
+    static String grouped(AgentContext context, String screen, MapScreen on, Group group) {
+        List<String> names = group.members() == null ? List.of()
+                : group.members().stream().filter(MapEdits::has).map(String::strip).toList();
+        if (names.isEmpty()) return ScreenEdits.NOT_WRITTEN + "name the pictures of the buttons in it (members).";
         List<ImageTemplate> members = new ArrayList<>();
         for (String name : names) {
             Optional<ImageTemplate> member = on.inputs().values().stream()
@@ -252,8 +269,25 @@ final class MapEdits {
             }
             members.add(member.get());
         }
-        int notches = strip.notches() == null ? 0 : strip.notches();
-        return ScreenEdits.setStrip(context.services(), screen, null, Strip.of(Scroll.wheel(notches), members));
+        int notches = group.notches() == null ? 0 : group.notches();
+        GroupScroll scroll = group.by() != null ? group.by() : notches != 0 ? GroupScroll.WHEEL
+                : GroupScroll.NONE;
+        if (scroll == GroupScroll.WHEEL && notches == 0) {
+            return ScreenEdits.NOT_WRITTEN + "a wheel scroll turns by some notches: give notches.";
+        }
+        if (group.kind() == GroupKind.TREE) {
+            Tree tree = Tree.of(members.stream().map(Node::of).toList());
+            return ScreenEdits.setTree(context.services(), screen, null, switch (scroll) {
+                case DRAG -> tree.dragged();
+                case WHEEL -> tree.wheel(notches);
+                case NONE -> tree;
+            });
+        }
+        if (scroll == GroupScroll.DRAG) {
+            return ScreenEdits.NOT_WRITTEN + "a strip scrolls by the wheel here; one dragged is tried by its members.";
+        }
+        return ScreenEdits.setStrip(context.services(), screen, null,
+                Strip.of(Scroll.wheel(scroll == GroupScroll.NONE ? 0 : notches), members));
     }
 
     /**

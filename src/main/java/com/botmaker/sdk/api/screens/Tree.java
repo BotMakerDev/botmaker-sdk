@@ -180,6 +180,18 @@ public record Tree(List<Node> nodes, boolean isDragged, int notches, boolean isT
         return List.of();
     }
 
+    /**
+     * The ids of the nodes no chain of offsets joins to its first node, in order: a walk from a node in view cannot
+     * bring them into view.
+     */
+    public List<String> unplaced() {
+        List<ImageTemplate> members = members();
+        if (members.isEmpty() || members.getFirst() == null) return List.of();
+        Set<String> first = Set.of(members.getFirst().id());
+        return members.stream().skip(1).filter(p -> p != null && path(first, p.id()).isEmpty())
+                .map(ImageTemplate::id).toList();
+    }
+
     @Override
     public String label() {
         return "tree " + (nodes.isEmpty() || nodes.getFirst().picture() == null ? "?"

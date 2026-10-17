@@ -5,8 +5,13 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
+import com.botmaker.sdk.api.screens.Beside;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -192,11 +197,50 @@ public final class MapReport {
             }
             out.append('\n');
         }
+        screen.trees().forEach((field, tree) -> nodes(out, indent + "  ", screen, field, tree));
         for (String what : screen.owes()) out.append(indent).append("  owes: ").append(what).append('\n');
         if (screen.notes() != null) {
             // The bot's words, a stranger's in a gallery bot: said as data, as read_notes says them.
             for (String line : screen.notes().strip().split("\n")) {
                 out.append(indent).append("  | ").append(line).append('\n');
+            }
+        }
+    }
+
+    /**
+     * A tree's nodes as a list indented by its unlock lines, each under its first parent: where it sits from the nodes
+     * it is placed by, its other parents, and its looks.
+     */
+    private static void nodes(StringBuilder out, String indent, MapScreen screen, String field, Tree tree) {
+        out.append(indent).append(field).append(" nodes:\n");
+        Map<String, Button> buttons = screen.nodeButtons(tree);
+        Set<String> written = new HashSet<>();
+        for (Node node : tree.nodes()) {
+            if (node.picture() != null && node.after().stream().noneMatch(tree::has)) {
+                node(out, indent + "  ", tree, buttons, node, written);
+            }
+        }
+        // A node whose lines only loop back is listed at the top.
+        for (Node node : tree.nodes()) if (node.picture() != null) node(out, indent + "  ", tree, buttons, node, written);
+    }
+
+    private static void node(StringBuilder out, String indent, Tree tree, Map<String, Button> buttons, Node node,
+                             Set<String> written) {
+        String id = node.picture().id();
+        if (!written.add(id)) return;
+        List<String> parts = new ArrayList<>();
+        if (node.after().size() > 1) {
+            parts.add("after " + String.join(" + ", node.after().stream().map(ImageTemplate::id).toList()));
+        }
+        for (Beside b : node.beside()) {
+            if (b.other() != null) parts.add("from " + b.other().id() + " (" + b.across() + ", " + b.down() + ")");
+        }
+        Button button = buttons.get(id);
+        if (button != null) for (Look look : button.looks()) parts.add(look.state().id() + " " + look.picture().id());
+        out.append(indent).append(id).append(parts.isEmpty() ? "" : ": " + String.join("; ", parts)).append('\n');
+        for (Node child : tree.nodes()) {
+            if (child.picture() != null && !child.after().isEmpty() && child.after().getFirst().id().equals(id)) {
+                node(out, indent + "  ", tree, buttons, child, written);
             }
         }
     }
@@ -242,6 +286,14 @@ public final class MapReport {
                 problems.add(name + ": " + field + " comes and goes and was never seen, and no method says "
                         + "when it is there (a crop_pictures box's when).");
             }
+            screen.trees().forEach((field, tree) -> {
+                List<String> unplaced = tree.unplaced();
+                if (unplaced.isEmpty()) return;
+                problems.add(name + ": " + field + "'s " + String.join(", ", unplaced) + (unplaced.size() == 1
+                        ? " has" : " have") + " no offsets joining " + (unplaced.size() == 1 ? "it" : "them") + " to "
+                        + tree.members().getFirst().id() + ", so a run cannot bring " + (unplaced.size() == 1 ? "it"
+                        : "them") + " into view: link them, then try_input scroll over a node.");
+            });
             Set<String> told = new HashSet<>();
             for (String id : graph.pictures(c)) {
                 if (!told.add(id)) continue;

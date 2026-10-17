@@ -35,6 +35,7 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -1646,14 +1647,14 @@ class SdkAssistTest {
         assertEquals(List.of("gem", "key_q", "keyW"), fields("HOME"));
     }
 
-    /** edit_map in_strip: a strip named by the screen's buttons in it, scrolled over a member that shows. */
+    /** edit_map group: a strip named by the screen's buttons in it, scrolled over a member that shows. */
     @Test
     void editMapMakesAStripOfTheScreensButtons() throws IOException {
         for (String name : List.of("tavern", "campaign", "mail")) TemplateLibrary.saveTemplate(resources, patch(), name);
         put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("ore")), Button.of(picture("tavern")),
                 Button.of(picture("campaign")), Button.of(picture("mail")), Hotkey.of(Key.named("Q").orElseThrow())));
 
-        AgentReply listed = run("edit_map", "screen", "Home", "action", "in_strip", "members",
+        AgentReply listed = run("edit_map", "screen", "Home", "action", "group", "members",
                 List.of("tavern", "campaign"), "notches", -5);
         assertFalse(listed.isRefused(), text(listed));
         assertEquals(1, screen("HOME").strips().size());
@@ -1663,13 +1664,49 @@ class SdkAssistTest {
         assertEquals(List.of("tavern", "campaign", "mail", "key_q", "tavernStrip"), fields("HOME"),
                 "a field of its own, named after its first member");
 
-        assertTrue(text(run("edit_map", "screen", "Home", "action", "in_strip", "members", List.of("gem"),
+        assertTrue(text(run("edit_map", "screen", "Home", "action", "group", "members", List.of("gem"),
                 "notches", -5)).startsWith(ScreenEdits.NOT_WRITTEN), "a member is one of the screen's buttons");
-        run("edit_map", "screen", "Home", "action", "in_strip", "members", List.of("campaign", "mail"), "notches", -3);
+        run("edit_map", "screen", "Home", "action", "group", "members", List.of("campaign", "mail"), "notches", -3);
         assertEquals(List.of("campaign", "mail"), screen("HOME").strips().values().iterator().next().members().stream()
                 .map(ImageTemplate::id).toList(), "a strip holding a member is replaced");
-        run("edit_map", "screen", "Home", "action", "in_strip", "members", List.of("mail"));
+        run("edit_map", "screen", "Home", "action", "group", "members", List.of("mail"));
         assertEquals(Map.of(), screen("HOME").strips(), "no notches: the strip is off");
+    }
+
+    /** edit_map group kind tree, then link: a tree of the screen's buttons and the lines between its nodes. */
+    @Test
+    void editMapMakesATreeOfTheScreensButtonsAndLinksItsNodes() throws IOException {
+        for (String name : List.of("damage", "health", "speed")) TemplateLibrary.saveTemplate(resources, patch(), name);
+        put("TREE", MapFixtures.screen(Setup.named("Tree").markers(marks("ore")), Button.of(picture("damage")),
+                Button.of(picture("health")), Button.of(picture("speed"))));
+        run("edit_map", "screen", "Tree", "action", "group", "members", List.of("health", "speed"), "notches", -2);
+        assertEquals(1, screen("TREE").strips().size());
+
+        AgentReply grouped = run("edit_map", "screen", "Tree", "action", "group", "kind", "tree", "members",
+                List.of("damage", "health", "speed"), "by", "drag");
+        assertFalse(grouped.isRefused(), text(grouped));
+        assertEquals(Map.of(), screen("TREE").strips(), "a button is in one strip or one tree");
+        Tree tree = screen("TREE").trees().get("damageTree");
+        assertTrue(tree.isDragged());
+        assertEquals(List.of("damage", "health", "speed"), tree.members().stream().map(ImageTemplate::id).toList());
+
+        AgentReply linked = run("edit_map", "screen", "Tree", "action", "link", "picture", "health", "after",
+                List.of("damage"));
+        assertFalse(linked.isRefused(), text(linked));
+        assertEquals(List.of("damage"), screen("TREE").trees().get("damageTree").node(picture("health")).orElseThrow()
+                .after().stream().map(ImageTemplate::id).toList());
+        assertTrue(run("edit_map", "screen", "Tree", "action", "link", "picture", "ore", "after", List.of("damage"))
+                .isRefused(), "a picture in no tree");
+        assertTrue(run("edit_map", "screen", "Tree", "action", "link", "picture", "health", "after", List.of("ore"))
+                .isRefused(), "a parent in no tree");
+
+        run("edit_map", "screen", "Tree", "action", "group", "kind", "tree", "members", List.of("damage", "health"),
+                "by", "wheel", "notches", -3);
+        Tree regrouped = screen("TREE").trees().get("damageTree");
+        assertEquals(-3, regrouped.notches());
+        assertFalse(regrouped.isDragged());
+        assertEquals(List.of("damage"), regrouped.node(picture("health")).orElseThrow().after().stream()
+                .map(ImageTemplate::id).toList(), "a node kept keeps its lines");
     }
 
     private static ImageTemplate picture(String name) {

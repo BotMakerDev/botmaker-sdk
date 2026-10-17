@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
@@ -127,6 +128,10 @@ public final class ScreenEdits {
                 now = now.withoutInput(held.getKey());
             }
         }
+        // A button is in one strip or one tree.
+        for (Map.Entry<String, Tree> held : screen.trees().entrySet()) {
+            if (strip.members().stream().anyMatch(held.getValue()::has)) now = now.withoutInput(held.getKey());
+        }
         if (off) return now;
         // The strip it replaces keeps its field and what it says of its members: only its members and scroll change,
         // and a scroll not measured that goes the same way keeps what Discovery measured of the old one.
@@ -142,6 +147,98 @@ public final class ScreenEdits {
         boolean same = had != null && had.notches() == now.notches() && had.drag() == now.drag()
                 && had.px() == now.px() && had.time().equals(now.time());
         return unmeasured && same ? had : now;
+    }
+
+    /**
+     * Makes {@code tree} one of {@code constant}'s trees, as its field {@code field} (null: a new one named from its
+     * first node), in place of every strip or tree that holds one of its nodes; a tree of no nodes takes those off,
+     * their buttons looked for at their places.
+     */
+    public static String setTree(StudioServices services, String constant, String field, Tree tree) {
+        String names = tree.members().stream().map(ImageTemplate::id).collect(Collectors.joining(", "));
+        String scrolled = tree.isDragged() ? "dragged" : tree.notches() != 0 ? "scrolled by the wheel"
+                : "fitting on the screen";
+        return said(ScreenBook.update(services, constant, s -> withTree(s, field, tree)),
+                tree.nodes().isEmpty() ? "The tree is off " + constant + ": its buttons are looked for at their places."
+                        : constant + " has a tree of " + names + ", " + scrolled + ". Link its nodes (edit_map link), "
+                        + "then try_input scroll over one of them to measure where each sits.");
+    }
+
+    /**
+     * {@code screen} without any strip or tree holding one of {@code tree}'s nodes, and {@code tree} last unless it has
+     * none. The tree it replaces keeps its field and traits, and each node it had keeps its lines and offsets to nodes
+     * still in it; only how it scrolls is {@code tree}'s.
+     */
+    static MapScreen withTree(MapScreen screen, String field, Tree tree) {
+        MapScreen now = screen;
+        Tree had = null;
+        String hadField = null;
+        // Each node any tree it leaves had, with its lines and offsets: the first tree's wins.
+        Map<String, Node> kept = new LinkedHashMap<>();
+        for (Map.Entry<String, Input> held : screen.inputs().entrySet()) {
+            boolean holds = switch (held.getValue()) {
+                case Strip s -> tree.members().stream().anyMatch(s::has);
+                case Tree t -> held.getKey().equals(field) || tree.members().stream().anyMatch(t::has);
+                default -> false;
+            };
+            if (!holds) continue;
+            if (held.getValue() instanceof Tree t) {
+                if (had == null) {
+                    had = t;
+                    hadField = held.getKey();
+                }
+                for (Node n : t.nodes()) if (n.picture() != null) kept.putIfAbsent(n.picture().id(), n);
+            }
+            now = now.withoutInput(held.getKey());
+        }
+        if (tree.nodes().isEmpty()) return now;
+        Tree made = tree.nodes(tree.nodes().stream()
+                .map(n -> n.picture() == null ? n : kept.getOrDefault(n.picture().id(), n)).toList());
+        if (had != null) {
+            made = new Tree(made.nodes(), tree.isDragged(), tree.notches(), had.isTried(), had.isLeaving(),
+                    had.isInfo(), had.never(), had.comesAndGoes(), had.lock(), had.when());
+        }
+        for (String gone : kept.keySet()) {
+            if (made.members().stream().noneMatch(p -> p != null && p.id().equals(gone))) made = made.without(gone);
+        }
+        String name = hadField != null ? hadField : field != null && !now.inputs().containsKey(field) ? field
+                : now.fieldFor((tree.members().isEmpty() ? "" : tree.members().getFirst().id()) + " tree");
+        return now.withInput(name, made);
+    }
+
+    /**
+     * Records that the lines of {@code parents} lead to {@code node}, each a node of the same tree of {@code on}
+     * ({@code constant}): they unlock it. No parent clears its lines. By picture id, any case.
+     */
+    public static String link(StudioServices services, String constant, MapScreen on, String node,
+                              List<String> parents) {
+        Optional<Map.Entry<String, Tree>> held = on.trees().entrySet().stream()
+                .filter(e -> idOf(e.getValue(), node).isPresent()).findFirst();
+        if (held.isEmpty()) {
+            return NOT_WRITTEN + node + " is no node of a tree of " + on.name() + ": edit_map group it first.";
+        }
+        Tree tree = held.get().getValue();
+        ImageTemplate child = idOf(tree, node).orElseThrow();
+        List<ImageTemplate> after = new ArrayList<>();
+        for (String parent : parents) {
+            Optional<ImageTemplate> found = idOf(tree, parent);
+            if (found.isEmpty()) return NOT_WRITTEN + parent + " is no node of " + held.get().getKey() + ".";
+            if (found.get().id().equals(child.id())) return NOT_WRITTEN + node + " cannot unlock itself.";
+            if (!after.contains(found.get())) after.add(found.get());
+        }
+        List<Node> nodes = tree.nodes().stream()
+                .map(n -> n.picture() != null && n.picture().id().equals(child.id()) ? n.after(after) : n).toList();
+        String done = after.isEmpty() ? child.id() + " has no lines leading to it."
+                : child.id() + " is unlocked by " + after.stream().map(ImageTemplate::id)
+                .collect(Collectors.joining(", ")) + ".";
+        return said(ScreenBook.update(services, constant, s -> s.withInput(held.get().getKey(), tree.nodes(nodes))),
+                done);
+    }
+
+    /** The picture of {@code tree}'s node named {@code id}, any case. */
+    private static Optional<ImageTemplate> idOf(Tree tree, String id) {
+        String typed = id == null ? "" : id.strip();
+        return tree.members().stream().filter(p -> p != null && p.id().equalsIgnoreCase(typed)).findFirst();
     }
 
     /**

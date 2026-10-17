@@ -31,6 +31,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   one of them to the node, and drags or scrolls the view there. Each move is at most 80 % of the frame, and the next
   look plans again, so an overshoot is corrected. When the node is not reached, the press is `ABSENT` and says why:
   no node in view, no chain of offsets, the view stopped moving, or the node is not where its offsets put it.
+- **Discovery maps a tree.** `edit_map group` (kind `tree`, by `drag`, `wheel` or `none`) makes the screen's buttons
+  a tree, and `edit_map link` records which nodes unlock a node. `try_input` with `scroll` over a node (or the tree's
+  field) measures every linked pair in view, moves the view once, and measures the pairs the move split; it writes
+  each offset. `read_map` lists a tree's nodes by their lines, with their offsets and looks, and names the nodes no
+  offset places. `crop_pictures` takes `state: locked`, `done` or `busy` for a node's look.
 - **A button's look can say locked, finished or busy.** `State` gains `LOCKED`, `DONE` and `BUSY`. A button showing
   one is never pressed, as a disabled one is. `Navigate.press` reports `Pressed.Result.LOCKED`, `FINISHED` or `BUSY`,
   and `Pick.untilNone()` stops on it.
@@ -367,6 +372,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **`edit_map in_strip` is `edit_map group`.** A strip is `group` with kind `strip` (the default) and its notches.
 - **`Screens.java` lists its screens one line each.** A line shows the screen's marker, name, how far Discovery got
   and *Open in 🗺*; its ▸ (or a click on the name) opens the shot, the way back, the looks, each input, the debts and
   the notes. A screen opened stays open across edits until Studio closes; a new one starts shut.

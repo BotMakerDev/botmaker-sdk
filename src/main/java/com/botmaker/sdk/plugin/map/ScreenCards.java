@@ -310,7 +310,9 @@ final class ScreenCards {
         String traits = switch (input) {
             case Button button -> button.cycles() ? "cycling" : button.repeats() ? "repeated" : "";
             case com.botmaker.sdk.api.screens.Strip strip -> strip.scroll() == null ? "" : scrolled(strip.scroll());
-            case Tree tree -> tree.isDragged() ? "dragged" : tree.notches() != 0 ? "wheel " + tree.notches() : "";
+            case Tree tree -> (tree.isDragged() ? "dragged, " : tree.notches() != 0 ? "wheel " + tree.notches() + ", "
+                    : "") + tree.nodes().size() + " nodes" + (tree.unplaced().isEmpty() ? ""
+                    : ", " + tree.unplaced().size() + " not placed");
             case Hotkey ignored -> "";
         };
         return new Row(field, input, field, picture(input), state, result, kind, look,

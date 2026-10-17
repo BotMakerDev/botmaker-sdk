@@ -1,10 +1,13 @@
 package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -148,5 +151,27 @@ class MapReportTest {
         screens.put("LOST", screen(Setup.named("Lost").markers(marks("home")).from(ref("NOWHERE", "tavern"))));
         List<String> problems = MapReport.problems(ScreenGraph.of(screens), NAMED::contains, id -> true, "LOST");
         assertEquals(List.of("Lost: no way from Home reaches it, so a run cannot go there."), problems);
+    }
+
+    @Test
+    void aTreesNodesAreListedByTheirLinesAndANodeNoOffsetPlacesIsSaid() {
+        Map<String, MapScreen> screens = screens();
+        Tree tree = Tree.of(List.of(Node.of(picture("damage")),
+                Node.of(picture("health")).after(List.of(picture("damage")))
+                        .beside(List.of(Beside.of(picture("damage"), 1.2, -0.6))),
+                Node.of(picture("speed")).after(List.of(picture("health"))))).dragged();
+        screens.put("RESEARCH", screen(Setup.named("Research").markers(marks("research")).from(ref("HOME", "tavern")),
+                click("damage"), click("health").looks(List.of(Look.of(picture("health_max"), State.DONE))),
+                click("speed"), tree));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        String text = MapReport.text(graph, Map.of(), id -> true, id -> true, id -> true, "RESEARCH");
+        assertTrue(text.contains("  damage_tree nodes:\n"
+                + "    damage\n"
+                + "      health: from damage (1.2, -0.6); done health_max\n"
+                + "        speed\n"), text);
+        assertEquals(List.of("Research: damage_tree's speed has no offsets joining it to damage, so a run cannot "
+                + "bring it into view: link them, then try_input scroll over a node."),
+                MapReport.problems(graph, id -> true, id -> true, "RESEARCH"));
     }
 }

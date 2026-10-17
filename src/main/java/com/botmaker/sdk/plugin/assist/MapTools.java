@@ -75,7 +75,8 @@ final class MapTools {
             + "(beerBuy)", optional = true)
                 String picture,
                 @Describe(value = "notches to scroll over the picture instead of clicking it, for a list or a panel "
-                        + "that scrolls: positive up or away, negative down or toward you", optional = true)
+                        + "that scrolls: positive up or away, negative down or toward you; over a tree node, measures "
+                        + "the tree", optional = true)
                 Integer scroll,
                 @Describe(value = "which copy of a picture the screen shows more than once, from 1 in reading order: "
                         + "the button is noted as repeated; left out, its best match", optional = true)
@@ -265,8 +266,18 @@ final class MapTools {
             case Strip strip -> strip.members().isEmpty() ? input : input.named(shownMember(strip, context),
                     input.scroll() != null || strip.scroll() == null ? input.scroll() : strip.scroll().notches(), null);
             case Hotkey hotkey -> hotkey.key() == null ? input : input.named(null, null, hotkey.key().label());
-            case Tree ignored -> input;
+            // A tree scrolled over by its field is scrolled over a node that shows.
+            case Tree tree -> tree.members().isEmpty() || input.scroll() == null ? input
+                    : input.named(shownNode(tree, context), input.scroll(), null);
         }).orElse(input);
+    }
+
+    /** The node of {@code tree} a fresh look shows, else its first. */
+    private static String shownNode(Tree tree, AgentContext context) {
+        Optional<BufferedImage> frame = Frames.look(context);
+        return tree.members().stream().map(ImageTemplate::id)
+                .filter(id -> frame.isPresent() && ActTools.shows(context, id, frame.get()))
+                .findFirst().orElse(tree.members().getFirst().id());
     }
 
     /**
@@ -363,6 +374,15 @@ final class MapTools {
         Optional<AgentReply> away = notOn(context, graph, screen);
         // Left on a screen below it, finished with nothing to try (a rules panel): walked back to it first.
         if (away.isPresent() && !walkedTo(context, graph, screen, input.desktop())) return Tried.left(away.get());
+        // A scroll over a node of a tree measures where its nodes sit, and moves its view once.
+        Optional<Map.Entry<String, Tree>> tree = notches == 0 ? Optional.empty() : on.trees().entrySet().stream()
+                .filter(e -> e.getValue().members().stream().anyMatch(p -> p != null && p.id().equalsIgnoreCase(what)))
+                .findFirst();
+        if (tree.isPresent()) {
+            Tree measured = tree.get().getValue();
+            return new Tried(TreeMeasure.tried(context, screen, name, tree.get().getKey(), measured,
+                    on.nodeButtons(measured), notches, input.desktop()), true);
+        }
         // The field the input is, or a new one named from what it acts on.
         String field = held.orElseGet(() -> on.fieldFor(byPicture ? what : "key " + key.get().label()));
         Input made = made(services, held.map(on.inputs()::get), what, key.orElse(null), notches);

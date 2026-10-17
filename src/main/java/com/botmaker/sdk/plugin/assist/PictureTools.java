@@ -214,7 +214,7 @@ final class PictureTools {
                @Describe(value = "the input this is another look of, by its picture: the same button with a badge, "
                        + "greyed out or picked. It stays one input; with state", optional = true)
                String variantOf,
-               @Describe(value = "with variantOf, what the look means: badge, disabled (never pressed) or selected",
+               @Describe(value = "with variantOf, what the look means (disabled, locked, done, busy: never pressed)",
                        optional = true)
                State state,
                @Describe(value = "for an input that comes and goes, the bot's or a plugin's method saying when it is "
@@ -560,7 +560,8 @@ final class PictureTools {
                         + "one; popup goes with marker set or add.");
             }
             if (c.variantOf() != null && (c.state() == null || c.state() == State.NORMAL)) {
-                return Optional.of(c.name() + ": say what the look means, state: badge, disabled or selected.");
+                return Optional.of(c.name() + ": say what the look means, state: badge, selected, disabled, locked, "
+                        + "done or busy.");
             }
         }
         return Optional.empty();
@@ -637,8 +638,8 @@ final class PictureTools {
                     + "goes with marker set or add.");
         }
         if (variantOf != null && (state.isEmpty() || state.get() == State.NORMAL)) {
-            return AgentReply.refused("Say what the look means, state: badge, disabled or selected. Nothing was "
-                    + "saved.");
+            return AgentReply.refused("Say what the look means, state: badge, selected, disabled, locked, done or "
+                    + "busy. Nothing was saved.");
         }
         if (when != null && !METHOD_REFERENCE.matcher(when).matches()) {
             return AgentReply.refused("when is a method reference, Firestone::eventOn: put an expression in a "
