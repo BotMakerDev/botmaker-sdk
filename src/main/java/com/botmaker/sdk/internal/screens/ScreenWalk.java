@@ -150,7 +150,11 @@ public final class ScreenWalk {
                 return shownTop(both);
             }
         }
-        return shownTop(shown(told, frame));
+        Optional<String> anywhere = shownTop(shown(told, frame));
+        if (anywhere.isPresent() || close.isEmpty()) return anywhere;
+        // None shows where its markers were cut: a window of another shape moves the UI pinned to its edges. The
+        // screens one step away are looked for over the whole frame, never every screen: that took 11 s a poll.
+        return shownTop(shown(told.stream().filter(close::contains).toList(), frame, false));
     }
 
     /**
@@ -379,8 +383,14 @@ public final class ScreenWalk {
                     return new Press(led ? Pressed.Result.DONE : Pressed.Result.LEFT, landed.orElse(null), times,
                             name + " led to " + landed.map(graph::shown).orElse("no screen of the map") + ".");
                 }
-                // Still here though the map says it leads away: a click lost to lag is pressed once more.
-                if (most == 1 && !leads.isEmpty() && !retried) {
+                // Still here though the map says it leads away: a click lost to lag is pressed once more, and a second
+                // stay is not what the map says (Firestone's mission pin opened a view the map lacked, 2026-10-17).
+                if (most == 1 && !leads.isEmpty() && !leads.contains(constant)) {
+                    if (retried) {
+                        return new Press(Pressed.Result.LEFT, constant, times, name + " left the game on "
+                                + graph.shown(constant) + " twice, though the map says it leads to "
+                                + String.join(", ", leads.stream().map(graph::shown).toList()) + ".");
+                    }
                     retried = true;
                     i--;
                 }
@@ -718,8 +728,13 @@ public final class ScreenWalk {
 
     /** Those of {@code constants} whose markers are on {@code frame}, in their order, all looked for on that frame. */
     private List<String> shown(List<String> constants, BufferedImage frame) {
+        return shown(constants, frame, true);
+    }
+
+    /** The same, each marker looked for over the whole frame unless {@code near}. */
+    private List<String> shown(List<String> constants, BufferedImage frame, boolean near) {
         List<Boolean> on = Markers.onEach(reach,
-                constants.stream().map(c -> Markers.of(graph.screens().get(c))).toList(), frame);
+                constants.stream().map(c -> Markers.of(graph.screens().get(c))).toList(), frame, near);
         List<String> shown = new ArrayList<>();
         for (int i = 0; i < constants.size(); i++) if (on.get(i)) shown.add(constants.get(i));
         return shown;

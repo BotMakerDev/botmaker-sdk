@@ -29,7 +29,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **`Navigate.to / isOn / where / press / state`** (palette, Interaction) are the bot's calls. `press(Screens.X.field[,
   Pick])` walks to the input's screen, scrolls its strip, clicks the copy, closes popups and waits where the map says
   it leads (`ScreenWalk.press`); its `Pressed.result()` is DONE, DISABLED, ABSENT, NOT_NOW or LEFT, its `landed()` the
-  screen after. `Pick.untilNone()` presses until the button is gone or disabled (at most 50). `state(button)` is how
+  screen after. A press that leaves the game on its screen though the map says it leads away is pressed once more
+  (lag); a second stay is LEFT. `Pick.untilNone()` presses until the button is gone or disabled (at most 50). `state(button)` is how
   it looks now, nothing walked or scrolled.
 
 ## The graph and the walk (`internal/screens`)
@@ -45,7 +46,10 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   last. Popups are never gone to.
 - **`ScreenWalk`** finds where the game is (`whereOn`: a screen opened from another, by any way in, hides it; of two
   shown that neither hides, the one told by more markers wins; the screens one step from where the game was first,
-  every screen only when none of them shows; markers looked for near their cut place, `Reach.findEachNear`) and
+  every screen only when none of them shows; markers looked for near their cut place, `Reach.findEachNear`, the
+  place and `MARKER_MARGIN` both scaled from the cut frame; when no screen shows near, the screens one step away
+  over the whole frame, a window of another shape having moved the UI pinned to its edges — never every screen,
+  which took 11 s a poll) and
   walks one edge at a time: do the input, wait up to `STEP_MS` (10 s) for the next marker, close a popup that
   shows, plan again from where a stray step landed. A way back is done once the left screen's marker is gone,
   wherever it lands. Ends: ARRIVED, NOT_NOW, LOCKED, MISSING (the map names a picture the game no longer shows:

@@ -305,6 +305,19 @@ class ScreenWalkTest {
         assertEquals(List.of("click campaign", "click campaign"), game.done);
     }
 
+    /** Still on its screen after the second press, though the map says it leads away: not what the map says. */
+    @Test
+    void aPressThatStaysTwiceLeftTheMap() {
+        Game game = new Game("HOME");
+        game.deaf = 2;
+
+        ScreenWalk.Press press = new ScreenWalk(game.map, game, STEP_MS, null).press("HOME", "campaign", null);
+
+        assertEquals(Pressed.Result.LEFT, press.result(), press.toString());
+        assertEquals("HOME", press.at());
+        assertEquals(List.of("click campaign", "click campaign"), game.done, "pressed twice, never a third time");
+    }
+
     /** A way through a copy is the copy pressed by its place along its order, whatever the pick's mode. */
     @Test
     void aWaysCopyIsTheOnePressedByPlaceAndOrder() {
@@ -808,6 +821,36 @@ class ScreenWalkTest {
         assertEquals(Optional.of("DIALOG"),
                 new ScreenWalk(map, new Shows("dialog_title"), STEP_MS, null).whereOn(frame, "DIALOG"),
                 "no close button: both match, and the screen it was last on is looked at first");
+    }
+
+    /**
+     * A window of another shape shows its titles away from where they were cut: none shows near, so the screens one
+     * step from where the game was are looked for over the whole frame; with nothing known, no screen is.
+     */
+    @Test
+    void noScreenShownNearLooksForTheNearbyOnesOverTheWholeFrame() {
+        List<String> wide = new ArrayList<>();
+        Reach moved = new Shows("window_title") {
+            @Override
+            public List<Optional<Rect>> findEachNear(List<ImageTemplate> pictures, BufferedImage frame) {
+                return pictures.stream().map(p -> Optional.<Rect>empty()).toList();
+            }
+
+            @Override
+            public List<Optional<Rect>> findEach(List<ImageTemplate> pictures, BufferedImage frame) {
+                pictures.forEach(p -> wide.add(p.id()));
+                return super.findEach(pictures, frame);
+            }
+        };
+        BufferedImage frame = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+        ScreenWalk walk = new ScreenWalk(tabs(), moved, STEP_MS, null);
+
+        assertEquals(Optional.of("WINDOW"), walk.whereOn(frame, "HOME"));
+        assertTrue(wide.contains("window_title"), "looked for over the whole frame: " + wide);
+        wide.clear();
+        assertEquals(Optional.empty(), walk.whereOn(frame, null));
+        assertEquals(List.of("close_x"), wide, "with no screen known, only the absent picture is looked for over the "
+                + "whole frame, as always; no marker is");
     }
 
     @Test

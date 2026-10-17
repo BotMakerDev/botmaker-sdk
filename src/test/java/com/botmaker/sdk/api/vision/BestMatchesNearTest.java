@@ -112,6 +112,18 @@ class BestMatchesNearTest {
         }
     }
 
+    /** The margin is a share of the frame too: 40 cut pixels off is 80 on a frame twice as wide, still within 48. */
+    @Test
+    void itsMarginIsScaledToTheFrame(@TempDir Path dir) throws IOException {
+        try (ImageTemplate atItsPlace = saved(dir).at(new Rect(300, 200, SIZE, SIZE)).in(new Size(640, 400))) {
+            MatchResult near = ImageFinder.bestMatchesNear(List.of(atItsPlace), 48,
+                    still(frame(1280, 800, patch(), 680, 400, 2))).getFirst();
+
+            assertTrue(Math.abs(near.topLeft().x() - 680) <= 2, "found at " + near.topLeft());
+            assertTrue(near.confidence() > 0.8, "scored " + near.confidence());
+        }
+    }
+
     @Test
     void aPictureHeldInMemoryMatchesAsItsSavedFileWould(@TempDir Path dir) throws IOException {
         CaptureSource source = still(frame(640, 400, patch(), 300, 200, 1));

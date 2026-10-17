@@ -120,7 +120,8 @@ public class ImageFinder {
 
     /**
      * {@link #bestMatches}, each picture that says where it was cut ({@link ImageTemplate#at}) looked for only
-     * within {@code margin} pixels of that place, scaled to the frame; one that does not is looked for everywhere.
+     * within {@code margin} pixels of that place, both counted in the frame it was cut from and scaled to this one
+     * (a margin of 60 on a 1600-wide cut is 120 on a 3200-wide frame); one that does not is looked for everywhere.
      * For the assistant's list of what an action left on screen: a picture's own corner costs a fraction of the
      * whole frame, and a picture away from its place is not listed.
      */
@@ -205,8 +206,9 @@ public class ImageFinder {
 
     /**
      * Where {@code template} is looked for in a {@code width}×{@code height} frame: its place, scaled from the frame
-     * it was cut from to this one, grown by {@code margin} on each side; null for the whole frame (no place, or
-     * {@link #EVERYWHERE}). The matcher clips it to the frame.
+     * it was cut from to this one, grown by {@code margin} on each side, scaled the same way: a share of the frame,
+     * so a bigger window keeps the same slack; null for the whole frame (no place, or {@link #EVERYWHERE}). The
+     * matcher clips it to the frame.
      */
     private static Rectangle near(ImageTemplate template, int margin, int width, int height) {
         Rect place = template.place();
@@ -214,10 +216,10 @@ public class ImageFinder {
         Dimension cut = template.authoredSize();
         double sx = cut == null ? 1 : width / (double) cut.width;
         double sy = cut == null ? 1 : height / (double) cut.height;
-        int left = (int) Math.floor(place.x() * sx) - margin;
-        int top = (int) Math.floor(place.y() * sy) - margin;
-        int right = (int) Math.ceil((place.x() + place.width()) * sx) + margin;
-        int bottom = (int) Math.ceil((place.y() + place.height()) * sy) + margin;
+        int left = (int) Math.floor((place.x() - margin) * sx);
+        int top = (int) Math.floor((place.y() - margin) * sy);
+        int right = (int) Math.ceil((place.x() + place.width() + margin) * sx);
+        int bottom = (int) Math.ceil((place.y() + place.height() + margin) * sy);
         return new Rectangle(left, top, right - left, bottom - top);
     }
 

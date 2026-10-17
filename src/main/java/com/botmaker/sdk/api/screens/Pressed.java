@@ -21,7 +21,10 @@ public record Pressed(Result result, Screen landed, int times) {
         ABSENT,
         /** Its screen could not be reached now, or it is locked or its method says no: nothing was pressed. */
         NOT_NOW,
-        /** Pressed, and the game showed another screen than its own or where the map says it leads, or none. */
+        /**
+         * Pressed, and the game showed another screen than its own or where the map says it leads, or none; or it
+         * stayed on its own after a second press, though the map says it leads away.
+         */
         LEFT
     }
 

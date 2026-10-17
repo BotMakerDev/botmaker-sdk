@@ -84,13 +84,24 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent) {
      * ({@link Reach#findEachNear}); an absent picture anywhere, as one shown elsewhere still tells the screens apart.
      */
     public static List<Boolean> onEach(Reach reach, List<Markers> sets, BufferedImage frame) {
+        return onEach(reach, sets, frame, true);
+    }
+
+    /**
+     * {@link #onEach}, each marker looked for over the whole frame unless {@code near}: a window whose shape changed
+     * since the cut (its UI pinned to the edges) shows its titles away from their places. The whole frame costs many
+     * times more, so it is the fallback when no set shows near.
+     */
+    public static List<Boolean> onEach(Reach reach, List<Markers> sets, BufferedImage frame, boolean near) {
         Map<String, ImageTemplate> markers = new LinkedHashMap<>();
         Map<String, ImageTemplate> absents = new LinkedHashMap<>();
         for (Markers set : sets) {
             for (ImageTemplate p : set.shown) markers.putIfAbsent(p.id(), p);
             for (ImageTemplate p : set.absent) absents.putIfAbsent(p.id(), p);
         }
-        Map<String, Boolean> shownNear = seen(markers, reach.findEachNear(List.copyOf(markers.values()), frame));
+        List<ImageTemplate> looked = List.copyOf(markers.values());
+        Map<String, Boolean> shownNear = seen(markers,
+                near ? reach.findEachNear(looked, frame) : reach.findEach(looked, frame));
         Map<String, Boolean> anywhere = absents.isEmpty() ? Map.of()
                 : seen(absents, reach.findEach(List.copyOf(absents.values()), frame));
         return sets.stream().map(set -> set.any()

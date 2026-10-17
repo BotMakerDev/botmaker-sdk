@@ -578,6 +578,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **A screen is found in a window of another size or shape.** A marker's slack round where it was cut now grows
+  with the window, as its place does. When no screen shows where its markers were cut, the screens one step away
+  are looked for over the whole window.
+- **`Navigate.press` says LEFT when the game stays put twice.** A press the map says leads away, pressed twice with
+  the game still on its screen, no longer reports DONE.
 - **`Screens.java` opened slowly on a big map.** Each screen's card read the whole map twice, so a map of 45
   screens took over 30 s to open. Every card drawn in one go now shares one read (about 0.5 s on Firestone), and
   the shots and thumbnails load in the background. Moving to another screen in the open file reads nothing again.

@@ -407,7 +407,7 @@ final class LookTools {
     record Scored(String name, MatchResult match) {
     }
 
-    /** How far from where it was cut {@link #scoresNear} looks for a picture, in the frame's pixels. */
+    /** How far from where it was cut {@link #scoresNear} looks for a picture, in the cut frame's pixels. */
     static final int NEAR = 48;
 
     /**

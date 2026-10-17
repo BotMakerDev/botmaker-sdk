@@ -78,7 +78,10 @@ public interface Reach {
         return findEach(pictures, frame).stream().map(at -> at.map(place -> new Found(place, 1))).toList();
     }
 
-    /** How far from its cut place a marker is looked for, in the frame's pixels: a title moves a few pixels at most. */
+    /**
+     * How far from its cut place a marker is looked for, in the pixels of the frame it was cut from, scaled with the
+     * frame: a title moves a few pixels at most.
+     */
     int MARKER_MARGIN = 60;
 
     /**
