@@ -50,7 +50,8 @@ final class MapGuide {
 
     private static final List<Section> SECTIONS = List.of(
             new Section("The toolbar", List.of(
-                    new Entry("Find a screen…", null, "Picks the first screen whose name or constant has the words."),
+                    new Entry("Find a screen…", null, "Lists the screens whose name, constant, inputs, pictures or "
+                            + "notes have the words; ↑ ↓ and Enter or a click zooms to one, Esc fits the map again."),
                     new Entry("Other ways", null, OTHER_WAYS + "."),
                     new Entry("− Fit +", null, FIT + "; the wheel zooms about the pointer, a right drag pans."),
                     new Entry("↶ ↷", null, "Undo and redo, in Studio's own history (Ctrl+Z, Ctrl+Y): a map edit "

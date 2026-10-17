@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.overlay.OverlayToolContext;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.plugin.toolkit.graph.GraphCanvas;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenStep;
 import com.botmaker.sdk.plugin.HistoryKeys;
@@ -60,6 +61,8 @@ public final class ScreenMap {
     static final Duration POLL = Duration.seconds(1.5);
     /** The polls after which the map is read again even with {@code Screens.java} unchanged, about 30 s. */
     private static final int READ_ANYWAY = 20;
+    /** A search hit's marker. */
+    private static final double HIT_THUMB = 26;
 
     /** The window open on each project, by its folder. On the FX thread. */
     private static final Map<Path, ScreenMap> OPEN = new HashMap<>();
@@ -390,8 +393,22 @@ public final class ScreenMap {
         }));
     }
 
+    /** A search hit's row: the screen's marker and name, and what matched when that was not its name. */
+    private Node hitRow(GraphCanvas.Hit<Card> hit) {
+        Label name = new Label(hit.node().name());
+        HBox row = new HBox(8, canvas.thumb(hit.node().marker(), HIT_THUMB, "screen-row-thumb"), name);
+        row.setAlignment(Pos.CENTER_LEFT);
+        if (!hit.matched().isEmpty()) {
+            Label matched = new Label(hit.matched());
+            matched.getStyleClass().add("screen-panel-path");
+            row.getChildren().add(matched);
+        }
+        return row;
+    }
+
     private Node toolbar(boolean full) {
-        TextField search = canvas.graph().searchField(card -> card.name() + " " + card.constant());
+        // Found by more than its name, read off the map the canvas draws: a hit picked zooms to its card.
+        TextField search = canvas.graph().searchField(card -> ScreenCards.terms(graph, card.constant()), this::hitRow);
         search.setPromptText("Find a screen…");
         search.setPrefColumnCount(full ? 16 : 10);
         CheckBox others = new CheckBox("Other ways");

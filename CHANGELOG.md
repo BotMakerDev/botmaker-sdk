@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Screens finds a screen by more than its name.** *Find a screen…* lists the screens whose name, constant,
+  input fields, pictures or notes hold the words. Each row shows the marker and the name, and what matched when it
+  was not the name (`input beerBuy`). ↑ ↓ and Enter, or a click, zoom the map to that screen at a readable size.
+  Esc fits the map again. The overlay editor's map has the same field.
+
 - **`Navigate.press`: a body presses the map's inputs.** `Navigate.press(Screens.MARKET.beerBuy, Pick.untilNone())`
   walks to the input's screen when the game is elsewhere, scrolls its strip to it, clicks the copy the `Pick` names,
   closes popups and waits where the map says it leads. It returns `Pressed`: `result()` is `DONE`, `DISABLED`,

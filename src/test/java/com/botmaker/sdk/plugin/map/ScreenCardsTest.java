@@ -90,6 +90,20 @@ class ScreenCardsTest {
     }
 
     @Test
+    void aScreenIsFoundByItsNameConstantInputsPicturesAndNotes() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("MARKET", screen(Setup.named("Market").notes("  Beer restocks at noon. "), click("beer_buy"),
+                Strip.of(Scroll.wheel(-5), List.of(picture("stall_a"), picture("stall_b"))), Hotkey.of(Key.M)));
+        assertEquals(List.of("Market", "MARKET", "input beer_buy", "input stall_a_strip", "input key_m",
+                        "picture beer_buy", "picture stall_a", "picture stall_b", "notes Beer restocks at noon."),
+                ScreenCards.terms(ScreenGraph.of(screens), "MARKET"));
+        assertEquals(List.of("Home", "HOME", "input campaign", "input engineer", "input gold", "input key_m",
+                        "input arena", "input event", "picture campaign", "picture engineer", "picture gold",
+                        "picture arena", "picture event"),
+                ScreenCards.terms(map(), "HOME"), "a key has no picture, a screen with no notes no notes term");
+    }
+
+    @Test
     void aScreenBehindALockOrAnInputThatComesAndGoesIsDrawnDashed() {
         assertTrue(card("ARENA").conditional());
         assertEquals(ScreenGraph.Presence.LOCKED, card("ARENA").presence());

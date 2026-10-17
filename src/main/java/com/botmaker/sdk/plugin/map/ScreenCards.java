@@ -240,6 +240,28 @@ final class ScreenCards {
         return names;
     }
 
+    /**
+     * What 🗺's search finds {@code constant} by, its name first: its constant, each input's field, each picture an
+     * input acts on, and its notes. Each but the name says what it is, as the hit shows it ({@code input beerBuy}).
+     */
+    static List<String> terms(ScreenGraph graph, String constant) {
+        List<String> terms = new ArrayList<>(List.of(graph.shown(constant), constant));
+        MapScreen screen = graph.screens().get(constant);
+        if (screen == null) return terms;
+        for (String field : graph.fields(constant)) terms.add("input " + field);
+        for (Input input : screen.inputs().values()) {
+            switch (input) {
+                case Button button when button.picture() != null -> terms.add("picture " + button.picture().id());
+                case com.botmaker.sdk.api.screens.Strip strip -> {
+                    for (ImageTemplate member : strip.members()) terms.add("picture " + member.id());
+                }
+                default -> {}
+            }
+        }
+        if (screen.notes() != null && !screen.notes().isBlank()) terms.add("notes " + screen.notes().strip());
+        return terms;
+    }
+
     /** {@code constant}'s inputs as the side panel lists them, in the order its class declares them. */
     static List<Row> rows(ScreenGraph graph, String constant) {
         List<Row> rows = new ArrayList<>();
